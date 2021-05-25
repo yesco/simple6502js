@@ -9,6 +9,16 @@
 // ("C") 2021 Jonas S Karlsson
 //
 //       jsk.org
+
+
+
+
+// WARNING: It doesn't generate the correct instructions yet!
+
+
+// TODO: compare with op-mnc-mod.lst
+
+
 function CPU6502() { // generates one instance
 
 // registers & memory
