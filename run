@@ -1,0 +1,1 @@
+perl gen.pl  > fil.js && node fil.js
