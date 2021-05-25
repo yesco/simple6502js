@@ -25,13 +25,13 @@ There are functions exported by the CPU6502 function that generates an CPU simul
 # TODO
 
 Possible TODO:s
-[ ] make it a real node module
-[ ] add cycle count
-[ ] optimize for performance (no switch)
-[ ] write a STXZX style dis/assembler
-[ ] utility file to read a binary program with location either from filename or as arguemnt
-[ ] generate a C variant?
-[ ] ... please add
+- [ ] make it a real node module
+- [ ] add cycle count
+- [ ] optimize for performance (no switch)
+- [ ] write a STXZX style dis/assembler
+- [ ] utility file to read a binary program with location either from filename or as arguemnt
+- [ ] generate a C variant?
+- [ ] ... please add
 
 ## speed
 
