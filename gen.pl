@@ -653,5 +653,19 @@ if (0) {
   console.log("STACK:");
   dump(0x200-16, 2);
 }
+
+// speedtest BRK lol
+if (1) {
+  cpu.reg('pc', 0);
+
+  let start = Date.now();
+  let n = 1000000;
+
+    cpu.run(n, 0);
+
+  let ms = Date.now() - start;
+  console.log(n, ms, Math.round(1000*n/ms), 'instructions/s');
+}
+
 DEBUGGER
 

@@ -146,7 +146,7 @@ function run(count= -1, trace= 0) {
 }
 
 return cpu= {
-  run, flags:ps, tracer, hex,
+  run, flags, tracer, hex,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
@@ -271,3 +271,18 @@ console.log('state= ', cpu.state());
 console.log(cpu.run(10, 1));
 dump(0);
 }
+
+
+// speedtest BRK lol
+if (1) {
+  cpu.reg('pc', 0);
+
+  let start = Date.now();
+  let n = 1000000;
+
+    cpu.run(n, 0);
+
+  let ms = Date.now() - start;
+  console.log(n, ms, Math.round(1000*n/ms), 'instructions/s');
+}
+

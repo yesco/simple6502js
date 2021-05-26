@@ -383,11 +383,13 @@ function parse(f) {
   let [nocomm]     = comments(f);
   let [noconst]    = constants(nocomm);
   let [nodef, def] = macros(noconst)
-  let [nomac]      = substNames(nodef);
-  let [hox,on,labs]= count(nomac, byter)
-  let [hax]        = substNames(labs);
-  let [hcx]        = calcExpr(hax)
-  let [hex,nn]     = count(hcx, error);
+  let [nomac]        = [nodef]
+//  let [nomac]      = substNames(nodef);
+  let [hox,on,labs,funs
+                   ]= count(nomac, byter)
+//  let [hax]        = substNames(labs);
+//  let [hcx]        = calcExpr(hax)
+//  let [hex,nn]     = count(hcx, error);
 
   if (nn != n)
     throw "Byte count changed! new=" + nn + " old=" + on;
@@ -628,11 +630,10 @@ function comments(f) {
 }
 
 function macros(f) {
-  // extract '=' alias
-  let alias = {};
+  let mac = {};
   f = f.replace(/=\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
     // call last fun defined
-    alias[f] = l.trim();;
+    mac[f] = l.trim();;
 
     // keep newlines! (for error reporting....)
     return a.replace(/[^\n]/g, '');
@@ -646,58 +647,96 @@ function macros(f) {
   let lastf;
   do {
     lastf = f;
-    Object.keys(alias).sort().reverse().forEach(
-      n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
+    Object.keys(mac).sort().reverse().forEach(
+      n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), mac[n]));
   } while (f !== lastf);
 
   return f;
 }
 
 // extract functions (in order!)
+//   label:    label   - will be resolved
+//   : fun     fun     - will be resolved
 function count(f) {
+  let labels = {}, funs = {};
+  let start, addr, len = 0;
   const valids = [
-    [/^[0-9a-f]{4}:/i, 0], // set address
-
+    [/^([0-9a-f]{4}):/i, 0, // set address
+     function(lab){
+       addr = parseInt(lab, 16);
+       return 0;
+     }],
     [/^[0-9a-f]{4}/i, 2], // hex xxxx(+...)
-    [/^[0-9a-f]{2}/i, 1], // hex xxxx(+
+    [/^[0-9a-f]{2}/i, 1], // hex xxxx(+   )
 
-    [/^[a-z_]\w+:$/i, 0], // label define
-    [/^[a-z_]\w+$/i, 2],  // label
-
-    [/^:[a-z_]\w+$/i, 0], // func define
-    [/^[a-z_]\w+$/i, 3],  // func call
-
+    [/^[a-z_]\w+:$/i, 0, // label define
+     function(nam) {
+       label[nam] = a;
+     }],
+    [/^:[a-z_]\w+$/i, 0, // func define
+     function(nam) {
+       funs[nam] = a;
+     }],
+    // we don't know if label or funcall!
+    [/^[a-z_]\w+$/i, undefined, // label or func?
+     function(nam) {
+       if (labels[nam]) return 2;
+       if (funs[name]) return 3;
+       // shouldn't end up here...
+       throw "%% ERROR.parse.count: no such label or func: "+nam;
+     }),
     [/^\*/, 1], // relative address
     [/^\&/, 2], // address of name func
     [/^\^/, 1], // hi 1 byte
     [/^\_/, 1], // lo 1 byte
   ];
 
-  let nbytes = 0;
-  // first format all address set to same format
-  f = '\n'+f;
+  f = '\n' + f; // TODO: will confuse line count!
+
+  // zeroth: format all address set to same format
   f = f.replace(/\n([0-9a-f]{4}):?/g, (a,xxxx)=>xxxx+':');
+
+  // first identify labels
+  f.replace(/\n([a-z_]\w+):/ig, function(a,nam) {
+    if (nam.match(/^[0-9a-z]+$/ig)) return a; // hex
+
+    labels[nam] = -1;
+    return a;
+  });
+
+  // second funs
+  f.replace(/\n:([a-z_]\w+)\s/ig, function(a,nam) {
+    if (nam.match(/^[0-9a-z]{4}$/ig)) // hex
+      throw "%% ERROR.parse.count: func cannot also be valid hex address: "+nam;
+    if (label[nam]) throw "Already defined label:"+nam;
+    funs[nam] = -1;
+    return a;
+  });
 
   // for each space delimited value count bytes
   // NOT CHANGING IT
+  let nbytes = 0;
+
   f.replace(/(\S+)/g, (a, tok)=>{
-    let [r, n] = valid.find((x)=>{
-      return tok.match(x[0]);
+
+    // find the matching expression
+    let [r, n, fix] = valids.find((x)=>{
+      return tok.match(x[0]); // t/f
     }) || [];
 
-    console.log('Count: ', tok, r, nbytes);
+    // if have fix it to address!
+    if (fix) n = fix(tok.match(x[0]))
 
-    if (r) {
-      nbytes += n;
-    } else {
-      console.log('Count.Error: no match: '+tok);
-    }
-
-    // TOOD: remove, for debug: tok/bytes
-    return t + '/' + n;;
+    nbytes += n;
+    console.log('Count: ', tok, n, nbytes);
   });
 
-  return [f, nbytes];
+  return [f, nbytes, labels, funs];
+}
+
+if (testing) {
+  f = '1234:  00 1a 2b 3d 7777 42 foobar ';
+  console.log(count, f, '+++++++++++++++++++++>', count(f));
 }
 
 function funcs(f) {
@@ -764,12 +803,12 @@ function admin(f) {
   }
 }
 
-function dumpNames(names) {
+function dumpNames(macs, funs) {
   // dump aliases and functions/labels
-  Object.keys(alias).sort().forEach(n=>{
+  Object.keys(macs.sort().forEach(n=>{
     console.log("A: ", n.padEnd(16),
-		' = ', alias[n]);
-  })
+		' = ', macs);
+  }));
 
   Object.keys(deffun).sort().forEach(n=>{
     if (typeof deffun[n] === 'number') {
