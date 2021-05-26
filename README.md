@@ -14,7 +14,7 @@ Features:
 
 ## How to use
 
-   ./run
+    ./run
 
 Runs gen.pl generating file fil.js and runs node on it. If you haven't changed the gen.pl it'll generated the same as simple6502.js.
 
