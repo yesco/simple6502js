@@ -27,6 +27,7 @@
 00 brk
 10 bpl imm
 50 bvc imm
+80 bra imm
 90 bcc imm
 D0 bne imm
 30 bmi imm
@@ -56,6 +57,7 @@ C6 dec zp
 CE dec abs
 D6 dec zpx
 DE dec absx
+3A dea_a
 CA dex
 88 dey
 41 eor zpxi
@@ -71,6 +73,7 @@ E6 inc zp
 EE inc abs
 F6 inc zpx
 FE inc absx
+1A inc_a_
 E8 inx
 C8 iny
 4C jmp abs
@@ -96,7 +99,7 @@ AC ldy abs
 B4 ldy zpx
 BC ldy absx
 46 lsr zp
-4A lsr
+4A lsr_a
 4E lsr abs
 56 lsr zpx
 5E lsr absx
@@ -112,15 +115,19 @@ EA nop
 1D ora absx
 08 php
 48 pha
+DA phx
+5A phy
 28 plp
 68 pla
+FA plx
+7A ply
 26 rol zp
-2A rol
+2A rol_a
 2E rol abs
 36 rol zpx
 3E rol absx
 66 ror zp
-6A ror
+6A ror_a
 6E ror abs
 76 ror zpx
 7E ror absx
@@ -152,6 +159,14 @@ F8 sed
 84 sty zp
 8C sty abs
 94 sty zpx
+64 stz zp
+74 stz zpx
+9C stz abs
+9E stz absx
+14 trb zp
+1C trb abs
+04 tsb zp
+0C trb abs
 8A txa
 98 tya
 9A txs

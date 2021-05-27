@@ -53,6 +53,8 @@ function label(name) {
 //  flush();
 }
 
+let L = label, ORG = addr;
+
 // label -> [addr]
 let backpatch = {};
 
@@ -166,6 +168,9 @@ function rel(name) {
   })(address)); // capture current addr
 }
 
+////////////////////////////////////////
+//        6502 INSTRUCTIONS
+//
 //  xxx mmm cc = generic structure
 //  ----------
 //                           (v--- indirect)
@@ -174,27 +179,55 @@ function rel(name) {
 //  xxx mmm 10 = ASL ROL LSR ROR  STX LDX DEC INC
 let ops = [];
 
+
+// 24 bytes of bits to test if op is valid
+//let valids = new Uint8Array(24);
+const valids = [0x55,0xFF,0x5D,0x5D,0x7E,0xFF,0x5F,0x5F,0xFF,0xFF,0xFF,0xFF,0xFB,0xFF,0xFF,0xFF,0xBA,0xBE,0xBE,0xBE,0x7E,0xFF,0xBE,0xBE];
+
+function valid(op) {
+  let cc = op & 3;
+  if (cc == 3) return; // not valid
+  let i = (cc << 6) | (op >> 2);
+  return valids[i>>3] & (1<< (i&7));
+}
+
+function setvalid(op) {
+  let cc = op & 3;
+  if (cc == 3) return; // not valid
+  let i = (cc << 6) | (op >> 2);
+  valids[i>>3] |= (1<< (i&7));
+}
+
 mgen('---BITJMPJMPSTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC');
-const mds=['#/ZX','Z','/#','A','IY','XI','Y','X'];
 function mgen(names, valids) {
-  const modes = ['imm/zpx', 'zp', 'acc/imm', 'abs', 'zpy', 'zpx', 'absy', 'absx'];
+  const modes = [['imm', 'zpxi'], 'zp', ['---','imm'], 'abs', 'zpiy', 'zpx', 'absy', 'absx'];
+  const mds=[['# ','XI'],'Z ',['--', '# '],'A ','IY','ZX','AY','AX'];
   // TODO: restrict gen depending on mode
-  for(let c=0; c<4; c++) {
+  for(let c=0; c<3; c++) {
     for(let i=0; i<8; i++) {
       for(let m=0; m<8; m++) {
 	let op = (i<<5) | (m<<2) | c;
-	let mnc = names.substr(3*((c << 3) | i), 3);
-	if (mnc === '---') continue;
-	let name = mnc + modes[m];
-	if (!mnc) continue;
-	console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
-	if (!mnc) console.log(hex(2,op), '_', 'NO NAME!');
+	if (!valid(op)) continue;
+	let io = (c << 3) | i;
+	let mnc = names.substr(3*io, 3);
+	//if (mnc === '---') continue;
+	let mode = mds[m], mleg = modes[m];
+	// use mode[2] to test for string! lol
+	// it's either 'foo' or ['foo', 'bar']...
+	mode = typeof mode=='string' ? mode : mode[c&1];
+	mleg = typeof mleg=='string' ? mleg : mleg[c&1];
+
+	let name = mnc + mode;
+	console.log(hex(2,op), i,m,c, mnc, 3*io, names.length, mode, mleg, name, '=');
+
+	//if (!mnc) continue;
+	//console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
 	let [b,cyc] = modebc(op);
 	if (b==1) f = Function(`data(${op})`);
 	if (b==2) f = Function('v','f',`data(${op}); byte(v, f)`);
 	if (b==3) f = Function('v','f',`data(${op}); word(v, f)`);
 	f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
-	f.SAN = name; f.mode = modes[m];
+	f.SAN = name; f.mode = mleg;
 	ops[op] = global[name] = f;
       }
     }
@@ -202,23 +235,23 @@ function mgen(names, valids) {
 }
 
 //  0xx 000 00 = call&stack       BRK JSR RTI RTS
-gen('BRKJSRRTITRS', 0x00, [1,3,1,1], [7,6,6,6]);
+gen('BRKJSRRTIRTS', 0x00, [1,3,1,1], [7,6,6,6]);
 //  0xx 010 00 = stack            PHP PLP PHA PLA
 //  1xx 010 00 = v--transfers--> *DEY TAY INY INX
 gen('PHPPLPPHAPLADEYTAYINYINX', 0x08, 1, [3,2,4,2,3,2,4,2]);
 //  xx0 110 00 = magic flags =0   CLC CLI*TYA CLD
-//  xx1 110 00 = magic flags =1   SEC SEI --- SED
-gen('CLCSECCLISEITYA---CLDSED', 0x18);
+//  xx1 110 00 = magic flags =1   SEC SEI CLV SED
+gen('CLCSECCLISEITYACLVCLDSED', 0x18);
 //  1xx x10 10 = TXA TXS TAX TSX  DEX --- NOP ---
 dgen(0x10,'TXATXSTAXTSXDEX---NOP---', 0x8a);
 function dgen(delta, s, base) {
   if (!delta) throw "Delta can't be zero";
   let op = base;
   let i = 0;
-  while (op < 255) {
+  while (op <= 255) {
     let mnc = s.substr(i*3, 3);
     //if (!mnc) return;
-    if (mnc !== '---') {
+    if (mnc && mnc !== '---') {
       let [b,cyc] = bytcyc(op);
       console.log('DGEN', '-', hex(2,op), mnc);
       let f = Function(`data(${op})`);
@@ -368,44 +401,44 @@ function BNE(name) { data(0xd0); rel(name)};
 function RTS() { data(0x60)};
 ////////////////////////////////////////
 
-addr(0x0501);
+ORG(0x0501);
         LDAN(3);
         LDAN(3, (v)=>v*v);
         LDAN(3);
 
-label('foo');
+L('foo');
         LDAN('foo', lo);
         LDAN('foo', hi);
         LDAN('bar', hi); // forward!
         LDAN('bar', (v)=>hi(v)*hi(v)); // delaye
 
-label('bar');
+L('bar');
         LDAN(0xbe);
         LDAN(0xef);
 
-label('fish');
+L('fish');
         LDAN(0xff);
 
-label('string');
+L('string');
         string("ABC");
 
-label('sverige');
+L('sverige');
         string("Svörigä");
 
-label('char');
+L('char');
         char('j');
         char('ö');
-label('copy');
+L('copy');
         char('©');
 
-label('here');
+L('here');
 	BNE('here');
 	LDAN(0x42);
 	BNE('there');
 	RTS()
-label('there');
+L('there');
 	RTS()
-label('end');
+L('end');
 
 console.log(current);
 
@@ -414,17 +447,56 @@ console.log(getHex(1,1,1));
 console.log(getHex(0,0,0));
 
 console.log('='.repeat(40));
+if (0)
 Object.keys(global).map(k=>{
   let f = global[k];
   if (!f.mnc) return;
   console.log(hex(2,f.op), '=', f.SAN, f.b, f.cyc, '(', k, ')');
 });
 
+// load "REFERENCE" real (some are 6502C)
+let fs = require('fs');
+// Real!
+let rops = "\n"+fs.readFileSync('op-mnc-mod.lst');
+rops.replace(/\n(..) (\w+)( (\w+))?/g,(a,op,n,_,m)=>{
+  op = parseInt(op, 16);
+  let f = ops[op] = ops[op] || function MISSING(){};
+  f.op = op; f.rn = n; f.rm = m;
+  setvalid(op);
+});
+
 console.log('-'.repeat(40));
 ops.map((f,i)=>{
   //if (!f.mnc) return;
-  console.log(hex(2,i), (f.mnc || '???').toLowerCase(), f.mode,  f.SAN, f.b, f.cyc, '_');
+  let m;
+  console.log(
+    hex(2,i),
+    (f.rn || '---'), m=(f.rm || '---'), '\t',
+    (f.rn == f.mnc.toLowerCase()) ? '=' : '.',
+    (m == f.mode) ? '=' : '.',
+    (f.mnc || '???').toLowerCase(), f.mode, '\t',
+    f.SAN, '\t', f.b, f.cyc);
   if (i != f.op) 
     console.log(
       `   ==== OP? i=${i}, f.op=${f.op}\n`);
 });
+
+console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
+
+a=`// instructions that are irregular
+/ --------------------------------
+//? 12 ora zpi 	 . . asl zpiy 	 ASLIY 	 2 5
+//? 32 and zpi 	 . . rol zpiy 	 ROLIY 	 2 5
+//? 52 eor zpi 	 . . lsr zpiy 	 LSRIY 	 2 5
+//? 72 adc zpi 	 . . ror zpiy 	 RORIY 	 2 5
+
+// 20 jsr abs 	 = . jsr --- 	 JSR 	 3 6
+// 6C jmpi abs 	 . = jmp abs 	 JMPA  	 3 4
+
+// == zpx => zpy (if mnc[2]=='y'
+// 96 stx zpy 	 = . stx zpx 	 STXZX 	 2 4
+// B6 ldx zpy 	 = . ldx zpx 	 LDXZX 	 2 4
+
+// === absx => absy because LDX = 'x'
+// BE ldx absy 	 = . ldx absx 	 LDXAX 	 3 4
+`;
