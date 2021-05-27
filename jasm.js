@@ -166,6 +166,201 @@ function rel(name) {
   })(address)); // capture current addr
 }
 
+//  xxx mmm cc = generic structure
+//  ----------
+//                           (v--- indirect)
+//  xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
+//  xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
+//  xxx mmm 10 = ASL ROL LSR ROR  STX LDX DEC INC
+let ops = [];
+
+mgen('---BITJMPJMPSTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC');
+const mds=['#/ZX','Z','/#','A','IY','XI','Y','X'];
+function mgen(names, valids) {
+  const modes = ['imm/zpx', 'zp', 'acc/imm', 'abs', 'zpy', 'zpx', 'absy', 'absx'];
+  // TODO: restrict gen depending on mode
+  for(let c=0; c<4; c++) {
+    for(let i=0; i<8; i++) {
+      for(let m=0; m<8; m++) {
+	let op = (i<<5) | (m<<2) | c;
+	let mnc = names.substr(3*((c << 3) | i), 3);
+	if (mnc === '---') continue;
+	let name = mnc + modes[m];
+	if (!mnc) continue;
+	console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
+	if (!mnc) console.log(hex(2,op), '_', 'NO NAME!');
+	let [b,cyc] = modebc(op);
+	if (b==1) f = Function(`data(${op})`);
+	if (b==2) f = Function('v','f',`data(${op}); byte(v, f)`);
+	if (b==3) f = Function('v','f',`data(${op}); word(v, f)`);
+	f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
+	f.SAN = name; f.mode = modes[m];
+	ops[op] = global[name] = f;
+      }
+    }
+  }
+}
+
+//  0xx 000 00 = call&stack       BRK JSR RTI RTS
+gen('BRKJSRRTITRS', 0x00, [1,3,1,1], [7,6,6,6]);
+//  0xx 010 00 = stack            PHP PLP PHA PLA
+//  1xx 010 00 = v--transfers--> *DEY TAY INY INX
+gen('PHPPLPPHAPLADEYTAYINYINX', 0x08, 1, [3,2,4,2,3,2,4,2]);
+//  xx0 110 00 = magic flags =0   CLC CLI*TYA CLD
+//  xx1 110 00 = magic flags =1   SEC SEI --- SED
+gen('CLCSECCLISEITYA---CLDSED', 0x18);
+//  1xx x10 10 = TXA TXS TAX TSX  DEX --- NOP ---
+dgen(0x10,'TXATXSTAXTSXDEX---NOP---', 0x8a);
+function dgen(delta, s, base) {
+  if (!delta) throw "Delta can't be zero";
+  let op = base;
+  let i = 0;
+  while (op < 255) {
+    let mnc = s.substr(i*3, 3);
+    //if (!mnc) return;
+    if (mnc !== '---') {
+      let [b,cyc] = bytcyc(op);
+      console.log('DGEN', '-', hex(2,op), mnc);
+      let f = Function(`data(${op})`);
+      f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
+      f.SAN = mnc; f.mode = '---';
+      ops[op] = global[mnc] = f;
+    }
+    op += delta;
+    i++;
+  }
+}
+
+function gen(s, base) {
+  dgen(1 << 5, s, base);
+}
+
+//  ffv 100 00 = branch instructions:
+//  ff0 100 00 = if flag == 0     BPL BVC BCC BNE
+//  ff1 100 00 = if flag == 1     BMI BVS BCS BEQ
+//  00v 100 00 = Negative flag   (BPL BMI)
+//  01v 100 00 = oVerflow flag   (BVC BVS)
+//  10v 100 00 = Carry flag      (BCC BCS)
+//  11v 100 00 = Zero flag       (BNE BEQ)
+gen('BPLBMIBVCBVSBCCBCSBNEBEQ', 0x10); // 3
+
+//          11 = not used  / (p = page cross)
+//modes summary:           | (RW = shift INC DEC)
+//  xxx mmm cc             | bytes cycles
+//  --- --- --              \----- ------
+
+//   !  000  0 = #immediate     2  2
+//   !  000  1 = (zero page,X)  2  6 (STA="xpy")
+
+//      001    = zero page      2  3 +2/RW
+
+//   !  010  0 = accumulator    1  2
+//   !  010  1 = #immediate     2  2
+
+//      011    = absolute       3  4 +2/RW JMP=3
+
+//      100    = (zero page),Y  2  5 +1/STA +1/p
+
+//      101    = zero page,X    2  4 +2/RW
+
+//      110    = absolute,Y     3 \4 +3/RW +1/STA
+
+//      111    = absolute,X     3 / +1/p
+//             JMP              3  3 JMP +2/JMPI
+//    branch instructions       2  2 +1/true +2/p
+//      stack: PHA/PHP          1  3 +1/PLA/PLP
+//             JSR RTS RTI      3  6 +1/BRK
+//  other implied instructions  1  2 
+
+
+// Calculate BYTES+CYCLES: (19+63 =82 bytes)
+// SIMPLE: no addresing modes (63 bytes)
+
+//(001 000 00  3 6    20jsr abs) NOT NOT NOT NOT
+// 0xx 000 00  1 6,7    brk/rti/rts (BUT JSR/abs!)
+
+// 0xx 010 00  1 3,4    PLx(3),PHx(4)
+// 0xx 010 10  1 2      ROL/ROT/ on A
+// xxx 010 x0  1 2      ***
+// xxx x10 00  1 2      ***
+
+// xxx 100 00  2 2,3    Bxx (imm) NOT? mmm=2bytes
+
+function bytcyc(op) {
+//
+//  (A contains op)
+//  TAY (backup)
+	
+//         x1           IS NOT SIMPLE!
+//     xx1              IS NOT SIMPLE!
+//
+// xxx xx0 x0    maybe    SIMPLE!
+  if (op & 0x05) return modebc(op);
+
+  // maybe SIMPLE
+  // after weeding out:
+  // 000 000 00     00    brk 
+  if (!op) // BRK
+    return [1, 7]
+
+  // 001 000 00     20    jsr abs
+  // if ((001 000 00 == 0x20     JSR-MODE (jsr ABS)
+  if (op == 0x20)  // JSR
+    return [3, 6];
+
+  // 010 000 00     40    rti 
+  // 011 000 00     60    rts 
+  if (op == 0x40 || op == 0x60) // RTI RTS
+    return [1,6];
+
+  // xxx 100 10     12    ***  zpi
+  if ((op & 0x1f) == 0x12)
+    return modebc(op);
+
+  // (100 000 00     80    bra imm)
+  // 101 000 00     A0    ldy imm
+  // 110 000 00     C0    cpy imm
+  // 111 000 00     E0    cpx imm
+  // 101 000 10     A2    ldx imm
+  if ((op & 0x9f) == 0x80) // ???
+    return [2, 3];
+
+  // 000 010 00     08    php 
+  // 001 010 00     28    plp 
+  // 010 010 00     48    pha 
+  // 011 010 00     68    pla 
+  if ((op & 0x1f) == 0x08)
+    return [2, 3 + ((op & 0x20) ? 1 : 0)];
+
+  // 001 010 10     2A    rol_a  1 2
+  // 010 010 10     4A    lsr_a 
+  // 011 010 10     6A    ror_a 
+  
+  // 100 010 00     88    dey 
+  // 101 010 00     A8    tay 
+  // 110 010 00     C8    iny 
+  // 111 010 00     E8    inx 
+  
+  // 1xx 010 10     8A    txa    1 2
+  
+  // xxx 100 00     10    Bxx
+  // xxx 110 x0     18    ***
+  
+  // in principle we have all instructions
+  return [1, 2];
+}
+
+// lookup in table xx[mmm c] (16 bytes)
+function modebc(op) {
+  // 16 values * 2b/2pack = 16 bytes total
+  const byts = [2,2, 2,2, 1,2, 3,3,  2,2, 2,2, 3,3, 3,3];
+  const cycs = [2,6, 3,3, 2,2, 4,4,  5,5, 4,4, 4,4, 4,4];
+  
+  let i = ((op >> 1) | (op & 1)) & 0xf;
+  return [ byts[i], cycs[i] ];
+}
+
+
 function LDAN(v, f) { data(0xA9); byte(v, f)}
 
 function BNE(name) { data(0xd0); rel(name)};
@@ -174,34 +369,34 @@ function RTS() { data(0x60)};
 ////////////////////////////////////////
 
 addr(0x0501);
-	LDAN(3);
-	LDAN(3, (v)=>v*v);
-	LDAN(3);
+        LDAN(3);
+        LDAN(3, (v)=>v*v);
+        LDAN(3);
 
 label('foo');
-	LDAN('foo', lo);
-	LDAN('foo', hi);
-	LDAN('bar', hi); // forward!
-	LDAN('bar', (v)=>hi(v)*hi(v)); // delaye
+        LDAN('foo', lo);
+        LDAN('foo', hi);
+        LDAN('bar', hi); // forward!
+        LDAN('bar', (v)=>hi(v)*hi(v)); // delaye
 
 label('bar');
-	LDAN(0xbe);
-	LDAN(0xef);
+        LDAN(0xbe);
+        LDAN(0xef);
 
 label('fish');
-	LDAN(0xff);
+        LDAN(0xff);
 
 label('string');
-	string("ABC");
+        string("ABC");
 
 label('sverige');
-	string("Svörigä");
+        string("Svörigä");
 
 label('char');
-	char('j');
-	char('ö');
+        char('j');
+        char('ö');
 label('copy');
-	char('©');
+        char('©');
 
 label('here');
 	BNE('here');
@@ -218,3 +413,18 @@ console.log(getChunks());
 console.log(getHex(1,1,1));
 console.log(getHex(0,0,0));
 
+console.log('='.repeat(40));
+Object.keys(global).map(k=>{
+  let f = global[k];
+  if (!f.mnc) return;
+  console.log(hex(2,f.op), '=', f.SAN, f.b, f.cyc, '(', k, ')');
+});
+
+console.log('-'.repeat(40));
+ops.map((f,i)=>{
+  //if (!f.mnc) return;
+  console.log(hex(2,i), (f.mnc || '???').toLowerCase(), f.mode,  f.SAN, f.b, f.cyc, '_');
+  if (i != f.op) 
+    console.log(
+      `   ==== OP? i=${i}, f.op=${f.op}\n`);
+});
