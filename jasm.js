@@ -1,3 +1,14 @@
+// A 6502 assember "hosted" in JS!
+//
+//    (C) 2021 Jonas S Karlsson
+//          jsk@yesco.org
+// 
+
+//
+
+
+// Data is stored and output in chunks:
+//
 // [ [addr, label, byte, ...], ...]
 // NOTE: backpatching will "overwrite"
 // by generating overlapping chunks!
@@ -33,6 +44,17 @@ function data(...bytes) {
 
 let labels = {};
 
+function clear(all=0) {
+  address = start = 0; current = [];
+  curlab = '';
+  chunks = [];
+  // TOOD: clear labels?
+  if (all) {
+    labels = {};
+    backpatch = {};
+  }
+}
+
 function label(name) {
   if (labels[name]) throw `%% Label already defined: ${name}`;
 
@@ -53,7 +75,8 @@ function label(name) {
 //  flush();
 }
 
-let L = label, ORG = addr;
+function L(...args) { label(...args); }
+function ORG(...args) { addr(...args); }
 
 // label -> [addr]
 let backpatch = {};
@@ -196,9 +219,20 @@ function rel(name) {
 //   bytes/cyc         69 bytes (machine code)
 //   modes =  # Xi ... 22 bytes (zy)
 
+// --------------------------------
+// Irregular instructions... TODO?
+
+// 20 jsr abs 	 = . jsr --- 	 JSR 	 3 6
+// 6C jmpi abs 	 . = jmp abs 	 JMPA  	 3 4
+
+// == zpx => zpy (if mnc[2]=='y'
+// 96 stx zpy 	 = . stx zpx 	 STXZX 	 2 4
+// B6 ldx zpy 	 = . ldx zpx 	 LDXZX 	 2 4
+
+// === absx => absy because LDX = 'x'
+// BE ldx absy 	 = . ldx absx 	 LDXAX 	 3 4
 
 let ops = [];
-
 
 // 24 bytes of bits to test if op is valid
 // there are 151 opcodes valid in 6502.
@@ -223,7 +257,7 @@ function setvalid(op) {
 mgen('---BITJMPJMPSTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC');
 function mgen(names, valids) {
   const modes = [['imm', 'zpxi'], 'zp', ['---','imm'], 'abs', 'zpiy', 'zpx', 'absy', 'absx'];
-  const mds=[['# ','XI'],'Z ',['--', '# '],'A ','IY','ZX','AY','AX'];
+  const mds=[['N','XI'],'Z',['--', 'N'],'A','IY','ZX','AY','AX'];
   // TODO: restrict gen depending on mode
   for(let c=0; c<3; c++) {
     for(let i=0; i<8; i++) {
@@ -244,10 +278,11 @@ function mgen(names, valids) {
 
 	//if (!mnc) continue;
 	//console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
-	let [b,cyc] = modebc(op);
-	if (b==1) f = Function(`data(${op})`);
-	if (b==2) f = Function('v','f',`data(${op}); byte(v, f)`);
-	if (b==3) f = Function('v','f',`data(${op}); word(v, f)`);
+	let [b,cyc] = modebc(op),
+	    f = `j6502.data(0x${hex(2,op)});`;
+	if (b==1) f = Function(f);
+	if (b==2) f = Function('v','f', f+`j6502.byte(v, f)`);
+	if (b==3) f = Function('v','f', f+`j6502.word(v, f)`);
 	f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
 	f.SAN = name; f.mode = mleg;
 	ops[op] = global[name] = f;
@@ -275,8 +310,8 @@ function dgen(delta, s, base) {
     //if (!mnc) return;
     if (mnc && mnc !== '---') {
       let [b,cyc] = bytcyc(op);
-      console.log('DGEN', '-', hex(2,op), mnc);
-      let f = Function(`data(${op})`);
+      //console.log('DGEN', '-', hex(2,op), mnc);
+      let f = Function(`j6502.data(0x${hex(2,op)});`);
       f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
       f.SAN = mnc; f.mode = '---';
       ops[op] = global[mnc] = f;
@@ -285,9 +320,38 @@ function dgen(delta, s, base) {
     i++;
   }
 }
+{ // JSRA
+  let op = 0x20;
+  let f = `j6502.data(0x${hex(2,op)});`;
+  f = Function('v','f', f+`j6502.word(v, f)`);
 
+  // Make a function! lol
+  f.op= op; f.mnc= 'JSR'; f.b= 3; f.cyc= 6;
+  f.SAN = 'JSRA'; f.mode = 'abs';
+  ops[0x20] = global[f.SAN] = f;
+  global.JSR = undefined;
+}
+{ // JMPA   JMPAY  JMPIY  JMPN
+  // fixing
+  let f;
+  f = ops[0x6c] = global.JMPI = global.JMPA;
+  f.op= 0x6c; f.mnc= 'JMP'; f.b= 3; f.cyc=5;
+  f.SAN = 'JMPI'; f.mode = 'indirect';
+  
+  f = ops[0x4c] = global.JMPA =
+    Function('v,f', 'j6502.data(0x4c);j6502.word(v, f)');
+  f.op= 0x4c; f.mnc= 'JMPA'; f.b= 3; f.cyc=3;
+  f.SAN = 'JMPA'; f.mode = 'abs';
+
+  // they didn't  override any opcodes
+  delete global.JMPAY;
+  delete global.JMPIY;
+  delete global.JMPN;
+}
 function gen(s, base) {
   dgen(1 << 5, s, base);
+  ops[0x6c] = global['JMPI'] =
+  ops[0x4c] = global['JMPA'] = global['JMPA'];
 }
 
 //  ffv 100 00 = branch instructions:
@@ -415,58 +479,36 @@ function modebc(op) {
   return [ byts[i], cycs[i] ];
 }
 
+// Ok, let's do some sketch stuff!
+//
+// The Function created assembly instructions
+// are global, thus they can't access any other
+// functions than those in global object.
+// So, we add them. Which means we don't 
+// need to use the '.' notation when accessing
+// them.
 
-function LDAN(v, f) { data(0xA9); byte(v, f)}
+module.exports =
+  global.j6502 =
+  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel };
 
-function BNE(name) { data(0xd0); rel(name)};
+global.ORG = ORG;
+global.data = data;
+global.label = label; global.L = L;
+global.addr = addr; global.ORG = ORG;
+global.byte = byte;
+global.word = word;
+global.char = char;
+global.hex = hex;
+global.string = string;
+global.pascal = pascal;
+global.hibit = hibit;
+global.OMG = OMG;
+global.rel = rel;
+global.lo = lo;
+global.hi = hi;
 
-function RTS() { data(0x60)};
 ////////////////////////////////////////
-
-ORG(0x0501);
-        LDAN(3);
-        LDAN(3, (v)=>v*v);
-        LDAN(3);
-
-L('foo');
-        LDAN('foo', lo);
-        LDAN('foo', hi);
-        LDAN('bar', hi); // forward!
-        LDAN('bar', (v)=>hi(v)*hi(v)); // delaye
-
-L('bar');
-        LDAN(0xbe);
-        LDAN(0xef);
-
-L('fish');
-        LDAN(0xff);
-
-L('string');
-        string("ABC");
-
-L('sverige');
-        string("Svörigä");
-
-L('char');
-        char('j');
-        char('ö');
-L('copy');
-        char('©');
-
-L('here');
-	BNE('here');
-	LDAN(0x42);
-	BNE('there');
-	RTS()
-L('there');
-	RTS()
-L('end');
-
-console.log(current);
-
-console.log(getChunks());
-console.log(getHex(1,1,1));
-console.log(getHex(0,0,0));
 
 console.log('='.repeat(40));
 if (0)
@@ -505,20 +547,3 @@ ops.map((f,i)=>{
 
 console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
 
-a=`// instructions that are irregular
-/ --------------------------------
-//? 12 ora zpi 	 . . asl zpiy 	 ASLIY 	 2 5
-//? 32 and zpi 	 . . rol zpiy 	 ROLIY 	 2 5
-//? 52 eor zpi 	 . . lsr zpiy 	 LSRIY 	 2 5
-//? 72 adc zpi 	 . . ror zpiy 	 RORIY 	 2 5
-
-// 20 jsr abs 	 = . jsr --- 	 JSR 	 3 6
-// 6C jmpi abs 	 . = jmp abs 	 JMPA  	 3 4
-
-// == zpx => zpy (if mnc[2]=='y'
-// 96 stx zpy 	 = . stx zpx 	 STXZX 	 2 4
-// B6 ldx zpy 	 = . ldx zpx 	 LDXZX 	 2 4
-
-// === absx => absy because LDX = 'x'
-// BE ldx absy 	 = . ldx absx 	 LDXAX 	 3 4
-`;
