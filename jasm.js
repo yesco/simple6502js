@@ -177,12 +177,34 @@ function rel(name) {
 //  xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
 //  xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
 //  xxx mmm 10 = ASL ROL LSR ROR  STX LDX DEC INC
+
+// Functions needed
+//   dis:
+//     valid(op) -> true/false
+//     bytes(op) -> 1..3, can combine 0..3
+//     mnc(op) -> 'ABC' (offset) pack3
+//     mod(op) -> 'XI' (offset?) pack3 (?)
+//
+//   asm:
+//     op('ADCXI') => op (or FF ?)
+//     valid(op) === see above
+//     bytes(op) === see above
+//     
+// TABLES:
+//   mnemomics         
+//   valids (cc != 11) 24 bytes
+//   bytes/cyc         69 bytes (machine code)
+//   modes =  # Xi ... 22 bytes (zy)
+
+
 let ops = [];
 
 
 // 24 bytes of bits to test if op is valid
+// there are 151 opcodes valid in 6502.
+//
 //let valids = new Uint8Array(24);
-const valids = [0x55,0xFF,0x5D,0x5D,0x7E,0xFF,0x5F,0x5F,0xFF,0xFF,0xFF,0xFF,0xFB,0xFF,0xFF,0xFF,0xBA,0xBE,0xBE,0xBE,0x7E,0xFF,0xBE,0xBE];
+const valids = [0x55,0xDF,0x5D,0x5D,0x7E,0xFF,0x5F,0x5F,0xFF,0xFF,0xFF,0xFF,0xFB,0xFF,0xFF,0xFF,0xAA,0xAE,0xAE,0xAE,0x6E,0xEF,0xAE,0xAE];
 
 function valid(op) {
   let cc = op & 3;
@@ -472,7 +494,7 @@ ops.map((f,i)=>{
   console.log(
     hex(2,i),
     (f.rn || '---'), m=(f.rm || '---'), '\t',
-    (f.rn == f.mnc.toLowerCase()) ? '=' : '.',
+    (f.rn == (f.mnc || '').toLowerCase()) ? '=' : '.',
     (m == f.mode) ? '=' : '.',
     (f.mnc || '???').toLowerCase(), f.mode, '\t',
     f.SAN, '\t', f.b, f.cyc);
