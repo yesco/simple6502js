@@ -22,9 +22,9 @@
     'abs', 'w((pc+=2)-2)',
     'absx', 'w((pc+=2)-2) + x',
     'absy', 'w((pc+=2)-2) + y',
-    'zpi',  'w(m[pc++])', # 6502C?
-    'zpxi', 'w(m[pc++ + (x & 0xff)])',
-    'zpiy', 'w(m[pc++] + y)',
+    'zpi',  'wz(m[pc++])', # 6502C?
+    'zpxi', 'wz(m[pc++ + (x & 0xff)])',
+    'zpiy', 'wz(m[pc++] + y)',
 );
 
 # instructions to generated code
