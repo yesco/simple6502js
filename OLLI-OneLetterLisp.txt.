@@ -1,0 +1,116 @@
+LISP:(minimal one char)
+( start list
+) end list
+a car (append)
+d cdr (define)
+l list [ ? ]
+c cons
+. dot
+
+0 nil
+
+? cond/if
+
++ - * / %
+& and
+| or
+! not
+
+= eq
+  equal
+< lt
+> gt
+
+! null? =0
+b numBer?
+b symBol? (aTom? symbol?)
+2 cons?
+$ string?
+  array? vector? 
+
+w write (print lol)
+i princ
+1 prin1
+t terpri
+
+m map
+f filter
+. append (?)
+x setcar!
+y setdr!
+l Length
+h ntH
+k assoK (member)
+y copY
+n Nconc (? needed, nth, number?)
+v reVerse
+  vector ? (make-array)
+
+u Union
+i Intersection
+  difference
+
+p Put (hash)
+g Get (hash)
+
+' quote
+" string
+
+s set
+q setq
+  (u pUsh)
+  (o pOp)
+
+e eval
+@ apply
+
+r recurse
+
+f deFine
+\ lambda
+
+j z
+
+ #,
+0123456789
+:;
+\
+
+(define (mapcar f l)
+  (cond
+    ((null? ))
+    (t (cons (f (car l)) (cdr l)))))
+
+1LISP "AlphabetLisp AL! == 34 bytes!
+(f(mfl)(?((!))(1(c(f(al)(dl))))))
+
+mapcar implementation in OLF= 21 bytes
+    cdr=vvv  //////cons
+dn?]d@xs2+@rcshrt,,
+ ^^^ \car  \\(map
+ ((null?))
+     car
+
+dn -- dup not -- (null? l)
+?] -- if-exit -- 
+d@ -- dup @   -- (car l)
+osx           -- (f .)
+s2+@          -- (cdr l)
+rc            -- (recurse "(car l)" "(cdr l)")
+hrt,,         -- (cons )
+
+dup not if-exit (f l -- f l)
+d@      car      ( -- f l car)
+osx     funcall  ( -- f l r)
+s2+@    cdr      ( -- f r l+2 -- f r cdr)
+rc      recurse  ( -- f r R)
+s                ( -- f R r)
+hrt,,   cons     ( -- f R r h -- f h R r -- f h N)
+
+over car
+
+
+function mapcar(f, l) {
+   if (null(l)) return l;
+   return cons(f(car(l)), cdr(l));
+}

@@ -13,6 +13,7 @@
 #  there (pc+=2)-2: there is no post add 2... (pc++++)
 #
 %modes = (
+    'acc', ' ', # lol: true!
     'imm', 'pc++',
     'zp',  'm[pc++]',
      #zpy is zpx but for STX it's senseless
@@ -159,7 +160,7 @@ print <<'PRELUDE';
 //   |    \       |  |    |  /
 //   \____/  \____/  \____/  |_____                  jsk.org
 
-function CPU6502() { // generates one instance
+function cpu6502() { // generates one instance
 
 // registers & memory
 var a= 0, x= 0, y= 0, p= 0, s= 0, pc= 0, m= new Uint8Array(0xffff + 1);
@@ -169,7 +170,8 @@ function reset(a) { pc= w(a || RESET) }
 function nmi(a) { PH(p); PH(pc >> 8); PH(pc & 0xff); reset(a || NMI) }
 function irq() { nmi(IRQ) }
 
-let w = (a) => m[a] + m[(a+1) & 0xff]<<8,
+let w = (a) => m[a] + (m[(a+1) & 0xffff]<<8),
+    wz= (a) => m[a] + (m[(a+1) & 0xff]<<8),
     PH= (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
     PL= ( ) => m[0x100 + (s= (s+1) & 0xff)];
 
@@ -201,7 +203,7 @@ function run(count= -1, trace= 0) {
   trace && trace('print', 'head');
   let t= count;
   while(t--) {
-    ic++; ipc= pc; mod= d= g= undefined;
+    ic++; ipc= pc; mod= d= g= q= undefined;
     switch(op= m[pc++]) {
 PRELUDE
 
@@ -368,7 +370,7 @@ while (<IN>) {
 
 
     my $line = "    case 0x$op: ";
-
+    my $comment = '';
 
     # TODO: test if mod aggrees w mmm bits?
     my $node = '';
@@ -389,11 +391,10 @@ while (<IN>) {
             $saved{$mnc} .= "case 0x$op: ";
             next;
         }
-; #($shortercode && $mod
-        my $comment = '';
+# #($shortercode && $mod
 #       unless (($mod eq $modes[$mmm]) || ($mnc =~ /^b../)) {
         unless ($mod eq $modes[$mmm]) {
-            # print "------foobar\n"; print works
+            #print "------foobar\n"; print works
             # doesn't seem to want to add this?
             $comment = " // MODE $mod instead of mmm";
         }
@@ -411,14 +412,16 @@ while (<IN>) {
     $i =~ s/RMEM/MEM -128/;
     $i =~ s/MEM/m[$modes{$mod}]/;
     if ($i =~ /ADDR/) {
-        $i = 'd= '.$modes{$mod}."; $i";
+	if ($modes{$mod}) {
+	    $i = 'd= '.$modes{$mod}."; $i";
+	}
         $i =~ s/ADDR/d/g;
     }
     die "MEM:only use once:$i" if $i =~ /MEM/;
     $i =~ s/ +/ /g;
     #print "\\y $op $i\n";
 
-    $line .= $i."; $comment";
+    $line .= $i;
 
     if ($genfun) {
         my $r = sprintf("%s(){ $i }\n", uc $mnc);
@@ -435,9 +438,9 @@ while (<IN>) {
     }
 
     if (!$debuginfo) {
-        print "break; // ",uc($mnc)," $mod\n";
+        print "; break; // ",uc($mnc)," $mod $comment\n";
     } else {
-        print "break;\n";
+        print "; break; $comment\n";
     }
 
     #print '----LINE TOO LONG: ', length($line), "\n" if length($line) > $wid;
@@ -464,7 +467,7 @@ if ($shortercode) {
       case 1: q='zp';     d= m[pc++];                         break;
       case 2: q='imm';    d= op&1 ? pc++ : q='';              break;
       case 3: q='abs';    d= pc; pc+= 2;                      break;
-      case 4: q='zpiy';   d= w(m[pc++] + y);                  break;
+      case 4: q='zpiy';   d= wz(m[pc++] + y);                  break;
       case 5: q='zpx';    d= (m[pc++] + x) & 0xff;            break;
       case 6: q='absy';   d= w(pc) + y; pc+= 2;               break;
       case 7: q='absx';   d= w(pc) + x; pc+= 2;               break;
@@ -515,7 +518,7 @@ print "    }
 }
   
 return cpu = {
-  run, flags:ps, tracer, hex,
+  run, flags:ps, tracer, hex, dump, memFormat,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
@@ -527,7 +530,7 @@ return cpu = {
 function hex(n,x,r=''){for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
 function ps(i=7,v=128,r=''){for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
 
-function tracer(how,what) {
+function tracer(how, what) {
   let line;
   if (what == 'head') {
     line = '= pc    op mnemonic   flags  a  x  y  s';
@@ -535,7 +538,7 @@ function tracer(how,what) {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f:'???')+(q?q:'---')).padEnd(8, ' ')+
       ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
-      +(d?' d='+d:'')+(g?' g='+g:'')
+      (d?' d='+hex(4,d):'') +(g?' g='+hex(2,g):'')
   }
 
   if (how == 'string') {
@@ -544,28 +547,6 @@ function tracer(how,what) {
     console.log(line);
   }
 }
-
-} // end CPU6502
-";
-
-if ($genfun) {
-    for $i (0..255) {
-        my $h = sprintf('%02X', $i);
-        my $f = $gendata{$h};
-        print $f ? "$f" : "";
-        print ",";
-    }
-}
-
-# Well, overambitious... just some tools
-
-print <<'DEBUGGER';
-
-
-// testing
-let cpu = CPU6502();
-let m = cpu.state().m;
-let hex = cpu.hex;
 
 function memFormat(a = dump.last,n = 8, dochars = 1) {
   let r = '', p = '', c;
@@ -586,7 +567,33 @@ function dump(a = dump.last, lines = 16, n = 8) {
   }
   dump.last = a;
 }
-dump.last = 0; // "static variable"
+
+dump.last = 0; // static variable
+
+} // end cpu6502
+
+module.exports = { cpu6502 };
+
+";
+
+if ($genfun) {
+    for $i (0..255) {
+        my $h = sprintf('%02X', $i);
+        my $f = $gendata{$h};
+        print $f ? "$f" : "";
+        print ",";
+    }
+}
+
+# Well, overambitious... just some tools
+
+print <<'DEBUGGER';
+
+
+// testing
+let cpu = cpu6502();
+let m = cpu.state().m;
+let hex = cpu.hex;
 
 // run 3 times with 3 instr:s each time
 let nn= 3;
@@ -620,7 +627,7 @@ if (0) {
 
   console.log(cpu.run(10, 1));
 
-  dump(0);
+  cpu.dump(0);
 
 } else {
 
@@ -649,9 +656,9 @@ if (0) {
 
   console.log('SWAP X Y');
   console.log(cpu.run(10, 1));
-  dump(start);
+  cpu.dump(start);
   console.log("STACK:");
-  dump(0x200-16, 2);
+  cpu.dump(0x200-16, 2);
 }
 
 // speedtest BRK lol

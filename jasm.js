@@ -4,7 +4,7 @@
 //          jsk@yesco.org
 // 
 
-//
+// TODO: not working...
 
 
 // Data is stored and output in chunks:
@@ -278,18 +278,24 @@ function mgen(names, valids) {
 
 	//if (!mnc) continue;
 	//console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
-	let [b,cyc] = modebc(op),
-	    f = `j6502.data(0x${hex(2,op)});`;
-	if (b==1) f = Function(f);
-	if (b==2) f = Function('v','f', f+`j6502.byte(v, f)`);
-	if (b==3) f = Function('v','f', f+`j6502.word(v, f)`);
-	f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
-	f.SAN = name; f.mode = mleg;
-	ops[op] = global[name] = f;
+	let [b,cyc] = modebc(op);
+        genf(op, name, mnc, mleg, b, cyc);
       }
     }
   }
 }
+
+function genf(op, name, mnc, mleg, b, cyc) {
+  f = `j6502.data(0x${hex(2,op)});`;
+  if (b==1) f = Function(f);
+  if (b==2) f = Function('v','f', f+`j6502.byte(v, f)`);
+  if (b==3) f = Function('v','f', f+`j6502.word(v, f)`);
+  f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
+  f.SAN = name; f.mode = mleg;
+  ops[op] = global[name] = f;
+}
+
+
 
 //  0xx 000 00 = call&stack       BRK JSR RTI RTS
 gen('BRKJSRRTIRTS', 0x00, [1,3,1,1], [7,6,6,6]);
@@ -309,12 +315,9 @@ function dgen(delta, s, base) {
     let mnc = s.substr(i*3, 3);
     //if (!mnc) return;
     if (mnc && mnc !== '---') {
-      let [b,cyc] = bytcyc(op);
       //console.log('DGEN', '-', hex(2,op), mnc);
-      let f = Function(`j6502.data(0x${hex(2,op)});`);
-      f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
-      f.SAN = mnc; f.mode = '---';
-      ops[op] = global[mnc] = f;
+      let [b,cyc] = bytcyc(op);
+      genf(op, mnc, mnc, '---', b, cyc);
     }
     op += delta;
     i++;
@@ -333,15 +336,8 @@ function dgen(delta, s, base) {
 }
 { // JMPA   JMPAY  JMPIY  JMPN
   // fixing
-  let f;
-  f = ops[0x6c] = global.JMPI = global.JMPA;
-  f.op= 0x6c; f.mnc= 'JMP'; f.b= 3; f.cyc=5;
-  f.SAN = 'JMPI'; f.mode = 'indirect';
-  
-  f = ops[0x4c] = global.JMPA =
-    Function('v,f', 'j6502.data(0x4c);j6502.word(v, f)');
-  f.op= 0x4c; f.mnc= 'JMPA'; f.b= 3; f.cyc=3;
-  f.SAN = 'JMPA'; f.mode = 'abs';
+  genf(0x6c, 'JMPI', 'JMP', 'indirect', 3, 5);
+  genf(0x4c, 'JMPA', 'JMP', 'abs', 3, 3);
 
   // they didn't  override any opcodes
   delete global.JMPAY;
@@ -462,8 +458,10 @@ function bytcyc(op) {
   
   // 1xx 010 10     8A    txa    1 2
   
-  // xxx 100 00     10    Bxx
+  // xxx 100 00     10    Bxx    2 2 (3)
   // xxx 110 x0     18    ***
+  if ((op & 0x1f) == 0x10)
+    return [2, 3 + ((op & 0x20) ? 1 : 0)];
   
   // in principle we have all instructions
   return [1, 2];
@@ -546,4 +544,3 @@ ops.map((f,i)=>{
 });
 
 console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
-
