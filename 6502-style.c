@@ -111,6 +111,9 @@ void* stack[128] = {0};
 #define zpxi(A) MEM(word( (A)+x) )
 #define zpiy(A) MEM(word( A )+y)
 
+#define STAZ STA MEM_MODE |
+#define ADCZ ADC MEM_MODE |
+
 // registers
 byte a = 0, x = 0, y = 0, s = 0;
 byte mem[65536] = {0};
@@ -217,11 +220,13 @@ printfibs:
 
 
 
-
 // recursive fib (of course not efficient!)
-#define TMP 0x0002
 
-fib: // (in: Y  out: A:= fib Y, untouched X)
+
+
+#define TMP 0x02
+
+fib: // (Y: n -> A: fib(n), untouched X)
   printf(".");
 
   CPY 0x02;
@@ -243,10 +248,10 @@ gofib:
   JSR(fib); 
 
   // "ADC a+stack"
-  STA zp(TMP);
+  STAZ TMP;
   PLA;
   CLC;
-  ADC zp(TMP);
+  ADCZ TMP;
 
   // restore
   INY; INY;
