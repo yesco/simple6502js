@@ -6,6 +6,12 @@
 typedef unsigned char byte;
 typedef unsigned short word;
 
+// registers
+byte a = 0, x = 0, y = 0, s = 0;
+byte mem[65536] = {0};
+// flags
+byte z = 0, n = 0, v = 0, c = 0;
+
 // we're not really simulating very accurately
 // the stack is just a figment of our imagination
 //
@@ -62,6 +68,9 @@ void* stack[128] = {0};
 //#define SED d = 1
 //#define SEI i = 1
 
+// temporary storage (for macros)
+int  _, __, __A, __skip;
+
 // load and store, inc/dex, transfer
 // (after enables "LDA 0x44;" syntax!)=
 #define LDA *(after(&a, 1, __LINE__, 0)) = __ =
@@ -114,17 +123,17 @@ void* stack[128] = {0};
 #define STAZ STA MEM_MODE |
 #define ADCZ ADC MEM_MODE |
 
-// registers
-byte a = 0, x = 0, y = 0, s = 0;
-byte mem[65536] = {0};
-// flags
-byte z = 0, n = 0, v = 0, c = 0;
-
-// temporary storage (for macros)
-int  _, __, __A, __skip;
-
-// 1: LD? 3: CP? 4: ADC
-// 0: ST?
+// after is a magical routine being called by assignement!
+// This is what enables the no parenthesis syntax:
+// General principle:
+//     *(foo(&reg, op)) = __ =  $0x0aff
+//     <======== LDA/STA ====>  <= ARG=>$
+// The Lvalue is (maybe/hopefully/guranteed) to be invoked
+// after the RHS...
+//
+// ops:
+//  1: LD? 3: CP? 4: ADC
+//   0: ST?
 int* after(byte *r, int rwc, int line, byte cmp) {
   static int _;
 
