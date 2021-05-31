@@ -34,15 +34,8 @@ void* stack[128] = {0};
 #define LABEL_(a) MERGE_(unique_name_, a)
 #define UNIQUE_NAME LABEL_(__COUNTER__)
 
-#ifndef SKIP
-  #define jsr_(L, U) { push &&U; goto L; U: (void)0; }
-  #define JSR(L) jsr_(L, UNIQUE_NAME)
-#endif
-
-#ifdef SKIP
-  #define jsr_(L, U) { U: push &&U + 4; goto L;}
-  #define JSR(L) jsr_(L, UNIQUE_NAME)
-#endif
+#define jsr_(L, U) { push &&U; goto L; U: (void)0; }
+#define JSR(L) jsr_(L, UNIQUE_NAME)
 
 #define RTS { goto *pop_; }
 #define JMP goto
@@ -70,6 +63,7 @@ void* stack[128] = {0};
 //#define SEI i = 1
 
 // load and store, inc/dex, transfer
+// (after enables "LDA 0x44;" syntax!)=
 #define LDA *(after(&a, 1, __LINE__, 0)) = __ =
 #define STA *(after(&a, 2, __LINE__, 0)) = __ =
 
@@ -102,8 +96,8 @@ void* stack[128] = {0};
 
 // addressing modes
 // (mark address as "authentic")
-#define MEM_MODE (0x30de)
-#define MEM(A) ((A) | 0x30de0000)
+#define MEM_MODE (0x30de0000)
+#define MEM(A) ((A) | MEM_MODE)
 
 #define imm(V) ((V) & 0xff)
 #define abs(A) MEM(A)
@@ -131,9 +125,8 @@ int  _, __, __A, __skip;
 int* after(byte *r, int rwc, int line, byte cmp) {
   static int _;
 
-  if ((v >> 16) == MEM_MODE) {
-    // OK!
-  } else if (v < 0 || v >= 0xff) {
+  int isAddress = (__ & 0xffff0000) == MEM_MODE;
+  if (!isAddress && (v < 0 || v >= 0xff)) {
       fprintf(stderr, "\n\n%% Line %d: value is out of range for immediate mode, please use 'STA/LDA <MODE>(0x0501);' to give address: 0x04x (%d).\n", line, a, a);
       exit(0);
   }
@@ -142,10 +135,10 @@ int* after(byte *r, int rwc, int line, byte cmp) {
   byte v;
 
   if (rwc==1 || rwc==3 || rwc==4) { // LD? - READ
-    if (0 <= a && a <= 0xff) { // immediate
-      v = a & 0xff;
-    } else {
-      v = mem[a];
+    if (isAddress) {
+      v = mem[a];  
+    } else { // immediate
+      v = a;
     }
 
     if (rwc==4) { // adc
@@ -161,12 +154,13 @@ int* after(byte *r, int rwc, int line, byte cmp) {
     }
 
   } else if (rwc==2) { // ST? - WRITE
-    if (0 <= a && a <= 0xff) {
-      // no immediate mode
-      fprintf(stderr, "\n\n%% Line %d: STA/STX/STY doesn't have immediate mode, please use 'STA/LDA <MODE>(0x501) for value: %x (%d)\n", line, a, a);
-      exit(0);
-    } else {
+    if (isAddress) {
       v = mem[a] = *r;
+    } else {
+      // no immediate mode
+      printf("__=%x", __);
+      fprintf(stderr, "\n\n%% Line %d: STA/STX/STY doesn't have immediate mode, please use 'STA <MODE>(0x501) for value: %x (%d)\n", line, a, a);
+      exit(0);
     }
   }
 
@@ -174,7 +168,7 @@ int* after(byte *r, int rwc, int line, byte cmp) {
   z = !v;
   n = v & 0x80;
 
-  // return dummy to have reason to be called
+  // return dummy so we get called!
   return &_;
 }
 
@@ -184,23 +178,8 @@ int main()
   assert(sizeof(word)==2);
   assert(sizeof(int)==4);
 
-  // admin stuff
-  
-  if (1) {
-    void* after = (void*) &&unique_after;
-  unique_before:
-    // Assuming there is constant difference!
-    goto unique_go;
-  unique_after:
-    (void)0;
 
-  unique_go:
-
-    __skip = (int)&&unique_after - (int)&&unique_before;
-    //printf("SKIP=%d\n", __skip);
-  }
   // CPU 65002 starts here
-
 
 reset:
   s = 0xff;
@@ -240,7 +219,7 @@ printfibs:
 
 
 // recursive fib (of course not efficient!)
-#define TMP 0x0110
+#define TMP 0x0002
 
 fib: // (in: Y  out: A:= fib Y, untouched X)
   printf(".");
@@ -264,10 +243,10 @@ gofib:
   JSR(fib); 
 
   // "ADC a+stack"
-  STA abs(TMP);
+  STA zp(TMP);
   PLA;
   CLC;
-  ADC abs(TMP);
+  ADC zp(TMP);
 
   // restore
   INY; INY;
