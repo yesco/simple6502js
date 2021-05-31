@@ -210,22 +210,18 @@ printfibs:
   BRK;
 
 fib: // in: a, out: a=fib
-  if (a < 1) {
-    x = 0;
-    goto fibreturn;
-  }
-     
-  if (a < 2) {
-    x = 1;
-    goto fibreturn;
-  }
+  TAX;
+  CMP 0x02;
+  BCC fibreturn;  
 
-  a--;
+  // fib -1 
+  DEX; 
+  TXA;
 
   PHA;
   JSR(fib);
   TAX;
-  PLA; //   PLA;
+  PLA;
 
   a--;
 
