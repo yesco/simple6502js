@@ -226,12 +226,10 @@ fib: // in: a, out: a=fib
   a--;
 
   push x;
-  PHA;
     
   JSR(fib);
   TAY;
 
-  PLA;
   x = pop;
   
   x += y;
