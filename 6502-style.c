@@ -59,6 +59,16 @@ void* stack[128] = {0};
 #define BPL if (!n) JMP
 #define BMI if (n) JMP
 
+// flags
+#define CLC c = 0
+//#define CLD d = 0
+//#define CLI i = 0
+#define CLV v = 0
+
+#define SEC c = 1
+//#define SED d = 1
+//#define SEI i = 1
+
 // load and store, inc/dex, transfer
 #define LDA *(after(&a, 1, __LINE__, 0)) = __ =
 #define STA *(after(&a, 2, __LINE__, 0)) = __ =
@@ -68,6 +78,8 @@ void* stack[128] = {0};
 
 #define LDY *(after(&y, 1, __LINE__, 0)) = __ =
 #define STY *(after(&y, 2, __LINE__, 0)) = __ =
+
+#define ADC *(after(&a, 4, __LINE__, 0)) = __ =
 
 #define TAX LDX a
 #define TXA LDA x
@@ -114,6 +126,8 @@ byte z = 0, n = 0, v = 0, c = 0;
 // temporary storage (for macros)
 int  _, __, __A, __skip;
 
+// 1: LD? 3: CP? 4: ADC
+// 0: ST?
 int* after(byte *r, int rwc, int line, byte cmp) {
   static int _;
 
@@ -127,11 +141,18 @@ int* after(byte *r, int rwc, int line, byte cmp) {
   int a = __ & 0xffff;
   byte v;
 
-  if (rwc==1 || rwc==3) { // LD? - READ
+  if (rwc==1 || rwc==3 || rwc==4) { // LD? - READ
     if (0 <= a && a <= 0xff) { // immediate
-      v = *r = a & 0xff;
+      v = a & 0xff;
     } else {
-      v = *r = mem[a];
+      v = mem[a];
+    }
+
+    if (rwc==4) { // adc
+      c = (*r + v > 255);
+      *r += v + c;
+    } else {
+      *r = v;
     }
 
     if (rwc==3) { // compare, set C
@@ -217,8 +238,9 @@ printfibs:
 
 
 
+#define TMP 0x0110
 
-fib: // (in: Y  out: A:= fib Y, untouched X))
+fib: // (in: Y  out: A:= fib Y, untouched X)
   printf(".");
 
   CPY 0x02;
@@ -228,9 +250,8 @@ fib: // (in: Y  out: A:= fib Y, untouched X))
   RTS;
 
 gofib:
-  TXA; PHA; TYA; PHA; // save X, Y
     
-  DEY; // y = -1
+  DEY;
   JSR(fib); // a = fib-1
 
   PHA;
@@ -239,15 +260,16 @@ gofib:
   JSR(fib); // a: fib-2
 
   // "ADC a+stack"
-  STA abs(0x1010);
+  STA abs(TMP);
   PLA;
-  // CLC;
-  // ADC
-  a += mem[abs(0x1010) & 0xffff];
-  STA abs(0x1010);
+  CLC;
+  ADC abs(TMP);
+  STA abs(TMP);
 
-  PLA; TAY; PLA; TAX; // restore xy
-  LDA abs(0x1010);
+  // restore
+  INY; INY;
+
+  LDA abs(TMP);
 
   RTS;
 
