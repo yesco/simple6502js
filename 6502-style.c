@@ -251,25 +251,24 @@ fib: // (in: Y  out: A:= fib Y, untouched X)
 
 gofib:
     
+  // a = fib-1
   DEY;
-  JSR(fib); // a = fib-1
+  JSR(fib); 
 
   PHA;
   
+  // a: fib-2
   DEY;
-  JSR(fib); // a: fib-2
+  JSR(fib); 
 
   // "ADC a+stack"
   STA abs(TMP);
   PLA;
   CLC;
   ADC abs(TMP);
-  STA abs(TMP);
 
   // restore
   INY; INY;
-
-  LDA abs(TMP);
 
   RTS;
 
