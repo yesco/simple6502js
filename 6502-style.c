@@ -223,13 +223,18 @@ fib: // in: a, out: a=fib
   TAY;
   PLA;
 
-  a--;
+  TAX;
+  TYA;
+  PHA;
+  DEX;
+  TXA;
 
-  push y;
   JSR(fib);
-  y = pop;
+  TAX;
+
+  PLA;
   
-  a += y;
+  a += x;
 
 fibreturn:
   printf(".");
