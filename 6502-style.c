@@ -203,43 +203,62 @@ not:
 
 printfibs:
   for(int i= 0; i<=13; i++) {
-    a = i;
+    y = i;
     JSR(fib);
     printf("\nfib(%d) = %d\n", i, a);
   }
   BRK;
 
-fib: // in: a, out: a=fib
-  TAX;
-  CMP 0x02;
-  BCC fibreturn;  
 
-  // fib -1 
-  DEX; 
-  TXA;
 
-  PHA;
-  JSR(fib);
-  TAY;
-  PLA;
 
-  TAX;
-  TYA;
-  PHA;
-  DEX;
-  TXA;
 
-  JSR(fib);
-  TAX;
 
-  PLA;
-  
-  a += x;
 
-fibreturn:
+
+
+
+fib: // (in: Y  out: A:= fib Y, untouched X))
   printf(".");
 
+  CPY 0x02;
+  BCS gofib;
+  // 0 1
+  TYA;
   RTS;
+
+gofib:
+  TXA; PHA; TYA; PHA; // save X, Y
+    
+  DEY; // y = -1
+  JSR(fib); // a = fib-1
+
+  PHA;
+  
+  DEY;
+  JSR(fib); // a: fib-2
+
+  // "ADC a+stack"
+  STA abs(0x1010);
+  PLA;
+  // CLC;
+  // ADC
+  a += mem[abs(0x1010) & 0xffff];
+  STA abs(0x1010);
+
+  PLA; TAY; PLA; TAX; // restore xy
+  LDA abs(0x1010);
+
+  RTS;
+
+
+
+
+
+
+
+
+
 
 brk:
   printf("BRK!\n");
