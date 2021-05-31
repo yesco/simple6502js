@@ -238,6 +238,8 @@ printfibs:
 
 
 
+
+// recursive fib (of course not efficient!)
 #define TMP 0x0110
 
 fib: // (in: Y  out: A:= fib Y, untouched X)
