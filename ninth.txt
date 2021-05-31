@@ -1,0 +1,449 @@
+ 64
+----
+ 16 rd   ACC = targ
+ 16 wr  targ = ACC
+ 32 am   ACC = +-/* reg
+( 4 am                     , reg == 000)
+ 32 lg   ACC = &|^~ reg
+( 4 lg                     , reg == 000)
+ 32 st   ACC = << <<< >> >>> ("reg"=3 bits const)
+( 4 lg   == < > !+         , "reg" == 000)
+ 
+
+============================================================================================================================================================================================================================================================================================================
+
+0 ----------- Compare / ALForth / Branch
+
+0 00 xxxxx (32)            0-31
+  01 xxxxx (32) ALForth   31-63 [ -?]
+  10 xxxxx (32) ALForth   64-95 [@A-Z\[\\\]]^_]
+  11 xxxxx (32) CP & BR   96-127 [`a-z{|}~, DEL]
+
+1 ----------- Read / Write
+
+1 00 ? T-ARG (32)  RD targ      ( acc <- targ)
+  01               ALisp?/Tokens
+  10               ALisp?/Tokens
+1 11 ? T-ARG (32)   WR targ      ( acc -> targ)
+
+
+////////////////////////////////////////
+(64)
+10 00 xxxx - (64)  RD (acc <-- value)
+   00 xxxx    (16)  RD   targ
+   01 0xxx     (8)  RD   indexed    (v += reg)
+      1xxx     (8)  RD   indirect 
+
+   10 xxxx    (16)  RD   const (0..14, -1)
+
+   11 xxxx    (16) FN modify using reg
+      0xxx    ( 8)  FN   + reg
+       000      <<  (acc*2)
+       111      >>
+      1xxx    ( 8)  FN   * reg
+       000     <<<
+       111      >>
+(64)
+11 00 xxxx - (64)  WR (acc -> value)
+   00 xxxx    (16)  WR   targ    
+   01 0xxx     (8)  WR   indexed 
+      1xxx     (8)  WR   indirect
+
+   10 0xxx     (8)  WR   swap
+       000      2^            
+       111      sqr          
+      1xxx     (8)  WR   reg -> operand (reg2)
+       100      lg2
+       111      count bits
+
+   11 xxxx    (16) FN
+      0xxx    ( 8)  FN   - reg
+       000      & operand
+       111      | operand
+      1xxx    ( 8)  FN   / reg
+       000      ^ operand
+       111      sqrt
+
+
+hash abs rem(%) fma max min nan exp exp2 exp10 log log2 log10 cubrt pow sin cos tan asin acos atan atan2 (sinh cosh tanh asinh acosh atanh atan2h) ceil floor round int sign isfin isnan isnormal isinf rand
+
+
+1 xx x T-ARG (64) WR targ      ( acc -> targ)
+       -----   Register / Immediate
+       0 000     # const (byte)   (accumulator)
+       0 001     register B  (operand)
+       0 010     register C    (++)
+       0 011     register D    (++)
+
+       0 100     register E    (--)
+       0 101     register F    (--)
+       0 110     register G  (overflow)
+       0 111     ## const (word)
+       - ---   Specials / Indirects
+       1 000     byte[## address]
+       1 001     op(# op) / op(pc++)=interpret
+       1 010     acc  = Flags Control IO register
+       1 011     acc  = read() / write(acc)
+       1 100     acc  = pop() / push(acc)
+       1 101     PC   = ret() / jsr(PC)
+       1 110     acc  = PC (current address Y)
+       1 111     word[## address]
+
+Flags Control IO Register
+=========================
+  NVaZ bcHC  deLL II/OO  (- = not used)
+  ==== ====  ==== == ==
+
+  NVZHC : curent used flags
+     LL : determines current token table index
+  II OO : controls which I/O is used
+a bc de : unused bits
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+--- NOT CMP & BRANCH
+000 00000 (32)  0-31
+ 00   FALSE branch
+
+--- OPCODES! (printable range, LOL)
+
+001 00000 (32) 31-63 ' '..'?'
+
+    We choose to have tokens that are printable
+    in contigious range 32..95 (64 tokens).
+
+    Each character is assigned a forth word,
+    thus the "compiled" version of forth is
+    equivalent to it's source form.
+
+    (see file ALF-AlphabeticalForth.txt)
+    
+
+ 10 00000 (32) "@A-Z[\]^_"
+
+--- end op
+
+--- NOT CMP & BRANCH
+011 00000 (96-127)  [` .... {|}~, DEL]
+ 11   TRUE branch
+
+
+-e 'for $i (64..127) { print chr($i); }'
+@ABCDEFGHIJKLMNOPQRSTUVWXYZ 
+`abcdefghijklmnopqrstuvwxyz 
+
+(64)
+01 =========== CMP/Bxx [#[#] const] [# rel]
+   R  UB  FLG/reg
+   ----------
+   0            - if false
+   1            - if true
+      0         no branch! just set flags
+      1         # branch!
+       0        # const
+       1        ## const
+      00  reg   set flags
+          000     CMP acc, # const
+          reg     CMP reg, # const (B-G)
+          111     CMP acc, byte[## address]
+
+      01  000     CMP acc, ## const
+          reg     CMP reg, ## const (B-G)
+          111     CMP acc, word[## address]
+
+      10  flg   use flags: # branch
+      11  flg   CMP acc, ## const, # branch (!)
+
+      00  flg  current flags (no change) # skip
+          000    = INSPECT!
+          001    C: Carry (bit -1)
+          010    H: Half carry (for BCD?)
+          011    6502: bit6, z80: bit5/bit3
+          100    Z: Zero (any/all)
+          101    V/P: oVerflow (P:even=1))
+          110    N: Negative (bit7)
+          111    = BIT MASK
+
+        INSPECT:
+        
+
+
+7
+=
+1 ----------- read/write        
+  
+  0 00  t arg   RD   acc  =  targ
+        -----
+        0 001        acc  = register B
+                            ...
+        0 110        acc  = register G
+
+        0 000        acc  = # const
+        0 111        acc  = byte[## const]
+
+        // how many ways can you call an op?
+        1 001        op(# op)
+        1 010        acc  = IO register
+
+        1 011        acc  = read()
+        1 100        acc  = pop()
+        1 101        PC   = ret()
+        1 110        acc  = PC (?)
+
+        1 000        acc  = ## const
+        1 111        acc  = word[## address]
+    MM  c nst        
+    --  -----
+    10                acc  = const (0..14, -1)
+        1 111         acc  = 0xffff (-1)
+    01                    += const (signed -7..7)
+        0 000         acc  = higest bit number
+    11                    *= const (1..15)
+        0 000         acc  = bits set count
+
+
+
+  1 00  t arg   WR        targ  =  acc
+  ===========   ==
+        0 001        register B = acc
+                            ... 
+        0 110        register G = acc
+
+        0 000         # const  <=> acc (CMP)
+        0 111      b[## const]  =  acc
+
+        // how many ways can you call an op?
+        1 001        op( b[acc++] } // interpret!
+        1 010        IO register = acc
+
+        1 011        write(acc)
+        1 100        push(acc)
+        1 101        call(acc)
+        1 110        PC = acc (jump)
+
+        1 000        ## const <=> acc (CMP)
+        1 111       w[## addr] =  acc
+
+  1 MM  m reg
+    --  = ---
+    01  0                     + =  reg
+          000                << =    (aka *2)
+          111               <<< =    (rol)
+    10  0                     - =  reg
+          000                >> =    (aka /2)
+          111               >>> =    (ror)
+    11  0                     * =  reg
+          000                 * =  acc (sqr)
+          111                 * = -1   (negate!)
+
+    01  1                     / =  reg (WTF?)
+          000                   =  sqrt
+          111                   =  inv (1/)
+    10  1           acc << = const (1..8)
+    11  1           acc >> = const (1..8)
+
+
+
+
+NINTH = Not INvenTed Here
+=========================
+
+cc iii vvv
+----------
+00          ==    0
+01           >    
+10          <
+11          <>
+
+cc Woo vvv
+----------
+   0       read
+   1       write
+
+    00     copy
+    01     sub
+    10     add
+    11     mult
+
+   000     read   reg #42
+   001     read   reg sub  
+   010     read   reg add
+   011     read   reg 
+
+   100     write  reg #42
+   101     write  reg 
+   110     write  reg
+   111     write  reg
+
+cc Woo reg
+----------
+
+compare
+-------
+
+flags          set by 
+-----          ----
+zero            rd
+overflow        math
+negative        math
+carry           math/shift
+
+
+rd acc = #const   # agg = agg
+rd acc = reg      # copy register
+rd acc = mem[reg] # read address  
+
+rd acc = mem[reg] # indirection!
+rd acc = mem[reg--]
+rd acc = mem[reg++]
+
+wr acc => acc      = acc + reg
+wr acc => acc      = acc - reg
+wr acc => acc      = acc / reg
+wr acc => acc      = acc * reg
+
+wr acc => acc      = acc % reg
+wr acc => acc      = acc % reg
+wr acc => acc      = acc % reg
+wr acc => acc      = acc % reg
+
+wr acc => reg
+wr acc => mem[reg] = acc
+rd acc => mem[reg--] = acc
+rd acc => mem[reg++] = acc
+
+F W 2 O0  REG
+  1 0 01  000 wr acc + 
+  1 0 01  000
+  1 0 11  000
+  1 0 11  000
+
+wish ops
+========
+
+mask-eq (acc & mask) == value
+skip next (disable next?)
+copy / fill (same, different entry?)
+jmp/jsr IY
+
+pickbits
+  iii mmm cc => 000 cc iii
+          11
+  111
+  000 000 00
+
+  iii mmm cc => 000 0m mmc
+      111
+           1
+  000 000  0
+
+  iii mmm cc => cc iii mmm
+          11
+  111
+      111
+  000 000 00
+
+  16 bits = 5 * 3 = 15 !
+  nnn nnn nnn nnn nnn ?
+  bit bit bit bit bit ?
+
+  start...
+  bit nn  bit nn  bit nn  invlast
+      1-4     1-4     1-4
+
+
+
+W X OO  REGG
+= = ==  ====
+0 0 00  0000  acc=RD # byte const
+0 0 01  0000  acc=RD inc
+0 0 10  0000  acc=RD dec
+0 0 11  0000  acc=RD # word const
+    00          reg
+    01          reg++
+    10          --reg
+    11          reg++, reg++
+        0001  B = acc
+        0010  C = acc
+        0011  D = acc
+        0100  H = acc
+     
+1 00  00 reg  acc += reg
+1 00  01 reg  acc -= reg
+1 00  10 reg  acc *= reg
+1 00  11 reg  acc /= reg
+
+1 01              %
+  01               <<
+                  >>
+                  ??
+
+
+
+00 >!    neq
+01 >=    ge
+10 <     lt
+11 <=    lte
+
+   Cneq
+01 00         !         => F=1
+01 01         = (zero)  => F=1
+01 10        <   (lt)   => F=1
+01 11        <=  (le)   => F=1
+
+
+F W 2 O REGG               
+    2   0000 #             byte/word
+        0001 B
+        0010 C
+        0011 D
+        0100 E
+        0101 F
+        0110 G 
+        0111 H             
+
+    2   1000 MEM         byte/word
+
+    +   1001 MEM[B++]
+    -   1010 MEM[C--]
+
+    +   1011 MEM[D++]
+    -   1100 MNE[D--]
+
+    2   1101 DEV         byte/word?
+
+    +   1110 STACK   pop
+    -   1110 STACK   push
+
+    +   1111 PC      ret
+    -   1111 PC      jsr
+
+
+
+
+0
+1    equal
+ 1   carry
+  1  oveflow
+   1 
+
+
+
+copy / fill (same, different entry?)
+
+ZERO:
+  LDA# 00
+  JMPA &FILL
+MOVE:
+  LDAIY rFrom
+FILL:
+  STAIY rTo
+  LDAIY rFrom
+  DEY
+  BNE FILL:
+
+  
+MOVE:
+
+
