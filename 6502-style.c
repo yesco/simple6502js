@@ -220,24 +220,20 @@ fib: // in: a, out: a=fib
 
   PHA;
   JSR(fib);
-  TAX;
+  TAY;
   PLA;
 
   a--;
 
-  push x;
-    
+  push y;
   JSR(fib);
-  TAY;
-
-  x = pop;
+  y = pop;
   
-  x += y;
+  a += y;
 
 fibreturn:
   printf(".");
 
-  TXA;
   RTS;
 
 brk:
