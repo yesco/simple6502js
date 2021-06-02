@@ -171,7 +171,7 @@ o========================================-
               ?)   until  n?]  while
                )   repeat
 
-    #(  do     #)  loop   #+)  +loop
+    $(  do     $)  loop   #+)  +loop
 
   Special:
     # - number related functions
@@ -182,6 +182,7 @@ o========================================-
     0-9 = start of decimal number
     : - define ":double:d+; "
     ; - "; " - enddef, ";i" immediate;
+    ; - ";c" - codce follows till (impl def) end marker
     
   OP CODES          
 
@@ -298,6 +299,13 @@ BEGIN                             AGAIN
             
             ap   Pad (at least 84 bytes long)
 
+            // Local variables
+            // - https://github.com/seanpringle/reforth
+            at   how to store these?
+            a@+
+            a1+
+
+
             
          66 B    j:base begin bl X:"buffer:"
                       (d ]w )r
@@ -344,6 +352,27 @@ COMPILATION IDEAS:
          74 J    j (loopv)
          75 K    key
          76 L    Literal (leave literal loop lshift)
+            LT   Literal
+            // Local variables
+            // - https://github.com/seanpringle/reforth
+            // (like a mini fast pick)
+            // (notice it changes number)
+            L0   - top 9..0 -- 1 0 0
+            L1   - second
+            L9         9..0 -- 1 0 9
+            L+0  - incresae L0
+            L-1  - decrease L1
+            L!2  -      42 L2 !
+            L!-2        42 L2 !   L-2
+            L-!2 - L-2  42 L2 !
+            L@+3 -         L2 @   L+2
+
+            // named locals (take of stack)
+            :(ABC)ROT:LBLCLA;
+            :(A)FOUR:4TALA;  // 4 TO A
+            :FOUR:D4;        // same
+            :FIB:D2=?]D1- FIB]SD1- FIB +;
+
          77 M    Max (m* max min mod move X:marker)
          78 N    Not (no ~ and ! is store) (min =="Max Swap" (negate X:nip))
          79 O    Over (or over X:Of)
@@ -358,6 +387,14 @@ COMPILATION IDEAS:
             rt   j:RoT
             rl   j:RoLl
             r
+
+            R0   acc
+            R1-R6 register 1
+            R!0
+            R@0
+            R+2
+            R-3
+            R-!3
 
          83 S    Swap (s" s>d sign sm/rem source space spaces state X:S\" (!) X:save-input X:source-id see - def of word)
          84 T    Tuck  type X:to X:true X:tuck
@@ -383,15 +420,19 @@ COMPILATION IDEAS:
          93 ]    J;"break"      
             ]    longmode:ends
             ]    exit in ':'
-            ]    #( ] #) == do leave loop
-            ]    #( ] #] == do leave +loop
+-- https://github.com/seanpringle/reforth
+            ]    $( ] $) == do leave loop
+            ]    $( ] $+) == do leave +loop
+            ] 10 #(   #) == 10 for loop
             ]    ?( ] ) == if else endif
-            ]    ( ?] ) == begin !while repeat
-            ]    ( ?] ) == begin while repeat
-            ]    ( ?) == begin until
+            ]    ( ?] ) == begin ifexit repeat
+            ]    ( n?] ) == begin while repeat // ???
+            ]    ( n?) == begin until
             ]    ( ) == begin again
+            ]    ( ?[ ?) = begin ifnext while
             
  j:Leave! Do-leave-loop ( I ] )
+
          94 ^    j:xor
          95 _    j:OR LOL
         
