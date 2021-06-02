@@ -11,6 +11,12 @@
 // - Address can be a/zp:
 //   code generated is adopted.
 
+// PROBLEM:
+// - explosion in combinations m x y
+// + SWEET16 have only 16 regs
+// + (maybe this is good to gen SW16?)
+// + stack machine doesnt deal w reg
+
 // - x and y are preserved
 // - a is almost always trashed
 
@@ -305,4 +311,54 @@ function adc(a) {
   } else {
     ADCA(a);
   }
+}
+
+// - http://www.6502.org/source/interpreters/sweet16.htm
+function SWEET16() {
+// 0x?n - all registers (16)
+L('SET');  // Rn = N
+
+L('LD');   // A = Rn
+L('ST');   //     Rn = A
+
+L('LDI');  // A = M[Rn++]
+L('STI');  //     M[Rn++] = A
+
+L('LDDI'); // A = W[Rn++++]
+L('STDI'); //     W[Rn++++] = A
+
+L('POPI'); // A = M[--Rn]
+L('STPI'); //     M[--Rn] = A
+
+L('ADD');  // A += Rn
+L('SUB');  // A -= Rn
+
+eL('POPDI');// A = W[----Rn]
+
+L('CPR');  // A - Rn => flags
+L('INR');  // Rn++
+L('DCR');  // Rn--
+
+// 0x0? - no registers
+L('RTN');
+
+L('BR');
+
+L('BNC');
+L('BN');
+
+L('BP');
+L('BM');
+
+L('BZ');
+L('BNZ');
+
+L('BM1');
+L('BNM1');
+
+L('BK');
+
+L('RS');
+L('BS');
+
 }

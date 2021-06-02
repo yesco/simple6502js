@@ -105,10 +105,11 @@
 
     'jmp',   'pc= w(pc)',
     'jmpi',  'pc= w(w(pc))',
-    'jsr',   'pc--; PH(pc >> 8); PH(pc & 0xff); pc= w(pc+1)',
+    # TODO: BUG! this depends on how generating cod.... if mode inline
+    'jsr',   'pc++; PH(pc >> 8); PH(pc & 0xff); pc= w(pc-1)',
 
     'brk', 'irq(); p|= B',
-    'rts', 'pc= PL(); pc+= PL()<<8',
+    'rts', 'pc= PL(); pc+= PL()<<8; pc++;',
     'rti', 'pc= PL(); pc+= PL()<<8; p= PL()',
 
     'php', 'PH(g= p | 0x30)',
@@ -532,6 +533,7 @@ return cpu = {
 
 function hex(n,x,r=''){for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
 function ps(i=7,v=128,r=''){for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+function is(v){ return typeof v!=='undefined'};
 
 function tracer(how, what) {
   let line;
@@ -541,7 +543,7 @@ function tracer(how, what) {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f:'???')+(q?q:'---')).padEnd(8, ' ')+
       ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
-      (d?' d='+hex(4,d):'') +(g?' g='+hex(2,g):'')
+      (is(d)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
   }
 
   if (how == 'string') {

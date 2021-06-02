@@ -477,6 +477,18 @@ function modebc(op) {
   return [ byts[i], cycs[i] ];
 }
 
+function burn(m, chunks) {
+  chunks.forEach(c=>{
+    let a = c.shift();
+    let lab = c.shift();
+
+    let b;
+    while (typeof (b = c.shift()) == 'number') {
+      m[a++] = b;
+    }
+  });
+}
+
 // Ok, let's do some sketch stuff!
 //
 // The Function created assembly instructions
@@ -488,7 +500,7 @@ function modebc(op) {
 
 module.exports =
   global.j6502 =
-  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel };
+  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel, burn };
 
 global.ORG = ORG;
 global.data = data;
@@ -505,6 +517,7 @@ global.OMG = OMG;
 global.rel = rel;
 global.lo = lo;
 global.hi = hi;
+global.burn = burn;
 
 ////////////////////////////////////////
 
