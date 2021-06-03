@@ -32,8 +32,17 @@ function flush() {
   addr(address);
 }
 
+// NOTICE: output contains overlapping patching
+// locations!
 function getChunks() {
   flush();
+  Object.keys(backpatch).map(k=>{
+    let bp = backpatch[k];
+    if (bp && bp.length) {
+      console.error(`\n%% getChunks: label not defined: ${k}`);
+      throw "%% getChunks: undefined labels!";
+    }
+  });
   return chunks;
 }
 
@@ -130,6 +139,9 @@ function hex(n,x,r=''){for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
 // lab: print 'label:' after 'addr:'
 // dumplab: prints sorted label=addr @end
 // pretty:  prints '  ...FOO....'
+//
+// NOTICE: output contains overlapping patching
+// locations!
 function getHex(prlab=0, dumplab=0, pretty=0) {
   let all = [...getChunks()]; // copy!
   let r = '', ch, p = '';
@@ -182,11 +194,12 @@ function pascal(s) { string(s, 1, 0, 0) }
 function hibit(s) { string(s, 0, 1, 0) }
 function OMG(s) { string(s, 1, 1, 1) }
 
-function rel(name) {
+function rel(name, f) {
   byte(name, ((address)=> a=>{
+    a = f ? f(a) : a;
     let b = a - address - 1;
-    console.log("REL: ", address, a, b);
-    //if (b < -128 || b > 127) throw `%% Branch to label '${name} to far (${b})`;
+    //console.log("REL: ", address, a, b);
+    if (b < -128 || b > 127) throw `%% Branch to label '${name} to far (${b})`;
     return b & 0xff;
   })(address)); // capture current addr
 }
@@ -286,10 +299,19 @@ function mgen(names, valids) {
 }
 
 function genf(op, name, mnc, mleg, b, cyc) {
-  f = `j6502.data(0x${hex(2,op)});`;
+  let f = `j6502.data(0x${hex(2,op)});`;
+
   if (b==1) f = Function(f);
-  if (b==2) f = Function('v','f', f+`j6502.byte(v, f)`);
-  if (b==3) f = Function('v','f', f+`j6502.word(v, f)`);
+  if (b==2) {
+    //console.log('jsk: ', hex(2,op&0x1f),hex(2,op), name, mleg, mnc, b, cyc);
+    if ((op & 0x1f) == 0x10) { // branch relative
+      f = Function('v,f', f+`j6502.rel(v, f)`);
+      //console.log('fish: ', hex(2,op), name, mnc);
+    } else {
+      f = Function('v,f', f+`j6502.byte(v, f)`);
+    }
+  }
+  if (b==3) f = Function('v,f', f+`j6502.word(v, f)`);
   f.op= op; f.mnc= mnc; f.b= b; f.cyc= cyc;
   f.SAN = name; f.mode = mleg;
   ops[op] = global[name] = f;
@@ -445,7 +467,7 @@ function bytcyc(op) {
   // 010 010 00     48    pha 
   // 011 010 00     68    pla 
   if ((op & 0x1f) == 0x08)
-    return [2, 3 + ((op & 0x20) ? 1 : 0)];
+    return [1, 3 + ((op & 0x20) ? 1 : 0)];
 
   // 001 010 10     2A    rol_a  1 2
   // 010 010 10     4A    lsr_a 
@@ -500,7 +522,7 @@ function burn(m, chunks) {
 
 module.exports =
   global.j6502 =
-  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel, burn };
+  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel, burn, clear };
 
 global.ORG = ORG;
 global.data = data;
@@ -514,10 +536,10 @@ global.string = string;
 global.pascal = pascal;
 global.hibit = hibit;
 global.OMG = OMG;
-global.rel = rel;
 global.lo = lo;
 global.hi = hi;
 global.burn = burn;
+global.clear = clear;
 
 ////////////////////////////////////////
 

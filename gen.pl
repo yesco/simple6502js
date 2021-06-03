@@ -39,8 +39,8 @@
 #      w    = word value)
 %impl = (
     'lda', 'g= z(a= MEM)',
-    'ldx', 'g= z(a= MEM)',
-    'ldy', 'g= z(a= MEM)',
+    'ldx', 'g= z(x= MEM)',
+    'ldy', 'g= z(y= MEM)',
 
     'sta', 'g= MEM= a',
     'stx', 'g= MEM= x',
@@ -78,15 +78,15 @@
     # notice B.. uses signed byte!
     'bra', 'pc += RMEM', # 6502C
 
-    'bpl', 'if (~p & N) pc+= RMEM',
-    'bvc', 'if (~p & V) pc+= RMEM',
-    'bcc', 'if (~p & C) pc+= RMEM',
-    'bne', 'if (~p & Z) pc+= RMEM',
+    'bpl', 'if (~p & N) pc+= RMEM; else pc++',
+    'bvc', 'if (~p & V) pc+= RMEM; else pc++',
+    'bcc', 'if (~p & C) pc+= RMEM; else pc++',
+    'bne', 'if (~p & Z) pc+= RMEM; else pc++',
 
-    'bmi', 'if (p & N) pc+= RMEM',
-    'bvs', 'if (p & V) pc+= RMEM',
-    'bcs', 'if (p & C) pc+= RMEM',
-    'beq', 'if (p & Z) pc+= RMEM',
+    'bmi', 'if (p & N) pc+= RMEM; else pc++',
+    'bvs', 'if (p & V) pc+= RMEM; else pc++',
+    'bcs', 'if (p & C) pc+= RMEM; else pc++',
+    'beq', 'if (p & Z) pc+= RMEM; else pc++',
     
 # BIT - Bit Test
 # A & M, N = M7, V = M6
@@ -108,7 +108,7 @@
     # TODO: BUG! this depends on how generating cod.... if mode inline
     'jsr',   'pc++; PH(pc >> 8); PH(pc & 0xff); pc= w(pc-1)',
 
-    'brk', 'irq(); p|= B',
+    'brk', 'pc++; irq(); p|= B',
     'rts', 'pc= PL(); pc+= PL()<<8; pc++;',
     'rti', 'pc= PL(); pc+= PL()<<8; p= PL()',
 
@@ -199,12 +199,17 @@ function adc(v) {
 
 let op /* Dutch! */, ic= 0, f, ipc, cpu, d, g, q;
 
-function run(count= -1, trace= 0) {
+// default is to run forever as count--...!=0 !
+// pc=0 will exit (effect of unvectored BRK)
+// return hash on BRK (why, where pc, count)
+function run(count= -1, trace= 0, patch= 0)  {
   trace= 1==trace ? tracer : trace;
   trace && trace('print', 'head');
   let t= count;
   while(t--) {
+    if (!pc) return {why: 'BRK', where:hex(4,w(0x100+s+1)-2), count: count-t};
     ic++; ipc= pc; mod= d= g= q= undefined;
+    if (patch && patch(pc, m, cpu)) continue;
     switch(op= m[pc++]) {
 PRELUDE
 
@@ -410,7 +415,7 @@ while (<IN>) {
     # address stuff
     my $i = $impl{$mnc};
     #print "/y $op $i\n";
-    $i =~ s/RMEM/MEM -128/;
+    $i =~ s/RMEM/\(\(MEM ^ 0x80\)-127\)/;
     $i =~ s/MEM/m[$modes{$mod}]/;
     if ($i =~ /ADDR/) {
 	if ($modes{$mod}) {
@@ -522,7 +527,7 @@ print "    }
 }
   
 return cpu = {
-  run, flags:ps, tracer, hex, dump, memFormat,
+  run, flags:ps, tracer, hex, dump, memFormat, w,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
