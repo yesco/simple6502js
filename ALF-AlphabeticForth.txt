@@ -173,17 +173,29 @@ o========================================-
 
     $(  do     $)  loop   #+)  +loop
 
-  Special:
+  Special (extra character follows):
     # - number related functions
     $ - string/hex related functions
     ? - conditional: if while until if-exit
     ( - comment if followed by space ...)
     ( - loop characters endable by [ or ... )
+    ' - find? 'A' ->65 ' + => address
     0-9 = start of decimal number
     : - define ":double:d+; "
     ; - "; " - enddef, ";i" immediate;
-    ; - ";c" - codce follows till (impl def) end marker
-    
+    ; - ";c" - codce follows till (impl def
+) end marker
+    A - allocation memory heap
+    B - base/BL(eank)
+    C - Character / Compile
+    L - Literal / Local
+    R - R stack, RoT/RoLl/ReCurse/Register
+    U - unsinged nums
+    X - Execute/???
+    Y - ??? FREE ---
+    Z - Zero/Erase
+    [ - immediate & [[
+
   OP CODES          
 
 001 00000 (32) 31-63 ' '..'?'
@@ -192,9 +204,19 @@ o========================================-
          34 "    string
          35 #    depth(of stack) (no need prefix! #10=decimal USED # #> #$)
             ##   depth of stack
+            #-   negative number follows
             #0-9 start NEW number 3#3 = "3 3"
                  (but 3d.7.+ = "3 dup . 7 ."
             #.r  u.r (. num in (cols -))
+
+            #<   lshift n steps (or format)
+            #>   rshift n steps (or format)
+            #s   sign
+            #a   absolute! (since not hex!)
+            #b   base
+            #t   true (-1)
+           (#f   false (==0, just do '0'))
+
             #(   do...
             #)   loop
             #+)  +loop
@@ -221,6 +243,11 @@ o========================================-
             $ g h i j n o p q u v x y
          37 %    j:Mod (8 digits 01 is binary) %010101 binary number
 38 
+            %0-f n bits (15 %2 --- 12 3)
+            %/   (125 10 --  12 5)
+            %#   modulo 10 (fast!)
+            %%   just modulo? '%/SD'
+
          38 &    j:And (&10 = decimal, or #10)
          39 '    address of: ' foo 'a=char 'a'=char
             ' foo (address of)
@@ -307,16 +334,25 @@ BEGIN                             AGAIN
 
 
             
-         66 B    j:base begin bl X:"buffer:"
+         66 B    ??? j:base begin bl X:"buffer:"
+            bs   BaSe
+            b0   base 10
+            b8   base octal 8
+            b2   base 2
+            bh   base hex
+            bl   BL(ank) -> 32 on stack
+
                       (d ]w )r
          67 C    character/relatedR c! c, c@ cell+ cells char char+ chars constant count cr create X:c" X:case X"compile,"
             c"   cstring (0 terminated)
-            c<   << lshift arith
-            c>   >> rshift airth
-            cr
             c!
             c@
-            cb   Blank -> 32 (BL)
+
+            // "constants"
+            cb   Blank -> 32 (BL) on stack, maybe just use BL?
+            cr   DO carriage return
+           (cf   is just 0)
+
             c    n print ' ' n times
             c#   c n print c n times
             co   count (?)
@@ -346,7 +382,7 @@ COMPILATION IDEAS:
          68 D    Dup (drop) do dup drop depth (decimal X:defer X:defer! X:defer@ dDoubleFunc)
          79 E    Emit else (emit environment evaluate execute exit(=]) X:endcase X:endof X:erase)
          70 F    fill find fm/mod X:false f+ f- e:form (-> r c)
-         71 G    j:Grab memory (heap --)
+         71 G    j:Grab memory (-- heap)
          72 H    j:Here (here ++) (hold X:hex X:holds)
          73 I    i (loopv) if immediate invert X:is
          74 J    j (loopv)
@@ -381,9 +417,13 @@ COMPILATION IDEAS:
 
          82 R    r> r@ recurse repeat rot rshift X:refill X:restore-input X;roll
             r>
-            r<   j:lol non standard
+            r<   <r
+            r@   R@ (==I)
+            rn>  NR>
+            rn<  N>R
+
             rc   j:RecuCrse
-            r@   I ?
+
             rt   j:RoT
             rl   j:RoLl
             r
@@ -424,7 +464,7 @@ COMPILATION IDEAS:
             ]    $( ] $) == do leave loop
             ]    $( ] $+) == do leave +loop
             ] 10 #(   #) == 10 for loop
-            ]    ?( ] ) == if else endif
+            ]    ?( ] ) == if else endif! (ELSE)
             ]    ( ?] ) == begin ifexit repeat
             ]    ( n?] ) == begin while repeat // ???
             ]    ( n?) == begin until
@@ -444,6 +484,8 @@ COMPILATION IDEAS:
 
 
   REFERENCES
+    FORTH STANDARD (active website, good quality!)
+    - https://forth-standard.org/standard/alpha
     Forth83 (clear summary by MikeOS)
     - http://mikeos.sourceforge.net/handbook-forth.html
     Forth2012 (not so understanable)

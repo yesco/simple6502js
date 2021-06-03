@@ -175,6 +175,21 @@ function getHex(prlab=0, dumplab=0, pretty=0) {
   return r;
 }
 
+function getLabels() {
+  return labels;
+}
+
+function allot(n, v= 0) {
+  if (n <=0 ) throw `%% allot: negative n: ${n}`;
+
+  while(n-->0) data(v);
+  return address;
+}
+
+function allotTo(n, to, v) {
+  return allot(to-n+1, v);
+}
+
 function char(c) {
   let ch = c.charCodeAt(c);
   if (ch > 255) throw `%% char: ${c} (${ch}) not single byte`;
@@ -522,20 +537,26 @@ function burn(m, chunks) {
 
 module.exports =
   global.j6502 =
-  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, char, string, pascal, hibit, OMG, rel, burn, clear };
+  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, string, pascal, hibit, OMG, rel, burn, clear };
 
 global.ORG = ORG;
+global.allot = allot;
+global.allotTo = allotTo;
+
 global.data = data;
-global.label = label; global.L = L;
-global.addr = addr; global.ORG = ORG;
 global.byte = byte;
 global.word = word;
+
 global.char = char;
-global.hex = hex;
 global.string = string;
 global.pascal = pascal;
 global.hibit = hibit;
 global.OMG = OMG;
+
+global.label = label; global.L = L;
+
+global.addr = addr; global.ORG = ORG;
+global.hex = hex;
 global.lo = lo;
 global.hi = hi;
 global.burn = burn;

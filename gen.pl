@@ -56,9 +56,9 @@
 #  uint16_t result = regs.y - mem_read(addr);
 #
 #  regs.p.c = result > 255;
-    'cmp', 'g= n(z(c( a - MEM)))',
-    'cpx', 'g= n(z(c( x - MEM)))',
-    'cpy', 'g= n(z(c( y - MEM)))',
+    'cmp', 'n(z(c( a - (g= MEM))))',
+    'cpx', 'n(z(c( x - (g= MEM))))',
+    'cpy', 'n(z(c( y - (g= MEM))))',
 
     'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1)))',
     'asl_a', 'g=       a= n(z(c(       a << 1)))',
@@ -189,7 +189,7 @@ let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
 function adc(v) {
   let oa= a;
   a= c(a + v + (p & C));
-  v((oa^a) & (v^a));
+  v= ((oa^a) & (v^a));
   if (~p & D) return; else c(0);
   if ((a & 0x0f) > 0x09) a+= 0x06;
   if ((a & 0xf0) <= 0x90) return;
@@ -522,7 +522,7 @@ if ($shortercode) {
 
 # postlude
 print "    }
-    trace && trace(cpu, { ic, ipc, op, f, mod, add: d, val: g} );
+    trace && trace(cpu, { ic, ipc, op, f, mod, d, val: g} );
   }
 }
   
@@ -548,7 +548,7 @@ function tracer(how, what) {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f:'???')+(q?q:'---')).padEnd(8, ' ')+
       ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
-      (is(d)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
+      (is(d)&&(d!=ipc+1)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
   }
 
   if (how == 'string') {
