@@ -214,7 +214,7 @@ function rel(name, f) {
     a = f ? f(a) : a;
     let b = a - address - 1;
     //console.log("REL: ", address, a, b);
-    if (b < -128 || b > 127) throw `%% Branch to label '${name} to far (${b})`;
+    if (b < -128 || b > 127) throw `%% Branch to label ${name} to far (${b})`;
     return b & 0xff;
   })(address)); // capture current addr
 }

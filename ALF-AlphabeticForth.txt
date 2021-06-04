@@ -200,6 +200,7 @@ o========================================-
 
 001 00000 (32) 31-63 ' '..'?'
          32 ' '  long name mode (ends with ])
+          [a-z]+ alt: use lowercase for longword
          33 !    store
          34 "    string
          35 #    depth(of stack) (no need prefix! #10=decimal USED # #> #$)
@@ -444,8 +445,9 @@ COMPILATION IDEAS:
          84 T    Tuck  type X:to X:true X:tuck
                  ?( ] ) Type (see $t)
          85 U    (u. u< um* um/mod unloop until X:u.r X"U>l" X:unused)
+            U<
+            U>
             U.
-            U< 
             ....
          86 V    Variable (! @) X:value (to)
             v foo 3 v ! (define and store)

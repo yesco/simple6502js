@@ -18,7 +18,7 @@
     'zp',  'm[pc++]',
      #zpy is zpx but for STX it's senseless
     'zpx', '((m[pc++] + x)& 0xff)',
-    'zpy', '((m[pc++] + y)& 0xff)', 
+    'zpy', '((m[pc++] + y)& 0xff)',
     'abs', 'w((pc+=2)-2)',
     'absx', 'w((pc+=2)-2) + x',
     'absy', 'w((pc+=2)-2) + y',
@@ -471,12 +471,13 @@ if ($shortercode) {
       // d= address of operand (data)
       switch(mod= (op >> 2) & 7) {
       case 0: d= op&1 ?
-             (q='zpx', d= (m[pc++] + x)& 0xff)
-          :  (q='imm', d= pc++);                              break;
+             (q='zpxi',   d= wz( m[pc++]+x ))
+          :  (q='imm',    d= pc++);                           break;
       case 1: q='zp';     d= m[pc++];                         break;
       case 2: q='imm';    d= op&1 ? pc++ : q='';              break;
       case 3: q='abs';    d= pc; pc+= 2;                      break;
-      case 4: q='zpiy';   d= (wz(m[pc++]) + y);                  break;
+      case 4: q='zpiy';   d= wz(m[pc++]) + y;
+             break;
       case 5: q='zpx';    d= (m[pc++] + x) & 0xff;            break;
       case 6: q='absy';   d= w(pc) + y; pc+= 2;               break;
       case 7: q='absx';   d= w(pc) + x; pc+= 2;               break;

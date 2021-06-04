@@ -16,6 +16,7 @@ let output = 1; // show 'OUTPUT: xyz'
              L('R3');        word(0); // 06
              L('R4');        word(0); // 08
              L('R5');        word(0); // 0a-0b
+
   // (ORIC uses...)
 
   // - FREE
@@ -29,7 +30,8 @@ ORG(0x16);   L('tmp_y');     byte(0);
   // ORIC 79 bytes input buffer
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
-ORG(0x35); /* INPUT_BUF */ string('0.1.2.3D+D.');
+ORG(0x35); /* INPUT_BUF */ string(
+'"ROLL"P98765432103RL..........');
 
   // Forth
 ORG(0x85);
@@ -76,6 +78,9 @@ ORG(0x0501); L('reset');
  L('MAIN_zero');
   RTS();
 
+ L('drop3_next'); // maybe used only once?
+  drop();
+
  L('drop2_next');
   drop();
 
@@ -91,6 +96,7 @@ ORG(0x0501); L('reset');
 
   let drop_next= ()=>JMPA('drop_next');
   let drop2_next= ()=>JMPA('drop2_next');
+  let drop3_next= ()=>JMPA('drop3_next');
   let number= ()=>JMPA('number');
 
   tabcod('MAIN', {
@@ -123,6 +129,35 @@ ORG(0x0501); L('reset');
     '7': function(){ return number},
     '8': function(){ return number},
     '9': function(){ return number},
+
+    '"_string': function(){
+      // calculate "pc"
+      push();
+      INY(); // Y no points at first char
+      STYZ('tmp_y');
+      TYA();
+      CLC();
+      ADCZ('NEXT_BASE');
+      STAZX(0);
+      LDAN(0);
+      ADCZ('NEXT_BASE', (a)=>a+1);
+      STAZX(1);
+      DEY();
+
+      LDAN(ord('"'));
+     L('skip_to"');
+      INY();
+      CMPIY('NEXT_BASE');
+      BNE('skip_to"');
+      
+      // now at " push(Y-Y')
+      push();
+      TYA();
+      SEC();
+      SBCZ('tmp_y');
+      STAZX(0); // lo
+      LDAN(0); STAZX(1); // hi = 0 TOOD: share
+    },
 
     Emit(){
       LDAZX(0);  JSRA(aputc);
@@ -188,30 +223,33 @@ ORG(0x0501); L('reset');
     '[_immediate': function(){
       LDAZ(0);
      L('set_state');
-      STAZ('STATE')
+      STAZ('STATE');
     },
 
-    '@_fetch': function(){
-      STYZ('tmp_y'); {
-        TXA(); TAY(); {
-          // m[addr]          addr
-          LDAIY(0);           STAZ('tmp_a');
-          LDAIY(1);    
-          // now can replace the pointer
-                              STAZX(1);
-          LDAZ('tmp_a');      STAZX(0);
-        }
-      } LDYZ('tmp_y');
+    '@_FETCH': function(){
+      LDAXI(0); STAZ('tmp_a');
+
+      // need to inc address!
+      INCZX(0);
+      BNE('@_noinc');
+      INCZX(1);
+     L('@_noinc');
+
+      LDAXI(1); STAZX(1);
+      LDAZ('tmp_a'); STAZX(0);
+      return drop_next;
     },
 
-    '!_store': function(){
-      STYZ('tmp_y'); {
-        TXA(); TAY(); {
-          // data              // addr
-          LDAZX(2);            STAIY(0);
-          LDAZX(3);            STAIY(1);
-        }
-      } LDYZ('tmp_y');
+    '!_STORE': function(){
+      LDAZX(2); STAXI(0);
+
+      // need to inc address!
+      INCZX(0);
+      BNE('!_noinc');
+      INCZX(1);
+     L('!_noinc');
+
+      LDAZX(3); STAXI(0);
       return drop2_next;
     },
 
@@ -288,10 +326,32 @@ ORG(0x0501); L('reset');
       return drop_next;
     },
 
+    Over (){
+      push();
+      LDAZX(4); STAZX(0);
+      LDAZX(5); STAZX(1);
+    },
+
     Dup (){ // dup
       push();
       LDAZX(2); STAZX(0);
       LDAZX(3); STAZX(1);
+    },
+
+    'P_printstring': function(){
+      // TODO: rename to $.
+// TODO: why STYZ not work and is slower?
+//      STYZ('tmp_y'); STXZ('tmp_x');
+      save_axy(()=>{
+        LDAZX(0); // length
+        STAZ('tmp_x');
+        LDAZX(2); // lo address
+        LDYZX(3); // hi address
+        LDXZ('tmp_x');
+        JSRA(aputs);
+      });
+//    LDYZ('tmp_y'); LDXZ('tmp_x');
+      return drop2_next;
     },
 
     '._print': function(){
@@ -329,7 +389,7 @@ L('number');
   // A = 0..9
   push();
            STAZX(0);
-  LDAN(0); STAZX(1);
+  LDAN(0); STAZX(1); // hi = 0 TOOD: share
   // TODO: read more digits...
 
   next();
@@ -365,37 +425,76 @@ L('Rminus');
   STAZX(3);
   RTS();
 
+  // zero X pages and Y bytes from R0
+ L('zero');
+  LDAN(0);
 
-L('CCC_zero');
+  // fill X pages and Y bytes with A from R0
+ L('fill');
+  INX(); // for 0 pages: DEX() => Z
+  // move blocks (of Y chars) backwards!
+ L('_fill');
+  STAIY(0);
+  DEY();
+  BNE('_fill');
+
+  // another page?
+  INCZ(1);
+  // Y is = 0 => 256 moves!
+  DEX();
+  BNE('_fill'); // yet
+  RTS();
+
+  // move X pages and Y bytes from R0 to R1
+  // OVERWRITES: if [R0, R0+n] ^ [R1, R1+n]
+  // but it's FAST! lol
+ L('move');
+  INX(); // for 0 pages: DEX() => Z
+  // move blocks (of Y chars) backwards!
+ L('_move');
+  LDAIY(0); STAIY(2);
+  DEY();
+  BNE('move');
+
+  // another page?
+  INCZ(1);
+  INCZ(3);
+  // Y is = 0 => 256 moves!
+  DEX();
+  BNE('_move'); // yet
+  //RTS(); as long as CCC_zero is there!
+
+L('CCC_zero'); // don't move (see above!)
   RTS();
 
 tabcod('CCC', {
-  '!_C!': function(){
-    STAZ('tmp_y'); {
-      TXA(); TAY();
-
-      // only lo byte
-      LDAZX(2);  STAIY(0);
-
-    } LDAZ('tmp_y');
-    return drop2_next;
-  },
-
-  '@_C@': function(){
-    STAZ('tmp_y'); {
-      TXA(); TAY();
-
-      // only lo byte
-      LDAIY(0);  STAZX(0);
-      // set hi = 0
-      LDAN(0);   STAZX(1);
-
-    } LDAZ('tmp_y');
+  '@_C@_CFETCH': function(){
+    LDAXI(2); STAZX(2) // only low byte
+    LDAN(0);  STAZX(3); // hi = 0
     return drop_next;
   },
 
-  'M_CMOVE': function() {
-    // TODO: 
+  '!_C!_CSTORE': function(){
+    LDAXI(2); STAZX(0) // only low byte
+    return drop2_next;
+  },
+
+  'M_CMOVE': function() { // (from to chars ==)
+    STYZ('tmp_y'); STYZ('tmp_x'); {
+      // - store in ZP at fixed address
+      // 4 from
+      LDAXI(4); STAZ(0);
+      LDAXI(5); STAZ(1);
+      // 2 to
+      LDAXI(2); STAZ(2);
+      LDAXI(3); STAZ(3);
+      // 0 chars
+      LDYZX(0); // Y = lo byte count
+      LDAZX(1); TAX(); // X = hi/page count
+
+      JSR&('move');
+    } LDXZ('tmp_x'); LDYZ('tmp_y'); 
+    return drop3_next;
   },
 
   R_CR(){
@@ -421,6 +520,63 @@ tabcod('RRR', {
     push();
     PLA();  STAZX(0);
     PLA();  STAZX(1);
+  },
+
+  T_RoT  (){ // (4 2 0 -- 2 0  4) b24 :-(
+    STYZ('tmp_y'); {
+      // TODO: maybe just call Roll?
+      // lo
+      LDYZX(4);
+      LDAZX(2); STAZX(4);
+      LDAZX(0); STAZX(2);
+                STYZX(0);
+      // hi
+      LDYZX(5);
+      LDAZX(3); STAZX(5);
+      LDAZX(1); STAZX(3);
+                STYZX(1);
+    } LDYZ('tmp_y');
+  },
+
+  L_Roll (){ // (5 4 3 2 1 0  3 -- 5 4  2 1 0  3)
+    // TODO: works only for n >= 2, lol
+    // 2 ROLL == ROT    mine: 3
+    // 1 ROLL == SWAP   mine: 2
+    // 0 ROLL === -     mine: 1
+    STYZ('tmp_y'); {
+      TXA();
+      CLC();
+      ADCZX(0);
+      ADCZX(0);  // A = X+2*Y == destination addr
+      TAX();
+      
+      // - X now is destination address
+      // store wanted value
+      LDAZX(0); STAZ(0);
+      LDAZX(1); STAZ(1);
+
+      LDYZX(2); // only lo count! (-2)
+      // move Y others
+     L('_roll');
+      BEQ('_roll_done');
+      LDAZX(0xfe); STAZX(0);
+      LDAZX(0xff); STAZX(1);
+      //LDAZX(0); STAZX(2);
+//      LDAZX(1); STAZX(3);
+      DEX(); DEX();
+      DEY();
+      BNE('_roll');
+      JMPA('_roll');
+
+     L('_roll_done');
+      // store the rolled out value
+      //LDAZ(0); STAZX(4);
+      //LDAZ(1); STAZX(5);
+      LDAZ(0); STAZX(2);
+      LDAZ(1); STAZX(3);
+      
+    } LDYZ('tmp_y');
+    return drop_next;
   },
 
   default(){
@@ -470,10 +626,11 @@ Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 
 print(cpu.run(-1, trace, patch));
 print();
-print(cpu.dump(0x0000, 2));
+cpu.dump(0x0000, 2);
+printstack();
 
 //print('INCZX=' + INCZX.toString(), INCZX);
-print('BNE=' + BNE.toString(), BNE);
+//print('BNE=' + BNE.toString(), BNE);
 
 
 // --- ALForth helpers
@@ -486,6 +643,9 @@ function trace(c, h) {
   }
 
   cpu.tracer(cpu, h);
+  cpu.dump(h.ipc,1);
+  printstack();
+  print("\n\n");
 
   l = a2l[h.d];
   if (l) {
@@ -496,7 +656,8 @@ function trace(c, h) {
 function printstack() {
   let x = cpu.reg('x');
   princ(`  DSTACK[${(0x101-x)/2}]: `)
-  while(++x < 0x100) {
+  x--;
+  while(++x < 0xff) {
     princ(hex(4, cpu.w(x++)));
     princ(' ');
   }
@@ -527,7 +688,7 @@ function patch(pc, m, cpu) {
   switch(d) {
   case 0xfff0: _putc(cpu.reg('a')); break;
   case 0xfff2: _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
-  case 0xfff4: _puts((cpu.reg('y')<<8)+cpu.reg('a')); break;
+  case 0xfff4: _puts((cpu.reg('y')<<8)+cpu.reg('a'), cpu.reg('x')); break;
   case 0xfff6: _getc(); break; // TODO:
     ////////////////////////////////////////
   case 0xfff8: return; // ABORT 6502C
@@ -553,13 +714,15 @@ function _putc(c) {
   if (output) princ("OUTPUT: ");
   process.stdout.write(chr(c));
   if (output) print();
-  return a;
 }
 
-function _puts(a) {
+// print string from ADDRESS
+// optinal max LEN chars
+// stops if char=0 or char hi-bit set.
+function _puts(a, len=-1) {
   if (output) princ("OUTPUT: ");
   let c = 0;
-  while((c < 128) && (c=m[a++]))
+  while(len-- && (c < 128) && (c=m[a++]))
     process.stdout.write(chr(c));
   if (output) print();
 }
@@ -582,7 +745,7 @@ function next() {
 }
 
 function ord(c) { return c.charCodeAt(0)}
-function ch(c) { return String.fromCharCode(c)}
+function chr(c) { return String.fromCharCode(c)}
 function print(...r) { return console.log(...r)}
 function princ(s) { return process.stdout.write(''+s);}
 
