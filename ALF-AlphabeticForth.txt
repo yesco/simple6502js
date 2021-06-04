@@ -186,7 +186,7 @@ o========================================-
     ; - ";c" - codce follows till (impl def
 ) end marker
     A - allocation memory heap
-    B - base/BL(eank)
+    B - base/BL(eank)/BeTween
     C - Character / Compile
     L - Literal / Local
     R - R stack, RoT/RoLl/ReCurse/Register
@@ -336,6 +336,7 @@ BEGIN                             AGAIN
             
          66 B    ??? j:base begin bl X:"buffer:"
             bs   BaSe
+            bt   BeTween
             b0   base 10
             b8   base octal 8
             b2   base 2
@@ -358,6 +359,7 @@ BEGIN                             AGAIN
             co   count (?)
 
             cp   Postone/Compile
+            cs   compiling 'Stateb' (0=executing, otherwise compiling)
             c'   compile ' = [']
             c,   Compile, "store char, here++"
             ce   "See" word def!
@@ -388,7 +390,9 @@ COMPILATION IDEAS:
          74 J    j (loopv)
          75 K    key
          76 L    Literal (leave literal loop lshift)
+            LA   Latest (pointer to linked list dictionary)
             LT   Literal
+
             // Local variables
             // - https://github.com/seanpringle/reforth
             // (like a mini fast pick)

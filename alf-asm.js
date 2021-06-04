@@ -2,10 +2,9 @@
 let cpu6502 = require('./fil.js');
 let jasm = require('./jasm.js');
 let aputc = 0xfff0;
-let aputs = 0xfff2;
-let aputd = 0xfff4;
-
-
+let aputd = 0xfff2;
+let aputs = 0xfff4;
+let output = 1; // show 'OUTPUT: xyz'
 
 // ALF - ALphabet  F O R T H
 
@@ -21,13 +20,22 @@ let aputd = 0xfff4;
 
   // - FREE
 
+ORG(0x14);   L('tmp_a');     byte(0);
+ORG(0x15);   L('tmp_x');     byte(0);
+ORG(0x16);   L('tmp_y');     byte(0);
+
+  // - FREE
+
   // ORIC 79 bytes input buffer
-  ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
+ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
-  ORG(0x35); /* INPUT_BUF */ string('D+D.');
+ORG(0x35); /* INPUT_BUF */ string('0.1.2.3D+D.');
 
   // Forth
-  ORG(0x85); L('NEXTPTR');   word('INPUT_BUF');
+ORG(0x85);
+  L('NEXT_BASE');   word('INPUT_BUF');
+  L('NEXT_Y');      data(0);
+  L('STATE');       data(0);
 
   // - FREE
 
@@ -48,13 +56,15 @@ ORG(0x0501); L('reset');
 
 //////////////////////////////
  L('start');
-  LDXN(0x00);
+  // init stack
+  LDXN(0xff);
   //JSRA('WINC');
   //JSRA('WINC2');
 
   //LDXN(0x02);
   //JSRA('WDEC');
 
+ L('interpret');
   // Init
   LDYN(0);
 
@@ -66,55 +76,184 @@ ORG(0x0501); L('reset');
  L('MAIN_zero');
   RTS();
 
- L('drop_next');
-  inx2();
+ L('drop2_next');
+  drop();
 
+ L('drop_next');
+  drop();
+
+  // This is a Alphabet Forth ("byte coded")
+  // maxlen of interpreted routine = 255!
  L('next');
+  TRACE(printstack);
+
   INY();
 
-  let drop= ()=>JMPA('drop_next');
+  let drop_next= ()=>JMPA('drop_next');
+  let drop2_next= ()=>JMPA('drop2_next');
+  let number= ()=>JMPA('number');
 
   tabcod('MAIN', {
-    // 11 Forth  Functions defined!
-    '+' : function(){ // plus
+
+    // 24 Forth  Functions defined!
+
+    // TODO:
+    // - $K key or ck?
+    // - cw - word skip space, read next word "store" it ( == addr len ) NOT z-terminated
+    // - cf find word  WROD DOUBLE FIND >CFA
+    // - ca Code Address ?
+    // - create ct ?
+    // - ':'
+    // - ';'
+    // - ','  !!!! first!
+    // - [ immediate go into immediatem mode - update STATE = 0
+    // - ] immediate go into compiling mode - update STATE = 1
+    // - Quit is "reset" ? loops Interpret
+
+    // - inefficient, lol
+    // TODO:we know(?) Z/!Z, use BNE... ???
+    // depends on codegen... if if if=> z=1...
+    '0': function(){ return number},
+    '1': function(){ return number},
+    '2': function(){ return number},
+    '3': function(){ return number},
+    '4': function(){ return number},
+    '5': function(){ return number},
+    '6': function(){ return number},
+    '7': function(){ return number},
+    '8': function(){ return number},
+    '9': function(){ return number},
+
+    Emit(){
+      LDAZX(0);  JSRA(aputc);
+      return drop_next;
+    },
+
+    '(_begin': function(){
+      // simple does it
+      TYA(); PHA();
+    },
+
+    ')_again': function(){
+      PLA(); TAY();
+      // start over at '('
+      JMPA('MAIN');
+      return ()=>0; // none
+    },
+
+    ']_stop': function(){
+      // TODO: long: move out, JSRA?
+
+      LDAZ('STATE');
+      BNE('forceend');
+
+      // inside '[' (immediate mode)
+      LDAZ(0x80);
+      BNE('set_state');
+
+      // running mode (!imm)
+      // drop loop tooken
+     L('forceend');
+      PLA(); // 0 means no more loop => exit!
+      BNE('leave');
+
+      // ] exit
+      RTS();
+
+      // leave - go to matching ')'
+      // TODO: handle ]]]] (unrolll+leave)
+      STXZ('tmp_x'); // 
+      LDXN(0);
+     L('leave');
+      INY();
+      LDAIY('NEXT_BASE');
+
+      CMPN(ord('('));
+      BNE('not(');
+      INX();
+
+     L('not(');
+      CMPN(ord(')'));
+      BNE('leave');
+      
+      DEX();
+      // more to go!
+      BNE('leave');
+
+      // we found matching )
+      STXZ('tmp_x');
+      // just go to next!
+    },
+
+    '[_immediate': function(){
+      LDAZ(0);
+     L('set_state');
+      STAZ('STATE')
+    },
+
+    '@_fetch': function(){
+      STYZ('tmp_y'); {
+        TXA(); TAY(); {
+          // m[addr]          addr
+          LDAIY(0);           STAZ('tmp_a');
+          LDAIY(1);    
+          // now can replace the pointer
+                              STAZX(1);
+          LDAZ('tmp_a');      STAZX(0);
+        }
+      } LDYZ('tmp_y');
+    },
+
+    '!_store': function(){
+      STYZ('tmp_y'); {
+        TXA(); TAY(); {
+          // data              // addr
+          LDAZX(2);            STAIY(0);
+          LDAZX(3);            STAIY(1);
+        }
+      } LDYZ('tmp_y');
+      return drop2_next;
+    },
+
+    '+_plus' : function(){
       CLC()
       LDAZX(0); ADCZX(2); STAZX(2);
       LDAZX(1); ADCZX(3); STAZX(3);
-      return drop;
+      return drop_next;
     },
 
-    '-' : function(){ // minus
+    '-_minus' : function(){
       JSRA('Rminus');
 //      SEC()
 //      LDAZX(0); SBCZX(2); STAZX(2);
 //      LDAZX(1); SBCZX(3); STAZX(3);
-      return drop;
+      return drop_next;
     },
 
-    '&' : function(){ // and
+    '&_and' : function(){
       LDAZX(0); ANDZX(2); STAZX(2);
       LDAZX(1); ANDZX(3); STAZX(3);
-      return drop;
+      return drop_next;
     },
 
-    '_' : function(){ // or
+    '__or' : function(){
       LDAZX(0); ORAZX(2); STAZX(2);
       LDAZX(1); ORAZX(3); STAZX(3);
-      return drop;
+      return drop_next;
     },
 
-    '^' : function(){ // eor
+    '^_xor' : function(){
       LDAZX(0); EORZX(2); STAZX(2);
       LDAZX(1); EORZX(3); STAZX(3);
-      return drop;
+      return drop_next;
     },
 
-    Not(){ // not
+    Not(){
       LDAZX(0); EORN(0xff); STAZX(0);
       LDAZX(1); EORN(0xff); STAZX(1);
     },
 
-    '=' : function(){ // = equal
+    '=_equal' : function(){
       JSRA('Rminus');
       LDAZX(0);
       ORAZX(1);
@@ -129,7 +268,7 @@ ORG(0x0501); L('reset');
       return;
     },
 
-    '<' : function(){ // < less than
+    '<_less_than' : function(){
       JSRA('Rminus');
       BMI('true');
       BPL('false');
@@ -138,30 +277,42 @@ ORG(0x0501); L('reset');
       JMPA('inv'); // => 1
     },
 
-    '>' : function(){ // > greater than
+    '>_greater_than' : function(){
       JSRA('Rminus');
       BEQ('false');
       BNE('true');
     },
 
     // TODO: put instruction before that also need to "drop"
-    '\\' : function(){ // drop
-      return drop;
+    '\\_drop' : function(){
+      return drop_next;
     },
 
     Dup (){ // dup
-      dex2(); // push
+      push();
       LDAZX(2); STAZX(0);
       LDAZX(3); STAZX(1);
     },
 
-    '.'	: function(){ // print
+    '._print': function(){
       save_ay(()=>{
         LDAZX(0);
         LDYZX(1);
         JSRA(aputd);
       });
-      return drop;
+      return drop_next;
+    },
+
+    'C_prefix': function(){
+      INY();
+      JMPA('CCC');
+      return ()=>0; // nothing
+    },
+
+    'R_prefix': function(){
+      INY();
+      JMPA('RRR');
+      return ()=>0; // nothing
     },
 
     default (){
@@ -172,6 +323,16 @@ ORG(0x0501); L('reset');
   // TODO: Report ERROR as no match?
   JMPA('end');
 
+L('number');
+  SEC();
+  SBCN(ord('0'));
+  // A = 0..9
+  push();
+           STAZX(0);
+  LDAN(0); STAZX(1);
+  // TODO: read more digits...
+
+  next();
 
 L('WINC2');
   JSRA('WINC');
@@ -205,25 +366,69 @@ L('Rminus');
   RTS();
 
 
-L('MULTI_zero');
+L('CCC_zero');
   RTS();
 
-tabcod('MULTI', {
-  A(){
-    LDAN(65);
+tabcod('CCC', {
+  '!_C!': function(){
+    STAZ('tmp_y'); {
+      TXA(); TAY();
+
+      // only lo byte
+      LDAZX(2);  STAIY(0);
+
+    } LDAZ('tmp_y');
+    return drop2_next;
+  },
+
+  '@_C@': function(){
+    STAZ('tmp_y'); {
+      TXA(); TAY();
+
+      // only lo byte
+      LDAIY(0);  STAZX(0);
+      // set hi = 0
+      LDAN(0);   STAZX(1);
+
+    } LDAZ('tmp_y');
+    return drop_next;
+  },
+
+  'M_CMOVE': function() {
+    // TODO: 
+  },
+
+  R_CR(){
+    LDAN(10);
     JSRA(aputc);
   },
-  B(){
-    LDAN(66);
-    JSRA(aputc);
-  },
-  C(){
-    LDAN(66);
-    JSRA(aputc);
-  },
-  default(){ // lol
+
+  default(){ 
+    // TODO: give error?
   }});
   
+L('RRR_zero');
+  RTS();
+
+tabcod('RRR', {
+  '<_R<_>R': function(){
+    LDAZX(1);  PHA();  // hi first
+    LDAZX(0);  PHA();  // lo
+    return drop_next;
+  },
+
+  '>_R>_R>': function(){
+    push();
+    PLA();  STAZX(0);
+    PLA();  STAZX(1);
+  },
+
+  default(){
+    // TODO:
+  },
+});
+
+
 L('end');
   BRK();
 L('halt');
@@ -273,6 +478,7 @@ print('BNE=' + BNE.toString(), BNE);
 
 // --- ALForth helpers
 
+// (called after instruction)
 function trace(c, h) {
   let l = a2l[h.ipc];
   if (l) {
@@ -287,8 +493,25 @@ function trace(c, h) {
   }
 }
 
+function printstack() {
+  let x = cpu.reg('x');
+  princ(`  DSTACK[${(0x101-x)/2}]: `)
+  while(++x < 0x100) {
+    princ(hex(4, cpu.w(x++)));
+    princ(' ');
+  }
+  print();
+}
+
+function TRACE(f) {
+  TRACE[jasm.address()] = f;
+}
+
 // install traps for putc!
+// (called before instruction)
 function patch(pc, m, cpu) {
+  (TRACE[pc] || (()=>0))();
+
   let op= m[pc], d;
 
   // get effective address
@@ -326,20 +549,25 @@ function patch(pc, m, cpu) {
   return 1;
 }
 
-function _putc(a) {
-  process.stdout.write(
-    String.fromCharCode(a));
+function _putc(c) {
+  if (output) princ("OUTPUT: ");
+  process.stdout.write(chr(c));
+  if (output) print();
   return a;
 }
 
 function _puts(a) {
+  if (output) princ("OUTPUT: ");
   let c = 0;
   while((c < 128) && (c=m[a++]))
-    _putc(c);
+    process.stdout.write(chr(c));
+  if (output) print();
 }
 
 function _putd(d) {
+  if (output) princ("OUTPUT: ");
   process.stdout.write(''+d);
+  if (output) print();
 }
   
 // code gen
@@ -356,6 +584,7 @@ function next() {
 function ord(c) { return c.charCodeAt(0)}
 function ch(c) { return String.fromCharCode(c)}
 function print(...r) { return console.log(...r)}
+function princ(s) { return process.stdout.write(''+s);}
 
 // generate a "switch" from assoc list
 // does order matter?
@@ -363,7 +592,7 @@ function print(...r) { return console.log(...r)}
 // you have to have a near label NAME_zero
 function tabcod(name, list, nxt= next) {
  L(name);
-  LDAIY('NEXTPTR');
+  LDAIY('NEXT_BASE');
   BEQ(name+'_zero');
 
   Object.keys(list).forEach(k=>{
@@ -396,9 +625,14 @@ function tabcod(name, list, nxt= next) {
   });
 }
 
-// typically used in stack manipulation
-function inx2() { INX(); INX(); }
-function dex2() { DEX(); DEX(); }
+// data stack manipulation
+// (stack grows down)
+function drop() { INX(); INX(); }
+function push(v) {
+  if (v)
+    throw "%% push no arg: just make spacec";
+  DEX(); DEX();
+}
 
 function save_a(f) {
   PHA(); {

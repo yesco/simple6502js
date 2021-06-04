@@ -537,7 +537,7 @@ function burn(m, chunks) {
 
 module.exports =
   global.j6502 =
-  { addr, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, string, pascal, hibit, OMG, rel, burn, clear };
+  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, string, pascal, hibit, OMG, rel, burn, clear };
 
 global.ORG = ORG;
 global.allot = allot;

@@ -1,0 +1,1 @@
+perl gen.pl > fil.js  && node alf-asm.js | less |grep '\(OUT\|----.*_op\)'
