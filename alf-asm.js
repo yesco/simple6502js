@@ -33,7 +33,7 @@ ORG(0x16);   L('tmp_y');     byte(0);
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
 ORG(0x35); /* INPUT_BUF */ string(
-'1234567##3');
+'1234567##3#.');
 //'6543210##');
 
 //'65432103P......');
@@ -51,12 +51,12 @@ ORG(0x35); /* INPUT_BUF */ string(
 //'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.2D.4Z'); // 2
 
 
-  // Forth
+  // ALForth
 ORG(0x85);
+  L('QUIT_STACK');  byte(0);
   L('NEXT_BASE');   word('INPUT_BUF');
   L('NEXT_Y');      data(0);
   L('STATE');       data(0);
-
   // - FREE
 
   ORG(0xbf); L('DSTACK');    allotTo(0xfe); // 32*2
@@ -75,15 +75,35 @@ ORG(start); L('reset');
 
 
 //////////////////////////////
+ L('ALF_init');
+  // save stack for QUIT
+  TSX(); STXZ('QUIT_STACK');
+
+  JMPA('interpret');
+
  L('ALF_reset');
-  // init stack
+  LDX('QUIT_STACK'); TXS();
+
+  // init data stack
   LDXN(0xff);
 
- L('interpret');
-  // Init index
+  // reset input to command line
+  LDAZ('INPUT_BUF', lo); STAZ('NEXT_BASE');
+  LDAZ('INPUT_BUF', hi); STAZ('NEXT_BASE', (a)=>a+1);
   LDYN(0);
+
+  // make sure it's empty!
+  LDAN(0); STAIY('NEXT_BASE');
+
+ L('interpret');
+  // init index
+  LDYN(0);
+  // TODO: read-eval loop!
   JSRA('MAIN');
+
+  // TODO: restore from BASE,Y fromstack?
   JMPA('end');
+
 
 
  L('MAIN_zero');
@@ -237,6 +257,7 @@ ORG(start); L('reset');
       BNE('forceend');
 
       // inside '[' (immediate mode)
+      // TODO: [=inc ]=dec that way can have a super immediate mode (as you type??
       LDAZ(0x80);
       BNE('set_state');
 
@@ -601,13 +622,23 @@ tabcod('###', {
 
   '._#._.S_print_stack': function(){
     save_axy(()=>{
+      if (0) {
+        // call ##
+        LDAN(ord('<')); JSR(aputc);
+        LDAZX(0); LDYZX(1); JSRA(aputd);
+        LDAN(ord('>')); JSR(aputc);
+        LDAN(ord(' ')); JSR(aputc);
+      }
+
+      // want reverse order!
       L('_printstack_next');
-      CPXN(0);
+      CPXN(0xff);
       BEQ('_printstack_done');
+      LDAN(ord(' ')); JSRA(aputc);
       // "."
-      LDAZX(0);
-      LDYZX(1);
-      JSRA(aputd);
+      LDAZX(0); LDYZX(1); JSRA(aputd);
+
+      drop();
       JSRA('_printstack_next');
 
       L('_printstack_done');
