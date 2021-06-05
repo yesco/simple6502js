@@ -53,9 +53,11 @@ ORG(0x35); /* INPUT_BUF */ string(
 
   // ALForth
 ORG(0x85);
+  // Need save this for subroutine call?
   L('QUIT_STACK');  byte(0);
   L('NEXT_BASE');   word('INPUT_BUF');
-  L('NEXT_Y');      data(0);
+  L('NEXT_Y');      byte(0);
+
   L('STATE');       data(0);
   // - FREE
 
@@ -73,6 +75,9 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
+  JSRA('ALF_init');
+  JMPA('end');
+  
 
 //////////////////////////////
  L('ALF_init');
@@ -82,6 +87,7 @@ ORG(start); L('reset');
   JMPA('interpret');
 
  L('ALF_reset');
+  // restore stack
   LDX('QUIT_STACK'); TXS();
 
   // init data stack
@@ -102,7 +108,8 @@ ORG(start); L('reset');
   JSRA('MAIN');
 
   // TODO: restore from BASE,Y fromstack?
-  JMPA('end');
+  RTS();
+  //JMPA('end');
 
 
 
@@ -133,7 +140,7 @@ ORG(start); L('reset');
 
   tabcod('MAIN', {
 
-    // 37 Forth  Functions defined!
+    // 42 ALForth functions defined!
     // (core forth has about 133 words)
     // (core extension has 50 words)
     //
