@@ -75,21 +75,14 @@ ORG(start); L('reset');
 
 
 //////////////////////////////
- L('start');
+ L('ALF_reset');
   // init stack
   LDXN(0xff);
-  //JSRA('WINC');
-  //JSRA('WINC2');
-
-  //LDXN(0x02);
-  //JSRA('WDEC');
 
  L('interpret');
-  // Init
+  // Init index
   LDYN(0);
-
   JSRA('MAIN');
-
   JMPA('end');
 
 
@@ -135,6 +128,10 @@ ORG(start); L('reset');
     // - ','  !!!! first!
     // - Quit is "reset" ? loops Interpret
     
+    Quit (){
+      JMPA('ALF_reset');
+    },
+
     Pick (){
       STXZ('tmp_x'); {
         INCZX(0);
