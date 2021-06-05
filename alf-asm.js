@@ -881,10 +881,14 @@ function tabcod(name, list, nxt= next) {
   tabcod.count = (tabcod.count || 0) + count;
   tabcod.tabcods =  (tabcod.tabcods || 0) + 1;
 
+  print('====tabcod=========================');
+  print('====TABCOD: ', name);
   print('====tabcod: ', count);
-  print('====tabcod_total: ', tabcod.count, ' tabcods: ', tabcod.tabcods);
+  print('====tabcod_total: ', tabcod.count);
+  print('====tabcod_tabcods: ', tabcod.tabcods);
 
   Object.keys(list).forEach(k=>{
+    print('====TABCOD_F: ', k);
     let cod= list[k];
     
     if (1) {
