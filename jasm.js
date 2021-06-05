@@ -115,9 +115,11 @@ function word(name, fexpr, byte) {
       data(hi(v));
   }
 
-  let a = typeof name=='string' ? labels[name] : name;
+  let a = typeof name==='string' ? labels[name] : name;
   if (typeof a === 'number')
     return write(a);
+  if (typeof name==='undefined')
+    throw '%% jasm: referred to undefined name';
 
   backpatch[name] = backpatch[name] || [];
   // double closure: save address
@@ -284,8 +286,8 @@ function setvalid(op) {
 
 mgen('---BITJMPJMPSTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC');
 function mgen(names, valids) {
-  const modes = [['imm', 'zpxi'], 'zp', ['---','imm'], 'abs', 'zpiy', 'zpx', 'absy', 'absx'];
-  const mds=[['N','XI'],'Z',['--', 'N'],'A','IY','ZX','AY','AX'];
+  const modes = [['imm', 'zpxi'], 'zp', ['','imm'], 'abs', 'zpiy', 'zpx', 'absy', 'absx'];
+  const mds=[['N','XI'],'Z',['', 'N'],'A','IY','ZX','AY','AX'];
   // TODO: restrict gen depending on mode
   for(let c=0; c<3; c++) {
     for(let i=0; i<8; i++) {
@@ -510,7 +512,7 @@ function modebc(op) {
   const byts = [2,2, 2,2, 1,2, 3,3,  2,2, 2,2, 3,3, 3,3];
   const cycs = [2,6, 3,3, 2,2, 4,4,  5,5, 4,4, 4,4, 4,4];
   
-  let i = ((op >> 1) | (op & 1)) & 0xf;
+  let i = (((op >> 1) & 0xe) | (op & 1)) & 0xf;
   return [ byts[i], cycs[i] ];
 }
 
@@ -599,4 +601,7 @@ ops.map((f,i)=>{
       `   ==== OP? i=${i}, f.op=${f.op}\n`);
 });
 
-console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
+//console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
+
+// debug modebc
+//console.log('modebc(LSR)=', modebc(0x4a), (((0x4a >> 1) & 14) | (0x4a&1)).toString(2));

@@ -523,7 +523,7 @@ if ($shortercode) {
 
 # postlude
 print "    }
-    trace && trace(cpu, { ic, ipc, op, f, mod, d, val: g} );
+    if (trace && trace(cpu, { ic, ipc, op, f, mod, d, val: g} )) return 'quit';
   }
 }
   

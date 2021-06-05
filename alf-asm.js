@@ -31,7 +31,23 @@ ORG(0x16);   L('tmp_y');     byte(0);
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
 ORG(0x35); /* INPUT_BUF */ string(
-'"ROLL"P98765432103RL..........');
+'1234567##9');
+//'6543210##');
+
+//'65432103P......');
+
+// TODO: --- ROLL BUG 9!
+//'"ROLL"P2222222226171915RL.............'); // 6 breaks in this case? where the hell the values went?
+//'"ROLL"$333365432106RL.............'); // 8 works fine.... ? WTF?
+//'"ROLL"$333398765432109RL.............'); - 8 works fine.... ? WTF?
+//'"ROLL"$333398765432109RL.............'); - doesn't work 
+
+// --- TODO: fill not working correctly
+//'81D+D+D+D+D+D+D+D+D.4Z');
+//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+D2+.4Z'); // 512+2
+//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+2+.4Z'); // 256+ 2
+//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.2D.4Z'); // 2
+
 
   // Forth
 ORG(0x85);
@@ -101,7 +117,7 @@ ORG(0x0501); L('reset');
 
   tabcod('MAIN', {
 
-    // 24 Forth  Functions defined!
+    // 37 Forth  Functions defined!
 
     // TODO:
     // - $K key or ck?
@@ -115,6 +131,45 @@ ORG(0x0501); L('reset');
     // - [ immediate go into immediatem mode - update STATE = 0
     // - ] immediate go into compiling mode - update STATE = 1
     // - Quit is "reset" ? loops Interpret
+    
+    Pick (){
+      STXZ('tmp_x'); {
+        INCZX(0);
+        TXA();
+        CLC();
+        ADCZX(0);
+        ADCZX(0);  // A = X+2*Y == destination addr
+        TAX();
+      
+        // - X now is destination address
+        // store wanted value
+        LDAZX(0); STAZ(0);
+        LDAZX(1); STAZ(1);
+      } LDXZ('tmp_x');
+      LDAZ(0); STAZX(0);
+      LDAZ(1); STAZX(1);
+    },
+
+
+    Z_Zill_Zero_Fill_Erase_Blank() { // alias for fill?
+//      save_axy(()=>{
+      STXZ('tmp_x'); STYZ('tmp_y'); {
+        // address
+        LDAZX(4); STAZ(0);
+        LDAZX(5); STAZ(1);
+        // lo char
+        LDAZX(0); STAZ(2);
+        // count
+        LDYZX(2);        // bytes (lo byte)
+        LDAZX(3); TAX(); // pages (hi byte)
+
+        LDAZ(2); // char
+
+        JSRA('fill');
+
+      } LDYZ('tmp_y'); LDXZ('tmp_x');
+      return drop3_next;
+    },
 
     // - inefficient, lol
     // TODO:we know(?) Z/!Z, use BNE... ???
@@ -332,13 +387,13 @@ ORG(0x0501); L('reset');
       LDAZX(5); STAZX(1);
     },
 
-    Dup (){ // dup
+    'Dup': function(){
       push();
       LDAZX(2); STAZX(0);
       LDAZX(3); STAZX(1);
     },
 
-    'P_printstring': function(){
+    '$_printstring': function(){
       // TODO: rename to $.
 // TODO: why STYZ not work and is slower?
 //      STYZ('tmp_y'); STXZ('tmp_x');
@@ -372,6 +427,12 @@ ORG(0x0501); L('reset');
     'R_prefix': function(){
       INY();
       JMPA('RRR');
+      return ()=>0; // nothing
+    },
+
+    '#_prefix': function(){
+      INY();
+      JMPA('###');
       return ()=>0; // nothing
     },
 
@@ -429,21 +490,43 @@ L('Rminus');
  L('zero');
   LDAN(0);
 
+
   // fill X pages and Y bytes with A from R0
  L('fill');
-  INX(); // for 0 pages: DEX() => Z
+  INX();
+  CPYN(0);
+  BNE('_fill_op');
+  // Y == 0
+  CPXN(0);
+  BEQ('_fillRTS_op');
+  DEX();
+  
+//  CPYN(0);
+//  BEQ('_fillpage');
+//  CPXN(1);
+//  BNE('_fill');
+//  RTS();
+  //INX(); // for 0 pages: DEX() => Z
   // move blocks (of Y chars) backwards!
- L('_fill');
-  STAIY(0);
-  DEY();
-  BNE('_fill');
 
+ L('_fill_op');
+  DEY();
+  STAIY(0);
+  BNE('_fill_op');
   // another page?
+ L('_fillpage_op');
+
+CLC();
+ADCN(1);
+
   INCZ(1);
   // Y is = 0 => 256 moves!
   DEX();
-  BNE('_fill'); // yet
+  BNE('_fill_op'); // yet
+ L('_fillRTS_op');
   RTS();
+
+
 
   // move X pages and Y bytes from R0 to R1
   // OVERWRITES: if [R0, R0+n] ^ [R1, R1+n]
@@ -452,8 +535,8 @@ L('Rminus');
   INX(); // for 0 pages: DEX() => Z
   // move blocks (of Y chars) backwards!
  L('_move');
-  LDAIY(0); STAIY(2);
   DEY();
+  LDAIY(0); STAIY(2);
   BNE('move');
 
   // another page?
@@ -506,6 +589,35 @@ tabcod('CCC', {
     // TODO: give error?
   }});
   
+L('###_zero'); // don't move (see above!)
+  RTS();
+
+tabcod('###', {
+  '#_##_DEPTH': function(){
+    TXA();
+    push();
+    // TODO: common seq? pushA();
+    EORN(0xff);
+    LSR();   STAZX(0);
+    LDAN(0); STAZX(1);
+  },
+
+  '._#._.S_print_stack': function(){
+    save_axy(()=>{
+      L('_printstack_next');
+      CPXN(0);
+      BEQ('_printstack_done');
+      // "."
+      LDAZX(0);
+      LDYZX(1);
+      JSRA(aputd);
+      JSRA('_printstack_next');
+
+      L('_printstack_done');
+    });
+  }
+});
+
 L('RRR_zero');
   RTS();
 
@@ -544,6 +656,7 @@ tabcod('RRR', {
     // 1 ROLL == SWAP   mine: 2
     // 0 ROLL === -     mine: 1
     STYZ('tmp_y'); {
+      INCZX(0);
       TXA();
       CLC();
       ADCZX(0);
@@ -561,11 +674,11 @@ tabcod('RRR', {
       BEQ('_roll_done');
       LDAZX(0xfe); STAZX(0);
       LDAZX(0xff); STAZX(1);
-      //LDAZX(0); STAZX(2);
+//      LDAZX(0); STAZX(2);
 //      LDAZX(1); STAZX(3);
       DEX(); DEX();
       DEY();
-      BNE('_roll');
+//      BNE('_roll');
       JMPA('_roll');
 
      L('_roll_done');
@@ -596,10 +709,6 @@ L('halt');
 }
 
 
-
-
-
-
 print(jasm.getChunks());
 print(jasm.getHex(1,1,0));
 print(jasm.getHex(0,0,0));
@@ -628,6 +737,10 @@ print(cpu.run(-1, trace, patch));
 print();
 cpu.dump(0x0000, 2);
 printstack();
+console.log();
+cpu.dump(8192, 512/8+2);
+printstack();
+console.log();
 
 //print('INCZX=' + INCZX.toString(), INCZX);
 //print('BNE=' + BNE.toString(), BNE);
@@ -650,6 +763,10 @@ function trace(c, h) {
   l = a2l[h.d];
   if (l) {
     print("                      @ ", l);
+  }
+
+  if (h.op==0) {
+    return 'quit';
   }
 }
 
@@ -754,9 +871,18 @@ function princ(s) { return process.stdout.write(''+s);}
 //
 // you have to have a near label NAME_zero
 function tabcod(name, list, nxt= next) {
+  print("--->tabcod: ", name);
  L(name);
   LDAIY('NEXT_BASE');
+  JSRA(aputc);
   BEQ(name+'_zero');
+
+  let count = Object.keys(list).length;
+  tabcod.count = (tabcod.count || 0) + count;
+  tabcod.tabcods =  (tabcod.tabcods || 0) + 1;
+
+  print('====tabcod: ', count);
+  print('====tabcod_total: ', tabcod.count, ' tabcods: ', tabcod.tabcods);
 
   Object.keys(list).forEach(k=>{
     let cod= list[k];
@@ -775,7 +901,7 @@ function tabcod(name, list, nxt= next) {
 
       // generate code and 'next'
      L(name+'_op_'+k);
-      (cod() ||nxt)();
+      (cod() || nxt)();
 
       // skip to here
       if (k !== 'default')
@@ -786,6 +912,7 @@ function tabcod(name, list, nxt= next) {
       // TODDO after cases need generate cod
     }
   });
+  print("<---tabcod: ", name);
 }
 
 // data stack manipulation

@@ -385,6 +385,14 @@ COMPILATION IDEAS:
          68 D    Dup (drop) do dup drop depth (decimal X:defer X:defer! X:defer@ dDoubleFunc)
          79 E    Emit else (emit environment evaluate execute exit(=]) X:endcase X:endof X:erase)
          70 F    fill find fm/mod X:false f+ f- e:form (-> r c)
+                 (it's not clear, if there MUST
+                  be a separeate F stack)
+            FF   fill
+            (maybe not implement but reserve)
+            F.   Float . (Print)
+            F+   
+            ....
+            
          71 G    j:Grab memory (-- heap)
          72 H    j:Here (here ++) (hold X:hex X:holds)
          73 I    i (loopv) if immediate invert X:is

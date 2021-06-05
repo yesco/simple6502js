@@ -15,6 +15,7 @@
 39 and absy
 3D and absx
 06 asl zp
+0A asl_a
 0E asl abs
 16 asl zpx
 1E asl absx
@@ -90,7 +91,7 @@ AC ldy abs
 B4 ldy zpx
 BC ldy absx
 46 lsr zp
-4A lsr
+4A lsr_a
 4E lsr abs
 56 lsr zpx
 5E lsr absx
@@ -108,12 +109,12 @@ EA nop
 28 plp
 68 pla
 26 rol zp
-2A rol
+2A rol_a
 2E rol abs
 36 rol zpx
 3E rol absx
 66 ror zp
-6A ror
+6A ror_a
 6E ror abs
 76 ror zpx
 7E ror absx
