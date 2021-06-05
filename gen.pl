@@ -571,9 +571,14 @@ function memFormat(a = dump.last,n = 8, dochars = 1) {
   return r+'  '+p;
 }
 
-function dump(a = dump.last, lines = 16, n = 8) {
+function dump(a = dump.last, lines = 16, n = 8, nz=0) {
+  let firsttime= 1;
   while(lines--) {
-    console.log(memFormat(a, n));
+    let s= 0;
+    for(let i=0; i<n; i++) s+= m[a+i];
+    if (firsttime || !lines || !nz || s)
+       console.log(memFormat(a, n));
+    firsttime= 0;
     a += n;
   }
   dump.last = a;

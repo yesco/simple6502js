@@ -8,6 +8,8 @@ let output = 1; // show 'OUTPUT: xyz'
 
 // ALF - ALphabet  F O R T H
 
+let start = 0x501; // TODO: get from label?
+
 {
   // -- zero page variables
   ORG(0x00); L('R0');        word(0); // 00
@@ -64,7 +66,7 @@ ORG(0x85);
 
 // program code
 
-ORG(0x0501); L('reset');
+ORG(start); L('reset');
   // make sure
   CLD();
   // init stack
@@ -119,7 +121,9 @@ ORG(0x0501); L('reset');
   tabcod('MAIN', {
 
     // 37 Forth  Functions defined!
-
+    // (core forth has about 133 words)
+    // (core extension has 50 words)
+    //
     // TODO:
     // - $K key or ck?
     // - cw - word skip space, read next word "store" it ( == addr len ) NOT z-terminated
@@ -129,8 +133,6 @@ ORG(0x0501); L('reset');
     // - ':'
     // - ';'
     // - ','  !!!! first!
-    // - [ immediate go into immediatem mode - update STATE = 0
-    // - ] immediate go into compiling mode - update STATE = 1
     // - Quit is "reset" ? loops Interpret
     
     Pick (){
@@ -701,11 +703,13 @@ L('end');
 L('halt');
   JMPA('halt');
 
-
-
-
 }
 
+let end = jasm.address();
+// bytes: assuming contigious
+let bytes = end - start;
+
+print("====CODELEN: ", bytes);
 
 //print(jasm.getChunks());
 //print(jasm.getHex(1,1,0));
@@ -718,7 +722,6 @@ jasm.burn(m, jasm.getChunks());
 
 // crash?
 
-let start = 0x501; // TODO: get from label?
 cpu.reg('pc', start);
 //print(cpu.state());
 
@@ -739,7 +742,7 @@ print();
 printstack();
 print();
 
-cpu.dump(8192, 512/8+2);
+cpu.dump(0, 65536/8, 8, 1);
 print();
 printstack();
 print();
