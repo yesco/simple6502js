@@ -31,7 +31,7 @@ ORG(0x16);   L('tmp_y');     byte(0);
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
 ORG(0x35); /* INPUT_BUF */ string(
-'1234567##9');
+'1234567##3');
 //'6543210##');
 
 //'65432103P......');
@@ -106,13 +106,14 @@ ORG(0x0501); L('reset');
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
  L('next');
-  TRACE(printstack);
+  TRACE(()=>{ print(); print(); printstack()});
 
   INY();
 
   let drop_next= ()=>JMPA('drop_next');
   let drop2_next= ()=>JMPA('drop2_next');
   let drop3_next= ()=>JMPA('drop3_next');
+  let pushA_next= ()=>JMPA('pushA_next');
   let number= ()=>JMPA('number');
 
   tabcod('MAIN', {
@@ -206,12 +207,11 @@ ORG(0x0501); L('reset');
       BNE('skip_to"');
       
       // now at " push(Y-Y')
-      push();
       TYA();
       SEC();
       SBCZ('tmp_y');
-      STAZX(0); // lo
-      LDAN(0); STAZX(1); // hi = 0 TOOD: share
+
+      return pushA_next;
     },
 
     Emit(){
@@ -448,12 +448,8 @@ L('number');
   SEC();
   SBCN(ord('0'));
   // A = 0..9
-  push();
-           STAZX(0);
-  LDAN(0); STAZX(1); // hi = 0 TOOD: share
+  pushA_next();
   // TODO: read more digits...
-
-  next();
 
 L('WINC2');
   JSRA('WINC');
@@ -552,9 +548,13 @@ L('CCC_zero'); // don't move (see above!)
 
 tabcod('CCC', {
   '@_C@_CFETCH': function(){
-    LDAXI(2); STAZX(2) // only low byte
-    LDAN(0);  STAZX(3); // hi = 0
-    return drop_next;
+    LDAXI(2);
+   L('drop_pushA_next'); // not sued?
+    drop();
+   L('pushA_next');
+    push();
+              STAZX(0) // only low byte
+    LDAN(0);  STAZX(1); // hi = 0
   },
 
   '!_C!_CSTORE': function(){
@@ -595,11 +595,9 @@ L('###_zero'); // don't move (see above!)
 tabcod('###', {
   '#_##_DEPTH': function(){
     TXA();
-    push();
-    // TODO: common seq? pushA();
     EORN(0xff);
-    LSR();   STAZX(0);
-    LDAN(0); STAZX(1);
+    LSR();
+    return pushA_next;
   },
 
   '._#._.S_print_stack': function(){
@@ -709,9 +707,9 @@ L('halt');
 }
 
 
-print(jasm.getChunks());
-print(jasm.getHex(1,1,0));
-print(jasm.getHex(0,0,0));
+//print(jasm.getChunks());
+//print(jasm.getHex(1,1,0));
+//print(jasm.getHex(0,0,0));
 
 let cpu = cpu6502.cpu6502(); // hmmm "call it..?"
 let m = cpu.state().m;
@@ -722,7 +720,7 @@ jasm.burn(m, jasm.getChunks());
 
 let start = 0x501; // TODO: get from label?
 cpu.reg('pc', start);
-print(cpu.state());
+//print(cpu.state());
 
 //console.log('BCC=' + BCC.toString(), BCC);
 //console.log('DEX=' + DEX.toString(), DEX);
@@ -735,12 +733,16 @@ Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 
 print(cpu.run(-1, trace, patch));
 print();
+
 cpu.dump(0x0000, 2);
+print();
 printstack();
-console.log();
+print();
+
 cpu.dump(8192, 512/8+2);
+print();
 printstack();
-console.log();
+print();
 
 //print('INCZX=' + INCZX.toString(), INCZX);
 //print('BNE=' + BNE.toString(), BNE);
@@ -756,9 +758,8 @@ function trace(c, h) {
   }
 
   cpu.tracer(cpu, h);
-  cpu.dump(h.ipc,1);
-  printstack();
-  print("\n\n");
+  //cpu.dump(h.ipc,1);
+  //printstack(); print("\n\n");
 
   l = a2l[h.d];
   if (l) {

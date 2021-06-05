@@ -79,7 +79,7 @@ function label(name) {
 
   addr(saved);
   labels[name] = saved;
-  console.log('LABEL: ', name);
+  //console.log('LABEL: ', name);
   curlab = name;
 //  flush();
 }
@@ -304,7 +304,7 @@ function mgen(names, valids) {
 	mleg = typeof mleg=='string' ? mleg : mleg[c&1];
 
 	let name = mnc + mode;
-	console.log(hex(2,op), i,m,c, mnc, 3*io, names.length, mode, mleg, name, '=');
+	//console.log(hex(2,op), i,m,c, mnc, 3*io, names.length, mode, mleg, name, '=');
 
 	//if (!mnc) continue;
 	//console.log(hex(2,op), mnc.toLowerCase(),modes[m], '-',  name, c, i, m);
@@ -566,13 +566,14 @@ global.clear = clear;
 
 ////////////////////////////////////////
 
-console.log('='.repeat(40));
-if (0)
-Object.keys(global).map(k=>{
-  let f = global[k];
-  if (!f.mnc) return;
-  console.log(hex(2,f.op), '=', f.SAN, f.b, f.cyc, '(', k, ')');
-});
+if (0) {
+  //console.log('='.repeat(40));
+  Object.keys(global).map(k=>{
+    let f = global[k];
+    if (!f.mnc) return;
+    console.log(hex(2,f.op), '=', f.SAN, f.b, f.cyc, '(', k, ')');
+  });
+}
 
 // load "REFERENCE" real (some are 6502C)
 let fs = require('fs');
@@ -585,21 +586,23 @@ rops.replace(/\n(..) (\w+)( (\w+))?/g,(a,op,n,_,m)=>{
   setvalid(op);
 });
 
-console.log('-'.repeat(40));
-ops.map((f,i)=>{
-  //if (!f.mnc) return;
-  let m;
-  console.log(
-    hex(2,i),
-    (f.rn || '---'), m=(f.rm || '---'), '\t',
-    (f.rn == (f.mnc || '').toLowerCase()) ? '=' : '.',
-    (m == f.mode) ? '=' : '.',
-    (f.mnc || '???').toLowerCase(), f.mode, '\t',
-    f.SAN, '\t', f.b, f.cyc);
-  if (i != f.op) 
+if (0){
+  console.log('-'.repeat(40));
+  ops.map((f,i)=>{
+    //if (!f.mnc) return;
+    let m;
     console.log(
-      `   ==== OP? i=${i}, f.op=${f.op}\n`);
-});
+      hex(2,i),
+      (f.rn || '---'), m=(f.rm || '---'), '\t',
+      (f.rn == (f.mnc || '').toLowerCase()) ? '=' : '.',
+      (m == f.mode) ? '=' : '.',
+      (f.mnc || '???').toLowerCase(), f.mode, '\t',
+      f.SAN, '\t', f.b, f.cyc);
+    if (i != f.op) 
+      console.log(
+        `   ==== OP? i=${i}, f.op=${f.op}\n`);
+  });
+}
 
 //console.log([...valids].map(n=>'0x'+hex(2,n)).join(','));
 

@@ -600,90 +600,91 @@ if ($genfun) {
 
 print <<'DEBUGGER';
 
-
-// testing
-let cpu = cpu6502();
-let m = cpu.state().m;
-let hex = cpu.hex;
-
-// run 3 times with 3 instr:s each time
-let nn= 3;
-while (nn--) {
-  console.log('cpu= ', cpu);
-  console.log('state= ', cpu.state());
-  console.log('last= ', cpu.last());
-  console.log('consts= ', cpu.consts());
-  console.log(cpu.run(3, 1));
-}
-
 if (0) {
-  // not sure this is correct
-  console.log('=======================');
-  let start = 0x501, p = start;
-  m[p++] = 0xa9; // LDA# 42
-  m[p++] = 0x42;
-  m[p++] = 0xa2; // LDX# fe
-  m[p++] = 0xfe;
-  m[p++] = 0xe8; // INX
-  m[p++] = 0xd0; // BNE -1
-  m[p++] = 0xff;
-  m[p++] = 0xad; // LDY# 17
-  m[p++] = 0x17;
-  m[p++] = 0xad; // STYZP 07
-  m[p++] = 0x07;
-  m[p++] = 0x00; // BRK
-  cpu.reg('pc', start);
+  // testing
+  let cpu = cpu6502();
+  let m = cpu.state().m;
+  let hex = cpu.hex;
 
-  console.log('state= ', cpu.state());
+  // run 3 times with 3 instr:s each time
+  let nn= 3;
+  while (nn--) {
+    console.log('cpu= ', cpu);
+    console.log('state= ', cpu.state());
+    console.log('last= ', cpu.last());
+    console.log('consts= ', cpu.consts());
+    console.log(cpu.run(3, 1));
+  }
 
-  console.log(cpu.run(10, 1));
+  if (0) {
+    // not sure this is correct
+    console.log('=======================');
+    let start = 0x501, p = start;
+    m[p++] = 0xa9; // LDA# 42
+    m[p++] = 0x42;
+    m[p++] = 0xa2; // LDX# fe
+    m[p++] = 0xfe;
+    m[p++] = 0xe8; // INX
+    m[p++] = 0xd0; // BNE -1
+    m[p++] = 0xff;
+    m[p++] = 0xad; // LDY# 17
+    m[p++] = 0x17;
+    m[p++] = 0xad; // STYZP 07
+    m[p++] = 0x07;
+    m[p++] = 0x00; // BRK
+    cpu.reg('pc', start);
 
-  cpu.dump(0);
+    console.log('state= ', cpu.state());
 
-} else {
+    console.log(cpu.run(10, 1));
 
-  // this seems to work
-  console.log('=======================');
-  cpu.reg('a', 0x42);
-  cpu.reg('x', 0x00);
-  cpu.reg('y', 0x69);
-  cpu.reg('p', 0);
-  console.log('state= ', cpu.state());
+    cpu.dump(0);
 
-  let start = 0x501, p = start;
-  m[p++] = 0x48; // PHA
-  m[p++] = 0x8a; // TXA
-  m[p++] = 0x48; // PHA
-  m[p++] = 0x98; // TYA
-  m[p++] = 0xaa; // TAX
-  m[p++] = 0x68; // PLA
-  m[p++] = 0xa8; // TAY
-  m[p++] = 0x68; // PLA
-  m[p++] = 0x00; // BRK
+  } else {
 
-  cpu.reg('pc', start);
+    // this seems to work
+    console.log('=======================');
+    cpu.reg('a', 0x42);
+    cpu.reg('x', 0x00);
+    cpu.reg('y', 0x69);
+    cpu.reg('p', 0);
+    console.log('state= ', cpu.state());
 
-  console.log('state= ', cpu.state());
+    let start = 0x501, p = start;
+    m[p++] = 0x48; // PHA
+    m[p++] = 0x8a; // TXA
+    m[p++] = 0x48; // PHA
+    m[p++] = 0x98; // TYA
+    m[p++] = 0xaa; // TAX
+    m[p++] = 0x68; // PLA
+    m[p++] = 0xa8; // TAY
+    m[p++] = 0x68; // PLA
+    m[p++] = 0x00; // BRK
 
-  console.log('SWAP X Y');
-  console.log(cpu.run(10, 1));
-  cpu.dump(start);
-  console.log("STACK:");
-  cpu.dump(0x200-16, 2);
-}
+    cpu.reg('pc', start);
 
-// speedtest BRK lol
-if (1) {
-  cpu.reg('pc', 0);
+    console.log('state= ', cpu.state());
 
-  let start = Date.now();
-  let n = 1000000;
+    console.log('SWAP X Y');
+    console.log(cpu.run(10, 1));
+    cpu.dump(start);
+    console.log("STACK:");
+    cpu.dump(0x200-16, 2);
+  }
 
-    cpu.run(n, 0);
+  // speedtest BRK lol
+  if (1) {
+    cpu.reg('pc', 0);
 
-  let ms = Date.now() - start;
-  console.log(n, ms, Math.round(1000*n/ms), 'instructions/s');
-}
+    let start = Date.now();
+    let n = 1000000;
+
+      cpu.run(n, 0);
+
+    let ms = Date.now() - start;
+    console.log(n, ms, Math.round(1000*n/ms), 'instructions/s');
+  }
+} // testing
 
 DEBUGGER
 
