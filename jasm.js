@@ -102,7 +102,7 @@ function word(name, fexpr, byte) {
 
   function maybewarn(v, addr) {
     if (byte && hi(v))
-      console.warn(`%% Warning: @ ${hex(4, addr)} write of (${hex(4,v)}) trunacted to byte!`);
+      throw `%% Warning: @ ${hex(4, addr)} write of (${hex(4,v)}) trunacted to byte using name='${name}'!\n`+(fexpr?'FUNCTION: '+fexpr.toString():'');
   }
 
   function write(v, init) {

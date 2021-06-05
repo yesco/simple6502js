@@ -4,7 +4,12 @@ let jasm = require('./jasm.js');
 let aputc = 0xfff0;
 let aputd = 0xfff2;
 let aputs = 0xfff4;
-let output = 1; // show 'OUTPUT: xyz'
+
+//let output = 1; // show 'OUTPUT: xyz'
+let output = 0; // show 'OUTPUT: xyz'
+let traceLevel = 0; // 1=labels, 2=instr.
+let showStack = 0;
+tabcod.trace = 0;
 
 // ALF - ALphabet  F O R T H
 
@@ -75,19 +80,28 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
+  //JMPA('ALF_init');
+  //JSR('end');
+
+  LDAN('mys', lo); STAZ('NEXT_BASE');
+  LDAN('mys', hi); STAZ('NEXT_BASE',(a)=>a+1);
+  JSRA('ALF_init');
+
+  LDAN('foo', lo); STAZ('NEXT_BASE');
+  LDAN('foo', hi); STAZ('NEXT_BASE',(a)=>a+1);
   JSRA('ALF_init');
 
   JMPA('end');
-  
-//  LDAN(');
 
-//  JSRA('ALF');
-//  RTS();
+L('mys'); string('"DOUBLING:"$1D+D.D+D.D+D.D+D.D+D.#.#.');
+//L('mys'); string('43DDDDDD321.....');
+//L('mys'); string('123DD#.#.');
 
-L('mys'); string("1D+.D+.D+.D+.D+.");
+//L('mys'); string('4123...D.#.'); //endless loop
+
+L('foo'); string('"FOO:"$1234D...');
 
   JMPA('end');
-  
 
 //////////////////////////////
  L('ALF_init');
@@ -110,6 +124,8 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
 
   // make sure it's empty!
   LDAN(0); STAIY('NEXT_BASE');
+
+  // Possibly Return to caller?
 
  L('ALF');
  L('interpret');
@@ -139,7 +155,12 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
  L('next');
-  TRACE(()=>{ print(); print(); printstack()});
+  TRACE(()=>{
+    if (showStack) {
+      print(); print();
+      printstack();
+    }
+  });
 
   INY();
 
@@ -147,6 +168,9 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
   let drop2_next= ()=>JMPA('drop2_next');
   let drop3_next= ()=>JMPA('drop3_next');
   let pushA_next= ()=>JMPA('pushA_next');
+  let putSA_drop_next= ()=>JMPA('putSA_drop_next');
+  let putSA_next= ()=>JMPA('putSA_next');
+  let pushSA_next= ()=>JMPA('pushSA_next');
   let number= ()=>JMPA('number');
 
   tabcod('MAIN', {
@@ -225,12 +249,13 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
 
     '"_string': function(){
       // calculate "pc"
-      push();
       INY(); // Y no points at first char
       STYZ('tmp_y');
       TYA();
       CLC();
       ADCZ('NEXT_BASE');
+
+      push(); // TODO, tailoptimize? pushSA()
       STAZX(0);
       LDAN(0);
       ADCZ('NEXT_BASE', (a)=>a+1);
@@ -362,12 +387,24 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
     },
 
     '&_and' : function(){
+      LDAZX(1); ANDZX(3); PHA();
+      LDAZX(0); ANDZX(2);
+     L('putSA_drop_next');
+              STAZX(-2 & 0xff);
+      PLA();  STAZX(-1 & 0xff);
+      return drop_next;
+
       LDAZX(0); ANDZX(2); STAZX(2);
       LDAZX(1); ANDZX(3); STAZX(3);
       return drop_next;
     },
 
-    '__or' : function(){
+    '__or' : function(){ // b12  (FIG: b14)
+      LDAZX(1); ORAZX(3); PHA();
+      LDAZX(0); ORAZX(2);
+      return putSA_drop_next;
+
+      // b15
       LDAZX(0); ORAZX(2); STAZX(2);
       LDAZX(1); ORAZX(3); STAZX(3);
       return drop_next;
@@ -419,16 +456,33 @@ L('mys'); string("1D+.D+.D+.D+.D+.");
       return drop_next;
     },
 
-    Over (){
-      push();
-      LDAZX(4); STAZX(0);
-      LDAZX(5); STAZX(1);
+    Over (){ // b8
+      LDAZX(3); PHA();
+      LDAZX(2);
+      return pushSA_next();
     },
 
-    'Dup': function(){
+    Dup (){ // b5
+      LDAZX(1); PHA(); // hi
+      LDAZX(0);
+      
+     L('pushSA_next');
       push();
-      LDAZX(2); STAZX(0);
-      LDAZX(3); STAZX(1);
+     L('putSA_next');
+             STAZX(0);
+      PLA(); STAZX(1);
+    },
+
+    Swap (){ // b18 (FIG: b16 c43
+      // hi
+      LDAZX(3); PHA();
+      LDAZX(1); STAZX(3);
+      // lo
+      LDAZX(2); PHA();
+      LDAZX(0); STAZX(2);
+      // STACK: hi, lo
+      PLA();
+      return putSA_next();
     },
 
     '$_printstring': function(){
@@ -486,8 +540,8 @@ L('number');
   SEC();
   SBCN(ord('0'));
   // A = 0..9
-  pushA_next();
   // TODO: read more digits...
+  pushA_next();
 
 L('WINC2');
   JSRA('WINC');
@@ -587,10 +641,7 @@ L('CCC_zero'); // don't move (see above!)
 tabcod('CCC', {
   '@_C@_CFETCH': function(){
     LDAXI(2);
-   L('drop_pushA_next'); // not sued?
-    drop();
-   L('pushA_next');
-    push();
+   L('putA_next');
               STAZX(0) // only low byte
     LDAN(0);  STAZX(1); // hi = 0
   },
@@ -633,9 +684,12 @@ L('###_zero'); // don't move (see above!)
 tabcod('###', {
   '#_##_DEPTH': function(){
     TXA();
-    EORN(0xff);
+    EORN(0xff); // 0xff-A
     LSR();
-    return pushA_next;
+   L('pushA_next');
+    push();
+             STAZX(0);
+    LDAN(0); STAZX(1);
   },
 
   '._#._.S_print_stack': function(){
@@ -657,10 +711,10 @@ tabcod('###', {
       LDAZX(0); LDYZX(1); JSRA(aputd);
 
       drop();
-      JSRA('_printstack_next');
+      JMPA('_printstack_next');
 
       L('_printstack_done');
-    });
+    }); // axy restored
   }
 });
 
@@ -674,10 +728,9 @@ tabcod('RRR', {
     return drop_next;
   },
 
-  '>_R>_R>': function(){
-    push();
-    PLA();  STAZX(0);
-    PLA();  STAZX(1);
+  '>_R>_R>': function(){ // b4 !
+    PLA(); // lo pops first!
+    return pushSA_next;
   },
 
   T_RoT  (){ // (4 2 0 -- 2 0  4) b24 :-(
@@ -780,7 +833,7 @@ let labels = jasm.getLabels();
 let a2l = {};
 Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 
-print(cpu.run(-1, trace, patch));
+print('\n\nCPU.run => ', cpu.run(-1, trace, patch));
 print();
 
 cpu.dump(0x0000, 2);
@@ -801,22 +854,28 @@ print();
 
 // (called after instruction)
 function trace(c, h) {
+  // quit at BRK? unless it's trapped!
+  if (h.op==0) {
+    return 'quit';
+  }
+
+  if (!traceLevel) return;
+
   let l = a2l[h.ipc];
   if (l) {
     print("\n---------------> ", l);
   }
 
-  cpu.tracer(cpu, h);
-  //cpu.dump(h.ipc,1);
-  //printstack(); print("\n\n");
+  if (traceLevel > 1)
+    cpu.tracer(cpu, h);
+  if (traceLevel > 2) {
+    cpu.dump(h.ipc,1);
+    printstack(); print("\n\n");
+  }
 
   l = a2l[h.d];
   if (l) {
     print("                      @ ", l);
-  }
-
-  if (h.op==0) {
-    return 'quit';
   }
 }
 
@@ -896,7 +955,7 @@ function _puts(a, len=-1) {
 
 function _putd(d) {
   if (output) princ("OUTPUT: ");
-  process.stdout.write(''+d);
+  process.stdout.write(''+d+' ');
   if (output) print();
 }
   
@@ -921,24 +980,45 @@ function princ(s) { return process.stdout.write(''+s);}
 //
 // you have to have a near label NAME_zero
 function tabcod(name, list, nxt= next) {
-  print("--->tabcod: ", name);
+  let trace = 1;
+  if (tabcod.trace)
+    print("--->tabcod: ", name);
+
  L(name);
+
+  if (traceLevel) {
+    LDAN(ord('\n')); JSRA(aputc);
+    LDAN(ord('\n')); JSRA(aputc);
+    LDAN(ord('>')); JSRA(aputc);
+    LDAN(ord(' ')); JSRA(aputc);
+  }
+
   LDAIY('NEXT_BASE');
-  JSRA(aputc);
+
+  if (traceLevel) {
+    PHA(); {
+      JSRA(aputc);
+      LDAN(ord('\n')); JSRA(aputc);
+    } PLA();
+  }
+
   BEQ(name+'_zero');
 
   let count = Object.keys(list).length;
   tabcod.count = (tabcod.count || 0) + count;
   tabcod.tabcods =  (tabcod.tabcods || 0) + 1;
 
-  print('====tabcod=========================');
-  print('====TABCOD: ', name);
-  print('====tabcod: ', count);
-  print('====tabcod_total: ', tabcod.count);
-  print('====tabcod_tabcods: ', tabcod.tabcods);
+  if (tabcod.trace) {
+    print('====tabcod=========================');
+    print('====TABCOD: ', name);
+    print('====tabcod: ', count);
+    print('====tabcod_total: ', tabcod.count);
+    print('====tabcod_tabcods: ', tabcod.tabcods);
+  }
 
   Object.keys(list).forEach(k=>{
-    print('====TABCOD_F: ', k);
+    if (tabcod.trace) 
+      print('====TABCOD_F: ', k);
     let cod= list[k];
     
     if (1) {
@@ -966,7 +1046,8 @@ function tabcod(name, list, nxt= next) {
       // TODDO after cases need generate cod
     }
   });
-  print("<---tabcod: ", name);
+  if (tabcod.trace)
+    print("<---tabcod: ", name);
 }
 
 // data stack manipulation
