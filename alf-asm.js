@@ -76,6 +76,16 @@ ORG(start); L('reset');
   // TODO: setup vectors
 
   JSRA('ALF_init');
+
+  JMPA('end');
+  
+//  LDAN(');
+
+//  JSRA('ALF');
+//  RTS();
+
+L('mys'); string("1D+.D+.D+.D+.D+.");
+
   JMPA('end');
   
 
@@ -84,7 +94,7 @@ ORG(start); L('reset');
   // save stack for QUIT
   TSX(); STXZ('QUIT_STACK');
 
-  JMPA('interpret');
+  JMPA('ALF');
 
  L('ALF_reset');
   // restore stack
@@ -94,13 +104,14 @@ ORG(start); L('reset');
   LDXN(0xff);
 
   // reset input to command line
-  LDAZ('INPUT_BUF', lo); STAZ('NEXT_BASE');
-  LDAZ('INPUT_BUF', hi); STAZ('NEXT_BASE', (a)=>a+1);
+  LDAN('INPUT_BUF', lo); STAZ('NEXT_BASE');
+  LDAN('INPUT_BUF', hi); STAZ('NEXT_BASE', (a)=>a+1);
   LDYN(0);
 
   // make sure it's empty!
   LDAN(0); STAIY('NEXT_BASE');
 
+ L('ALF');
  L('interpret');
   // init index
   LDYN(0);
