@@ -181,7 +181,7 @@ let C= 0x01, Z= 0x02, I= 0x04, D= 0x08, B= 0x10, Q= 0x20, V= 0x40, N= 0x80;
 // set flag depending on value (slow?)
 let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
     n= (x)=> (p^= N & (p^ x)          , x),
-    c= (x)=> (p^= C & (p^ (x > 255))  , x & 0xff),
+    c= (x)=> (p^= C & (p^ !!(x & 0xff00))  , x & 0xff),
     v= (x)=> (p^= V & (p^ (x * V))    , x),
     // set carry if low bit set (=C!)
     sc=(x)=> (p^= C & (p^ x)          , x);

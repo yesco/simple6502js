@@ -198,7 +198,7 @@ function char(c) {
   data(ch);
 }
 
-function string(s, pascal, hibit, zero) {
+function _string(s, pascal, hibit, zero) {
   let d = [...Buffer.from(''+s)];
   let len = d.lenght;
   if (pascal) d.unshift(len);
@@ -207,9 +207,10 @@ function string(s, pascal, hibit, zero) {
   data(...d);
 }
 
-function pascal(s) { string(s, 1, 0, 0) } 
-function hibit(s) { string(s, 0, 1, 0) }
-function OMG(s) { string(s, 1, 1, 1) }
+function string(s) { _string(s, 0, 0, 1)}
+function pascal(s) { _string(s, 1, 0, 0)} 
+function hibit(s) { _string(s, 0, 1, 0)}
+function OMG(s) { _string(s, 1, 1, 1)}
 
 function rel(name, f) {
   byte(name, ((address)=> a=>{

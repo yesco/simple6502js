@@ -18,7 +18,10 @@ let start = 0x0501;
 // MUST have a leading space...
 let program = 
 
-' 22 22 77 22 77 13 13 13 22 22 77 drop 13 1+ 1+ dup 2* 2* + dup dup bye'
+' 0 1 2 3 74 11 12 13 14 42 17 bye';
+
+//1232312323
+// '   0     1 2 7 42 3 2 1 0 1 2 3 4 5 6 7 8 9 22 22 77 22 77 13 13 13 22 22 77 drop 13 1+ 1+ dup 2* 2* + dup dup bye'
 
 
 ;
@@ -31,28 +34,72 @@ let program =
 ORG(start);
  L('PROGRAM'); string(program);
 
+ORG(start+1024);
+ L('BRK');
+
+ // ' 74' comes here
+ PLA(); STAZ(0); // lo = first digit '7'
+ 
+ SEC();
+ SBCN(ord('0')+2); // pc+=2 by jsr
+ STAZ(2); // 07
+ 
+ push();  STAZX(0); // 07 on stack
+ LDAN(0); STAZX(1);
+
+ PLA(); STAZ(1); // hi = second digit '4'
+
+ SEC();
+ SBCN(ord('0'));
+ STAZ(3); // 04
+
+ push();  STAZX(0); // 04 on stack
+ LDAN(0); STAZX(1);
+
+ // 0,1:lohi = '4','2'  2,3: 4,2
+ PLP();
+
+ // look at first char
+ LDAZ(0);
+ CMPN(ord(' '));
+ BNE('BRK_1');
+ // TODO: back one more step
+ JMPA('RTS_goback');
+L('BRK_1');
+ 
+ // look at second char
+ LDAZ(1);
+ CMPN(ord(' '));
+ BNE('BRK_2');
+ JMPA('RTS_goback');
+
+L('BRK_2');
+ // TODO: it's not all nubmers....
+ pull();
+ LDAZ(2); // first number
+ CLC(); ROL(); // ASL()?
+ STAZ(0); // 2 x number
+ CLC(); ROL(); CLC(); ROL(); // 8x number
+ CLC();
+ ADCZ(0); // 2x + 8x = 10x !
+ ADCZ(3);!
+ 
+          STAZX(0);
+ LDAN(0); STAZX(1);
+
+ RTS();
+ 
+
+// catch brk!
+ORG(0xfffe);
+ L('BRKVEC');
+ word('BRK');
+ 
+
 // HI zero page data stack:
 //   don't trash X in impl.
 function push() { DEX(); DEX(); }
 function pull() { INX(); INX(); }
-
-F('22', ()=>{
-  push();
-  LDAN(22); STAZX(0);
-  LDAN(0);  STAZX(1);
-});
-
-F('77', ()=>{
-  push();
-  LDAN(77); STAZX(0);
-  LDAN(0);  STAZX(1);
-});
-
-F('13', ()=>{
-  push();
-  LDAN(13); STAZX(0);
-  LDAN(0);  STAZX(1);
-});
 
 F('1+', ()=>{
   INCZX(0);
@@ -123,6 +170,7 @@ L('RTS_goback');
     // lo
     DEY();
     TYA();
+    LDYN(0);
     PHA();
     RTS();
 
@@ -142,6 +190,55 @@ L('RTS_goforward');
     RTS();
 
 
+// --- numbers
+
+// assume Y is always zero!
+for(let n = 0; n <= 9; n++) {
+  let a = 0x2000 + n + 48;
+  ORG(a);
+//  print(n, hex(4,a));
+//  L(''+a);
+  INY();
+  //let i = 10-n; print("EOR ", i, (i^0xff)-245);
+}
+TYA();
+EORN(0xff);
+SEC();
+SBCN(245);
+push();
+         STAZX(0);
+LDAZ(0); STAZX(1);
+LDYN(0);
+JMPA('RTS_goback');
+
+// it doesn't fit
+if (0) {
+// x0
+for(let n = 0; n <= 9; n++) {
+  let a = 0x3000 + n + 48;
+  ORG(a);
+  INY();
+  let i = 10-n; let x = (i^0xff)-245;
+  print(n, hex(4,a), i, x, 10*x);
+}
+TYA();
+CLC(); ROL(); // ASL?
+EORN(0xff);
+SEC();
+SBCN(245);
+// multiply by 10
+STAZ(0);
+CLC(); ROL(); // ASL?
+CLC(); ROL(); // ASL?
+ADCZ(0);
+
+push();
+         STAZX(0);
+LDAZ(0); STAZX(1);
+LDYN(0);
+RTS();
+}
+
 /// ASM:END ------------------------
 
 let cpu = cpu6502.cpu6502();
@@ -153,8 +250,8 @@ jasm.burn(m, jasm.getChunks());
 cpu.reg('s', 0xff);
 cpu.reg('pc', start);
 
-
-print(cpu.run(-1, 1, patcher));
+// trace
+print(cpu.run(-1, 0, patcher));
 
 // see all non-zero memory!
 cpu.dump(0, 65536/8, 8, 1);
