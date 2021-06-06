@@ -1,9 +1,45 @@
-// Since ' ' is 0x20 is JSR:
-//   why don't we make a forth that dispatches
-//   onto those locations?
-//   96x96 possible destinations = 9K, lol
+//          HEADLESS FORTH
 //
-// Yeah, it's going to fragment memory...
+//               6502
+//
+//          Jonas S Karlsson
+//
+// What is headless? It usually means
+// without UI. This FORTH "embryo" has
+// no UI, no dictionary.
+//
+// Postulate: 6502 was created to run
+// FORTH code natively, see:
+//
+// ' 0 1 3 dup + 7 33 2* 42 drop 77 bye'
+//
+// To execute it: store it in memory
+// then just "JMP address"!
+//
+// Yes, it works! WTF! How?
+// 
+// ' ' or 0x20 is, wait, JSR!
+//
+// So space is a subroutine call, now
+// we only need to store our words at
+// the address as given by the first
+// two letters!
+//
+// Special case 
+//  '  ' (2 spaces) => RET-1, RTS
+//  - 2 letters RTS
+//  - n letters RET+n-2, RTS
+//  - 1 letter, store as ' L'
+//  - numbers - BRK!
+//  - ' + ' also gives BRK
+//  - capture BRK
+//    - if number push on stack
+//    - if single letter do '  L'
+// 
+// NOTICE: All UR memory are belong
+//  Headless Forth (or very fragmented)
+// - Unsupported words give BRK
+// - ':' not defined == strcpy!
 //
 
 let cpu6502 = require('./fil.js');
