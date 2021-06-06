@@ -466,24 +466,27 @@ L('foo'); string('"FOO:"$1234D...');
       CMPZX(2);
      L('_CMP');
 
-      BEQ('0');   // x == y   ame
+      BEQ('0');   // x == y   same
       BCC('-1');  // x < y    lower
       BNE('+1');  // x > y    higher
 
      L('-1');   // x < y    lower
       LDAN(0xff); STAZX(2);
       LDAN(0xff); STAZX(3);
-      JMPA('drop_next');
+      drop_next();
 
      L('+1');  // x > y    higher
-      LDAN(1);  STAZX(2);
+      LDAN(1);
+     L('put_drop_next');
+                STAZX(2);
+
       LDAN(0);  STAZX(3);
-      JMPA('drop_next');
+      //JMPA('put_drop_next');
+      drop_next();
 
      L('0');    // x == y   ame
-      LDAN(0);  STAZX(2);
-      LDAN(0);  STAZX(3);
-      JMPA('drop_next');
+      LDAN(0);
+      JMPA('put_drop_next');
 
       return ()=>0;
     },
