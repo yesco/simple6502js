@@ -5,6 +5,9 @@ let aputc = 0xfff0;
 let aputd = 0xfff2;
 let aputs = 0xfff4;
 
+// TODO: testing!
+// use https://github.com/scotws/TaliForth2/blob/master/tests/core_a.fs ...
+
 //let output = 1; // show 'OUTPUT: xyz'
 let output = 0; // show 'OUTPUT: xyz'
 let traceLevel = 0; // 1=labels, 2=instr.
@@ -38,7 +41,8 @@ ORG(0x16);   L('tmp_y');     byte(0);
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
   // testing: simple program!
 ORG(0x35); /* INPUT_BUF */ string(
-'1234567##3#.');
+'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456');
+//'5671<2.3<4.2<1.4<3.567');
 //'6543210##');
 
 //'65432103P......');
@@ -80,16 +84,16 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
-  //JMPA('ALF_init');
+  JMPA('ALF_init');
   //JSR('end');
 
-  LDAN('mys', lo); STAZ('NEXT_BASE');
-  LDAN('mys', hi); STAZ('NEXT_BASE',(a)=>a+1);
-  JSRA('ALF_init');
+//  LDAN('mys', lo); STAZ('NEXT_BASE');
+//  LDAN('mys', hi); STAZ('NEXT_BASE',(a)=>a+1);
+//  JSRA('ALF_init');
 
-  LDAN('foo', lo); STAZ('NEXT_BASE');
-  LDAN('foo', hi); STAZ('NEXT_BASE',(a)=>a+1);
-  JSRA('ALF_init');
+//  LDAN('foo', lo); STAZ('NEXT_BASE');
+//  LDAN('foo', hi); STAZ('NEXT_BASE',(a)=>a+1);
+//  JSRA('ALF_init');
 
   JMPA('end');
 
@@ -178,6 +182,8 @@ L('foo'); string('"FOO:"$1234D...');
     // 42 ALForth functions defined!
     // (core forth has about 133 words)
     // (core extension has 50 words)
+    //
+    // 42 instructions == 1105 bytes!
     //
     // TODO:
     // - $K key or ck?
@@ -421,6 +427,21 @@ L('foo'); string('"FOO:"$1234D...');
       LDAZX(1); EORN(0xff); STAZX(1);
     },
 
+    // on the topic of 16 bits compare
+    // http://forum.6502.org/viewtopic.php?f=2&t=6136
+    'UCMP': function(){
+      LDAZX(3); // x
+      CMPZX(1); // y
+      BNE('UCMP_notequal');
+      LDAZX(2);
+      CMPZX(0);
+     L('UCMP_notequal')
+//      BCC(lower);   // x < y    lower
+//      BNE(higher);  // x > y    higher
+//      BEQ(same);    // x == y   ame
+    },
+
+
     '=_equal' : function(){
       JSRA('Rminus');
       LDAZX(0);
@@ -436,19 +457,41 @@ L('foo'); string('"FOO:"$1234D...');
       return;
     },
 
-    '<_less_than' : function(){
-      JSRA('Rminus');
-      BMI('true');
-      BPL('false');
-     L('true');
-      LDAN(0);
-      JMPA('inv'); // => 1
+    // TODO: '#?' == CMP
+    '?' : function(){
+      LDAZX(1); // x
+      CMPZX(3); // y
+      BNE('_CMP');
+      LDAZX(0);
+      CMPZX(2);
+     L('_CMP');
+
+      BEQ('0');   // x == y   ame
+      BCC('-1');  // x < y    lower
+      BNE('+1');  // x > y    higher
+
+     L('-1');   // x < y    lower
+      LDAN(0xff); STAZX(2);
+      LDAN(0xff); STAZX(3);
+      JMPA('drop_next');
+
+     L('+1');  // x > y    higher
+      LDAN(1);  STAZX(2);
+      LDAN(0);  STAZX(3);
+      JMPA('drop_next');
+
+     L('0');    // x == y   ame
+      LDAN(0);  STAZX(2);
+      LDAN(0);  STAZX(3);
+      JMPA('drop_next');
+
+      return ()=>0;
     },
 
     '>_greater_than' : function(){
       JSRA('Rminus');
       BEQ('false');
-      BNE('true');
+//      BNE('true');
     },
 
     // TODO: put instruction before that also need to "drop"

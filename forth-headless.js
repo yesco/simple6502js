@@ -42,6 +42,21 @@
 // - ':' not defined == strcpy!
 //
 
+// FB post
+// - https://m.facebook.com/groups/6502CPU/permalink/2949669985302588/?ref=content_filter
+// HEADLESS FORTH!
+//
+// So, did you know that 6502 can run forth source code natively?
+//
+// Imagine writing:  ' 2 dup 3 + 2* =0 42 dup drop bye'
+//
+//And then just jump to as if it is machine code! And who says it isn't?
+//
+// So, let's do it!
+//
+// I've prototyped an embryo of functions; and they work, as does 2 digit numbers,  it's a fun idea, but probably I won't go any further... (used my jsasm + js codegen)
+//
+
 let cpu6502 = require('./fil.js');
 let jasm = require('./jasm.js');
 let aputc = 0xfff0;
