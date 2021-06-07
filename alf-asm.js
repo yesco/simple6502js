@@ -180,31 +180,41 @@ L('foo'); string('"FOO:"$1234D...');
   // Possibly Return to caller?
 
  L('ALF');
- L('interpret');
   // init index
   LDYN(0);
-  // TODO: read-eval loop!
-  JSRA('MAIN');
 
-  // TODO: restore from BASE,Y fromstack?
-  RTS();
-  //JMPA('end');
+  // TODO: this is normaly called QUIT ?
+ L('interpret');
+  // This looks silly, but actually has
+  // a function. Normally, token
+  // implementations do a JMPA('next').
+  // However, to be used as subroutines
+  // by other code, they'd need to do RTS.
+  // This would end up here, so we call it
+  // again, to handle the next one. Normal,
+  // functions doing NEXT.
+  JSRA('MAIN');
+  // TODO: if this was moved inside
+  // tabcod() then we'd not need it here!
+  INY();
+  JMPA('interpret');
+
 
  L('fail'); // error in A
-
   puts("%% FAIL ( ");
-
   save('y', ()=>{
     LDYN(0);
     JSRA(aputd);
   });
-
   puts(")\n");
 
+  // FALLTRHOUGH: ABORT/QUIT
+  // - https://forth-standard.org/standard/core/QUIT
+ L('MAIN_zero');
+  // drop one level (== interpret)
+  PLA(); PLA(); 
   RTS();
 
- L('MAIN_zero');
-  RTS();
 
  L('drop3_next'); // maybe used only once?
   drop();
@@ -287,7 +297,8 @@ L('foo'); string('"FOO:"$1234D...');
   // to interact with the normal 6502
   // code. It seemed to separate.
   //
-
+  
+  // FALLTHROUGH from drop..._next !
  L('next');
   TRACE(()=>{
     if (showStack) {
@@ -295,8 +306,6 @@ L('foo'); string('"FOO:"$1234D...');
       printstack();
     }
   });
-
-  INY();
 
   let drop_next= ()=>JMPA('drop_next');
   let drop2_next= ()=>JMPA('drop2_next');
@@ -306,6 +315,9 @@ L('foo'); string('"FOO:"$1234D...');
   let putSA_next= ()=>JMPA('putSA_next');
   let pushSA_next= ()=>JMPA('pushSA_next');
   let number= ()=>JMPA('number');
+
+  // TODO: this should be done inside tabcod?
+  INY();
 
   tabcod('MAIN', {
 
@@ -1180,6 +1192,7 @@ function tabcod(name, list, nxt= next) {
   }
 
   LDAIY('NEXT_BASE');
+  BEQ(name+'_zero');
 
   if (traceLevel) {
     PHA(); {
@@ -1187,8 +1200,6 @@ function tabcod(name, list, nxt= next) {
       LDAN(ord('\n')); JSRA(aputc);
     } PLA();
   }
-
-  BEQ(name+'_zero');
 
   let count = Object.keys(list).length;
   tabcod.count = (tabcod.count || 0) + count;
