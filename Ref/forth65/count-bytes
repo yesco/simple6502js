@@ -1,0 +1,10 @@
+echo "total lines: `cat forth65/FIG6502.ASM |wc`"
+echo "others     : `cat forth65/FIG6502.ASM |grep -iv '\(.*\),' | grep -P '\s[A-Z]{3} ' | grep -ivP '\(' | grep -cvP '(JSR|RTS)'`"
+echo "indexed  xy: `cat forth65/FIG6502.ASM |grep -icP '\(.*\),[XY]'`" 
+echo "indirect  x: `cat forth65/FIG6502.ASM |grep -icP '\(.*,.*\),'`" 
+echo "jsr/rts   x: `cat forth65/FIG6502.ASM |grep -iv '\(.*,.*\),' | grep -P '\s[A-Z]{3} ' | grep -ivP '\(' | grep -vcP '(JSR|RTS)'`"
+
+cat forth65/FIG6502.ASM | sed 's/;.*$//g' | grep '  [A-Z]\{3\}' | less 
+cat forth65/FIG6502.ASM | sed 's/;.*//g' |  grep " | sed "s/.*,// 
+cat forth65/FIG6502.ASM | grep '.WORD' 
+cat forth65/FIG6502.ASM | grep '.WORD' 

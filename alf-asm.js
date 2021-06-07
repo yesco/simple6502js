@@ -158,6 +158,78 @@ L('foo'); string('"FOO:"$1234D...');
 
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
+  // (b c38   FIG: c39
+  //
+  // jsk:
+  //   STXZ(save_x);
+  //
+  //   INY();
+  //   LDAIY(PROG);
+  //   ASL();
+  //   TAX();
+  //
+  //   LDAX(jmptabadj);
+  //   STAZ(opad);
+  //   INX();
+  //   LDAIX(jmptabadj);
+  //   STAZ(opad+1);
+  //
+  //   LDXZ(save_x);
+  //   JMPI(opad);
+  //
+  // FB post with Garth Wilson:
+  // - https://m.facebook.com/groups/6502CPU/permalink/2949669985302588/
+  //
+  // I'm not actually sure, the FIG forth
+  // 65 is updating the IP with CLC,ADC
+  // for every instruction. And for some
+  // reason using a JMP to a JMP in
+  // zeropage instead of JMPI (indirect).
+  // 
+  // It comes out at 39 cycles in most
+  // cases (minimal), see picture.
+  // 
+  // Mine (untested):
+  // --(see above)--
+  // which seems to come out to 38 cycles,
+  // I think?
+  //
+  // That one cycle they could also saved
+  // by using JMPI instead of JMP to JMP.
+  //
+  // In my case I limit a ALF (ALphabet
+  // Forth) subroutine to 255 chars since
+  // I'm using Y.
+  //
+  // I'll have slightly more overhead
+  // when calling a non-primitive word
+  // as that recurses on the interpreter
+  // having to save and then restore the
+  // IP and Y.
+  //
+  // But yes, I'll have other
+  // inefficiencies as I'll not/and
+  // needn't be compiling!
+  // 
+  // Loops are changed to the tokens
+  // '(' and ')', ']' is unloop/leave
+  // (and exit). '?(' is 'if'. Since I
+  // use Y as "subroutine local IP", a
+  // JMP is setting Y.
+  //
+  // ']' unloop/leave needs to skip till
+  // matching ')' so that's overhead
+  // (but I deem as acceptable).
+  // 
+  // The intention is to be simple and
+  // "embedded" with inline
+  // "half-readable" op-codes.
+  //
+  // I never saw how SWEET16 was supposed
+  // to interact with the normal 6502
+  // code. It seemed to separate.
+  //
+
  L('next');
   TRACE(()=>{
     if (showStack) {
