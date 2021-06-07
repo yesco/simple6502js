@@ -280,15 +280,21 @@ o========================================-
          58 :    define : X":noname"
            ':name:' (not long mode)
          59 '; ' enddef
-            ;i   ; Immediate
+            ;I   ; Immediate
+            ;[.. tailcall ; ..
          60 <    less < <# X<> 
          61 =    =
          62 >    > >body >in >number >r r>
          63 ?    ?dup> X:?do
-            ?d   ?dup
+            ?D   ?dup
             ?(   -1 if 2 then 4 else
                  -1 ?( 2  ]   4   )
             ?]   if-exit
+                 ( for if and )
+                 - https://github.com/phreda4/r3d4?fbclid=IwAR2Q5ch2l-cK_mTCGLXzUqNZWk30JtFuwcg2l0XaNjxsyeTDT2x16tnV0hc
+            ?0   0 = if-exit
+            ?1   0 <> if-exit
+            
 control structures
 http://lars.nocrew.org/forth2012/core/qDO.html
 
@@ -508,4 +514,7 @@ COMPILATION IDEAS:
     - https://www.complang.tuwien.ac.at/forth/fth79std/FORTH-79.TXT
     Gforth
     - ???
+    Stable - An extreme fast "forthy" VM:
+    (it also uses one letter)
+    - https://w3group.de/stable.html
 

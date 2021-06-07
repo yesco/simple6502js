@@ -1,4 +1,8 @@
-// TODO: simple6502.js
+//      ALfabetic Forth
+// 
+// 2021 (>) Jonas S Karlsson
+//       jsk@yesco.org
+//
 let cpu6502 = require('./fil.js');
 let jasm = require('./jasm.js');
 let aputc = 0xfff0;
@@ -13,6 +17,7 @@ let output = 0; // show 'OUTPUT: xyz'
 let traceLevel = 0; // 1=labels, 2=instr.
 let showStack = 0;
 tabcod.trace = 0;
+let showMem = 0;
 
 // ALF - ALphabet  F O R T H
 
@@ -37,11 +42,50 @@ ORG(0x16);   L('tmp_y');     byte(0);
 
   // - FREE
 
+  ////// ========= input buffer ========= ///////
   // ORIC 79 bytes input buffer
+
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
-  // testing: simple program!
+
+// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 ORG(0x35); /* INPUT_BUF */ string(
-'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456');
+
+
+
+
+
+
+
+
+
+
+
+
+
+'1234(.)9'
+
+
+
+
+
+
+
+
+
+
+
+
+
+);
+
+//'123456789(d..1+)"end"$99');
+
+
+//'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456');
+
+
 //'5671<2.3<4.2<1.4<3.567');
 //'6543210##');
 
@@ -58,6 +102,10 @@ ORG(0x35); /* INPUT_BUF */ string(
 //'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+D2+.4Z'); // 512+2
 //'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+2+.4Z'); // 256+ 2
 //'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.2D.4Z'); // 2
+
+
+/////////////////////////////////////////////
+
 
 
   // ALForth
@@ -142,7 +190,18 @@ L('foo'); string('"FOO:"$1234D...');
   RTS();
   //JMPA('end');
 
+ L('fail'); // error in A
 
+  puts("%% FAIL ( ");
+
+  save('y', ()=>{
+    LDYN(0);
+    JSRA(aputd);
+  });
+
+  puts(")\n");
+
+  RTS();
 
  L('MAIN_zero');
   RTS();
@@ -161,7 +220,7 @@ L('foo'); string('"FOO:"$1234D...');
   // (b c38   FIG: c39
   //
   // jsk:
-  //   STXZ(save_x);
+  //   STXZ(tmp_x);
   //
   //   INY();
   //   LDAIY(PROG);
@@ -174,7 +233,7 @@ L('foo'); string('"FOO:"$1234D...');
   //   LDAIX(jmptabadj);
   //   STAZ(opad+1);
   //
-  //   LDXZ(save_x);
+  //   LDXZ(tmp_x);
   //   JMPI(opad);
   //
   // FB post with Garth Wilson:
@@ -292,7 +351,7 @@ L('foo'); string('"FOO:"$1234D...');
 
 
     Z_Zill_Zero_Fill_Erase_Blank() { // alias for fill?
-//      save_axy(()=>{
+//      push_axy(()=>{
       STXZ('tmp_x'); STYZ('tmp_y'); {
         // address
         LDAZX(4); STAZ(0);
@@ -374,8 +433,9 @@ L('foo'); string('"FOO:"$1234D...');
     ']_stop': function(){
       // TODO: long: move out, JSRA?
 
-      LDAZ('STATE');
-      BNE('forceend');
+//      LDAZ('STATE');
+//      BNE('forceend');
+      JMPA('forceend');
 
       // inside '[' (immediate mode)
       // TODO: [=inc ]=dec that way can have a super immediate mode (as you type??
@@ -607,7 +667,7 @@ L('foo'); string('"FOO:"$1234D...');
       // TODO: rename to $.
 // TODO: why STYZ not work and is slower?
 //      STYZ('tmp_y'); STXZ('tmp_x');
-      save_axy(()=>{
+      push_axy(()=>{
         LDAZX(0); // length
         STAZ('tmp_x');
         LDAZX(2); // lo address
@@ -620,7 +680,13 @@ L('foo'); string('"FOO:"$1234D...');
     },
 
     '._print': function(){
-      save_ay(()=>{
+
+      CPXN(0xff);
+      BNE('._0');
+      THROW(13); // we're getting 5???
+     L('._0');
+
+      push_ay(()=>{
         LDAZX(0);
         LDYZX(1);
         JSRA(aputd);
@@ -811,7 +877,7 @@ tabcod('###', {
   },
 
   '._#._.S_print_stack': function(){
-    save_axy(()=>{
+    push_axy(()=>{
       if (0) {
         // call ##
         LDAN(ord('<')); JSR(aputc);
@@ -952,17 +1018,20 @@ let a2l = {};
 Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 
 print('\n\nCPU.run => ', cpu.run(-1, trace, patch));
-print();
 
-cpu.dump(0x0000, 2);
-print();
-printstack();
-print();
+if (showMem) {
+  print();
 
-cpu.dump(0, 65536/8, 8, 1);
-print();
-printstack();
-print();
+  cpu.dump(0x0000, 2);
+  print();
+  printstack();
+  print();
+  
+  cpu.dump(0, 65536/8, 8, 1);
+  print();
+  printstack();
+  print();
+}
 
 //print('INCZX=' + INCZX.toString(), INCZX);
 //print('BNE=' + BNE.toString(), BNE);
@@ -1177,40 +1246,90 @@ function push(v) {
   DEX(); DEX();
 }
 
-function save_a(f) {
+function save(regs, f) {
+  regs.split('').forEach(r=>
+    global['ST'+r.toUpperCase()+'Z']('tmp_' + r.toLowerCase()));
+
+  f();
+
+  regs.split('').forEach(r=>
+    global['LD'+r.toUpperCase()+'Z']('tmp_' + r.toLowerCase()));
+}
+
+function push_a(f) {
   PHA(); {
     f();
   } PLA();
 }
 
-function save_ax(f) {
-  save_a(()=>{
+function push_ax(f) {
+  push_a(()=>{
     TXA(); PHA(); {
       f();
     } PLA(); TAX();
   });
 }
 
-function save_ay(f) {
-  save_a(()=>{
+function push_ay(f) {
+  push_a(()=>{
     TYA(); PHA(); {
       f();
     } PLA(); TAY();
   });
 }
 
-function save_axy(f) {
-  save_ax(()=>{
+function push_axy(f) {
+  push_ax(()=>{
     TYA(); PHA(); {
       f();
     } PLA(); TAY();
   });
 }
 
-function save_axyp(f) {
-  save_axy(()=>{
+function push_axyp(f) {
+  push_axy(()=>{
     PHP(); {
       f();
     } PLP();
+  });
+}
+
+// TODO: not correct (this is more ERR)
+// - https://forth-standard.org/standard/exception/CATCH
+function THROW(n) {
+  LDAN(n);
+  JMPA('fail');
+}
+
+function puts(s) {
+  // TODO: put in "datasegment?"
+  let l = 'STR:' + s;
+
+  // TODO: generate "clever"
+  // inline code w/o jmp
+  // like JSRA(sputs); string("foo");
+
+  JMPA('_'+l);
+ L(l); string(s);
+ L('_'+l);
+
+  push_axy(()=>{
+    LDAZX(0xff); // length
+    LDAN(l, lo);
+    LDYN(l, hi);
+    JSRA(aputs);
+  });
+}
+  
+function putc(c) {
+  LDAN(ord(c));
+  JSRA(aputc);
+}
+
+function putd(d) {
+  push_ay(()=>{
+    LDAZX(0);
+    LDYZX(1);
+    JSRA(aputd);
   });
 }

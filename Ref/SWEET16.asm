@@ -1,3 +1,5 @@
+	;; -*- truncate-lines: true; -*-
+	                     (font-lock-add-keywords nil '(("^.{0,16}" (0 '(face nil invisible t)))))
                 1    ***********************
                 2    *                     *
                 3    *   APPLE-II PSEUDO   *

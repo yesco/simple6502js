@@ -1,0 +1,3 @@
+timeout 1s sh -c 'perl gen.pl > fil.js && node alf-asm.js  | head -c 256'
+echo "..."
+echo
