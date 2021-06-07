@@ -217,20 +217,18 @@ L('foo'); string('"FOO:"$1234D...');
 
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
-  // (b c38   FIG: c39
+  // (b c34   FIG: c39
   //
   // jsk:
   //   STXZ(tmp_x);
   //
   //   INY();
   //   LDAIY(PROG);
-  //   ASL();
   //   TAX();
   //
-  //   LDAX(jmptabadj);
+  //   LDAX(LO_jmptabadj);
   //   STAZ(opad);
-  //   INX();
-  //   LDAIX(jmptabadj);
+  //   LDAX(HI_jmptabadj);
   //   STAZ(opad+1);
   //
   //   LDXZ(tmp_x);
@@ -251,6 +249,7 @@ L('foo'); string('"FOO:"$1234D...');
   // Mine (untested):
   // --(see above)--
   // which seems to come out to 38 cycles,
+  //                (      NOW: 34   )
   // I think?
   //
   // That one cycle they could also saved
