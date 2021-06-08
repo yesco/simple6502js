@@ -182,23 +182,38 @@ L('foo'); string('"FOO:"$1234D...');
 
   // Code to run inline ALF after an JSR
  L('ALF');
+  // save old base
+  LDAZ('NEXT_BASE');          STAZ(0);
+  LDAZ('NEXT_BASE', a=>a+1);  STAZ(1);
+  
   // interpret chars at return address
   PLA();
   STAZ('NEXT_BASE');
   PLA();
   STAZ('NEXT_BASE', a=>a+1);
-  LDYN(0);
 
+  // push Y, IP on stack
+  LDAZ(1); PHA(); // IP.hi
+  LDAZ(0); PHA(); // IP.lo
+  TYA(); PHA(); // push Y
+
+  LDYN(0); // TODO: or 1?
   putc('>');
 
   JSRA('interpret');
 
+  // just print char w "len" info
   putc('<');
   TYA();
   CLC();
   ADCN(ord('0'));
   JSRA(aputc);
 
+  // restore Y, IP from stack
+  PLA(); STAZ(2); // Y
+  PLA(); STAZ(0); // IP.lo
+  PLA(); STAZ(1); // IP.hi
+  
   // fix return address
   INY(); // skip the 0
   STYZ('tmp_y');
@@ -208,12 +223,18 @@ L('foo'); string('"FOO:"$1234D...');
   ADCZ('tmp_y');
   LDAZ('NEXT_BASE');
 
+  // save return address
   ADCN(0);
   STAZ('NEXT_BASE', a=>a+1);
   PHA();
 
   LDAZ('NEXT_BASE');
   PHA();
+
+  // restore to state before ALF call
+  LDAZ(0); STAZ('NEXT_BASE');
+  LDAZ(1); STAZ('NEXT_BASE', a=>a+1);
+  LDAZ(2); TAY();
 
   RTS();
 
