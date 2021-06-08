@@ -83,25 +83,24 @@
   WORDS DEFINED
 
   Arithmetic:
-    +   plus
-    -   minus
-    *   multiply
-    /   divide
+    +   +
+    -   -
+    *   *
+    /   /
     %%  mod
     %/  /mod
     %#  /mod10
 
-    =   equal
-    <   less than
-    >   greater than
-  ( >=  not have. Use: <n )
+    =   =
+    <   <
+    >   >
+  ( >=  don't have. Use: <n )
 
     &   and
     _   or (or if use lowercase map |)
     ^   xor
     n   invert (not) (or if use lowercase ~)
    
-    0< 0= 0> 1+ 1- (lol, for free!)
   (     no max / min )
 
   Stack:
@@ -113,19 +112,18 @@
     rt  rot
     rl  roll
     t   tuck
-  ( p   nip ? )
+    p   nip
 
     ##  depth
     
     e   emit
-    .   print number
-    $.  print string
-    $h  print hex    
-    
+    .   print
+    $.  hex
+
     r>  r> 
     r<  >r (lol)
-    r@  @r
-    r!  !r
+    r@  r@
+    r!  r!
 
     r[0-9]>    nr>
     r[0-9]<    n>r
@@ -136,13 +134,14 @@
         a decimal number (possibly negative)
         # is optional
     #n  negate
+    #-1  -1
     #t  true -1
   ( #f  false 0 - maybe not needed )
   ( #.  decimal print )
-    #r  right justified print number
+    #r  u.r right justified print number
 
-    #<  shift n steps left
-    #>  shift n stops right
+    #<  lshift n steps left
+    #>  rshift n stops right
 
     #s  sign
     #a  abs
@@ -150,7 +149,7 @@
     #x  max
     #m  min (?)
 
-    #q  square root
+    #q  sqrt
 
   ( #b  base )
     #/% /mod ( n d -- div rest )
@@ -161,14 +160,12 @@
   Hex:
     $[0-9a-f]{0,4}
         a hex number
-    $...
+    $.  print-hex number
 
   Strings:
-    "
-    $.  print hex ($t for type)
-    $"  pascal string (counted)
- (  $(...)         )
- (       .( ... )  )
+    "   s"
+    $"  c" pascal string (counted)
+ (  $(...)  .( ... )  )
 
     $=
     $<
@@ -187,6 +184,7 @@
     $r  replace
 
     $k  key
+    $k  key?
     $l  line (accept)
 
     $t  type
@@ -195,11 +193,12 @@
     $l  sliteral
 
   Memory:
-    @
-    !
+    @  @
+    !  !
 
   Char:
-    'c  put ascii for c on stack, can be space
+    'c  char
+    '_  bl
 
     c,  c,
     c!  c!
@@ -220,24 +219,33 @@
 
     ]    exit (or use ';'!)
     
-    Q    quit
-    Q"   quit"
+    q    quit
+    q"   quit"
+    rt   throw
+    re   catch (errcatch)
 
-    ?(   if  -1 ?( <then> ] <else> )
-    ?n(  dup 0 =  if
+    ?(   if_-1_?__<then>_]_<else>_
+    ]    else
+    )    then
 
-    ?=(  over swap = if
-    ?<(  over swap < if
-    ?>(  over swap > if
+    ?n(  dup_0_=_f
+
+    ?=(  over_swap_=_if
+    ?<(  over_swap_<_if
+    ?>(  over_swap_>_if
     ?<=( ?<n(
     ?>=( ?>n(
-    ?=n( <> if
+    ?=n( <>_if
     ?&(
     ?_(
     ?^(
     
   ( ?[0-9](                    )
   (      dup 1 <digit> << & if )
+
+    #(   for
+    #)   loop
+    #+)  +loop
 
     (... begin / do (counts up from zero!)
     )    again / repeat
@@ -295,6 +303,9 @@
     ;tN    tail call N
     ;f...  fallthrough
 
+    [      [
+    ]      ]
+
     vx@    variable 'x' fetch (zp)
     vx!    variable 'x' store (zp)
 
@@ -325,8 +336,16 @@
     [ - immediate,  [[
 
 ( 2dup etc: t_W_o)
-(   w...  2... )
-(   TODO: 2! 2/ 2@ 2drop 2dup 2over 2swap X:2>r X:2r> X:2r@ )
+    w!  2!
+    2/  2/
+    w@  2@
+    w\  2drop
+    wd  2dup
+    wo  2over
+    ws  2swap
+    wr< 2>r
+    wr> 2r>
+    wr@ 2r@
 
   Input/Output:
     .      print
@@ -336,6 +355,7 @@
     $t     type (string)
     $k     key 
     $l     line (accept)
+
 
   UNUSED:
 
@@ -371,7 +391,7 @@ Ideas for adding long name words:
   For example, we may add an 'g' user defined
   op-code. Behind it hides several functions:
 
-    graphics:     ('g' opcode - eXtra Graphics)
+    graphics: ('g' opcode - eXtra Graphics)
       ALF_nextchar
       ALF_adispatch (assoc)
         'L' &line
@@ -424,13 +444,13 @@ NOTES:
 
 COMPILATION IDEAS:
   Immidiates
-    :   push (start,0,':') on stack (call c')
-    rc  recurse (c:jsr address, leaves on stack)
-    ?]  pop, push(@here as backpatch), jmp @xx
-    (   push (start,0,'(') on stack
+    : push (start,0,':') on stack (call c')
+    rc recurse (c:jsr address, leaves on stack)
+    ?] pop, push(@here as backpatch), jmp @xx
+    ( push (start,0,'(') on stack
     
-    )   pop (start,backpatch,'(')) off stack
-    ;   pop (start,backpatch,':')) off stack
+    ) pop (start,backpatch,'(')) off stack
+    ; pop (start,backpatch,':')) off stack
     
     If backpatch != 0 write current address
     add that address.

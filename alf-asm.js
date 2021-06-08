@@ -382,6 +382,48 @@ L('foo'); string('"FOO:"$1234D...');
     // - ','  !!!! first!
     // - Quit is "reset" ? loops Interpret
     
+    // first words according to eForth:
+    // - EXIT
+    // - EXECUTE
+    // - next
+    // - ?branch
+    // - branch
+    // - !
+    // - @
+    // - c!
+    // - c@
+    // - rp@
+    // - rp!
+    // - r>
+    // - r@
+    // - >r
+    // - sp@
+    // - sp!
+    // - drop
+    // - dup
+    // - swap
+    // - over
+    // - 0<
+    // - and
+    // - or
+    // - xor
+    // - um+
+    // - ?key
+    // - emit
+    // - expect
+    // - tap
+    // - >in
+    // - #TIB
+    // - last
+    // - ?dup
+    // - rot
+    // - 2drop
+    // - 2dup
+    // - +
+    // - d+
+    // (- not (build on xor))
+    // (- negate inver 1 + exit)
+
     Quit (){
       JMPA('ALF_reset');
     },
