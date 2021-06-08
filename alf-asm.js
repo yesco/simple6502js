@@ -197,7 +197,7 @@ L('foo'); string('"FOO:"$1234D...');
   LDAZ(0); PHA(); // IP.lo
   TYA(); PHA(); // push Y
 
-  LDYN(0); // TODO: or 1?
+  LDYN(1); // TODO: should be 3 if a def?
   putc('>');
 
   JSRA('interpret');
