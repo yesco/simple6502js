@@ -64,7 +64,8 @@ ORG(0x35); /* INPUT_BUF */ string(
 
 //'11=.00=.77=.17=.23=.97=.'
 
-'12>.01>.33>.43>.87>.30>.'
+'12345....'
+//'12>.01>.33>.43>.87>.30>.'
 
 //'12<.01<.34<.77<.87<.30<.'
 
@@ -129,7 +130,10 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
-  JMPA('ALF_init');
+  //JSRA('ALF_init');
+
+  ALF('34+."$Hello ALForth!\n"$t77+.');
+
   //JSR('end');
 
 //  LDAN('mys', lo); STAZ('NEXT_BASE');
@@ -157,7 +161,7 @@ L('foo'); string('"FOO:"$1234D...');
   // save stack for QUIT
   TSX(); STXZ('QUIT_STACK');
 
-  JMPA('ALF');
+  JMPA('ALF'); string('98754.....');
 
  L('ALF_reset');
   // restore stack
@@ -176,9 +180,42 @@ L('foo'); string('"FOO:"$1234D...');
 
   // Possibly Return to caller?
 
+  // Code to run inline ALF after an JSR
  L('ALF');
-  // init index
+  // interpret chars at return address
+  PLA();
+  STAZ('NEXT_BASE');
+  PLA();
+  STAZ('NEXT_BASE', a=>a+1);
   LDYN(0);
+
+  putc('>');
+
+  JSRA('interpret');
+
+  putc('<');
+  TYA();
+  CLC();
+  ADCN(ord('0'));
+  JSRA(aputc);
+
+  // fix return address
+  INY(); // skip the 0
+  STYZ('tmp_y');
+
+  CLC();
+  LDAZ('NEXT_BASE');
+  ADCZ('tmp_y');
+  LDAZ('NEXT_BASE');
+
+  ADCN(0);
+  STAZ('NEXT_BASE', a=>a+1);
+  PHA();
+
+  LDAZ('NEXT_BASE');
+  PHA();
+
+  RTS();
 
   // TODO: this is normaly called QUIT ?
  L('interpret');
@@ -208,7 +245,7 @@ L('foo'); string('"FOO:"$1234D...');
   // FALLTRHOUGH: ABORT/QUIT
   // - https://forth-standard.org/standard/core/QUIT
  L('MAIN_zero');
-  // drop one level (== interpret)
+  // drop up one level (== interpret)
   PLA(); PLA(); 
   RTS();
 
@@ -1444,4 +1481,9 @@ function putd(d) {
     LDYZX(1);
     JSRA(aputd);
   });
+}
+
+// call ALF interpreter (recursively?)
+function ALF(alf) {
+  JSRA('ALF'); string(alf);
 }
