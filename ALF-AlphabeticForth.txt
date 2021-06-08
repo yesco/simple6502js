@@ -1,21 +1,38 @@
-o========================================-
-010 00000 (32) "@A-Z[\]^_"
-001 00000 (32) 31-63 ' '..'?'
-
-  ALphatbetic Forth ALF
+  ALF - ALphabetic Forth ALF
   =====================
   
-  The grounding principle is that all
-  Forth CORE functions are mapped to single
-  character tokens in the range 32-95
+  The purpose of ALF is to replace SWEET16
+  as an embedded 16-bit language. I found that
+  SWEET16 felt too limited and started designing
+  another virtual machine for the 6502. A
+  register machine. Then I tought, it wouild be 
+  nice to have tokens for additional more
+  advanced user subroutines that were readable.
+  An embedded token language inside a VM with
+  new binary register instructions. Eventually,
+  I lost interest in register machines and
+  instead focussed on a "one letter" Forth.
+
+  Forth is easy to implement; more difficult
+  to program. But, it provides a very simple
+  and generic way of making functions interact
+  with each-other; a universial calling
+  and parameter-passing, as well as temporary
+  storage, without messing with registers and
+  memory locations.
+
+  The grounding principle of ALF is that most
+  (common) Forth CORE functions are mapped to
+  a single character token in the range 32-95
   (64 characters), basically all readable
   characters of ASCII. Only upper case
-  letters are used.
+  letters are used. (TODO: change)
  
-  The idea behind this is to used a token
-  based interpreter, instead of threaded.
-  (no general inlining of calling addresses
-  or generating (6502) JSR/JMP codes.
+  The idea behind this is to use a token
+  based interpreter, instead of subroutine or
+  direct threaded, i.e. no general inlining
+  of calling addresses or generating (6502)
+  JSR/JMP codes.
 
   This is a well-know and compact way of
   storing common/basic tokens, and to
@@ -30,51 +47,67 @@ o========================================-
   'xxxx xx11' (64 of them). Sadly enough,
   these are not "nice". I've decided to play
   a game where I use 64 characters as inline
-  tookens.
+  tokens.
 
-  More tokens are possibly, but require a
-  second byte.
+  We use a single main lookup table from the
+  character to get an address that we execute.
+  Each word ends with jumping to next (3 bytes,
+  but fast!), or RTS if it's reused internally
+  (slower but code saving).
+
+  Some Forth functionality is hidden behind a
+  secondary dispatch using a second character.
   
-    OP 'p'      (print)
+  For example, all string functions are prefixed
+  by '$'.
 
-  Basically, hiding a simplified one-byte
-  JSR using a lookup table. These are
-  not limited to 64 entries, but could
-  allow for 256 words. The dispatch table
-  would be huge (512 bytes), however
-  we will use the same printable range.
+  .         print number
+  $.        print string
 
-  All new functions are added to a dictionary,
-  and also assigned a single letter.
+  The secondary dispatch may just be chained
+  CMP '.'; BNE *; ... which is slow, but easy.
+  Or the 'codtab' function may choose to generate
+  an 'assaoc' list that is searched that returns
+  a single byte offset that is added to the PC.
+  We also need a "didn't match" default clause,
+  to either give error, or just process next
+  token.
 
-  Please note that several instructions are
-  multi-instructions, in that they have
-  a second "dynamic" dispatch sensing the
-  next letter. This is typically done inline:
-  
-  graphics:     ('xg' opcode - eXtra Graphics)
-    ALF_nextchar
-    ALF_adispatch (assoc)
-      'L' &line
-      'P' &pixel
-      'G' &goto
-      'C' &circle
-      'R' &rectangle
-    00
-    (Arrive here if no match, A is letter)
-    putc
-    fail "%% No such graphics command!"
-    RTS
+  User defined functions, may be single letter,
+  alternative case (probably uppercase).
+
+  For example, we may add an 'g' user defined
+  op-code. Behind it hides several functions:
+
+    graphics:     ('g' opcode - eXtra Graphics)
+      ALF_nextchar
+      ALF_adispatch (assoc)
+        'L' &line
+        'P' &pixel
+        'G' &goto
+        'C' &circle
+        'R' &rectangle
+      00
+      (default:)
+      putc
+      fail "%% No such graphics command!"
+      RTS
+    line: ...
+    pixel: ...
+    goto: ...
+    circle: ...
+    ...
     
-  OR
-    ALF_nextchar
-    ALF_tdispatch
-      "LPGCR"
-      &line &pixel &goto &circle &rectangle
-    (Arrive here if no match, A is letter)
-    putc
-    fail "%% No such graphics command!"
-    RTS
+    OR
+      ALF_nextchar
+      ALF_tdispatch
+        "LPGCR"
+        &line &pixel &goto &circle &rectangle
+      (Arrive here if no match, A is letter)
+      putc
+      fail "%% No such graphics command!"
+      RTS
+      ...
             
   Indeed this method is employed by a number
   of core functions. Here are the letters
@@ -88,7 +121,7 @@ o========================================-
   
   In ALF:
 
-    :DOUBLE:D+;
+    :D:d+;
     
   Inded a single space will put us in long-name
   mode, until a ] is encountered.
@@ -101,70 +134,185 @@ o========================================-
 
   WORDS DEFINED
 
-  (upper case letter indicate dispatch letter)
+  Arithmetic:
+    +   plus
+    -   minus
+    *   multiply
+    /   divide
+    %%  mod
+    %/  /mod
+    %#  /mod10
 
-  Names & Symbols
-    ! " # $ $" ' * + , - . / : ; < = > @
+    =   equal
+    <   less than
+    >   greater than
+  ( >=  not have. Use: <n )
+
+    &   and
+    _   or (or if use lowercase map |)
+    ^   xor
+    n   invert (not) (or if use lowercase ~)
+   
     0< 0= 0> 1+ 1- (lol, for free!)
+  (     no max / min )
 
-    ALlot Base C" CR C! Dup Emit Here I J
-    Key Literal Max Not Over Pick Q Q"
-    R> R< (!) RoT RoLl Swap Tuck Variable
-    Write ?
+  Stack:
+    d   dup
+    \   drop
+    s   swap
+    o   over
+    p   pick
+    rt  rot
+    rl  roll
+    t   tuck
+  ( p   nip ? )
 
-  Missing
-    <= (> Not)
-    >= (< Not)
-    negate (0 Swap -)
-    nip
-    min (Max Swap)
-    within (RoT Dup RoT > Not RoT > Not &and)
-           (R< Over > Not Swap R> > Not &and)
-
-      (crap: this is difficult!)
-        val min max
-        val min     | max  -- R<
-        val min val | max  -- Over
-        val t/f     | max  -- > Not
-        t/f val     | max  -- Swap
-        t/f val max |      -- R>
-        t/f t/f     |      -- > Not
-        t/f         |      -- &and
-
-  Numbers & Strings
-    3 17 42 4711 (is it in long-mode now?)
-    3#17#42#4711
-    3$11$2A$1267
-
-    Ambiguous:
-      '$3d' can be written '$3 d'
-      '$beefd' write '$beef d'
-      (for decimals this is not a problem)
+    ##  depth
     
-  Extras
-    (heap)
-       Grab       AM(M/Alloc)  mAllocFree
-       AllocsiZe  A,
-    (generic)
-       AllocChain AllocDict AssoK AssokeXecute
+    e   emit
+    .   print number
+    $.  print string
+    $h  print hex    
+    
+    r>  r> 
+    r<  >r (lol)
+    r@  @r
+    r!  !r
+
+    r[0-9]>    nr>
+    r[0-9]<    n>r
 
 
-  Remapped
-    &   and    ^   xor    _   or      n   not
-    ?D  ?dup   \   drop   ##  depth
-    ##  depth  \   drop   AP  pad
-    #.R .R     $.  .s     $/  /string $-  -string
-   '$ ' blanks $#  fill   $<  string<
-    $?  ?search $k key    $l  literal
-    $m  cmove     $r  replace   $t type
-    $w  typewhite               $\" s\"
-    c<  rshift    c> lshift     cb  blank   
-   'c ' blanks    c# fill       co  count
-    c'  [']       c, compile,   cp  Postpone
-    cee see       cc create
-    R<  <R        rc ReCurse    
+  Numbers:
+    #-?[0-9]+
+        a decimal number (possibly negative)
+        # is optional
+    #n  negate
+    #t  true -1
+  ( #f  false 0 - maybe not needed )
+  ( #.  decimal print )
+    #r  right justified print number
 
-  Flow control
+    #<  shift n steps left
+    #>  shift n stops right
+
+    #s  sign
+    #a  abs
+
+    #x  max
+    #m  min (?)
+
+    #q  square root
+
+  ( #b  base )
+    #/% /mod ( n d -- div rest )
+  
+  Floats:
+    f... (reserved)
+
+  Hex:
+    $[0-9a-f]{0,4}
+        a hex number
+    $...
+
+  Strings:
+    "
+    $.  print hex ($t for type)
+    $"  pascal string (counted)
+ (  $(...)         )
+ (       .( ... )  )
+
+    $=
+    $<
+    $>
+    $?  search
+  ( $n= )
+  ( $n< )
+  ( $n> )
+
+    $s  subst
+    $/  /string
+    $-  -string
+   '$ ' blank string
+
+    $m  move
+    $r  replace
+
+    $k  key
+    $l  line (accept)
+
+    $t  type
+    $w  typewhite
+
+    $l  sliteral
+
+  Memory:
+    @
+    !
+
+  Char:
+    'c  put ascii for c on stack, can be space
+
+    c,  c,
+    c!  c!
+    c@  c@
+
+  ( c"  counted string )
+
+    cr  cr
+    c#  print c n times (c n -- )
+    cb  blanks
+    co  count (?)
+    
+    c... more in Compiler section
+
+  Control:
+    ?d   ?dup
+    rc   recurse
+
+    ]    exit (or use ';'!)
+    
+    Q    quit
+    Q"   quit"
+
+    ?(   if  -1 ?( <then> ] <else> )
+    ?n(  dup 0 =  if
+
+    ?=(  over swap = if
+    ?<(  over swap < if
+    ?>(  over swap > if
+    ?<=( ?<n(
+    ?>=( ?>n(
+    ?=n( <> if
+    ?&(
+    ?_(
+    ?^(
+    
+  ( ?[0-9](                    )
+  (      dup 1 <digit> << & if )
+
+    (... begin / do (counts up from zero!)
+    )    again / repeat
+    i    index of innnermost loop
+    j    index of next level loop
+    ?)   while
+    ]    leave (go to matching ')')
+    ?]   if-leave
+    [    next (go back to '(')
+
+  ( #(   numbered for )
+  ( ##(  numbered do loop )
+  ( $(   loop over chars a pointer )
+    
+    ]]   unroll-leave
+    ]]]  unroll-unroll-leave
+    ]]]]...
+
+    ?]]  if-unroll-leave
+    ?]]]...
+
+    ?[   if-next
+
     ?(  if     )   then   ]    exit
 
     (   begin  )   again  ?]   if-exit
@@ -173,204 +321,96 @@ o========================================-
 
     $(  do     $)  loop   #+)  +loop
 
-  Special (extra character follows):
-    # - number related functions
-    $ - string/hex related functions
-    ? - conditional: if while until if-exit
-    ( - comment if followed by space ...)
-    ( - loop characters endable by [ or ... )
-    ' - find? 'A' ->65 ' + => address
-    0-9 = start of decimal number
-    : - define ":double:d+; "
-    ; - "; " - enddef, ";i" immediate;
-    ; - ";c" - codce follows till (impl def
-) end marker
-    A - allocation memory heap
-    B - base/BL(eank)/BeTween
-    C - Character / Compile
-    L - Literal / Local
-    R - R stack, RoT/RoLl/ReCurse/Register
-    U - unsinged nums
-    X - Execute/???
-    Y - ??? FREE ---
-    Z - Zero/Erase
-    [ - immediate & [[
 
-  OP CODES          
+  Allocation:
+    al   allot
+    
+    am   malloc
+    af   free
+    ar   resize
+    az   size
+    a,   heap compile (steal 2 bytes)
+    
+    ac   alloc chain (push on linked list)
+    ad   alloc dictionary (create)
+
+    ak   assoc
+    ax   assoc execute
+    
+    ap   pad
+
+  Compiler / Definitions:
+    :
+    ;
+    ;i
+    ;a...  again / tail recurse
+    ;tN    tail call N
+    ;f...  fallthrough
+
+    vx@    variable 'x' fetch (zp)
+    vx!    variable 'x' store (zp)
+
+  ( v+X    inc var X)
+  ( v-X    dec var X)
+
+    h      here
+    g      gere (memory, lol. use M?)
+
+    ,      ,
+    l      literal
+    $l     sliteral
+
+    x      execute / eval
+
+    c,     c,
+    c'     ' or [']
+    cp     postpone
+    cd     defer
+    cs     state
+    ce     see
+    cc     create
+
+    [ - immediate,  [[
+
+( 2dup etc: t_W_o)
+(   w...  2... )
+(   TODO: 2! 2/ 2@ 2drop 2dup 2over 2swap X:2>r X:2r> X:2r@ )
+
+  Input/Output:
+    .      print
+    e      emit
+    #.     number print (same as .)
+    $.     hex print
+    $t     type (string)
+    $k     key 
+    $l     line (accept)
+
+  UNUSED:
+
+   ' ' - space (ignore / use for long names?)
+    b  - (byte? binary? bit?)
+    k  - (key? is $k)
+    l  - (literal?)
+    m  - (min max move memory?)
+    n  - ?
+    p  - (nip)
+  ( u  - Unsigned )
+  ( v  - variable )
+  ( w  - 2... )
+    y  - (yield if multitasking?)
+    z  - fill/erase
+
+  OP CODES (ALphabetic)
 
 001 00000 (32) 31-63 ' '..'?'
-         32 ' '  long name mode (ends with ])
-          [a-z]+ alt: use lowercase for longword
-         33 !    store
-         34 "    string
-         35 #    depth(of stack) (no need prefix! #10=decimal USED # #> #$)
-            ##   depth of stack
-            #-   negative number follows
-            #0-9 start NEW number 3#3 = "3 3"
-                 (but 3d.7.+ = "3 dup . 7 ."
-            #.r  u.r (. num in (cols -))
+    
+========================================-
+  001 00000 (32) 31-63 ' '..'?'
+  010 00000 (32) "@A-Z[\]^_"
+  011 00000 (32) "?a-z{|}??" 
 
-            #<   lshift n steps (or format)
-            #>   rshift n steps (or format)
-            #s   sign
-            #a   absolute! (since not hex!)
-            #b   base
-            #t   true (-1)
-           (#f   false (==0, just do '0'))
+NOTES:
 
-            #(   do...
-            #)   loop
-            #+)  +loop
-            #[
-
-         36 $    j:Hex $af $name=pascal string
-            $"   pascal string create
-            $s   string subst
-            $.   print string
-            $/   slash string (skip & declen)
-            $-   -string
-            $    blank string
-            $z   -"- lol
-            $<   str cmp < lt=-1s eq=0 gt=1
-            $?   ?search
-            $k   j:Key key. (accept=readline)
-            $l   j:sLiteral
-            $m   cMove
-            $r   Replace (?)
-            $t   Type
-            $w   typeWhite
-            $\"  parse \ string
-            $
-            $ g h i j n o p q u v x y
-         37 %    j:Mod (8 digits 01 is binary) %010101 binary number
-38 
-            %0-f n bits (15 %2 --- 12 3)
-            %/   (125 10 --  12 5)
-            %#   modulo 10 (fast!)
-            %%   just modulo? '%/SD'
-
-         38 &    j:And (&10 = decimal, or #10)
-         39 '    address of: ' foo 'a=char 'a'=char
-            ' foo (address of)
-            'x    (push letter x as number)
-
-         40 (    Do-loop-leave "4 1 ( I ) => 1 2 3"
-                 (     )   ]
-         40 (    ( comment ) (internalword)
-         41 )    j:Loop comment 
-         42 *    j:* */ */MOD * *! *LOOP
-         43 +    j:+ +!
-         44 ,    j:, (store word @here here+=2)
-         45 -    j:-
-         46 .    print . X:.(  ." Print string"
-         47 /    j:div / /MOD
-
-         // no good function names!
-         48 0    0< 0= X:0<> X:0> 0xfa 012=octal?
-         49 1    1+ 1-
-         50 2    2! 2/ 2@ 2drop 2dup 2over 2swap X:2>r X:2r> X:2r@ === it means do it twice or 2 is an argument
-         51 3    FREE
-         52 4    FREE
-         53 5    FREE
-         54 6    FREE
-         55 7    FREE
-         56 8    FREE
-         57 9    FREE
-
-         58 :    define : X":noname"
-           ':name:' (not long mode)
-         59 '; ' enddef
-            ;I   ; Immediate
-            ;[.. tailcall ; ..
-         60 <    less < <# X<> 
-         61 =    =
-         62 >    > >body >in >number >r r>
-         63 ?    ?dup> X:?do
-            ?D   ?dup
-            ?(   -1 if 2 then 4 else
-                 -1 ?( 2  ]   4   )
-            ?]   if-exit
-                 ( for if and )
-                 - https://github.com/phreda4/r3d4?fbclid=IwAR2Q5ch2l-cK_mTCGLXzUqNZWk30JtFuwcg2l0XaNjxsyeTDT2x16tnV0hc
-            ?0   0 = if-exit
-            ?1   0 <> if-exit
-            
-control structures
-http://lars.nocrew.org/forth2012/core/qDO.html
-
-till n DO I DUP 2 = IF LEAVE THEN LOOP
-
-till start ?DO I +LOOP
-           ?D(   )+
-till n (D I D   2 = ?( ]L    )    )L
-
-BEGIN code flag    WHILE code     REPEAT
-(B                 ]W             )R
-
-BEGIN code flag                   UNTIL
-(B                                )U
-
-BEGIN                             AGAIN
-(B                                )A
-
-010 00000 (32) "@A-Z[\]^_"
-         64 @    @ (fetch)
-         65 A    Allot (j:quit" abort abort") abs accept align aligned allot and X:action-of X:again
-            al   ALlot (permanent) (@ here (+n))
-
-            ( heap, each element knows size)
-            am   MAlloc            (@ grab (-n+2))
-            af   Free mAlloc
-            ar   Remalloc
-            az   Alloc siZe
-
-            ac   AllocChain (adr,lptr --)(prev=@)
-            ad   Alloc Dictionary (== cc?)
-            a,   compile, but to heap (g-=2)
-
-            ak   AssoK (tok addr -- index)
-            ax   Assok execute (addr --)
-            
-            ap   Pad (at least 84 bytes long)
-
-            // Local variables
-            // - https://github.com/seanpringle/reforth
-            at   how to store these?
-            a@+
-            a1+
-
-
-            
-         66 B    ??? j:base begin bl X:"buffer:"
-            bs   BaSe
-            bt   BeTween
-            b0   base 10
-            b8   base octal 8
-            b2   base 2
-            bh   base hex
-            bl   BL(ank) -> 32 on stack
-
-                      (d ]w )r
-         67 C    character/relatedR c! c, c@ cell+ cells char char+ chars constant count cr create X:c" X:case X"compile,"
-            c"   cstring (0 terminated)
-            c!
-            c@
-
-            // "constants"
-            cb   Blank -> 32 (BL) on stack, maybe just use BL?
-            cr   DO carriage return
-           (cf   is just 0)
-
-            c    n print ' ' n times
-            c#   c n print c n times
-            co   count (?)
-
-            cp   Postone/Compile
-            cs   compiling 'Stateb' (0=executing, otherwise compiling)
-            c'   compile ' = [']
-            c,   Compile, "store char, here++"
-            ce   "See" word def!
-            cc   Compile Create (in dict)
 
 COMPILATION IDEAS:
   Immidiates
@@ -388,122 +428,9 @@ COMPILATION IDEAS:
     If before and after compilation stack is
     different (!= 0) give error.
 
-         68 D    Dup (drop) do dup drop depth (decimal X:defer X:defer! X:defer@ dDoubleFunc)
-         79 E    Emit else (emit environment evaluate execute exit(=]) X:endcase X:endof X:erase)
-         70 F    fill find fm/mod X:false f+ f- e:form (-> r c)
-                 (it's not clear, if there MUST
-                  be a separeate F stack)
-            FF   fill
-            (maybe not implement but reserve)
-            F.   Float . (Print)
-            F+   
-            ....
-            
-         71 G    j:Grab memory (-- heap)
-         72 H    j:Here (here ++) (hold X:hex X:holds)
-         73 I    i (loopv) if immediate invert X:is
-         74 J    j (loopv)
-         75 K    key
-         76 L    Literal (leave literal loop lshift)
-            LA   Latest (pointer to linked list dictionary)
-            LT   Literal
+========================================
+REFERENCES
 
-            // Local variables
-            // - https://github.com/seanpringle/reforth
-            // (like a mini fast pick)
-            // (notice it changes number)
-            L0   - top 9..0 -- 1 0 0
-            L1   - second
-            L9         9..0 -- 1 0 9
-            L+0  - incresae L0
-            L-1  - decrease L1
-            L!2  -      42 L2 !
-            L!-2        42 L2 !   L-2
-            L-!2 - L-2  42 L2 !
-            L@+3 -         L2 @   L+2
-
-            // named locals (take of stack)
-            :(ABC)ROT:LBLCLA;
-            :(A)FOUR:4TALA;  // 4 TO A
-            :FOUR:D4;        // same
-            :FIB:D2=?]D1- FIB]SD1- FIB +;
-
-         77 M    Max (m* max min mod move X:marker)
-         78 N    Not (no ~ and ! is store) (min =="Max Swap" (negate X:nip))
-         79 O    Over (or over X:Of)
-         80 P    Pick (postpone X:pad X:parse X:parse-name X:pick e:page)
-         81 Q    Quit Q"
-
-         82 R    r> r@ recurse repeat rot rshift X:refill X:restore-input X;roll
-            r>
-            r<   <r
-            r@   R@ (==I)
-            rn>  NR>
-            rn<  N>R
-
-            rc   j:RecuCrse
-
-            rt   j:RoT
-            rl   j:RoLl
-            r
-
-            R0   acc
-            R1-R6 register 1
-            R!0
-            R@0
-            R+2
-            R-3
-            R-!3
-
-         83 S    Swap (s" s>d sign sm/rem source space spaces state X:S\" (!) X:save-input X:source-id see - def of word)
-         84 T    Tuck  type X:to X:true X:tuck
-                 ?( ] ) Type (see $t)
-         85 U    (u. u< um* um/mod unloop until X:u.r X"U>l" X:unused)
-            U<
-            U>
-            U.
-            ....
-         86 V    Variable (! @) X:value (to)
-            v foo 3 v ! (define and store)
-            
-         87 W    j:Write (while word X:within)
-         88 X    eXecute
-           'x '  from stack
-           'xa'  call extended word/token a
-                 (duplicate op codes,userdef)
-         89 Y    j:Yle (while!) e:at-xY?
-         90 Z    j:zero(a n) (X:erase)
-         91 [    [immediate mode in compilation] ['] [char] X:[compile]
-            [[   super immediate (like do it while typing!) end with ]]
-            [    immediate mode (during compie)
-         92 \    j:drop X:\
-         93 ]    J;"break"      
-            ]    longmode:ends
-            ]    exit in ':'
--- https://github.com/seanpringle/reforth
-            ]    $( ] $) == do leave loop
-            ]    $( ] $+) == do leave +loop
-            ] 10 #(   #) == 10 for loop
-            ]    ?( ] ) == if else endif! (ELSE)
-            ]    ( ?] ) == begin ifexit repeat
-            ]    ( n?] ) == begin while repeat // ???
-            ]    ( n?) == begin until
-            ]    ( ) == begin again
-            ]    ( ?[ ?) = begin ifnext while
-            
- j:Leave! Do-leave-loop ( I ] )
-
-         94 ^    j:xor
-         95 _    j:OR LOL
-        
-011 00000 (96-127)  [` .... {|}~, DEL]
-            {    { a b -- b a } <- end comment
-                   ^_^ +---comment
-                   |local variable
-            }
-
-
-  REFERENCES
     FORTH STANDARD (active website, good quality!)
     - https://forth-standard.org/standard/alpha
     Forth83 (clear summary by MikeOS)
@@ -517,4 +444,5 @@ COMPILATION IDEAS:
     Stable - An extreme fast "forthy" VM:
     (it also uses one letter)
     - https://w3group.de/stable.html
-
+    RetroForth with ColorForth f: namesspaces:
+    - http://forthworks.com:9999

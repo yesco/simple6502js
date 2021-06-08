@@ -60,17 +60,15 @@ ORG(0x35); /* INPUT_BUF */ string(
 
 
 
+//'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456'
 
+//'11=.00=.77=.17=.23=.97=.'
 
+'12>.01>.33>.43>.87>.30>.'
 
+//'12<.01<.34<.77<.87<.30<.'
 
-'1234(.)9'
-
-
-
-
-
-
+//'1234(.)9'
 
 
 
@@ -83,7 +81,6 @@ ORG(0x35); /* INPUT_BUF */ string(
 //'123456789(d..1+)"end"$99');
 
 
-//'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456');
 
 
 //'5671<2.3<4.2<1.4<3.567');
@@ -227,22 +224,24 @@ L('foo'); string('"FOO:"$1234D...');
 
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
-  // (b c34   FIG: c39
+  // (b c34   FIG: c39          c17)
   //
-  // jsk:
+  // jsk:                       self-mod
   //   STXZ(tmp_x);
   //
-  //   INY();
-  //   LDAIY(PROG);
-  //   TAX();
-  //
-  //   LDAX(LO_jmptabadj);
-  //   STAZ(opad);
-  //   LDAX(HI_jmptabadj);
-  //   STAZ(opad+1);
+  //   INY();                   INY();
+  //   LDAIY(PROG);             LDAIY(PROG);
+  //   TAX();                   
+  //                            
+  //A: LDAX(LO_jmptabadj);      ASL();
+  //   STAZ(opad);              STAZ(C+1)
+  //B: LDAX(HI_jmptabadj);      
+  //   STAZ(opad+1);            
   //
   //   LDXZ(tmp_x);
-  //   JMPI(opad);
+  //C: JMPI(opad);              JMPI(____);
+  //
+  //
   //
   // FB post with Garth Wilson:
   // - https://m.facebook.com/groups/6502CPU/permalink/2949669985302588/
@@ -297,6 +296,48 @@ L('foo'); string('"FOO:"$1234D...');
   // to interact with the normal 6502
   // code. It seemed to separate.
   //
+  // - http://wilsonminesco.com/SelfModCode/
+  // 
+  // Note particularly that the JMP (____)
+  // below becomes a double indirect, as the
+  // initial LDA fetches an address and stores
+  // it in JMP's operand, then the JMP (____)
+  // uses that fetched address to look up
+  // another address of where to jump to,
+  // then finally does the jump.
+  //
+  // ROM_IMAGE_OF_NEXT: /   22c
+  //             (copy to page 0 before running)
+  //               ;clocks
+  // preIP:
+  //        vvvv==== IP!
+  //** LDA  1234   ;4(5)  a=m[IP];            
+  //** STA  W      ;3(4)  update W inside JMP!
+  //   LDA  IP     ;3(4) \          faster than
+  //   INA         ;2    IP++        INCZP(IP);
+  // ( INA         ;2    IP++ )(jsk:why INC2?)
+  //   STA  IP     ;3(4) /
+  // preW:     vv=== W
+  //   JMP  (1234) ;5  jmp to code ptr by word
+  // 
+  // ; (code & W together here eliminates a JMP,
+  // ;  adv. to have NEXT in direct-page RAM.)
+  // 
+  // jsk: this is for
+  //   - page boundary aligned addr table
+  //   - each addr is 2 bytes
+  //
+  // The "1234" occurrences are just 16-bit
+  // placeholders for the operands that will
+  // get modified before use.  The address of
+  // IP is one byte after label preIP, and the
+  // address of W is one byte after label preW.
+  // Both of these are two-byte variables.
+  // The loading and double-incrementing of IP
+  // above may seem like a waste; ie, why not
+  // shorten the four instructions to just a
+  // pair of INC IP lines?  However, the way
+  // that's shown is faster
   
   // FALLTHROUGH from drop..._next !
  L('next');
@@ -522,6 +563,11 @@ L('foo'); string('"FOO:"$1234D...');
 
     '+_plus' : function(){
       CLC()
+      LDAZX(1); ADCZX(3); PHA();
+      LDAZX(0); ADCZX(2);
+      return putSA_drop_next;
+      // b13
+      CLC()
       LDAZX(0); ADCZX(2); STAZX(2);
       LDAZX(1); ADCZX(3); STAZX(3);
       return drop_next;
@@ -539,105 +585,75 @@ L('foo'); string('"FOO:"$1234D...');
       LDAZX(1); ANDZX(3); PHA();
       LDAZX(0); ANDZX(2);
      L('putSA_drop_next');
-              STAZX(-2 & 0xff);
-      PLA();  STAZX(-1 & 0xff);
-      return drop_next;
-
-      LDAZX(0); ANDZX(2); STAZX(2);
-      LDAZX(1); ANDZX(3); STAZX(3);
-      return drop_next;
+              STAZX(2);
+      PLA();  STAZX(3);
+      drop_next();
     },
 
     '__or' : function(){ // b12  (FIG: b14)
       LDAZX(1); ORAZX(3); PHA();
       LDAZX(0); ORAZX(2);
       return putSA_drop_next;
-
-      // b15
-      LDAZX(0); ORAZX(2); STAZX(2);
-      LDAZX(1); ORAZX(3); STAZX(3);
-      return drop_next;
     },
 
     '^_xor' : function(){
-      LDAZX(0); EORZX(2); STAZX(2);
-      LDAZX(1); EORZX(3); STAZX(3);
-      return drop_next;
+      LDAZX(1); EORZX(3); PHA();
+      LDAZX(0); EORZX(2); 
+      return putSA_drop_next;
     },
 
     Not(){
-      LDAZX(0); EORN(0xff); STAZX(0);
-      LDAZX(1); EORN(0xff); STAZX(1);
-    },
-
-    // on the topic of 16 bits compare
-    // http://forum.6502.org/viewtopic.php?f=2&t=6136
-    'UCMP': function(){
-      LDAZX(3); // x
-      CMPZX(1); // y
-      BNE('UCMP_notequal');
-      LDAZX(2);
-      CMPZX(0);
-     L('UCMP_notequal')
-//      BCC(lower);   // x < y    lower
-//      BNE(higher);  // x > y    higher
-//      BEQ(same);    // x == y   ame
-    },
-
-
-    '=_equal' : function(){
-      JSRA('Rminus');
-      LDAZX(0);
-      ORAZX(1);
-      BEQ('inv'); // zero (A=0)
-
-     L('false');
-      LDAN(0xff); //     => false 0
-     L('inv'); // A=0 => true -1
-      EORN(0xff);
-      STAZX(0);
-      STAZX(1);
-      return;
+      LDAZX(1); EORN(0xff); PHA();
+      LDAZX(0); EORN(0xff);
+      return putSA_next();
     },
 
     // TODO: '#?' == CMP
     '?' : function(){
-      LDAZX(1); // x
-      CMPZX(3); // y
-      BNE('_CMP');
-      LDAZX(0);
-      CMPZX(2);
-     L('_CMP');
-
+      JSRA('UCMP');
       BEQ('0');   // x == y   same
       BCC('-1');  // x < y    lower
-      BNE('+1');  // x > y    higher
-
-     L('-1');   // x < y    lower
-      LDAN(0xff); STAZX(2);
-      LDAN(0xff); STAZX(3);
-      drop_next();
+      // higher // fallthrough
 
      L('+1');  // x > y    higher
       LDAN(1);
-     L('put_drop_next');
-                STAZX(2);
+      BNE('putA_drop_next');
 
-      LDAN(0);  STAZX(3);
-      //JMPA('put_drop_next');
-      drop_next();
+     L('-1');   // x < y    lower
+      LDAN(0xff); PHA();
+      BNE('putSA_drop_next');
 
      L('0');    // x == y   ame
       LDAN(0);
-      JMPA('put_drop_next');
+     L('putA_drop_next');
+                STAZX(2);
+
+      LDAN(0);  STAZX(3);
+      drop_next();
 
       return ()=>0;
     },
 
+    '=_equal' : function(){ // b14
+      JSRA('UCMP');
+      BEQ('0');
+      BNE('-1');
+      return ()=>0;
+    },
+
     '>_greater_than' : function(){
-      JSRA('Rminus');
-      BEQ('false');
-//      BNE('true');
+      JSRA('UCMP');
+      BCC('0');  // x < y    lower (or equal)
+      BNE('-1');  // x > y    higher
+      return ()=>0;
+    },
+
+    '<_less_than' : function(){
+      JSRA('UCMP');
+      BEQ('0');   // x == y   same
+      BCC('-1');  // x < y    lower
+      BNE('0');  // x > y    higher
+      return ()=>0;
     },
 
     // TODO: put instruction before that also need to "drop"
@@ -646,9 +662,9 @@ L('foo'); string('"FOO:"$1234D...');
     },
 
     Over (){ // b8
-      LDAZX(3); PHA();
-      LDAZX(2);
-      return pushSA_next();
+      LDAZX(3); STAZX(1);
+      LDAZX(2); STAZX(0);
+      return pushSA_next;
     },
 
     Dup (){ // b5
@@ -730,6 +746,23 @@ L('foo'); string('"FOO:"$1234D...');
 
   // TODO: Report ERROR as no match?
   JMPA('end');
+
+  // on the topic of 16 bits compare
+  // http://forum.6502.org/viewtopic.php?f=2&t=6136
+  // TODO: separate U< and < ... ?
+ L('UCMP');
+  LDAZX(1); // x
+  CMPZX(3); // y
+  BNE('_CMP');
+  LDAZX(0);
+  CMPZX(2);
+  L('_CMP');
+  RTS();
+  // Usage:
+  //   JSRA('CMP');
+  //   BEQ('0');   // x == y   same
+  //   BCC('-1');  // x < y    lower
+  //   BNE('+1');  // x > y    higher
 
 L('number');
   SEC();
@@ -1003,7 +1036,7 @@ let end = jasm.address();
 // bytes: assuming contigious
 let bytes = end - start;
 
-print("====CODELEN: ", bytes);
+print("====CODELEN: ", bytes, "\n");
 
 //print(jasm.getChunks());
 //print(jasm.getHex(1,1,0));
@@ -1213,6 +1246,7 @@ function tabcod(name, list, nxt= next) {
     print('====tabcod_tabcods: ', tabcod.tabcods);
   }
 
+  let bsum = 0;
   Object.keys(list).forEach(k=>{
     if (tabcod.trace) 
       print('====TABCOD_F: ', k);
@@ -1230,6 +1264,7 @@ function tabcod(name, list, nxt= next) {
         BNE(nexttest);
       }
 
+      let a = jasm.address();
       // generate code and 'next'
      L(name+'_op_'+k);
       (cod() || nxt)();
@@ -1237,6 +1272,22 @@ function tabcod(name, list, nxt= next) {
       // skip to here
       if (k !== 'default')
         L(nexttest);
+
+      // JMPA, if BCS or RTS 1
+      let b = jasm.address()-a -3;
+      if (b==0) { // jmp
+        bsum += 3;
+      } else {
+        bsum += b + 1; // at least one byte
+      }
+
+      if (tabcod.trace) 
+        print(
+          '====tabcod: ', name, k[0],
+          b.toString().padStart(3, ' '),
+          ' + 3/1 B ',
+          bsum.toString().padStart(3, ' '),
+          k);
     } else {
       // take +1 penalty only if match
       BEQ( name+'_'+k );
@@ -1256,6 +1307,12 @@ function push(v) {
   DEX(); DEX();
 }
 
+// TODO:
+// http://wilsonminesco.com/SelfModCode/?fbclid=IwAR3Xh_P6M4mH2E-p04fnvNS7q9avOjgzsh_AAxXhWos74O8Lg3k_g2NChnQ
+// save one cycle
+//         STY  label+1; This is in place of PHY.
+//         <do_stuff>
+// label:  LDY  #0     ; Mod op:and. (PLY)
 function save(regs, f) {
   regs.split('').forEach(r=>
     global['ST'+r.toUpperCase()+'Z']('tmp_' + r.toLowerCase()));
