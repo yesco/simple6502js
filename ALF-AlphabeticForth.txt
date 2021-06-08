@@ -76,62 +76,10 @@
   User defined functions, may be single letter,
   alternative case (probably uppercase).
 
-  For example, we may add an 'g' user defined
-  op-code. Behind it hides several functions:
-
-    graphics:     ('g' opcode - eXtra Graphics)
-      ALF_nextchar
-      ALF_adispatch (assoc)
-        'L' &line
-        'P' &pixel
-        'G' &goto
-        'C' &circle
-        'R' &rectangle
-      00
-      (default:)
-      putc
-      fail "%% No such graphics command!"
-      RTS
-    line: ...
-    pixel: ...
-    goto: ...
-    circle: ...
-    ...
-    
-    OR
-      ALF_nextchar
-      ALF_tdispatch
-        "LPGCR"
-        &line &pixel &goto &circle &rectangle
-      (Arrive here if no match, A is letter)
-      putc
-      fail "%% No such graphics command!"
-      RTS
-      ...
-            
-  Indeed this method is employed by a number
-  of core functions. Here are the letters
-  that are effected: '#$?(0-9:;AC:R[]"
-
-  Here is how to use it:
-
-  Normal Forth with spaces:
-  
-    : DOUBLE DUP + ;
-  
   In ALF:
 
     :D:d+;
     
-  Inded a single space will put us in long-name
-  mode, until a ] is encountered.
-
-  To use a "long-name" function:
-
-    : QUADRUPLE DOUBLE DOUBLE ;
-    :MUL5:D QUADRUPLE]+; ( 4 1 + )
-    :MUL10 QUADRUPLE DOUBLE ;
-
   WORDS DEFINED
 
   Arithmetic:
@@ -340,8 +288,8 @@
     ap   pad
 
   Compiler / Definitions:
-    :
-    ;
+    :       def of single letter word
+    ;      "return" end of def
     ;i
     ;a...  again / tail recurse
     ;tN    tail call N
@@ -360,8 +308,12 @@
     l      literal
     $l     sliteral
 
-    x      execute / eval
-
+    xx     execute (t - ?)
+    xe     eval (s - ?)
+    xs     subroutine (JSR) (a x y p A - a x y p)
+    xa     jump address (JMP) (a x y p A - a x y p)
+    xr     return (RTS / quit?)
+    
     c,     c,
     c'     ' or [']
     cp     postpone
@@ -405,6 +357,64 @@
 001 00000 (32) 31-63 ' '..'?'
     
 ========================================-
+Ideas for adding long name words:
+
+  Inded a single space will put us in long-name
+  mode, until a ] is encountered.
+
+  To use a "long-name" function:
+
+    : QUADRUPLE DOUBLE DOUBLE ;
+    :MUL5:D QUADRUPLE]+; ( 4 1 + )
+    :MUL10 QUADRUPLE DOUBLE ;
+
+  For example, we may add an 'g' user defined
+  op-code. Behind it hides several functions:
+
+    graphics:     ('g' opcode - eXtra Graphics)
+      ALF_nextchar
+      ALF_adispatch (assoc)
+        'L' &line
+        'P' &pixel
+        'G' &goto
+        'C' &circle
+        'R' &rectangle
+      00
+      (default:)
+      putc
+      fail "%% No such graphics command!"
+      RTS
+    line: ...
+    pixel: ...
+    goto: ...
+    circle: ...
+    ...
+    
+    OR
+      ALF_nextchar
+      ALF_tdispatch
+        "LPGCR"
+        &line &pixel &goto &circle &rectangle
+      (Arrive here if no match, A is letter)
+      putc
+      fail "%% No such graphics command!"
+      RTS
+      ...
+            
+  Indeed this method is employed by a number
+  of core functions. Here are the letters
+  that are effected: '#$?(0-9:;AC:R[]"
+
+  Here is how to use it:
+
+  Normal Forth with spaces:
+  
+    : DOUBLE DUP + ;
+  
+
+
+
+========================================
   001 00000 (32) 31-63 ' '..'?'
   010 00000 (32) "@A-Z[\]^_"
   011 00000 (32) "?a-z{|}??" 
@@ -446,3 +456,7 @@ REFERENCES
     - https://w3group.de/stable.html
     RetroForth with ColorForth f: namesspaces:
     - http://forthworks.com:9999
+
+    Forth words defined in Forth:
+    - https://github.com/flagxor/eforth/blob/main/ueforth/common/boot.fs
+    

@@ -360,6 +360,9 @@ L('foo'); string('"FOO:"$1234D...');
   // TODO: this should be done inside tabcod?
   INY();
 
+  // Forth words defined in Forth:
+  // - https://github.com/flagxor/eforth/blob/main/ueforth/common/boot.fs
+
   tabcod('MAIN', {
 
     // 42 ALForth functions defined!
