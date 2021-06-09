@@ -72,16 +72,19 @@ ORG(start); L('reset');
   CLD();
   // init data stack, and program stack!
   LDXN(0xff); TXS();
-
   // get rid of "node" "foo.js"
   process.argv.shift();
   process.argv.shift();
-
-  print(process.argv.join(' '));
-  process.exit(0);
-
-  ALF(process.argv.join(' '));
   // TODO: setup vectors
+
+
+
+  // generate call for input data
+  print(process.argv.join(' '));
+
+  // TODO: -e "foo" ?
+  ALF(process.argv.join(' '));
+
   //JSRA('ALF_init');
 
   ALF('34+."$Hello ALForth!\n"$t77+.q99...');
