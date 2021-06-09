@@ -1,0 +1,1 @@
+grep -inP "\b$1\b" ../AutomaticLettering/ORIC/6502.txt-other
