@@ -42,69 +42,12 @@ ORG(0x16);   L('tmp_y');     byte(0);
 
   // - FREE
 
-  ////// ========= input buffer ========= ///////
-  // ORIC 79 bytes input buffer
-
+////// ========= input buffer ========= ///////
+// ORIC 79 bytes input buffer
+// TODO: move elsewhere! (my precious... ZP!)
 ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
 
-// ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-ORG(0x35); /* INPUT_BUF */ string(
-
-
-
-
-
-
-
-
-
-//'1230D.1D.?."//"$1D.1D.?."//"$2D.1D.?.456'
-
-//'11=.00=.77=.17=.23=.97=.'
-
-'12345....'
-//'12>.01>.33>.43>.87>.30>.'
-
-//'12<.01<.34<.77<.87<.30<.'
-
-//'1234(.)9'
-
-
-
-
-
-
-
-);
-
-//'123456789(d..1+)"end"$99');
-
-
-
-
-//'5671<2.3<4.2<1.4<3.567');
-//'6543210##');
-
-//'65432103P......');
-
-// TODO: --- ROLL BUG 9!
-//'"ROLL"P2222222226171915RL.............'); // 6 breaks in this case? where the hell the values went?
-//'"ROLL"$333365432106RL.............'); // 8 works fine.... ? WTF?
-//'"ROLL"$333398765432109RL.............'); - 8 works fine.... ? WTF?
-//'"ROLL"$333398765432109RL.............'); - doesn't work 
-
-// --- TODO: fill not working correctly
-//'81D+D+D+D+D+D+D+D+D.4Z');
-//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+D2+.4Z'); // 512+2
-//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.1D+D+D+D+D+D+D+D+2+.4Z'); // 256+ 2
-//'1D+D+D+D+D+D+D+D+D+D+D+D+D+D.2D.4Z'); // 2
-
-
 /////////////////////////////////////////////
-
-
 
   // ALForth
 ORG(0x85);
@@ -125,11 +68,20 @@ ORG(0x85);
 
 ORG(start); L('reset');
   // make sure
+  SEI();
   CLD();
-  // init stack
+  // init data stack, and program stack!
   LDXN(0xff); TXS();
-  // TODO: setup vectors
 
+  // get rid of "node" "foo.js"
+  process.argv.shift();
+  process.argv.shift();
+
+  print(process.argv.join(' '));
+  process.exit(0);
+
+  ALF(process.argv.join(' '));
+  // TODO: setup vectors
   //JSRA('ALF_init');
 
   ALF('34+."$Hello ALForth!\n"$t77+.q99...');
@@ -148,22 +100,7 @@ ORG(start); L('reset');
 
   JMPA('end');
 
-L('mys'); string('"DOUBLING:"$1D+D.D+D.D+D.D+D.D+D.#.#.');
-//L('mys'); string('43DDDDDD321.....');
-//L('mys'); string('123DD#.#.');
 
-//L('mys'); string('4123...D.#.'); //endless loop
-
-L('foo'); string('"FOO:"$1234D...');
-
-  JMPA('end');
-
-//////////////////////////////
- L('ALF_init');
-  // save stack for QUIT
-  TSX(); STXZ('QUIT_STACK');
-
-  JMPA('ALF'); string('98754.....');
 
  L('ALF_reset');
   // restore stack
@@ -251,10 +188,19 @@ L('ALF_next'); // b38   c70   SLOW!!!!
   next();
 
 
-// Code to run inline ALF after an JSR
-// and then continue
+// Usage:
+//   ALF('123++');
+//   continues here!
+//
 // TODO: very similar to ALF_next
 L('ALF'); // b79 c130 - BAD!
+
+  // save stack for QUIT
+  // (this requires ALF not to call ALF,
+  //  internally ALF_next should be used)
+  // ... or these need to be chained?
+  TSX(); STXZ('QUIT_STACK');
+
   // save old base
   LDAZ('NEXT_BASE');          STAZ(0);
   LDAZ('NEXT_BASE', a=>a+1);  STAZ(1);
@@ -331,13 +277,14 @@ L('ALF'); // b79 c130 - BAD!
     JSRA(aputd);
   });
   puts(")\n");
+
   // FALLTRHOUGH: ABORT/QUIT
   // - https://forth-standard.org/standard/core/QUIT
  L('MAIN_zero');
   // drop up one level (== interpret)
+  // TODO: restore program stack?
   PLA(); PLA(); 
   RTS();
-
 
 
 
@@ -1734,4 +1681,3 @@ function ALF(alf) {
 function ALF_next(alf) {
   JSRA('ALF_next'); string(alf);
 }
-
