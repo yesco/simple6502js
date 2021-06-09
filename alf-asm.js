@@ -132,7 +132,9 @@ ORG(start); L('reset');
 
   //JSRA('ALF_init');
 
-  ALF('34+."$Hello ALForth!\n"$t77+.');
+  ALF('34+."$Hello ALForth!\n"$t77+.q99...');
+  // TODO: doesn't get here!
+  ALF('7.0000000"FISH"$t123...');
 
   //JSR('end');
 
@@ -180,17 +182,86 @@ L('foo'); string('"FOO:"$1234D...');
 
   // Possibly Return to caller?
 
+// slightly faster but super slow!!!       call
+// see file: Ref/fast-token-threading.txt  bytes
+//                              // b29 c49   0
+//  JSRA('ALF_next');           // b44 c70   3
+//       ALF_inline_next(alf) { // b31 c57  31 !
+//    see comment w hi bit set  //     c60   0
+//
+// This will call interpreter on a new ALF
+// when finished it'll continue the previous.
+// Used to implement primitives as ALF!
+// (relative expensive)
+//
+// TODO: if this routine was called for word
+// (token) that is in A, we could modify it
+// to set the hi-bit, so next time we can
+// detect it faster! LOL
+// Then use Ref/faster-token-threading.txt
+// to dispatch faster at next call!
+// How to call, in next:
+//
+// exit: // c20
+//   PLA(); TAY();
+//   PLA(); STAZ('BASE_NEXT');
+//   PLA(); STAZ('BASE_NEXT', a=>a+1);
+//
+// next:
+//   ...
+//   ASL();
+//   STA(J+1);
+//   BCS('enter'); // we knwo it's subroutine
+// J:
+//   JMPI(____);
+// enter: // c41
+//   STA(K+1);
+//   LDAZ('BASE_NEXT');         PHA();
+//   LDAZ('BASE_NEXT', a=>a+1); PHA();
+//   TYA();                     PHA():
+// K:
+//   LDAA(____); STAZ('BASE_NEXT');
+//   LDAN(__);   STAZ('BASE_NEXT', a=>a+1);
+//   LDYN(3); // skip JMP
+//   next();
+
+// subroutine c61...
+
+L('ALF_next'); // b38   c70   SLOW!!!!
+  // where we came from (RET address)
+  PLA(); STAZ(0);
+  PLA(); STAZ(1);
+
+  // current interpreter
+  LDAZ('NEXT_BASE', a=>a+1); PHA(); // hi
+  LDAZ('NEXT_BASE');         PHA(); // lo
+  TYA();                     PHA(); // Y
+
+  // set NEXT_BASE
+  LDAZ(0); STAZ('NEXT_BASE');
+  LDAZ(1); STAZ('NEXT_BASE', a=>a+1);
+  LDYN(1); // RTS+1
+
+  // Do it
+  JSRA('interpret');
+
+  // restore previous interpreter state
+  PLA(); TAY();
+  PLA(); STAZ('NEXT_BASE');
+  PLA(); STAZ('NEXT_BASE', a=>a+1);
+
+  next();
+
+
   // Code to run inline ALF after an JSR
  L('ALF');
   // save old base
   LDAZ('NEXT_BASE');          STAZ(0);
   LDAZ('NEXT_BASE', a=>a+1);  STAZ(1);
   
-  // interpret chars at return address
-  PLA();
-  STAZ('NEXT_BASE');
-  PLA();
-  STAZ('NEXT_BASE', a=>a+1);
+  // interpret chars at return address (PC)
+  PLA();  STAZ('NEXT_BASE');
+  PLA();  STAZ('NEXT_BASE', a=>a+1);
 
   // push Y, IP on stack
   LDAZ(1); PHA(); // IP.hi
@@ -221,15 +292,12 @@ L('foo'); string('"FOO:"$1234D...');
   CLC();
   LDAZ('NEXT_BASE');
   ADCZ('tmp_y');
-  LDAZ('NEXT_BASE');
+  LDAZ('NEXT_BASE', a=>a+1);
 
   // save return address
   ADCN(0);
-  STAZ('NEXT_BASE', a=>a+1);
-  PHA();
-
-  LDAZ('NEXT_BASE');
-  PHA();
+  LDAZ('NEXT_BASE', a=>a+1);  PHA(); // hi
+  LDAZ('NEXT_BASE');          PHA(); // lo
 
   // restore to state before ALF call
   LDAZ(0); STAZ('NEXT_BASE');
@@ -422,6 +490,14 @@ L('foo'); string('"FOO:"$1234D...');
   // - https://github.com/flagxor/eforth/blob/main/ueforth/common/boot.fs
 
   tabcod('MAIN', {
+    // TEST recurseive inline ALF
+    q: function(){
+      // TODO: we actually want a TAIL_ALF
+      // ALF_DO_AND_EXIT
+      ALF_next('"qqqqqq"$t24');
+      // TODO: doesn't get back!
+      RTS();
+    },
 
     // 42 ALForth functions defined!
     // (core forth has about 133 words)
@@ -1349,6 +1425,72 @@ function tabcod(name, list, nxt= next) {
     print('====tabcod_tabcods: ', tabcod.tabcods);
   }
 
+  if (1) { // just chained CMP, BNE
+    // per item // b4 c5
+    //   b = n*4
+    //   c = n*5
+  } else if (1) { // arrange in binary tree? lol?
+    // makes sense if N > 4, there may be no additional cost!
+    // sort the items, pick "mid" element, generate less than,
+    // equal tests should be for free (well 2 more bytes)
+    // when the chunk is small n <= 4 (?) do linear search, last go to default
+    // this means cyc = 20 + ln2(n/4)*5
+    // N=32 => 20 + 3*5 = 35 cycles
+    // N=16 => 20 + 2*5 = 30 cycles
+    
+    // linear:
+    // N=32 => 34 + 11*N = 386 max, 193 cycles on average...
+    // we could also do binary search in the list below...
+    // still it have a greater overhead
+  } else if (1) { // linear search for match of A
+    // OR make call to subroutine (even slower)
+    JSRA('assoc_jmp');
+    byte(N=10); // address on stack in assoc_jmp will have this at (addr),Y=1 !
+    chars('DLKSJDFLKS'); // loop from Y=N+2   .... 0  found => Y  !!
+    data(rel, rel, rel, rel, rel,  rel, rel, rel, rel, rel); // we want item at index Y+N !!
+    //...
+
+    // OR generate for each?
+    save('y', ()=>{ // b19
+
+      LDYN(15); // number of items, no need \0 terminate
+     L(name+'_next'); // b c11
+      DEY();
+      BMI(name+'_default');
+      CMPAY(name+'_table');
+      BNE(name+'_next');
+
+     L(name+'_found');
+    });
+    // match
+    STAZ('name_jmp', a=>a+1); // selfmod jmp
+   L(name+'_jmp');
+    JSRA(name+'_jmps');
+
+    // per item // b2 
+    chars(table);
+    data(offsets); // TOODO: apply array?
+    // b = 4*n = 4 + 2*n
+    //  2n = 4,  n = 2 ===> break even at 2 items
+
+    // c = 5*n = 34 + 11 * n  
+    //   5n = 34 + 11n
+    //  -34 = 6n 
+    //    n = - 34/6 =~= -6 ===> no breakeven except in past
+    //
+    // Also, the subroutine looses 6 by cycles per solution
+    // (why same number? lol)
+  }
+
+  // storage break even
+  //   n*2 = 22        n = 11    !!!!
+  // => make subroutine? but then even slower...
+
+  // cycle break even 
+  //   -15 = n*20      n = -0.75 ????
+  //          ====> never???
+  // TODO: look at woz monitor, he does something
+
   let bsum = 0;
   Object.keys(list).forEach(k=>{
     if (tabcod.trace) 
@@ -1508,3 +1650,10 @@ function putd(d) {
 function ALF(alf) {
   JSRA('ALF'); string(alf);
 }
+
+// called by interpreter to inline a
+// highlevel routine, it'll exit and next.
+function ALF_next(alf) {
+  JSRA('ALF_next'); string(alf);
+}
+

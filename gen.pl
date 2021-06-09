@@ -95,7 +95,7 @@
 #
 # jsk: not clear: 76 from memory are copied or from the combined result?
 
-    'bit', 'g= z( m6v(n(m[ADDR])) & a)',
+    'bit', 'g= z( v(n(m[ADDR])) & a)',
 #   'bit', 'g= m6m7(n(z(m[ADDR])))',
 
     'nop', '',
@@ -182,11 +182,12 @@ let C= 0x01, Z= 0x02, I= 0x04, D= 0x08, B= 0x10, Q= 0x20, V= 0x40, N= 0x80;
 let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
     n= (x)=> (p^= N & (p^ x)          , x),
     c= (x)=> (p^= C & (p^ !!(x & 0xff00))  , x & 0xff),
-    v= (x)=> (p^= V & (p^ (x * V))    , x),
+    v= (x)=> (p^= V & (p^ (x & V))    , x),
     // set carry if low bit set (=C!)
     sc=(x)=> (p^= C & (p^ x)          , x);
 
 function adc(v) {
+  // TODO: set overflow?
   let oa= a;
   a= c(a + v + (p & C));
   v= ((oa^a) & (v^a));

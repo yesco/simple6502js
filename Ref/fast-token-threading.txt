@@ -1,0 +1,63 @@
+https://comp.lang.forth.narkive.com/pzlX5mdU/what-is-the-most-compact-ttc-scheme 
+
+Source sketch 6502 compact
+
+To give an idea of how byte tokens for
+primitives might be "compact enough".
+This is untested 65N02 code. You will see
+toward the end of the core engine why the
+return stack is X-index in the zero page.
+
+; In initialisation, the three bytes
+; starting at JV are loaded with
+;
+;   JMP ($PRIMTBL)
+; 
+; PRIMTBL is 64 jump vectors, so 64
+; primitives are available
+;
+; IP is initalised at 0, probably in Warm Boot.
+
+
+EXIT:  // exit from "subword" (get IP from stack)
+  DEX
+  DEX
+  LDY R,X
+  LDA R+1,X
+  STA IP+1
+; 15 cycles
+
+NEXT:  // inc IP
+  INY
+  BNE *+2
+  INC IP+1
+
+ENTER0: // jmp to subroutine
+  LDA (IP),Y
+  BMI ENTER // any hibit token is subroutine!
+  STA JV+1
+  JMP JV
+; (next) 23 cycles, +4 on page crossing
+
+ENTER:  // enter "subword" (push IP on stack)
+  INY
+  BNE *+2
+  INC IP
+  INX
+  INX
+  STY R,X
+  LDY IP+1
+  STY R+1,X
+  STA IP+1
+  LDA (R,X)
+  TAY
+  JMP ENTER0
+; 34 cycles, +4 on page crossing
+
+SRT is 11 clocks execution overhead per
+primitive, 11 clocks ENTER/EXIT overhead for
+high level words. This is 23 cycles
+execution overhead per low level, roughly 2x,
+and 49 clocks ENTER/EXIT overhead, about 4.5x.
+
+

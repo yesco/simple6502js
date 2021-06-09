@@ -207,6 +207,7 @@ function _string(s, pascal, hibit, zero) {
   data(...d);
 }
 
+function chars(s) { _string(s, 0, 0, 0)}
 function string(s) { _string(s, 0, 0, 1)}
 function pascal(s) { _string(s, 1, 0, 0)} 
 function hibit(s) { _string(s, 0, 1, 0)}
@@ -540,7 +541,7 @@ function burn(m, chunks) {
 
 module.exports =
   global.j6502 =
-  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, string, pascal, hibit, OMG, rel, burn, clear };
+  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, chars, string, pascal, hibit, OMG, rel, burn, clear };
 
 global.ORG = ORG;
 global.allot = allot;
@@ -551,6 +552,7 @@ global.byte = byte;
 global.word = word;
 
 global.char = char;
+global.chars = chars;
 global.string = string;
 global.pascal = pascal;
 global.hibit = hibit;

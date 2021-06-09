@@ -1,0 +1,1033 @@
+Groups
+
+Sign in
+Minimal Forth
+42 views
+Mark Carroll <MC>'s profile photo
+Mark Carroll <MC>
+unread,
+8/17/90
+to
+I'm considering writing up a very small Forth for fun. Of course,
+being a little bit crazy, I have absolutely no "real" reference
+on Forth. (I've got the manual to Amiga MultiForth, source
+to AForth, source to tile, and a fragmented basis12.)
+What I'm wondering is: what is the absolute minimum set of words
+necessary to create a forth interpreter? That is, what minimum
+set of words would I need to be able to write all of the other
+words in Forth?
+
+For anyone who cares, I'll probably do this on my Amiga. (There's
+a very outside chance that I might dare to try it on the Suns,
+but I doubt it. I'd rather not muck about in machine language
+across the network.)
+
+<MC>
+
+--
+|Mark Craig Carroll: <MC> |"We the people want it straight for a change;
+|Soon-to-be Grad Student at| cos we the people are getting tired of your games;
+|University of Delaware | If you insult us with cheap propaganda;
+|car...@udel.edu | We'll elect a precedent to a state of mind" -Fish
+
+Mikael Patel's profile photo
+Mikael Patel
+unread,
+8/17/90
+to
+Hi, Carroll, interesting question your are asking! I asked myself the
+same question last year and went looking for the "real" minimal set,
+in gates and all. Below is a simulator which run what I think is a real
+minimal set (9 primitives are needed: 1+, 0=, nand, >r, r>, @, !, exit,
+call). This is a toy simulator to get to understand the selection of
+minimal instruction set computers (MISC is not RISC). The simulator
+runs in my C-based kernel TILE Forth (Sun-machines etc.)
+To answer you question; you should ask yourself what you wish to run
+and what are the typical high frequency low level operations. Also
+you should try to place the most frequently accessed data in registers
+and as close to the processor as possible. For a threaded Forth
+interpreter using registers for top of stack, the intruction pointer,
+the stack pointers, and index registers for I and I' is sufficient.
+
+If you take the Forth-83 glossary you only have to implement
+about 35-50 of them on the machine code level and the rest on forth
+level to get nice and fast forth interpreter. The selection of virtual
+machine registers and the threading method (next) is very important,
+also to leave the right "hooks" for multi-tasking.
+
+On a 68K-processor I like to the following direct threaded next to
+implement a 16-bit forth:
+
+SP EQ A7 ; parameter stack pointer
+RP EQ A6 ; return stack pointer
+IP EQ A5 ; instruction (thread) pointer
+KP EQ A4 ; kernel segment pointer for relocation
+TOS EQ D7 ; top of parameter stack register
+I EQ D6 ; current index
+I' EQ D5 ; last index
+
+MACRO NEXT
+MOVE.W (IP)+, D0 ; Fetch next thread
+JMP (D0, KP) ; And branch to the code field
+END.MACRO
+
+DOVARIABLE:
+MOVE.W (SP), D0 ; Swap the variable address on stack
+MOVE.W TOS, (SP) ; with the stack register
+MOVE.W DO, TOS
+NEXT
+
+DOCONSTANT:
+MOVE.W (SP), D0 ; Swap the constant address on stack
+MOVE.W TOS, (SP) ; with the stack register
+MOVE.W (DO, KP), TOS ; Relocate and fetch value
+NEXT
+
+DOCOLON:
+MOVE.W IP, -(SP) ; Push instruction pointer
+MOVE.W (SP)+, IP ; Pop the new instruction pointer
+NEXT
+
+All primitives contain code starting at the code field address. A
+colon definition has the following code field:
+
+COLONDEFINITION:
+JSR DOCOLON(KP)
+
+All interpreted words have symmetrical code fields. With top of
+stack in a register the primitive arithmetic operation become
+easy. Here's an example of the definition of "+".
+
+DOADD:
+ADD.W (SP)+, TOS
+NEXT
+
+Happy Hunting.....
+
+Mikael R.K. Patel
+Researcher and Lecturer
+Computer Aided Design Laboratory (CADLAB)
+Department of Computer and Information Science
+Linkoping University, S-581 83 LINKOPING, SWEDEN
+
+Phone: +46 13281821
+Telex: 8155076 LIUIDA S Telefax: +46 13142231
+Internet: m...@ida.liu.se UUCP: {uunet,mcsun,...}!liuida!mip
+Bitnet: MIP@SELIUIDA SUNET: LIUIDA::MIP
+
+- - - - - - - CUT HERE: File: minimal.f83 (tile forth) - - - - - - - - - - -
+
+.( Loading Minimal Forth Machine definitions...) cr
+
+vocabulary minimal
+
+minimal definitions
+
+forth
+
+\ Hardware Devices: Registers and Stacks
+: register ( -- ) create 0 , does> @ ;
+: -> ( x -- ) ' >body [compile] literal compile ! ; immediate compilation
+: stack ( n -- ) create here swap 2+ cells allot here over cell + ! here swap ! ;
+: push ( x s -- ) cell negate over +! @ ! ;
+: pop ( s -- x) dup @ @ cell rot +! ;
+: .stack ( s -- ) dup cell + @ swap @ ?do i @ . cell +loop ;
+
+\ Forth Machine Registers
+register ir ( Instruction register)
+register ip ( Instruction pointer)
+16 stack rp ( Return address stack)
+register tos ( Top of stack register)
+16 stack sp ( Parameter stack)
+
+\ Dump machine state
+: .registers ( -- )
+." ir: " ir .name space
+." ip: " ip cell - .
+." rp: " rp .stack
+." tos: " tos .
+." sp: " sp .stack cr ;
+
+\ Forth Machine Instructions
+: instruction ( n -- ) create ;
+: decode ( -- ) minimal [compile] ['] forth ; immediate compilation
+
+instruction 1+
+instruction 0=
+instruction NAND
+instruction >R
+instruction R>
+instruction !
+instruction @
+instruction EXIT
+instruction HALT
+
+: CALL ( -- ) ip rp push ir >body -> ip ;
+
+\ The Minimal Forth Machine
+: fetch-instruction ( -- ir) ip @ dup -> ir ip cell + -> ip ;
+: processor ( -- )
+begin
+fetch-instruction
+.registers
+case
+decode 1+ of tos 1+ -> tos endof
+decode 0= of tos 0= -> tos endof
+decode NAND of sp pop tos and not -> tos endof
+decode >R of tos rp push sp pop -> tos endof
+decode R> of tos sp push rp pop -> tos endof
+decode ! of sp pop tos ! sp pop -> tos endof
+decode @ of tos @ -> tos endof
+decode EXIT of rp pop -> ip endof
+decode HALT of true abort" HALT" endof
+CALL
+endcase
+again ;
+
+: run ( addr -- ) -> ip 0 -> tos ." RUN" cr processor ;
+
+\ A simple compiler for the Minimal Forth Machine
+
+minimal
+
+: CREATE ( -- ) create ;
+: COMPILE ( -- ) compile compile ; immediate
+
+: DEFINE ( -- ) CREATE ] ;
+: END ( -- ) COMPILE EXIT [compile] [ ; immediate
+: BLOCK ( n -- ) cells allot ;
+: DATA ( -- ) , ;
+
+\ Variable management
+
+DEFINE [VARIABLE] ( -- addr) R> END
+: VARIABLE ( -- addr) CREATE COMPILE [VARIABLE] 1 BLOCK ;
+
+\ Constant management
+
+DEFINE [CONSTANT] ( -- n) R> @ END
+: CONSTANT ( n -- ) CREATE COMPILE [CONSTANT] DATA ;
+
+\ Basic stack manipulation functions
+
+VARIABLE TEMP
+
+DEFINE DROP ( x -- ) TEMP ! END
+DEFINE DUP ( x -- x x) TEMP ! TEMP @ TEMP @ END
+DEFINE SWAP ( x y -- y x) TEMP ! >R TEMP @ R> END
+DEFINE ROT ( x y z -- y z x) >R SWAP R> SWAP END
+DEFINE OVER ( x y -- x y x) >R DUP R> SWAP END
+DEFINE R@ ( -- x) R> R> DUP >R SWAP >R END
+
+\ Logical function
+
+DEFINE BOOLEAN ( x -- flag) 0= 0= END
+DEFINE NOT ( x y -- z) DUP NAND END
+DEFINE AND ( x y -- z) NAND NOT END
+DEFINE OR ( x y -- z) NOT SWAP NOT NAND END
+DEFINE XOR ( x y -- y) OVER OVER NOT NAND >R SWAP NOT NAND R> NAND END
+
+\ Primitive arithmetric functions
+
+DEFINE 1- ( x -- y) NOT 1+ NOT END
+DEFINE 2+ ( x -- y) 1+ 1+ END
+DEFINE 2- ( x -- y) NOT 2+ NOT END
+
+\ Cell sizes and functions
+
+4 CONSTANT CELL
+DEFINE CELL+ ( x -- y) 1+ 1+ 1+ 1+ END
+
+\ Branch instructions
+
+DEFINE (BRANCH) ( -- ) R> @ >R END
+DEFINE (?BRANCH) ( flag -- ) 0= DUP R@ @ AND SWAP NOT R> CELL+ AND OR >R END
+
+\ Compiler functions
+
+: >MARK ( -- addr) here 0 , ;
+: >RESOLVE ( addr -- ) here swap (forth) ! ;
+: <MARK ( -- addr) here ;
+: <RESOLVE ( -- addr) , ;
+
+: IF ( flag -- ) COMPILE (?BRANCH) >MARK ; immediate
+: ELSE ( -- ) COMPILE (BRANCH) >MARK swap >RESOLVE ; immediate
+: THEN ( -- ) >RESOLVE ; immediate
+: BEGIN ( -- ) <MARK ; immediate
+: WHILE ( flag -- ) COMPILE (?BRANCH) >MARK ; immediate
+: REPEAT ( -- ) COMPILE (BRANCH) swap <RESOLVE >RESOLVE ; immediate
+: UNTIL ( flag -- ) COMPILE (?BRANCH) <RESOLVE ; immediate
+
+\ Simple arithmetrical functions
+
+DEFINE U+ ( x y -- z) BEGIN DUP WHILE 1- SWAP 1+ SWAP REPEAT DROP END
+DEFINE NEGATE ( x -- y) NOT 1+ END
+DEFINE U- ( x y -- ) BEGIN DUP WHILE 1+ SWAP 1- SWAP REPEAT DROP END
+
+\ Literal numbers in code
+
+DEFINE (LITERAL) ( -- ) R> DUP @ SWAP CELL+ >R END
+: LITERAL ( x -- ) COMPILE (LITERAL) , ; immediate
+
+\ Some test code just to show that it works
+
+DEFINE ARITH-TEST ( -- )
+[ 2 ] LITERAL [ 4 ] LITERAL U+ [ 2 ] LITERAL NEGATE U- HALT
+END
+
+\ ARITH-TEST run
+
+DEFINE FIB ( n -- m)
+DUP 1- 0= OVER 0= OR NOT
+IF DUP 1- FIB SWAP 1- 1- FIB U+ THEN
+END
+
+DEFINE FIB-TEST
+[ 5 ] LITERAL FIB HALT
+END
+
+TEST run
+
+Mikael Patel's profile photo
+Mikael Patel
+unread,
+8/21/90
+to
+
+Please excuse the error that worked its way into the definition of
+DOCOLON in the direct threaded forth interpreter for M68K I suggested.
+It SHOULD be:
+
+DOCOLON:
+MOVE.W IP, -(RP) ; Push IP onto the return stack
+MOVE.W (SP)+, IP ; Pop the new IP
+NEXT ; And go to the next thread
+
+Mikael Patel
+
+
+
+Groups
+
+Sign in
+The Minimal Forth Machine
+159 views
+Mikael Patel's profile photo
+Mikael Patel
+unread,
+8/11/89
+to
+Hi, Forth Lovers, how about a distributed problem solving session?
+The quest is to find `the minimal Forth Machine'. What is the minimal set
+of operations such a machine must implement?
+
+I have started to attach this problem. My first group of operations to
+study is the arithmetric operations, thus the sub-problem is; What is
+the minimal set of operation to realize + - * /mod mod /?
+
+Sofar I need:
+not xor
+0> 0< 0=
+1+ 1-
+dup swap rot drop
+>r r>
+if else then
+tail-recurse ( compiles a branch to the beginning of the definition)
+
+This list can be minimized further by defining control structure,
+stack, logical, and memory operations.
+
+The goal is to design this minimal machine and the definitions need
+so that any teacher out there can take a net-list description of the
+machine and a memory specification (in for instance EDIF) and hand it
+over to students in a computer architecture/digital design classes.
+
+"Forth for the Masses" -- Mikael Patel
+
+----8<----8<----8<----8<----8<----8<----8<----8<----8<----8<----
+
+( Arithmetric operations with a small set of primitives, Mikael Patel, 1989)
+
+( Requires: not xor 0> 0< 0= 1+ 1- dup swap rot drop >r r> if else then)
+( Implements: 0 1 negate abs + - * /mod / mod)
+
+0 constant 0 ( A bit crazy but...)
+1 constant 1 ( ...you an't seen nothing yet)
+
+: negate ( x -- y)
+not 1+ ; ( Invert and increment)
+
+: abs ( x -- y)
+dup 0< if negate then ; ( Absolute value)
+
+: + ( x y -- z)
+dup 0= ( Check if there is still more to do)
+if drop ( Return result)
+else
+dup 0> ( Check direction)
+if 1- swap 1+ swap ( Decrement and increment)
+else
+1+ swap 1- swap ( Increment and decrement)
+then
+tail-recurse ( And go again)
+then ;
+
+: - ( x y -- z)
+negate + ; ( Negate and add)
+
+: (*) ( a x y -- z)
+dup 0> ( Check if there is still more to do)
+if 1- ( Decrement counter)
+swap rot over + swap rot ( Add to result and put back in order )
+tail-recurse ( And go again)
+else
+drop drop ( Drop temporary parameters)
+then ;
+
+: sign ( x y -- s)
+0> swap 0> xor ; ( Return sign of arithmetric operation)
+
+: * ( x y -- z)
+dup 0= ( Check for zero)
+if swap drop ( Drop parameter and return zero)
+else
+over over sign >r ( Save the sign of the result)
+0 rot abs rot abs (*) ( Do it the hard way)
+r> if negate then ( Check if negative then negate)
+then ;
+
+: (/mod) ( q r y -- r q)
+swap over - dup 0< not ( Generate next reminder and check)
+if swap ( Put reminer back into place)
+rot 1+ rot rot ( Increment quotient)
+tail-recurse ( And go again)
+else
++ swap ( Restore and return result)
+then ;
+
+: /mod ( x y -- r q)
+dup 0= ( Check if divide by zero)
+if drop drop 0 0 ( Return zero)
+else
+over >r ( Save sign of divident)
+over over sign >r ( Save sign of result)
+0 rot abs rot abs (/mod) ( Setup initial quotient)
+r> if negate then ( Check sign of quotient)
+r> if swap negate swap then ( Check sign of reminder)
+then ;
+
+: / ( x y -- q)
+/mod swap drop ; ( Do it and drop reminder)
+
+: mod ( x y -- r)
+/mod drop ; ( Do it and drop quotient)
+
+PAul STevens -- MACC's profile photo
+PAul STevens -- MACC
+unread,
+8/11/89
+to
+In article <13...@massormetrix.ida.liu.se>, mi...@massormetrix.ida.liu.se (Mikael Patel) writes...
+>Hi, Forth Lovers, how about a distributed problem solving session?
+>
+>The quest is to find `the minimal Forth Machine'. What is the minimal set
+>of operations such a machine must implement?
+>
+>I have started to attach this problem. My first group of operations to
+>study is the arithmetric operations, thus the sub-problem is; What is
+>the minimal set of operation to realize + - * /mod mod /?
+>
+>Sofar I need:
+> not xor
+> 0> 0< 0=
+> 1+ 1-
+> dup swap rot drop
+> >r r>
+> if else then
+> tail-recurse ( compiles a branch to the beginning of the definition)
+>
+
+I don't think you really want a minimal machine. I bet it would
+amount to no more than 4 words, including IF and THEN. One of the
+words might be -!, which subtracts a memory location from the
+top of the stack and puts the result both on the top of the stack
+and back in the memory location.
+-! ( 16b addr .. 16b-(addr)) (addr) = 16b-(addr)
+Let's try one:
+variable JUNKA ( scratch area for several words )
+variable JUNKB ( scratch area )
+: DROP ( 16b .. )
+JUNKA -! JUNKA -! ( clear junka and stack entry )
+JUNKB JUNKA -! ( junka and tos both = address of junkb )
+-! JUNKB -! ( clear tos and junkb )
+JUNKA -! ( junka=-junkb )
+JUNKB -! JUNKB -! ( clear junkb and tos )
+JUNKA -! -! ; ( subtract 0 from second entry on stack)
+( leaves it unchanged and drops entry )
+
+Could get inefficient!
+
+For example, you certainly don't need ROT in your example:
+
+: ROT >R SWAP R> SWAP ;
+
+In the limit you wind up with something about as efficient as a Turing
+machine. But very complete.
+
+Stephen D Hawley's profile photo
+Stephen D Hawley
+unread,
+8/12/89
+to
+In article <22...@dogie.macc.wisc.edu> ste...@vms.macc.wisc.edu (PAul STevens -- MACC) writes:
+>In article <13...@massormetrix.ida.liu.se>, mi...@massormetrix.ida.liu.se (Mikael Patel) writes...
+>In the limit you wind up with something about as efficient as a Turing
+>machine. But very complete.
+I think perhaps you missed the point. The original article mentioned that
+this would be for student use to implement. Efficiency is not really the
+question, but educational value.
+
+For example, I took an architecture class 2 semesters ago that covered the
+advantages of RISC machines as part of the curriculum. We were presented
+the a machine called the Machester Mark I (which was a real machine --the
+prof. gave us a program that simulated it). It had the following instruction
+set:
+BRA addr -branch unconditional to addr
+BRL disp -branch uncond with disp as a displacement
+LNG addr -load the negation of the contents of addr
+STA addr -store into addr
+SUB addr -subtract the contents of addr
+SKN -if negative, skip next instruction
+HLT -halt
+
+7 instructions. That's all. The prof had a contest to write the most
+compact factorial. Mine came in 3rd (3 bytes longer than the winner).
+I also wrote an optimizing assembler for the machine.
+Below is my entry, for your amusement and perusal.
+
+This coming semester, I will be implementing a compiler for a FORTH-like
+language. Unlike most FORTH's, it will be suited to an environment which
+doesn't take kindly to you poking around at the address space, FORGET
+will not be so unforgiving (ie, only the function you want to forget will
+go away, not everything defined afterwards), and much more planned.
+
+Why? Purely for educational reasons.
+
+Oh dear. I seem to have gone off the deep end here.
+
+* factorial program for the MM I
+* Steve Hawley
+* has to be assembled at location 1!!
+* uses the fact that the data for "zero" is really just a branch to 1
+* manchasm -a 1 ... ...
+fact lng n
+skn
+hlt
+sta 501
+lng zero
+sta 500
+bra ment
+mult lng 500
+sub r
+sta 500
+lng 500
+sta 500
+lng 501
+sta 501
+ment lng 501
+sub one
+sta 501
+skn
+bra mult
+lng 500
+sta r
+lng r
+sta r
+lng n
+sta n
+lng n
+sub one
+sta n
+* data section. dat is a pseudo op
+zero dat 0 * this is actually a branch to location 1!!
+one dat 1
+n dat 4
+r dat 1
+
+Steve Hawley
+s...@flash.bellcore.com
+"Up is where you hang your hat."
+--Jim Blandy, computer scientist
+
+Lassila Timo-Pekka's profile photo
+Lassila Timo-Pekka
+unread,
+8/16/89
+to
+In article <13...@massormetrix.ida.liu.se> mi...@massormetrix.ida.liu.se (Mikael Patel) writes:
+
+> ( Arithmetric operations with a small set of primitives, Mikael Patel, 1989)
+
+> ( Requires: not xor 0> 0< 0= 1+ 1- dup swap rot drop >r r> if else then)
+
+^^ ^^ ^^^
+
+
+> ( Implements: 0 1 negate abs + - * /mod / mod)
+
+How about ...
+
+: >0 dup <0
+if drop 0
+else =0
+if 0
+else 1
+then
+then ;
+
+: 1- not 1+ not ;
+
+: rot >r swap r> swap ;
+
+
+> : (*) ( a x y -- z)
+> dup 0> ( Check if there is still more to do)
+> if 1- ( Decrement counter)
+> swap rot over + swap rot ( Add to result and put back in order )
+
+^^^^
+
+And you forgot this.
+
+: over >r dup r> swap ;
+
+
+--
+Timo-Pekka Lassila # Tampere University of Technology
+# /Signal Processing Laboratory
+t...@tut.fi # PO Box 527, SF-33101 Tampere, Finland
+mcvax!tut!tp #
+
+
+
+
+
+
+====================
+Groups
+
+Sign in
+The Mininal Forth Machine, First Report.
+199 views
+Mikael Patel's profile photo
+Mikael Patel
+unread,
+8/16/89
+to
+After some discussions and help of Mitch Bradley (w...@Sun.COM) and Peter
+da Silva (pe...@ficc.uu.net) the Minimal Forth Machine is down to nine
+instructions. Three stack instructions may be added when considering
+hardware structures as they are implict in the basic set.
+With this tiny set of instructions a Forth environment can be built;
+may it be virtual on an other processor or directly in hardware.
+
+Some interesting observation are:
+
+1. The machine does not have a branch instruction.
+2. The machine has only three basic functions.
+3. All instructions can be realized so that they only take one
+clock cycle. Even memory access!
+4. The time complexity of the arithmetric operations are:
++ ( x y -- z) O(y)
+- ( x y -- z) O(y)
+* ( x y -- z) O(x*y)
+/ ( x y -- z) O(x/y)
+So the time to perform arithmetric operations is proportional to
+the operation and the operands. Very human :-).
+
+Below follows a description of the Machine in a toy hardware language
+and Forth definitions for:
+
+1. Stack manipulation
+2. Logical operations
+3. Arithmetric operations
+4. Control structures
+5. Some system dependent words
+
+The description of the physical machine is 16-bit and the code has been
+tested on a 32-bit Forth-83 environment.
+
+Mikael R.K. Patel
+Researcher and Lecturer
+Computer Aided Design Laboratory
+Department of Computer and Information Science
+Linkoeping University, S-581 83 LINKOEPING, SWEDEN
+
+-----8<-----8<-----8<-----8<-----8<-----8<-----8<-----8<-----8<-----
+
+( The required set of primitives, Mikael Patel, 1989)
+
+>r ( x -- )
+r> ( -- x)
+
+1+ ( x -- y)
+0= ( x -- flag)
+
+nand ( x y -- z)
+
+@ ( addr -- x)
+dup! ( x addr -- x)
+
+execute ( addr -- )
+exit ( -- )
+
+( May be included because of hardware considerations)
+
+drop ( x -- )
+dup ( x -- x x)
+swap ( x y -- y x)
+
+( The structure of the minimal machine, Mikael Patel, 1989)
+
+16 constant bits/word ( Bits per word)
+
+bits/word bus b0 ( Bus 0)
+bits/word bus b1 ( Bus 1 )
+
+bits/word register ir ( Instruction register)
+bits/word register tos ( Top of stack)
+bits/word register ip ( Instruction pointer)
+
+16 bits/word stack st ( Parameter stack)
+16 bits/word stack rt ( Return stack)
+
+wr bits/word port ma ( Port for address to memory)
+rd/wr bits/word port md ( Port for data to and from memory)
+
+( A simple register transfer language)
+
+fetch ( -- )
+ip -> b0, ( Fetch next instruction)
+b0 -> ma,
+md -> b1,
+b1 -> ir ( Put into decode register)
+* ( Execute instruction)
+ip + 1 -> ip ( And incremenent instruction pointer)
+
+drop ( x -- )
+st -> b1, ( Pop parameter stack into tos)
+b1 -> tos
+
+dup ( x -- x x)
+tos -> b0, ( Push tos onto parameter stack)
+b0 -> st
+
+swap ( x y -- y x)
+tos -> b0, ( Exchange contents of tos and)
+b0 -> st, ( parameter stack)
+st -> b1,
+b1 -> tos
+
+>r ( x -- )
+tos -> b0, ( Pop tos to return stack)
+b0 -> rt,
+st -> b1,
+b1 -> tos
+
+r> ( -- x)
+tos -> b0, ( Pop return stack to tos)
+b0 -> st,
+rt -> b1,
+b1 -> tos
+
+unary ( x -- y)
+f(tos) -> tos ( Perform operation on tos)
+
+1+ ( x -- y)
+0= ( x -- flag)
+
+binary ( x y -- z)
+st -> b1, ( Perform operation on tos and)
+b1 -> f(st, tos) -> tos ( top of parameter stack)
+
+nand ( x y -- z)
+
+@ ( addr -- x)
+c@ ( addr -- x)
+tos -> b0, ( Access memory port and read)
+b0 -> ma,
+md -> b1,
+b1 -> tos
+
+dup! ( x addr -- x)
+dupc! ( x addr -- x)
+tos -> b0, ( Access memory port and write)
+b0 -> ma,
+st -> b1, ( Pop one parameter)
+b1 -> tos, md
+
+call ( -- )
+ip -> b0, ( Push old instruction pointer)
+b0 -> rt, ( And branch to new one)
+ir -> b1,
+b1 -> ip
+
+exit ( -- )
+rt -> b1, ( Pop old instruction pointer)
+b1 -> ip
+
+( Stack operations with a small set of primitives, Mikael Patel, 1989)
+
+: rot ( x y z -- y z x)
+>r swap r> swap ;
+
+: over ( x y -- x y x)
+>r dup r> swap ;
+
+: ?dup ( x -- [0] or [x x])
+dup if dup then ;
+
+: r@ ( -- n)
+r> dup >r ;
+
+( Logical words using a small set of primitive, Mikael Patel, 1989)
+
+: not ( x -- y)
+dup nand ;
+
+: and ( x y -- z)
+nand not ;
+
+: or ( x y -- z)
+not swap not nand ;
+
+: xor ( x y -- z)
+over over not nand >r
+swap not nand
+r> nand ;
+
+( Comparision operations with a small set of primitives, Mikael Patel, 1989)
+
+: 0< ( n -- flag)
+min-int and 0= not ; ( Check the sign bit)
+
+: 0> ( n -- flag)
+dup 0< swap 0= or not ; ( Check not negative and not zero)
+
+: = ( x y -- flag)
+- 0= ; ( Subtract and check against zero)
+
+: < ( x y -- flag)
+- 0< ; ( Subtract and check against zero)
+
+: > ( x y -- flag)
+- 0> ; ( Subtract and check against zero)
+
+: d< ( dx dy -- flag)
+dnegate d+ swap drop 0< ; ( Subtract and check against zero)
+
+: boolean ( n -- flag)
+0= not ; ( Check not zero)
+
+( Arithmetric operations with a small set of primitives, Mikael Patel, 1989)
+
+: negate ( x -- y)
+not 1+ ;
+
+: 1- ( x -- y)
+not 1+ not ;
+
+: 2+ ( x -- y)
+1+ 1+ ;
+
+: 2- ( x -- y)
+not 1+ 1+ not ;
+
+: abs ( x -- y)
+dup 0< ( Check if less than zero)
+if negate then ; ( Then negate)
+
+: + ( x y -- z)
+begin
+dup ( Check if there is still more to do)
+while
+dup 0< ( Check direction)
+if 1+ swap 1- swap ( Decrement and increment)
+else
+1- swap 1+ swap ( Increment and decrement)
+then
+repeat
+drop ; ( Drop counter)
+
+: - ( x y -- z)
+negate + ; ( Negate and add)
+
+: d+ ( lx hx ly hy -- lz hz)
+>r rot swap ( Save high part of hy)
+begin
+dup ( Check if there is still more to do)
+while
+1- swap 1+ swap ( Decrement and increment)
+over 0= ( Check for carry)
+if rot 1+ rot rot then ( Increment high word)
+repeat
+drop ( Drop counter)
+swap r> + swap ; ( Add high words)
+
+: dnegate ( dx -- dy)
+not swap not swap ( Complement double number)
+1 0 d+ ; ( And add one)
+
+: min ( x y -- z)
+over over > ( Compare the two numbers)
+if swap then ( If greater then swap)
+drop ; ( And drop)
+
+: max ( x y -- z)
+over over < ( Compare the two numbers)
+if swap then ( If less then swap)
+drop ; ( And drop)
+
+: * ( x y -- z)
+dup ( Check not zero)
+if over 0< over 0< xor >r ( Calculate sign of result)
+0 rot abs rot abs ( Make absolute values)
+begin
+dup ( Check if there is still more to do)
+while
+swap rot over + ( Add to accumulator)
+swap rot 1- ( and decrement counter)
+repeat
+drop drop ( Drop temporary parameters)
+r> if negate then ( Check sign and return)
+else
+swap drop ( Return zero)
+then ;
+
+: 2* ( x -- y)
+2 * ; ( Two times)
+
+: /mod ( x y -- r q)
+dup
+if over 0< >r ( Save sign of divident)
+over 0< over 0< xor >r ( Save sign of result)
+0 rot abs rot abs ( Create accumlator and inital values)
+begin
+swap over - dup 0< not ( Calculate next reminder)
+while
+swap rot 1+ ( Increment quotient)
+rot rot ( And put back into order)
+repeat
++ swap ( Restore reminder)
+r> if negate then ( Check sign and negate if needed)
+r> if swap negate swap then ( Check sign of reminder)
+then ;
+
+: / ( x y -- q)
+/mod swap drop ; ( Do it and drop reminder)
+
+: mod ( x y -- r)
+/mod drop ; ( Do it and drop quotient)
+
+: 2/ ( x -- y)
+2 / ; ( Divide by two)
+
+: sqr ( x -- x**2)
+dup * ; ( Multply with its self)
+
+: fac ( n -- n!)
+dup 0> ( Check if end of iteration)
+if dup 1- recurse * ( Decrement and go again)
+else
+drop 1 ( Drop parameter and return 1)
+then ;
+
+: sqrt ( x -- x**1/2)
+1 11 0 do ( Newton's method-type algorithm)
+over over / + 2/ ( Guess one and divide successive)
+loop ( values)
+swap drop ; ( Drop temporary value and return)
+
+( Control structures with a small set of primitives, Mikael Patel, 1989)
+
+: >mark ( -- addr)
+here 0 , ; ( Save position and make place)
+
+: >resolve ( addr -- )
+here swap ! ; ( Store branch address)
+
+: if ( flag -- )
+compile (?branch) >mark ; immediate ( Compile conditional branch forward)
+
+: else ( -- )
+compile (branch) >mark ( Compile branch forward)
+swap >resolve ; immediate ( Access old branch offset and resolve)
+
+: then ( -- )
+>resolve ; immediate ( Resolve forward branch)
+
+: <mark ( -- addr)
+here ; ( Save pointer for backwards branch)
+
+: <resolve ( addr -- )
+, ; ( Store branch address)
+
+: begin ( -- )
+<mark ; immediate ( Mark beginning of block)
+
+: again ( -- )
+compile (branch) ( Compile a backward branch)
+<resolve ; immediate ( And resolve branch address)
+
+: until ( flag -- )
+compile (?branch) ( Compile a conditional branch)
+<resolve ; immediate ( And resolve branch address)
+
+: while ( flag -- )
+compile (?branch) ( Compile a conditional brach forward)
+>mark ; immediate ( And make address)
+
+: repeat ( -- )
+swap ( Access block start)
+compile (branch) ( Compile a backward branch)
+<resolve ( And resolve branch address)
+>resolve ; immediate ( And resolve forward branch address)
+
+Now for the fun part. The minimal machine DOES NOT require a
+branch instruction. It may be defined using logical operators.
+
+( System dependent definitions, Mikael Patel, 1989)
+
+0 constant 0 ( A bit crazy but...)
+1 constant 1 ( ...you an't seen nothing yet)
+
+-1 constant true ( The truth)
+0 constant false ( And whats not)
+
+0 constant nil ( Nil pointer)
+
+04 constant bytes/word ( Memory words size in bytes)
+32 constant bits/word ( Bits per word)
+
+-2147483648 constant min-int ( Just for simplicity!!)
+2147483647 constant max-int
+
+: word+ ( n -- m)
+1+ 1+ 1+ 1+ ; ( Increment to next word)
+
+: thread ( addr -- )
+, ; ( Thread the given address)
+
+: unthread ( addr1 -- addr2)
+@ ; ( Access threaded pointer)
+
+: (literal) ( -- n)
+>r dup word+ >r @ ; ( Access literal number)
+
+: (branch) ( -- )
+r> @ >r ; ( Fetch branch address and go to it)
+
+: (?branch) ( flag -- )
+0= dup r@ @ and ( Fetch branch address and mask)
+swap not r> word+ and or >r ; ( Create skip address and select)
+
