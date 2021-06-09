@@ -72,36 +72,27 @@ ORG(start); L('reset');
   CLD();
   // init data stack, and program stack!
   LDXN(0xff); TXS();
-  // get rid of "node" "foo.js"
-  process.argv.shift();
-  process.argv.shift();
   // TODO: setup vectors
 
 
 
-  // generate call for input data
-  print(process.argv.join(' '));
 
+  // get rid of "node" "foo.js"
+  process.argv.shift();
+  process.argv.shift();
+  // generate call for input data
   // TODO: -e "foo" ?
   ALF(process.argv.join(' '));
 
-  //JSRA('ALF_init');
 
-  ALF('34+."$Hello ALForth!\n"$t77+.q99...');
-  // TODO: doesn't get here!
+
+  ALF('34+."Hello ALForth!\n"$t77+.q99...');
+
+  // TODO: doesn't get here????
   ALF('7.0000000"FISH"$t123...');
 
-  //JSR('end');
-
-//  LDAN('mys', lo); STAZ('NEXT_BASE');
-//  LDAN('mys', hi); STAZ('NEXT_BASE',(a)=>a+1);
-//  JSRA('ALF_init');
-
-//  LDAN('foo', lo); STAZ('NEXT_BASE');
-//  LDAN('foo', hi); STAZ('NEXT_BASE',(a)=>a+1);
-//  JSRA('ALF_init');
-
   JMPA('end');
+
 
 
 
@@ -243,7 +234,7 @@ L('ALF'); // b79 c130 - BAD!
   ADCZ('tmp_y');
   LDAZ('NEXT_BASE', a=>a+1);
 
-  // save return address
+  // push return address
   ADCN(0);
   LDAZ('NEXT_BASE', a=>a+1);  PHA(); // hi
   LDAZ('NEXT_BASE');          PHA(); // lo
@@ -280,15 +271,16 @@ L('ALF'); // b79 c130 - BAD!
     JSRA(aputd);
   });
   puts(")\n");
+  PLA(); PLA(); // ?
+  // TODO: need real catch and throw?
 
   // FALLTRHOUGH: ABORT/QUIT
   // - https://forth-standard.org/standard/core/QUIT
  L('MAIN_zero');
   // drop up one level (== interpret)
   // TODO: restore program stack?
-  PLA(); PLA(); 
+  // TODO: need real catch and throw?
   RTS();
-
 
 
 
