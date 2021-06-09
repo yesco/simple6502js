@@ -485,10 +485,15 @@ L('ALF'); // b79 c130 - BAD!
   let drop_next= ()=>JMPA('drop_next');
   let drop2_next= ()=>JMPA('drop2_next');
   let drop3_next= ()=>JMPA('drop3_next');
+
+  let putAS_drop_next= ()=>JMPA('putAS_drop_next');
+
+  let putA_next= ()=>JMPA('putA_next');
   let pushA_next= ()=>JMPA('pushA_next');
-  let putSA_drop_next= ()=>JMPA('putSA_drop_next');
-  let putSA_next= ()=>JMPA('putSA_next');
-  let pushSA_next= ()=>JMPA('pushSA_next');
+
+  let putAS_next= ()=>JMPA('putAS_next');
+  let pushAS_next= ()=>JMPA('pushAS_next');
+
   let number= ()=>JMPA('number');
   let nonext= ()=>0;
 
@@ -732,20 +737,6 @@ L('ALF'); // b79 c130 - BAD!
       STAZ('STATE');
     },
 
-    '@_FETCH': function(){
-      LDAXI(0); STAZ('tmp_a');
-
-      // need to inc address!
-      INCZX(0);
-      BNE('@_noinc');
-      INCZX(1);
-     L('@_noinc');
-
-      LDAXI(1); STAZX(1);
-      LDAZ('tmp_a'); STAZX(0);
-      return drop_next;
-    },
-
     '!_STORE': function(){
       LDAZX(2); STAXI(0);
 
@@ -759,52 +750,64 @@ L('ALF'); // b79 c130 - BAD!
       return drop2_next;
     },
 
+    // -- (a b - c)
+
+    '@_FETCH': function(){
+      LDAXI(0); PHA(); // lo
+
+      INCZX(0);
+      BNE('@_noinc');
+      INCZX(1);
+     L('@_noinc');
+
+      LDAXI(0);
+      return putAS_next;
+    },
+
     '+_plus' : function(){
       CLC()
-      LDAZX(1); ADCZX(3); PHA();
-      LDAZX(0); ADCZX(2);
-      return putSA_drop_next;
-      // b13
-      CLC()
-      LDAZX(0); ADCZX(2); STAZX(2);
-      LDAZX(1); ADCZX(3); STAZX(3);
-      return drop_next;
+      // WOW, totally wrong?
+      LDAZX(0); ADCZX(2); PHA();
+      LDAZX(1); ADCZX(3);
+      return putAS_drop_next;
     },
 
     '-_minus' : function(){
-      JSRA('Rminus');
-//      SEC()
-//      LDAZX(0); SBCZX(2); STAZX(2);
-//      LDAZX(1); SBCZX(3); STAZX(3);
-      return drop_next;
+      SEC()
+      LDAZX(0); SBCZX(2); PHA();
+      LDAZX(1); SBCZX(3);
+      return putAS_drop_next;
     },
 
     '&_and' : function(){
-      LDAZX(1); ANDZX(3); PHA();
-      LDAZX(0); ANDZX(2);
-     L('putSA_drop_next');
-              STAZX(2);
-      PLA();  STAZX(3);
+      LDAZX(0); ANDZX(2); PHA();
+      LDAZX(1); ANDZX(3);
+     L('putAS_drop_next');
+              STAZX(3); // hi
+      PLA();  STAZX(2); // lo
       drop_next();
     },
 
     '__or' : function(){ // b12  (FIG: b14)
-      LDAZX(1); ORAZX(3); PHA();
-      LDAZX(0); ORAZX(2);
-      return putSA_drop_next;
+      LDAZX(0); ORAZX(2); PHA();
+      LDAZX(1); ORAZX(3); 
+      return putAS_drop_next;
     },
 
     '^_xor' : function(){
-      LDAZX(1); EORZX(3); PHA();
-      LDAZX(0); EORZX(2); 
-      return putSA_drop_next;
+      LDAZX(0); EORZX(2); PHA(); 
+      LDAZX(1); EORZX(3);
+      return putAS_drop_next;
     },
 
     Not(){
-      LDAZX(1); EORN(0xff); PHA();
-      LDAZX(0); EORN(0xff);
-      return putSA_next();
+      LDAZX(0); EORN(0xff); PHA();
+      LDAZX(1); EORN(0xff);
+      return putAS_next();
     },
+
+
+    // --- Comparisons!
 
     // TODO: '#?' == CMP
     '?' : function(){
@@ -815,21 +818,19 @@ L('ALF'); // b79 c130 - BAD!
 
      L('+1');  // x > y    higher
       LDAN(1);
-      BNE('putA_drop_next');
+      BNE('drop_putA_next');
 
      L('-1');   // x < y    lower
       LDAN(0xff); PHA();
-      BNE('putSA_drop_next');
+      BNE('putAS_drop_next');
 
      L('0');    // x == y   ame
       LDAN(0);
-     L('putA_drop_next');
-                STAZX(2);
-
-      LDAN(0);  STAZX(3);
-      drop_next();
-
-      return nonext;
+     L('drop_putA_next');
+      drop();
+     L('putA_next');
+                STAZX(0) // only low byte
+      LDAN(0);  STAZX(1); // hi = 0
     },
 
     '=_equal' : function(){ // b14
@@ -854,38 +855,36 @@ L('ALF'); // b79 c130 - BAD!
       return nonext
     },
 
-    // TODO: put instruction before that also need to "drop"
     '\\_drop' : function(){
       return drop_next;
     },
 
     Over (){ // b8
-      LDAZX(3); STAZX(1);
-      LDAZX(2); STAZX(0);
-      return pushSA_next;
+      LDAZX(2); PHA(); // lo
+      LDAZX(3);
+      return pushAS_next;
     },
 
-    Dup (){ // b5
-      LDAZX(1); PHA(); // hi
-      LDAZX(0);
+    Dup (){ // b5+3 +7(shared)
+      LDAZX(0); PHA(); // lo
+      LDAZX(1);
       
-     L('pushSA_next');
+     L('pushAS_next');
       push();
-     L('putSA_next');
-             STAZX(0);
-      PLA(); STAZX(1);
+     L('putAS_next');
+             STAZX(1);
+      PLA(); STAZX(0);
     },
 
     Swap (){ // b18 (FIG: b16 c43
-      // hi
-      LDAZX(3); PHA();
-      LDAZX(1); STAZX(3);
-      // lo
-      LDAZX(2); PHA();
+      LDAZX(2); PHA(); // lo
       LDAZX(0); STAZX(2);
-      // STACK: hi, lo
-      PLA();
-      return putSA_next();
+
+      LDAZX(3); PHA(); // hi
+      LDAZX(1); STAZX(3);
+
+      PLA(); // hi
+      return putAS_next();
     },
 
     '$_printstring': function(){
@@ -1071,9 +1070,7 @@ L('CCC_zero'); // don't move (see above!)
 tabcod('CCC', {
   '@_C@_CFETCH': function(){
     LDAXI(2);
-   L('putA_next');
-              STAZX(0) // only low byte
-    LDAN(0);  STAZX(1); // hi = 0
+    return putA_next;
   },
 
   '!_C!_CSTORE': function(){
@@ -1163,14 +1160,16 @@ L('RRR_zero');
 
 tabcod('RRR', {
   '<_R<_>R': function(){
-    LDAZX(1);  PHA();  // hi first
-    LDAZX(0);  PHA();  // lo
+    LDAZX(1);  PHA(); // hi
+    LDAZX(0);  PHA(); // lo
     return drop_next;
   },
 
   '>_R>_R>': function(){ // b4 !
-    PLA(); // lo pops first!
-    return pushSA_next;
+    push();
+    PLA(); STAZX(0); // lo
+    PLA(); STAZX(1); // hi
+    // can't use pushAS_next
   },
 
   T_RoT  (){ // (4 2 0 -- 2 0  4) b24 :-(

@@ -785,9 +785,9 @@ L577      .BYTE $82,'R',$BE
 RFROM     .WORD *+2
           DEX            ; make room on data stack
           DEX
-          PLA            ; high byte
+          PLA        ; high byte (jsk: lo byte)
           STA 0,X
-          PLA            ; then low byte
+          PLA        ; low  byte (jsk: hi byte)
           STA 1,X        ; restored to data stack
           JMP NEXT
 ;
