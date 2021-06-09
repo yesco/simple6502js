@@ -180,7 +180,6 @@ L('foo'); string('"FOO:"$1234D...');
   // make sure it's empty!
   LDAN(0); STAIY('NEXT_BASE');
 
-  // Possibly Return to caller?
 
 // slightly faster but super slow!!!       call
 // see file: Ref/fast-token-threading.txt  bytes
@@ -225,8 +224,7 @@ L('foo'); string('"FOO:"$1234D...');
 //   LDYN(3); // skip JMP
 //   next();
 
-// subroutine c61...
-
+// TODO: very similar to ALF_next
 L('ALF_next'); // b38   c70   SLOW!!!!
   // where we came from (RET address)
   PLA(); STAZ(0);
@@ -253,8 +251,10 @@ L('ALF_next'); // b38   c70   SLOW!!!!
   next();
 
 
-  // Code to run inline ALF after an JSR
- L('ALF');
+// Code to run inline ALF after an JSR
+// and then continue
+// TODO: very similar to ALF_next
+L('ALF'); // b79 c130 - BAD!
   // save old base
   LDAZ('NEXT_BASE');          STAZ(0);
   LDAZ('NEXT_BASE', a=>a+1);  STAZ(1);
@@ -306,7 +306,8 @@ L('ALF_next'); // b38   c70   SLOW!!!!
 
   RTS();
 
-  // TODO: this is normaly called QUIT ?
+
+  // Read-Eval loop, normaly called QUIT ?
  L('interpret');
   // This looks silly, but actually has
   // a function. Normally, token
@@ -330,7 +331,6 @@ L('ALF_next'); // b38   c70   SLOW!!!!
     JSRA(aputd);
   });
   puts(")\n");
-
   // FALLTRHOUGH: ABORT/QUIT
   // - https://forth-standard.org/standard/core/QUIT
  L('MAIN_zero');
@@ -339,14 +339,12 @@ L('ALF_next'); // b38   c70   SLOW!!!!
   RTS();
 
 
- L('drop3_next'); // maybe used only once?
-  drop();
 
- L('drop2_next');
-  drop();
 
- L('drop_next');
-  drop();
+
+  //             N E X T
+
+
 
   // This is a Alphabet Forth ("byte coded")
   // maxlen of interpreted routine = 255!
@@ -465,7 +463,17 @@ L('ALF_next'); // b38   c70   SLOW!!!!
   // pair of INC IP lines?  However, the way
   // that's shown is faster
   
-  // FALLTHROUGH from drop..._next !
+  // We have many more words that consume
+  // data then produce it, so we combine
+  // the postop drop and next with fallthroughs..
+
+ L('drop3_next'); // maybe used only once?
+  drop();
+ L('drop2_next');
+  drop();
+ L('drop_next');
+  drop();
+
  L('next');
   TRACE(()=>{
     if (showStack) {
@@ -482,21 +490,32 @@ L('ALF_next'); // b38   c70   SLOW!!!!
   let putSA_next= ()=>JMPA('putSA_next');
   let pushSA_next= ()=>JMPA('pushSA_next');
   let number= ()=>JMPA('number');
+  let nonext= ()=>0;
 
-  // TODO: this should be done inside tabcod?
+  // TODO: move inside tabcod
   INY();
+
+
+
+
+
+  //            M A I N
+
 
   // Forth words defined in Forth:
   // - https://github.com/flagxor/eforth/blob/main/ueforth/common/boot.fs
 
   tabcod('MAIN', {
-    // TEST recurseive inline ALF
+
+    // TEST recursive inline ALF!
+    // (use to implement words in ALF)
     q: function(){
-      // TODO: we actually want a TAIL_ALF
-      // ALF_DO_AND_EXIT
-      ALF_next('"qqqqqq"$t24');
-      // TODO: doesn't get back!
-      RTS();
+      ALF_next('"qqqqqq"$tw24');
+      return nonext;
+    },
+    w: function(){
+      ALF_next('123..."What?"$t321...');
+      return nonext;
     },
 
     // 42 ALForth functions defined!
@@ -658,7 +677,7 @@ L('ALF_next'); // b38   c70   SLOW!!!!
       PLA(); TAY();
       // start over at '('
       JMPA('MAIN');
-      return ()=>0; // none
+      return nonext;
     },
 
     ']_stop': function(){
@@ -810,21 +829,21 @@ L('ALF_next'); // b38   c70   SLOW!!!!
       LDAN(0);  STAZX(3);
       drop_next();
 
-      return ()=>0;
+      return nonext;
     },
 
     '=_equal' : function(){ // b14
       JSRA('UCMP');
       BEQ('0');
       BNE('-1');
-      return ()=>0;
+      return nonext;
     },
 
     '>_greater_than' : function(){
       JSRA('UCMP');
       BCC('0');  // x < y    lower (or equal)
       BNE('-1');  // x > y    higher
-      return ()=>0;
+      return nonext;
     },
 
     '<_less_than' : function(){
@@ -832,7 +851,7 @@ L('ALF_next'); // b38   c70   SLOW!!!!
       BEQ('0');   // x == y   same
       BCC('-1');  // x < y    lower
       BNE('0');  // x > y    higher
-      return ()=>0;
+      return nonext
     },
 
     // TODO: put instruction before that also need to "drop"
@@ -903,19 +922,19 @@ L('ALF_next'); // b38   c70   SLOW!!!!
     'C_prefix': function(){
       INY();
       JMPA('CCC');
-      return ()=>0; // nothing
+      return nonext;
     },
 
     'R_prefix': function(){
       INY();
       JMPA('RRR');
-      return ()=>0; // nothing
+      return nonext;
     },
 
     '#_prefix': function(){
       INY();
       JMPA('###');
-      return ()=>0; // nothing
+      return nonext;
     },
 
     default (){
@@ -1042,6 +1061,10 @@ ADCN(1);
   BNE('_move'); // yet
   //RTS(); as long as CCC_zero is there!
 
+
+
+// CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
+
 L('CCC_zero'); // don't move (see above!)
   RTS();
 
@@ -1088,6 +1111,10 @@ tabcod('CCC', {
 L('###_zero'); // don't move (see above!)
   RTS();
 
+
+
+// ##################################
+
 tabcod('###', {
   '#_##_DEPTH': function(){
     TXA();
@@ -1124,6 +1151,12 @@ tabcod('###', {
     }); // axy restored
   }
 });
+
+
+
+// RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR
+
+
 
 L('RRR_zero');
   RTS();
@@ -1203,7 +1236,6 @@ tabcod('RRR', {
   },
 });
 
-
 L('end');
   BRK();
 L('halt');
@@ -1211,31 +1243,41 @@ L('halt');
 
 }
 
+
+
+
+
+
+
+
+//               SIMULATE!
+
+
+
+
+
+
+
 let end = jasm.address();
 // bytes: assuming contigious
 let bytes = end - start;
 
-print("====CODELEN: ", bytes, "\n");
+print("====CODELEN: ", bytes, "\n\n");
 
 //print(jasm.getChunks());
 //print(jasm.getHex(1,1,0));
 //print(jasm.getHex(0,0,0));
 
-let cpu = cpu6502.cpu6502(); // hmmm "call it..?"
+let cpu = cpu6502.cpu6502();
 let m = cpu.state().m;
 
+// crash and burn
 jasm.burn(m, jasm.getChunks());
-
-// crash?
-
 cpu.reg('pc', start);
-//print(cpu.state());
 
-//console.log('BCC=' + BCC.toString(), BCC);
-//console.log('DEX=' + DEX.toString(), DEX);
 //console.log('JMPA=' + JMPA.toString(), JMPA);
 
-//cpu6502.dump(0x501, 16); which mem?
+// generate symbol information
 let labels = jasm.getLabels();
 let a2l = {};
 Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
@@ -1260,7 +1302,25 @@ if (showMem) {
 //print('BNE=' + BNE.toString(), BNE);
 
 
+
+
+
+
+
+
+
+
 // --- ALForth helpers
+
+
+
+
+
+
+
+
+
+
 
 // (called after instruction)
 function trace(c, h) {
@@ -1369,7 +1429,26 @@ function _putd(d) {
   if (output) print();
 }
   
-// code gen
+
+
+
+
+
+
+
+
+
+//               CODE  GEN
+
+
+
+
+
+
+
+
+
+
 
 function next() {
   if (1) {
