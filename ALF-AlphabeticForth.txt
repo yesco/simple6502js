@@ -62,7 +62,8 @@
   by '$'.
 
   .         print number
-  $.        print string
+  $.        print hex
+  $t        print string
 
   The secondary dispatch may just be chained
   CMP '.'; BNE *; ... which is slow, but easy.
@@ -91,15 +92,17 @@
     %/  /mod
     %#  /mod10
 
+    n   negate
+
     =   =
     <   <
     >   >
   ( >=  don't have. Use: <n )
 
     &   and
-    _   or (or if use lowercase map |)
+    |   or (or if only used uppoer case _)
     ^   xor
-    n   invert (not) (or if use lowercase ~)
+    ~   invert
    
   (     no max / min )
 
@@ -111,8 +114,8 @@
     p   pick
     rt  rot
     rl  roll
-    t   tuck
-    p   nip
+  (     tuck )
+  (     nip )
 
     ##  depth
     
@@ -139,6 +142,7 @@
   ( #f  false 0 - maybe not needed )
   ( #.  decimal print )
     #r  u.r right justified print number
+    #w  within
 
     #<  lshift n steps left
     #>  rshift n stops right
@@ -153,6 +157,12 @@
 
   ( #b  base )
     #/% /mod ( n d -- div rest )
+  
+  Unsigned
+    u.   u.
+    u<   u<
+   (     um* )
+   (     um/mod  )
   
   Floats:
     f... (reserved)
@@ -218,6 +228,8 @@
     rc   recurse
 
     ]    exit (or use ';'!)
+    ]    leave
+    ]    unloop
     
     q    quit
     q"   quit"
@@ -228,16 +240,23 @@
     ]    else
     )    then
 
-    ?n(  dup_0_=_f
-
+    ?(   if
+    ?]   if-exit/leave
+    ?]]  if-unroll-exit
+    ?[   if-next
+    
+   Chainables (redundant - nah?)
     ?=(  over_swap_=_if
     ?<(  over_swap_<_if
     ?>(  over_swap_>_if
     ?<=( ?<n(
     ?>=( ?>n(
-    ?=n( <>_if
+    ?=~( <>_if
+    ?+(  positive 7d0>?(3) == 7?+(3) == 7 3
+    ?-(  negative
+    ?~(
     ?&(
-    ?_(
+    ?|(
     ?^(
     
   ( ?[0-9](                    )
@@ -290,6 +309,9 @@
     ac   alloc chain (push on linked list)
     ad   alloc dictionary (create)
 
+    ab   abort
+    ab"  abort"
+
     ak   assoc
     ax   assoc execute
     
@@ -316,7 +338,7 @@
     g      gere (memory, lol. use M?)
 
     ,      ,
-    l      literal
+    r,     -, reverse comma = #-2 al @
     $l     sliteral
 
     xx     execute (t - ?)
@@ -329,6 +351,7 @@
     c'     ' or [']
     cp     postpone
     cd     defer
+    cl     literal (or $l)
     cs     state
     ce     see
     cc     create
@@ -336,8 +359,10 @@
     [ - immediate,  [[
 
 ( 2dup etc: t_W_o)
+
     w!  2!
-    2/  2/
+    w/  2/
+    w*  2*
     w@  2@
     w\  2drop
     wd  2dup
@@ -357,24 +382,100 @@
     $l     line (accept)
 
 
+  Locals:
+    3{     nlocals = 3dr<#(,)r>,
+    }      dealloc_locals = r,2*nal
+    la     first_local
+    lb     second_local
+    lx     x:th local     == h2-@'x'a-2*@
+    l!x    set x:th local == h2-@'x'a-2*!
+    
+    {abc--ignore|code}
+    {      locals (3 2 * d al r<)
+    }      deallocates (r> #n al)
+    lx     value of local x
+    l!x    store value in local x
+    
   UNUSED:
 
-   ' ' - space (ignore / use for long names?)
+   ' ' - space (ignore or use for longnames?)
+    `  - (backtick special quoting function?)
     b  - (byte? binary? bit?)
     k  - (key? is $k)
-    l  - (literal?)
+    l  - (la=local a)
     m  - (min max move memory?)
-    n  - ?
-    p  - (nip)
-  ( u  - Unsigned )
-  ( v  - variable )
+    n  - (negate not=~ nip=sd)
+  ( t  - to x='x! tuck=so)
+  ( u  - Unsigned prefix)
+  ( v  - variable value)
   ( w  - 2... )
     y  - (yield if multitasking?)
     z  - fill/erase
 
-  OP CODES (ALphabetic)
+  SUMMARY
+   174 words (standard + some extra)
+       choosen words
+             (   133        49     ) = 182 total
+             
+    44 single letter
+   123 two letters
 
-001 00000 (32) 31-63 ' '..'?'
+    58 NOT MAPPED:
+       
+       #>       #$      hold     <#
+
+       */        */mod   /mod     fm/mod
+       m*        sm/rem  um*      um/mod  
+
+       ."        s"      +!      
+       
+       environment?
+
+       s>d       >number 
+       
+       word      [']      [char]
+       find      compile,
+
+       >in       
+
+       base      decimal
+
+       constant  variable 
+
+    Extended words
+
+       .(       .R       :noname   action-of  
+
+       refill   restore-input   save-input
+       source   source-id       buffer:
+       
+       to       value
+
+       defer    defer!   defer@
+
+       case     endcase  of    endof
+
+       hex      holds    is
+
+       marker   unused   
+
+       nip      parse    parse-name
+       tuck     [compile]
+
+       s\"
+
+     8 DON'T NEED
+
+       0<       0=      1+      1-
+       0<>      0>      <>      \
+
+       >align   cell+   cells   char+
+
+      
+
+
+
+01 00000 (32) 31-63 ' '..'?'
     
 ========================================-
 Ideas for adding long name words:

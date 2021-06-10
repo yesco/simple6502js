@@ -1,0 +1,345 @@
+   166 words
+    44 single letter
+         - 64 * 2 => JMP         = 128
+         - 64 => offset 1 page, most common
+           (25 words?) rest jump same location
+   122 2 letters
+
+   (* 116 4) = 464 bytes if serial test
+
+   >> !"#$%&'()*+,-./0123456789:;<=>?@ABC<<
+   >> XYZ[\]^_`abc<<<          >>>xyz{|}~<<
+
+
+!  !
+"   s"
+
+
+    ##  depth
+    #(   for
+    #)   loop
+    #+)  +loop
+    #-
+    #.     number print (same as .)
+#0-9 share code with number (that jump into here?)
+    #/% /mod ( n d -- div rest )
+    #<  lshift n steps left
+    #>  rshift n stops right
+    #a  abs
+    #m  min (?)
+ #n  negate
+    #q  sqrt
+    #r  u.r right justified print number
+    #s  sign
+  #t  true -1
+    #x  max
+
+    $  blank string
+    $"  c" pascal string (counted)
+  $(  do     $)  loop   #+)  +loop
+    $-  -string
+    $.  print-hex number
+ $0-9
+    $/  /string
+    $<
+$=
+    $>
+    $?  search
+    $k  key
+    $l  line (accept)
+  $m  move
+
+    $r  replace
+    $s  subst
+    $t  type
+    $w  typewhite
+
+
+%#  /mod10
+%%  mod
+%/  /mod
+
+
+&   and
+
+
+
+'_  bl
+'c  char
+
+
+
+(   begin  )   again  ?]   if-exit
+)    again / repeat / then
+*   *
++   +
+,      ,
+-   -
+.   print
+/   /
+:       def of single letter word
+;      "return" end of def
+
+;a...  again / tail recurse
+;f...  fallthrough
+;i
+;tN    tail call N
+
+
+<   <
+=   =
+>   >
+
+
+    ?&(
+ ?(   IF
+    ?)   WHILE
+    ?+(  POSITIVE 7D0>?(3) == 7?+(3) == 7 3
+    ?-(  NEGATIVE
+    ?<(  OVER_SWAP_<_IF
+    ?<=( ?<N(
+?=(  OVER_SWAP_=_IF
+    ?=~( <>_IF
+    ?>(  OVER_SWAP_>_IF
+    ?>=( ?>N(
+ ?[   IF-NEXT
+    ?] POP, PUSH(@HERE AS BACKPATCH), JMP @XX
+    ?^(
+  ?D   ?DUP
+    ?|(
+    ?~(
+
+
+
+
+@  @
+[    next (go back to '(')
+\   drop
+]    leave (go to matching ')')
+^   xor
+`  - (backtick special quoting function?)
+
+    a,   heap compile (steal 2 bytes)
+    ac   alloc chain (push on linked list)
+    ad   alloc dictionary (create)
+    af   free
+    ak   assoc
+al   allot
+    am   malloc
+    ap   pad
+    ar   resize
+    ax   assoc execute
+    az   size
+
+
+
+
+b  - (byte? binary? bit?)
+
+
+
+ c!  c!
+    c#  print c n times (c n -- )
+    c'     ' or [']
+    c,  c,
+c@  c@
+    cb  blanks
+    cc     create
+    cd     defer
+    ce     see
+    cl     literal (or $l)
+    co  count (?)
+    cp     postpone
+ cr  cr
+    cs     state
+
+
+
+
+
+d   dup
+e   emit
+f... (reserved)
+g      gere (memory, lol. use M?)
+h      here
+i    index of innnermost loop
+j    index of next level loop
+k  - (key? is $k)
+
+
+
+
+l!x    set x:th local == h2-@'x'a-2*!
+l!x    store value in local x
+
+la     first_local
+lb     second_local
+
+lx     value of local x
+
+
+
+m  - (min max move memory?)
+n   negate
+o   over
+p   pick
+
+q    quit
+
+    r!  r!
+    r,     -, reverse comma = #-2 al @
+ r<  >r (lol)
+    r>  r> 
+r@  r@
+    r[0-9]<    n>r
+    r[0-9]>    nr>
+  rc   recurse
+    re   catch (errcatch)
+   rl  roll
+    rt  throw
+ rt  rot
+
+
+
+
+s   swap
+
+vx!    variable 'x' store (zp)
+
+vx@    variable 'x' fetch (zp)
+
+
+
+
+w!  2!
+w@  2@
+w\  2drop
+wd  2dup
+wo  2over
+wr< 2>r
+wr> 2r>
+wr@ 2r@
+ws  2swap
+
+
+
+xa     jump address (JMP) (a x y p A - a x y p)
+xe     eval (s - ?)
+xr     return (RTS / quit?)
+xs     subroutine (JSR) (a x y p A - a x y p)
+xx     execute (t - ?)
+
+y  - (yield if multitasking?)
+z  - fill/erase
+{      locals (3 2 * d al r<)
+{abc--ignore|code}
+|   or (or if only used uppoer case _)
+}      deallocates (r> #n al)
+~   invert
+' ' - space (ignore or use for longnames?)
+
+
+          // without jmp (add 3 or less)
+    0-9 -27 jmp (because share offset and 1 jmp))
+    q     0 jmp
+    c     0 
+    r     0
+    #     0
+    d     0
+
+    p     0     29          7 long ones
+    "     0     29
+    ]     0     32
+    ?     0     26
+    $     0     23
+    .     0     22
+    \     0
+        ====
+        -27      
+
+     44 unique
+    122 needs secondary dispatch
+
+     (=> 2 bytes/item)
+
+     binary search on 2n byte? lol?
+
+
+    1 main dispatch 128*2 = 256 bytes
+
+    0-31: editor immediate key words? lol!
+    _-@ : dense, mostly singles
+    A-Z : user defined (reserved)
+    a-z : system
+
+    20 need longjmp/dispatch = 60
+    44 maybe rts 1+3/2 = 2 avg 88
+                            -------
+                              148 
+
+    64 byte dispatch with offset? nah?
+    two levels waste more mem and slower?
+    still for # $ ? a c r w   we need dispatch
+                 (   7    )
+
+    17 ops below are "important" fit one one page
+    (+ -27 (+ 35 67 13 35)) == 123 bytes
+                       44*3 => 132
+                               255 LOL!!!!!
+
+                               123
+                      RTS=1 =>  44
+        2 letters = 20 *3   =>  60
+                               227
+
+        RTS = 1 byte but 9 cyc (RTS+JSR)
+        JMP = 3 bytes    3 cycles !
+        
+
+
+
+    VV/// 17 of these important singles
+
+    o     5
+    d    12
+    s    18
+        ====
+         35
+
+    !    14    
+    @    11
+    +    10
+    -    10
+    =     4
+    <     6
+    ~    12
+        ====
+         67
+
+    e     5
+    (     2
+    )     2
+    [     4
+        ====
+         13
+
+    &    17
+    |     9
+    ^     9
+        ====
+         35
+
+    CCC
+    @     2
+    !     4
+    m    29
+    r     5
+    d     0
+    
+    ###
+    #    12
+    .    31
+
+    RRR
+    <     6
+    >     8

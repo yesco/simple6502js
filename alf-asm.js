@@ -13,7 +13,7 @@ let aputs = 0xfff4;
 // use https://github.com/scotws/TaliForth2/blob/master/tests/core_a.fs ...
 
 //let output = 1; // show 'OUTPUT: xyz'
-let output = 0; // show 'OUTPUT: xyz'
+let output = 1; // show 'OUTPUT: xyz'
 let traceLevel = 0; // 1=labels, 2=instr.
 let showStack = 0;
 tabcod.trace = 0;
@@ -42,10 +42,15 @@ ORG(0x16);   L('tmp_y');     byte(0);
 
   // - FREE
 
-////// ========= input buffer ========= ///////
-// ORIC 79 bytes input buffer
-// TODO: move elsewhere! (my precious... ZP!)
-ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
+/// --- Variables (0-9 A-Z a-z)
+ORG(0x30); allot(10); // address '0'..'9'
+ORG(0x3a); // FREE 6B
+ORG(0x40); // FREE 1B
+ORG(0x41); allot(31); // address 'A' (variable)
+ORG(0x60); // FREE 1B
+ORG(0x61); allot(31); // address 'a' (variable)
+
+ORG(0x80); // FREE--
 
 /////////////////////////////////////////////
 
@@ -53,7 +58,7 @@ ORG(0x35); L('INPUT_BUF'); allotTo(0x84);
 ORG(0x85);
   // Need save this for subroutine call?
   L('QUIT_STACK');  byte(0);
-  L('NEXT_BASE');   word('INPUT_BUF');
+  L('NEXT_BASE');   word(0);
   L('NEXT_Y');      byte(0);
 
   L('STATE');       data(0);
@@ -74,26 +79,9 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
-
-
-
-  // get rid of "node" "foo.js"
-  process.argv.shift();
-  process.argv.shift();
-  // generate call for input data
-  // TODO: -e "foo" ?
-  ALF(process.argv.join(' '));
-
-
-
-  ALF('34+."Hello ALForth!\n"$t77+.q99...');
-
-  // TODO: doesn't get here????
-  ALF('7.0000000"FISH"$t123...');
-
+  JSRA('usermain');
   JMPA('end');
-
-
+  
 
 
  L('ALF_reset');
@@ -104,8 +92,8 @@ ORG(start); L('reset');
   LDXN(0xff);
 
   // reset input to command line
-  LDAN('INPUT_BUF', lo); STAZ('NEXT_BASE');
-  LDAN('INPUT_BUF', hi); STAZ('NEXT_BASE', (a)=>a+1);
+  //LDAN('INPUT_BUF', lo); STAZ('NEXT_BASE');
+  //LDAN('INPUT_BUF', hi); STAZ('NEXT_BASE', (a)=>a+1);
   LDYN(0);
 
   // make sure it's empty!
@@ -456,14 +444,14 @@ L('ALF'); // b79 c130 - BAD!
 
     // TEST recursive inline ALF!
     // (use to implement words in ALF)
-    q: function(){
-      ALF_next('"qqqqqq"$tw24');
-      return nonext;
-    },
-    w: function(){
-      ALF_next('123..."What?"$t321...');
-      return nonext;
-    },
+//    q: function(){
+//      ALF_next('"qqqqqq"$tw24');
+//      return nonext;
+//    },
+//    w: function(){
+//      ALF_next('123..."What?"$t321...');
+//      return nonext;
+//    },
 
     // 42 ALForth functions defined!
     // (core forth has about 133 words)
@@ -524,11 +512,11 @@ L('ALF'); // b79 c130 - BAD!
     // (- not (build on xor))
     // (- negate inver 1 + exit)
 
-    Quit (){
+    quit (){
       JMPA('ALF_reset');
     },
 
-    Pick (){
+    pick (){
       STXZ('tmp_x'); {
         INCZX(0);
         TXA();
@@ -547,7 +535,7 @@ L('ALF'); // b79 c130 - BAD!
     },
 
 
-    Z_Zill_Zero_Fill_Erase_Blank() { // alias for fill?
+    z_Zill_Zero_Fill_Erase_Blank() { // alias for fill?
 //      push_axy(()=>{
       STXZ('tmp_x'); STYZ('tmp_y'); {
         // address
@@ -610,7 +598,7 @@ L('ALF'); // b79 c130 - BAD!
       return pushA_next;
     },
 
-    Emit(){
+    emit(){
       LDAZX(0);  JSRA(aputc);
       return drop_next;
     },
@@ -679,7 +667,7 @@ L('ALF'); // b79 c130 - BAD!
       STAZ('STATE');
     },
 
-    '!_STORE': function(){
+    '!_store': function(){
       LDAZX(2); STAXI(0);
 
       // need to inc address!
@@ -694,7 +682,7 @@ L('ALF'); // b79 c130 - BAD!
 
     // -- (a b - c)
 
-    '@_FETCH': function(){
+    '@_fetch': function(){
       LDAXI(0); PHA(); // lo
 
       INCZX(0);
@@ -730,7 +718,7 @@ L('ALF'); // b79 c130 - BAD!
       drop_next();
     },
 
-    '__or' : function(){ // b12  (FIG: b14)
+    '|_or' : function(){ // b12  (FIG: b14)
       LDAZX(0); ORAZX(2); PHA();
       LDAZX(1); ORAZX(3); 
       return putAS_drop_next;
@@ -742,7 +730,7 @@ L('ALF'); // b79 c130 - BAD!
       return putAS_drop_next;
     },
 
-    Not(){
+    not(){
       LDAZX(0); EORN(0xff); PHA();
       LDAZX(1); EORN(0xff);
       return putAS_next();
@@ -801,24 +789,30 @@ L('ALF'); // b79 c130 - BAD!
       return drop_next;
     },
 
-    Over (){ // b8
+    over (){ // b8
       LDAZX(2); PHA(); // lo
       LDAZX(3);
       return pushAS_next;
     },
 
-    Dup (){ // b5+3 +7(shared)
+    dup (){ // b5+3 +7(shared)
+      DEX(); DEX();
+      push(); push();
+      LDAZX(2); STAZX(0);
+      LDAZX(3); STAZX(1);
+      next();
+
       LDAZX(0); PHA(); // lo
       LDAZX(1);
       
      L('pushAS_next');
-      push();
+      push(); push();
      L('putAS_next');
              STAZX(1);
       PLA(); STAZX(0);
     },
 
-    Swap (){ // b18 (FIG: b16 c43
+    swap (){ // b18 (FIG: b16 c43
       LDAZX(2); PHA(); // lo
       LDAZX(0); STAZX(2);
 
@@ -847,7 +841,7 @@ L('ALF'); // b79 c130 - BAD!
 
     '._print': function(){
 
-      CPXN(0xff);
+      CPXN(0xfd);
       BNE('._0');
       THROW(13); // we're getting 5???
      L('._0');
@@ -860,13 +854,13 @@ L('ALF'); // b79 c130 - BAD!
       return drop_next;
     },
 
-    'C_prefix': function(){
+    'c_prefix': function(){
       INY();
       JMPA('CCC');
       return nonext;
     },
 
-    'R_prefix': function(){
+    'r_prefix': function(){
       INY();
       JMPA('RRR');
       return nonext;
@@ -1015,12 +1009,12 @@ tabcod('CCC', {
     return putA_next;
   },
 
-  '!_C!_CSTORE': function(){
+  '!_c!_cstore': function(){
     LDAXI(2); STAZX(0) // only low byte
     return drop2_next;
   },
 
-  'M_CMOVE': function() { // (from to chars ==)
+  'm_cmove': function() { // (from to chars ==)
     STYZ('tmp_y'); STYZ('tmp_x'); {
       // - store in ZP at fixed address
       // 4 from
@@ -1055,38 +1049,45 @@ L('###_zero'); // don't move (see above!)
 // ##################################
 
 tabcod('###', {
-  '#_##_DEPTH': function(){
+  '#_##_depth': function(){
+   L('##');
     TXA();
     EORN(0xff); // 0xff-A
+    SEC();
+    SBCN(4);
     LSR();
    L('pushA_next');
     push();
              STAZX(0);
     LDAN(0); STAZX(1);
+    return RTS;
   },
 
-  '._#._.S_print_stack': function(){
-    push_axy(()=>{
-      if (0) {
+  // TODO:??? #.
+  '._#._.s_print_stack': function(){
+    save('yx', ()=>{
+      if (1) {
+        JSRA('##');
         // call ##
-        LDAN(ord('<')); JSR(aputc);
+        putc('<');
         LDAZX(0); LDYZX(1); JSRA(aputd);
-        LDAN(ord('>')); JSR(aputc);
-        LDAN(ord(' ')); JSR(aputc);
+        putc('|');
+        putc(' ');
       }
 
       // want reverse order!
-      L('_printstack_next');
-      CPXN(0xff);
+     L('_printstack_next');
+      drop();
+      CPXN(0x03);
       BEQ('_printstack_done');
       LDAN(ord(' ')); JSRA(aputc);
       // "."
       LDAZX(0); LDYZX(1); JSRA(aputd);
-
-      drop();
-      JMPA('_printstack_next');
+      CPXN(0xf9);
+      BCS('_printstack_next');
 
       L('_printstack_done');
+      putc('>');
     }); // axy restored
   }
 });
@@ -1101,20 +1102,20 @@ L('RRR_zero');
   RTS();
 
 tabcod('RRR', {
-  '<_R<_>R': function(){
+  '<_r<_>r': function(){
     LDAZX(1);  PHA(); // hi
     LDAZX(0);  PHA(); // lo
     return drop_next;
   },
 
-  '>_R>_R>': function(){ // b4 !
+  '>_r>': function(){ // b4 !
     push();
     PLA(); STAZX(0); // lo
     PLA(); STAZX(1); // hi
     // can't use pushAS_next
   },
 
-  T_RoT  (){ // (4 2 0 -- 2 0  4) b24 :-(
+  t_rot  (){ // (4 2 0 -- 2 0  4) b24 :-(
     STYZ('tmp_y'); {
       // TODO: maybe just call Roll?
       // lo
@@ -1130,7 +1131,7 @@ tabcod('RRR', {
     } LDYZ('tmp_y');
   },
 
-  L_Roll (){ // (5 4 3 2 1 0  3 -- 5 4  2 1 0  3)
+  l_roll (){ // (5 4 3 2 1 0  3 -- 5 4  2 1 0  3)
     // TODO: works only for n >= 2, lol
     // 2 ROLL == ROT    mine: 3
     // 1 ROLL == SWAP   mine: 2
@@ -1183,6 +1184,58 @@ L('halt');
   JMPA('halt');
 
 }
+
+
+
+
+
+L('usermain');
+
+  // get rid of "node" "foo.js"
+  process.argv.shift();
+  process.argv.shift();
+
+  while(process.argv.length) {
+    let a = process.argv.shift(), testing = 0;
+    switch(a) { 
+    case '-e': 
+      ALF(process.argv.shift());
+      break;
+    case '-t':
+      testing = true;
+    case '-f': {
+      let fs = require('fs');
+      let f = fs.readFileSync(process.argv.shift(), 'utf8');
+
+      f.split("\n").forEach(ln=>{
+        if (testing) {
+          ALF(ln + '#.');
+          // puts('\n');
+          //putc("\n");
+        } else {
+          ALF(ln);
+        }});
+
+      testing = false;
+      break; }
+    default:
+      console.log("%% unknonw arg: " + a);
+    }
+  }
+
+  // generate call for input data
+  // TODO: -e "foo" ?
+
+  ALF('34+."Hello ALForth!\n"$t77+.q99...');
+
+  // TODO: doesn't get here????
+  ALF('7.0000000"FISH"$t123...');
+
+  JMPA('end');
+
+
+
+
 
 
 
@@ -1635,15 +1688,16 @@ function THROW(n) {
 
 function puts(s) {
   // TODO: put in "datasegment?"
-  let l = 'STR:' + s;
+  puts.n = (puts.n || 0) + 1;
+  let l = '_puts#' + puts.n;
 
   // TODO: generate "clever"
   // inline code w/o jmp
   // like JSRA(sputs); string("foo");
 
-  JMPA('_'+l);
+  JMPA(l+'skip');
  L(l); string(s);
- L('_'+l);
+ L(l+'skip');
 
   push_axy(()=>{
     LDAZX(0xff); // length

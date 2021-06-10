@@ -545,10 +545,10 @@ function is(v){ return typeof v!=='undefined'};
 function tracer(how, what) {
   let line;
   if (what == 'head') {
-    line = '= pc    op mnemonic   flags  a  x  y  s';
+    line = '= pc    op mnemonic   flags   a  x  y  s';
   } else {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
-      ((f?f:'???')+(q?q:'---')).padEnd(8, ' ')+
+      ((f?f:'???')+(q?q:'---')).padEnd(9, ' ')+
       ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
       (is(d)&&(d!=ipc+1)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
   }
