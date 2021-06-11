@@ -11,7 +11,6 @@ let jasm = require('./jasm.js');
 // TODO: maybe len is not static?
 // uses all registers
 function readline(buffer, len) {
-// empty
 L('READLINE');
   LDXN(0);
   BEQ('_readline.next'); // always!
@@ -172,7 +171,7 @@ L('readeditloop');
   putc(0x0a);
   BRK();
 
-  readline('input', 5);
+  library(readline, 'input', 5);
 }
 
 ////////////////////////////////////////
@@ -191,6 +190,13 @@ cpu.run(-1, 1, 1);
 
 ////////////////////////////////////////
 //  library
+function library(lib, ...args) {
+  let a = jasm.address();
+  lib(...args);
+  let len = jasm.address() - a;
+  console.log('=LIBRARY:', lib.name, len, 'bytes');
+}
+
 function putl(label) {
   LDXN(0xff);
   LDAN(label, lo);
