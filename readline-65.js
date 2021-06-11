@@ -15,12 +15,15 @@ L('READLINE');
   LDXN(0);
   BEQ('_readline.next'); // always!
 
+L('_readline.redraw');
+  putc('\\');
+  putc('\n');
+
 // X contains length
 L('EDITLINE');
+  // enforce length
   LDAN(0);
-  //eLDXN(1);
   STAAX(buffer);
-//  RTS();
 
 L('_readline.print');
   TXA(); PHA(); {
@@ -33,9 +36,9 @@ L('_readline.next');
   STAAX(buffer);
 
 L('_readline.wait');
+  // wait for key
   JSRA(terminal.agetc);
   BEQ('_readline.wait');
-  // have key
     
   // return
   CMPN(0x0d);
@@ -44,8 +47,8 @@ L('_readline.wait');
   // backspace/DEL
   CMPN(0x7f);
   BNE('_readline.1');
-  CPXN(0);
-  BEQ('_readline.next');
+  // TODO: remove one test by change 0
+  CPXN(1);
   BCS('_readline.next'); 
   DEX();
   putc(0x08); // BS
@@ -55,19 +58,14 @@ L('_readline.wait');
 
 L('_readline.1');
   // CTRL-L re-draw
-  CMPN(0x0c);
-  BNE('_readline.2');
-  putc('\\');
-  putc(0x0a);
-  JMPA('_readline.print');
+  CMPN(ord('L')-64);
+  BEQ('_readline.redraw')
 
-  // CTRL-U empty line
-L('_readline.2');
+  // CTRL-U empties line
   CMPN(ord('U')-64);
   BNE('_readline.3');
-  putc('\\');
-  putc(0x0a);
-  JMPA('READLINE');
+  LDXN(0);
+  BEQ('_readline.redraw');
 
 L('_readline.3');
   // CTRL-X cancel
@@ -87,7 +85,7 @@ L('_readline.4');
   // - CTRL-F
   // - CTRL-B
   // - CTRL-E
-  // - CTRL-
+  // - CTRL-D
 
   // ignore other control chars
   CMPN(ord(' ')-1);
