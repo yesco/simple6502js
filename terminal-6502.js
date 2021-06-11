@@ -1,9 +1,10 @@
-let cpu6502 = require('./fil.js');
+const cpu6502 = require('./fil.js');
+const readline = require('readline');
 
 let aputc = 0xfff0;
 let aputd = 0xfff2;
 let aputs = 0xfff4;
-let agetk = 0xfff6;
+let agetc = 0xfff6;
 
 let orig_maker = cpu6502.cpu6502;
 
@@ -34,6 +35,74 @@ function _putd(d) {
   if (this.output) print();
 }
 
+// return 0 if no key
+function _getc() {
+  if (!keybuf.length) return 0;
+  let key = keybuf.shift();
+  if (!key) return 0;
+  return key;
+}
+
+// on some computers a key is put in a memory
+// location (ORIC ATMOS):
+
+// array of integer char codes
+var keybuf = [];
+
+// simulate keystroke
+function sendKey() {
+  // key not yet consumed
+  if (cpu.mem[KEYADDR] & 128)
+    return;
+
+  let key = keybuf.shift();
+  if (!key) return;
+
+  cpu.mem[KEYADDR] = 128 + key;
+}	
+
+// set up capture of key strokes
+readline.emitKeypressEvents(process.stdin);
+process.stdin.setRawMode(true);
+
+function exit(key, k) {
+  console.log();
+  console.log();
+  console.log('='.repeat(50));
+  console.log("KEY=", key);
+  console.log("k=", k);
+  console.log("CTRL-C: Exiting...");
+  process.exit();
+}
+
+process.stdin.on('keypress', (str, key) => {
+  if (key.ctrl && key.name === 'c') {
+    exit(key);
+  } else {
+    //console.log("KEY=", key, key.sequence);
+    let k, seq = key.sequence;
+    if (key.meta) {
+      k = seq[seq.length-1].toUpperCase().charCodeAt(0);
+      k |= 0x80;
+    } else {
+      k = seq.charCodeAt(0);
+    }
+    // ALT-BACKSPACE
+    if (k === 255) {
+      exit(key, k);
+    }
+    // assume get onle one key
+    keybuf.push(k);
+    //sendKey();
+  }
+});
+
+// 100 times a second
+//setInterval(sendKey, 10);
+
+
+
+
 function chr(c) { return String.fromCharCode(c) }
 
 // extend and patch
@@ -43,7 +112,7 @@ let tcpu = {
   aputc,
   aputd,
   aputs,
-  agetk,
+  agetc,
 
   TRACE,
 
@@ -64,11 +133,30 @@ let tcpu = {
         this.output = n;
       },
 
+      timer: undefined,
+
       // patch extend
-      run(count, trace, patch) {
-        return cpu.run(count, this.tracer, this.patch);
+      run(count=-1, trace, patch) {
+        trace = this.tracer || trace;
+        patch = this.patch || patch;
+
+        if (count < 0) { // would block
+
+          this.timer = setInterval(function(){
+            cpu.run(1000, trace, patch);
+          }, 10);
+          
+        } else {
+          return cpu.run(count, tracer, patch);
+        }
       },
 
+      stop() {
+        if (!timer) return;
+        cancelTimout(timer);
+        timer = undefined;
+        return true;
+      },
       // (called after instruction)
       tracer(c, h) {
         // quit at BRK? unless it's trapped!
@@ -128,8 +216,17 @@ let tcpu = {
         case 0xfff0: _putc(cpu.reg('a')); break;
         case 0xfff2: _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
         case 0xfff4: _puts((cpu.reg('y')<<8)+cpu.reg('a'), cpu.reg('x'), m); break;
-        case 0xfff6: _getc(); break; // TODO:
-          ////////////////////////////////////////
+        case 0xfff6: {
+          let c= _getc();
+          cpu.reg('a', c);
+          let consts= cpu.consts();
+          cpu.setFlags(c);
+          if (c){
+            //process.stdout.write('['+c+']');
+          }
+          break;
+        }
+        ///////////////////////////////////
         case 0xfff8: return; // ABORT 6502C
         case 0xfffa: return; // NMI
         case 0xfffc: return; // RESET

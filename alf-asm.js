@@ -1,7 +1,7 @@
-//      ALfabetic Forth
+//               ALfabetic Forth
 // 
-// 2021 (>) Jonas S Karlsson
-//       jsk@yesco.org
+//          (>) 2021 Jonas S Karlsson
+//                jsk@yesco.org
 //
 let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
@@ -76,10 +76,17 @@ ORG(start); L('reset');
   LDXN(0xff); TXS();
   // TODO: setup vectors
 
+  // keyboard test
+  if (0) {
+ L('luup');
+  JSRA(terminal.agetc);
+  BEQ('luup');
+  JSRA(terminal.aputc);
+  JMPA('luup');
+
   JSRA('usermain');
   JMPA('end');
-  
-
+  }
 
  L('ALF_reset');
   // restore stack

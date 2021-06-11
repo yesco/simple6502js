@@ -532,7 +532,8 @@ return cpu = {
   run, flags:ps, tracer, hex, dump, memFormat, w,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
-  reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
+  reg(n,v=run) { return eval(n+(v!=run?'='+v:''))},
+  setFlags(v){ n(z(v)) },
   consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}};
 
 ////////////////////////////////////////
