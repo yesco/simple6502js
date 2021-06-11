@@ -1589,7 +1589,7 @@ function puts(s) {
  L(l+'skip');
 
   push_axy(()=>{
-    LDAZX(0xff); // length
+    LDXZ(0xff); // length
     LDAN(l, lo);
     LDYN(l, hi);
     JSRA(terminal.aputs);
