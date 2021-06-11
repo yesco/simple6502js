@@ -78,15 +78,25 @@
     # notice B.. uses signed byte!
     'bra', 'pc += RMEM', # 6502C
 
-    'bpl', 'if (~p & N) pc+= RMEM; else pc++',
-    'bvc', 'if (~p & V) pc+= RMEM; else pc++',
-    'bcc', 'if (~p & C) pc+= RMEM; else pc++',
-    'bne', 'if (~p & Z) pc+= RMEM; else pc++',
+    # 'bpl', 'if (~p & N) pc+= RMEM; else pc++',
+    # 'bvc', 'if (~p & V) pc+= RMEM; else pc++',
+    # 'bcc', 'if (~p & C) pc+= RMEM; else pc++',
+    # 'bne', 'if (~p & Z) pc+= RMEM; else pc++',
 
-    'bmi', 'if (p & N) pc+= RMEM; else pc++',
-    'bvs', 'if (p & V) pc+= RMEM; else pc++',
-    'bcs', 'if (p & C) pc+= RMEM; else pc++',
-    'beq', 'if (p & Z) pc+= RMEM; else pc++',
+    # 'bmi', 'if (p & N) pc+= RMEM; else pc++',
+    # 'bvs', 'if (p & V) pc+= RMEM; else pc++',
+    # 'bcs', 'if (p & C) pc+= RMEM; else pc++',
+    # 'beq', 'if (p & Z) pc+= RMEM; else pc++',
+
+    'bpl', '(~p & N)?pc+=RMEM:pc++',
+    'bvc', '(~p & V)?pc+=RMEM:pc++',
+    'bcc', '(~p & C)?pc+=RMEM:pc++',
+    'bne', '(~p & Z)?pc+=RMEM:pc++',
+
+    'bmi', '(p & N)?pc+=RMEM:pc++',
+    'bvs', '(p & V)?pc+=RMEM:pc++',
+    'bcs', '(p & C)?pc+=RMEM:pc++',
+    'beq', '(p & Z)?pc+=RMEM:pc++',
     
 # BIT - Bit Test
 # A & M, N = M7, V = M6
@@ -106,7 +116,7 @@
     'jmp',   'pc= w(pc)',
     'jmpi',  'pc= w(w(pc))',
     # TODO: BUG! this depends on how generating cod.... if mode inline
-    'jsr',   'pc++; PH(pc >> 8); PH(pc & 0xff); pc= w(pc-1)',
+    'jsr',   'pc++;PH(pc>>8);PH(pc & 0xff);pc= w(pc-1)',
 
     'brk', 'pc++; irq(); p|= B',
     'rts', 'pc= PL(); pc+= PL()<<8; pc++;',
@@ -198,7 +208,7 @@ function adc(v) {
   sc(1);
 }
 
-let op /* Dutch! */, ic= 0, f, ipc, cpu, d, g, q;
+let op /*Dutch!*/, ic= 0, f, ipc, cpu, d, g, q, cycles= 0;
 
 // default is to run forever as count--...!=0 !
 // pc=0 will exit (effect of unvectored BRK)
@@ -403,7 +413,7 @@ while (<IN>) {
         unless ($mod eq $modes[$mmm]) {
             #print "------foobar\n"; print works
             # doesn't seem to want to add this?
-            $comment = " // MODE $mod instead of mmm";
+            #$comment = " // MODE $mod instead of mmm";
         }
 
     }
@@ -471,14 +481,13 @@ if ($shortercode) {
     print "    default:
       // d= address of operand (data)
       switch(mod= (op >> 2) & 7) {
-      case 0: d= op&1 ?
-             (q='zpxi',   d= wz( m[pc++]+x ))
+      case 0: op&1 ?
+             (q='zpxi',   d= wz( m[pc++]+x))
           :  (q='imm',    d= pc++);                           break;
       case 1: q='zp';     d= m[pc++];                         break;
       case 2: q='imm';    d= op&1 ? pc++ : q='';              break;
       case 3: q='abs';    d= pc; pc+= 2;                      break;
-      case 4: q='zpiy';   d= wz(m[pc++]) + y;
-             break;
+      case 4: q='zpiy';   d= wz(m[pc++]) + y;                 break;
       case 5: q='zpx';    d= (m[pc++] + x) & 0xff;            break;
       case 6: q='absy';   d= w(pc) + y; pc+= 2;               break;
       case 7: q='absx';   d= w(pc) + x; pc+= 2;               break;
@@ -524,7 +533,8 @@ if ($shortercode) {
 
 # postlude
 print "    }
-    if (trace && trace(cpu, { ic, ipc, op, f, mod, d, val: g} )) return 'quit';
+    if (trace && trace(cpu, { ic, ipc, op, f, mod, d, val: g, cyc: cyc(op)})) return 'quit';
+    cycles+= cyc(op);
   }
 }
   
@@ -543,6 +553,8 @@ function hex(n,x,r=''){for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
 function ps(i=7,v=128,r=''){for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
 function is(v){ return typeof v!=='undefined'};
 
+function cyc(op){return +('7600033032000440350004402400044066003330422044404500044024004440660003303220444035000440240004406600033042204440450004402400044006003330302044403500444024200400362033304220444045004440242044403600333032204440350004402400044036003330422044404500044024000440'[op])};
+
 function tracer(how, what) {
   let line;
   if (what == 'head') {
@@ -550,7 +562,7 @@ function tracer(how, what) {
   } else {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f:'???')+(q?q:'---')).padEnd(9, ' ')+
-      ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
+      ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+' '+what.cyc+
       (is(d)&&(d!=ipc+1)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
   }
 
@@ -694,4 +706,5 @@ if (0) {
 } // testing
 
 DEBUGGER
+
 

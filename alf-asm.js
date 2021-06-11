@@ -201,8 +201,6 @@ L('ALF'); // b79 c130 - BAD!
   TYA(); PHA(); // push Y
 
   LDYN(1); // TODO: should be 3 if a def?
-console.log('TERMINAL:', terminal);
-
   putc('>');
 
   JSRA('interpret');
