@@ -1730,3 +1730,67 @@ function ALF(alf) {
 function ALF_next(alf) {
   JSRA('ALF_next'); string(alf);
 }
+
+function binsearch() {
+  LDAN(ord('('));
+  
+  CMPN(ord('0'));
+  BEQ('number'); // x == y   same
+  BCC(')');  // x < y    lower
+  // higher
+  { // > 'o'
+    CMPN(ord('n'));
+    BEQ('negate'); // x == y   same
+    BCC('/');  // x < y    lower
+    // higher
+    { // > 'n'
+      CMPN(ord('t'));
+      BEQ('type'); // x == y   same
+      BCC('q');  // x < y    lower
+      // higher
+      { // > t'
+        //CMPN(ord('x'));
+        //BNE('error');
+        L('x');
+        // We're here! (or at some error code?)
+        RTS();
+      }
+
+      CMP(ord('r'));
+      BEQ('r'); // x == y   same
+      BCC('q');  // x < y    lower
+      // higher == 's'
+      L('s');  RTS();
+      L('r');  RTS();
+      l('t')
+
+      L('q');  RTS();
+
+
+      
+      L(')'); {
+      }
+
+      L('/'); {
+      }
+
+
+  
+    #
+    (
+ )
+    +)
+    -
+    .
+0-9
+    /%
+    <
+    >
+    a
+    m
+ n
+    q
+    r
+    s
+  t
+    x
