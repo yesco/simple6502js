@@ -23,6 +23,9 @@
 // - indirection. For cleverness 'si'
 // - is stored inside the JSRI instruction:
 
+let cpu6502 = require('./fil.js');
+let jasm = require('./jasm.js');
+
 let si = 0x21;
 
 ORG(si-1);

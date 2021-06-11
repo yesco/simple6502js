@@ -119,7 +119,7 @@ function word(name, fexpr, byte) {
   if (typeof a === 'number')
     return write(a);
   if (typeof name==='undefined')
-    throw '%% jasm: referred to undefined name';
+    throw new Error('%% jasm: referred to undefined name');
 
   backpatch[name] = backpatch[name] || [];
   // double closure: save address

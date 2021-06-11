@@ -3,11 +3,8 @@
 // 2021 (>) Jonas S Karlsson
 //       jsk@yesco.org
 //
-let cpu6502 = require('./fil.js');
+let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
-let aputc = 0xfff0;
-let aputd = 0xfff2;
-let aputs = 0xfff4;
 
 // TODO: testing!
 // use https://github.com/scotws/TaliForth2/blob/master/tests/core_a.fs ...
@@ -197,6 +194,8 @@ L('ALF'); // b79 c130 - BAD!
   TYA(); PHA(); // push Y
 
   LDYN(1); // TODO: should be 3 if a def?
+console.log('TERMINAL:', terminal);
+
   putc('>');
 
   JSRA('interpret');
@@ -206,7 +205,7 @@ L('ALF'); // b79 c130 - BAD!
   TYA();
   CLC();
   ADCN(ord('0'));
-  JSRA(aputc);
+  JSRA(terminal.aputc);
 
   // restore Y, IP from stack
   PLA(); STAZ(2); // Y
@@ -256,7 +255,7 @@ L('ALF'); // b79 c130 - BAD!
   puts("%% FAIL ( ");
   save('y', ()=>{
     LDYN(0);
-    JSRA(aputd);
+    JSRA(terminal.aputd);
   });
   puts(")\n");
   PLA(); PLA(); // ?
@@ -405,10 +404,10 @@ L('ALF'); // b79 c130 - BAD!
   drop();
 
  L('next');
-  TRACE(()=>{
+  terminal.TRACE(jasm, ()=>{
     if (showStack) {
       print(); print();
-      printstack();
+      terminal.printstack();
     }
   });
 
@@ -599,7 +598,7 @@ L('ALF'); // b79 c130 - BAD!
     },
 
     emit(){
-      LDAZX(0);  JSRA(aputc);
+      LDAZX(0);  JSRA(terminal.aputc);
       return drop_next;
     },
 
@@ -833,7 +832,7 @@ L('ALF'); // b79 c130 - BAD!
         LDAZX(2); // lo address
         LDYZX(3); // hi address
         LDXZ('tmp_x');
-        JSRA(aputs);
+        JSRA(terminal.aputs);
       });
 //    LDYZ('tmp_y'); LDXZ('tmp_x');
       return drop2_next;
@@ -849,7 +848,7 @@ L('ALF'); // b79 c130 - BAD!
       push_ay(()=>{
         LDAZX(0);
         LDYZX(1);
-        JSRA(aputd);
+        JSRA(terminal.aputd);
       });
       return drop_next;
     },
@@ -1034,7 +1033,7 @@ tabcod('CCC', {
 
   R_CR(){
     LDAN(10);
-    JSRA(aputc);
+    JSRA(terminal.aputc);
   },
 
   default(){ 
@@ -1070,7 +1069,7 @@ tabcod('###', {
         JSRA('##');
         // call ##
         putc('<');
-        LDAZX(0); LDYZX(1); JSRA(aputd);
+        LDAZX(0); LDYZX(1); JSRA(terminal.aputd);
         putc('|');
         putc(' ');
       }
@@ -1080,9 +1079,9 @@ tabcod('###', {
       drop();
       CPXN(0x03);
       BEQ('_printstack_done');
-      LDAN(ord(' ')); JSRA(aputc);
+      LDAN(ord(' ')); JSRA(terminal.aputc);
       // "."
-      LDAZX(0); LDYZX(1); JSRA(aputd);
+      LDAZX(0); LDYZX(1); JSRA(terminal.aputd);
       CPXN(0xf9);
       BCS('_printstack_next');
 
@@ -1262,8 +1261,9 @@ print("====CODELEN: ", bytes, "\n\n");
 //print(jasm.getHex(1,1,0));
 //print(jasm.getHex(0,0,0));
 
-let cpu = cpu6502.cpu6502();
+let cpu = terminal.cpu6502();
 let m = cpu.state().m;
+cpu.setTraceLevel(traceLevel);
 
 // crash and burn
 jasm.burn(m, jasm.getChunks());
@@ -1276,19 +1276,19 @@ let labels = jasm.getLabels();
 let a2l = {};
 Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 
-print('\n\nCPU.run => ', cpu.run(-1, trace, patch));
+print('\n\nCPU.run => ', cpu.run(-1));
 
 if (showMem) {
   print();
 
   cpu.dump(0x0000, 2);
   print();
-  printstack();
+  terminal.printstack();
   print();
   
   cpu.dump(0, 65536/8, 8, 1);
   print();
-  printstack();
+  terminal.printstack();
   print();
 }
 
@@ -1306,122 +1306,6 @@ if (showMem) {
 
 // --- ALForth helpers
 
-
-
-
-
-
-
-
-
-
-
-// (called after instruction)
-function trace(c, h) {
-  // quit at BRK? unless it's trapped!
-  if (h.op==0) {
-    return 'quit';
-  }
-
-  if (!traceLevel) return;
-
-  let l = a2l[h.ipc];
-  if (l) {
-    print("\n---------------> ", l);
-  }
-
-  if (traceLevel > 1)
-    cpu.tracer(cpu, h);
-  if (traceLevel > 2) {
-    cpu.dump(h.ipc,1);
-    printstack(); print("\n\n");
-  }
-
-  l = a2l[h.d];
-  if (l) {
-    print("                      @ ", l);
-  }
-}
-
-function printstack() {
-  let x = cpu.reg('x');
-  princ(`  DSTACK[${(0x101-x)/2}]: `)
-  x--;
-  while(++x < 0xff) {
-    princ(hex(4, cpu.w(x++)));
-    princ(' ');
-  }
-  print();
-}
-
-function TRACE(f) {
-  TRACE[jasm.address()] = f;
-}
-
-// install traps for putc!
-// (called before instruction)
-function patch(pc, m, cpu) {
-  (TRACE[pc] || (()=>0))();
-
-  let op= m[pc], d;
-
-  // get effective address
-  switch(op) {
-    case 0x4c: // jmpa
-    case 0x20: d= cpu.w(pc+1); break; // jsra
-    case 0x6c: d= cpu.w(cpu.w(pc+1)); break; // jmpi
-    // case 0x40: case 0x60: // TODO: rts/rti - look on stack?
-    default: return;
-  }
-
-  // traps
-  switch(d) {
-  case 0xfff0: _putc(cpu.reg('a')); break;
-  case 0xfff2: _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
-  case 0xfff4: _puts((cpu.reg('y')<<8)+cpu.reg('a'), cpu.reg('x')); break;
-  case 0xfff6: _getc(); break; // TODO:
-    ////////////////////////////////////////
-  case 0xfff8: return; // ABORT 6502C
-  case 0xfffa: return; // NMI
-  case 0xfffc: return; // RESET
-  case 0xfffe: return; // IRQ/BRK
-  default: return;
-  }
-
-  // just go to next instruction
-  cpu.reg('pc+=3'); 
-  
-  // for jsr - no need to rts
-  if (0x20) return 1; 
-
-  // if jmpa jmpi - simulate rts!
-  d= PL()+(PL()<<8);
-  cpu.reg('pc',d);
-  return 1;
-}
-
-function _putc(c) {
-  if (output) princ("OUTPUT: ");
-  process.stdout.write(chr(c));
-  if (output) print();
-}
-
-// print string from ADDRESS
-// optinal max LEN chars
-// stops if char=0 or char hi-bit set.
-function _puts(a, len=-1) {
-  if (output) princ("OUTPUT: ");
-  let c = 0;
-  while(len-- && (c < 128) && (c=m[a++]))
-    process.stdout.write(chr(c));
-  if (output) print();
-}
-
-function _putd(d) {
-  if (output) princ("OUTPUT: ");
-  process.stdout.write(''+d+' ');
-  if (output) print();
-}
   
 
 
@@ -1470,10 +1354,10 @@ function tabcod(name, list, nxt= next) {
  L(name);
 
   if (traceLevel) {
-    LDAN(ord('\n')); JSRA(aputc);
-    LDAN(ord('\n')); JSRA(aputc);
-    LDAN(ord('>')); JSRA(aputc);
-    LDAN(ord(' ')); JSRA(aputc);
+    LDAN(ord('\n')); JSRA(terminal.aputc);
+    LDAN(ord('\n')); JSRA(terminal.aputc);
+    LDAN(ord('>')); JSRA(terminal.aputc);
+    LDAN(ord(' ')); JSRA(terminal.aputc);
   }
 
   LDAIY('NEXT_BASE');
@@ -1481,8 +1365,8 @@ function tabcod(name, list, nxt= next) {
 
   if (traceLevel) {
     PHA(); {
-      JSRA(aputc);
-      LDAN(ord('\n')); JSRA(aputc);
+      JSRA(terminal.aputc);
+      LDAN(ord('\n')); JSRA(terminal.aputc);
     } PLA();
   }
 
@@ -1703,20 +1587,20 @@ function puts(s) {
     LDAZX(0xff); // length
     LDAN(l, lo);
     LDYN(l, hi);
-    JSRA(aputs);
+    JSRA(terminal.aputs);
   });
 }
   
 function putc(c) {
   LDAN(ord(c));
-  JSRA(aputc);
+  JSRA(terminal.aputc);
 }
 
 function putd(d) {
   push_ay(()=>{
     LDAZX(0);
     LDYZX(1);
-    JSRA(aputd);
+    JSRA(terminal.aputd);
   });
 }
 
@@ -1732,65 +1616,4 @@ function ALF_next(alf) {
 }
 
 function binsearch() {
-  LDAN(ord('('));
-  
-  CMPN(ord('0'));
-  BEQ('number'); // x == y   same
-  BCC(')');  // x < y    lower
-  // higher
-  { // > 'o'
-    CMPN(ord('n'));
-    BEQ('negate'); // x == y   same
-    BCC('/');  // x < y    lower
-    // higher
-    { // > 'n'
-      CMPN(ord('t'));
-      BEQ('type'); // x == y   same
-      BCC('q');  // x < y    lower
-      // higher
-      { // > t'
-        //CMPN(ord('x'));
-        //BNE('error');
-        L('x');
-        // We're here! (or at some error code?)
-        RTS();
-      }
-
-      CMP(ord('r'));
-      BEQ('r'); // x == y   same
-      BCC('q');  // x < y    lower
-      // higher == 's'
-      L('s');  RTS();
-      L('r');  RTS();
-      l('t')
-
-      L('q');  RTS();
-
-
-      
-      L(')'); {
-      }
-
-      L('/'); {
-      }
-
-
-  
-    #
-    (
- )
-    +)
-    -
-    .
-0-9
-    /%
-    <
-    >
-    a
-    m
- n
-    q
-    r
-    s
-  t
-    x
+}
