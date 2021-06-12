@@ -20,8 +20,8 @@ function chr(c) { return String.fromCharCode(c) }
 //process.exit(0);
 
 function next() {
-  // BRK(); but doen't work for now
-  JMPA('NEXT');
+  // BRK(); but doen't work for now but preffered = 1 byte
+  JMPA('NEXT'); // 3 bytes :-(
 }
 
 let last;
@@ -99,52 +99,60 @@ ORG(start);
 // there own OP-codes we're just editing! Here is editor commands!
 //
 // Basically, all these words are "IMMEDIATE"
+L('redisplay');
+  TYA(),PHA(); {
+    LDAN(ord('\n')),JSRA(putc);
+    LDXN(0xff);
+    LDAN(S, lo), LDYN(S, hi), JSRA(puts);
+  } PLA(), TAY();
+  LDAN(0);
+  BEQ('compiling');
+L('BackSpace');
+  JSRA(putc);
+  //CPYN(1),BMI('NEXT');
+  CPYN(2),BMI('compiling');
+  DEY()
+  LDAN(0x20),JSRA(putc),
+  LDAN(0x08),JSRA(putc),
+  LDAN(0),STAAY(S), // null out last char
+  JMPA('compiling');
+L('waitkey'),
+  JSRA(getc),
+  BEQ('waitkey'),
+
 L('compiling');
-  if(0)
+  if(1)
   terminal.TRACE(jasm, ()=>{
+    return;
+    process.stdout.write('['+cpu.reg('a')+']');
+    return;
     console.log('compiling', {
     });
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  def(0x08); { // BackSpace key!
-    CPYN(1),BMI('NEXT'),
-    DEY()
-    PHA(),LDAN(0x20),JSRA(putc),PLA(),
-    JSRA(putc),
-    LDAN(0),STAAY(S),
-    JMPA('compiling');
-  }
-  def(12); { // CTRL-L redisplay
-    TYA(); PHA();
-    LDAN(ord('\n')); JSRA(putc);
-    LDXN(0xff);
-    LDAN(S, lo);
-    LDYN(S, hi);
-    JSRA(puts);
-    PLA(); TAY();
-    LDAN(0);
-    JMPA('compiling');
-  }
-  def(';'); DECA('state');                     // ; end def
-  def('['); INCA('state');                     // [
-  def(']'); DECA('state');                     // ]
-  def(0x00); { // nothing, wait for key!
-    NOP(), // toa mek different address for label!
-    L('waitkey'),
-    JSRA(getc),
-    BEQ('waitkey'),
-    
-    // echo
-    PHA(),JSRA(putc),PLA(),
-    JMPA('compiling');
-  }    
+  def(0x7f); LDAN(0x08),BNE('BackSpace');      // DEL // TODO: not working
+  def(0x08); BEQ('BackSpace');                 // BS
+  def(12);   JMPA('redisplay');                // CTRL-L redisplay
+  def(';');  DECA('state');                    // ; end def
+  def('[');  INCA('state');                    // [
+  def(']');  DECA('state');                    // ]
+  def(0x00); JMPA('waitkey');                  // nothing, wait for key!
   enddef();
 
+  
+  // echo TODO: not of control chars? lol, good for BS...
+  JSRA(putc)
+  //JMPA('compiling');
   // stuff the key in memory!
+  terminal.TRACE(jasm, ()=>{
+    return;
+    cpu.dump(S, 16);
+    console.log("STATE:",  m[jasm.getLabels().state]);
+  });
+
   STAAY(S);
 
-  next();
   // TODO: search for words... if user can define IMMEDIATE?
   //BRK(); // next (can't just fallthroug: gunk removed...)
 
@@ -157,6 +165,7 @@ L('NEXT');
 L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
+    //process.stdout.write('.');
     if (1) return;
     let ss= jasm.getLabels()['state'];;
     if (1)
@@ -180,7 +189,6 @@ L('interpret'); // A has our word
 
   // -- "interpretation" or running
 
-  last= undefined;
   // same "minimal" 8 as sectorforth!
   def('@'); PLA(),TAX(),LDAAX(S),PHA();        // @
   def('!'); PLA(),TAX(),PLA(),STAAX(S);        // !
@@ -190,10 +198,10 @@ L('interpret'); // A has our word
   def('+'); PLA(),TSX(),ADCAX(S+1),STAAX(S+1); // +
   def('N'); PLA(),TSX(),ANDAX(S+1),EORN(0xff),STAAX(S+1); // Nand
   // ... and it also defines these
-  def('b'); next()                               // Bye
-  //def('B'); LDAN('tib'),PHA();                 // tiB
+  def('b'); next()                             // Bye
+  //def('B'); LDAN('tib'),PHA();               // tiB
   def('T'); LDAA('state'),PHA();               // sTate
-  //def('I'); LDAN('>in'),PHA();                 // >In
+  //def('I'); LDAN('>in'),PHA();               // >In
   def('h'); LDAAX('here'),PHA();               // Here
   def('L'); LDAAX('latest'),PHA();             // Latest
   def('K'); L('K'),JSRA(getc),BEQ('K'),PHA();  // Key
@@ -208,6 +216,10 @@ L('interpret'); // A has our word
   def(';'); PLA(),TAY();                       // EXIT word ("RTS")
   def(0x00); INCA('state');
   enddef();
+
+// TODO: remove
+next();
+
   L('ENTER_not_a_primitive_try_user_defined');
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
   STXA('token');
@@ -249,8 +261,8 @@ L('found');
   }
   function compile() {
   }
-}
 
+}
 
 ////////////////////////////////////////
 // RUN

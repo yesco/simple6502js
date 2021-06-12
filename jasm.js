@@ -218,7 +218,7 @@ function rel(name, f) {
     a = f ? f(a) : a;
     let b = a - address - 1;
     //console.log("REL: ", address, a, b);
-    if (b < -128 || b > 127) throw Error(`%% Branch to label ${name} too far (${b})`);
+    if (b < -128 || b > 127) throw Error(`%% Branch to label '${name}' too far (${b})`);
     return b & 0xff;
   })(address)); // capture current addr
 }
@@ -386,6 +386,8 @@ function dgen(delta, s, base) {
   delete global.JMPAY;
   delete global.JMPIY;
   delete global.JMPN;
+  delete global.JMP;
+  delete global.JSR;
 }
 function gen(s, base) {
   dgen(1 << 5, s, base);
