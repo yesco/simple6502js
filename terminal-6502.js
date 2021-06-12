@@ -14,7 +14,10 @@ function TRACE(jasm, f) {
 
 function _putc(c) {
   if (this.output) princ("OUTPUT: ");
-  process.stdout.write(chr(c));
+  if (typeof c==='number')
+    process.stdout.write(chr(c));
+  else
+    process.stdout.write(''+c);
   if (this.output) print();
 }
 
@@ -100,18 +103,25 @@ process.stdin.on('keypress', (str, key) => {
 // 100 times a second
 //setInterval(sendKey, 10);
 
+// TODO: some shit going on here with
+// object scope and this???
+var a2l;
 
 
+function ord(c) { return c.charCodeAt(0)}
+function chr(c) { return String.fromCharCode(c)}
+function print(...r) { return console.log(...r)}
+function princ(s) { return process.stdout.write(''+s);}
 
-function chr(c) { return String.fromCharCode(c) }
+
 
 // extend and patch
 let tcpu = {
   ...cpu6502,
   // extend
-  aputc,
-  aputd,
-  aputs,
+  aputc, _putc,
+  aputd, _putd,
+  aputs, _puts,
   agetc,
 
   TRACE,
@@ -126,6 +136,7 @@ let tcpu = {
       traceLevel: 0,
       setTraceLevel(n) {
         this.traceLevel = n;
+        console.log("SET: ", this.traceLevel);
       },
 
       output: 0,
@@ -133,23 +144,17 @@ let tcpu = {
         this.output = n;
       },
 
-      timer: undefined,
-
-      // patch extend
-      run(count=-1, trace, patch) {
-        trace = this.tracer || trace;
-        patch = this.patch || patch;
-
-        if (count < 0) { // would block
-
-          this.timer = setInterval(function(){
-            cpu.run(1000, trace, patch);
-          }, 10);
-          
-        } else {
-          return cpu.run(count, tracer, patch);
-        }
+      a2l: undefined,
+      setLabels(l) {
+        // generate symbol information
+        this.labels = l;
+        this.a2l = {};
+        Object.keys(l).forEach(k=>
+          this.a2l[l[k]]= k);
+        a2l = this.a2l;
       },
+
+      timer: undefined,
 
       stop() {
         if (!timer) return;
@@ -159,28 +164,35 @@ let tcpu = {
       },
       // (called after instruction)
       tracer(c, h) {
+        //console.log("SET: ", this.traceLevel);
+        //console.log("TRACER");
+        this.traceLevel = 2;
         // quit at BRK? unless it's trapped!
-        if (h.op==0) {
-          return 'quit';
-        }
+//        if (h.op==0) {
+//          return 'quit';
+//        }
 
         if (!this.traceLevel) return;
-
-        let l = a2l[h.ipc];
-        if (l) {
-          print("\n---------------> ", l);
-        }
 
         if (this.traceLevel > 1)
           cpu.tracer(cpu, h);
         if (this.traceLevel > 2) {
           cpu.dump(h.ipc,1);
-          printstack(); print("\n\n");
+          this.printstack(); print("\n\n");
         }
 
-        l = a2l[h.d];
-        if (l) {
-          print("                      @ ", l);
+        // WTF?
+        if (this.a2l) {
+          l = this.a2l[h.d];
+          if (l) {
+            print("                      @ ", l);
+          }
+        }
+        if (a2l) {
+          l = a2l[h.d];
+          if (l) {
+            print("                      @ ", l);
+          }
         }
       },
 
@@ -198,9 +210,25 @@ let tcpu = {
       // install traps for putc!
       // (called before instruction)
       patch(pc, m, cpu) {
+        //console.log("SET: ", this.traceLevel);
+        //console.log("PATCH");
         (TRACE[pc] || (()=>0))();
 
         let op= m[pc], d;
+
+        // WTF?
+        if (this.a2l) {
+          let l = this.a2l[pc];
+          if (l) {
+            print("\n---------------> ", l);
+          }
+        }
+        if (a2l) {
+          let l = a2l[pc];
+          if (l) {
+            print("\n---------------> ", l);
+          }
+        }
 
         // get effective address
         switch(op) {
@@ -244,6 +272,22 @@ let tcpu = {
         d= PL()+(PL()<<8);
         cpu.reg('pc',d);
         return 1;
+      },
+
+      // patch extend
+      run(count=-1, trace, patch) {
+        trace = this.tracer || trace;
+        patch = this.patch || patch;
+
+        if (count < 0) { // would block
+
+          this.timer = setInterval(function(){
+            cpu.run(1000, trace, patch);
+          }, 10);
+          
+        } else {
+          return cpu.run(count, trace, patch);
+        }
       },
 
     };

@@ -1278,6 +1278,7 @@ cpu.reg('pc', start);
 
 // generate symbol information
 let labels = jasm.getLabels();
+cpu.setLabels(labels);
 let a2l = {};
 Object.keys(labels).forEach(k=>a2l[labels[k]]=k);
 

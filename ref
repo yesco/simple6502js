@@ -1,1 +1,3 @@
 grep -inP "\b$1\b" ../AutomaticLettering/ORIC/6502.txt-other
+#grep -i "$1" op-mnc-mod.lst
+grep -i "$1" opcodes.lst

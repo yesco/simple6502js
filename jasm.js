@@ -102,7 +102,7 @@ function word(name, fexpr, byte) {
 
   function maybewarn(v, addr) {
     if (byte && hi(v))
-      throw `%% Warning: @ ${hex(4, addr)} write of (${hex(4,v)}) trunacted to byte using name='${name}'!\n`+(fexpr?'FUNCTION: '+fexpr.toString():'');
+      throw Error(`%% Warning: @ ${hex(4, addr)} write of (${hex(4,v)}) truncated to byte using name='${name}'!\n`+(fexpr?'FUNCTION: '+fexpr.toString():''));
   }
 
   function write(v, init) {
@@ -218,7 +218,7 @@ function rel(name, f) {
     a = f ? f(a) : a;
     let b = a - address - 1;
     //console.log("REL: ", address, a, b);
-    if (b < -128 || b > 127) throw `%% Branch to label ${name} to far (${b})`;
+    if (b < -128 || b > 127) throw Error(`%% Branch to label ${name} too far (${b})`);
     return b & 0xff;
   })(address)); // capture current addr
 }
@@ -541,9 +541,17 @@ function burn(m, chunks) {
 // need to use the '.' notation when accessing
 // them.
 
+// used to access hi byte (next byte)
+function inc(a) { return a+1 }
+
+let gencount= 0;
+function gensym(prefix) {
+  return prefix + '_' + gencount++;
+}
+
 module.exports =
   global.j6502 =
-  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, chars, string, pascal, hibit, OMG, rel, burn, clear };
+  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, chars, string, pascal, hibit, OMG, rel, burn, clear, gensym, inc };
 
 global.ORG = ORG;
 global.allot = allot;
@@ -561,8 +569,10 @@ global.hibit = hibit;
 global.OMG = OMG;
 
 global.label = label; global.L = L;
+global.gensym = gensym;
 
 global.addr = addr; global.ORG = ORG;
+global.inc = inc;
 global.hex = hex;
 global.lo = lo;
 global.hi = hi;

@@ -14,17 +14,17 @@
 #
 %modes = (
     'acc', ' ', # lol: true!
-    'imm', 'pc++',
-    'zp',  'm[pc++]',
+    'imm', 'd= pc++',
+    'zp',  'd= m[ pc++]',
      #zpy is zpx but for STX it's senseless
-    'zpx', '((m[pc++] + x)& 0xff)',
-    'zpy', '((m[pc++] + y)& 0xff)',
-    'abs', 'w((pc+=2)-2)',
-    'absx', 'w((pc+=2)-2) + x',
-    'absy', 'w((pc+=2)-2) + y',
-    'zpi',  'wz(m[pc++])', # 6502C?
-    'zpxi', '(wz( m[pc++]+x ))',
-    'zpiy', '( wz(m[pc++]) + y )',
+    'zpx', 'd= ((m[ pc++] + x)& 0xff)',
+    'zpy', 'd= ((m[ pc++] + y)& 0xff)',
+    'abs', 'd= w( (pc+=2)-2)',
+    'absx', 'd= w( (pc+=2)-2) + x',
+    'absy', 'd= w( (pc+=2)-2) + y',
+    'zpi',  'd= wz( m[pc++])', # 6502C?
+    'zpxi', 'd= (wz( m[pc++]+x ))',
+    'zpiy', 'd= ( wz( m[pc++]) + y )',
 );
 
 # instructions to generated code
@@ -56,9 +56,9 @@
 #  uint16_t result = regs.y - mem_read(addr);
 #
 #  regs.p.c = result > 255;
-    'cmp', 'n(z(c( a - (g= MEM))))',
-    'cpx', 'n(z(c( x - (g= MEM))))',
-    'cpy', 'n(z(c( y - (g= MEM))))',
+    'cmp', 'sc(0 >= n(z(g= a - (MEM))))',
+    'cpx', 'sc(0 >= n(z(g= x - (MEM))))',
+    'cpy', 'sc(0 >= n(z(g= y - (MEM))))',
 
     'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1)))',
     'asl_a', 'g=       a= n(z(c(       a << 1)))',
