@@ -106,6 +106,7 @@ process.stdin.on('keypress', (str, key) => {
 // TODO: some shit going on here with
 // object scope and this???
 var a2l;
+var traceLevel;
 
 
 function ord(c) { return c.charCodeAt(0)}
@@ -133,9 +134,10 @@ let tcpu = {
 
       orig_cpu: cpu,
       
+      // Doesn't seem to be this.traceLevel forall...
       traceLevel: 0,
       setTraceLevel(n) {
-        this.traceLevel = n;
+        traceLevel = this.traceLevel = n;
         console.log("SET: ", this.traceLevel);
       },
 
@@ -162,40 +164,8 @@ let tcpu = {
         timer = undefined;
         return true;
       },
-      // (called after instruction)
-      tracer(c, h) {
-        //console.log("SET: ", this.traceLevel);
-        //console.log("TRACER");
-        this.traceLevel = 2;
-        // quit at BRK? unless it's trapped!
-//        if (h.op==0) {
-//          return 'quit';
-//        }
 
-        if (!this.traceLevel) return;
-
-        if (this.traceLevel > 1)
-          cpu.tracer(cpu, h);
-        if (this.traceLevel > 2) {
-          cpu.dump(h.ipc,1);
-          this.printstack(); print("\n\n");
-        }
-
-        // WTF?
-        if (this.a2l) {
-          l = this.a2l[h.d];
-          if (l) {
-            print("                      @ ", l);
-          }
-        }
-        if (a2l) {
-          l = a2l[h.d];
-          if (l) {
-            print("                      @ ", l);
-          }
-        }
-      },
-
+      // not found by others by this.prinstack?
       printstack() {
         let x = cpu.reg('x');
         princ(`  DSTACK[${(0x101-x)/2}]: `)
@@ -205,6 +175,42 @@ let tcpu = {
           princ(' ');
         }
         print();
+      },
+
+      // (called after instruction)
+      tracer(c, h) {
+        //console.log("SET: ", this.traceLevel);
+        //console.log("TRACER");
+
+        // quit at BRK? unless it's trapped!
+//        if (h.op==0) {
+//          return 'quit';
+//        }
+
+        //if (!this.traceLevel) return;
+        if (!traceLevel) return;
+
+        if (traceLevel > 1)
+          cpu.tracer(cpu, h);
+        if (traceLevel > 2) {
+          cpu.dump(h.ipc,1);
+          // this.prinstack not work
+          //printstack(); print("\n\n");
+        }
+
+        // WTF?
+        if (this.a2l && traceLevel) {
+          l = this.a2l[h.d];
+          if (l) {
+            print("                      @ ", l);
+          }
+        }
+        if (a2l && traceLevel) {
+          l = a2l[h.d];
+          if (l) {
+            print("                      @ ", l);
+          }
+        }
       },
 
       // install traps for putc!
@@ -217,13 +223,13 @@ let tcpu = {
         let op= m[pc], d;
 
         // WTF?
-        if (this.a2l) {
+        if (this.a2l && traceLevel) {
           let l = this.a2l[pc];
           if (l) {
             print("\n---------------> ", l);
           }
         }
-        if (a2l) {
+        if (a2l &&  traceLevel) {
           let l = a2l[pc];
           if (l) {
             print("\n---------------> ", l);

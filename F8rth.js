@@ -8,6 +8,7 @@ let jasm = require('./jasm.js');
 
 let putc = terminal.aputc;
 let putd = terminal.aputd;
+let puts = terminal.aputs;
 let getc = terminal.agetc;
 
 let start = 0x501;
@@ -52,7 +53,6 @@ function enddef() {
 ////////////////////////////////////////
 //  TEST
 function test() {
-  let getc = terminal.agetc;
 
 ORG(0x0100); // This is ALL of our (user) memory!
 
@@ -100,19 +100,53 @@ ORG(start);
 //
 // Basically, all these words are "IMMEDIATE"
 L('compiling');
+  if(0)
   terminal.TRACE(jasm, ()=>{
     console.log('compiling', {
     });
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  def(0x08); DEY();                            // BackSpace key!
+  def(0x08); { // BackSpace key!
+    CPYN(1),BMI('NEXT'),
+    DEY()
+    PHA(),LDAN(0x20),JSRA(putc),PLA(),
+    JSRA(putc),
+    LDAN(0),STAAY(S),
+    JMPA('compiling');
+  }
+  def(12); { // CTRL-L redisplay
+    TYA(); PHA();
+    LDAN(ord('\n')); JSRA(putc);
+    LDXN(0xff);
+    LDAN(S, lo);
+    LDYN(S, hi);
+    JSRA(puts);
+    PLA(); TAY();
+    LDAN(0);
+    JMPA('compiling');
+  }
   def(';'); DECA('state');                     // ; end def
   def('['); INCA('state');                     // [
   def(']'); DECA('state');                     // ]
+  def(0x00); { // nothing, wait for key!
+    NOP(), // toa mek different address for label!
+    L('waitkey'),
+    JSRA(getc),
+    BEQ('waitkey'),
+    
+    // echo
+    PHA(),JSRA(putc),PLA(),
+    JMPA('compiling');
+  }    
   enddef();
+
+  // stuff the key in memory!
+  STAAY(S);
+
+  next();
   // TODO: search for words... if user can define IMMEDIATE?
-  BRK(); // next (can't just fallthroug: gunk removed...)
+  //BRK(); // next (can't just fallthroug: gunk removed...)
 
 L('NEXT');
 //  PLP(),PLP(),PLP(); // drop BRK crap
@@ -123,8 +157,9 @@ L('NEXT');
 L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
+    if (1) return;
     let ss= jasm.getLabels()['state'];;
-    if (0)
+    if (1)
     console.log('----------interpret', {
       '#': cpu.reg('a'),
       A: chr(cpu.reg('a')),
@@ -134,10 +169,11 @@ L('interpret'); // A has our word
     //cpu.dump(ss);
   });
 
-  LDAA('state');
+  LDXA('state');
   BNE('compiling');
 
   terminal.TRACE(jasm, ()=>{
+    if (1) return;
     console.log('interpret.interpret', {
     });
   });
@@ -170,7 +206,7 @@ L('interpret'); // A has our word
   def('\\'); PLA(),PHA(),PHA();                // drop
   def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA(); // Swap
   def(';'); PLA(),TAY();                       // EXIT word ("RTS")
-  def(0x00); JSRA(getc),PHA(),DEY();           // at end... no input: wait for key!
+  def(0x00); INCA('state');
   enddef();
   L('ENTER_not_a_primitive_try_user_defined');
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
@@ -229,8 +265,14 @@ jasm.burn(m, jasm.getChunks());
 console.log({start});
 
 // debug stuff
-cpu.setLabels(jasm.getLabels());
-cpu.setTraceLevel(3);
+let labels = jasm.getLabels();
+delete labels.waitkey;
+cpu.setLabels(labels);
+
+cpu.setTraceLevel(2);
+cpu.setTraceLevel(1);
+cpu.setTraceLevel(0);
+
 cpu.setOutput(1);
 
 cpu.reg('pc', start);
