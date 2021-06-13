@@ -5,6 +5,31 @@
 //          (>) 2021 Jonas S Karlsson
 //                jsk@yesco.org
 //
+// Preimise:
+// - looking at sectorforth, other x86 etc 
+//   it seems too easy to make an 16 bit on 16.
+// - So, I wanted to make a PURE 8-bit Forth.
+// = a mini-variant of ALF (ALphabetic Forth)
+// - How "small" can it get?
+//
+// Peculiarities:
+// - 8 bit can only address 2^8 = 256 bytes.
+// - The page is the fixed STACK page 0x0100!
+// - The stack ops are used for data
+//   (compared to a ZP-stack, less INC*2,DEC*2)
+// - Data stack is small, Return is very smaller.
+// - Y register is "ip" (in 0x100 page)
+// - A register keeps TOS (Top Of Stack)
+//   (this works out as all action is in A)
+// - X register stores the token (can trash)
+
+// History:
+// - started out minimal with sectoforth style
+// - added more words
+// - added editors in compile mode (= edit)
+// - def(8, jmp) = saved 7*3 (in chained)
+// - A is TOS, X is token, 15 ops saved 30B (489)
+
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
@@ -41,20 +66,19 @@ function def(a, optJmp) {
 
   L(gensym('test_'+a+'_$'+cpu.hex(2,aa)));
 
-  CMPN(aa);
+  CPXN(aa);
   if (optJmp) {
 
-    L(match);
     BEQ(optJmp);
     last= undefined; // ! supress
 
   } else {
     
-    L(match);
     BNE(tryother);
     last= tryother;
     // the words def comes after
     // ... till the next def!
+    L(match);
   }
 }
 
@@ -136,8 +160,13 @@ L('BackSpace');
   LDAN(0),STAAY(S), // null out last char
   JMPA('compiling');
 L('waitkey'),
+  PHA();
+L('_waitkey');
   JSRA(getc),
-  BEQ('waitkey'),
+  TAX();
+  BEQ('_waitkey'),
+  PLA();
+  // X now contains keystroke, A retains TOS
 
 L('compiling');
   if(1)
@@ -160,11 +189,13 @@ L('compiling');
   enddef();
 
   // echo TODO: not of control chars? lol, good for BS...
-  JSRA(putc)
+  PHA(); TXA();
+  JSRA(putc);
   //JMPA('compiling');
   // stuff the key in memory!
 
   STAAY(S);
+  PLA();
 
   terminal.TRACE(jasm, ()=>{
     return;
@@ -182,20 +213,25 @@ L('NEXT');
   if (brk) { PLP(),PLP(),PLP() } // drop BRK crap
 
   INY();
-  LDAAY(S);
+  LDXAY(S);
+  print("LDXAY", LDXAY.toString());
+  print("LDYAX", LDYAX.toString());
 
 L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
+    return;
     //process.stdout.write('.');
     //if (1) return;
     let ss= jasm.getLabels()['state'];;
     console.log('interpret', {
       Y: hex(2,cpu.reg('y')),
+      X: chr(cpu.reg('x')),
       A: chr(cpu.reg('a')),
       '#': cpu.reg('a'),
       state: m[ss],
     });
+    //cpu.printStack();
     //cpu.dump(ss);
   });
 
@@ -205,11 +241,11 @@ L('interpret'); // A has our word
   terminal.TRACE(jasm, ()=>{
     //if (1) return;
     console.log('--interpret', {
-      A: chr(cpu.reg('a')),
+      X: chr(cpu.reg('x')),
     });
   });
 
-  // TODO: those wanting TSX could share...
+  // TODO: those wanting PLP,TSX could share...
 
   // -- "interpretation" or running
   // LOL: we incstate by dec!
@@ -218,46 +254,49 @@ L('interpret'); // A has our word
   def(']'); L('decstate'),INCA('state');
 
   // same "minimal" 8 as sectorforth!
-  def('@'); PLA(),TAX(),LDAAX(S),PHA();
-  def('!'); PLA(),TAX(),PLA(),STAAX(S);
-  def('S'); TSX(),TXA(),PHA();
-  def('R'); LDAZ('rp',lo),PHA();
-  def('z'); PLA(),ORAN(0xff),PHA();
+  def('@'); TAX(),LDAAX(S);
+  def('!'); TAX(),PLA();
+  def('S'); TSX(),TXA();
+  def('R'); LDAZ('rp',lo);
+  def('z'); ORAN(0xff);
 
-  def('+'); PLA(),TSX(),CLC(),ADCAX(S+1),STAAX(S+1);
-  def('-'); PLA(),TSX(),SEC(),SBCAX(S+1),STAAX(S+1);
-  def('&'); PLA(),TSX(),      ANDAX(S+1),STAAX(S+1);
-  def('|'); PLA(),TSX(),      ORAAX(S+1),STAAX(S+1);
-  def('^'); PLA(),TSX(),      EORAX(S+1),STAAX(S+1);
-  def('~'); PLA(),EORN(0x44),PHA();
+  def('+'); PLP(),TSX(),CLC(),ADCAX(S+1);
+  def('-'); PLP(),TSX(),SEC(),SBCAX(S+1);
+  def('&'); PLP(),TSX(),      ANDAX(S+1);
+  def('|'); PLP(),TSX(),      ORAAX(S+1);
+  def('^'); PLP(),TSX(),      EORAX(S+1);
+  def('~'); EORN(0x44);
   // :~dN;
   // :&N~;
   // :|~s~N;
 
-  def('N'); PLA(),TSX(),ANDAX(S+1),EORN(0xff),STAAX(S+1);
+  def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
   // ... and it also defines these
-  //def('B'); LDAN('tib'),PHA();
-  //def('T'); LDAA('state'),PHA();
-  //def('I'); LDAN('>in'),PHA();
-  def('h'); LDAAX('here'),PHA();
-  def('L'); LDAAX('latest'),PHA();
-  def('K'); L('K'),JSRA(getc),BEQ('K'),PHA();
-  def('e'); PLA(),JSRA(putc);
+  //def('B'); PHA(),LDAN('tib');
+  //def('T'); PHA(),LDAA('state');
+  //def('I'); PHA(),LDAN('>in');
+  def('h'); PHA(),LDAAX('here');
+  def('L'); PHA(),LDAAX('latest');
+  def('K'); PHA(),L('K'),JSRA(getc),BEQ('K');
+  def('e'); JSRA(putc),PLA();
 
   //def(':'); colon(),INCA('state');
   //def('C'); compile();
-  def('x'); PLA(),JMPA('interpret');       
+
+  def('x'); TAX(),PLA(),JMPA('interpret');
+
   // --- jsk additions
-  // TODO: all words that start with PLA...
-  def('d'); PLA(),PHA(),PHA();
-  def('\\'); PLA(),PHA(),PHA();
-  def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA();
-  def('.'); PLA(),STYA('token'),LDYN(0),JSRA(putd),LDYA('token');
-  def(';'); PLA(),TAY();
+  def('d'); PHA();
+  def('\\'); PLA();
+  def('s'); TSX(),EORAX(S+1),EORA(S+1),STAA(S+1),EORA(S+1); // b13 c18
+  //def('s'); STYA('token'),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),LDYA('token'); // b10 c23
+  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token');
+  def(';'); TAY(),PLA();
   enddef();
   // assume it's a number, lol
   // TODO: check
-  SEC(),SBCN(ord('0')),PHA();
+  L('number');
+  PHA(),TXA(),SEC(),SBCN(ord('0'));
 
 // TODO: remove
 next();
@@ -323,11 +362,12 @@ let labels = jasm.getLabels();
 delete labels.waitkey;
 cpu.setLabels(labels);
 
-cpu.setTraceLevel(2);
 cpu.setTraceLevel(1);
+cpu.setTraceLevel(2);
 cpu.setTraceLevel(0);
 
 cpu.setOutput(1);
+cpu.setOutput(0);
 
 cpu.reg('pc', start);
 cpu.run(-1);

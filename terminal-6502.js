@@ -14,20 +14,23 @@ function TRACE(jasm, f) {
 
 let output= 0;
 
-function _putc(c) {
-  if (output) princ("OUTPUT: ");
-  if (typeof c==='number')
-    process.stdout.write(chr(c));
+function _putc(ch) {
+  if (typeof ch==='number')
+    c = chr(ch);
   else
-    process.stdout.write(''+c);
-  if (output) print();
+    ch = ord(c);
+
+  if (output) princ("OUTPUT.c: ");
+  process.stdout.write(c);
+  if (output)
+    print(`    (\${hex(2,ch)})`);
 }
 
 // print string from ADDRESS
 // optinal max LEN chars
 // stops if char=0 or char hi-bit set.
 function _puts(a, len=-1, m) {
-  if (output) princ("OUTPUT: ");
+  if (output) princ("OUTPUT.s: ");
   let c = 0;
   while(len-- && (c < 128) && (c=m[a++]))
     process.stdout.write(chr(c));
@@ -35,7 +38,7 @@ function _puts(a, len=-1, m) {
 }
 
 function _putd(d) {
-  if (output) princ("OUTPUT: ");
+  if (output) princ("OUTPUT.d: ");
   process.stdout.write(''+d+' ');
   if (output) print();
 }
@@ -140,7 +143,7 @@ let tcpu = {
 
       output: 0,
       setOutput(n) {
-        this.output = n;
+        output = n;
       },
 
       a2l: undefined,
