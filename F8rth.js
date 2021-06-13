@@ -19,9 +19,15 @@ let start = 0x501;
 // TODO: if not this, hang!
 //process.exit(0);
 
+let brk= 0;
 function next() {
-  // BRK(); but doen't work for now but preffered = 1 byte
-  JMPA('NEXT'); // 3 bytes :-(
+  if (brk) {
+    // use only 1 saves 2 bytes!
+    // (little slower)
+    BRK();
+  } else {
+    JMPA('NEXT'); // 3 bytes :-(
+  }
 }
 
 let last;
@@ -84,7 +90,7 @@ ORG(S+ 0xfd); L('state');
 ORG(S+ 0xfe); L('sp'); // TODO: maybe not?
 ORG(S+ 0xff); L('rp');
 
-ORG(S); string('34+.');
+ORG(S); string('3d.4d.+.');
 
 // separate code (ROM) & RAM
 // == Harward Architecture
@@ -105,8 +111,7 @@ ORG(start);
 
   // init state of interpreter
   LDAN(0xff); TAY(); // ip! -1 since we'll INY()
-  LDAN(0); // wait for key!
-  JMPA('interpret');
+  next();
 
 // -- state is true thus we're "compiling" for letters that are
 // there own OP-codes we're just editing! Here is editor commands!
@@ -122,11 +127,12 @@ L('redisplay');
   BEQ('compiling');
 L('BackSpace');
   CPYN(1),BMI('NEXT');
+  LDAN(8);
   JSRA(putc);
   //CPYN(2),BMI('compiling');
   DEY()
-  LDAN(0x20),JSRA(putc),
-  LDAN(0x08),JSRA(putc),
+  LDAN(32),JSRA(putc),
+  LDAN(8),JSRA(putc),
   LDAN(0),STAAY(S), // null out last char
   JMPA('compiling');
 L('waitkey'),
@@ -144,7 +150,7 @@ L('compiling');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  def(0x7f); LDAN(0x08),BNE('BackSpace');     // DEL // TODO: not working
+  def(0x7f, 'BackSpace');                     // DEL // TODO: not working
   def(0x08, 'BackSpace');                     // BS
   def(12, 'redisplay');                       // CTRL-L redisplay
   def(';', 'decstate');                       // ; end def
@@ -167,10 +173,12 @@ L('compiling');
   STAAY(S);
 
   // TODO: search for words... if user can define IMMEDIATE?
-  //BRK(); // next (can't just fallthroug: gunk removed...)
+
+  // next (can't just fallthroug: gunk removed...)
+  if (brk) BRK();
 
 L('NEXT');
-//  PLP(),PLP(),PLP(); // drop BRK crap
+  if (brk) { PLP(),PLP(),PLP() } // drop BRK crap
 
   INY();
   LDAAY(S);
@@ -181,11 +189,11 @@ L('interpret'); // A has our word
     //process.stdout.write('.');
     //if (1) return;
     let ss= jasm.getLabels()['state'];;
-    if (1)
-    console.log('--interpret', {
-      '#': cpu.reg('a'),
+    console.log('interpret', {
+      Y: hex(2,cpu.reg('y')),
       A: chr(cpu.reg('a')),
-      state: cpu.hex(2,m[ss]),
+      '#': cpu.reg('a'),
+      state: m[ss],
     });
     //cpu.dump(ss);
   });
@@ -207,10 +215,10 @@ L('interpret'); // A has our word
   // same "minimal" 8 as sectorforth!
   def('@'); PLA(),TAX(),LDAAX(S),PHA();        // @
   def('!'); PLA(),TAX(),PLA(),STAAX(S);        // !
-  def('S'); TXA(),PHA();                       // sp@
-  def('R'); LDAZ('rp', lo),PHA();              // rp@
+  def('S'); TSX(),TXA(),PHA();                 // sp@
+  def('R'); LDAZ('rp',lo),PHA();               // rp@
   def('z'); PLA(),ORAN(0xff),PHA();;           // 0=
-  def('+'); PLA(),TSX(),ADCAX(S+1),STAAX(S+1); // +
+  def('+'); PLA(),TSX(),CLC(),ADCAX(S+1),STAAX(S+1); // +
   def('N'); PLA(),TSX(),ANDAX(S+1),EORN(0xff),STAAX(S+1); // Nand
   // ... and it also defines these
   def('b'); next()                             // Bye
@@ -224,7 +232,8 @@ L('interpret'); // A has our word
   def(':'); colon(),INCA('state');             // :
   def('C'); compile();                         // Compile
   def('x'); PLA(),                             // eXecute
-  // jsk additions
+  // --- jsk additions
+  // TODO: all words that start with PLA...
   def('d'); PLA(),PHA(),PHA();                 // Dup
   def('\\'); PLA(),PHA(),PHA();                // drop
   def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA(); // Swap
