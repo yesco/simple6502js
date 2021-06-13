@@ -8,6 +8,10 @@
 # consider testing using:
 # - https://github.com/pmonta
 
+# TODO: illegal instructions that HLT or freeze
+#
+# http://ist.uwaterloo.ca/~schepers/MJK/ascii/65xx_ill.txt
+
 # address calculation of argument
 # (this is intended to be used inline, so cannot have second expression
 #  there (pc+=2)-2: there is no post add 2... (pc++++)
