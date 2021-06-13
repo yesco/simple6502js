@@ -1,8 +1,11 @@
+//      -*- truncate-lines: true; -*-
+//
 //               READLINE-65
 // 
 //          (>) 2021 Jonas S Karlsson
 //                jsk@yesco.org
 //
+let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
 
@@ -12,9 +15,6 @@ let puts = terminal.aputs;
 let getc = terminal.agetc;
 
 let start = 0x501;
-
-function ord(c) { return c.charCodeAt(0) }
-function chr(c) { return String.fromCharCode(c) }
 
 // TODO: if not this, hang!
 //process.exit(0);
@@ -26,21 +26,32 @@ function next() {
 
 let last;
 
-function def(a) {
+function def(a, optJmp) {
   let aa = typeof a==='string'? ord(a) : a;
   let tryother = gensym('is_not_'+a+'_$'+cpu.hex(2,aa));
+  let match = gensym('MATCH_'+a+'_$'+cpu.hex(2,aa));
 
   enddef();
 
   L(gensym('test_'+a+'_$'+cpu.hex(2,aa)));
-  CMPN(aa);
-  BNE(tryother);
- L(gensym('MATCH_'+a+'_$'+cpu.hex(2,aa)));
 
-  last= tryother;
-  // the words def comes after
-  // ... till the next def!
+  CMPN(aa);
+  if (optJmp) {
+
+    L(match);
+    BEQ(optJmp);
+    last= undefined; // ! supress
+
+  } else {
+    
+    L(match);
+    BNE(tryother);
+    last= tryother;
+    // the words def comes after
+    // ... till the next def!
+  }
 }
+
 
 function enddef() {
   if (last) {
@@ -66,12 +77,14 @@ ORG(S+ 0xcf); L('rstack');
 ORG(S+ 0xef); L('stack');
 
 //variables
-ORG(S+ 0xfa); L('token');
+ORG(S+ 0xfa); L('token'); // or save Y
 ORG(S+ 0xfb); L('latest');
 ORG(S+ 0xfc); L('here');
 ORG(S+ 0xfd); L('state');
 ORG(S+ 0xfe); L('sp'); // TODO: maybe not?
 ORG(S+ 0xff); L('rp');
+
+ORG(S); string('34+.');
 
 // separate code (ROM) & RAM
 // == Harward Architecture
@@ -108,9 +121,9 @@ L('redisplay');
   LDAN(0);
   BEQ('compiling');
 L('BackSpace');
+  CPYN(1),BMI('NEXT');
   JSRA(putc);
-  //CPYN(1),BMI('NEXT');
-  CPYN(2),BMI('compiling');
+  //CPYN(2),BMI('compiling');
   DEY()
   LDAN(0x20),JSRA(putc),
   LDAN(0x08),JSRA(putc),
@@ -131,13 +144,13 @@ L('compiling');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  def(0x7f); LDAN(0x08),BNE('BackSpace');      // DEL // TODO: not working
-  def(0x08); BEQ('BackSpace');                 // BS
-  def(12);   JMPA('redisplay');                // CTRL-L redisplay
-  def(';');  DECA('state');                    // ; end def
-  def('[');  INCA('state');                    // [
-  def(']');  DECA('state');                    // ]
-  def(0x00); JMPA('waitkey');                  // nothing, wait for key!
+  def(0x7f); LDAN(0x08),BNE('BackSpace');     // DEL // TODO: not working
+  def(0x08, 'BackSpace');                     // BS
+  def(12, 'redisplay');                       // CTRL-L redisplay
+  def(';', 'decstate');                       // ; end def
+  def('[', 'incstate')                        // [
+  def(']', 'decstate')                        // ]
+  def(0x00, 'waitkey')                        // nothing, wait for key!
   enddef();
 
   
@@ -166,13 +179,12 @@ L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
     //process.stdout.write('.');
-    if (1) return;
+    //if (1) return;
     let ss= jasm.getLabels()['state'];;
     if (1)
-    console.log('----------interpret', {
+    console.log('--interpret', {
       '#': cpu.reg('a'),
       A: chr(cpu.reg('a')),
-      ss: cpu.hex(4,ss),
       state: cpu.hex(2,m[ss]),
     });
     //cpu.dump(ss);
@@ -182,12 +194,15 @@ L('interpret'); // A has our word
   BNE('compiling');
 
   terminal.TRACE(jasm, ()=>{
-    if (1) return;
-    console.log('interpret.interpret', {
+    //if (1) return;
+    console.log('--interpret', {
+      A: chr(cpu.reg('a')),
     });
   });
 
   // -- "interpretation" or running
+  def(0x00); L('incstate'),INCA('state');
+  def(']'); L('decstate'),DECA('state');
 
   // same "minimal" 8 as sectorforth!
   def('@'); PLA(),TAX(),LDAAX(S),PHA();        // @
@@ -213,9 +228,12 @@ L('interpret'); // A has our word
   def('d'); PLA(),PHA(),PHA();                 // Dup
   def('\\'); PLA(),PHA(),PHA();                // drop
   def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA(); // Swap
+  def('.'); PLA(),STYA('token'),LDYN(0),JSRA(putd),LDYA('token'); // .
   def(';'); PLA(),TAY();                       // EXIT word ("RTS")
-  def(0x00); INCA('state');
   enddef();
+  // assume it's a number, lol
+  // TODO: check
+  SEC(),SBCN(ord('0')),PHA();
 
 // TODO: remove
 next();

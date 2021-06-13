@@ -108,14 +108,6 @@ process.stdin.on('keypress', (str, key) => {
 var a2l;
 var traceLevel;
 
-
-function ord(c) { return c.charCodeAt(0)}
-function chr(c) { return String.fromCharCode(c)}
-function print(...r) { return console.log(...r)}
-function princ(s) { return process.stdout.write(''+s);}
-
-
-
 // extend and patch
 let tcpu = {
   ...cpu6502,
@@ -138,7 +130,6 @@ let tcpu = {
       traceLevel: 0,
       setTraceLevel(n) {
         traceLevel = this.traceLevel = n;
-        console.log("SET: ", this.traceLevel);
       },
 
       output: 0,
@@ -179,9 +170,6 @@ let tcpu = {
 
       // (called after instruction)
       tracer(c, h) {
-        //console.log("SET: ", this.traceLevel);
-        //console.log("TRACER");
-
         // quit at BRK? unless it's trapped!
 //        if (h.op==0) {
 //          return 'quit';
@@ -216,8 +204,6 @@ let tcpu = {
       // install traps for putc!
       // (called before instruction)
       patch(pc, m, cpu) {
-        //console.log("SET: ", this.traceLevel);
-        //console.log("PATCH");
         (TRACE[pc] || (()=>0))();
 
         let op= m[pc], d;
