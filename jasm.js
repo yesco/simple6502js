@@ -320,6 +320,21 @@ function mgen(names, valids) {
 }
 
 function genf(op, name, mnc, mleg, b, cyc) {
+
+if (mnc == 'LDX') {
+  console.log({op:hex(2,op),name,mnc,mleg,b,cyc});
+
+  // INVALID!
+  if (op == 0xAA) return; // no LDX ''
+  
+  // MODE EXCEPTION
+  if (mleg == 'zpx') mleg= 'mzpy';
+  if (mleg == 'absxyx') mleg= 'mzpy';
+
+  // LDXAY but not BA but BE
+  if (op == 0xBA) op= 0xBE;
+}
+
   let f = `j6502.data(0x${hex(2,op)});`;
 
   if (b==1) f = Function(f);

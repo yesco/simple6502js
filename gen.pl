@@ -490,7 +490,7 @@ if ($shortercode) {
           :  (q='imm',    d= pc++);                           break;
       case 1: q='zp';     d= m[pc++];                         break;
       case 2: q='imm';    d= op&1 ? pc++ : q='';              break;
-      case 3: q='abs';    d= pc; pc+= 2;                      break;
+      case 3: q='abs';    d= w(pc); pc+= 2;                   break;
       case 4: q='zpiy';   d= wz(m[pc++]) + y;                 break;
       case 5: q='zpx';    d= (m[pc++] + x) & 0xff;            break;
       case 6: q='absy';   d= w(pc) + y; pc+= 2;               break;
@@ -543,7 +543,7 @@ print "    }
 }
   
 return cpu = {
-  run, flags:ps, tracer, hex, dump, memFormat, w,
+  run, flags:ps, tracer, hex, dump, printStack, memFormat, w,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n,v=run) { return eval(n+(v!=run?'='+v:''))},
@@ -601,8 +601,18 @@ function dump(a = dump.last, lines = 16, n = 8, nz=0) {
   }
   dump.last = a;
 }
-
 dump.last = 0; // static variable
+
+function printStack() {
+  let x = cpu.reg('x');
+  princ(`  STACK[\${(0x101-x)/2}]: `)
+  x--;
+  while(++x < 0xff) {
+    princ(hex(4, cpu.w(x++)));
+    princ(' ');
+  }
+  print();
+}
 
 } // end cpu6502
 

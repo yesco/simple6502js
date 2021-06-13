@@ -12,30 +12,32 @@ function TRACE(jasm, f) {
   TRACE[jasm.address()] = f;
 }
 
+let output= 0;
+
 function _putc(c) {
-  if (this.output) princ("OUTPUT: ");
+  if (output) princ("OUTPUT: ");
   if (typeof c==='number')
     process.stdout.write(chr(c));
   else
     process.stdout.write(''+c);
-  if (this.output) print();
+  if (output) print();
 }
 
 // print string from ADDRESS
 // optinal max LEN chars
 // stops if char=0 or char hi-bit set.
 function _puts(a, len=-1, m) {
-  if (this.output) princ("OUTPUT: ");
+  if (output) princ("OUTPUT: ");
   let c = 0;
   while(len-- && (c < 128) && (c=m[a++]))
     process.stdout.write(chr(c));
-  if (this.output) print();
+  if (output) print();
 }
 
 function _putd(d) {
-  if (this.output) princ("OUTPUT: ");
+  if (output) princ("OUTPUT: ");
   process.stdout.write(''+d+' ');
-  if (this.output) print();
+  if (output) print();
 }
 
 // return 0 if no key
@@ -127,6 +129,10 @@ let tcpu = {
       orig_cpu: cpu,
       
       // Doesn't seem to be this.traceLevel forall...
+      setOutput(n) {
+        output= n;
+      },
+
       traceLevel: 0,
       setTraceLevel(n) {
         traceLevel = this.traceLevel = n;
@@ -156,18 +162,6 @@ let tcpu = {
         return true;
       },
 
-      // not found by others by this.prinstack?
-      printstack() {
-        let x = cpu.reg('x');
-        princ(`  DSTACK[${(0x101-x)/2}]: `)
-        x--;
-        while(++x < 0xff) {
-          princ(hex(4, cpu.w(x++)));
-          princ(' ');
-        }
-        print();
-      },
-
       // (called after instruction)
       tracer(c, h) {
         // quit at BRK? unless it's trapped!
@@ -183,7 +177,7 @@ let tcpu = {
         if (traceLevel > 2) {
           cpu.dump(h.ipc,1);
           // this.prinstack not work
-          //printstack(); print("\n\n");
+          c.printstack(); print("\n\n");
         }
 
         // WTF?
