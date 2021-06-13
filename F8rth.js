@@ -208,37 +208,49 @@ L('interpret'); // A has our word
     });
   });
 
+  // TODO: those wanting TSX could share...
+
   // -- "interpretation" or running
   def(0x00); L('incstate'),INCA('state');
   def(']'); L('decstate'),DECA('state');
 
   // same "minimal" 8 as sectorforth!
-  def('@'); PLA(),TAX(),LDAAX(S),PHA();        // @
-  def('!'); PLA(),TAX(),PLA(),STAAX(S);        // !
-  def('S'); TSX(),TXA(),PHA();                 // sp@
-  def('R'); LDAZ('rp',lo),PHA();               // rp@
-  def('z'); PLA(),ORAN(0xff),PHA();;           // 0=
-  def('+'); PLA(),TSX(),CLC(),ADCAX(S+1),STAAX(S+1); // +
-  def('N'); PLA(),TSX(),ANDAX(S+1),EORN(0xff),STAAX(S+1); // Nand
+  def('@'); PLA(),TAX(),LDAAX(S),PHA();
+  def('!'); PLA(),TAX(),PLA(),STAAX(S);
+  def('S'); TSX(),TXA(),PHA();
+  def('R'); LDAZ('rp',lo),PHA();
+  def('z'); PLA(),ORAN(0xff),PHA();
+
+  def('+'); PLA(),TSX(),CLC(),ADCAX(S+1),STAAX(S+1);
+  def('-'); PLA(),TSX(),SEC(),SBCAX(S+1),STAAX(S+1);
+  def('&'); PLA(),TSX(),      ANDAX(S+1),STAAX(S+1);
+  def('|'); PLA(),TSX(),      ORAAX(S+1),STAAX(S+1);
+  def('^'); PLA(),TSX(),      EORAX(S+1),STAAX(S+1);
+  def('~'); PLA(),EORN(0x44),PHA();
+  // :~dN;
+  // :&N~;
+  // :|~s~N;
+
+  def('N'); PLA(),TSX(),ANDAX(S+1),EORN(0xff),STAAX(S+1);
   // ... and it also defines these
-  def('b'); next()                             // Bye
-  //def('B'); LDAN('tib'),PHA();               // tiB
-  def('T'); LDAA('state'),PHA();               // sTate
-  //def('I'); LDAN('>in'),PHA();               // >In
-  def('h'); LDAAX('here'),PHA();               // Here
-  def('L'); LDAAX('latest'),PHA();             // Latest
-  def('K'); L('K'),JSRA(getc),BEQ('K'),PHA();  // Key
-  def('e'); PLA(),JSRA(putc);                  // Emit
-  def(':'); colon(),INCA('state');             // :
-  def('C'); compile();                         // Compile
-  def('x'); PLA(),                             // eXecute
+  //def('B'); LDAN('tib'),PHA();
+  //def('T'); LDAA('state'),PHA();
+  //def('I'); LDAN('>in'),PHA();
+  def('h'); LDAAX('here'),PHA();
+  def('L'); LDAAX('latest'),PHA();
+  def('K'); L('K'),JSRA(getc),BEQ('K'),PHA();
+  def('e'); PLA(),JSRA(putc);
+
+  //def(':'); colon(),INCA('state');
+  //def('C'); compile();
+  def('x'); PLA(),JMPA('interpret');       
   // --- jsk additions
   // TODO: all words that start with PLA...
-  def('d'); PLA(),PHA(),PHA();                 // Dup
-  def('\\'); PLA(),PHA(),PHA();                // drop
-  def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA(); // Swap
-  def('.'); PLA(),STYA('token'),LDYN(0),JSRA(putd),LDYA('token'); // .
-  def(';'); PLA(),TAY();                       // EXIT word ("RTS")
+  def('d'); PLA(),PHA(),PHA();
+  def('\\'); PLA(),PHA(),PHA();
+  def('s'); PLA(),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),PHA();
+  def('.'); PLA(),STYA('token'),LDYN(0),JSRA(putd),LDYA('token');
+  def(';'); PLA(),TAY();
   enddef();
   // assume it's a number, lol
   // TODO: check
