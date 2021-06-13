@@ -159,18 +159,19 @@ L('compiling');
   def(0x00, 'waitkey')                        // nothing, wait for key!
   enddef();
 
-  
   // echo TODO: not of control chars? lol, good for BS...
   JSRA(putc)
   //JMPA('compiling');
   // stuff the key in memory!
+
+  STAAY(S);
+
   terminal.TRACE(jasm, ()=>{
     return;
+    nl();
     cpu.dump(S, 16);
     console.log("STATE:",  m[jasm.getLabels().state]);
   });
-
-  STAAY(S);
 
   // TODO: search for words... if user can define IMMEDIATE?
 
@@ -198,8 +199,8 @@ L('interpret'); // A has our word
     //cpu.dump(ss);
   });
 
-  LDXA('state');
-  BNE('compiling');
+  BITA('state');
+  BMI('compiling');
 
   terminal.TRACE(jasm, ()=>{
     //if (1) return;
@@ -211,8 +212,10 @@ L('interpret'); // A has our word
   // TODO: those wanting TSX could share...
 
   // -- "interpretation" or running
-  def(0x00); L('incstate'),INCA('state');
-  def(']'); L('decstate'),DECA('state');
+  // LOL: we incstate by dec!
+  // neg num can test with BIT!
+  def(0x00); DEY(),L('incstate'),DECA('state');
+  def(']'); L('decstate'),INCA('state');
 
   // same "minimal" 8 as sectorforth!
   def('@'); PLA(),TAX(),LDAAX(S),PHA();
