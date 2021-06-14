@@ -1,4 +1,15 @@
-PROGRAM = '3d.4d.+.123`A56789';
+PROGRAM = '123 ...'; // test space
+PROGRAM = '34+.';
+// +1 inc at 4th position
+// TODO: bug? 153 wrap around (CTRL-R)
+PROGRAM = '9`\0048765432102@d.1+d.2!2@...........h.';
+PROGRAM = '73-.';
+
+
+///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
+// PROGRAM = '9876543210..........'; test stack and print
+
+
 
 //      -*- truncate-lines: true; -*-
 //
@@ -201,8 +212,12 @@ L('FORTH_BEGIN');
   next();
 
 L('Run');
-  LDYN(0);
-  next();
+  PHA(); {
+    LDAN(ord('\n')),LDYN(0),JSRA(putc);
+    LDAN(ord('\n')),LDYN(0),JSRA(putc);
+  } PLA();
+  LDYN(0xff);
+  JMPA('decstate');
 
 L('List');
   TYA(),PHA(); {
@@ -211,17 +226,28 @@ L('List');
     LDAN(S, lo), LDYN(S, hi), JSRA(puts);
   } PLA(), TAY();
   LDAN(0);
+  next();
   BEQ('compiling');
 
 L('BackSpace');
+  // nothing to delete?
   CPYN(1),BMI('NEXT');
-  LDAN(8);
-  JSRA(putc);
   //CPYN(2),BMI('compiling');
-  DEY()
-  LDAN(32),JSRA(putc),
-  LDAN(8),JSRA(putc),
-  LDAN(0),STAAY(S), // null out last char
+
+  PHA(); {
+    // delete on screen (BS+SPC+BS) // b12
+    // (TODO: optimize with a putsi)
+    LDAN(8),JSRA(putc);
+    LDAN(32),JSRA(putc);
+    LDAN(8),JSRA(putc);
+
+    // null out last char
+    DEY();
+    PHA(); {
+      LDAN(0),STAAY(S);
+    } PLA();
+  }
+  next();
   JMPA('compiling');
 
 L('waitkey'),
@@ -244,6 +270,7 @@ L('compiling');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
+  // Check editing first
   def(0x7f, 'BackSpace');
   def(ctrl('H'), 'BackSpace');
   def(ctrl('L'), 'List');
@@ -255,13 +282,10 @@ L('compiling');
   enddef();
 
   // echo TODO: not of control chars? lol, good for BS...
-  PHA(); TXA();
-  JSRA(putc);
-  //JMPA('compiling');
-  // stuff the key in memory!
-
-  STAAY(S);
-  PLA();
+  PHA(); {
+    TXA(),JSRA(putc);
+    STAAY(S);
+  } PLA();
 
   terminal.TRACE(jasm, ()=>{
     if (!trace) return;
@@ -301,8 +325,12 @@ L('interpret'); // A has our word
 
   let echo = 1;
   if (echo) {
+    // TODO: don't cheat!
+    terminal.TRACE(jasm,()=>princ(fgcol(GREEN)));
     PHA(); TXA();
     JSRA(putc);
+    // TODO: don't cheat!
+    terminal.TRACE(jasm,()=>princ(fgcol(WHITE)));
     PLA();
   }
 
@@ -324,18 +352,39 @@ L('interpret'); // A has our word
   def(0x00); DEY(),L('incstate'),DECA('state');
   def(']'); L('decstate'),INCA('state');
 
+  // do not interpret as number! lol
+  def(32);
+
   // same "minimal" 8 as sectorforth!
   def('@'); TAX(),LDAAX(S);
-  def('!'); TAX(),PLA();
+  def('!');
+
+TAX(),PLA(),
+
+terminal.TRACE(jasm, ()=>{
+  print('<<<<',{a: cpu.reg('a'), x: cpu.reg('x'), 2: m[S+2]});
+});
+
+STAAX(S),PLA(),
+
+console.log('STAAX', STAAX.toString());
+terminal.TRACE(jasm, ()=>{
+  print('>>>',{
+    a: cpu.reg('a'),
+    x: cpu.reg('x'),
+    2: m[S+2],
+    d: cpu.hex(4,cpu.reg('d')),
+    });
+});
   def('S'); TSX(),TXA();
   def('R'); LDAZ('rp',lo);
   def('z'); ORAN(0xff);
 
-  def('+'); PLP(),TSX(),CLC(),ADCAX(S+1);
-  def('-'); PLP(),TSX(),SEC(),SBCAX(S+1);
-  def('&'); PLP(),TSX(),      ANDAX(S+1);
-  def('|'); PLP(),TSX(),      ORAAX(S+1);
-  def('^'); PLP(),TSX(),      EORAX(S+1);
+  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
+  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
+  def('&'); PLP(),TSX(),      ANDAX(S);
+  def('|'); PLP(),TSX(),      ORAAX(S);
+  def('^'); PLP(),TSX(),      EORAX(S);
   def('~'); EORN(0x44);
   // :~dN;
   // :&N~;
@@ -346,7 +395,8 @@ L('interpret'); // A has our word
   //def('B'); PHA(),LDAN('tib');
   //def('T'); PHA(),LDAA('state');
   //def('I'); PHA(),LDAN('>in');
-  def('h'); PHA(),LDAAX('here');
+  //def('h'); PHA(),LDAAX('here');
+  def('h'); PHA(),TYA(); // if in compilation...
   def('L'); PHA(),LDAAX('latest');
   def('K'); PHA(),L('K'),JSRA(getc),BEQ('K');
   def('e'); JSRA(putc),PLA();
@@ -361,7 +411,7 @@ L('interpret'); // A has our word
   def('\\'); PLA();
   def('s'); TSX(),EORAX(S+1),EORA(S+1),STAA(S+1),EORA(S+1); // b13 c18
   //def('s'); STYA('token'),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),LDYA('token'); // b10 c23
-  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token');
+  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
   def(';'); TAY(),PLA();
 
   // -- printers and formatters
@@ -369,6 +419,16 @@ L('interpret'); // A has our word
   // TODO: comment? cna be used as headline
 
   enddef();
+
+  // control codes, quote them!
+L('quotecontrol');
+  CPXN(31),BCC('number');
+  PHA(),TYA(),PHA(); {
+    LDAN(ord('<')),JSRA(putc);
+    TXA(),LDYN(0),JSRA(putd);
+    LDAN(ord('>')),JSRA(putc);
+  }; PLA(),TAY(),PLA();
+  next();
   // assume it's a number, lol
   // TODO: check
   L('number');
@@ -465,12 +525,12 @@ jasm.burn(m, jasm.getChunks());
 console.log({start});
 
 // remove l.waitKey!
-delete l.waitkey;
+delete l._waitkey;
 
 cpu.setLabels(l);
 
-cpu.setTraceLevel(1);
 cpu.setTraceLevel(2);
+cpu.setTraceLevel(1);
 cpu.setTraceLevel(0);
 
 cpu.setOutput(1);

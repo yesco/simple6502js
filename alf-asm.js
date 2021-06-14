@@ -929,12 +929,11 @@ L('_INVERT'); // X is +2
   RTS();
 `;
 
-// all trashes X (+2)
-// call by: // b8
-//   JSRA('AND'),DEX(),DEX(),NEXT()
-// or // b6
-//   JSRA('AND'),JMPA('DROP');
-let opt = `
+// these ones correctly all drop
+// call by: // b36
+//   JMPA('AND')
+//
+let opt = ` // b33 !!!!
 AND   LDA #$35
       BNE MATH
 OR    LDA #$15

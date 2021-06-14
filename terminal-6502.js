@@ -23,7 +23,7 @@ function _putc(ch) {
   if (output) princ("OUTPUT.c: ");
   process.stdout.write(c);
   if (output)
-    print(`    (\${hex(2,ch)})`);
+    print(`    (\$${hex(2,ch)})`);
 }
 
 // print string from ADDRESS
