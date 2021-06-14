@@ -7,6 +7,9 @@ PROGRAM = '73-.';
 PROGRAM = '1234567RRrr.......';
 PROGRAM = '1234567RR.....r.r.';
 
+PROGRAM = '33=. 55=.  17=. 12=.   71=. 76=.';
+PROGRAM = '34..34s..';
+
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
 
@@ -47,7 +50,15 @@ PROGRAM = '1234567RR.....r.r.';
 // - adding ` print ineline value (508 +44)
 //   (to much growth: implement as word?)
 // - r and R, and move printcontrol (590 +69)
-
+//
+//
+//
+// TODO:  60 bytes next()==BRK 30 nexts
+// TODO  120 bytes CMP,BCC (4b) x 30 OPS
+//           (can do a ' '..'@' (32 B)
+//           (offset jmptable make compact)
+//           - 23 routines ( don't count num)
+//           - 256/23 => 11
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
@@ -133,7 +144,8 @@ function ctrl(c) {
 let last;
 
 function def(a, optJmp) {
-  let aa = typeof a==='string'? ord(a) : a;
+  let aa = typeof a==='string' && a.length==1? ord(a) : a;
+  console.error("DEF", a, aa, optJmp);
   let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
   let match = gensym('OP_'+a+'_$'+cpu.hex(2,aa));
 
@@ -348,14 +360,26 @@ L('interpret'); // A has our word
 
   // TODO: those wanting PLP,TSX could share...
 
+  // --- Symbol based operators
+  // (mostly arith, logic, short!)
+  // (and it fit in 256 bytes?)
+  // (if so make an page offset jmp table for 32)
+  //
+  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
+  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
+  def('&'); PLP(),TSX(),      ANDAX(S);
+  def('|'); PLP(),TSX(),      ORAAX(S);
+  def('^'); PLP(),TSX(),      EORAX(S);
+  def('~'); EORN(0x44);
+  // :~dN;
+  // :&N~;
+  // :|~s~N;
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
   def(0x00); DEY(),L('incstate'),DECA('state');
   def(']'); L('decstate'),INCA('state');
-
-  // do not interpret as number! lol
-  def(32);
+  def(32); // do not interpret as number! lol
 
   // same "minimal" 8 as sectorforth!
   def('@'); TAX(),LDAAX(S);
@@ -378,6 +402,67 @@ terminal.TRACE(jasm, ()=>{
     d: cpu.hex(4,cpu.reg('d')),
     });
 });
+
+  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
+  def(';'); TAY(),PLA();
+  // (+ 13 15 12 12 12 9 1 10 0 10 7 11 13 10 9)
+  // = 144 bytes
+
+
+  // add more symbols here!
+
+  def('<'); CLC(),ROL(); // TODO: ASL(); save 1B
+  def('>'); CLC(),ROR(); // TODO: LSR()
+  // ?=
+  // ?<
+  // ?>
+  // ?~=
+  // ?~<
+  // ?~>
+
+  // N  Z  C
+  // --------
+  // ?  0  0   A < M
+  // 0  1  1   A = M
+  // ?  0  1   A > M
+
+
+if (0) {
+  def('=');
+
+  PLP(),TSX(),SEC(),SBCAX(S),
+  BEQ('ret0'),
+  BCC('ret-1'),
+
+  aaa = 55;
+  ADCAX(S);
+  //ADCN(253-aaa);
+  //LDAN(0xff);
+ L('ret0');
+  EORN(0xff);
+}
+if(1){ // dispatch and next for these 
+  def("'");
+
+  def('"');
+  def('#');
+  def('$');
+  def('%');
+
+  def('*');
+  def('/');
+
+  def('(');
+  def(')');
+
+  def(',');
+
+  def(':');
+  def(';');
+  def('?');
+}
+
+  // --- letter commands
   def('S'); TSX(),TXA();
   def('r');
 
@@ -394,17 +479,6 @@ TSX(),STXA('sp'),LDXA('rp'),TXS();{
 PLA();
 
   def('z'); ORAN(0xff);
-
-  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
-  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
-  def('&'); PLP(),TSX(),      ANDAX(S);
-  def('|'); PLP(),TSX(),      ORAAX(S);
-  def('^'); PLP(),TSX(),      EORAX(S);
-  def('~'); EORN(0x44);
-  // :~dN;
-  // :&N~;
-  // :|~s~N;
-
   def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
   // ... and it also defines these
   //def('B'); PHA(),LDAN('tib');
@@ -424,10 +498,9 @@ PLA();
   // --- jsk additions
   def('d'); PHA();
   def('\\'); PLA();
-  def('s'); TSX(),EORAX(S+1),EORA(S+1),STAA(S+1),EORA(S+1); // b13 c18
-  //def('s'); STYA('token'),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),LDYA('token'); // b10 c23
-  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
-  def(';'); TAY(),PLA();
+
+  def('s'); STAA('token'),PLA(),TAX(),LDAA('token'),PHA(),TXA(); // b10 c19
+  // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
 
   // -- printers and formatters
   def(96, 'printval');
