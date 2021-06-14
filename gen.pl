@@ -204,7 +204,8 @@ function adc(v) {
   // TODO: set overflow?
   let oa= a;
   a= c(a + v + (p & C));
-  v= ((oa^a) & (v^a));
+  if ((a & N) != (oa & N)) p |= V; else p &= ~V;
+  //if ((oa^a) & (v^a)) ...
   if (~p & D) return; else c(0);
   if ((a & 0x0f) > 0x09) a+= 0x06;
   if ((a & 0xf0) <= 0x90) return;

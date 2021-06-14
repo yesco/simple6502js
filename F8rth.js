@@ -7,9 +7,11 @@ PROGRAM = '73-.';
 PROGRAM = '1234567RRrr.......';
 PROGRAM = '1234567RR.....r.r.';
 
-PROGRAM = '33=. 55=.  17=. 12=.   71=. 76=.';
 PROGRAM = '34..34s..';
 PROGRAM = '1<<<<<<<<.  9>d.>d.>d.>d.>d.';
+
+PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
+PROGRAM = "12345'A'B'C........";
 
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
@@ -421,31 +423,37 @@ terminal.TRACE(jasm, ()=>{
   // ?~<
   // ?~>
 
-  // N  Z  C
-  // --------
-  // ?  0  0   A < M
-  // 0  1  1   A = M
-  // ?  0  1   A > M
+  def('='); { // sign function! fun to write...
+    PLP(),TSX(),CMPAX(S);   
+    
+    // Had to do some thing about this one...
+    //
+    // N  Z  C               C  !Z         -2
+    // --------              ===== ordered ===
+    // ?  0  0      A < M    0  1   1      -1
+    // 0  1  1      A = M    1  0   2       0
+    // ?  0  1      A > M    1  1   3      +1
 
+    PHP();             // b12 c17
+    LDAN(-2 & 0xff);   // offset -2
+    BCC('_cskip');
+    ADCN(1);           // if carry add 2! 
+    L('_cskip');
 
-if (1) {
-  def('=');
+    PLP();             // using original flags
+    BEQ('_zskip');
+    CLC();
+    ADCN(1);           // if equal add 1
+    L('_zskip');
 
-  PLP(),TSX(),SEC(),SBCAX(S),
-  BEQ('ret0'),
-  BCC('ret-1'),
- L('ret1');
-  LDAN(1);
-  next();
- L('ret-1');
-  LDAN(0xff);
- L('ret0');
-  EORN(0xff);
- L('ret');
-  next();
-}
+    // A: -1 if <    0 if =    +1  if  >
+    next();
+  }
+
+  // TODO:color\ make a JSR "getc" that echoes?
+  def("'"); PHA(),INY(),LDAAY(S),JSRA(putc); // got the char!
+
 if(1){ // dispatch and next for these 
-  def("'");
 
   def('"');
   def('#');
@@ -506,7 +514,7 @@ PLA();
   // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
 
   // -- printers and formatters
-  def(96, 'printval');
+  def('`', 'printval');
   // TODO: comment? cna be used as headline
 
   enddef();

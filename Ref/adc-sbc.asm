@@ -25,6 +25,9 @@ function subAND(oper)
 	if (A>=0x80) FlagN=1;else FlagN=0;
 }
 
+	
+
+
 https://github.com/JoeyShepard/65C02_Emulator/blob/master/emu6502.js
 
 function subSBC(oper)
