@@ -134,12 +134,12 @@ let last;
 
 function def(a, optJmp) {
   let aa = typeof a==='string'? ord(a) : a;
-  let tryother = gensym('is_not_'+a+'_$'+cpu.hex(2,aa));
-  let match = gensym('MATCH_'+a+'_$'+cpu.hex(2,aa));
+  let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
+  let match = gensym('OP_'+a+'_$'+cpu.hex(2,aa));
 
   enddef();
 
-  L(gensym('test_'+a+'_$'+cpu.hex(2,aa)));
+  L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
 
   CPXN(aa);
   if (optJmp) {
@@ -213,7 +213,7 @@ L('FORTH_BEGIN');
   LDAN(0xff); TAY(); // ip! -1 since we'll INY()
   next();
 
-L('Run');
+L('OP_Run');
   PHA(); {
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
@@ -221,7 +221,7 @@ L('Run');
   LDYN(0xff);
   JMPA('decstate');
 
-L('List');
+L('OP_List');
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
@@ -231,7 +231,7 @@ L('List');
   next();
   BEQ('compiling');
 
-L('BackSpace');
+L('OP_BackSpace');
   // nothing to delete?
   CPYN(1),BMI('NEXT');
   //CPYN(2),BMI('compiling');
@@ -273,10 +273,10 @@ L('compiling');
   });
 
   // Check editing first
-  def(0x7f, 'BackSpace');
-  def(ctrl('H'), 'BackSpace');
-  def(ctrl('L'), 'List');
-  def(ctrl('R'), 'Run');
+  def(0x7f, 'OP_BackSpace');
+  def(ctrl('H'), 'OP_BackSpace');
+  def(ctrl('L'), 'OP_List');
+  def(ctrl('R'), 'OP_Run');
   def(';', 'decstate');
   def('[', 'incstate'); 
   def(']', 'decstate');
@@ -536,8 +536,39 @@ test();
 
 let l = jasm.getLabels();
 
+if (0) {
+  print(jasm.getHex(0,0,0));
+  process.exit();
+} else if (1) {
+  let lasta, last;
+  Object.keys(l).forEach(x=>{
+
+    // skip local labels
+    if (x.match(/^_/)) return;
+    if (x.match(/_$/)) return;
+
+    let a = l[x];
+    let len = lasta ? a - lasta : '-';
+    
+    if (last) {
+      print(last.padEnd(30,' '), hex(4,a),
+            "\t", len.toString().padStart(4));
+    }
+
+    lasta = a;
+    last = x;
+
+  });
+
+}
+
+print();
+
 console.log("FORTH:", l.FORTH_END-l.FORTH_BEGIN);
 console.log("TOTAL:", jasm.address()-l.FORTH_END);
+
+print('-'.repeat(40));
+print();
 
 // crash and burn
 jasm.burn(m, jasm.getChunks());
@@ -558,5 +589,7 @@ cpu.setOutput(0);
 trace = 1;
 trace = 0;
 
+
 cpu.reg('pc', start);
 cpu.run(-1);
+
