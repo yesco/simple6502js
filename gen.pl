@@ -70,8 +70,8 @@
     'lsr',   'g= n(z( m[ADDR]= sc(m[ADDR]) >> 1))',
     'lsr_a', 'g= n(z(       a=       sc(a) >> 1))',
 
-    'rol',   'g= m[ADDR]= n(z(c((m[ADDR]<<1) + (p&C))))',
-    'rol_a', 'g=       a= n(z(c((      a<<1) + (p&C))))',
+    'rol',   'g= m[ADDR]= c(n(z(m[ADDR]<<1) + (p&C)))',
+    'rol_a', 'g=       a= c(n(z((     a<<1) + (p&C))))',
 
     'ror',    'tmp=m[ADDR];g= m[ADDR]= n(z((m[ADDR]>>>1) | ((p&C)<<7)));sc(tmp)',
     'ror_a',  'tmp=a;      g=       a= n(z((  a    >>>1) | ((p&C)<<7)));sc(tmp)',
