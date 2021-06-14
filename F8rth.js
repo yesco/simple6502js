@@ -428,19 +428,21 @@ terminal.TRACE(jasm, ()=>{
   // ?  0  1   A > M
 
 
-if (0) {
+if (1) {
   def('=');
 
   PLP(),TSX(),SEC(),SBCAX(S),
   BEQ('ret0'),
   BCC('ret-1'),
-
-  aaa = 55;
-  ADCAX(S);
-  //ADCN(253-aaa);
-  //LDAN(0xff);
+ L('ret1');
+  LDAN(1);
+  next();
+ L('ret-1');
+  LDAN(0xff);
  L('ret0');
   EORN(0xff);
+ L('ret');
+  next();
 }
 if(1){ // dispatch and next for these 
   def("'");
