@@ -1,3 +1,5 @@
+PROGRAM = '3d.4d.+.123`A56789';
+
 //      -*- truncate-lines: true; -*-
 //
 //               READLINE-65
@@ -29,6 +31,9 @@
 // - added editors in compile mode (= edit)
 // - def(8, jmp) = saved 7*3 (in chained)
 // - A is TOS, X is token, 15 ops saved 30B (489)
+// - moving stuff around, 
+// - adding ` print ineline value (508 +44)
+//   (to much growth: implement as word?)
 
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
@@ -40,6 +45,8 @@ let puts = terminal.aputs;
 let getc = terminal.agetc;
 
 let start = 0x501;
+
+let trace = 0;
 
 // TODO: if not this, hang!
 //process.exit(0);
@@ -53,6 +60,61 @@ function next() {
   } else {
     JMPA('NEXT'); // 3 bytes :-(
   }
+}
+
+// xterm/ansi
+let BLACK= 0, RED= 1,     GREEN= 2, YELLOW= 3,
+    BLUE=  4, MAGNENTA=5, CYAN=  6, WHITE=  7;
+
+function amber() { return '[38;5;214m'; }
+function cursorOff() { return '[?25l'; }
+function home() { return gotorc(0, 0); }
+function cls() { return '[2J' + home; }
+function cursorOn() { return '[?25h'; }
+function gotorc(r, c) { return '['+r+';'+c+'H'; }
+function fgcol(c) { return '[3'+c+'m'; }
+function bgcol(c) { return '[4'+c+'m'; }
+function inverseOn() { return '[7m'; }
+function underscoreOn() { return '[4m'; }
+function boldOn() { return '[1m'; }
+// you can only turn all off! :-(
+function off(){ return'[m'; }
+
+console.log(
+  'text', fgcol(GREEN), 'fish',
+  bgcol(YELLOW), 'crap',
+  off(), fgcol(BLUE), 'input',
+  inverseOn(), 'output', off());
+
+console.log(
+  fgcol(GREEN), '34+.',
+  boldOn()+fgcol(WHITE), '7777777',
+  off()+inverseOn()+' '+off(),
+)
+
+console.log(
+  fgcol(GREEN), '34+.',
+  fgcol(WHITE), '7777777',
+  fgcol(RED), '7777777',
+  boldOn()+fgcol(RED), '7777777',
+  off()+inverseOn()+' '+off(),
+)
+
+console.log(
+  boldOn()+fgcol(WHITE),
+  '34+.',
+  fgcol(GREEN),
+  '7777777',
+)
+
+console.log(
+  fgcol(GREEN), '34+.',
+  amber(), '7777777',
+  off()+inverseOn()+' '+off(),
+);
+
+function ctrl(c) {
+  return ord(c.toUpperCase())-64;
 }
 
 let last;
@@ -114,11 +176,12 @@ ORG(S+ 0xfd); L('state');
 ORG(S+ 0xfe); L('sp'); // TODO: maybe not?
 ORG(S+ 0xff); L('rp');
 
-ORG(S); string('3d.4d.+.');
+ORG(S); string(PROGRAM);
 
 // separate code (ROM) & RAM
 // == Harward Architecture
 ORG(start);
+L('FORTH_BEGIN');
   // init stack pointers
   LDXN('stack', lo); TXS();
   LDXN('rstack', lo); STAA('rp');
@@ -137,11 +200,11 @@ ORG(start);
   LDAN(0xff); TAY(); // ip! -1 since we'll INY()
   next();
 
-// -- state is true thus we're "compiling" for letters that are
-// there own OP-codes we're just editing! Here is editor commands!
-//
-// Basically, all these words are "IMMEDIATE"
-L('redisplay');
+L('Run');
+  LDYN(0);
+  next();
+
+L('List');
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
@@ -149,6 +212,7 @@ L('redisplay');
   } PLA(), TAY();
   LDAN(0);
   BEQ('compiling');
+
 L('BackSpace');
   CPYN(1),BMI('NEXT');
   LDAN(8);
@@ -159,12 +223,13 @@ L('BackSpace');
   LDAN(8),JSRA(putc),
   LDAN(0),STAAY(S), // null out last char
   JMPA('compiling');
+
 L('waitkey'),
   PHA();
-L('_waitkey');
-  JSRA(getc),
-  TAX();
+  L('_waitkey');
+    JSRA(getc),
   BEQ('_waitkey'),
+  TAX();
   PLA();
   // X now contains keystroke, A retains TOS
 
@@ -179,13 +244,14 @@ L('compiling');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  def(0x7f, 'BackSpace');                     // DEL // TODO: not working
-  def(0x08, 'BackSpace');                     // BS
-  def(12, 'redisplay');                       // CTRL-L redisplay
-  def(';', 'decstate');                       // ; end def
-  def('[', 'incstate')                        // [
-  def(']', 'decstate')                        // ]
-  def(0x00, 'waitkey')                        // nothing, wait for key!
+  def(0x7f, 'BackSpace');
+  def(ctrl('H'), 'BackSpace');
+  def(ctrl('L'), 'List');
+  def(ctrl('R'), 'Run');
+  def(';', 'decstate');
+  def('[', 'incstate'); 
+  def(']', 'decstate');
+  def(0x00, 'waitkey');
   enddef();
 
   // echo TODO: not of control chars? lol, good for BS...
@@ -198,7 +264,7 @@ L('compiling');
   PLA();
 
   terminal.TRACE(jasm, ()=>{
-    return;
+    if (!trace) return;
     nl();
     cpu.dump(S, 16);
     console.log("STATE:",  m[jasm.getLabels().state]);
@@ -214,13 +280,11 @@ L('NEXT');
 
   INY();
   LDXAY(S);
-  print("LDXAY", LDXAY.toString());
-  print("LDYAX", LDYAX.toString());
 
 L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
-    return;
+    if (!trace) return;
     //process.stdout.write('.');
     //if (1) return;
     let ss= jasm.getLabels()['state'];;
@@ -235,11 +299,18 @@ L('interpret'); // A has our word
     //cpu.dump(ss);
   });
 
+  let echo = 1;
+  if (echo) {
+    PHA(); TXA();
+    JSRA(putc);
+    PLA();
+  }
+
   BITA('state');
   BMI('compiling');
 
   terminal.TRACE(jasm, ()=>{
-    //if (1) return;
+    if (!trace) return;
     console.log('--interpret', {
       X: chr(cpu.reg('x')),
     });
@@ -292,6 +363,11 @@ L('interpret'); // A has our word
   //def('s'); STYA('token'),TAX(),PLA(),TAY(),TXA(),PHA(),TYA(),LDYA('token'); // b10 c23
   def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token');
   def(';'); TAY(),PLA();
+
+  // -- printers and formatters
+  def(96, 'printval');
+  // TODO: comment? cna be used as headline
+
   enddef();
   // assume it's a number, lol
   // TODO: check
@@ -336,14 +412,41 @@ L('found');
   INY(); // !! skip ptr,
   next();
 
+//   (to much growth: implement as word?)
+L('FORTH_END');
+
+L('printval');
+  PHA(); {
+    // TODO: make section for commands where A Y is saved
+
+    // next byte
+    INY(),LDXAY(S);
+
+    // nightmare! (on stack A Y X)
+    PHA(),TYA(),PHA(),TXA(),PHA(); {
+      LDAN('resultColor', lo),LDYN('resultColor', hi),LDXN(0xff),JSRA(puts);
+      // dup, putd
+      PLA(),PHA(),LDYN(0),JSRA(putd);
+      LDAN('colorOff', lo),LDYN('colorOff', hi),LDXN(0xff),JSRA(puts);
+    } PLA(),TAX(),PLA(),TAY(),PLA();
+
+    // or print hex ???
+    //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),JSRA(putc);
+    //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),JSRA(putc);
+  } PLA();
+  next();
+
   function colon() {
   }
   function docolon() {
   }
   function compile() {
   }
-
+  
 }
+
+L('resultColor'); string(amber());
+L('colorOff'); string(off());
 
 ////////////////////////////////////////
 // RUN
@@ -352,15 +455,19 @@ var m = cpu.state().m;
 
 test();
 
-console.log("CODESIZE:", jasm.address()-start);
+let l = jasm.getLabels();
+
+console.log("FORTH:", l.FORTH_END-l.FORTH_BEGIN);
+console.log("TOTAL:", jasm.address()-l.FORTH_END);
+
 // crash and burn
 jasm.burn(m, jasm.getChunks());
 console.log({start});
 
-// debug stuff
-let labels = jasm.getLabels();
-delete labels.waitkey;
-cpu.setLabels(labels);
+// remove l.waitKey!
+delete l.waitkey;
+
+cpu.setLabels(l);
 
 cpu.setTraceLevel(1);
 cpu.setTraceLevel(2);
@@ -368,6 +475,9 @@ cpu.setTraceLevel(0);
 
 cpu.setOutput(1);
 cpu.setOutput(0);
+
+trace = 1;
+trace = 0;
 
 cpu.reg('pc', start);
 cpu.run(-1);

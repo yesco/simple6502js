@@ -28,13 +28,31 @@ function _putc(ch) {
 
 // print string from ADDRESS
 // optinal max LEN chars
-// stops if char=0 or char hi-bit set.
+// stops if char = 0
+// or after a hitbit char
+//
+// returns address of last char
+// in string (not affected by len)
+// (0 or hibit set) after where
+// next insstruction is
 function _puts(a, len=-1, m) {
+  let saved_len = len;
   if (output) princ("OUTPUT.s: ");
-  let c = 0;
-  while(len-- && (c < 128) && (c=m[a++]))
-    process.stdout.write(chr(c));
+  let c= 0;
+  while((a <= 0xffff) && (c= m[a])) {
+    if (len-- > 0)
+      process.stdout.write(chr(c & 0x7f));
+
+    if (c > 127) break;
+    a++;
+  }
+
+  // for OMG-strings skip (BRK) one more
+  if (!m[a+1]) a++;
+ 
   if (output) print();
+
+  return a;
 }
 
 function _putd(d) {
@@ -232,7 +250,13 @@ let tcpu = {
         switch(d) {
         case 0xfff0: _putc(cpu.reg('a')); break;
         case 0xfff2: _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
-        case 0xfff4: _puts((cpu.reg('y')<<8)+cpu.reg('a'), cpu.reg('x'), m); break;
+        case 0xfff4: {
+          let end = _puts(
+            (cpu.reg('y')<<8)+cpu.reg('a'),
+            cpu.reg('x'), m);
+          cpu.reg('a', end & 0xff);
+          cpu.reg('y', end >> 8);
+          break; }
         case 0xfff6: {
           let c= _getc();
           cpu.reg('a', c);

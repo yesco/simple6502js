@@ -698,7 +698,7 @@ L('ALF'); // b79 c130 - BAD!
       return putAS_next;
     },
 
-    '+_plus' : function(){
+    '+_plus' : function(){ // b13 c39
       CLC()
       // WOW, totally wrong?
       LDAZX(0); ADCZX(2); PHA();
@@ -880,6 +880,88 @@ L('ALF'); // b79 c130 - BAD!
       // TODO:: try parse number
     },
   })
+
+  // clever short JSR routines!
+  // - http://forum.6502.org/viewtopic.php?p=3335
+
+  // normal, but stil save bytes cmp inl
+L('1-'); // i3 b9 c17 (incl RTS)
+  LDAZX(0);
+  BNE('_1-');
+  DECZX(1);
+ L('_1-')
+  DECZX(0);
+  RTS();
+
+// TODO: these modify X by implicit drop,
+// X need to be "RECOVERED"!
+// 
+// Calling inline: // b7 c20+20+
+//   STXZ('tmp'),JSRA('ABS'),LDXZ('tmp');
+//          // or   b11
+//   LDAZX(1),BPL('_pos'),
+//     JSR('ABS'),DEX(),DEX(),
+//     L('_pos');
+//
+// Other: // b6
+//   JSR('NEG'),JMPA('DROP'):
+//
+// but wait, isn't that same as inline?
+//
+// Can NOT tailcall (for next)
+//   
+
+// NOT convinced...
+let opt1 =`
+L('_ABS'); // X is trashed (X is +0 or +2)
+  LDAZX(1);
+  BPL('_ABS'); // BNE('_ABS'); wrong!
+L('_NEGATE'); // X is +2
+  JSR('1-');
+L('_INVERT'); // X is +2
+  JSR('_INVERT_'); // i.e do twice!
+ L('_INVERT_');
+  LDAN(0xFF);
+  EORZX(0);
+  STAZX(0);
+  INX();
+ L('_ABS');
+  RTS();
+`;
+
+// all trashes X (+2)
+// call by: // b8
+//   JSRA('AND'),DEX(),DEX(),NEXT()
+// or // b6
+//   JSRA('AND'),JMPA('DROP');
+let opt = `
+AND   LDA #$35
+      BNE MATH
+OR    LDA #$15
+      BNE MATH
+XOR   LDA #$55
+      BNE MATH
+MINUS JSR NEGATE
+PLUS  CLC
+      LDA #$75
+MATH  STA MATH2
+      JSR MATH1
+MATH1 LDA 2,X
+MATH2 ADC 0,X
+      STA 2,X
+      INX
+      RTS
+
+
+  0= IF which would ordinarily compile to DW ZEQ,QBRANCH,destination can be implemented in 6 bytes using STC also:
+
+Code:
+LDA 0,X
+ORA 1,X
+BNE label
+
+`;
+
 
   // TODO: Report ERROR as no match?
   JMPA('end');
