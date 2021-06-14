@@ -4,7 +4,8 @@ PROGRAM = '34+.';
 // TODO: bug? 153 wrap around (CTRL-R)
 PROGRAM = '9`\0048765432102@d.1+d.2!2@...........h.';
 PROGRAM = '73-.';
-
+PROGRAM = '1234567RRrr.......';
+PROGRAM = '1234567RR.....r.r.';
 
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
@@ -45,6 +46,7 @@ PROGRAM = '73-.';
 // - moving stuff around, 
 // - adding ` print ineline value (508 +44)
 //   (to much growth: implement as word?)
+// - r and R, and move printcontrol (590 +69)
 
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
@@ -175,8 +177,8 @@ ORG(0x0100); // This is ALL of our (user) memory!
 // (DON'T JSR/RTS any, you hear?)
 let S = 0x0100;
 
-ORG(S+ 0xbf); L('top');
-ORG(S+ 0xcf); L('rstack');
+ORG(S+ 0x8f); L('top');
+ORG(S+ 0xbf); L('rstack');
 ORG(S+ 0xef); L('stack');
 
 //variables
@@ -195,7 +197,7 @@ ORG(start);
 L('FORTH_BEGIN');
   // init stack pointers
   LDXN('stack', lo); TXS();
-  LDXN('rstack', lo); STAA('rp');
+  LDXN('rstack', lo); STXA('rp');
 
   // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
   LDAN('NEXT', lo); STAA(cpu.consts().RESET);
@@ -377,7 +379,20 @@ terminal.TRACE(jasm, ()=>{
     });
 });
   def('S'); TSX(),TXA();
-  def('R'); LDAZ('rp',lo);
+  def('r');
+
+PHA();
+TSX(),STXA('sp'),LDXA('rp'),TXS();{
+  PLA();
+}TSX(),STXA('rp'),LDXA('sp'),TXS();
+
+  def('R'); 
+
+TSX(),STXA('sp'),LDXA('rp'),TXS();{
+  PHA();
+}TSX(),STXA('rp'),LDXA('sp'),TXS();
+PLA();
+
   def('z'); ORAN(0xff);
 
   def('+'); PLP(),TSX(),CLC(),ADCAX(S);
@@ -420,21 +435,16 @@ terminal.TRACE(jasm, ()=>{
 
   enddef();
 
-  // control codes, quote them!
-L('quotecontrol');
-  CPXN(31),BCC('number');
-  PHA(),TYA(),PHA(); {
-    LDAN(ord('<')),JSRA(putc);
-    TXA(),LDYN(0),JSRA(putd);
-    LDAN(ord('>')),JSRA(putc);
-  }; PLA(),TAY(),PLA();
-  next();
+  CPXN(31),BCS('printcontrol');
+
   // assume it's a number, lol
   // TODO: check
-  L('number');
+
+L('number');
   PHA(),TXA(),SEC(),SBCN(ord('0'));
 
 // TODO: remove
+// search for function
 next();
 
   L('ENTER_not_a_primitive_try_user_defined');
@@ -474,6 +484,15 @@ L('found');
 
 //   (to much growth: implement as word?)
 L('FORTH_END');
+
+  // control codes, quote them!
+L('printcontrol');
+  PHA(),TYA(),PHA(); {
+    LDAN(ord('<')),JSRA(putc);
+    TXA(),LDYN(0),JSRA(putd);
+    LDAN(ord('>')),JSRA(putc);
+  }; PLA(),TAY(),PLA();
+  next();
 
 L('printval');
   PHA(); {
