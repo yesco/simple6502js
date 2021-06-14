@@ -453,6 +453,7 @@ terminal.TRACE(jasm, ()=>{
   // TODO:color\ make a JSR "getc" that echoes?
   def("'"); PHA(),INY(),LDAAY(S),JSRA(putc); // got the char!
 
+
 if(1){ // dispatch and next for these 
 
   def('"');
