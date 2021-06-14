@@ -64,7 +64,7 @@ let trace = 0;
 // TODO: if not this, hang!
 //process.exit(0);
 
-let brk= 1;
+let brk= 0;
 function next() {
   if (brk) {
     // use only 1 saves 2 bytes!
