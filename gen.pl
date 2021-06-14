@@ -70,11 +70,11 @@
     'lsr',   'g= n(z( m[ADDR]= sc(m[ADDR]) >> 1))',
     'lsr_a', 'g= n(z(       a=       sc(a) >> 1))',
 
-    'rol',   'g= m[ADDR]= n(z(c(m[ADDR]<<1 + (p&C))))',
-    'rol_a', 'g=       a= n(z(c(      a<<1 + (p&C))))',
+    'rol',   'g= m[ADDR]= n(z(c((m[ADDR]<<1) + (p&C))))',
+    'rol_a', 'g=       a= n(z(c((      a<<1) + (p&C))))',
 
-    'ror',    'g= m[ADDR]= n(z( sc( m[ADDR] | ((p&C)<<8))));',
-    'ror_a',  'g=       a= n(z( sc(       a | ((p&C)<<8))))',
+    'ror',    'tmp=m[ADDR];g= m[ADDR]= n(z((m[ADDR]>>>1) | ((p&C)<<7)));sc(tmp)',
+    'ror_a',  'tmp=a;      g=       a= n(z((  a    >>>1) | ((p&C)<<7)));sc(tmp)',
 
     'adc', 'adc(MEM)',
     'sbc', 'adc(~MEM)', # lol
@@ -212,7 +212,7 @@ function adc(v) {
   sc(1);
 }
 
-let op /*Dutch!*/, ic= 0, f, ipc, cpu, d, g, q, cycles= 0;
+let op /*Dutch!*/, ic= 0, f, ipc, cpu, d, g, q, cycles= 0, tmp;
 
 // default is to run forever as count--...!=0 !
 // pc=0 will exit (effect of unvectored BRK)

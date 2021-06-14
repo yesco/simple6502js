@@ -9,6 +9,7 @@ PROGRAM = '1234567RR.....r.r.';
 
 PROGRAM = '33=. 55=.  17=. 12=.   71=. 76=.';
 PROGRAM = '34..34s..';
+PROGRAM = '1<<<<<<<<.  9d>.d>.d>.';
 
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
