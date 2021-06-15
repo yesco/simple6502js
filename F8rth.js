@@ -13,6 +13,23 @@ PROGRAM = '1<<<<<<<<.  9>d.>d.>d.>d.>d.';
 PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
 PROGRAM = "12345'A'B'C........";
 
+// TODO: * mul not working
+PROGRAM = `
+9
+  11*.. 01*..  10*.. 22*.. 33*..
+  99*.. 88*.. 77*.. 44*..
+
+ .`;
+
+
+// r stack
+PROGRAM = '1234567RR.....r.r.';
+PROGRAM = '1234567RRrr.......';
+
+
+// ( ) loop
+PROGRAM = '123(4.])567';
+
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
 
@@ -234,7 +251,10 @@ L('OP_Run');
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
   } PLA();
   LDYN(0xff);
-  JMPA('decstate');
+ L('decstate'); 
+  INCA('state');
+  next();
+  //JMPA('decstate');
 
 L('OP_List');
   TYA(),PHA(); {
@@ -292,9 +312,9 @@ L('compiling');
   def(ctrl('H'), 'OP_BackSpace');
   def(ctrl('L'), 'OP_List');
   def(ctrl('R'), 'OP_Run');
-  def(';', 'decstate');
+//  def(';', 'decstate');
   def('[', 'incstate'); 
-  def(']', 'decstate');
+//  def(']', 'decstate');
   def(0x00, 'waitkey');
   enddef();
 
@@ -381,8 +401,8 @@ L('interpret'); // A has our word
   // LOL: we incstate by dec!
   // neg num can test with BIT!
   def(0x00); DEY(),L('incstate'),DECA('state');
-  def(']'); L('decstate'),INCA('state');
-  def(32); // do not interpret as number! lol
+  def(' '); // do not interpret as number! lol
+  def(10); // do not interpret as number! lol
 
   // same "minimal" 8 as sectorforth!
   def('@'); TAX(),LDAAX(S);
@@ -453,43 +473,151 @@ terminal.TRACE(jasm, ()=>{
   // TODO:color\ make a JSR "getc" that echoes?
   def("'"); PHA(),INY(),LDAAY(S),JSRA(putc); // got the char!
 
+  def('*'); {
 
-if(1){ // dispatch and next for these 
+    // 19 bytes only! avg 130 cycles
+    // - https://www.lysator.liu.se/~nisse/misc/6502-mul.html
+    // same as:
+    // - https://llx.com/Neil/a2/mult.html
+  L('mul');
+
+    PHA();
+
+    STYA('token'); {
+      TSX();
+
+      LDAN(2); STAAX(S+1);
+      LDAN(3); STAAX(S+2);
+      
+      // factors in factor1 and factor2
+      LDAN(0);
+      LDYN(9);
+     L('_mul');
+      LSRAX(S+1);
+      BCC('_mul_no_add');
+      CLC();
+      ADCAX(S+2);
+      L('_mul_no_add');
+      ROR();
+      RORAX(S+1);
+      DEY();
+      BNE('_mul');
+      STAAX(S+2); // hi result factor2
+      // low result in factor1
+
+      // check that the right stack offset!
+      // yes...
+      //LDAN(7); STAAX(S+1);
+      //LDAN(8); STAAX(S+2);
+      
+    } LDYA('token');
+    
+    PLA(); // lo
+    
+    next();
+  }
+
+let div=`
+
+  def('/'); {
+    LDAN(0)      // Initialize REM to 0
+    STA(REM)n
+        STA REM+1
+        LDX #16     ;There are 16 bits in NUM1
+L1      ASL NUM1    ;Shift hi bit of NUM1 into REM
+        ROL NUM1+1  ;(vacating the lo bit, which will be used for the quotient)
+        ROL REM
+        ROL REM+1
+        LDA REM
+        SEC         ;Trial subtraction
+        SBC NUM2
+        TAY
+        LDA REM+1
+        SBC NUM2+1
+        BCC L2      ;Did subtraction succeed?
+        STA REM+1   ;If yes, save it
+        STY REM
+        INC NUM1    ;and record a 1 in the quotient
+L2      DEX
+        BNE L1
+  }
+`;
+
+  def('('); {
+    PHA();
+    R_BEGIN(); {
+      // push "ip"
+      TYA(),PHA();
+    } R_END();
+    PLA();
+  }
+
+  def(')'); {
+    PHA();
+    R_BEGIN(); {
+      // restore "ip"
+      // (jumps back to just after '(')
+      PLA(),TAY(),PHA();
+    } R_END();
+    PLA();
+  }
+
+  def(']'); {
+    PHA();
+    R_BEGIN(); {
+      // drop "ip"
+      PLA();
+
+     L('_]');
+      INY(),LDAAY(S);
+      terminal.TRACE(jasm, ()=>{
+        //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
+      });
+      CMPN(ord(')'));
+      BNE('_]');
+    } R_END();
+    PLA();
+  }
+
+
+  if(0) { // dispatch and next for these 
+
 
   def('"');
   def('#');
   def('$');
   def('%');
 
-  def('*');
   def('/');
-
-  def('(');
-  def(')');
 
   def(',');
 
   def(':');
   def(';');
   def('?');
-}
-
+  }
+  
   // --- letter commands
   def('S'); TSX(),TXA();
-  def('r');
+  def('r'); {
+    // TODO: too big, and not callable
+    L('R>');
+    
+    PHA();
+    R_BEGIN(); {
+      PLA();
+    } R_END();
+  }
+  def('R'); {
+    // can only push A
+    L('>R');
 
-PHA();
-TSX(),STXA('sp'),LDXA('rp'),TXS();{
-  PLA();
-}TSX(),STXA('rp'),LDXA('sp'),TXS();
+    R_BEGIN();{
+      PHA();
+    } R_END();
+    PLA();
 
-  def('R'); 
-
-TSX(),STXA('sp'),LDXA('rp'),TXS();{
-  PHA();
-}TSX(),STXA('rp'),LDXA('sp'),TXS();
-PLA();
-
+  }
   def('z'); ORAN(0xff);
   def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
   // ... and it also defines these
@@ -611,6 +739,14 @@ L('printval');
 
 L('resultColor'); string(amber());
 L('colorOff'); string(off());
+
+function R_BEGIN() {
+  TSX(),STXA('sp'),LDXA('rp'),TXS();
+}
+
+function R_END() {
+  TSX(),STXA('rp'),LDXA('sp'),TXS();
+}
 
 ////////////////////////////////////////
 // RUN
