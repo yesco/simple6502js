@@ -1,0 +1,169 @@
+// Emacs:  -*- truncate-lines: true; -*-
+
+-- I-CHIN LIST of Hexagrams and Trigrams
+
+REFERENCES:
+  chakra colors according to
+  - https://charmvirgo.wordpress.com/2013/06/17/i-ching-binary-numbers-astrology-and-chakras/
+
+  Other cultures binary systems (African, Chinese, Arab, Libnizian)
+  - http://viznut.fi/texts-en/ancient_binary_symbolism.html
+
+  I-ching_Fortunes - A TCL program w many lists!
+  - https://wiki.tcl-lang.org/page/Iching_Fortunes
+
+
+ * = order differs?
+ |
+0. 000 KUN   - -  - -  - - white
+1. 001 KEN   ---  - -  - - magnenta
+2. 010 KAN   - -  ---  - - blue
+3.*011 CHEN  ---  ---  - - green
+4.*100 XUN   - -  - -  --- yellow
+5. 101 LI    ---  - -  --- orange?
+6. 110 TUI   - -  ---  --- red
+7. 111 CHIEN ---  ---  --- black
+
+- BAGUA - Miniuatiure Representation of Universe
+(8 directions: N/S E/W NE NW SE SW)
+
+
+                  CHIEN
+              f     7    f
+         TUI       Sun      XUN
+         6  _______________   4
+    Moon   /               \     Venus
+      N   /                 \     N
+    KAN   \_______    ______/     LI
+      2            \ /            5
+Jupiter             X            Mercury
+      m       _____/ \____       m
+     KEN     / Female-old \   CHEN
+         1  /___  KUN _____\ 3
+        Saturn      0      Mars
+               M   KUN   M
+                  Earth
+
+
+
+                 CHIEN
+              f    7    f
+         TUI      Sun      XUN
+         6                   4
+    Moon                       Venus
+      N                         N
+    KAN                         LI
+      2                         5
+Jupiter                         Mercury
+      m                         m
+     KEN        Female-old     CHEN
+         1         KUN       3
+        Saturn      0      Mars
+               M   KUN   M
+                  Earth
+
+
+
+               7
+ 
+       6                 4
+
+
+
+    2                       5
+
+
+
+       1                 3
+                0       
+
+
+
+THE NAMES OF THE TRIGRAMS
+
+|I |Ching|Picture  |THE     , Translations
+=====================================================================================================
+|1.|Qian |Heaven   |Creative  heaven, Father,northwest,head,lungs|
+|2.|Kun  |Eearth   |Receptive earth,Mother,southwest,abdomen,reproductive_organs|
+|3.|Zhen |Thunder  |Arousing  thunder,Eldest_Son,east,throat|
+|4.|Kan  |Water    |Abysmal   water,Middle_Son,north,liver,kidneys,inner_ear|
+|5.|Gen  |Mountain |Stilness  (keeping still), mountain,Youngest_Son,northeast,hands,spine,bones|
+|6.|Xun  |Wind     |Gentle    wind, Eldest Daughter,southeast,hips,buttocks|
+|7.|Li   |Flame    |Clinging  flame,Middle_Daughter,south,eyes,heart|
+|8.|Dui  |Lake     |Joyous    lake,Youngest_Daughter,west,mouth }|
+
+#    set bookvalue  [ list  1  63  43  62  14  61  34  60  9  59  5 58 26  57  11  56  10  55  58  54  38  53  54  52  61  51 60  50 41  49  19  48 13  47  49  46  30  45  55  44  37  43  63  42  22  41  36  40  25  39  17  38  21  37  51  36  42  35  3  34  27  33  24  32  44  31  28  30  50  29  32  28  57  27  48  26  18  25  46  24  6  23  47  22  64  21  40  20  59  19  29  18 4 17  7  16  33  15  31  14  56  13  62  12  53  11  39 10  52  9  15  31  14  56  13  62  12  53  11  39  10 52  9  15 8 12   7  45  6  35  5  16  4  20  3   23  1  2  0 8 2 ]
+
+(Not ordered binary :-()
+
+|1.  |Qian     |Ch'ien, The Creative|
+|2.  |Kun      |K'un, The Receptive|
+|3.  |Zhun     |Chun, Difficulty at the Beginning|
+|4.  |Meng     |Mêng, Youthful Folly|
+|5.  |Xu       |Hsü, Waiting|
+|6.  |Song     |Sung, Conflict|
+|7.  |Shi      |Shih, The Army|
+|8.  |Bi       |Pi, Holding Together|
+|9.  |Xiaoxu   |Hsiao Ch'u, The Taming Power of the Small|
+|10.  |Lü       |Lü, Treading|
+|11.  |Tai      |T'ai, Peace|
+|12.  |Pi       |P'i, Standstill|
+|13.  |Tongren  |T'ung Jên, Fellowship with Men|
+|14.  |Dayou    |Ta Yu, Possession in Great Measure|
+|15.  |Qian     |Ch'ien, Modesty|
+|16.  |Yu       |Yü, Enthusiasm|
+|17.  |Sui      |Sui, Following|
+|18.  |Gu       |Ku, Work on What Has Been Spoiled|
+|19.  |Lin      |Lin, Approach|
+|20.  |Guan     |Kuan, Contemplation|
+|21.  |Shike    |Shih Ho, Biting Through|
+|22.  |Bi       |Pi, Grace|
+|23.  |Bo       |Po, Splitting Apart|
+|24.  |Fu       |Fu, Return|
+|25.  |Wuwang   |Wu Wang, Innocence|
+|26.  |Daxu     |Ta Ch'u, The Taming Power of the Great|
+|27.  |Yi       |I, The Corners of the Mouth|
+|28.  |Daguo    |Ta Kuo, Preponderance of the Great|
+|29.  |Kan      |K'an, The Abysmal|
+|30.  |Li       |Li, The Clinging|
+|31.  |Xian     |Hsien, Influence|
+|32.  |Heng     |Hêng, Duration|
+|33.  |Dun      |Tun, Retreat|
+|34.  |Dazhuang |Ta Chuang, The Power of the Great|
+|35.  |Jin      |Chin, Progress|
+|36.  |Mingyi   |Ming I, Darkening of the Light|
+|37.  |Jiaren   |Chia Jên, The Family|
+|38.  |Kui      |K'uei, Opposition|
+|39.  |Jian     |Chien, Obstruction|
+|40.  |Xie      |Hsieh, Deliverance|
+|41.  |Sun      |Sun, Decrease|
+|42.  |Yi       |I, Increase|
+|43.  |Guai     |Kuai, Break-through|
+|44.  |Gou      |Kou, Coming to Meet|
+|45.  |Cui      |Ts'ui, Gathering Together|
+|46.  |Sheng    |Shêng, Pushing Upward|
+|47.  |Kun      |K'un, Oppression|
+|48.  |Jing     |Ching, The Well|
+|49.  |Ge       |Ko, Revolution|
+|50.  |Ding     |Ting, The Caldron|
+|51.  |Zhen     |Chên, The Arousing|
+|52.  |Gen      |Kên, Keeping Still|
+|53.  |Jian     |Chien, Development|
+|54.  |Guimei   |Kuei Mei, The Marrying Maiden|
+|55.  |Feng     |Fêng, Abundance|
+|56.  |Lü       |Lü, The Wanderer|
+|57.  |Xun      |Sun, The Gentle|
+|58.  |Dui      |Tui, The Joyous|
+|59.  |Huan     |Huan, Dispersion|
+|60.  |Jie      |Chieh, Limitation|
+|61.  |Zhongfu  |Chung Fu, Inner Truth|
+|62.  |Xiaoguo  |Hsiao Kuo, Preponderance of the Small|
+|63.  |Jiji     |Chi Chi, After Completion|
+|64.  |Weiji    |Wei Chi, Before Completion
+
+
+    proc binaryexchange {gualisting} {
+        # converts gualisting as a list
+        # to binary & decimal 
+#    set bookvalue  [ list  1  63  43  62  14  61  34  60  9  59  5 58 26  57  11  56  10  55  58  54  38  53  54  52  61  51 60  50 41  49  19  48 13  47  49  46  30  45  55  44  37  43  63  42  22  41  36  40  25  39  17  38  21  37  51  36  42  35  3  34  27  33  24  32  44  31  28  30  50  29  32  28  57  27  48  26  18  25  46  24  6  23  47  22  64  21  40  20  59  19  29  18 4 17  7  16  33  15  31  14  56  13  62  12  53  11  39 10  52  9  15  31  14  56  13  62  12  53  11  39  10 52  9  15 8 12   7  45  6  35  5  16  4  20  3   23  1  2  0 8 2 ]
+#    set bookvalue2  [ list 9999 1  63  43  62  14  61  34  60  9  59  5 58 26  57  11  56  10  55  58  54  38  53  54  52  61  51 60  50 41  49  19 48  13  47  49  46  30  45  55  44  37  43  63  42  22  41  36  40  25  39  17  38  21  37  51  36  42  35  3  34  27  33  24  32  44  31  28  30  50  29  32  28  57  27  48  26  18  25  46  24  6  23  47  22  64  21  40  20  59  19  29  18 4 17  7  16  33  15  31  14  56  13  62  12  53  11  39 10  52  9  15  31  14  56  13  62  12  53  11  39  10 52  9  15 8 12   7  45  6  35  5  16  4  20  3   23  1  2  0 8 2 ]
