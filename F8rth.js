@@ -22,13 +22,14 @@ PROGRAM = `
  .`;
 
 
+
+// ( ) loop
+PROGRAM = '123(4.])567';
+
 // r stack
 PROGRAM = '1234567RR.....r.r.';
 PROGRAM = '1234567RRrr.......';
 
-
-// ( ) loop
-PROGRAM = '123(4.])567';
 
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
@@ -214,6 +215,7 @@ ORG(0x0100); // This is ALL of our (user) memory!
 // (so we can use PHA(), PLA(), lol)
 // (DON'T JSR/RTS any, you hear?)
 let S = 0x0100;
+L('S'); // LOL, alias
 
 ORG(S+ 0x8f); L('top');
 ORG(S+ 0xbf); L('rstack');
@@ -615,25 +617,10 @@ L2      DEX
   ////////////////////////////////////////
   // letter commands
   def('S'); TSX(),TXA();
-  def('r'); {
-    // TODO: too big, and not callable
-    L('R>');
-    
-    PHA();
-    R_BEGIN(); {
-      PLA();
-    } R_END();
-  }
-  def('R'); {
-    // can only push A
-    L('>R');
 
-    R_BEGIN();{
-      PHA();
-    } R_END();
-    PLA();
+  def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
+  def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
-  }
   def('z'); ORAN(0xff);
   def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
   // ... and it also defines these
@@ -760,12 +747,20 @@ L('printval');
 L('resultColor'); string(amber());
 L('colorOff'); string(off());
 
-function R_BEGIN() {
+function R_BEGIN() { // b8
   TSX(),STXA('sp'),LDXA('rp'),TXS();
 }
 
-function R_END() {
+function R_END() { // b8
   TSX(),STXA('rp'),LDXA('sp'),TXS();
+}
+
+// use these twice and you might as well...
+function R_PHA() { // b9
+  LDXA('rp'),STAAX('S'),DECA('rp'); // push
+}
+function R_PLA() { // b9
+  LDXA('rp'),INCA('rp'),LDAAX('S',inc); // drop
 }
 
 ////////////////////////////////////////
