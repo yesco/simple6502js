@@ -169,6 +169,8 @@ function def(a, optJmp) {
   let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
   let match = gensym('OP_'+a+'_$'+cpu.hex(2,aa));
 
+  def.count++;
+
   enddef();
 
   L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
@@ -188,6 +190,7 @@ function def(a, optJmp) {
     L(match);
   }
 }
+def.count = 0;
 
 
 function enddef() {
@@ -200,6 +203,9 @@ function enddef() {
 
 ////////////////////////////////////////
 //  TEST
+
+var syms_defs, alfa_defs;
+
 function test() {
 
 ORG(0x0100); // This is ALL of our (user) memory!
@@ -410,8 +416,11 @@ terminal.TRACE(jasm, ()=>{
     });
 });
 
+  ////////////////////////////////////////
+  // Symbol based operators
+
+  L('SYMS_BEGIN'); syms_defs = def.count;
   // TODO: those wanting PLP,TSX could share...
-  // --- Symbol based operators
   // (mostly arith, logic, short!)
   // (and it fit in 256 bytes?)
   // (if so make an page offset jmp table for 32)
@@ -473,8 +482,24 @@ terminal.TRACE(jasm, ()=>{
   // TODO:color\ make a JSR "getc" that echoes?
   def("'"); PHA(),INY(),LDAAY(S),JSRA(putc); // got the char!
 
-  def('*'); {
+  if(0) { // dispatch and next for these 
 
+
+  def('"');
+  def('#');
+  def('$');
+  def('%');
+
+  def('/');
+
+  def(',');
+
+  def(':');
+  def(';');
+  def('?');
+  }
+  
+  def('*'); {
     // 19 bytes only! avg 130 cycles
     // - https://www.lysator.liu.se/~nisse/misc/6502-mul.html
     // same as:
@@ -486,8 +511,11 @@ terminal.TRACE(jasm, ()=>{
     STYA('token'); {
       TSX();
 
-      LDAN(2); STAAX(S+1);
-      LDAN(3); STAAX(S+2);
+      // TODO: FIX!
+      // Try to fix the values
+      // still not working!
+      //LDAN(2); STAAX(S+1);
+      //LDAN(3); STAAX(S+2);
       
       // factors in factor1 and factor2
       LDAN(0);
@@ -543,6 +571,7 @@ L2      DEX
   }
 `;
 
+  // loop stuff
   def('('); {
     PHA();
     R_BEGIN(); {
@@ -579,25 +608,12 @@ L2      DEX
     PLA();
   }
 
+  L('SYMS_END'); syms_defs = def.count - syms_defs;
+  L('ALFA_BEGIN'); alfa_defs = def.count;
 
-  if(0) { // dispatch and next for these 
 
-
-  def('"');
-  def('#');
-  def('$');
-  def('%');
-
-  def('/');
-
-  def(',');
-
-  def(':');
-  def(';');
-  def('?');
-  }
-  
-  // --- letter commands
+  ////////////////////////////////////////
+  // letter commands
   def('S'); TSX(),TXA();
   def('r'); {
     // TODO: too big, and not callable
@@ -647,6 +663,10 @@ L2      DEX
   // TODO: comment? cna be used as headline
 
   enddef();
+  L('ALFA_END'); alfa_defs = def.count - alfa_defs;
+
+  ////////////////////////////////////////
+  // more special test, or fallbacks
 
   CPXN(31),BCS('printcontrol');
 
@@ -786,6 +806,10 @@ if (0) {
 print();
 
 console.log("FORTH:", l.FORTH_END-l.FORTH_BEGIN);
+console.log("SYMS:", l.SYMS_END-l.SYMS_BEGIN);
+console.log("   #:", syms_defs);
+console.log("ALFA:", l.ALFA_END-l.ALFA_BEGIN);
+console.log("   #:", alfa_defs);
 console.log("TOTAL:", jasm.address()-l.FORTH_END);
 
 print('-'.repeat(40));
