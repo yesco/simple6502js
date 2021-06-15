@@ -21,19 +21,46 @@ PROGRAM = `
 
  .`;
 
-
-
-// ( ) loop
-PROGRAM = '123(4.])567';
-
 // r stack
 PROGRAM = '1234567RR.....r.r.';
 PROGRAM = '1234567RRrr.......';
 
-
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
 
+
+// TODO:
+// exit, hmmm, searches for ) lol
+PROGRAM = ':1.]234';
+
+// ( ) loop
+PROGRAM = '123(4.(5.)9.9.9.)567';
+
+// loop w ]
+PROGRAM = '123(4.]6.6.6.)567';
+
+// TODO: should print 1 2 3 4 5 6
+// (the ')' is somewhat undefefined,
+// in this case pulls z 0 from stack, lol)
+PROGRAM = ':1.]6.6.6.;  2.3.4.)8.8.';
+
+// tail recurse on last ')', lol
+// (however, this has overhead of one PH,PL
+//  for interpreted words :-( )
+// For ALF; words start at Y=0, but then needs
+//  another word for tailrecurse :-( )
+PROGRAM = ':1.)234;';
+
+// TODO: skip intermediate (count matching)
+// should give 1 2 3 4 
+PROGRAM = '12(3.](6.9.6.)0.6.0.)4.5.6.';
+
+// multiple unloop/leave
+PROGRAM = '12(3])456';
+PROGRAM = '12(3(4]4)5]5)67';
+
+PROGRAM = '12(3(4]]4)44)567';
+PROGRAM = '12(3(4]]4)4]4)567';
 
 
 //      -*- truncate-lines: true; -*-
@@ -315,6 +342,10 @@ L('compiling');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
+  // hmmm
+  //def(':'); colon(),INCA('state');
+  //def('C'); compile();
+
   // Check editing first
   def(0x7f, 'OP_BackSpace');
   def(ctrl('H'), 'OP_BackSpace');
@@ -438,7 +469,7 @@ terminal.TRACE(jasm, ()=>{
   // :|~s~N;
 
   def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
-  def(';'); TAY(),PLA();
+
   // (+ 13 15 12 12 12 9 1 10 0 10 7 11 13 10 9)
   // = 144 bytes
 
@@ -495,12 +526,15 @@ terminal.TRACE(jasm, ()=>{
   def('/');
 
   def(',');
-
-  def(':');
-  def(';');
-  def('?');
+    
   }
   
+  // TODO: if
+  def('?');
+
+  // TODO: GOTO ?
+  // TAY(),PLA();
+
   def('*'); {
     // 19 bytes only! avg 130 cycles
     // - https://www.lysator.liu.se/~nisse/misc/6502-mul.html
@@ -575,6 +609,7 @@ L2      DEX
 
   // loop stuff
   def('('); {
+    L('do');
     PHA();
     R_BEGIN(); {
       // push "ip"
@@ -593,20 +628,110 @@ L2      DEX
     PLA();
   }
 
-  def(']'); {
-    PHA();
-    R_BEGIN(); {
-      // drop "ip"
-      PLA();
+  def(']'); { // b44 (HUGE! because of interpret)
+    // TODO: idea; have a "skip mode",
+    // only then we need a stack of modes?
+    //
+    // Hmmmm STATE = 0  Immediate mode (running)
+    //       STATE = 1  Skipping mode!
+    //                  just reacting to editing
+    //                  and maybe [ ] ?
+    //                  but [] 
+    // possibly    > 1  is the count of {} to skip?
+    //                  do we need to match correctly?
+    //                  LOL: only "..." and then
+    //                  counting ({}) no count[]
+    //   !!! During "skipping" / compilation mode
+    //     we can use the data stack to store
+    //     expected token!
+    //
+    // Maybe STATE = -1   Immediate
+    //                0   Compiling
+    //               >1   Loops that needs dec?
+    //       can have separate words for ();
+    //  maybe won't work when enter immediate mode?
+    //  may need to have separate counter. Hmmm
+    //
+    // CONCLUSION: (?)
+    //   it's cheaper and much more effective
+    //   to "compile" the code... the traditional
+    //   way. It's probably smaller even!
+    //
+    // OR>...
+    //   We could just enter "compile mode"?
+    //   That skips matching stuff?
+    //   (it doesn't have to normally, but...)
+    //
+    //   So just name it "skip mode"?
+    PHA(); {
 
-     L('_]');
-      INY(),LDAAY(S);
+      TXA();
+      LDXN(0); // count of depth of ()
+
+      // TODO: count the number of ]]]]
+    L('_]]');
+      TRACE(_=>['].count', cpu.reg('x')]);
+      CMPN(ord(']'));
+      BNE('_]skip');
+      INX(),INY(),LDAAY(S);
+      BNE('_]]');
+      // never falls out (unless at 00)
+      // TODO: test...
+      DEY();
+
+      // Takes an f to run at emulation time
+      // if it returns an array, pass on to
+      // console.log
+      function TRACE(f) {
+        terminal.TRACE(jasm, ()=>{
+          let r = f();
+          if (!r) return;
+          print(' >>> ', ...r);
+        });
+      }
+
+    L('_]skip.next');
+      INY();
+    L('_]skip');
+      LDAAY(S);
       terminal.TRACE(jasm, ()=>{
         //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
       });
+
+      // TODO: "  [  ) "
+      // TODO: nesting of "{ ..{ ...  } .. }"
+
+      CMPN(ord(';'));
+      BEQ('_;_mid');
+
+      CMPN(ord('('))
+      BNE('_not(');
+      INX();
+    L('_not(');
+
       CMPN(ord(')'));
-      BNE('_]');
-    } R_END();
+      BNE('_]skip.next');
+      DEX();
+      BNE('_]skip.next');
+      // you'll fall through here when at
+      // and the last matching ')'
+
+      // foudn last matching ')'
+      // similar to ';' but w/o PLA
+      R_PLA(); // drop "ip"
+    }
+    PLA();
+  }
+
+  // COLON (not ENTER) and ; (EXIT)
+  def(':', 'do'); // dispatch does ENTER
+  def(';'); {
+    PHA(); {
+      L('_;_mid');
+      R_PLA();
+      // do "RTS"
+      R_PLA(),TAY();
+    }
     PLA();
   }
 
@@ -632,9 +757,6 @@ L2      DEX
   def('L'); PHA(),LDAAX('latest');
   def('K'); PHA(),L('K'),JSRA(getc),BEQ('K');
   def('e'); JSRA(putc),PLA();
-
-  //def(':'); colon(),INCA('state');
-  //def('C'); compile();
 
   def('x'); TAX(),PLA(),JMPA('interpret');
 
