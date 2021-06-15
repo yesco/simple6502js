@@ -381,22 +381,6 @@ L('interpret'); // A has our word
     });
   });
 
-  // TODO: those wanting PLP,TSX could share...
-
-  // --- Symbol based operators
-  // (mostly arith, logic, short!)
-  // (and it fit in 256 bytes?)
-  // (if so make an page offset jmp table for 32)
-  //
-  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
-  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
-  def('&'); PLP(),TSX(),      ANDAX(S);
-  def('|'); PLP(),TSX(),      ORAAX(S);
-  def('^'); PLP(),TSX(),      EORAX(S);
-  def('~'); EORN(0x44);
-  // :~dN;
-  // :&N~;
-  // :|~s~N;
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
@@ -425,6 +409,22 @@ terminal.TRACE(jasm, ()=>{
     d: cpu.hex(4,cpu.reg('d')),
     });
 });
+
+  // TODO: those wanting PLP,TSX could share...
+  // --- Symbol based operators
+  // (mostly arith, logic, short!)
+  // (and it fit in 256 bytes?)
+  // (if so make an page offset jmp table for 32)
+  //
+  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
+  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
+  def('&'); PLP(),TSX(),      ANDAX(S);
+  def('|'); PLP(),TSX(),      ORAAX(S);
+  def('^'); PLP(),TSX(),      EORAX(S);
+  def('~'); EORN(0x44);
+  // :~dN;
+  // :&N~;
+  // :|~s~N;
 
   def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
   def(';'); TAY(),PLA();
