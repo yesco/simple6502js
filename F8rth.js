@@ -62,6 +62,12 @@ PROGRAM = '12(3(4]4)5]5)67';
 PROGRAM = '12(3(4]]4)44)567';
 PROGRAM = '12(3(4]]4)4]4)567';
 
+// 0=
+PROGRAM = '0z. 1z. 2z. 3z. 4z. 5z. 6z. 7z. 8z. 9z. ';
+
+PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
+
+
 
 //      -*- truncate-lines: true; -*-
 //
@@ -486,7 +492,12 @@ terminal.TRACE(jasm, ()=>{
   // ?~>
 
   def('='); { // sign function! fun to write...
-    PLP(),TSX(),CMPAX(S);   
+
+//STYA('token');
+//LDYN(0);
+
+
+    TSX(),CMPAX(S, inc);
     
     // Had to do some thing about this one...
     //
@@ -496,7 +507,133 @@ terminal.TRACE(jasm, ()=>{
     // 0  1  1      A = M    1  0   2       0
     // ?  0  1      A > M    1  1   3      +1
 
-    PHP();             // b12 c17
+    // TODO: https://wiki.nesdev.com/w/index.php/Synthetic_instructions
+    
+    // negates Z
+    //PHP();
+    //PLP();
+    //ANDN(2);
+    if (0){ // b7 c13
+
+      // NOT correct for negative nums...
+      let B=0, A=128; 
+      LDAN(A);
+      CMPN(B);
+
+      PHP();
+      PLA();
+      ROL();
+      ANDN(1);
+      SBCN(0);
+
+    } else if (1){ // b8 c15  JSK!
+      // Final, don't modify!!!
+
+      PHP();
+      PLA();
+      ROR();
+      ANDN(3);
+      // 0 1 2 !!!
+      CLC(),SBCN(0); // A -= 1
+      // 255 0 1
+
+    } else if(1){ // b5
+      
+      PHP();
+      PLA();
+      ROR();
+      ANDN(3);
+      // 0 1 2 !!!
+    } else if (1) {  // b12
+      // no jumps
+
+      PHP();
+      PLA();
+      ROR();
+      ANDN(3);
+      SBCN(1);
+      ADCN(255);
+      // => 254, 255, 0 !!!
+      CLC();
+      ADCN(1);
+      // => 255, 0, 1
+
+    } else if (1) {  // b 9 c5 to 10
+      // jsk
+
+      SEC();
+      SBCAX(S, inc); // nc
+      BEQ('__next');
+      LDAN(1);
+      ADCN(254); // make ADC w C add 2!
+      ADCN(0);
+    L('__next');
+
+
+    } else if (1) {  // b 9  c5 | c9 | c10
+      // Daneiele Versotto NICE!
+
+      SEC();
+      SBCAX(S, inc); // nc
+      BEQ('__next');
+      LDAN(1);
+      BCS('__next');
+      LDAN(0xff);
+    L('__next');
+
+      
+    } else if (1) { // b11 +1 SEC()
+      // jsk variant of below
+
+      SEC();
+      SBCAX(S, inc);  // change to SBC
+
+      BEQ('__end');   // A is already 0!
+      LDAN(0);
+      BCS('__p');
+      ADCN(0xff);
+    L('__p');
+      ADCN(0);
+    L('__end');
+
+    } else if (1) { // b10
+
+      STYA('token'); // not counting
+
+      // - https://m.facebook.com/groups/1449255602010708?view=permalink&id=2956507981285455&notif_ref=m_beeper
+      LDYN(0);
+      CMPAX(S, inc); // no count
+
+      BEQ('-z');
+      BCS('-p');
+      DEY();
+      DEY();
+     L('-p');
+      INY();
+     L('-z');
+      TYA();
+      
+      
+      L('_=end');
+
+    LDYA('token');
+
+    } else if (1) {
+      //LDAN(-1);
+      //CMPN(127);
+      // works  b7 c13  !!!! WTF!
+      PHP();
+      PLA();
+      ROL();
+      ANDN(1);
+      SBCN(0);
+    }
+
+    PLP(); // safer here (interrrupts...)
+    next();
+
+
+    PHP();             // b13 c17
     LDAN(-2 & 0xff);   // offset -2
     BCC('_cskip');
     ADCN(1);           // if carry add 2! 
@@ -740,13 +877,33 @@ L2      DEX
 
 
   ////////////////////////////////////////
-  // letter commands
-  def('S'); TSX(),TXA();
-
+  // ALFA / letter commands
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
-  def('z'); ORAN(0xff);
+  def('S'); TSX(),TXA();
+
+// 0 -> 0 other -> 255
+//  def('z'); CMPN(0),LDAN(0),SBCN(0);
+
+  def('z'); TSX(),CMPN(0),SBCAX(S);
+
+// 0 -> 1 other +: 0
+//  def('z'); CMPN(0),LDAN(0),ADCN(0);
+
+// 0: 0  -: 255
+//  def('z'); CMPN(0),LDAN(0),ADCN(255);
+
+//  def('z'); CMPN(0),LDAN(255),ADCN(0);
+
+// This gives correct:  b 8  (too much!) c8
+//  def('z'); CMPN(0),LDAN(0),ADCN(0xff),EORN(0xff);
+
+  // Typical: b 8 c7+1
+//  def('z'); CMPN(0),LDAN(0),BCC('_z'),
+//  EORN(0xff),L('_z');
+
+  // ??
   def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
   // ... and it also defines these
   //def('B'); PHA(),LDAN('tib');
@@ -883,6 +1040,16 @@ function R_PHA() { // b9
 }
 function R_PLA() { // b9
   LDXA('rp'),INCA('rp'),LDAAX('S',inc); // drop
+}
+
+// BIT trick (overlaps other instr)
+// use:
+//   CMP(0),BNE(3),LDAN(0)p
+function SKIP1() { // BITZ()
+  data(0x24);
+}
+function SKIP1() { // BITA()
+  data(0x2c);
 }
 
 ////////////////////////////////////////
