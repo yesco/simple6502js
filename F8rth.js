@@ -388,6 +388,7 @@ L('SYSTEM');
                            // use for loop counting?
   L('sp');        byte(0); // might
   L('rp');        byte(0);
+  L('LATEST');    word(0); 
 
 ////////////////////////////////////////
 if (jasm.address() > 0x0200)
@@ -905,10 +906,15 @@ L2      DEX
       CMPN(ord(';'));
       BEQ('_;_mid');
 
+      CMPN(ord('`'));
+      BNE('_not_backtick');
+        INY();
+      L('_not_backtick');
+
       CMPN(ord('('))
       BNE('_not(');
-      INX();
-    L('_not(');
+        INX();
+      L('_not(');
 
       CMPN(ord(')'));
       BNE('_]skip.next');
@@ -1048,6 +1054,10 @@ L('found');
 //   (to much growth: implement as word?)
 L('FORTH_END');
 
+////////////////////////////////////////
+// Extras (not core)
+
+L('XTRAS_BEGIN');
   // control codes, quote them!
 L('printcontrol');
   PHA(),TYA(),PHA(); {
@@ -1078,17 +1088,74 @@ L('printval');
   } PLA();
   next();
 
-  function colon() {
-  }
-  function docolon() {
-  }
-  function compile() {
-  }
+L('XTRAS_END');
   
-}
+////////////////////////////////////////
+// High-Level words go here
+L('WORDS_BEGIN');
+
+  WORD('ones', 0, '11111.....');
+  WORD('twos', 0, '2222....');
+  WORD('threes', 0, '333...');
+L('WORDS_END');
+
+} // test
 
 L('resultColor'); string(amber());
 L('colorOff'); string(off());
+
+////////////////////////////////////////
+// word functions
+
+// define a high level word
+// at "pre-process time" (macro)
+// Usage:
+//   CREATE('square', 0, 'd*');
+// Returns start address
+var latest = 0
+function WORD(name, imm, prog, datas=[], qsize=0) {
+  let start = jasm.address();
+  let l = gensym('WORD_cod_'+name);
+
+  // link
+  word(latest);
+  // imm / flags
+  byte(imm);
+  // cod
+  byte(l, a=>a-start);
+  // name
+  hibit(name);
+  // dataset
+  // (TODO: how to find it?)
+  datas.forEach(x=>data(x));
+  // program
+ L(l);
+  string(prog);
+  // circular queue/buffer
+  // (TODO: howto find it?)
+  allot(qsize);
+  
+  let len = jasm.address() - start;
+  if (len > 256)
+    throw `%% WORD: '${name}' bigger than 256 bytes: ${len}`;
+
+  latest = jasm.address();
+
+  // pathc/put first in linked-list
+//  ORG(jasm.getLabels().LATEST); word(latest);
+
+  // let's continue
+//  ORG(latest);
+} 
+
+
+// generates 6502 code for create
+function create() {
+  
+}
+
+////////////////////////////////////////
+// Generic Library
 
 function R_BEGIN() { // b8
   TSX(),STXA('sp'),LDXA('rp'),TXS();
@@ -1116,13 +1183,13 @@ function SKIP1() { // BITA()
   data(0x2c);
 }
 
-      function TRACE(f) {
-        terminal.TRACE(jasm, ()=>{
-          let r = f();
-          if (!r) return;
-          print(' >>> ', ...r);
-        });
-      }
+function TRACE(f) {
+  terminal.TRACE(jasm, ()=>{
+    let r = f();
+    if (!r) return;
+    print(' >>> ', ...r);
+  });
+}
 
 ////////////////////////////////////////
 // RUN
@@ -1161,12 +1228,20 @@ if (0) {
 
 print();
 
-console.log("FORTH:", l.FORTH_END-l.FORTH_BEGIN);
-console.log("SYMS:", l.SYMS_END-l.SYMS_BEGIN);
-console.log("   #:", syms_defs);
-console.log("ALFA:", l.ALFA_END-l.ALFA_BEGIN);
-console.log("   #:", alfa_defs);
-console.log("TOTAL:", jasm.address()-l.FORTH_END);
+function prsize(nam, len, more) {
+  console.log(nam,
+              len.toString().padStart(6),
+              more?more:'');
+}
+prsize("FORTH :", l.FORTH_END-l.FORTH_BEGIN);
+prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
+prsize("  ( # :", syms_defs, ')');
+prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
+prsize("  ( # :", alfa_defs, ')');
+prsize(" XTRA :", l.XTRA_END-l.XTRA_BEGIN);
+prsize("WORDS :", l.WORDS_END-l.WORDS_BEGIN);
+prsize("TOTAL :", jasm.address()-start);
+
 
 print('-'.repeat(40));
 print();
