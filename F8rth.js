@@ -1,5 +1,4 @@
 PROGRAM = '123 ...'; // test space
-PROGRAM = '34+.';
 // +1 inc at 4th position
 // TODO: bug? 153 wrap around (CTRL-R)
 PROGRAM = '9`\0048765432102@d.1+d.2!2@...........h.';
@@ -55,6 +54,9 @@ PROGRAM = ':1.)234;';
 // should give 1 2 3 4 
 PROGRAM = '12(3.](6.9.6.)0.6.0.)4.5.6.';
 
+// 0=
+PROGRAM = '0z. 1z. 2z. 3z. 4z. 5z. 6z. 7z. 8z. 9z. ';
+
 // multiple unloop/leave
 PROGRAM = '12(3])456';
 PROGRAM = '12(3(4]4)5]5)67';
@@ -62,16 +64,24 @@ PROGRAM = '12(3(4]4)5]5)67';
 PROGRAM = '12(3(4]]4)44)567';
 PROGRAM = '12(3(4]]4)4]4)567';
 
-// 0=
-PROGRAM = '0z. 1z. 2z. 3z. 4z. 5z. 6z. 7z. 8z. 9z. ';
-
 PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
 
-
+PROGRAM = `
+34+.99+.
+73-.37-.99-.01-.
+73*.37*.99*.
+73/.37/.99/.93/.
+13&.97&.84&.
+13|.97|.84|.
+13^.97^.84^.
+ 1~. 0~. 8~.01-~.
+`;
 
 //      -*- truncate-lines: true; -*-
 //
-//               READLINE-65
+//
+//
+//              F8rth 8-Bit Forth
 // 
 //          (>) 2021 Jonas S Karlsson
 //                jsk@yesco.org
@@ -113,6 +123,50 @@ PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
 //           (offset jmptable make compact)
 //           - 23 routines ( don't count num)
 //           - 256/23 => 11
+
+// DICTIONARY ENTRY (longword)
+//               ____________________________ 
+//              /    +------------------+    \
+// offset:     /     |                  |     \
+// |0     |1  /   |2 ^  |3         |4   v      \
+// | link | flags | cod | name...7 | CODE... | data |
+//    #2     #1      #1    #len
+// bytes^^^
+//
+// link  : pointer to previous entry (2B)
+// flags : N=immediate (lo bits data offset)
+// cod   : offset of code (len = cod-2)
+// name  : ascii, hi-bit terminated
+// data  : as this is somewhat object
+//         orienterd, data is after code
+//         known by the code (?)
+// 
+
+// INTERPREATION
+// 
+// In general execution takes place inside
+// a word.
+//
+// variables and registers
+//
+// BIP   : Base IP
+//     Y : little "yp", added to IP
+//         using LDAAY BIP as "next"
+//         If you want to use Y, save it.
+//
+//         Either TYA,PHA .... PLA,TAY
+//         Or     STAA('tmp') LDAA('tmp')
+//
+//         (BIP+ip) == token stored in X
+//         ...except when function parsing
+// 
+//     X : general index register, free
+//         initially it contains 'token'
+//
+//     A : general register free to use
+
+
+
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
 let jasm = require('./jasm.js');
@@ -244,17 +298,34 @@ function test() {
 
 ORG(0x0100); // This is ALL of our (user) memory!
 
-// verything is relative the stack
+// (ANS Forth specifies a minimum:
+//  of 32 cells of Parameter Stack,
+//  and 24 cells of Return Stack.)
+const CELL= 1; // 8-bit system, LOL
+const DS_SIZE= 32*CELL;
+const RS_SIZE= 24*CELL;
+
+// everything is relative the stack
 // (so we can use PHA(), PLA(), lol)
 // (DON'T JSR/RTS any, you hear?)
-let S = 0x0100;
-L('S'); // LOL, alias
+const      S= 0x0100;
+const SYSTEM= 0x01f0;  
+L('S'); // alias
 
-ORG(S+ 0x8f); L('top');
-ORG(S+ 0xbf); L('rstack');
-ORG(S+ 0xef); L('stack');
+// 0x100-- program/editor
+// 
+// "top" of memory
+ORG(S+ 0xf0-1-RS_SIZE-DS_SIZE); L('top');
+
+// Data Stack (Params)
+ORG(S+ 0xf0-1-RS_SIZE);         L('stack');
+
+// Return Stack
+ORG(S+ 0xf0-1);                 L('rstack');
 
 //variables
+ORG(S+ 0xf0); /// FREE
+  L('SYSTEMD'):
 ORG(S+ 0xfa); L('token'); // or save Y
 ORG(S+ 0xfb); L('latest');
 ORG(S+ 0xfc); L('here');
@@ -382,7 +453,13 @@ L('compiling');
   if (brk) BRK();
 
 L('NEXT');
-  if (brk) { PLP(),PLP(),PLP() } // drop BRK crap
+  if (brk) {
+    STAA('token');
+    // drop BRK crap
+    PLA(),PLA(),PLA();
+    // TODO: brk dispatch?
+    LDAA('token');
+  }
 
   INY();
   LDXAY(S);
@@ -459,31 +536,31 @@ terminal.TRACE(jasm, ()=>{
   // Symbol based operators
 
   L('SYMS_BEGIN'); syms_defs = def.count;
-  // TODO: those wanting PLP,TSX could share...
-  // (mostly arith, logic, short!)
   // (and it fit in 256 bytes?)
   // (if so make an page offset jmp table for 32)
+
+  // no TOS: // b12 c20 all stack !
+  //   def('+'); TSX(),CLC(),LDAN(S+1),ADCAX(S+2),STAAX(S+2),PLA();
   //
-  def('+'); PLP(),TSX(),CLC(),ADCAX(S);
-  def('-'); PLP(),TSX(),CLC(),SBCAX(S),EORN(0xff); // haha CLC turns it around!
-  def('&'); PLP(),TSX(),      ANDAX(S);
-  def('|'); PLP(),TSX(),      ORAAX(S);
-  def('^'); PLP(),TSX(),      EORAX(S);
-  def('~'); EORN(0x44);
-  // :~dN;
-  // :&N~;
-  // :|~s~N;
+  // zp stack using X // b11 c16 zp stack
+  //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
+
+  // TODO: JMPA('dex_txs');
+  //        /get stack ptr                    /drop one
+  def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
+  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
+  def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
+  def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
+  def('^'); TSX(),      EORAX(S+1),           DEX(),TXS();
+  def('~'); EORN(0xff)                                     // WINNER!
 
   def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
-
-  // (+ 13 15 12 12 12 9 1 10 0 10 7 11 13 10 9)
-  // = 144 bytes
-
 
   // add more symbols here!
 
   def('<'); CLC(),ROL(); // TODO: ASL(); save 1B
   def('>'); CLC(),ROR(); // TODO: LSR()
+
   // ?=
   // ?<
   // ?>
@@ -491,75 +568,24 @@ terminal.TRACE(jasm, ()=>{
   // ?~<
   // ?~>
 
-  def('='); { // sign function! fun to write...
-
-//STYA('token');
-//LDYN(0);
-
-
+  def('='); { // Unsigned <=>  ==> -1, 0, 1
     TSX(),CMPAX(S, inc);
-    
-    // Had to do some thing about this one...
+    // Had to do some thinking about this one...
     //
     // N  Z  C               C  !Z         -2
     // --------              ===== ordered ===
     // ?  0  0      A < M    0  1   1      -1
     // 0  1  1      A = M    1  0   2       0
     // ?  0  1      A > M    1  1   3      +1
+    //
+    //         A := C*2 + !Z - 2;
+    //
+    // too difficult; asked in 6502 forum for shortest
+    // - https://m.facebook.com/groups/1449255602010708?view=permalink&id=2956507981285455&notif_ref=m_beeper
 
-    // TODO: https://wiki.nesdev.com/w/index.php/Synthetic_instructions
-    
-    // negates Z
-    //PHP();
-    //PLP();
-    //ANDN(2);
-    if (0){ // b7 c13
-
-      // NOT correct for negative nums...
-      let B=0, A=128; 
-      LDAN(A);
-      CMPN(B);
-
-      PHP();
-      PLA();
-      ROL();
-      ANDN(1);
-      SBCN(0);
-
-    } else if (1){ // b8 c15  JSK!
-      // Final, don't modify!!!
-
-      PHP();
-      PLA();
-      ROR();
-      ANDN(3);
-      // 0 1 2 !!!
-      CLC(),SBCN(0); // A -= 1
-      // 255 0 1
-
-    } else if(1){ // b5
-      
-      PHP();
-      PLA();
-      ROR();
-      ANDN(3);
-      // 0 1 2 !!!
-    } else if (1) {  // b12
-      // no jumps
-
-      PHP();
-      PLA();
-      ROR();
-      ANDN(3);
-      SBCN(1);
-      ADCN(255);
-      // => 254, 255, 0 !!!
-      CLC();
-      ADCN(1);
-      // => 255, 0, 1
-
-    } else if (1) {  // b 9 c5 to 10
-      // jsk
+    TSX(),CMPAX(S, inc);
+    if (1) {  // b9 c5 or c10 (with SBC/CMP +c4)
+      // jsk - CORRECT!
 
       SEC();
       SBCAX(S, inc); // nc
@@ -600,7 +626,6 @@ terminal.TRACE(jasm, ()=>{
 
       STYA('token'); // not counting
 
-      // - https://m.facebook.com/groups/1449255602010708?view=permalink&id=2956507981285455&notif_ref=m_beeper
       LDYN(0);
       CMPAX(S, inc); // no count
 
@@ -629,23 +654,8 @@ terminal.TRACE(jasm, ()=>{
       SBCN(0);
     }
 
-    PLP(); // safer here (interrrupts...)
-    next();
-
-
-    PHP();             // b13 c17
-    LDAN(-2 & 0xff);   // offset -2
-    BCC('_cskip');
-    ADCN(1);           // if carry add 2! 
-    L('_cskip');
-
-    PLP();             // using original flags
-    BEQ('_zskip');
-    CLC();
-    ADCN(1);           // if equal add 1
-    L('_zskip');
-
-    // A: -1 if <    0 if =    +1  if  >
+    // all variants cleanup
+    PLA();
     next();
   }
 
@@ -819,13 +829,6 @@ L2      DEX
       // Takes an f to run at emulation time
       // if it returns an array, pass on to
       // console.log
-      function TRACE(f) {
-        terminal.TRACE(jasm, ()=>{
-          let r = f();
-          if (!r) return;
-          print(' >>> ', ...r);
-        });
-      }
 
     L('_]skip.next');
       INY();
@@ -903,8 +906,8 @@ L2      DEX
 //  def('z'); CMPN(0),LDAN(0),BCC('_z'),
 //  EORN(0xff),L('_z');
 
-  // ??
-  def('N'); TSX(),PLP(),ANDAX(S+1),EORN(0xff);
+  // ~1+
+  //def('N'); TSX(),ANDAX(S+2),EORN(0xff);
   // ... and it also defines these
   //def('B'); PHA(),LDAN('tib');
   //def('T'); PHA(),LDAA('state');
@@ -1051,6 +1054,14 @@ function SKIP1() { // BITZ()
 function SKIP1() { // BITA()
   data(0x2c);
 }
+
+      function TRACE(f) {
+        terminal.TRACE(jasm, ()=>{
+          let r = f();
+          if (!r) return;
+          print(' >>> ', ...r);
+        });
+      }
 
 ////////////////////////////////////////
 // RUN
