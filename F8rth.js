@@ -1,3 +1,5 @@
+//      -*- truncate-lines: true; -*-
+
 PROGRAM = '123 ...'; // test space
 // +1 inc at 4th position
 // TODO: bug? 153 wrap around (CTRL-R)
@@ -164,8 +166,55 @@ PROGRAM = `
 //         initially it contains 'token'
 //
 //     A : general register free to use
+//
+// TASKS
+//
+// A word can be seen as a task.
+//
+//   - Limited to 256 bytes (1 page)
+//   - Send and receive messages
+//   - Reactive system ala erlang
+//   - Internal storage
+//   - Check status
+//   - y yield
+//   - Multiple types of message
+//     X: message number
+//     data on global stack?
+//   - Provide and use services
+//     (alarm, 
+//   - local "recv" function (called)
 
+// Local Storage ("User")
+//
+//   * static variables/data
+//   * circular double-headed buffer
+//     - l<     l>  (push, pop)
+//     - q<     q>  (unshift, shift)
+//           #      (size, 0 if empty)
+//       q!     q@  (send, receive)
+//       l!     l@  (1 byte addresses)
+//   * or use Pub/Sub style
+//     emit, subscribers, receive,
+//     channels, ...
+//     - can be implemented by just
+//       producer calling consumers
+//     - a channel can be an instance
+//       of a queue word, code impl
+//       just JSR to other word, no
+//       setup, does not do ENTER as
+//       it's calling an "abstract obj"
+//   
+// Stack usage
+//   * has a single entry point
+//   * the system will call with message
 
+// Private Terminale Window (tty)
+//   * ala Apple ][
+//     (pos r,c  size w,h  cur r,c)
+//   * minimize/maximize (user request)
+//     (META-123... or CTRL-123...)
+//   * can enter EDITOR for the command!
+//     CTRL-R etc...
 
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
@@ -324,14 +373,26 @@ ORG(S+ 0xf0-1-RS_SIZE);         L('stack');
 ORG(S+ 0xf0-1);                 L('rstack');
 
 //variables
-ORG(S+ 0xf0); /// FREE
-  L('SYSTEMD'):
-ORG(S+ 0xfa); L('token'); // or save Y
-ORG(S+ 0xfb); L('latest');
-ORG(S+ 0xfc); L('here');
-ORG(S+ 0xfd); L('state');
-ORG(S+ 0xfe); L('sp'); // TODO: maybe not?
-ORG(S+ 0xff); L('rp');
+ORG(SYSTEM);
+L('SYSTEM');
+  // I think we want the concept
+  // of local data:
+  
+
+  // make ZP global?
+  L('token');     byte(0); // tmp?
+  // these may be local page related?
+  L('latest');    byte(0); // => zp?
+  L('here');      byte(0); // "where"
+  L('state');     byte(0); // why local?
+                           // use for loop counting?
+  L('sp');        byte(0); // might
+  L('rp');        byte(0);
+
+////////////////////////////////////////
+if (jasm.address() > 0x0200)
+  throw "SYSTEM area too big!";
+////////////////////////////////////////
 
 ORG(S); string(PROGRAM);
 
