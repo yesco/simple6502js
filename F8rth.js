@@ -79,6 +79,8 @@ PROGRAM = `
  1~. 0~. 8~.01-~.
 `;
 
+PROGRAM = '34+.';
+
 //      -*- truncate-lines: true; -*-
 //
 //
@@ -248,16 +250,25 @@ let BLACK= 0, RED= 1,     GREEN= 2, YELLOW= 3,
     BLUE=  4, MAGNENTA=5, CYAN=  6, WHITE=  7;
 
 function amber() { return '[38;5;214m'; }
-function cursorOff() { return '[?25l'; }
-function home() { return gotorc(0, 0); }
+
 function cls() { return '[2J' + home; }
-function cursorOn() { return '[?25h'; }
+function home() { return gotorc(0, 0); }
 function gotorc(r, c) { return '['+r+';'+c+'H'; }
+function cursorOn() { return '[?25h'; }
+function cursorOff() { return '[?25l'; }
+
+function cursorSave() { return '7'; }
+function cursorRestore() { return '8'; }
+
 function fgcol(c) { return '[3'+c+'m'; }
 function bgcol(c) { return '[4'+c+'m'; }
+
 function inverseOn() { return '[7m'; }
 function underscoreOn() { return '[4m'; }
 function boldOn() { return '[1m'; }
+
+function save(c) { return '[3'+c+'m'; }
+
 // you can only turn all off! :-(
 function off(){ return'[m'; }
 
@@ -364,13 +375,13 @@ L('S'); // alias
 // 0x100-- program/editor
 // 
 // "top" of memory
-ORG(S+ 0xf0-1-RS_SIZE-DS_SIZE); L('top');
+ORG(SYSTEM-1-RS_SIZE-DS_SIZE); L('top');
 
 // Data Stack (Params)
-ORG(S+ 0xf0-1-RS_SIZE);         L('stack');
+ORG(SYSTEM-1-RS_SIZE);         L('stack');
 
 // Return Stack
-ORG(S+ 0xf0-1);                 L('rstack');
+ORG(SYSTEM-1);                 L('rstack');
 
 //variables
 ORG(SYSTEM);
@@ -420,13 +431,18 @@ L('FORTH_BEGIN');
   next();
 
 L('OP_Run');
+  TRACE(()=>princ('[H[2J[3J\n\n'));
   PHA(); {
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
   } PLA();
   LDYN(0xff);
+  
  L('decstate'); 
   INCA('state');
+
+  JMPA('FORTH_BEGIN');
+
   next();
   //JMPA('decstate');
 
@@ -547,11 +563,14 @@ L('interpret'); // A has our word
   let echo = 1;
   if (echo) {
     // TODO: don't cheat!
-    terminal.TRACE(jasm,()=>princ(fgcol(GREEN)));
+    TRACE(()=>princ(fgcol(GREEN)));
+
     PHA(); TXA();
     JSRA(putc);
+
     // TODO: don't cheat!
-    terminal.TRACE(jasm,()=>princ(fgcol(WHITE)));
+    TRACE(()=>princ(fgcol(WHITE)));
+
     PLA();
   }
 
@@ -569,6 +588,33 @@ L('interpret'); // A has our word
   // LOL: we incstate by dec!
   // neg num can test with BIT!
   def(0x00); DEY(),L('incstate'),DECA('state');
+    // terminal debug help
+    TRACE(()=>{
+      let used= cpu.reg('y');
+      let free= SYSTEM-S-used;
+      let rstack= jasm.getLabels().rstack+1;
+      let stack= jasm.getLabels().stack+1;
+      princ(cursorSave());
+      print();
+      print();
+      print();
+      //for(let i=0; i<free; i++) {
+      for(let i=0; i<256; i++) {
+        //princ(m[SYSTEM+used+i]?'x':'.');
+        princ(m[S+i]?'x':'.');
+      }
+      print();
+      for(let i=0; i<DS_SIZE; i++) {
+        princ(m[stack+i-DS_SIZE]?'D':':');
+      }
+      print();
+      for(let i=0; i<RS_SIZE; i++) {
+        princ(m[rstack+i-RS_SIZE]?'R':':');
+      }
+
+      princ(gotorc(1,1)+`(${used}/${free})`);
+      princ(cursorRestore());
+    });
   def(' '); // do not interpret as number! lol
   def(10); // do not interpret as number! lol
 
@@ -906,6 +952,7 @@ L2      DEX
       CMPN(ord(';'));
       BEQ('_;_mid');
 
+      // skip inline backtick value (could be any)
       CMPN(ord('`'));
       BNE('_not_backtick');
         INY();
@@ -1188,7 +1235,7 @@ function SKIP1() { // BITA()
 function TRACE(f) {
   terminal.TRACE(jasm, ()=>{
     let r = f();
-    if (!r) return;
+    if (!Array.isArray(r)) return;
     print(' >>> ', ...r);
   });
 }
@@ -1240,7 +1287,7 @@ prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, ')');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, ')');
-prsize(" XTRA :", l.XTRA_END-l.XTRA_BEGIN);
+prsize(" XTRA :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("WORDS :", l.WORDS_END-l.WORDS_BEGIN);
 prsize("TOTAL :", jasm.address()-start);
 
@@ -1270,4 +1317,3 @@ trace = 0;
 
 cpu.reg('pc', start);
 cpu.run(-1);
-
