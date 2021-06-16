@@ -1114,6 +1114,8 @@ L('colorOff'); string(off());
 // Returns start address
 var latest = 0
 function WORD(name, imm, prog, datas=[], qsize=0) {
+  if (!!prog.match(/:/) !== !!prog.match(/;/))
+      throw `%% WORD: '${word} must either use : and ; or neither`;
   let start = jasm.address();
   let l = gensym('WORD_cod_'+name);
 
