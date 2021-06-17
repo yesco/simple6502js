@@ -4,7 +4,6 @@ PROGRAM = '123 ...'; // test space
 // +1 inc at 4th position
 // TODO: bug? 153 wrap around (CTRL-R)
 PROGRAM = '9`\0048765432102@d.1+d.2!2@...........h.';
-PROGRAM = '73-.';
 PROGRAM = '1234567RRrr.......';
 PROGRAM = '1234567RR.....r.r.';
 
@@ -66,7 +65,9 @@ PROGRAM = '12(3(4]4)5]5)67';
 PROGRAM = '12(3(4]]4)44)567';
 PROGRAM = '12(3(4]]4)4]4)567';
 
-PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
+PROGRAM = '34+.';
+
+PROGRAM = '0.1.2.3.7.9.';
 
 PROGRAM = `
 34+.99+.
@@ -79,7 +80,8 @@ PROGRAM = `
  1~. 0~. 8~.01-~.
 `;
 
-PROGRAM = '34+.';
+PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
+
 
 //      -*- truncate-lines: true; -*-
 //
@@ -612,33 +614,15 @@ L('interpret'); // A has our word
         princ(m[rstack+i-RS_SIZE]?'R':':');
       }
 
-      princ(gotorc(1,1)+`(${used}/${free})`);
+      princ(gotorc(1,1)+`(${used} free: ${free})`);
       princ(cursorRestore());
     });
   def(' '); // do not interpret as number! lol
   def(10); // do not interpret as number! lol
 
   // same "minimal" 8 as sectorforth!
-  def('@'); TAX(),LDAAX(S);
-  def('!');
-
-TAX(),PLA(),
-
-terminal.TRACE(jasm, ()=>{
-  print('<<<<',{a: cpu.reg('a'), x: cpu.reg('x'), 2: m[S+2]});
-});
-
-STAAX(S),PLA(),
-
-console.log('STAAX', STAAX.toString());
-terminal.TRACE(jasm, ()=>{
-  print('>>>',{
-    a: cpu.reg('a'),
-    x: cpu.reg('x'),
-    2: m[S+2],
-    d: cpu.hex(4,cpu.reg('d')),
-    });
-});
+  def('@'); TAX(),LDAAX(S); // cool!
+  def('!'); TAX(),PLA(),STAAX(S),PLA();
 
   ////////////////////////////////////////
   // Symbol based operators
@@ -656,6 +640,7 @@ terminal.TRACE(jasm, ()=>{
   // TODO: JMPA('dex_txs');
   //        /get stack ptr                    /drop one
   def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
+  //TRACE(()=>[cpu.reg('a')]);
   def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
   def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
   def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
@@ -692,7 +677,19 @@ terminal.TRACE(jasm, ()=>{
     // - https://m.facebook.com/groups/1449255602010708?view=permalink&id=2956507981285455&notif_ref=m_beeper
 
     TSX(),CMPAX(S, inc);
-    if (1) {  // b9 c5 or c10 (with SBC/CMP +c4)
+    
+    if (0) {
+      // THIS IS SO WRONG, lol? but why works sometimes?
+  LDAN(255);
+  CMPN(1);  // for these it's wrong!
+      // works  b7 c13  !!!! WTF!
+      PHP();
+      PLA();
+      ROL();
+      ANDN(1);
+      SBCN(0);
+
+    } else if (0) {  // b9 c5 or c10 (with SBC/CMP +c4)
       // jsk - CORRECT!
 
       SEC();
@@ -711,7 +708,7 @@ terminal.TRACE(jasm, ()=>{
       SBCAX(S, inc); // nc
       BEQ('__next');
       LDAN(1);
-      BCS('__next');
+      BCC('__next');
       LDAN(0xff);
     L('__next');
 
@@ -751,19 +748,10 @@ terminal.TRACE(jasm, ()=>{
 
     LDYA('token');
 
-    } else if (1) {
-      //LDAN(-1);
-      //CMPN(127);
-      // works  b7 c13  !!!! WTF!
-      PHP();
-      PLA();
-      ROL();
-      ANDN(1);
-      SBCN(0);
     }
-
     // all variants cleanup
-    PLA();
+    TSX(),DEX(),TXS(); // pop
+
     next();
   }
 

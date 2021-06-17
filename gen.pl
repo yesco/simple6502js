@@ -77,7 +77,7 @@
     'ror_a',  'tmp=a;      g=       a= n(z((  a    >>>1) | ((p&C)<<7)));sc(tmp)',
 
     'adc', 'adc(MEM)',
-    'sbc', 'adc(~MEM)', # lol
+    'sbc', 'sbc(MEM)', # lol
 
     # notice B.. uses signed byte!
     'bra', 'pc += RMEM', # 6502C
@@ -203,10 +203,24 @@ let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
 function adc(v) {
   // TODO: set overflow?
   let oa= a;
-  a= c(a + v + (p & C));
+  a= n(z(c(a + v + (p & C))));
+  if ((a & N) != (oa & N)) p |= V; else p &= ~V;
+  if (~p & D) return; else c(0);
+  if ((a & 0x0f) > 0x09) a+= 0x06;
+  if ((a & 0xf0) <= 0x90) return;
+  a+= 0x60;
+  sc(1);
+}
+
+function sbc(v) {
+  // TODO: set overflow?
+  let oa= a;
+  a= a - v - (1-(p & C))
+  sc( a>= 0 );
+  a= z(n(a & 0xff));
   if ((a & N) != (oa & N)) p |= V; else p &= ~V;
   //if ((oa^a) & (v^a)) ...
-  if (~p & D) return; else c(0);
+  if (~p & D) return; else sc(0);
   if ((a & 0x0f) > 0x09) a+= 0x06;
   if ((a & 0xf0) <= 0x90) return;
   a+= 0x60;

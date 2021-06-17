@@ -800,8 +800,10 @@ L('ALF'); // b79 c130 - BAD!
     },
 
     dup (){ // b5+3 +7(shared)
+      // LOL:WTF?
       DEX(); DEX();
       push(); push();
+
       LDAZX(2); STAZX(0);
       LDAZX(3); STAZX(1);
       next();
