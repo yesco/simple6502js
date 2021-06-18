@@ -47,13 +47,15 @@ function hex(n, x) {
 let BLACK= 0, RED= 1,     GREEN= 2, YELLOW= 3,
     BLUE=  4, MAGNENTA=5, CYAN=  6, WHITE=  7;
 
-function cll() { return ereaseinline(2); }
-function cleol() { return ereaseinline(0); }
-function clbol() { return ereaseinline(1); }
+function cll() { return eraseinline(2); }
+function cleol() { return eraseinline(0); }
+function clbol() { return eraseinline(1); }
 
-function cls() { return ereaseinline(2); }
-function cleos() { return ereaseinline(0); }
-function clbos() { return ereaseinline(1); }
+function cls() { return '[H[2J[3J'; }
+
+//function cls() { return eraseindisplay(2); }
+function cleos() { return eraseindisplay(0); }
+function clbos() { return eraseindisplay(1); }
 
 // 0 end 1 before 2 all
 function eraseindisplay(n=0) { return'[J'; }
@@ -75,8 +77,9 @@ function scrolldown() { return'[T'; }
 
 function getpos() { return'[6n'; }
 
-function hide() { return '[?25h'; }
-function show() { return '[?25l'; }
+
+function hide() { return '[?25l'; }
+function show() { return '[?25h'; }
 
 function cursorSave() { return '7'; }
 function cursorRestore() { return '8'; }
@@ -131,7 +134,7 @@ ansi = {
   black, darkgray,
   red, darkred,
   green, lime,  
-  yellow, brown,  
+  yellow, brown,
 
   blue, darkblue,
   magnenta, darkmagnenta,
@@ -170,4 +173,3 @@ module.exports = {
 
 Object.keys(module.exports).forEach(k=>
   global[k] = module.exports[k]);
-

@@ -83,7 +83,20 @@ PROGRAM = `
 
  .`;
 
+// numbers, truncate correctly
 PROGRAM = '12.34.55.123.234.345.256.257.65535. 66 . 111 .';
+
+// edit
+PROGRAM = 
+`ABC DEF GHI  JKL\N
+  2 SPACES LATER\TTAB
+TAB\TTAB\TTAB\TTAB\TTAB
+        SPACES
+\TTAB
+      ETC
+    DEF
+  GHI
+END`;
 
 
 //      -*- truncate-lines: true; -*-
@@ -412,7 +425,7 @@ L('SYSTEM');
   
 
   // saved editing pos, during editing in Y
-  L('save_pos');  byte(0);
+  L('save_pos');  byte(PROGRAM.length>>1);
 
   // make ZP global?
   L('token');     byte(0); // tmp?
@@ -489,7 +502,6 @@ L('NEXT');
   LDXAY(S);
 
   BITA('state');
-
   BVC('nodisplay'); {
     PHA(),TXA(); { // save TOS
       JSRA('display');
@@ -550,8 +562,6 @@ L('interpret'); // A has our word
       let free= SYSTEM-S-used;
       let rstack= jasm.getLabels().rstack+1;
       let stack= jasm.getLabels().stack+1;
-      princ(cursorSave());
-      print();
       print();
       print();
       //for(let i=0; i<free; i++) {
@@ -568,7 +578,9 @@ L('interpret'); // A has our word
         princ(m[rstack+i-RS_SIZE]?'R':':');
       }
 
-      princ(gotorc(1,1)+`(${used} free: ${free})`);
+      // OMG: TODO: somuch cheating!
+      princ(gotorc(1,1)+`(${used} free: ${free})`); 
+      princ(ansi.cleol());
       princ(cursorRestore());
     });
 
@@ -994,7 +1006,7 @@ L2      DEX
   // more special test, or fallbacks
 
   CPXN(31),BCC('number?');
-  JMPA('printcontrol');
+  //JMPA('printcontrol');
 
 L('number?');
   CPXN(ord('0')),BCS('not_number');
@@ -1149,6 +1161,9 @@ L('printcontrol');
 
 L('XTRAS_END');
   
+////////////////////////////////////////
+// Emacs
+
 L('EDIT_BEGIN');
 
 L('OP_BackSpace');
@@ -1172,7 +1187,11 @@ L('OP_BackSpace');
   RTS();
 
 L('OP_Run');
-  TRACE(()=>princ('[H[2J[3J\n\n'));
+  TRACE(()=>{
+    princ(ansi.hide());
+    princ(ansi.home());
+  });
+
   PHA(); {
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
     LDAN(ord('\n')),LDYN(0),JSRA(putc);
@@ -1181,13 +1200,16 @@ L('OP_Run');
   
   // Reinterpret buffer from scratch
   // stack is lost etc, only memory remain!
+  TRACE(()=>princ(ansi.hide()));
   JMPA('FORTH_BEGIN');
 
 L('OP_List');
+  TRACE(()=>princ(ansi.cls()+ansi.home()));
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
+    LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAN(S, lo), LDYN(S, hi), JSRA(puts);
+    LDAN(S+1, lo),LDYN(S+1, hi), JSRA(puts);
   } PLA(), TAY();
   LDAN(0);
   BEQ('edit');
@@ -1196,6 +1218,10 @@ L('OP_List');
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
 L('edit');
+  LDYA('save_pos');
+
+  TRACE(()=>princ(ansi.show()));
+
   PHA(); // save TOS!
 
   // this so can use RTS for 'editing_next'!
@@ -1208,6 +1234,8 @@ L('edit');
   next();
 
 L('edit_next');
+  // save cursor position
+//  STYA('save_pos');
 
  L('edit_next_waitkey');
   NOP(); // just to display different label
@@ -1234,15 +1262,26 @@ L('edit_next');
   cmd('^R', 'OP_Run');
   cmd('^H', 'OP_BackSpace');
   cmd('^L', 'OP_List');
+
+  // half cursor pos, lol for testing
+  cmd('^E'); TYA(),CLC(),ROR(),TAY();
+
   cmd('^F'); L('e+'),INY(),BEQ('e-');
+    TRACE(()=>princ(ansi.forward()));
   cmd('^B'); L('e-'),DEY(),BEQ('e+');
+    TRACE(()=>princ(ansi.back()));
+  cmd('^P'); DEY(),BEQ('e+');
+    TRACE(()=>princ(ansi.up()));
+  cmd('^N'); INY();
+    TRACE(()=>princ(ansi.down()));
+
   cmd('^A'); {
     L('ea');
     DEY(),BNE('e+');
     LDAAY('S');
     CMPN(10),BNE('ea');
     // redisplay
-    STYA('save_pos');
+//    STYA('save_pos');
     LDYN(0);
     LDAN(state_edit+state_display); // edit+display
     STAA('state');
@@ -1258,23 +1297,35 @@ L('edit_next');
 
   // store character
   STAAY(S),INY();
-  JSRA('display');
-  JMPA('edit_next');
+//  next();
+//  JSRA('display');
+//  JMPA('edit_next');
 
   // TODO: can we be in vt100 insert char mode?
-
-  //JMPA('display'); // tail call; next=editing_next
 
  L('display');
   // TODO: don't cheat!
   TRACE(()=>princ(lime));
 
-  JSRA(putc);
+  CPYA('save_pos'),BNE('_display.nopos');
+ L('display_pos');
+  NOP();
+  TRACE(()=>princ(ansi.cursorSave()));
+  NOP();
+  TRACE(()=>print("<<<HERE"+JSON.stringify({
+    A: cpu.reg('a'),
+    Y: cpu.reg('y'),
+    save_pos: m[jasm.getLabels().save_pos]})));
+  NOP();
+  L('_display.nopos');
 
   // need CR NL
   CMPN(10),BNE('display_nonl');
+  TRACE(()=>princ(ansi.cleol()));
   PHA(),LDAN(13),JSRA(putc),PLA();
  L('display_nonl');
+
+  JSRA(putc);
 
   // end? - turn off display
   CMPN(0),BPL('_display.noend');
@@ -1304,6 +1355,8 @@ L('WORDS_END');
 
 L('resultColor'); string(amber);
 L('colorOff'); string(off());
+L('hide'); string(ansi.hide());
+L('show'); string(ansi.show());
 
 ////////////////////////////////////////
 // word functions
