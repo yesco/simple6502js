@@ -470,6 +470,10 @@ L('FORTH_BEGIN');
 
 L('edit2'); JMPA('edit');
 // TODO: place somebody who want to fallthrough!
+
+// TODO: Use some tricks from Token Threaded Forth
+// - http://6502org.wikidot.com/software-token-threading
+
 L('NEXT');
   if (brk) {
     STAA('token'); {
