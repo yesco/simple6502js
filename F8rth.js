@@ -83,7 +83,8 @@ PROGRAM = `
 
  .`;
 
-PROGRAM = '12345.....';
+PROGRAM = '12.34.55.....';
+
 
 //      -*- truncate-lines: true; -*-
 //
@@ -249,69 +250,48 @@ function next() {
   }
 }
 
-// xterm/ansi
-let BLACK= 0, RED= 1,     GREEN= 2, YELLOW= 3,
-    BLUE=  4, MAGNENTA=5, CYAN=  6, WHITE=  7;
-
-function amber() { return '[38;5;214m'; }
-
-function cls() { return '[2J' + home; }
-function home() { return gotorc(0, 0); }
-function gotorc(r, c) { return '['+r+';'+c+'H'; }
-function cursorOn() { return '[?25h'; }
-function cursorOff() { return '[?25l'; }
-
-function cursorSave() { return '7'; }
-function cursorRestore() { return '8'; }
-
-function fgcol(c) { return '[3'+c+'m'; }
-function bgcol(c) { return '[4'+c+'m'; }
-
-function inverseOn() { return '[7m'; }
-function underscoreOn() { return '[4m'; }
-function boldOn() { return '[1m'; }
-
-function save(c) { return '[3'+c+'m'; }
-
-// you can only turn all off! :-(
-function off(){ return'[m'; }
+console.log(
+  'text', fg(GREEN), 'fish',
+  bg(YELLOW), 'crap',
+  off(), fg(BLUE), 'input',
+  inverse(), 'output', off());
 
 console.log(
-  'text', fgcol(GREEN), 'fish',
-  bgcol(YELLOW), 'crap',
-  off(), fgcol(BLUE), 'input',
-  inverseOn(), 'output', off());
-
-console.log(
-  fgcol(GREEN), '34+.',
-  boldOn()+fgcol(WHITE), '7777777',
-  off()+inverseOn()+' '+off(),
+  fg(GREEN), '34+.',
+  bold()+fg(WHITE), '7777777',
+  off()+inverse()+' '+off(),
 )
 
 console.log(
-  fgcol(GREEN), '34+.',
-  fgcol(WHITE), '7777777',
-  fgcol(RED), '7777777',
-  boldOn()+fgcol(RED), '7777777',
-  off()+inverseOn()+' '+off(),
+  fg(GREEN), '34+.',
+  fg(WHITE), '7777777',
+  fg(RED), '7777777',
+  bold()+fg(RED), '7777777',
+  off()+inverse()+' '+off(),
+  italic(), "ITALICS? italics?",
 )
 
 console.log(
-  boldOn()+fgcol(WHITE),
+  bold()+fg(WHITE),
   '34+.',
-  fgcol(GREEN),
+  fg(GREEN),
   '7777777',
 )
 
 console.log(
-  fgcol(GREEN), '34+.',
-  amber(), '7777777',
-  off()+inverseOn()+' '+off(),
+  fg(GREEN), '34+.',
+  amber, '7777777',
+  off()+inverse()+' '+off(),
 );
 
 function ctrl(c) {
   return ord(c.toUpperCase())-64;
 }
+
+function meta(c) {
+  return 0x80 + ord(c[1].toUpperCase());
+}
+  
 
 let last, last_ret;
 
@@ -376,7 +356,7 @@ function cmd(c, optJmp) {
     } else if (c[0] === '^') {
       c = ctrl(c[1]);
     } else if (c[0] === '_') {
-      c = 0x80 + ord(c[1].toUpperCase());
+      c = meta(c1[1]);
     }
   }
 
@@ -457,7 +437,7 @@ if (jasm.address() > 0x0200)
   throw "SYSTEM area too big!";
 ////////////////////////////////////////
 
-ORG(S); string(PROGRAM);
+ORG(S); pascalz(PROGRAM); // LOL
 
 // separate code (ROM) & RAM
 // == Harward Architecture
@@ -467,46 +447,65 @@ L('FORTH_BEGIN');
   LDXN('stack', lo); TXS();
   LDXN('rstack', lo); STXA('rp');
 
-  // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
-  LDAN('NEXT', lo); STAA(cpu.consts().RESET);
-  LDAN('NEXT', hi); STAA(cpu.consts().RESET, inc);
+  if (brk) {
+    // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
+    LDAN('NEXT', lo); STAA(cpu.consts().RESET);
+    LDAN('NEXT', hi); STAA(cpu.consts().RESET, inc);
+  } else {
+    LDAN('FORTH_BEGIN', lo); STAA(cpu.consts().RESET);
+    LDAN('FORTH_BEGIN', hi); STAA(cpu.consts().RESET, inc);
+  }
 
   // init other stuff
-  LDAN(0); STAA('token');
-  LDAN(0); STAA('latest');
-  LDAN(0); STAA('here');
-  LDAN(state_display); STAA('state');
+  LDAN(0); {
+    STAA('token');
+    STAA('latest');
+    STAA('here');
+    // init state of interpreter
+    TAY();
+  }
 
-  // init state of interpreter
-  LDAN(0xff); TAY(); // ip! -1 since we'll INY()
+  LDAN(state_display); STAA('state');
   next();
 
+L('edit2'); JMPA('edit');
 // TODO: place somebody who want to fallthrough!
 L('NEXT');
   if (brk) {
-    STAA('token');
-    // drop BRK crap
-    PLA(),PLA(),PLA();
-    // TODO: brk dispatch?
-    LDAA('token');
+    STAA('token'); {
+      // drop BRK crap
+      PLA(),PLA(),PLA();
+      // TODO: brk dispatch?
+    } LDAA('token');
   }
 
   INY();
+  // wrapped around?
+  //BEQ('edit2');
   LDXAY(S);
 
   BITA('state');
 
   BVC('nodisplay'); {
-    JSRA('display');
+    PHA(),TXA(); { // save TOS
+      JSRA('display');
+    } PLA();
+
     BITA('state');
     // loop if in editing: (re)display all!
     BMI('NEXT'); 
   }
  L('nodisplay');
 
+  // TODO: replace state with JMP edit!
   BPL('_not_edit');
   JMPA('edit_next');
  L('_not_edit');
+
+L('NEXT_END');
+
+////////////////////////////////////////
+// Interpreter
 
 L('interpret'); // A has our word
 
@@ -539,7 +538,8 @@ L('interpret'); // A has our word
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
-  def(0x00); DEY(),LDXN(state_edit+state_display),STAA('state');
+  def(0); { 
+    DEY(),LDXN(state_edit+state_display),STAA('state');
     // terminal debug help
     TRACE(()=>{
       let used= cpu.reg('y');
@@ -567,13 +567,9 @@ L('interpret'); // A has our word
       princ(gotorc(1,1)+`(${used} free: ${free})`);
       princ(cursorRestore());
     });
-  def(' '); // do not interpret as number! lol
-  def(10); // do not interpret as number! lol
 
-  // same "minimal" 8 as sectorforth!
-  def('@'); TAX(),LDAAX(S); // cool!
-  def('!'); TAX(),PLA(),STAAX(S),PLA();
-
+    JMPA('edit');
+  }
   ////////////////////////////////////////
   // Symbol based operators
 
@@ -586,6 +582,10 @@ L('interpret'); // A has our word
   //
   // zp stack using X // b11 c16 zp stack
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
+
+  def(' '); // do not interpret as number! lol
+  def('@'); TAX(),LDAAX(S); // cool!
+  def('!'); TAX(),PLA(),STAAX(S),PLA();
 
   // TODO: JMPA('dex_txs');
   //        /get stack ptr                    /drop one
@@ -980,8 +980,8 @@ L2      DEX
   // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
 
   // -- printers and formatters
-  def('`', 'printval');
-  // TODO: comment? cna be used as headline
+  def(10); // do not interpret NL as number! lol
+  def('`', ''); JMPA('printval');
 
   enddef();
   L('ALFA_END'); alfa_defs = def.count - alfa_defs;
@@ -989,19 +989,75 @@ L2      DEX
   ////////////////////////////////////////
   // more special test, or fallbacks
 
-  CPXN(31),BCS('printcontrol');
+  CPXN(31),BCC('number?');
+  JMPA('printcontrol');
 
-  // assume it's a number, lol
-  // TODO: check
+L('number?');
+  CPXN(ord('0')),BCS('not_number');
+  CPXN(ord('9')+1),BCC('not_number');
 
-L('number');
-  PHA(),TXA(),SEC(),SBCN(ord('0'));
+  TRACE(()=>{
+    cpu.setTraceLevel(2);
+  });
 
-// TODO: remove
-// search for function
+  // -- we will have number!
+  PHA(); // save TOS
+
+  // init
+  LDAN(0);
+  STAA('token');
+  
+  TXA();
+
+ L('number_next');
+
+  // extract number from digit
+  SEC(),SBCN(ord('0'));
+
+  // if not in range 0..9 ?
+  CMPN(10); BCC('number.done');
+
+  TRACE(()=>['digit', {
+    A: cpu.reg('a'),
+    X: cpu.reg('x'),
+    Y:cpu.reg('y')}]);
+
+  // we have a digit 2
+  PHA();
+
+  // multiply token by 10
+  LDAA('token');       // prev number 4
+  CLC(),ROL();         // *4 
+  CLC(),ROL();         // TODO: fix ASL
+  CLC(),ADCA('token'); // A*4 + A
+  CLC(),ROL();         // *2 = A*10
+  STAA('token');
+
+  PLA(),ADCA('token'); // 42!
+  STAA('token');
+
+  TRACE(()=>['sum', {
+    A: cpu.reg('a'),
+    X: cpu.reg('x'),
+    Y:cpu.reg('y')}]);
+
+  INY(),LDAAY(S);
+  JMPA('number_next');
+
+L('number.done');
+  LDAA('token');
+  TRACE(()=>{
+    cpu.setTraceLevel(0);
+  });
+
+  DEY(); // adjust pointer as we read a non-digit
+  next();
+
+L('not_number');
+
+L('findword'); 
 next();
 
-  L('ENTER_not_a_primitive_try_user_defined');
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
   STXA('token');
 
@@ -1043,14 +1099,6 @@ L('FORTH_END');
 // Extras (not core)
 
 L('XTRAS_BEGIN');
-  // control codes, quote them!
-L('printcontrol');
-  PHA(),TYA(),PHA(); {
-    LDAN(ord('<')),JSRA(putc);
-    TXA(),LDYN(0),JSRA(putd);
-    LDAN(ord('>')),JSRA(putc);
-  }; PLA(),TAY(),PLA();
-  next();
 
 L('printval');
   PHA(); {
@@ -1071,6 +1119,15 @@ L('printval');
     //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),JSRA(putc);
     //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),JSRA(putc);
   } PLA();
+  next();
+
+  // control codes, quote them!
+L('printcontrol');
+  PHA(),TYA(),PHA(); {
+    LDAN(ord('<')),JSRA(putc);
+    TXA(),LDYN(0),JSRA(putd);
+    LDAN(ord('>')),JSRA(putc);
+  }; PLA(),TAY(),PLA();
   next();
 
 L('XTRAS_END');
@@ -1178,41 +1235,40 @@ L('edit_next');
   endcmd();
 
   // non-printable
-  CMPN(31),BCC('edit_next'); // ctrl-
+  CMPN(31),BCS('edit_next'); // ctrl-
   CMPN(128),BCC('edit_next'); // meta-
 
   // store character
-  STAAY(S);
+  STAAY(S),INY();
+  JSRA('display');
+  JMPA('edit_next');
 
   // TODO: can we be in vt100 insert char mode?
 
   //JMPA('display'); // tail call; next=editing_next
 
  L('display');
-  PHA(),TXA(); { // save TOS
-    // TODO: don't cheat!
-    TRACE(()=>princ(fgcol(GREEN)));
-  
-    JSRA(putc);
+  // TODO: don't cheat!
+  TRACE(()=>princ(green));
 
-    // need CR NL
-    CMPN(10),BNE('display_nonl');
-    PHA(),LDAN(13),JSRA(putc),PLA();
-   L('display_nonl');
-    
-    // end? - turn off display
-    CMPN(0),BPL('_display.noend');
-    LDAN(state_edit); // stay edit/run
-    ANDA('state');
-    STAA('state');
+  JSRA(putc);
 
-   L('_display.noend');
+  // need CR NL
+  CMPN(10),BNE('display_nonl');
+  PHA(),LDAN(13),JSRA(putc),PLA();
+ L('display_nonl');
 
-    // TODO: don't cheat!
-    TRACE(()=>princ(fgcol(WHITE)));
+  // end? - turn off display
+  CMPN(0),BPL('_display.noend');
+  LDAN(state_edit); // stay edit/run
+  ANDA('state');
+  STAA('state');
+ L('_display.noend');
 
-  } PLA();
-  RTS();
+  // TODO: don't cheat!
+  TRACE(()=>princ(fg(WHITE)));
+
+ RTS();
 
 L('EDIT_END');
 
@@ -1228,7 +1284,7 @@ L('WORDS_END');
 
 } // test
 
-L('resultColor'); string(amber());
+L('resultColor'); string(amber);
 L('colorOff'); string(off());
 
 ////////////////////////////////////////
@@ -1363,6 +1419,7 @@ function prsize(nam, len, more) {
               more?more:'');
 }
 prsize("FORTH :", l.FORTH_END-l.FORTH_BEGIN);
+prsize(" NEXT :", l.NEXT_END-l.NEXT);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, ')');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);

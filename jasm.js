@@ -18,6 +18,8 @@ var chunks = [];
 var start = 0, address = 0, current = [], curlab = '';;
 
 function addr(a) {
+  if (typeof a === 'undefind' || Number.isNaN(a))
+    throw `%% jasm: use of empty label '${a}'`;
   if (current.length || curlab) {
     current.unshift(curlab);
     current.unshift(start);
@@ -182,7 +184,7 @@ function getLabels() {
 }
 
 function allot(n, v= 0) {
-  if (n <=0 ) throw `%% allot: negative n: ${n}`;
+  if (n < 0 ) throw `%% allot: negative n: ${n}`;
 
   while(n-->0) data(v);
   return address;
@@ -198,9 +200,10 @@ function char(c) {
   data(ch);
 }
 
+// TODO: PACKED16
 function _string(s, pascal, hibit, zero) {
   let d = [...Buffer.from(''+s)];
-  let len = d.lenght;
+  let len = d.length;
   if (pascal) d.unshift(len);
   if (hibit) d[d.length-1] |= 128;
   if (zero) d.push(0);
@@ -211,6 +214,8 @@ function chars(s) { _string(s, 0, 0, 0)}
 function string(s) { _string(s, 0, 0, 1)}
 function pascal(s) { _string(s, 1, 0, 0)} 
 function hibit(s) { _string(s, 0, 1, 0)}
+
+function pascalz(s) { _string(s, 1, 0, 1)} 
 function OMG(s) { _string(s, 1, 1, 1)}
 
 function rel(name, f) {
@@ -320,6 +325,23 @@ function mgen(names, valids) {
 }
 
 function genf(op, name, mnc, mleg, b, cyc) {
+
+// TODO: verify instructions valid again...
+// CPX  CPXA   CPXAY  CPXIY  CPXN   CPXZ
+
+// I'm not even sure what CPX is!!!
+// 
+// 150:CPX (ComPare X register)
+// 154:Immediate     CPX #$44      $E0  2   2
+// 155:Zero Page     CPX $44       $E4  2   3
+// 156:Absolute      CPX $4400     $EC  3   4
+// = CPX# e0 ;
+// = CPXZ e4 ;
+// = CPXA ec ;
+//       case 0x07: f='CPX'; sc(0 >= n(z(g= x - (m[d])))); break;
+
+
+
 
 if (mnc == 'LDX') {
   console.log({op:hex(2,op),name,mnc,mleg,b,cyc});
@@ -568,7 +590,7 @@ function gensym(prefix) {
 
 module.exports =
   global.j6502 =
-  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, chars, string, pascal, hibit, OMG, rel, burn, clear, gensym, inc };
+  { address(){return address;}, ORG, flush, getChunks, data, label, hi, lo, byte, word, hex, getHex, getLabels, char, chars, string, pascal, pascalz, hibit, OMG, rel, burn, clear, gensym, inc };
 
 global.ORG = ORG;
 global.allot = allot;
@@ -582,6 +604,7 @@ global.char = char;
 global.chars = chars;
 global.string = string;
 global.pascal = pascal;
+global.pascalz = pascalz;
 global.hibit = hibit;
 global.OMG = OMG;
 

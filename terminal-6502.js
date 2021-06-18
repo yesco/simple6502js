@@ -1,5 +1,6 @@
 const cpu6502 = require('./fil.js');
 const readline = require('readline');
+const utility = require('./utility.js');
 
 let aputc = 0xfff0;
 let aputd = 0xfff2;
@@ -193,8 +194,13 @@ let tcpu = {
         //if (!this.traceLevel) return;
         if (!traceLevel) return;
 
-        if (traceLevel > 1)
+        if (traceLevel > 1) {
+          princ(gray);
+          princ(lime);
           cpu.tracer(cpu, h);
+          princ(white);
+        }
+
         if (traceLevel > 2) {
           cpu.dump(h.ipc,1);
           // this.prinstack not work
