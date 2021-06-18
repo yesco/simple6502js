@@ -113,6 +113,7 @@
     o   over
     p   pick
     rt  rot
+  ( r-  -rot )  
     rl  roll
   (     tuck )
   (     nip )
@@ -127,12 +128,14 @@
     r<  >r (lol)
     r@  r@
     r!  r!
+  ( rr  rr r> d r< (peek) )
 
     r[0-9]>    nr>
     r[0-9]<    n>r
 
 
   Numbers:
+  ( ## size of number in bytes )
     #-?[0-9]+
         a decimal number (possibly negative)
         # is optional
@@ -164,11 +167,9 @@
    (     um* )
    (     um/mod  )
   
-  Floats:
-    f... (reserved)
-
   Hex:
-    $[0-9a-f]{0,4}
+    $# size of hex in bytes?
+    $[0-9a-f]{1,n} ! (push many bytes...)
         a hex number
     $.  print-hex number
 
@@ -178,8 +179,8 @@
  (  $(...)  .( ... )  )
 
     $=
-    $<
-    $>
+  ( $<  )
+  ( $>  )
     $?  search
   ( $n= )
   ( $n< )
@@ -372,7 +373,7 @@
     wr> 2r>
     wr@ 2r@
 
-  Input/Output:
+  Input / Output:
     .      print
     e      emit
     #.     number print (same as .)
@@ -381,6 +382,123 @@
     $k     key 
     $l     line (accept)
 
+  Float
+   'f '    size of a float in bytes
+    fv     fvariable
+           fconstant
+           represent (?)
+    fp     precision
+    f#     fdepth
+    f@     f@
+    f!     f!
+
+    fd     fdup
+    f\     fdrop
+    fo     fover
+    fr     frot
+    fs     fswap
+
+ (  lf     literal f ? )
+           float+
+           floats
+    f_     floor
+    f\     ftrunc
+    fx     fmax
+    fm     fmin
+    fn     fnegate
+    fo     fround
+
+    f~     f~ (approximate)
+
+    f.     f.
+           fe.
+           fs.
+
+    f+     f+
+    f-     f-
+    f*     f*
+    f/     f/
+    f^     f**
+    f|     fabs
+    fac    facos
+    fahc   facosh
+    fas    fasin
+    fahs   fasinh
+    fat    fatan
+    faht   fatanh
+
+    fc     fcos
+    fhc    fcosh
+    fs     fsin
+    fhs    fsinh
+    fSC    fsincos (?)
+
+    fe     fexp
+           fexpm1
+    fl     fln
+           flnp1
+    fal    falog
+           
+
+
+    fq     fsqrt
+           
+           >float
+           f>d
+           f>s
+           s>f
+           d>f
+           
+           f0<
+           f0=
+           f<
+           falign
+           faligned
+
+  Buffers / Blocks / Files
+   (these could be F but then float?)
+    br     r/o open-file
+    bc     w/o create-file
+    bm     r/w open-file
+    ba     append create-file
+    bq     quit-file (close-file)
+    bp     file-position
+    bs     file-seek (reposition-file)
+    b?     file-status
+
+    rl     read-line 
+    wl     write-line
+    
+           included include-file (difference?)
+           required (include only once)
+           evaluate
+
+    bb     "block-block" (set-blockfile)
+           (these are redundant: "foo" br bb)
+           open-blockfile
+           create-blockfile
+           close-blockfile
+
+    bf     buffer
+    bk     block
+    bh     "block-here" (blk set by block)
+    bl     list (?hmm, blank?)
+           scr (set by list)
+    bt     thru
+    bu     update (just mark "dirty")
+           flush
+    bz     save-buffers (same as flush?)
+    bd     buffer-dump? lol
+    be     empty-buffers
+
+
+    ld     load
+    bi     >in (?)
+    bi ?   source-id (?)
+           save-input
+           restore-input
+
+    
 
   Locals:
     3{     nlocals = 3dr<#(,)r>,
