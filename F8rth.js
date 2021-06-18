@@ -13,14 +13,6 @@ PROGRAM = '1<<<<<<<<.  9>d.>d.>d.>d.>d.';
 PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
 PROGRAM = "12345'A'B'C........";
 
-// TODO: * mul not working
-PROGRAM = `
-9
-  11*.. 01*..  10*.. 22*.. 33*..
-  99*.. 88*.. 77*.. 44*..
-
- .`;
-
 // r stack
 PROGRAM = '1234567RR.....r.r.';
 PROGRAM = '1234567RRrr.......';
@@ -82,6 +74,16 @@ PROGRAM = `
 
 PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
 
+
+// TODO: * mul not working
+PROGRAM = `
+9
+  11*.. 01*..  10*.. 22*.. 33*..
+  99*.. 88*.. 77*.. 44*..
+
+ .`;
+
+PROGRAM = '12345.....';
 
 //      -*- truncate-lines: true; -*-
 //
@@ -311,9 +313,9 @@ function ctrl(c) {
   return ord(c.toUpperCase())-64;
 }
 
-let last;
+let last, last_ret;
 
-function def(a, optJmp) {
+function def(a, optJmp, cmp=CPXN, ret=next) {
   let aa = typeof a==='string' && a.length==1? ord(a) : a;
   console.error("DEF", a, aa, optJmp);
   let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
@@ -322,10 +324,11 @@ function def(a, optJmp) {
   def.count++;
 
   enddef();
+  last_ret = ret;
 
   L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
 
-  CPXN(aa);
+  cmp(aa);
   if (optJmp) {
 
     BEQ(optJmp);
@@ -343,12 +346,48 @@ function def(a, optJmp) {
 def.count = 0;
 
 
-function enddef() {
+// end def, optNext:
+//   default: next();
+//   ''     : no next
+//   'lab'  : JMAP('lab');
+function enddef(optNext) {
   if (last) {
-    next();
+    if (typeof optNext==='undefined') {
+      last_ret();
+    } else if (optNext === '') {
+      // none
+    } else {
+      JMPA(optNext);
+    }
+
     L(last);
   }
   last= undefined;
+}
+
+// compare if A has command if so invoke
+// optionally, call jmp instead
+// (similar ot def)
+function cmd(c, optJmp) {
+  // parse cmd chars
+  if (typeof c === 'string') {
+    if (c.length === 1) {
+      c = ord(c);
+    } else if (c[0] === '^') {
+      c = ctrl(c[1]);
+    } else if (c[0] === '_') {
+      c = 0x80 + ord(c[1].toUpperCase());
+    }
+  }
+
+  def(c, optJmp, CMPN, RTS);
+}
+
+function endcmd(foo) {
+  // because we have stuff on stack?
+  if (foo) throw `"%% endcmd can't JMP to '${foo}'`;
+  
+  enddef();
 }
 
 ////////////////////////////////////////
@@ -392,11 +431,21 @@ L('SYSTEM');
   // of local data:
   
 
+  // saved editing pos, during editing in Y
+  L('save_pos');  byte(0);
+
   // make ZP global?
   L('token');     byte(0); // tmp?
   // these may be local page related?
   L('latest');    byte(0); // => zp?
   L('here');      byte(0); // "where"
+  // "state" (or rather mode)  test with BITA!
+  //   0d-- ---- : run ("interpreting") // BPL
+  //   1d-- ---- : editing              // BMI
+  //   -d-- ---- : display char/echo    // BVS
+  const state_edit = 0x80;
+  const state_display = 0x40;
+  const state_run = 0;
   L('state');     byte(0); // why local?
                            // use for loop counting?
   L('sp');        byte(0); // might
@@ -426,112 +475,13 @@ L('FORTH_BEGIN');
   LDAN(0); STAA('token');
   LDAN(0); STAA('latest');
   LDAN(0); STAA('here');
-  LDAN(0); STAA('state');
+  LDAN(state_display); STAA('state');
 
   // init state of interpreter
   LDAN(0xff); TAY(); // ip! -1 since we'll INY()
   next();
 
-L('OP_Run');
-  TRACE(()=>princ('[H[2J[3J\n\n'));
-  PHA(); {
-    LDAN(ord('\n')),LDYN(0),JSRA(putc);
-    LDAN(ord('\n')),LDYN(0),JSRA(putc);
-  } PLA();
-  LDYN(0xff);
-  
- L('decstate'); 
-  INCA('state');
-
-  JMPA('FORTH_BEGIN');
-
-  next();
-  //JMPA('decstate');
-
-L('OP_List');
-  TYA(),PHA(); {
-    LDAN(ord('\n')),JSRA(putc);
-    LDXN(0xff);
-    LDAN(S, lo), LDYN(S, hi), JSRA(puts);
-  } PLA(), TAY();
-  LDAN(0);
-  next();
-  BEQ('compiling');
-
-L('OP_BackSpace');
-  // nothing to delete?
-  CPYN(1),BMI('NEXT');
-  //CPYN(2),BMI('compiling');
-
-  PHA(); {
-    // delete on screen (BS+SPC+BS) // b12
-    // (TODO: optimize with a putsi)
-    LDAN(8),JSRA(putc);
-    LDAN(32),JSRA(putc);
-    LDAN(8),JSRA(putc);
-
-    // null out last char
-    DEY();
-    PHA(); {
-      LDAN(0),STAAY(S);
-    } PLA();
-  }
-  next();
-  JMPA('compiling');
-
-L('waitkey'),
-  PHA();
-  L('_waitkey');
-    JSRA(getc),
-  BEQ('_waitkey'),
-  TAX();
-  PLA();
-  // X now contains keystroke, A retains TOS
-
-L('compiling');
-  if(1)
-  terminal.TRACE(jasm, ()=>{
-    return;
-    process.stdout.write('['+cpu.reg('a')+']');
-    return;
-    console.log('compiling', {
-    });
-    //cpu.dump(S, 256/8, 8, 1);
-  });
-
-  // hmmm
-  //def(':'); colon(),INCA('state');
-  //def('C'); compile();
-
-  // Check editing first
-  def(0x7f, 'OP_BackSpace');
-  def(ctrl('H'), 'OP_BackSpace');
-  def(ctrl('L'), 'OP_List');
-  def(ctrl('R'), 'OP_Run');
-//  def(';', 'decstate');
-  def('[', 'incstate'); 
-//  def(']', 'decstate');
-  def(0x00, 'waitkey');
-  enddef();
-
-  // echo TODO: not of control chars? lol, good for BS...
-  PHA(); {
-    TXA(),JSRA(putc);
-    STAAY(S);
-  } PLA();
-
-  terminal.TRACE(jasm, ()=>{
-    if (!trace) return;
-    nl();
-    cpu.dump(S, 16);
-    console.log("STATE:",  m[jasm.getLabels().state]);
-  });
-
-  // TODO: search for words... if user can define IMMEDIATE?
-
-  // next (can't just fallthroug: gunk removed...)
-  if (brk) BRK();
-
+// TODO: place somebody who want to fallthrough!
 L('NEXT');
   if (brk) {
     STAA('token');
@@ -543,6 +493,20 @@ L('NEXT');
 
   INY();
   LDXAY(S);
+
+  BITA('state');
+
+  BVC('nodisplay'); {
+    JSRA('display');
+    BITA('state');
+    // loop if in editing: (re)display all!
+    BMI('NEXT'); 
+  }
+ L('nodisplay');
+
+  BPL('_not_edit');
+  JMPA('edit_next');
+ L('_not_edit');
 
 L('interpret'); // A has our word
 
@@ -562,22 +526,8 @@ L('interpret'); // A has our word
     //cpu.dump(ss);
   });
 
-  let echo = 1;
-  if (echo) {
-    // TODO: don't cheat!
-    TRACE(()=>princ(fgcol(GREEN)));
-
-    PHA(); TXA();
-    JSRA(putc);
-
-    // TODO: don't cheat!
-    TRACE(()=>princ(fgcol(WHITE)));
-
-    PLA();
-  }
-
-  BITA('state');
-  BMI('compiling');
+  // We're INTERPRETING!
+  // (token in X)
 
   terminal.TRACE(jasm, ()=>{
     if (!trace) return;
@@ -589,7 +539,7 @@ L('interpret'); // A has our word
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
-  def(0x00); DEY(),L('incstate'),DECA('state');
+  def(0x00); DEY(),LDXN(state_edit+state_display),STAA('state');
     // terminal debug help
     TRACE(()=>{
       let used= cpu.reg('y');
@@ -793,12 +743,12 @@ L('interpret'); // A has our word
       // TODO: FIX!
       // Try to fix the values
       // still not working!
-      //LDAN(2); STAAX(S+1);
-      //LDAN(3); STAAX(S+2);
+      LDAN(2); STAAX(S+1);
+      LDAN(3); STAAX(S+2);
       
       // factors in factor1 and factor2
       LDAN(0);
-      LDYN(9);
+      LDYN(8);
      L('_mul');
       LSRAX(S+1);
       BCC('_mul_no_add');
@@ -1125,6 +1075,147 @@ L('printval');
 
 L('XTRAS_END');
   
+L('EDIT_BEGIN');
+
+L('OP_BackSpace');
+  // nothing to delete?
+  CPYN(1),BMI('edit_next');
+  //CPYN(2),BMI('edit');
+
+  PHA(); {
+    // delete on screen (BS+SPC+BS) // b12
+    // (TODO: optimize with a putsi)
+    LDAN(8),JSRA(putc);
+    LDAN(32),JSRA(putc);
+    LDAN(8),JSRA(putc);
+
+    // null out last char
+    DEY();
+    PHA(); {
+      LDAN(0),STAAY(S);
+    } PLA();
+  }
+  RTS();
+
+L('OP_Run');
+  TRACE(()=>princ('[H[2J[3J\n\n'));
+  PHA(); {
+    LDAN(ord('\n')),LDYN(0),JSRA(putc);
+    LDAN(ord('\n')),LDYN(0),JSRA(putc);
+  } PLA();
+  LDYN(0xff);
+  
+  // Reinterpret buffer from scratch
+  // stack is lost etc, only memory remain!
+  JMPA('FORTH_BEGIN');
+
+L('OP_List');
+  TYA(),PHA(); {
+    LDAN(ord('\n')),JSRA(putc);
+    LDXN(0xff);
+    LDAN(S, lo), LDYN(S, hi), JSRA(puts);
+  } PLA(), TAY();
+  LDAN(0);
+  BEQ('edit');
+  // TODO: FALLTHROUGH!
+
+// We're not forthing, so we can use the rstack!
+// (what if we want to do editing in forth?)
+L('edit');
+  PHA(); // save TOS!
+
+  // this so can use RTS for 'editing_next'!
+ L('_edit');
+  JSRA('edit_next');
+  BITA('state'),BMI('_edit')
+
+  // if no longer editing
+  PLA(); // restore TOS
+  next();
+
+L('edit_next');
+
+ L('edit_next_waitkey');
+  NOP(); // just to display different label
+ L('_edit.waitkey'),
+  JSRA(getc),
+  BEQ('_edit.waitkey');
+
+  if(1)
+  terminal.TRACE(jasm, ()=>{
+    console.log('edit', {
+      A: hex(2,cpu.reg('a')),
+      c: chr(cpu.reg('a')),
+      Y: hex(2,cpu.reg('y')),
+      X: hex(2,cpu.reg('x')),
+    });
+    //cpu.dump(S, 256/8, 8, 1);
+  });
+
+  // hmmm
+  //def(':'); colon(),INCA('state');
+
+  cmd(0x7f, 'OP_BackSpace');
+  cmd('^R', 'OP_Run');
+  cmd('^H', 'OP_BackSpace');
+  cmd('^L', 'OP_List');
+  cmd('^F'); L('e+'),INY(),BEQ('e-');
+  cmd('^B'); L('e-'),DEY(),BEQ('e+');
+  cmd('^A'); {
+    L('ea');
+    DEY(),BNE('e+');
+    LDAAY('S');
+    CMPN(10),BNE('ea');
+    // redisplay
+    STYA('save_pos');
+    LDYN(0);
+    LDAN(state_edit+state_display); // edit+display
+    STAA('state');
+    //enddef('decstate');
+  }
+  // cmd('[', 'incstate'); 
+  // cmd(']', 'decstate');
+  endcmd();
+
+  // non-printable
+  CMPN(31),BCC('edit_next'); // ctrl-
+  CMPN(128),BCC('edit_next'); // meta-
+
+  // store character
+  STAAY(S);
+
+  // TODO: can we be in vt100 insert char mode?
+
+  //JMPA('display'); // tail call; next=editing_next
+
+ L('display');
+  PHA(),TXA(); { // save TOS
+    // TODO: don't cheat!
+    TRACE(()=>princ(fgcol(GREEN)));
+  
+    JSRA(putc);
+
+    // need CR NL
+    CMPN(10),BNE('display_nonl');
+    PHA(),LDAN(13),JSRA(putc),PLA();
+   L('display_nonl');
+    
+    // end? - turn off display
+    CMPN(0),BPL('_display.noend');
+    LDAN(state_edit); // stay edit/run
+    ANDA('state');
+    STAA('state');
+
+   L('_display.noend');
+
+    // TODO: don't cheat!
+    TRACE(()=>princ(fgcol(WHITE)));
+
+  } PLA();
+  RTS();
+
+L('EDIT_END');
+
 ////////////////////////////////////////
 // High-Level words go here
 L('WORDS_BEGIN');
@@ -1132,6 +1223,7 @@ L('WORDS_BEGIN');
   WORD('ones', 0, '11111.....');
   WORD('twos', 0, '2222....');
   WORD('threes', 0, '333...');
+
 L('WORDS_END');
 
 } // test
@@ -1275,7 +1367,8 @@ prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, ')');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, ')');
-prsize(" XTRA :", l.XTRAS_END-l.XTRAS_BEGIN);
+prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
+prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
 prsize("WORDS :", l.WORDS_END-l.WORDS_BEGIN);
 prsize("TOTAL :", jasm.address()-start);
 
@@ -1289,11 +1382,12 @@ console.log({start});
 
 // remove l.waitKey!
 delete l._waitkey;
+delete l['_edit.waitkey'];
 
 cpu.setLabels(l);
 
-cpu.setTraceLevel(2);
 cpu.setTraceLevel(1);
+cpu.setTraceLevel(2);
 cpu.setTraceLevel(0);
 
 cpu.setOutput(1);
