@@ -196,7 +196,8 @@ let tcpu = {
 
         if (traceLevel > 1) {
           princ(gray);
-          princ(lime);
+          //princ(lime);
+          //princ(green);
           cpu.tracer(cpu, h);
           princ(white);
         }

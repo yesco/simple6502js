@@ -83,7 +83,7 @@ PROGRAM = `
 
  .`;
 
-PROGRAM = '12.34.55.....';
+PROGRAM = '12.34.55.123.234.345.256.257.65535. 66 . 111 .';
 
 
 //      -*- truncate-lines: true; -*-
@@ -997,6 +997,7 @@ L('number?');
   CPXN(ord('9')+1),BCC('not_number');
 
   TRACE(()=>{
+    return;
     cpu.setTraceLevel(2);
   });
 
@@ -1017,6 +1018,7 @@ L('number?');
   // if not in range 0..9 ?
   CMPN(10); BCC('number.done');
 
+  if (0)
   TRACE(()=>['digit', {
     A: cpu.reg('a'),
     X: cpu.reg('x'),
@@ -1033,20 +1035,31 @@ L('number?');
   CLC(),ROL();         // *2 = A*10
   STAA('token');
 
+  BITA('state'),BVC('_number.nodisp1');
+  PHA(); {
+    // don't display if first
+    LDAA('token'),BEQ('_number.nodisp2');
+    TXA(),JSRA('display');
+    L('_number.nodisp2');
+  } PLA();
+  L('_number.nodisp1');
+
   PLA(),ADCA('token'); // 42!
   STAA('token');
 
+  if (0)
   TRACE(()=>['sum', {
     A: cpu.reg('a'),
     X: cpu.reg('x'),
     Y:cpu.reg('y')}]);
 
-  INY(),LDAAY(S);
+  INY(),LDAAY(S),TAX();
   JMPA('number_next');
 
 L('number.done');
   LDAA('token');
   TRACE(()=>{
+    
     cpu.setTraceLevel(0);
   });
 
@@ -1200,6 +1213,7 @@ L('edit_next');
 
   if(1)
   terminal.TRACE(jasm, ()=>{
+    return;
     console.log('edit', {
       A: hex(2,cpu.reg('a')),
       c: chr(cpu.reg('a')),
@@ -1249,7 +1263,7 @@ L('edit_next');
 
  L('display');
   // TODO: don't cheat!
-  TRACE(()=>princ(green));
+  TRACE(()=>princ(lime));
 
   JSRA(putc);
 
