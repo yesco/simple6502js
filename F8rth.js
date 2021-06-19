@@ -577,6 +577,7 @@ L('interpret'); // A has our word
     DEY(),LDXN(state_edit+state_display),STAA('state');
     // terminal debug help
     TRACE(()=>{
+      // assumes to have printed screen first
       let used= cpu.reg('y');
       let free= SYSTEM-S-used;
       let rstack= jasm.getLabels().rstack+1;
@@ -1240,14 +1241,14 @@ L('OP_Run');
 
 L('OP_List');
   TRACE(()=>princ(ansi.cursorSave()));
-  TRACE(()=>princ(ansi.cls()+ansi.home()));
+  TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
     LDAN(S+1, lo),LDYN(S+1, hi), JSRA(puts);
   } PLA(), TAY();
-  TRACE(()=>princ(ansi.cursorRestore()));
+  TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
   JMPA('edit_next');
   // TODO: FALLTHROUGH!
 
@@ -1260,7 +1261,7 @@ L('edit');
 
   PHA(); // save TOS!
 
-  // this so can use RTS for 'editing_next'!
+  // this so can use RTS for 'edit_next'!
  L('_edit');
   JSRA('edit_next');
   BITA('state'),BMI('_edit')
@@ -1271,7 +1272,14 @@ L('edit');
 
 L('edit_next');
   // save cursor position
-//  STYA('edit_pos');
+  STYA('edit_pos');
+
+  TRACE(()=>{
+    princ(cursorSave());
+    princ(gotorc(1, 30));
+    princ(cpu.reg('y')+'   ');
+    princ(cursorRestore());
+  });
 
  L('edit_next_waitkey');
   NOP(); // just to display different label
@@ -1299,30 +1307,20 @@ L('edit_next');
   cmd('^H', 'OP_BackSpace');
   cmd('^L', 'OP_List');
 
-  // half cursor pos, lol for testing
-  cmd('^E'); TYA(),CLC(),ROR(),TAY();
-
-  cmd('^F'); L('e+'),INY(),BEQ('e-');
-    TRACE(()=>princ(ansi.forward()));
-  cmd('^B'); L('e-'),DEY(),BEQ('e+');
-    TRACE(()=>princ(ansi.back()));
+  cmd('^F'); L('e+'),INY(),
+    BEQ('e-');
+    TRACE(()=>princ(ansi.forward())); NOP();
+  cmd('^B'); L('e-'),DEY(),
+    BEQ('e+');
+    TRACE(()=>princ(ansi.back())); NOP();
   cmd('^P'); DEY(),BEQ('e+');
-    TRACE(()=>princ(ansi.up()));
+    TRACE(()=>princ(ansi.up())); NOP();
   cmd('^N'); INY();
-    TRACE(()=>princ(ansi.down()));
-
-  cmd('^A'); {
-    L('ea');
-    DEY(),BNE('e+');
-    LDAAY('S');
-    CMPN(10),BNE('ea');
-    // redisplay
-//    STYA('edit_pos');
-    LDYN(0);
-    LDAN(state_edit+state_display); // edit+display
-    STAA('state');
-    //enddef('decstate');
-  }
+    TRACE(()=>princ(ansi.down())); NOP();
+  cmd('^A'); LDYA('line_pos');
+    TRACE(()=>princ(chr(10)));
+  cmd('^E'); LDYA('eol_pos');
+  cmd('^G'); TYA(),CLC(),ROR(),TAY();
   endcmd();
 
   // non-printable
