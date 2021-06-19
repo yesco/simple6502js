@@ -28,7 +28,7 @@ function _putc(ch) {
 }
 
 // print string from ADDRESS
-// optinal max LEN chars
+// optional max LEN chars
 // stops if char = 0
 // or after a hitbit char
 //
@@ -37,12 +37,14 @@ function _putc(ch) {
 // (0 or hibit set) after where
 // next insstruction is
 function _puts(a, len=-1, m) {
+  //process.stdout.write(' @'+hex(4,a)+' ');
   let saved_len = len;
   if (output) princ("OUTPUT.s: ");
   let c= 0;
   while((a <= 0xffff) && (c= m[a])) {
     if (len-- > 0)
       process.stdout.write(chr(c & 0x7f));
+    if (len < -256) break; // give up
 
     if (c > 127) break;
     a++;
@@ -260,7 +262,7 @@ let tcpu = {
         case 0xfff4: {
           let end = _puts(
             (cpu.reg('y')<<8)+cpu.reg('a'),
-            cpu.reg('x'), m);
+            cpu.reg('x'), cpu.state().m);
           cpu.reg('a', end & 0xff);
           cpu.reg('y', end >> 8);
           break; }

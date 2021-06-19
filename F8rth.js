@@ -113,8 +113,10 @@ PROGRAM = '1d. 2d. 3d. 4d. 5d. o......';
 // pick
 PROGRAM = '11d. 22d. 33d. 44d. 55d. 4p......';
 
+// string
+PROGRAM = '8d.9d."BAR"oo..$..';
 
-
+PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.$$7...';
 
 
 //      -*- truncate-lines: true; -*-
@@ -621,8 +623,6 @@ L('interpret'); // A has our word
   }
 
   L('INTERPRET_END');
-  L('SYMS_BEGIN'); syms_defs = def.count;
-
 
   ////////////////////////////////////////
   // Symbol based operators
@@ -635,11 +635,26 @@ L('interpret'); // A has our word
   //
   // zp stack using X // b11 c16 zp stack
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
+  L('SYMS_BEGIN'); syms_defs = def.count;
+
 
   // TODO:
-  // "#$%,?
+  //   # $ % , ?
   
-  // TEST: */
+  // TODO: this is limited/local to one page
+  def('"'); {
+    PHA(),
+    INY(),TYA(),PHA(),
+    LDXN(0),LDAN(ord('"'));
+    L('_"'),CMPAY(S),BEQ('_".done'); {
+      INY(),INX();
+    } BNE('_"');
+    L('_".done'),TXA();
+  }
+  // TODO: It's really $.
+  def('$'); TAX(),STYA('token'); {
+    PLA(),LDYN(S, hi),JSRA(puts);
+  } LDYA('token'),PLA();
 
   def(' '); // do not interpret as number! lol
   def('@'); TAX(),LDAAX(S); // cool!
@@ -1016,9 +1031,6 @@ L2      DEX
     PLA();
   }
 
-  // TODO: ?
-  def('z'); TSX(),CMPN(0),SBCAX(S);
-
 // 0 -> 1 other +: 0
 //  def('z'); CMPN(0),LDAN(0),ADCN(0);
 
@@ -1062,6 +1074,9 @@ L2      DEX
   // -- printers and formatters
   def(10); // do not interpret NL as number! lol
   def('`', ''); JMPA('printval');
+
+  def('z'); TSX(),CMPN(0),SBCAX(S);
+
 
   enddef();
   L('ALFA_END'); alfa_defs = def.count - alfa_defs;
