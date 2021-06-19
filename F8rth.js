@@ -1239,6 +1239,7 @@ L('OP_Run');
   JMPA('FORTH_BEGIN');
 
 L('OP_List');
+  TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()));
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
@@ -1246,8 +1247,8 @@ L('OP_List');
     LDXN(0xff);
     LDAN(S+1, lo),LDYN(S+1, hi), JSRA(puts);
   } PLA(), TAY();
-  LDAN(0);
-  BEQ('edit');
+  TRACE(()=>princ(ansi.cursorRestore()));
+  JMPA('edit_next');
   // TODO: FALLTHROUGH!
 
 // We're not forthing, so we can use the rstack!
