@@ -121,7 +121,7 @@
     so  tuck
     sd  nip
 
-    wd   2dup  oo
+    wd   2dup   oo
     w\   2drop  \\
     wo   2over  3p3p
     ws   2swap  3rl3rl

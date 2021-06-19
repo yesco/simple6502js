@@ -105,9 +105,13 @@ TAB\tTAB\tTAB\tTAB\tTAB
   GHI
 END`;
 
+PROGRAM = '1 2 3 4 5.....';
+PROGRAM = '3 4+. 1d.n.2d.n.3d.n. 0.0d.n. 00... 000. 0000. 00000. 01. 07. 0009.';
 
-
-
+// over
+PROGRAM = '1d. 2d. 3d. 4d. 5d. o......';
+// pick
+PROGRAM = '11d. 22d. 33d. 44d. 55d. 4p......';
 
 
 
@@ -420,6 +424,9 @@ const      S= 0x0100;
 const SYSTEM= 0x01f0;  
 L('S'); // alias
 
+ORG(S);
+  L('PASCAL_PROGRAM_Z'); pascalz(PROGRAM); // LOL
+
 // 0x100-- program/editor
 // 
 // "top" of memory
@@ -438,8 +445,9 @@ L('SYSTEM');
   // of local data:
 
   // editing 
-  L('edit_pos');  byte(PROGRAM.length>>1);
-//  L('edit_pos');  byte(0);
+// effects initial evaulation?
+//  L('edit_pos');  byte(PROGRAM.length>>1);
+  L('edit_pos');  byte(0);
 
   L('line_pos');  byte(0); // one before?
   L('eol_pos');   byte(0); // one before?
@@ -464,12 +472,12 @@ L('SYSTEM');
   L('rp');        byte(0);
   L('LATEST');    word(0); 
 
+L('SYSTEMS_END');
 ////////////////////////////////////////
+
 if (jasm.address() > 0x0200)
   throw `%% SYSTEM area too big! ends at ${hex(4,jasm.address())}`;
 ////////////////////////////////////////
-
-ORG(S); pascalz(PROGRAM); // LOL
 
 // separate code (ROM) & RAM
 // == Harward Architecture
@@ -477,6 +485,7 @@ ORG(start);
 L('FORTH_BEGIN');
   // init stack pointers
   LDXN('stack', lo); TXS();
+L('quit');
   LDXN('rstack', lo); STXA('rp');
 
   if (brk) {
@@ -500,7 +509,10 @@ L('FORTH_BEGIN');
   LDAN(state_display); STAA('state');
   next();
 
+L('FORTH_INIT_END');
+
 L('edit2'); JMPA('edit');
+
 // TODO: place somebody who want to fallthrough!
 
 // TODO: Use some tricks from Token Threaded Forth
@@ -542,6 +554,7 @@ L('NEXT_END');
 ////////////////////////////////////////
 // Interpreter
 
+L('INTERPRET_BEGIN');
 L('interpret'); // A has our word
 
   terminal.TRACE(jasm, ()=>{
@@ -606,10 +619,14 @@ L('interpret'); // A has our word
 
     JMPA('edit');
   }
+
+  L('INTERPRET_END');
+  L('SYMS_BEGIN'); syms_defs = def.count;
+
+
   ////////////////////////////////////////
   // Symbol based operators
 
-  L('SYMS_BEGIN'); syms_defs = def.count;
   // (and it fit in 256 bytes?)
   // (if so make an page offset jmp table for 32)
 
@@ -620,7 +637,9 @@ L('interpret'); // A has our word
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
 
   // TODO:
-  // "#$%',/:;?
+  // "#$%,?
+  
+  // TEST: */
 
   def(' '); // do not interpret as number! lol
   def('@'); TAX(),LDAAX(S); // cool!
@@ -750,19 +769,17 @@ L('interpret'); // A has our word
   if(0) { // dispatch and next for these 
 
 
-  def('"');
-  def('#');
-  def('$');
-  def('%');
-
-  def('/');
-
-  def(',');
+//  def('"');
+//  def('#');
+//  def('$');
+//  def('%');
+//  def('/');
+//  def(',');
     
   }
   
   // TODO: if
-  def('?');
+//  def('?');
 
   // TODO: GOTO ?
   // TAY(),PLA();
@@ -860,6 +877,49 @@ L2      DEX
     PLA();
   }
 
+  // COLON (not ENTER) and ; (EXIT)
+  def(':', 'do'); // dispatch does ENTER
+  def(';'); {
+    PHA(); {
+      L('_;_mid');
+      R_PLA();
+      // do "RTS"
+      R_PLA(),TAY();
+    }
+    PLA();
+  }
+
+
+  L('SYMS_END'); syms_defs = def.count - syms_defs;
+  L('ALFA_BEGIN'); alfa_defs = def.count;
+
+
+  ////////////////////////////////////////
+  // ALFA / letter commands
+
+  // TODO:
+  //   g h t v y z
+  //   [ ]
+  //   { } - nested strings / lambdas
+  //   _longname
+  //
+  // TOOO (secondary ops):
+  //   abcflrwum
+
+  def('d'); PHA();
+  def('\\'); PLA();
+  def('o'); PHA(),TSX(),LDAAX(S+2);
+  def('s'); STAA('token'),PLA(),TAX(),LDAA('token'),PHA(),TXA(); // b10 c19
+  // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
+
+  def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
+  def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
+  def('i'); PHA(),LDXA('rp'),LDAAX('S',a=>a+1);
+  def('j'); PHA(),LDXA('rp'),LDAAX('S',a=>a+3);
+  def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
+
+  def('q', ''); JMPA('quit');
+
   def(']'); { // b44 (HUGE! because of interpret)
     // TODO: idea; have a "skip mode",
     // only then we need a stack of modes?
@@ -927,7 +987,9 @@ L2      DEX
       // TODO: nesting of "{ ..{ ...  } .. }"
 
       CMPN(ord(';'));
-      BEQ('_;_mid');
+      BNE('_;_nomid');
+      JMPA('_;_mid');
+      L('_;_nomid');
 
       // skip inline backtick value (could be any)
       CMPN(ord('`'));
@@ -953,41 +1015,6 @@ L2      DEX
     }
     PLA();
   }
-
-  // COLON (not ENTER) and ; (EXIT)
-  def(':', 'do'); // dispatch does ENTER
-  def(';'); {
-    PHA(); {
-      L('_;_mid');
-      R_PLA();
-      // do "RTS"
-      R_PLA(),TAY();
-    }
-    PLA();
-  }
-
-  L('SYMS_END'); syms_defs = def.count - syms_defs;
-  L('ALFA_BEGIN'); alfa_defs = def.count;
-
-
-  ////////////////////////////////////////
-  // ALFA / letter commands
-
-  // TODO:
-  //   ghijlmnopqrtuvwyz
-  //   []_{}
-  // TOOO (secondary ops):
-  //   abcfl
-
-  // TODO (partially there):
-  //   x
-  def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
-  def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
-
-  def('S'); TSX(),TXA();
-
-// 0 -> 0 other -> 255
-//  def('z'); CMPN(0),LDAN(0),SBCN(0);
 
   // TODO: ?
   def('z'); TSX(),CMPN(0),SBCAX(S);
@@ -1026,12 +1053,11 @@ L2      DEX
   // xr rts
   def('x'); TAX(),PLA(),JMPA('interpret');
 
-  // --- jsk additions
-  def('d'); PHA();
-  def('\\'); PLA();
+  def('S'); TSX(),TXA();
 
-  def('s'); STAA('token'),PLA(),TAX(),LDAA('token'),PHA(),TXA(); // b10 c19
-  // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
+// 0 -> 0 other -> 255
+//  def('z'); CMPN(0),LDAN(0),SBCN(0);
+
 
   // -- printers and formatters
   def(10); // do not interpret NL as number! lol
@@ -1046,6 +1072,7 @@ L2      DEX
   CPXN(31),BCC('number?');
   //JMPA('printcontrol');
 
+ L('NUMBER_BEGIN');
 L('number?');
   CPXN(ord('0')-1),BCS('not_number');
   CPXN(ord('9')+1),BCC('not_number');
@@ -1118,8 +1145,10 @@ L('number.done');
   DEY(); // adjust pointer as we read a non-digit
   next();
 
-L('not_number');
+ L('not_number');
+L('NUMBER_END');
 
+L('FIND_BEGIN');
 L('findword'); 
 next();
 
@@ -1156,6 +1185,7 @@ L('error');
 L('found');
   INY(); // !! skip ptr,
   next();
+L('FIND_END');
 
 //   (to much growth: implement as word?)
 L('FORTH_END');
@@ -1510,20 +1540,25 @@ if (0) {
   print(jasm.getHex(0,0,0));
   process.exit();
 } else if (1) {
-  let lasta, last;
+  let lasta, last='', runtot = 0;
   Object.keys(l).forEach(x=>{
-
     // skip local labels
     if (x.match(/^_/)) return;
     if (x.match(/_$/)) return;
 
     let a = l[x];
     let len = lasta ? a - lasta : '-';
+    runtot += +len;
     
     if (last) {
-      print(last.padEnd(30,' '), hex(4,a),
-            "\t", len.toString().padStart(4));
+      print(last.padEnd(22,' '), hex(4,lasta),
+            "\t", len.toString().padStart(4),
+            "\t", runtot.toString().padStart(5));
     }
+
+    if (last.match(/_BEGIN$/)) runtot = 0;
+    if (last.match(/_END/)) runtot = 0;
+
 
     lasta = a;
     last = x;
@@ -1540,11 +1575,15 @@ function prsize(nam, len, more) {
               more?more:'');
 }
 prsize("FORTH :", l.FORTH_END-l.FORTH_BEGIN);
+prsize(" INIT :", l.FORTH_INIT_END-l.FORTH_BEGIN);
 prsize(" NEXT :", l.NEXT_END-l.NEXT);
+prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
-prsize("  ( # :", syms_defs, ')');
+prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
-prsize("  ( # :", alfa_defs, ')');
+prsize("  ( # :", alfa_defs, '/ 36)');
+prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
+prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
 prsize(" displ:", l.EDIT_END-l.display);
