@@ -86,17 +86,31 @@ PROGRAM = `
 // numbers, truncate correctly
 PROGRAM = '12.34.55.123.234.345.256.257.65535. 66 . 111 .';
 
+PROGRAM = '3 4+. 4 7+.';
+
+PROGRAM = '0.';
+PROGRAM = '12.34.5.6.7.';
+PROGRAM = '1.12.123.9 0.0. 00. 000007. .'
+PROGRAM = '3 4+. 1d.n.2d.n.3d.n. 0.0d.n. 00... 000. 0000. 00000. 01. 07. 0009.';
+
 // edit
 PROGRAM = 
-`ABC DEF GHI  JKL\N
-  2 SPACES LATER\TTAB
-TAB\TTAB\TTAB\TTAB\TTAB
+`ABC DEF GHI  JKL
+  2 SPACES LATER\tTAB
+TAB\tTAB\tTAB\tTAB\tTAB
         SPACES
-\TTAB
+\tTAB
       ETC
     DEF
   GHI
 END`;
+
+
+
+
+
+
+
 
 
 //      -*- truncate-lines: true; -*-
@@ -422,10 +436,15 @@ ORG(SYSTEM);
 L('SYSTEM');
   // I think we want the concept
   // of local data:
-  
 
-  // saved editing pos, during editing in Y
-  L('save_pos');  byte(PROGRAM.length>>1);
+  // editing 
+  L('edit_pos');  byte(PROGRAM.length>>1);
+//  L('edit_pos');  byte(0);
+
+  L('line_pos');  byte(0); // one before?
+  L('eol_pos');   byte(0); // one before?
+  L('end_pos');   byte(0);
+  L('last_line'); byte(0); // tmp
 
   // make ZP global?
   L('token');     byte(0); // tmp?
@@ -447,7 +466,7 @@ L('SYSTEM');
 
 ////////////////////////////////////////
 if (jasm.address() > 0x0200)
-  throw "SYSTEM area too big!";
+  throw `%% SYSTEM area too big! ends at ${hex(4,jasm.address())}`;
 ////////////////////////////////////////
 
 ORG(S); pascalz(PROGRAM); // LOL
@@ -598,6 +617,9 @@ L('interpret'); // A has our word
   //
   // zp stack using X // b11 c16 zp stack
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
+
+  // TODO:
+  // "#$%',/:;?
 
   def(' '); // do not interpret as number! lol
   def('@'); TAX(),LDAAX(S); // cool!
@@ -949,6 +971,15 @@ L2      DEX
 
   ////////////////////////////////////////
   // ALFA / letter commands
+
+  // TODO:
+  //   ghijlmnopqrtuvwyz
+  //   []_{}
+  // TOOO (secondary ops):
+  //   abcfl
+
+  // TODO (partially there):
+  //   x
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
@@ -957,6 +988,7 @@ L2      DEX
 // 0 -> 0 other -> 255
 //  def('z'); CMPN(0),LDAN(0),SBCN(0);
 
+  // TODO: ?
   def('z'); TSX(),CMPN(0),SBCAX(S);
 
 // 0 -> 1 other +: 0
@@ -974,18 +1006,23 @@ L2      DEX
 //  def('z'); CMPN(0),LDAN(0),BCC('_z'),
 //  EORN(0xff),L('_z');
 
-  // ~1+
+  // nand?
   //def('N'); TSX(),ANDAX(S+2),EORN(0xff);
+
+  def('n'); CLC(),SBCN(0),EORN(255);
   // ... and it also defines these
-  //def('B'); PHA(),LDAN('tib');
-  //def('T'); PHA(),LDAA('state');
-  //def('I'); PHA(),LDAN('>in');
   //def('h'); PHA(),LDAAX('here');
-  def('h'); PHA(),TYA(); // if in compilation...
-  def('L'); PHA(),LDAAX('latest');
-  def('K'); PHA(),L('K'),JSRA(getc),BEQ('K');
+  //def('h'); PHA(),TYA(); // if in compilation...
+  //def('L'); PHA(),LDAAX('latest');
+  def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
   def('e'); JSRA(putc),PLA();
 
+  // TODO:
+  // xx execute
+  // xe eval
+  // xs jsr w regs
+  // xa jmp w regs
+  // xr rts
   def('x'); TAX(),PLA(),JMPA('interpret');
 
   // --- jsk additions
@@ -1009,7 +1046,7 @@ L2      DEX
   //JMPA('printcontrol');
 
 L('number?');
-  CPXN(ord('0')),BCS('not_number');
+  CPXN(ord('0')-1),BCS('not_number');
   CPXN(ord('9')+1),BCC('not_number');
 
   TRACE(()=>{
@@ -1021,12 +1058,11 @@ L('number?');
   PHA(); // save TOS
 
   // init
-  LDAN(0);
+  TXA(),SEC(),SBCN(ord('0'));
   STAA('token');
-  
-  TXA();
 
  L('number_next');
+  INY(),LDAAY(S),TAX();
 
   // extract number from digit
   SEC(),SBCN(ord('0'));
@@ -1051,10 +1087,11 @@ L('number?');
   CLC(),ROL();         // *2 = A*10
   STAA('token');
 
+  // echo if state_display
   BITA('state'),BVC('_number.nodisp1');
   PHA(); {
-    // don't display if first
-    LDAA('token'),BEQ('_number.nodisp2');
+    //// don't display digit if first (value==0)
+    //    LDAA('token'),BEQ('_number.nodisp2');
     TXA(),JSRA('display');
     L('_number.nodisp2');
   } PLA();
@@ -1069,13 +1106,11 @@ L('number?');
     X: cpu.reg('x'),
     Y:cpu.reg('y')}]);
 
-  INY(),LDAAY(S),TAX();
   JMPA('number_next');
 
 L('number.done');
   LDAA('token');
   TRACE(()=>{
-    
     cpu.setTraceLevel(0);
   });
 
@@ -1218,7 +1253,7 @@ L('OP_List');
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
 L('edit');
-  LDYA('save_pos');
+  LDYA('edit_pos');
 
   TRACE(()=>princ(ansi.show()));
 
@@ -1235,7 +1270,7 @@ L('edit');
 
 L('edit_next');
   // save cursor position
-//  STYA('save_pos');
+//  STYA('edit_pos');
 
  L('edit_next_waitkey');
   NOP(); // just to display different label
@@ -1281,14 +1316,12 @@ L('edit_next');
     LDAAY('S');
     CMPN(10),BNE('ea');
     // redisplay
-//    STYA('save_pos');
+//    STYA('edit_pos');
     LDYN(0);
     LDAN(state_edit+state_display); // edit+display
     STAA('state');
     //enddef('decstate');
   }
-  // cmd('[', 'incstate'); 
-  // cmd(']', 'decstate');
   endcmd();
 
   // non-printable
@@ -1303,42 +1336,60 @@ L('edit_next');
 
   // TODO: can we be in vt100 insert char mode?
 
+  // Display have two functions:
+  // 1. display a trace of command character
+  // 2. display an edit buffer character
+  // 3. update line_pos, eol_pos, end_pos
+  //    to make the editor code simple.
  L('display');
   // TODO: don't cheat!
   TRACE(()=>princ(lime));
 
-  CPYA('save_pos'),BNE('_display.nopos');
+  // tell terminal to save cursor when
+  // it's at edit_pos!
+  CPYA('edit_pos'),BNE('_display.nopos');
  L('display_pos');
   NOP();
   TRACE(()=>princ(ansi.cursorSave()));
+  LDXA('last_line'),STXA('line_pos');
+  LDXN(0),STXA('eol_pos');
   NOP();
-  TRACE(()=>print("<<<HERE"+JSON.stringify({
+  if(0) TRACE(()=>print("<<<HERE"+JSON.stringify({
     A: cpu.reg('a'),
     Y: cpu.reg('y'),
-    save_pos: m[jasm.getLabels().save_pos]})));
+    edit_pos: m[jasm.getLabels().edit_pos]})));
   NOP();
   L('_display.nopos');
 
   // need CR NL
-  CMPN(10),BNE('display_nonl');
-  TRACE(()=>princ(ansi.cleol()));
-  PHA(),LDAN(13),JSRA(putc),PLA();
- L('display_nonl');
+  CMPN(10),BNE('_display.notnl'); {
+    TRACE(()=>princ(ansi.cleol()));
+    PHA(),LDAN(13),JSRA(putc),PLA();
 
+    STYA('line_pos');
+  
+    // if eol_pos is zero it'll be set!
+    LDXA('eol_pos'),BNE('_display.notnl');
+    STYA('eol_pos');
+  } L('_display.notnl');
+
+  // actually print char!
   JSRA(putc);
 
   // end? - turn off display
-  CMPN(0),BPL('_display.noend');
-  LDAN(state_edit); // stay edit/run
-  ANDA('state');
-  STAA('state');
- L('_display.noend');
+  CMPN(0),BPL('_display.noend'); {
+    LDAN(state_edit); // stay edit/run
+    ANDA('state');
+    STAA('state');
+    STYA('end_pos');
+  } L('_display.noend');
 
   // TODO: don't cheat!
   TRACE(()=>princ(fg(WHITE)));
 
- RTS();
-
+  RTS();
+  // Do NOT put any more code here!
+  // (to keep display bytes correct)
 L('EDIT_END');
 
 ////////////////////////////////////////
@@ -1497,6 +1548,7 @@ prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, ')');
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
+prsize(" displ:", l.EDIT_END-l.display);
 prsize("WORDS :", l.WORDS_END-l.WORDS_BEGIN);
 prsize("TOTAL :", jasm.address()-start);
 

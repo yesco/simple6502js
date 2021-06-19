@@ -111,12 +111,23 @@
     \   drop
     s   swap
     o   over
+
     p   pick
     rt  rot
   ( r-  -rot )  
     rl  roll
-  (     tuck )
-  (     nip )
+
+    (these are simple)
+    so  tuck
+    sd  nip
+
+    wd   2dup  oo
+    w\   2drop  \\
+    wo   2over  3p3p
+    ws   2swap  3rl3rl
+    wp   2pick  2*1+dpp    ??? unverified
+    wrl  2roll
+    wrt  2rot
 
     ##  depth
     
@@ -522,7 +533,7 @@
     k  - (key? is $k)
     l  - (la=local a)
     m  - (min max move memory?)
-    n  - (negate not=~ nip=sd)
+    n  - negate
   ( t  - to x='x! tuck=so)
   ( u  - Unsigned prefix)
   ( v  - variable value)
