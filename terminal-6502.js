@@ -2,10 +2,26 @@ const cpu6502 = require('./fil.js');
 const readline = require('readline');
 const utility = require('./utility.js');
 
+
+// file I/O
+// TODO: implement
+let afopen = 0xffe0;
+let aflush = 0xffe2;
+let afread = 0xffe4;
+let afwrit = 0xffe6;
+let afclos = 0xffe8;
+let afstat = 0xffea;
+let afseek = 0xffec;
+let afremo = 0xffee;
+
+// terminal I/O
+
 let aputc = 0xfff0;
 let aputd = 0xfff2;
 let aputs = 0xfff4;
 let agetc = 0xfff6;
+
+// 0xFFF8-  6502 hardwired vectors
 
 let orig_maker = cpu6502.cpu6502;
 
@@ -90,6 +106,32 @@ function sendKey() {
   cpu.mem[KEYADDR] = 128 + key;
 }	
 
+function _fopen() {
+}
+
+function _flush() {
+}
+
+function _fread() {
+}
+
+function _fwrit() {
+}
+
+function _fclos() {
+}
+
+function _fstat() {
+}
+
+function _fseek() {
+}
+
+function _fremo() {
+}
+
+
+
 // set up capture of key strokes
 readline.emitKeypressEvents(process.stdin);
 process.stdin.setRawMode(true);
@@ -137,11 +179,24 @@ var traceLevel;
 // extend and patch
 let tcpu = {
   ...cpu6502,
-  // extend
+
+  // terminal I/O
   aputc, _putc,
   aputd, _putd,
   aputs, _puts,
   agetc,
+
+  // file I/O
+  afopen, _fopen,
+  aflush, _flush,
+  afread, _fread,
+  afwrit, _fwrit,
+  afclos, _fclos,
+  afstat, _fstat,
+  afseek, _fseek,
+  afremo, _fremo,
+
+// terminal I/O
 
   TRACE,
 
@@ -257,16 +312,16 @@ let tcpu = {
 
         // traps
         switch(d) {
-        case 0xfff0: _putc(cpu.reg('a')); break;
-        case 0xfff2: _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
-        case 0xfff4: {
+        case(aputc): _putc(cpu.reg('a')); break;
+        case(aputd): _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
+        case(aputs): {
           let end = _puts(
             (cpu.reg('y')<<8)+cpu.reg('a'),
             cpu.reg('x'), cpu.state().m);
           cpu.reg('a', end & 0xff);
           cpu.reg('y', end >> 8);
           break; }
-        case 0xfff6: {
+        case(agetc): {
           let c= _getc();
           cpu.reg('a', c);
           let consts= cpu.consts();

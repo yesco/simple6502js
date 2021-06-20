@@ -637,7 +637,6 @@ L('interpret'); // A has our word
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
   L('SYMS_BEGIN'); syms_defs = def.count;
 
-
   // TODO:
   //   # $ % , ?
   
@@ -906,7 +905,6 @@ L2      DEX
 
 
   L('SYMS_END'); syms_defs = def.count - syms_defs;
-  L('ALFA_BEGIN'); alfa_defs = def.count;
 
 
   ////////////////////////////////////////
@@ -919,7 +917,11 @@ L2      DEX
   //   _longname
   //
   // TOOO (secondary ops):
-  //   abcflrwum
+  //
+  //   a c r w
+  //
+  //  (No def: b f l u m)
+  L('ALFA_BEGIN'); alfa_defs = def.count;
 
   def('d'); PHA();
   def('\\'); PLA();
