@@ -272,7 +272,9 @@ let trace = 0;
 // TODO: if not this, hang!
 //process.exit(0);
 
-let brk= 0;
+// using BRK is slower, but saves bytes
+// 95 bytes for 40 functions!
+let brk= 1; // save space!
 function next() {
   if (brk) {
     // use only 1 saves 2 bytes!
@@ -492,12 +494,15 @@ L('quit');
 
   if (brk) {
     // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
-    LDAN('NEXT', lo); STAA(cpu.consts().RESET);
-    LDAN('NEXT', hi); STAA(cpu.consts().RESET, inc);
+    LDAN('BRK_NEXT', lo); STAA(cpu.consts().IRQ);
+    LDAN('BRK_NEXT', hi); STAA(cpu.consts().IRQ, inc);
   } else {
     LDAN('FORTH_BEGIN', lo); STAA(cpu.consts().RESET);
     LDAN('FORTH_BEGIN', hi); STAA(cpu.consts().RESET, inc);
   }
+
+  LDAN('FORTH_BEGIN', lo); STAA(cpu.consts().RESET);
+  LDAN('FORTH_BEGIN', hi); STAA(cpu.consts().RESET, inc);
 
   // init other stuff
   LDAN(0); {
@@ -515,19 +520,22 @@ L('FORTH_INIT_END');
 
 L('edit2'); JMPA('edit');
 
-// TODO: place somebody who want to fallthrough!
-
-// TODO: Use some tricks from Token Threaded Forth
-// - http://6502org.wikidot.com/software-token-threading
+// If enabled (why not always?) allow for:
+// 
+//   BRK();          // 1 byte "next"
+//   JMPA('NEXT');   // 3 byte "next"
+//
+// - saves 2 bytes per next! (40 words -> 96!)
+// - 16 cycles instead of 3 cycles.
+//
+L('BRK_NEXT');
+  if (brk) { // overhead i-2, b5 c10
+    TSX(),INX(),INX(),INX(),TXS();
+  }
 
 L('NEXT');
-  if (brk) {
-    STAA('token'); {
-      // drop BRK crap
-      PLA(),PLA(),PLA();
-      // TODO: brk dispatch?
-    } LDAA('token');
-  }
+// TODO: Use some tricks from Token Threaded Forth
+// - http://6502org.wikidot.com/software-token-threading
 
   INY();
   // wrapped around?

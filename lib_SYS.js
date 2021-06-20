@@ -158,15 +158,18 @@ function SYS(n) {
 // generate this before DEFAULT code!
 // (so it'll fall-through...)
 function SYS_HANDLER() {
+  
   // save registers A,X,Y,P to ZP 2,3,4,5
   STAZ(2),STXZ(3),STYZ(4)
+
+  // Save status register first
+  PLA(),STAZ(5);
 
   // copy BRK return address to ZP 0,1
   // decrease by one; make it point
   // at "n" after BRK.
   PLA(),TAX(),DEX(),STXZ(0); // lo
   PLA(),STAZ(1); // hi
-  PLA(),STAZ(5); // saved P
 
   // load "n"
   LDXN(0);

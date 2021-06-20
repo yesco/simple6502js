@@ -87,6 +87,8 @@ ORG(start);
 
 ORG(start+1024);
  L('BRK');
+ // Pop status register first
+ PLP();
 
  // ' 74' comes here
  PLA(); STAZ(0); // lo = first digit '7'
@@ -108,7 +110,6 @@ ORG(start+1024);
  LDAN(0); STAZX(1);
 
  // 0,1:lohi = '4','2'  2,3: 4,2
- PLP();
 
  // look at first char
  LDAZ(0);

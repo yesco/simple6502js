@@ -122,9 +122,9 @@
     # TODO: BUG! this depends on how generating cod.... if mode inline
     'jsr',   'pc++;PH(pc>>8);PH(pc & 0xff);pc= w(pc-1)',
 
-    'brk', 'pc++; irq(); p|= B',
-    'rts', 'pc= PL(); pc+= PL()<<8; pc++;',
-    'rti', 'pc= PL(); pc+= PL()<<8; p= PL()',
+    'brk', 'pc++; tmp= p; p|= B; irq(); p|= tmp|I',
+    'rts', 'pc= PL(); pc+= PL()<<8; pc++',
+    'rti', 'p= PL(); pc=PL(); pc+= PL()<<8',
 
     'php', 'PH(g= p | 0x30)',
     'pha', 'PH(g= a)',
@@ -559,7 +559,7 @@ print "    }
   
 return cpu = {
   run, flags:ps, tracer, hex, dump, printStack, memFormat, w,
-  state() { return { a, x, y, p, pc, s, m, ic}},
+  state() { return { a, x, y, p, pc, s, m, ic, cycles}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n,v=run) { return eval(n+(v!=run?'='+v:''))},
   setFlags(v){ n(z(v)) },
