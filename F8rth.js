@@ -115,9 +115,18 @@ PROGRAM = '11d. 22d. 33d. 44d. 55d. 4p......';
 
 // string
 PROGRAM = '8d.9d."BAR"oo..$..';
-
 PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.$$7...';
 
+// multiply
+PROGRAM = '0 0*. 8 0*. 0 8*. 1 8*. 8 1*. 8 8*. 255 2*. 255 255*. 128 128*. 42 33*. 17 99*. 1 255*. 255 1*.';
+
+
+
+
+
+
+
+// zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
 //
@@ -456,10 +465,11 @@ L('SYSTEM');
   L('line_pos');  byte(0); // one before?
   L('eol_pos');   byte(0); // one before?
   L('end_pos');   byte(0);
-  L('last_line'); byte(0); // tmp
+  L('last_line'); byte(0); // tmp3 ?
 
   // make ZP global?
-  L('token');     byte(0); // tmp?
+  L('tmp');       byte(0); // tmp?
+  L('tmp2');     byte(0); // tmp?
   // these may be local page related?
   L('latest');    byte(0); // => zp?
   L('here');      byte(0); // "where"
@@ -506,7 +516,7 @@ L('quit');
 
   // init other stuff
   LDAN(0); {
-    STAA('token');
+    STAA('tmp');
     STAA('latest');
     STAA('here');
     // init state of interpreter
@@ -533,7 +543,14 @@ L('BRK_NEXT');
     TSX(),INX(),INX(),INX(),TXS();
   }
 
+  let savcyc = 0;
 L('NEXT');
+  TRACE(()=>{
+    let c = cpu.state().cycles;
+    princ('\t(C:'+(c-savcyc)+')\n');
+    savcyc= c;
+  });
+
 // TODO: Use some tricks from Token Threaded Forth
 // - http://6502org.wikidot.com/software-token-threading
 
@@ -645,6 +662,99 @@ L('interpret'); // A has our word
   //   def('+'); CLC(),LDAAX(S+1),ADCAX(S+2),STAAX(S+2),DEX();
   L('SYMS_BEGIN'); syms_defs = def.count;
 
+  // almost peano numbers!
+  //def('M*'); { // b15 zp
+  if (0) {
+    TAX(),BEQ('NEXT');
+    PLA(),STAA(0);
+
+   L('_*');
+    DEX();
+    BEQ('NEXT');
+    CLC();
+    ADCA(0);
+    JMPA('_*');
+  }
+
+  def('M'); {
+    // TODO: remove
+    TRACE(()=>{
+      savcyc= cpu.state().cycles;
+      print();
+    });
+
+    // c144 Z1156
+    STAZ(1);
+    PLA(),STAZ(2);
+
+    LDAN(0x80); // sentiel bit
+    STAZ(0);
+    CLC(),ROL();  // hi byte = 0 /// ASL?
+    DECZ(1);
+L('L1');
+    LSRZ(2); // lo bit of NUM2
+    BCC('L2');
+    ADCZ(1); // If 1, add (NUM1-1)+1
+L('L2');
+    ROR(); // "Stairstep" shift (catching carry from add)
+    RORZ(0);
+    BCC('L1'); // When sentinel falls off into carry, we're done
+    //STA RESULT+1
+    LDAZ(0);
+
+    // TODO: remove
+    TRACE(()=>{
+      print('MUL.c: ', cpu.state().cycles-savcyc);
+    });
+  }
+
+  def('*'); { // b19 avg c73 c26-172
+    // TODO: remove
+    TRACE(()=>{
+      savcyc= cpu.state().cycles;
+      print();
+    });
+
+    STAZ(0);
+    PLA(),STAZ(1);
+    LDAN(0);
+
+   L('_*N'); // c16
+    LSRZ(0);
+    BCC('_*noadd');
+
+    CLC();
+    ADCA(1);
+
+   L('_*noadd');
+    // w extra 2 bytes... => c93  Z932
+    // avg c93 c22-204
+    BEQ('_*done');
+    CLC(),ROLZ(1); // asl?
+    BNE('_*N')
+  }
+
+  L('_*done');
+  // TODO: remove
+  TRACE(()=>{
+    print('MUL.c: ', cpu.state().cycles-savcyc);
+  });
+
+  // TODO: JMPA('dex_txs');
+  //        /get stack ptr                    /drop one
+  def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
+  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
+  def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
+  def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
+  def('^'); TSX(),      EORAX(S+1),           DEX(),TXS();
+
+  def('~'); EORN(0xff)                                     // WINNER!
+
+  def('.'); STYA('tmp'),LDYN(0),JSRA(putd),LDYA('tmp'),PLA();
+
+  def('<'); CLC(),ROL(); // TODO: ASL(); save 1B
+  def('>'); CLC(),ROR(); // TODO: LSR()
+
   // TODO:
   //   # $ % , ?
   
@@ -658,31 +768,9 @@ L('interpret'); // A has our word
     } BNE('_"');
     L('_".done'),TXA();
   }
-  // TODO: It's really $.
-  def('$'); TAX(),STYA('token'); {
-    PLA(),LDYN(S, hi),JSRA(puts);
-  } LDYA('token'),PLA();
-
   def(' '); // do not interpret as number! lol
   def('@'); TAX(),LDAAX(S); // cool!
   def('!'); TAX(),PLA(),STAAX(S),PLA();
-
-  // TODO: JMPA('dex_txs');
-  //        /get stack ptr                    /drop one
-  def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
-  //TRACE(()=>[cpu.reg('a')]);
-  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
-  def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
-  def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
-  def('^'); TSX(),      EORAX(S+1),           DEX(),TXS();
-  def('~'); EORN(0xff)                                     // WINNER!
-
-  def('.'); STYA('token'),LDYN(0),JSRA(putd),LDYA('token'),PLA();
-
-  // add more symbols here!
-
-  def('<'); CLC(),ROL(); // TODO: ASL(); save 1B
-  def('>'); CLC(),ROR(); // TODO: LSR()
 
   // ?=
   // ?<
@@ -759,7 +847,7 @@ L('interpret'); // A has our word
 
     } else if (1) { // b10
 
-      STYA('token'); // not counting
+      STYA('tmp'); // not counting
 
       LDYN(0);
       CMPAX(S, inc); // no count
@@ -773,10 +861,9 @@ L('interpret'); // A has our word
      L('-z');
       TYA();
       
-      
       L('_=end');
 
-    LDYA('token');
+    LDYA('tmp');
 
     }
     // all variants cleanup
@@ -805,52 +892,6 @@ L('interpret'); // A has our word
 
   // TODO: GOTO ?
   // TAY(),PLA();
-
-  def('*'); {
-    // 19 bytes only! avg 130 cycles
-    // - https://www.lysator.liu.se/~nisse/misc/6502-mul.html
-    // same as:
-    // - https://llx.com/Neil/a2/mult.html
-  L('mul');
-
-    PHA();
-
-    STYA('token'); {
-      TSX();
-
-      // TODO: FIX!
-      // Try to fix the values
-      // still not working!
-      LDAN(2); STAAX(S+1);
-      LDAN(3); STAAX(S+2);
-      
-      // factors in factor1 and factor2
-      LDAN(0);
-      LDYN(8);
-     L('_mul');
-      LSRAX(S+1);
-      BCC('_mul_no_add');
-      CLC();
-      ADCAX(S+2);
-      L('_mul_no_add');
-      ROR();
-      RORAX(S+1);
-      DEY();
-      BNE('_mul');
-      STAAX(S+2); // hi result factor2
-      // low result in factor1
-
-      // check that the right stack offset!
-      // yes...
-      //LDAN(7); STAAX(S+1);
-      //LDAN(8); STAAX(S+2);
-      
-    } LDYA('token');
-    
-    PLA(); // lo
-    
-    next();
-  }
 
 let div=`
 
@@ -919,31 +960,41 @@ L2      DEX
   // ALFA / letter commands
 
   // TODO:
-  //   g h t v y z
+  //   g v y z
   //   [ ]
   //   { } - nested strings / lambdas
   //   _longname
   //
+  // TOOO: rename r R
   // TOOO (secondary ops):
   //
   //   a c r w
   //
-  //  (No def: b f l u m)
+  //  (No def: b f u m)
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
   def('d'); PHA();
   def('\\'); PLA();
   def('o'); PHA(),TSX(),LDAAX(S+2);
-  def('s'); STAA('token'),PLA(),TAX(),LDAA('token'),PHA(),TXA(); // b10 c19
+  def('s'); STAA('tmp'),PLA(),TAX(),LDAA('tmp'),PHA(),TXA(); // b10 c19
   // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
 
   def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
-  def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('i'); PHA(),LDXA('rp'),LDAAX('S',a=>a+1);
   def('j'); PHA(),LDXA('rp'),LDAAX('S',a=>a+3);
+
+  def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
+  def('t'); TAX(),STYA('tmp'); {
+    PLA(),LDYN(S, hi),JSRA(puts);
+  } LDYA('tmp'),PLA();
+
   def('q', ''); JMPA('quit');
+
+  // not needed unless go with Words (double)
+  //def('h'); PHA(),LDAAX('here');
+  //def('l'); PHA(),LDAAX('latest');
 
   def(']'); { // b44 (HUGE! because of interpret)
     // TODO: idea; have a "skip mode",
@@ -1060,10 +1111,6 @@ L2      DEX
   //def('N'); TSX(),ANDAX(S+2),EORN(0xff);
 
   def('n'); CLC(),SBCN(0),EORN(255);
-  // ... and it also defines these
-  //def('h'); PHA(),LDAAX('here');
-  //def('h'); PHA(),TYA(); // if in compilation...
-  //def('L'); PHA(),LDAAX('latest');
   def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
   def('e'); JSRA(putc),PLA();
 
@@ -1112,7 +1159,7 @@ L('number?');
 
   // init
   TXA(),SEC(),SBCN(ord('0'));
-  STAA('token');
+  STAA('tmp');
 
  L('number_next');
   INY(),LDAAY(S),TAX();
@@ -1133,25 +1180,25 @@ L('number?');
   PHA();
 
   // multiply token by 10
-  LDAA('token');       // prev number 4
+  LDAA('tmp');       // prev number 4
   CLC(),ROL();         // *4 
   CLC(),ROL();         // TODO: fix ASL
-  CLC(),ADCA('token'); // A*4 + A
+  CLC(),ADCA('tmp'); // A*4 + A
   CLC(),ROL();         // *2 = A*10
-  STAA('token');
+  STAA('tmp');
 
   // echo if state_display
   BITA('state'),BVC('_number.nodisp1');
   PHA(); {
     //// don't display digit if first (value==0)
-    //    LDAA('token'),BEQ('_number.nodisp2');
+    //    LDAA('tmp'),BEQ('_number.nodisp2');
     TXA(),JSRA('display');
     L('_number.nodisp2');
   } PLA();
   L('_number.nodisp1');
 
-  PLA(),ADCA('token'); // 42!
-  STAA('token');
+  PLA(),ADCA('tmp'); // 42!
+  STAA('tmp');
 
   if (0)
   TRACE(()=>['sum', {
@@ -1162,7 +1209,7 @@ L('number?');
   JMPA('number_next');
 
 L('number.done');
-  LDAA('token');
+  LDAA('tmp');
   TRACE(()=>{
     cpu.setTraceLevel(0);
   });
@@ -1178,7 +1225,7 @@ L('findword');
 next();
 
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
-  STXA('token');
+  STXA('tmp');
 
   // save data stack
   TSX(); STXA('stack'); {
@@ -1188,7 +1235,7 @@ next();
     } TSX(); STXA('rstack');
   } LDXA('stack'); TXS();
 
-  LDXA('token');
+  LDXA('tmp');
   // Find word from token (TODO:' ?)
   LDYA('latest');
 
