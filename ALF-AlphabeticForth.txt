@@ -90,22 +90,20 @@
     /   /
     %%  mod
     %/  /mod
-    %#  /mod10
+  ( %#  /mod10 )
 
     n   negate
 
     =   =
     <   <
     >   >
-  ( >=  don't have. Use: <n )
+  ( >=  don't have. Use: <~ )
 
     &   and
     |   or (or if only used uppoer case _)
     ^   xor
     ~   invert
    
-  (     no max / min )
-
   Stack:
     d   dup
     \   drop
@@ -114,8 +112,8 @@
 
     p   pick
     rt  rot
-  ( r-  -rot )  
-    rl  roll
+E ( r-  -rot )  
+E   rl  roll
 
     (these are simple)
     so  tuck
@@ -158,18 +156,23 @@
     #r  u.r right justified print number
     #w  within
 
-    #<  lshift n steps left
-    #>  rshift n stops right
+C   #<  <#
+C   #>  #>
+    #S
+    #
+
+    #{  lshift n steps left
+    #}  rshift n stops right
 
     #s  sign
     #a  abs
 
     #x  max
-    #m  min (?)
+    #m  min
 
     #q  sqrt
 
-  ( #b  base )
+C ( #b  base )
     #/% /mod ( n d -- div rest )
   
   Unsigned
@@ -312,52 +315,52 @@
   Allocation:
     al   allot
     
-    am   malloc
-    af   free
-    ar   resize
-    az   size
-    a,   heap compile (steal 2 bytes)
+M   am   aallocate (malloc)
+M   af   free
+M   ar   resize
+A   az   size
+A   a,   heap compile (steal 2 bytes)
     
-    ac   alloc chain (push on linked list)
+A   ac   alloc chain (push on linked list)
     ad   alloc dictionary (create)
 
     ab   abort
     ab"  abort"
 
-    ak   assoc
-    ax   assoc execute
+A   ak   assoc
+A   ax   assoc execute
     
     ap   pad
 
   Compiler / Definitions:
     :       def of single letter word
     ;      "return" end of def
-    ;i
+    ;i     immediate
     ;a...  again / tail recurse
     ;tN    tail call N
     ;f...  fallthrough
 
-    [      [
+    [      [ (relocate code during "compilation")
     ]      ]
 
-    vx@    variable 'x' fetch (zp)
-    vx!    variable 'x' store (zp)
+A   vx@    variable 'x' fetch (zp)
+A   vx!    variable 'x' store (zp)
 
-  ( v+X    inc var X)
-  ( v-X    dec var X)
+A ( v+X    inc var X)
+A ( v-X    dec var X)
 
     h      here
-    g      gere (memory, lol. use M?)
+A   g      gere (memory, lol. use M?)
 
     ,      ,
-    r,     -, reverse comma = #-2 al @
+A   r,     -, reverse comma = #-2 al @
     $l     sliteral
 
     xx     execute (t - ?)
     xe     eval (s - ?)
-    xs     subroutine (JSR) (a x y p A - a x y p)
-    xa     jump address (JMP) (a x y p A - a x y p)
-    xr     return (RTS / quit?)
+A   xs     subroutine (JSR) (a x y p A - a x y p)
+A   xa     jump address (JMP) (a x y p A - a x y p)
+A   xr     return (RTS / quit?)
     
     c,     c,
     c'     ' or [']
@@ -368,30 +371,31 @@
     ce     see
     cc     create
 
-    [ - immediate,  [[
-
 ( 2dup etc: t_W_o)
 
     w!  2!
     w/  2/
     w*  2*
     w@  2@
-    w\  2drop
     wd  2dup
+    w\  2drop
     wo  2over
     ws  2swap
     wr< 2>r
     wr> 2r>
     wr@ 2r@
 
+    w<  s>d
+A   w>  d>s  (s\)
+
   Input / Output:
     .      print
     e      emit
-    #.     number print (same as .)
+  ( #.     number print (same as .) )
     $.     hex print
     $t     type (string)
     $k     key 
-    $l     line (accept)
+    $l     accept (line)
 
   Float
    'f '    size of a float in bytes
@@ -450,8 +454,6 @@
            flnp1
     fal    falog
            
-
-
     fq     fsqrt
            
            >float

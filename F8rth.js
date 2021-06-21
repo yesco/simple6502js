@@ -137,7 +137,6 @@ PROGRAM = '32@. 66 32! 44 31! 32@. 31@.';
 PROGRAM = '0 128  w@..   152 118 w@..';
 PROGRAM = '152 118 w@..';
 
-
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -349,6 +348,10 @@ function meta(c) {
   return 0x80 + ord(c[1].toUpperCase());
 }
   
+
+// def('d');     .....; // def add next
+// def('d', ''); (jmp); // no next
+// def('x', 'NEXT');    // rel jmp
 
 let last, last_ret;
 
@@ -687,7 +690,12 @@ L('interpret'); // A has our word
 
   ////////////////////////////////////////
   // Symbol based operators
-
+  // 
+  // TODO:
+  //
+  //     $abba (hex) (and more)
+  //     #decimal (and math)
+  //
   // (and it fit in 256 bytes?)
   // (if so make an page offset jmp table for 32)
 
@@ -785,6 +793,7 @@ L('L2');
   def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
   def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
   def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
+  // actually not symbol (32-64)
   def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
   def('^'); TSX(),      EORAX(S+1),           DEX(),TXS();
 
@@ -998,10 +1007,10 @@ L2      DEX
 
   ////////////////////////////////////////
   // ALFA / letter commands
-
   // TODO:
   //   
-  //   [ ]
+  //   fill move
+  //   [ ] "immediate mode" (execute while copy)
   //   { } - nested strings / lambdas
   //   _longname
   //
@@ -1169,14 +1178,32 @@ L2      DEX
   def('e'); JSRA(putc),PLA();
 
   // TODO:
-  // xx execute
-  // xe eval
-  // xs jsr w regs
-  // xa jmp w regs
-  // xr rts
+  //   xx execute  \_____ could be same!
+  //   xe eval     /      if it's an address
+  //  (xs jsr w regs)
+  //  (xa jmp w regs)
+  //  (xr rts)
+  //
+  // Representation:
+  // - two bytes
+  // - one letter ( < 127 )
+  // - two letters ??? alloc string? (waste)
+  // - address of string ( > 127 )
+  // - address of machine code/word? from table?
+  // - need to know if should interpret or run
+  // - strings need to be zero terminated?
+  //   (rewrite second '"' when copy?
+  // - strings can come from:
+  //    + inline words
+  //    + constructed w allot
+  //    + be a char (< 127)
+  //    + be malloced
+  //    + be a user defined word (string)
+  //    + be a { ..  } expression
+  //
   def('x'); TAX(),PLA(),JMPA('interpret');
 
-  def('S'); TSX(),TXA();
+  //def('S'); TSX(),TXA();
 
 // 0 -> 0 other -> 255
 //  def('z'); CMPN(0),LDAN(0),SBCN(0);
@@ -1186,8 +1213,8 @@ L2      DEX
   def(10); // do not interpret NL as number! lol
   def('`', ''); JMPA('printval');
 
-  // ???
-  def('z'); TSX(),CMPN(0),SBCAX(S);
+  // 0=
+  def('z'); TSX(),CMPN(0),CMPAX(S);
 
 
   enddef();
@@ -1280,22 +1307,54 @@ L('found');
   next();
 L('FIND_END');
 
+
+// Idea for secondary dispatch:
+//
+// Dispatch by 32 byte offset table:
+// - ascii -> offset (0-31,32-64,96-126)
+// - per 32 offset in different pages
+// - TC: offset 0  count of secondary
+//   dispatch Table IDs (TIDs)
+// TID:
+// > 127 == small table/linear search
+// < 128 == look up address in Table^2
+//          => 2 byte address (^^^ zp?)
+//                            (LDAAX)
+// TIDs are only even numbers  ^^^^^
+// 
+// --------------------
+// 00: 05 ( <tables' counts> )
+// 01: <table id for r>
+// 02: <table id for c>
+// 03: ...
+// 04: <table id for w>
+// 05: machine code for 
+//
+//     ... (fall through)
+// 8x: JMPA('NEXT'); // for B?? jmps!!
+//
+// direct: JMPA('NEXT'); // i3  c3
+// b??   : to JMPA       // i2  c6
+//         BRK           // i1 c16
+
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
   // get next
   INY(),LDXAY('U');
 
+  // lot of indirect stuff
+  LDXN(0);
+
   // Not very efficient... better on ZP stack...
-  def('@'); {
-    STAZ(0),PLA(),STAZ(1),LDXN(0);
-    LDAXI(0),STAZ(2), // lo
+  def('@'); { // b20 c36+4 (fig: b14 c31 c-3 next!)
+    STAZ(0),PLA(),STAZ(1), // lo, hi addr
+    LDAXI(0),STAZ(2), // lo, data
     INCZ(0),BNE('_w@'),INCZ(1),L('_w@'),
-    LDAXI(0),PHA(); // hi
+    LDAXI(0),PHA(); // hi, data
     LDAZ(2); // lo
   }
-  def('!'); {
+  def('!'); { // b18 c41+4
     STAZ(0),PLA(),STAZ(1), // lo, hi addr
-    LDXN(0),
     PLA(),STAXI(0), // lo, data
     INCZ(0),BNE('_w!'),INCZ(1),L('_w!'),
     PLA(),STAXI(0), // hi, data
@@ -1713,9 +1772,10 @@ prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
-prsize("  ( # :", alfa_defs, '/ 36)');
+prsize("  ( # :", alfa_defs, '/ 30)');
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
+print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
