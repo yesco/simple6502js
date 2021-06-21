@@ -120,9 +120,8 @@ PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.$$7...';
 // multiply
 PROGRAM = '0 0*. 8 0*. 0 8*. 1 8*. 8 1*. 8 8*. 255 2*. 255 255*. 128 128*. 42 33*. 17 99*. 1 255*. 255 1*.';
 
-
-
-
+// new number parse
+PROGRAM = '33 44+d.47.42.1025.0.  007. .';
 
 
 
@@ -277,6 +276,7 @@ let getc = terminal.agetc;
 let start = 0x501;
 
 let trace = 0;
+let tracecyc = 0;
 
 // TODO: if not this, hang!
 //process.exit(0);
@@ -466,10 +466,11 @@ L('SYSTEM');
   L('eol_pos');   byte(0); // one before?
   L('end_pos');   byte(0);
   L('last_line'); byte(0); // tmp3 ?
+  L('num_pos');   byte(0);
 
   // make ZP global?
   L('tmp');       byte(0); // tmp?
-  L('tmp2');     byte(0); // tmp?
+  L('tmp2');      byte(0); // tmp?
   // these may be local page related?
   L('latest');    byte(0); // => zp?
   L('here');      byte(0); // "where"
@@ -501,6 +502,9 @@ L('FORTH_BEGIN');
   LDXN('stack', lo); TXS();
 L('quit');
   LDXN('rstack', lo); STXA('rp');
+
+  // init
+  LDAN(0xff),STAA('num_pos');;
 
   if (brk) {
     // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
@@ -546,6 +550,7 @@ L('BRK_NEXT');
   let savcyc = 0;
 L('NEXT');
   TRACE(()=>{
+    if (!tracecyc) return;
     let c = cpu.state().cycles;
     princ('\t(C:'+(c-savcyc)+')\n');
     savcyc= c;
@@ -679,6 +684,7 @@ L('interpret'); // A has our word
   def('M'); {
     // TODO: remove
     TRACE(()=>{
+      if (!tracecyc) return;
       savcyc= cpu.state().cycles;
       print();
     });
@@ -704,6 +710,7 @@ L('L2');
 
     // TODO: remove
     TRACE(()=>{
+      if (!tracecyc) return;
       print('MUL.c: ', cpu.state().cycles-savcyc);
     });
   }
@@ -711,6 +718,7 @@ L('L2');
   def('*'); { // b19 avg c73 c26-172
     // TODO: remove
     TRACE(()=>{
+      if (!tracecyc) return;
       savcyc= cpu.state().cycles;
       print();
     });
@@ -737,6 +745,7 @@ L('L2');
   L('_*done');
   // TODO: remove
   TRACE(()=>{
+    if (!tracecyc) return;
     print('MUL.c: ', cpu.state().cycles-savcyc);
   });
 
@@ -1141,83 +1150,48 @@ L2      DEX
   ////////////////////////////////////////
   // more special test, or fallbacks
 
-  CPXN(31),BCC('number?');
+//  CPXN(31),BCC('number?');
   //JMPA('printcontrol');
 
- L('NUMBER_BEGIN');
-L('number?');
-  CPXN(ord('0')-1),BCS('not_number');
-  CPXN(ord('9')+1),BCC('not_number');
+L('NUMBER_BEGIN');
+ L('number?')
 
-  TRACE(()=>{
-    return;
-    cpu.setTraceLevel(2);
-  });
-
-  // -- we will have number!
-  PHA(); // save TOS
-
-  // init
-  TXA(),SEC(),SBCN(ord('0'));
-  STAA('tmp');
-
- L('number_next');
-  INY(),LDAAY(S),TAX();
+  PHA(); // save current
 
   // extract number from digit
-  SEC(),SBCN(ord('0'));
+  TXA(),SEC(),SBCN(ord('0'));
+  CMPN(10),BCS('have_num'); {
+    PLA(); // restore
+    JMPA('not_number');
+  } L('have_num');
+  
+  STAZ(1);
 
-  // if not in range 0..9 ?
-  CMPN(10); BCC('number.done');
+  DEY(),CPYA('num_pos'),BEQ('_num.cont'); {
+    // It's a new number
+    // TRACE(()=>princ('<LDAN0>'));
+    LDAN(0);
+  } SKIP1(),L('_num.cont'); {
+    // TRACE(()=>princ('<PLA>'));
+    PLA();
+  }
+  INY();
 
-  if (0)
-  TRACE(()=>['digit', {
-    A: cpu.reg('a'),
-    X: cpu.reg('x'),
-    Y:cpu.reg('y')}]);
+  STYA('num_pos');
 
-  // we have a digit 2
-  PHA();
-
-  // multiply token by 10
-  LDAA('tmp');       // prev number 4
+  // multiply A by 10
+  STAZ(0);
   CLC(),ROL();         // *4 
   CLC(),ROL();         // TODO: fix ASL
-  CLC(),ADCA('tmp'); // A*4 + A
+  CLC(),ADCA(0);       // A*4 + A
   CLC(),ROL();         // *2 = A*10
-  STAA('tmp');
 
-  // echo if state_display
-  BITA('state'),BVC('_number.nodisp1');
-  PHA(); {
-    //// don't display digit if first (value==0)
-    //    LDAA('tmp'),BEQ('_number.nodisp2');
-    TXA(),JSRA('display');
-    L('_number.nodisp2');
-  } PLA();
-  L('_number.nodisp1');
+  // add digit
+  CLC(),ADCZ(1);
 
-  PLA(),ADCA('tmp'); // 42!
-  STAA('tmp');
-
-  if (0)
-  TRACE(()=>['sum', {
-    A: cpu.reg('a'),
-    X: cpu.reg('x'),
-    Y:cpu.reg('y')}]);
-
-  JMPA('number_next');
-
-L('number.done');
-  LDAA('tmp');
-  TRACE(()=>{
-    cpu.setTraceLevel(0);
-  });
-
-  DEY(); // adjust pointer as we read a non-digit
   next();
 
- L('not_number');
+L('not_number');
 L('NUMBER_END');
 
 L('FIND_BEGIN');
@@ -1587,7 +1561,7 @@ function R_PLA() { // b9
 function SKIP1() { // BITZ()
   data(0x24);
 }
-function SKIP1() { // BITA()
+function SKIP2() { // BITA()
   data(0x2c);
 }
 
