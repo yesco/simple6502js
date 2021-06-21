@@ -111,9 +111,6 @@ PROGRAM = '11d. 22d. 33d. 44d. 55d. 4p......';
 // multiply
 PROGRAM = '0 0*. 8 0*. 0 8*. 1 8*. 8 1*. 8 8*. 255 2*. 255 255*. 128 128*. 42 33*. 17 99*. 1 255*. 255 1*.';
 
-// new number parse
-PROGRAM = '33 44+d.47.42.1025.0.  007. .';
-
 // multiple unloop/leave
 
 PROGRAM = '1 2(3])4 5 6 7.......';
@@ -126,6 +123,19 @@ PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.tt7...';
 PROGRAM = '8d.9d."BAR"... ..';
 PROGRAM = '8d.9d."BAR"t ..';
 
+// new number parse
+PROGRAM = '33 44+d.47.42.1025.0.  007. .';
+
+// double words and h ,
+PROGRAM = 'h..';
+PROGRAM = 'h@.';
+PROGRAM = 'h..hw@.66d0s.hw!7d.hw@..';
+
+// works fine one byte U addresses!
+PROGRAM = '32@. 66 32! 44 31! 32@. 31@.';
+
+PROGRAM = '0 128  w@..   152 118 w@..';
+PROGRAM = '152 118 w@..';
 
 
 // zzzz to find fast!
@@ -422,9 +432,7 @@ function endcmd(foo) {
 
 var syms_defs, alfa_defs;
 
-function test() {
-
-ORG(0x0100); // This is ALL of our (user) memory!
+function F8rth() {
 
 // (ANS Forth specifies a minimum:
 //  of 32 cells of Parameter Stack,
@@ -465,6 +473,11 @@ ORG(SYSTEM-1-RS_SIZE);         L('stack');
 // Return Stack
 ORG(SYSTEM-1);                 L('rstack');
 
+// Zero Page
+ORG(0xf0);
+  L('here');      word(0);
+  L('latest');    word(0);
+
 //variables
 ORG(SYSTEM);
 L('SYSTEM');
@@ -486,8 +499,6 @@ L('SYSTEM');
   L('tmp');       byte(0); // tmp?
   L('tmp2');      byte(0); // tmp?
   // these may be local page related?
-  L('latest');    byte(0); // => zp?
-  L('here');      byte(0); // "where"
   // "state" (or rather mode)  test with BITA!
   //   0d-- ---- : run ("interpreting") // BPL
   //   1d-- ---- : editing              // BMI
@@ -510,33 +521,39 @@ if (jasm.address() > 0x0200)
 
 // separate code (ROM) & RAM
 // == Harward Architecture
+
+//TODO:remove debug
+//ORG(0x80); word(0x9876);
+//ORG(0x9876); byte(0x66); byte(0x88);
+
 ORG(start);
+
 L('FORTH_BEGIN');
   // init stack pointers
-  LDXN('stack', lo); TXS();
+  LDXN('stack', lo),TXS();
+
+  LDAN('INITIAL_HERE', lo),STAZ('here');
+  LDAN('INITIAL_HERE', hi),STAZ('here',inc);
+  
+  if (brk) {
+    // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
+    LDAN('BRK_NEXT', lo),STAA(cpu.consts().IRQ);
+    LDAN('BRK_NEXT', hi),STAA(cpu.consts().IRQ, inc);
+  }
+
+  LDAN('FORTH_BEGIN', lo),STAA(cpu.consts().RESET);
+  LDAN('FORTH_BEGIN', hi),STAA(cpu.consts().RESET, inc);
+
 L('quit');
-  LDXN('rstack', lo); STXA('rp');
+  LDXN('rstack', lo),STXA('rp');
 
   // init
   LDAN(0xff),STAA('num_pos');;
-
-  if (brk) {
-    // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
-    LDAN('BRK_NEXT', lo); STAA(cpu.consts().IRQ);
-    LDAN('BRK_NEXT', hi); STAA(cpu.consts().IRQ, inc);
-  } else {
-    LDAN('FORTH_BEGIN', lo); STAA(cpu.consts().RESET);
-    LDAN('FORTH_BEGIN', hi); STAA(cpu.consts().RESET, inc);
-  }
-
-  LDAN('FORTH_BEGIN', lo); STAA(cpu.consts().RESET);
-  LDAN('FORTH_BEGIN', hi); STAA(cpu.consts().RESET, inc);
 
   // init other stuff
   LDAN(0); {
     STAA('tmp');
     STAA('latest');
-    STAA('here');
     // init state of interpreter
     TAY();
   }
@@ -971,6 +988,10 @@ L2      DEX
     PLA();
   }
 
+  def(','); { L('OP_,_tail');
+    LDXN(0),STAXI('here'),
+    INCZ('here'),BNE('_,'),INCZ('here',inc),L('_,');
+  }
 
   L('SYMS_END'); syms_defs = def.count - syms_defs;
 
@@ -979,7 +1000,7 @@ L2      DEX
   // ALFA / letter commands
 
   // TODO:
-  //   g v y z
+  //   
   //   [ ]
   //   { } - nested strings / lambdas
   //   _longname
@@ -989,12 +1010,17 @@ L2      DEX
   //
   //   a c r w
   //
-  //  (No def: b f u m)
+  //  (No def: b f g l m u v z)
   //
   // 27 words... for double... :-(
   // w must: * + . < > " @ ! ( ) o s i j r R (15)
   // w op  : - & | ^ ~ = d \ o n t (12)
   L('ALFA_BEGIN'); alfa_defs = def.count;
+
+  def('a'); { L('OP_allot_next');
+    CLC(),ADCZ('here'),
+    BNE('_a'),INCZ('here',inc),L('_a');
+  }
 
   def('d'); PHA();
   def('\\'); PLA();
@@ -1010,13 +1036,18 @@ L2      DEX
 
   def('t'); TAX(),STYZ(0x10); {
     PLA(),STAZ(0x11),PLA(),TAY(),LDAZ(0x11),
+    // TODO: change it to puts_AY_X
+    // now it's puts_YA_X (save some juggle)
     JSRA(puts);
   } LDYZ(0x10),PLA();
 
   def('q', ''); JMPA('quit');
 
-  // not needed unless go with Words (double)
-  //def('h'); PHA(),LDAAX('here');
+  def('h'); PHA(),LDAZ('here',inc),PHA(),LDAZ('here');
+  def('y'); PHA(),TYA();
+
+  def('w', ''); JMPA('W_double_words');
+
   //def('l'); PHA(),LDAAX('latest');
 
   def(']'); { // b44 (HUGE! because of interpret)
@@ -1170,6 +1201,7 @@ L2      DEX
 
 L('NUMBER_BEGIN');
  L('number?')
+  //TRACE(()=>princ('<number?>'));
 
   PHA(); // save current
 
@@ -1184,10 +1216,10 @@ L('NUMBER_BEGIN');
 
   DEY(),CPYA('num_pos'),BEQ('_num.cont'); {
     // It's a new number
-    // TRACE(()=>princ('<LDAN0>'));
+    //TRACE(()=>princ('<LDAN0>'));
     LDAN(0);
   } SKIP1(),L('_num.cont'); {
-    // TRACE(()=>princ('<PLA>'));
+    //TRACE(()=>princ('<PLA>'));
     PLA();
   }
   INY();
@@ -1247,6 +1279,38 @@ L('found');
   INY(); // !! skip ptr,
   next();
 L('FIND_END');
+
+L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
+ L('W_double_words');
+  // get next
+  INY(),LDXAY('U');
+
+  // Not very efficient... better on ZP stack...
+  def('@'); {
+    STAZ(0),PLA(),STAZ(1),LDXN(0);
+    LDAXI(0),STAZ(2), // lo
+    INCZ(0),BNE('_w@'),INCZ(1),L('_w@'),
+    LDAXI(0),PHA(); // hi
+    LDAZ(2); // lo
+  }
+  def('!'); {
+    STAZ(0),PLA(),STAZ(1), // lo, hi addr
+    LDXN(0),
+    PLA(),STAXI(0), // lo, data
+    INCZ(0),BNE('_w!'),INCZ(1),L('_w!'),
+    PLA(),STAXI(0), // hi, data
+    PLA();
+  }
+  def('+'); TSX(); { // b16
+          CLC(),ADCAX(S+2),STAAX(S+2); // lo
+    PLA(),CLC(),ADCAX(S+3),STAAX(S+3); // hi
+  } PLA();
+  enddef();
+
+  // no match
+  // TODO: error
+  next();
+L('DOUBLE_WORDS_END'); double_defs = def.count - double_defs;
 
 //   (to much growth: implement as word?)
 L('FORTH_END');
@@ -1492,12 +1556,19 @@ L('WORDS_BEGIN');
 
 L('WORDS_END');
 
-} // test
-
 L('resultColor'); string(amber);
 L('colorOff'); string(off());
 L('hide'); string(ansi.hide());
 L('show'); string(ansi.show());
+
+
+//              This must be LAST!
+//
+//                   WARNING:
+//
+//      any code after will be overwritten
+L('INITIAL_HERE');
+} // F8rth
 
 ////////////////////////////////////////
 // word functions
@@ -1593,7 +1664,7 @@ function TRACE(f) {
 var cpu = terminal.cpu6502();
 var m = cpu.state().m;
 
-test();
+F8rth();
 
 let l = jasm.getLabels();
 
@@ -1645,6 +1716,7 @@ prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, '/ 36)');
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
+prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
 prsize(" displ:", l.EDIT_END-l.display);
@@ -1668,6 +1740,7 @@ cpu.setLabels(l);
 cpu.setTraceLevel(1);
 cpu.setTraceLevel(2);
 cpu.setTraceLevel(0);
+
 
 cpu.setOutput(1);
 cpu.setOutput(0);

@@ -42,9 +42,9 @@
 #     (b    = byte value
 #      w    = word value)
 %impl = (
-    'lda', 'g= z(a= MEM)',
-    'ldx', 'g= z(x= MEM)',
-    'ldy', 'g= z(y= MEM)',
+    'lda', 'g= n(z(a= MEM))',
+    'ldx', 'g= n(z(x= MEM))',
+    'ldy', 'g= n(z(y= MEM))',
 
     'sta', 'g= MEM= a',
     'stx', 'g= MEM= x',
@@ -158,12 +158,12 @@
     'sei', 'g= p|= I',
     'sed', 'g= p|= D',
 
-    'txa', 'g= z(a= x)',
-    'tya', 'g= z(a= y)',
-    'txs', 'g= z(s= x)',
-    'tay', 'g= z(y= a)',
-    'tax', 'g= z(x= a)',
-    'tsx', 'g= z(x= s)',
+    'txa', 'g= n(z(a= x))',
+    'tya', 'g= n(z(a= y))',
+    'txs', 'g= n(z(s= x))',
+    'tay', 'g= n(z(y= a))',
+    'tax', 'g= n(z(x= a))',
+    'tsx', 'g= n(z(x= s))',
 );
 
 # prelude w wrappings
@@ -577,11 +577,11 @@ function cyc(op){return +('76000330320004403500044024000440660033304220444045000
 function tracer(how, what) {
   let line;
   if (what == 'head') {
-    line = '= pc    op mnemonic   flags   a  x  y  s';
+    line = '= pc    op mnemonic   flags    a  x  y  s';
   } else {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f:'???')+(q?q:'---')).padEnd(9, ' ')+
-      ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+' '+what.cyc+
+      ps()+'  '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+' '+what.cyc+
       (is(d)&&(d!=ipc+1)?' d='+hex(4,d):'') +(is(g)?' g='+hex(2,g):'')
   }
 
