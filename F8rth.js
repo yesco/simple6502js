@@ -3,19 +3,19 @@
 PROGRAM = '123 ...'; // test space
 // +1 inc at 4th position
 // TODO: bug? 153 wrap around (CTRL-R)
-PROGRAM = '9`\0048765432102@d.1+d.2!2@...........h.';
-PROGRAM = '1234567RRrr.......';
-PROGRAM = '1234567RR.....r.r.';
+PROGRAM = '9`\0 0 4 8 7 6 5 4 3 2 1 0 2@d.1+d.2!2@...........h.';
+PROGRAM = '1 2 3 4 5 6 7RRrr.......';
+PROGRAM = '1 2 3 4 5 6 7RR.....r.r.';
 
 PROGRAM = '34..34s..';
 PROGRAM = '1<<<<<<<<.  9>d.>d.>d.>d.>d.';
 
-PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
-PROGRAM = "12345'A'B'C........";
+PROGRAM = '1 7=.1 2=.  3 3=.5 5=.  7 1=.7 6=.';
+PROGRAM = "1 2 3 4 5'A'B'C........";
 
 // r stack
-PROGRAM = '1234567RR.....r.r.';
-PROGRAM = '1234567RRrr.......';
+PROGRAM = '1 2 3 4 5 6 7RR.....r.r.';
+PROGRAM = '1 2 3 4 5 6 7RRrr.......';
 
 ///PROGRAM = '19s..11111`A56789@d.1+9s!fish\n';
 // PROGRAM = '9876543210..........'; test stack and print
@@ -23,13 +23,13 @@ PROGRAM = '1234567RRrr.......';
 
 // TODO:
 // exit, hmmm, searches for ) lol
-PROGRAM = ':1.]234';
+PROGRAM = ':1.]2 3 4';
 
 // ( ) loop
-PROGRAM = '123(4.(5.)9.9.9.)567';
+PROGRAM = '1 2 3(4.(5.)9.9.9.)5 6 7';
 
 // loop w ]
-PROGRAM = '123(4.]6.6.6.)567';
+PROGRAM = '1 2 3(4.]6.6.6.)5 6 7';
 
 // TODO: should print 1 2 3 4 5 6
 // (the ')' is somewhat undefefined,
@@ -41,45 +41,40 @@ PROGRAM = ':1.]6.6.6.;  2.3.4.)8.8.';
 //  for interpreted words :-( )
 // For ALF; words start at Y=0, but then needs
 //  another word for tailrecurse :-( )
-PROGRAM = ':1.)234;';
+PROGRAM = ':1.)2 3 4;';
 
 // TODO: skip intermediate (count matching)
 // should give 1 2 3 4 
-PROGRAM = '12(3.](6.9.6.)0.6.0.)4.5.6.';
+PROGRAM = '1 2(3.](6.9.6.)0.6.0.)4.5.6.';
 
 // 0=
 PROGRAM = '0z. 1z. 2z. 3z. 4z. 5z. 6z. 7z. 8z. 9z. ';
 
-// multiple unloop/leave
-PROGRAM = '12(3])456';
-PROGRAM = '12(3(4]4)5]5)67';
+// math
 
-PROGRAM = '12(3(4]]4)44)567';
-PROGRAM = '12(3(4]]4)4]4)567';
-
-PROGRAM = '34+.';
+PROGRAM = '3 4+.';
 
 PROGRAM = '0.1.2.3.7.9.';
 
 PROGRAM = `
-34+.99+.
-73-.37-.99-.01-.
-73*.37*.99*.
-73/.37/.99/.93/.
-13&.97&.84&.
-13|.97|.84|.
-13^.97^.84^.
- 1~. 0~. 8~.01-~.
+3 4+.9 9+.
+7 3-.3 7-.9 9-.0 1-.
+7 3*.3 7*.9 9*.
+7 3/.3 7/.9 9/.9 3/.
+1 3&.9 7&.8 4 &.
+1 3|.9 7|.8 4|.
+1 3^.9 7^.8 4^.
+ 1~. 0~. 8~.0 1-~.
 `;
 
-PROGRAM = '17=.12=.  33=.55=.  71=.76=.';
+PROGRAM = '1 7=.1 2=.  3 3=.5 5=.  7 1=.7 6=.';
 
 
 // TODO: * mul not working
 PROGRAM = `
 9
-  11*.. 01*..  10*.. 22*.. 33*..
-  99*.. 88*.. 77*.. 44*..
+  1 1*.. 0 1*..  1 0*.. 2 2*.. 3 3*..
+  9 9*.. 8 8*.. 7 7*.. 4 4*..
 
  .`;
 
@@ -113,17 +108,22 @@ PROGRAM = '1d. 2d. 3d. 4d. 5d. o......';
 // pick
 PROGRAM = '11d. 22d. 33d. 44d. 55d. 4p......';
 
-// string
-PROGRAM = '8d.9d."BAR"oo..$..';
-PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.$$7...';
-
 // multiply
 PROGRAM = '0 0*. 8 0*. 0 8*. 1 8*. 8 1*. 8 8*. 255 2*. 255 255*. 128 128*. 42 33*. 17 99*. 1 255*. 255 1*.';
 
 // new number parse
 PROGRAM = '33 44+d.47.42.1025.0.  007. .';
 
+// string
+PROGRAM = '8d.9d."BAR"oo..t..';
+PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.tt7...';
 
+// multiple unloop/leave
+
+PROGRAM = '1 2(3])4 5 6 7.......';
+PROGRAM = '1 2(3(4]4)5]5)6 7.......';
+PROGRAM = '1 2(3(4]]4)4]4)5 6 7.......';
+PROGRAM = '1 2(3(4]]4)44)5 6 7.......';
 
 // zzzz to find fast!
 
@@ -435,9 +435,17 @@ const RS_SIZE= 24*CELL;
 // (DON'T JSR/RTS any, you hear?)
 const      S= 0x0100;
 const SYSTEM= 0x01f0;  
-L('S'); // alias
+
+// For now user page/memory is stack!
+// TODO: zp would save code bytes,
+// but probably want to use indirection ptr
+const      U= S;
 
 ORG(S);
+L('S'); // alias to S
+
+ORG(U);
+L('U'); // U = user space (1 page)
   L('PASCAL_PROGRAM_Z'); pascalz(PROGRAM); // LOL
 
 // 0x100-- program/editor
@@ -562,7 +570,7 @@ L('NEXT');
   INY();
   // wrapped around?
   //BEQ('edit2');
-  LDXAY(S);
+  LDXAY(U);
 
   BITA('state');
   BVC('nodisplay'); {
@@ -772,14 +780,14 @@ L('L2');
     PHA(),
     INY(),TYA(),PHA(),
     LDXN(0),LDAN(ord('"'));
-    L('_"'),CMPAY(S),BEQ('_".done'); {
+    L('_"'),CMPAY(U),BEQ('_".done'); {
       INY(),INX();
     } BNE('_"');
     L('_".done'),TXA();
   }
   def(' '); // do not interpret as number! lol
-  def('@'); TAX(),LDAAX(S); // cool!
-  def('!'); TAX(),PLA(),STAAX(S),PLA();
+  def('@'); TAX(),LDAAX(U); // cool!
+  def('!'); TAX(),PLA(),STAAX(U),PLA();
 
   // ?=
   // ?<
@@ -882,7 +890,7 @@ L('L2');
   }
 
   // TODO:color\ make a JSR "getc" that echoes?
-  def("'"); PHA(),INY(),LDAAY(S),JSRA(putc); // got the char!
+  def("'"); PHA(),INY(),LDAAY(U),JSRA(putc); // got the char!
 
   if(0) { // dispatch and next for these 
 
@@ -987,17 +995,16 @@ L2      DEX
   def('\\'); PLA();
   def('o'); PHA(),TSX(),LDAAX(S+2);
   def('s'); STAA('tmp'),PLA(),TAX(),LDAA('tmp'),PHA(),TXA(); // b10 c19
-  // EOR swap def('s');TSX(),STAAX(S),EORAX(S+1),EORAX(S),STAAX(S+1),EORA(S); // b13 c18
 
   def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
-  def('i'); PHA(),LDXA('rp'),LDAAX('S',a=>a+1);
-  def('j'); PHA(),LDXA('rp'),LDAAX('S',a=>a+3);
+  def('i'); PHA(),LDXA('rp'),LDAAX(S+1);
+  def('j'); PHA(),LDXA('rp'),LDAAX(S+3);
 
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
   def('t'); TAX(),STYA('tmp'); {
-    PLA(),LDYN(S, hi),JSRA(puts);
+    PLA(),LDYN(U, hi),JSRA(puts);
   } LDYA('tmp'),PLA();
 
   def('q', ''); JMPA('quit');
@@ -1051,7 +1058,7 @@ L2      DEX
       TRACE(_=>['].count', cpu.reg('x')]);
       CMPN(ord(']'));
       BNE('_]skip');
-      INX(),INY(),LDAAY(S);
+      INX(),INY(),LDAAY(U);
       BNE('_]]');
       // never falls out (unless at 00)
       // TODO: test...
@@ -1064,7 +1071,7 @@ L2      DEX
     L('_]skip.next');
       INY();
     L('_]skip');
-      LDAAY(S);
+      LDAAY(U);
       terminal.TRACE(jasm, ()=>{
         //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
       });
@@ -1142,6 +1149,7 @@ L2      DEX
   def(10); // do not interpret NL as number! lol
   def('`', ''); JMPA('printval');
 
+  // ???
   def('z'); TSX(),CMPN(0),SBCAX(S);
 
 
@@ -1216,9 +1224,9 @@ next();
 
 L('find');
   TXA(); // get token
-  CMPAY(S+1); // 0: "ptr to next word", 1: "token/name", 2: "code"
+  CMPAY(U+1); // 0: "ptr to next word", 1: "token/name", 2: "code"
   BEQ('found');
-  LDAAX(S); // link
+  LDAAX(U); // link
   TAY();
   BNE('find');
   // 0 is end
@@ -1247,7 +1255,7 @@ L('printval');
     // TODO: make section for commands where A Y is saved
 
     // next byte
-    INY(),LDXAY(S);
+    INY(),LDXAY(U);
 
     // nightmare! (on stack A Y X)
     PHA(),TYA(),PHA(),TXA(),PHA(); {
@@ -1294,7 +1302,7 @@ L('OP_BackSpace');
     // null out last char
     DEY();
     PHA(); {
-      LDAN(0),STAAY(S);
+      LDAN(0),STAAY(U);
     } PLA();
   }
   RTS();
@@ -1323,7 +1331,7 @@ L('OP_List');
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAN(S+1, lo),LDYN(S+1, hi), JSRA(puts);
+    LDAN(U+1, lo),LDYN(U+1, hi), JSRA(puts);
   } PLA(), TAY();
   TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
   JMPA('edit_next');
@@ -1405,7 +1413,7 @@ L('edit_next');
   CMPN(128),BCC('edit_next'); // meta-
 
   // store character
-  STAAY(S),INY();
+  STAAY(U),INY();
 //  next();
 //  JSRA('display');
 //  JMPA('edit_next');
@@ -1553,7 +1561,7 @@ function R_PHA() { // b9
   LDXA('rp'),STAAX('S'),DECA('rp'); // push
 }
 function R_PLA() { // b9
-  LDXA('rp'),INCA('rp'),LDAAX('S',inc); // drop
+  LDXA('rp'),INCA('rp'),LDAAX('S', inc); // drop
 }
 
 // BIT trick (overlaps other instr)
