@@ -887,12 +887,9 @@ L('L2');
   if(0) { // dispatch and next for these 
 
 
-//  def('"');
 //  def('#');
 //  def('$');
 //  def('%');
-//  def('/');
-//  def(',');
     
   }
   
@@ -980,6 +977,10 @@ L2      DEX
   //   a c r w
   //
   //  (No def: b f u m)
+  //
+  // 27 words... for double... :-(
+  // w must: * + . < > " @ ! ( ) o s i j r R (15)
+  // w op  : - & | ^ ~ = d \ o n t (12)
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
   def('d'); PHA();
