@@ -114,16 +114,19 @@ PROGRAM = '0 0*. 8 0*. 0 8*. 1 8*. 8 1*. 8 8*. 255 2*. 255 255*. 128 128*. 42 33
 // new number parse
 PROGRAM = '33 44+d.47.42.1025.0.  007. .';
 
-// string
-PROGRAM = '8d.9d."BAR"oo..t..';
-PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.tt7...';
-
 // multiple unloop/leave
 
 PROGRAM = '1 2(3])4 5 6 7.......';
 PROGRAM = '1 2(3(4]4)5]5)6 7.......';
 PROGRAM = '1 2(3(4]]4)4]4)5 6 7.......';
 PROGRAM = '1 2(3(4]]4)44)5 6 7.......';
+
+// string
+PROGRAM = '8d.9d."BAR"oo..t..';
+PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.tt7...';
+
+
+
 
 // zzzz to find fast!
 
@@ -439,7 +442,8 @@ const SYSTEM= 0x01f0;
 // For now user page/memory is stack!
 // TODO: zp would save code bytes,
 // but probably want to use indirection ptr
-const      U= S;
+//const      U= S;
+const      U= 0x0400; // not ZP! (no clash)
 
 ORG(S);
 L('S'); // alias to S
