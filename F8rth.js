@@ -442,13 +442,15 @@ const SYSTEM= 0x01f0;
 // For now user page/memory is stack!
 // TODO: zp would save code bytes,
 // but probably want to use indirection ptr
-//const      U= S;
-const      U= 0x0400; // not ZP! (no clash)
+// DON'T use this  var, it'll be come indirect
+// USE 'U'.
+//const      _U= S;
+const      _U= 0x0400; // not ZP! (no clash)
 
 ORG(S);
 L('S'); // alias to S
 
-ORG(U);
+ORG(_U);
 L('U'); // U = user space (1 page)
   L('PASCAL_PROGRAM_Z'); pascalz(PROGRAM); // LOL
 
@@ -574,7 +576,7 @@ L('NEXT');
   INY();
   // wrapped around?
   //BEQ('edit2');
-  LDXAY(U);
+  LDXAY('U');
 
   BITA('state');
   BVC('nodisplay'); {
@@ -784,14 +786,14 @@ L('L2');
     PHA(),
     INY(),TYA(),PHA(),
     LDXN(0),LDAN(ord('"'));
-    L('_"'),CMPAY(U),BEQ('_".done'); {
+    L('_"'),CMPAY('U'),BEQ('_".done'); {
       INY(),INX();
     } BNE('_"');
     L('_".done'),TXA();
   }
   def(' '); // do not interpret as number! lol
-  def('@'); TAX(),LDAAX(U); // cool!
-  def('!'); TAX(),PLA(),STAAX(U),PLA();
+  def('@'); TAX(),LDAAX('U'); // cool!
+  def('!'); TAX(),PLA(),STAAX('U'),PLA();
 
   // ?=
   // ?<
@@ -894,7 +896,7 @@ L('L2');
   }
 
   // TODO:color\ make a JSR "getc" that echoes?
-  def("'"); PHA(),INY(),LDAAY(U),JSRA(putc); // got the char!
+  def("'"); PHA(),INY(),LDAAY('U'),JSRA(putc); // got the char!
 
   if(0) { // dispatch and next for these 
 
@@ -1008,7 +1010,7 @@ L2      DEX
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
   def('t'); TAX(),STYA('tmp'); {
-    PLA(),LDYN(U, hi),JSRA(puts);
+    PLA(),LDYN('U', hi),JSRA(puts);
   } LDYA('tmp'),PLA();
 
   def('q', ''); JMPA('quit');
@@ -1062,7 +1064,7 @@ L2      DEX
       TRACE(_=>['].count', cpu.reg('x')]);
       CMPN(ord(']'));
       BNE('_]skip');
-      INX(),INY(),LDAAY(U);
+      INX(),INY(),LDAAY('U');
       BNE('_]]');
       // never falls out (unless at 00)
       // TODO: test...
@@ -1075,7 +1077,7 @@ L2      DEX
     L('_]skip.next');
       INY();
     L('_]skip');
-      LDAAY(U);
+      LDAAY('U');
       terminal.TRACE(jasm, ()=>{
         //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
       });
@@ -1228,9 +1230,9 @@ next();
 
 L('find');
   TXA(); // get token
-  CMPAY(U+1); // 0: "ptr to next word", 1: "token/name", 2: "code"
+  CMPAY('U', inc); // 0: "ptr to next word", 1: "token/name", 2: "code"
   BEQ('found');
-  LDAAX(U); // link
+  LDAAX('U'); // link
   TAY();
   BNE('find');
   // 0 is end
@@ -1259,7 +1261,7 @@ L('printval');
     // TODO: make section for commands where A Y is saved
 
     // next byte
-    INY(),LDXAY(U);
+    INY(),LDXAY('U');
 
     // nightmare! (on stack A Y X)
     PHA(),TYA(),PHA(),TXA(),PHA(); {
@@ -1306,7 +1308,7 @@ L('OP_BackSpace');
     // null out last char
     DEY();
     PHA(); {
-      LDAN(0),STAAY(U);
+      LDAN(0),STAAY('U');
     } PLA();
   }
   RTS();
@@ -1335,7 +1337,7 @@ L('OP_List');
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAN(U+1, lo),LDYN(U+1, hi), JSRA(puts);
+    LDAN('U', a=>lo(a+1)),LDYN('U', a=>hi(a+1)), JSRA(puts);
   } PLA(), TAY();
   TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
   JMPA('edit_next');
@@ -1417,7 +1419,7 @@ L('edit_next');
   CMPN(128),BCC('edit_next'); // meta-
 
   // store character
-  STAAY(U),INY();
+  STAAY('U'),INY();
 //  next();
 //  JSRA('display');
 //  JMPA('edit_next');
