@@ -122,9 +122,9 @@ PROGRAM = '1 2(3(4]]4)4]4)5 6 7.......';
 PROGRAM = '1 2(3(4]]4)44)5 6 7.......';
 
 // string
-PROGRAM = '8d.9d."BAR"oo..t..';
 PROGRAM = '8d.9d."BAR"oo.."FOO"oo..6.tt7...';
-
+PROGRAM = '8d.9d."BAR"... ..';
+PROGRAM = '8d.9d."BAR"t ..';
 
 
 
@@ -781,10 +781,9 @@ L('L2');
   // TODO:
   //   # $ % , ?
   
-  // TODO: this is limited/local to one page
   def('"'); {
     PHA(),
-    INY(),TYA(),PHA(),
+    INY(),LDAN('U',hi),PHA(),TYA(),PHA(),
     LDXN(0),LDAN(ord('"'));
     L('_"'),CMPAY('U'),BEQ('_".done'); {
       INY(),INX();
@@ -1009,9 +1008,10 @@ L2      DEX
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
-  def('t'); TAX(),STYA('tmp'); {
-    PLA(),LDYN('U', hi),JSRA(puts);
-  } LDYA('tmp'),PLA();
+  def('t'); TAX(),STYZ(0x10); {
+    PLA(),STAZ(0x11),PLA(),TAY(),LDAZ(0x11),
+    JSRA(puts);
+  } LDYZ(0x10),PLA();
 
   def('q', ''); JMPA('quit');
 
@@ -1230,7 +1230,7 @@ next();
 
 L('find');
   TXA(); // get token
-  CMPAY('U', inc); // 0: "ptr to next word", 1: "token/name", 2: "code"
+  CMPAY('U', a=>(a+1)&0xff); // 0: "ptr to next word", 1: "token/name", 2: "code"
   BEQ('found');
   LDAAX('U'); // link
   TAY();
