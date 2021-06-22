@@ -149,9 +149,9 @@ PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
 PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
 PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
 PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
-PROGRAM = '44.33.255#(i.#)T';
-
 PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
+
+PROGRAM = '44.33.255#(i.#)T';
 
 // zzzz to find fast!
 
@@ -497,6 +497,8 @@ ORG(0xf0);
   L('here');      word(0);
   L('latest');    word(0);
 
+  L('rp');        byte(0);
+
 //variables
 ORG(SYSTEM);
 L('SYSTEM');
@@ -528,9 +530,6 @@ L('SYSTEM');
   L('state');     byte(0); // why local?
                            // use for loop counting?
   L('sp');        byte(0); // might
-
-// TODO: move to zp, count savings!
-  L('rp');        byte(0);
 
   L('LATEST');    word(0); 
 
@@ -567,7 +566,7 @@ L('FORTH_BEGIN');
   LDAN('FORTH_BEGIN', hi),STAA(cpu.consts().RESET, inc);
 
 L('quit');
-  LDXN('rstack', lo),STXA('rp');
+  LDXN('rstack', lo),STXZ('rp');
 
   // init
   LDAN(0xff),STAA('num_pos');;
@@ -1001,7 +1000,7 @@ L2      DEX
 
   def(')'); {
     // restore "ip"
-    LDXA('rp');
+    LDXZ('rp');
     LDYAX('S',inc);
     // (jumps back to just after '(')
   }
@@ -1058,8 +1057,8 @@ L2      DEX
   def('s'); STAA('tmp'),PLA(),TAX(),LDAA('tmp'),PHA(),TXA(); // b10 c19
 
   def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
-  def('i'); PHA(),LDXA('rp'),LDAAX(S+1);
-  def('j'); PHA(),LDXA('rp'),LDAAX(S+3);
+  def('i'); PHA(),LDXZ('rp'),LDAAX(S+1);
+  def('j'); PHA(),LDXZ('rp'),LDAAX(S+3);
 
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
@@ -1386,15 +1385,15 @@ L('#_number_words');
     // init (R: -- "ip" "counter")
     STAZ(0);
 
-    LDXA('rp');
+    LDXZ('rp');
     TYA(),DEX(),STAAX(S+1);
     LDAZ(0),DEX(),STAAX(S+1);
-    STXA('rp');
+    STXZ('rp');
 
     PLA();
   }
   def(')'); { // #)
-    LDXA('rp');
+    LDXZ('rp');
     // TODO: dec! then no DECAX below
     // also SBC above can be removed!
     DECAX(S+1); // get count to TOS
@@ -1402,7 +1401,7 @@ L('#_number_words');
     BNE('#)_repeat');
     // ready to unroll and leave!
     //R_DROP(),R_DROP(); // b6 c10
-    INX(),INX(),STXA('rp'); // b5 c7
+    INX(),INX(),STXZ('rp'); // b5 c7
     // this will pass ')'
 //TRACE(()=>print('  #)leave '));
     next();
@@ -1761,27 +1760,27 @@ function create() {
 // Generic Library
 
 // TODO: 3 pushes in BEGIN END is cheaper
-function R_BEGIN() { // b10 zp:b8
-  TSX(),STXA('sp'),LDXA('rp'),TXS();
+function R_BEGIN() { // b9 zp:b8
+  TSX(),STXA('sp'),LDXZ('rp'),TXS();
 }
 
-function R_END() { // b10 zp:b8
-  TSX(),STXA('rp'),LDXA('sp'),TXS();
+function R_END() { // b9 zp:b8
+  TSX(),STXZ('rp'),LDXA('sp'),TXS();
 }
 
 // use these twice and you might as well...
 
 // TODO: move to zero page ( will be b6)
 
-function R_PHA() { // b9 zp:b6
-  LDXA('rp'),STAAX('S'),DECA('rp'); // push
+function R_PHA() { // b6 zp:b6
+  LDXZ('rp'),STAAX('S'),DECZ('rp'); // push
 }
-function R_PLA() { // b9 zp:b6
-  LDXA('rp'),INCA('rp'),LDAAX('S', inc); // drop
+function R_PLA() { // b6 zp:b6
+  LDXZ('rp'),INCZ('rp'),LDAAX('S', inc); // drop
 }
 // three or more R_DROP can do better
 function R_DROP() { // b3 c4
-  INCA('rp'); 
+  INCZ('rp'); 
 }
 
 // BIT trick (overlaps other instr)
