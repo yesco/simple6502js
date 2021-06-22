@@ -36,13 +36,6 @@ PROGRAM = '1 2 3(4.]6.6.6.)5 6 7';
 // in this case pulls z 0 from stack, lol)
 PROGRAM = ':1.]6.6.6.;  2.3.4.)8.8.';
 
-// tail recurse on last ')', lol
-// (however, this has overhead of one PH,PL
-//  for interpreted words :-( )
-// For ALF; words start at Y=0, but then needs
-//  another word for tailrecurse :-( )
-PROGRAM = ':1.)2 3 4;';
-
 // TODO: skip intermediate (count matching)
 // should give 1 2 3 4 
 PROGRAM = '1 2(3.](6.9.6.)0.6.0.)4.5.6.';
@@ -152,6 +145,14 @@ PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
 PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
 
 PROGRAM = '44.33.255#(i.#)T';
+
+// tail recurse on last ')', lol
+// (however, this has overhead of one PH,PL
+//  for interpreted words :-( )
+// For ALF; words start at Y=0, but then needs
+//  another word for tailrecurse :-( )
+PROGRAM = ':1.)2 3 4;';
+
 
 // zzzz to find fast!
 
@@ -1008,13 +1009,12 @@ L2      DEX
   // COLON (not ENTER) and ; (EXIT)
   def(':', 'do'); // dispatch does ENTER
   def(';'); {
-    PHA(); {
-      L('_;_mid');
-      R_PLA();
-      // do "RTS"
-      R_PLA(),TAY();
-    }
-    PLA();
+    L('_;_mid');
+    LDXZ('rp');
+    DEX(); // drop address of 'begin'
+    // do "RTS"
+    DEX();
+    LDYAX(S+2);
   }
 
   def(','); { L('OP_,_tail');
