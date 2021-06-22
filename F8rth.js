@@ -137,6 +137,20 @@ PROGRAM = '32@. 66 32! 44 31! 32@. 31@.';
 PROGRAM = '0 128  w@..   152 118 w@..';
 PROGRAM = '152 118 w@..';
 
+// check R stack op ok
+PROGRAM = '8 9 42R.17.r..';
+// check i
+PROGRAM = '8 9 42R.17.i..r.';
+// check j
+PROGRAM = '8 9 42R.99R255R17R.i.j..r.r.r.';
+
+// counted loops #( #)
+PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
+PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
+PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
+PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
+PROGRAM = '255#(i.#)';
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -512,7 +526,10 @@ L('SYSTEM');
   L('state');     byte(0); // why local?
                            // use for loop counting?
   L('sp');        byte(0); // might
+
+// TODO: move to zp, count savings!
   L('rp');        byte(0);
+
   L('LATEST');    word(0); 
 
 L('SYSTEMS_END');
@@ -561,7 +578,8 @@ L('quit');
     TAY();
   }
 
-  LDAN(state_display); STAA('state');
+  LDAN(0); STAA('state');
+  //LDAN(state_display); STAA('state');
   next();
 
 L('FORTH_INIT_END');
@@ -926,7 +944,6 @@ L('L2');
   if(0) { // dispatch and next for these 
 
 
-//  def('#');
 //  def('$');
 //  def('%');
     
@@ -965,6 +982,12 @@ L2      DEX
 `;
 
   // loop stuff
+  def('#', ''); JMPA('#_number_words');
+
+  // TODO: remove the eternal loop ()
+  // use only #( #) (renmae those to ())
+  // do we need a w( and w) - yes...
+  // .. then need wi wj, lol...
   def('('); {
     L('do');
     PHA();
@@ -1123,7 +1146,7 @@ L2      DEX
       });
 
       // TODO: "  [  ) "
-      // TODO: nesting of "{ ..{ ...  } .. }"
+      // TODO: nesting of "{ ..{ ...  } .. }" ???
 
       CMPN(ord(';'));
       BNE('_;_nomid');
@@ -1148,7 +1171,7 @@ L2      DEX
       // you'll fall through here when at
       // and the last matching ')'
 
-      // foudn last matching ')'
+      // found last matching ')'
       // similar to ';' but w/o PLA
       R_PLA(); // drop "ip"
     }
@@ -1336,6 +1359,46 @@ L('FIND_END');
 // direct: JMPA('NEXT'); // i3  c3
 // b??   : to JMPA       // i2  c6
 //         BRK           // i1 c16
+
+L('#_number_words');
+  // get next
+  INY(),LDXAY('U');
+  
+  // counting loops
+  // TODO: 10#(i.) => 10,9,8,7,6,5..1 lol
+  // should start w 9 and exit?
+  def('('); { // #( 
+    LDXN(1); // means skip one ')'
+    CMPN(0),BNE('_#('); {
+      // TODO: make it near to ']' ???
+      JMPA('_]skip.next');
+    } L('_#(');
+    STAZ(0);
+    R_BEGIN(); {
+      TYA(),PHA(); // push "ip"
+      LDAZ(0),PHA(); // push count
+    } R_END();
+    PLA();
+  }
+  def(')'); { // #)
+    LDXA('rp');
+    // TODO: dec! then no DECAX below
+    // also SBC above can be removed!
+    DECAX(S+1); // get count to TOS
+//TRACE(()=>print('  #) '));
+    BNE('#)_repeat');
+    // ready to unroll and leave!
+    //R_DROP(),R_DROP(); // b6 c10
+    INX(),INX(),STXA('rp'); // b5 c7
+    // this will pass ')'
+//TRACE(()=>print('  #)leave '));
+    next();
+    // restore "ip" to beginning of loop
+  L('#)_repeat');
+//TRACE(()=>print('  #)repeat '));
+    LDYAX(S+2);
+  }
+  enddef();
 
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
@@ -1684,20 +1747,27 @@ function create() {
 ////////////////////////////////////////
 // Generic Library
 
-function R_BEGIN() { // b8
+function R_BEGIN() { // b10 zp:b8
   TSX(),STXA('sp'),LDXA('rp'),TXS();
 }
 
-function R_END() { // b8
+function R_END() { // b10 zp:b8
   TSX(),STXA('rp'),LDXA('sp'),TXS();
 }
 
 // use these twice and you might as well...
-function R_PHA() { // b9
+
+// TODO: move to zero page ( will be b6)
+
+function R_PHA() { // b9 zp:b6
   LDXA('rp'),STAAX('S'),DECA('rp'); // push
 }
-function R_PLA() { // b9
+function R_PLA() { // b9 zp:b6
   LDXA('rp'),INCA('rp'),LDAAX('S', inc); // drop
+}
+// three or more R_DROP can do better
+function R_DROP() { // b3 c4
+  INCA('rp'); 
 }
 
 // BIT trick (overlaps other instr)
