@@ -1772,10 +1772,11 @@ function R_END() { // b9 zp:b8
 
 // TODO: move to zero page ( will be b6)
 
-function R_PHA() { // b6 zp:b6
+function R_PHA() { // b7 zp:b6
   LDXZ('rp'),STAAX('S'),DECZ('rp'); // push
 }
-function R_PLA() { // b6 zp:b6
+// no reason can't do PLY ...
+function R_PLA() { // b7 zp:b6
   LDXZ('rp'),INCZ('rp'),LDAAX('S', inc); // drop
 }
 // three or more R_DROP can do better
