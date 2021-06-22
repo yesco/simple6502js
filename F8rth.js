@@ -149,7 +149,9 @@ PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
 PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
 PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
 PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
-PROGRAM = '255#(i.#)';
+PROGRAM = '44.33.255#(i.#)T';
+
+PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
 
 // zzzz to find fast!
 
@@ -990,22 +992,18 @@ L2      DEX
   // .. then need wi wj, lol...
   def('('); {
     L('do');
-    PHA();
-    R_BEGIN(); {
+    PHA(); {
+      // TODO: on zp can do STYZX(), save bytes!
       // push "ip"
-      TYA(),PHA();
-    } R_END();
-    PLA();
+      TYA(),R_PHA();
+    } PLA();
   }
 
   def(')'); {
-    PHA();
-    R_BEGIN(); {
-      // restore "ip"
-      // (jumps back to just after '(')
-      PLA(),TAY(),PHA();
-    } R_END();
-    PLA();
+    // restore "ip"
+    LDXA('rp');
+    LDYAX('S',inc);
+    // (jumps back to just after '(')
   }
 
   // COLON (not ENTER) and ; (EXIT)
@@ -1240,8 +1238,20 @@ L2      DEX
   def('z'); TSX(),CMPN(0),CMPAX(S);
 
 
+  def('T'); { // Timing for debugging
+    PHA();
+    NOP();
+    TRACE(()=>{
+      let c = cpu.state().cycles;
+      princ('\n----- (cycles:'+c+')\n');
+      cpu.reg('cycles', 0);
+    });
+    NOP();
+    PLA();
+  }
   enddef();
-  L('ALFA_END'); alfa_defs = def.count - alfa_defs;
+
+L('ALFA_END'); alfa_defs = def.count - alfa_defs;
 
   ////////////////////////////////////////
   // more special test, or fallbacks
@@ -1373,11 +1383,14 @@ L('#_number_words');
       // TODO: make it near to ']' ???
       JMPA('_]skip.next');
     } L('_#(');
+    // init (R: -- "ip" "counter")
     STAZ(0);
-    R_BEGIN(); {
-      TYA(),PHA(); // push "ip"
-      LDAZ(0),PHA(); // push count
-    } R_END();
+
+    LDXA('rp');
+    TYA(),DEX(),STAAX(S+1);
+    LDAZ(0),DEX(),STAAX(S+1);
+    STXA('rp');
+
     PLA();
   }
   def(')'); { // #)
@@ -1747,6 +1760,7 @@ function create() {
 ////////////////////////////////////////
 // Generic Library
 
+// TODO: 3 pushes in BEGIN END is cheaper
 function R_BEGIN() { // b10 zp:b8
   TSX(),STXA('sp'),LDXA('rp'),TXS();
 }
