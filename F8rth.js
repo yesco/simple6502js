@@ -500,6 +500,9 @@ ORG(0xf0);
 
   L('rp');        byte(0);
 
+  L('base');      word(0); // base + Y == "IP"
+
+
 //variables
 ORG(SYSTEM);
 L('SYSTEM');
@@ -569,15 +572,18 @@ L('FORTH_BEGIN');
 L('quit');
   LDXN('rstack', lo),STXZ('rp');
 
-  // init
+  // init base "IP"
   LDAN(0xff),STAA('num_pos');;
+
+  LDAN('U', lo),STAZ('base');
+  LDAN('U', hi),STAZ('base', inc);
 
   // init other stuff
   LDAN(0); {
     STAA('tmp');
     STAA('latest');
     // init state of interpreter
-    TAY();
+    TAY(); // "ip"
   }
 
   LDAN(0); STAA('state');
@@ -590,18 +596,36 @@ L('edit2'); JMPA('edit');
 
 // If enabled (why not always?) allow for:
 // 
-//   BRK();          // 1 byte "next"
-//   JMPA('NEXT');   // 3 byte "next"
+//   BRK();          // 1 byte "next" // i1 c17
+//   JMPA('NEXT');   // 3 byte "next" // i3 c6
 //
 // - saves 2 bytes per next! (40 words -> 96!)
 // - 16 cycles instead of 3 cycles.
 //
 L('BRK_NEXT');
-  if (brk) { // overhead i-2, b5 c10
+  if (brk) { // overhead i-2, b5 c10 + 7 for BRK
     TSX(),INX(),INX(),INX(),TXS();
   }
 
   let savcyc = 0;
+
+  // TODO: make 'NEXT' more efficient.
+  // Current overheads in priority:
+  // 1. def() uses CMP,BNE - OH// b4 c5 * #ops/2
+  //    use lookup - SAVE// b 3*#ops c5*#ops/2
+  // 2. A is used for TOS - OH// b2 c7
+  //    no use A TOS (lots code) - SAVE// b2 c7
+  // 3. BRK costly instead of RTS OH// b1 c14
+  //    a. switch to RS before RTS ==// b4 c10
+  //    b. don't use stack for data ===// b1 c6
+  //       (that's a lot of re-write
+  //        basically a normal ALF)
+
+  // Solutions:
+  // 1. not use A for TOS (what's the loss?)
+  // 2. not use BRK for RTS and use real stack
+  // 3. 
+
 L('NEXT');
   TRACE(()=>{
     if (!tracecyc) return;
@@ -616,7 +640,12 @@ L('NEXT');
   INY();
   // wrapped around?
   //BEQ('edit2');
-  LDXAY('U');
+
+  // no LDXIY :-( ... make better...
+  PHA(); { // b3 c7 // PHA+PLA overhead // b2 c7
+    LDAIY('base');
+    TAX();
+  } PLA();
 
   BITA('state');
   BVC('nodisplay'); {
@@ -636,6 +665,22 @@ L('NEXT');
  L('_not_edit');
 
 L('NEXT_END');
+
+// Dispatch sketch:
+// 
+// 0 00x xxxx edit commands      (32B offset)
+// 0 01x xxxx [ -@] symbols machine code (32B offset)
+// 0 10x xxxx [A-Z] UDF in ALF (UDFs 64 address)
+// 0 11x xxxx [a-z] letters machine code (32B offset)
+// 1 xxx xxxx hi bit mark for ALF code? (128B  adress)
+//            or just UDFs in ALF (256 bytes)
+//
+//   ^^     ~    ORDER
+//   00 E  01 E  000 S
+//   01 S  00 S  001 E
+//   10 U  11 U  010 L
+//   11 L  10 L  011 U >= 96 --- ALF!!! 2b addr
+//( 1xx U        1xX (also bit reverse) ALF? )
 
 ////////////////////////////////////////
 // Interpreter
@@ -829,16 +874,18 @@ L('L2');
   
   def('"'); {
     PHA(),
-    INY(),LDAN('U',hi),PHA(),TYA(),PHA(),
+    INY(),LDAN('base',hi),PHA(),TYA(),PHA(),
     LDXN(0),LDAN(ord('"'));
-    L('_"'),CMPAY('U'),BEQ('_".done'); {
+    L('_"'),CMPIY('base'),BEQ('_".done'); {
       INY(),INX();
     } BNE('_"');
     L('_".done'),TXA();
   }
   def(' '); // do not interpret as number! lol
-  def('@'); TAX(),LDAAX('U'); // cool!
-  def('!'); TAX(),PLA(),STAAX('U'),PLA();
+
+// TODO: word relative addressing?
+//  def('@'); TAX(),LDAAX('U'); // cool!
+//  def('!'); TAX(),PLA(),STAAX('U'),PLA();
 
   // ?=
   // ?<
@@ -941,7 +988,7 @@ L('L2');
   }
 
   // TODO:color\ make a JSR "getc" that echoes?
-  def("'"); PHA(),INY(),LDAAY('U'),JSRA(putc); // got the char!
+  def("'"); PHA(),INY(),LDAIY('base'),JSRA(putc); // got the char!
 
   if(0) { // dispatch and next for these 
 
@@ -1046,6 +1093,8 @@ L2      DEX
   // w op  : - & | ^ ~ = d \ o n t (12)
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
+  def('D', ''); JSRA('inline'); string('d3+.');
+
   def('a'); { L('OP_allot_next');
     CLC(),ADCZ('here'),
     BNE('_a'),INCZ('here',inc),L('_a');
@@ -1124,7 +1173,7 @@ L2      DEX
       TRACE(_=>['].count', cpu.reg('x')]);
       CMPN(ord(']'));
       BNE('_]skip');
-      INX(),INY(),LDAAY('U');
+      INX(),INY(),LDAIY('base');
       BNE('_]]');
       // never falls out (unless at 00)
       // TODO: test...
@@ -1137,7 +1186,7 @@ L2      DEX
     L('_]skip.next');
       INY();
     L('_]skip');
-      LDAAY('U');
+      LDAIY('base');
       terminal.TRACE(jasm, ()=>{
         //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
       });
@@ -1251,6 +1300,7 @@ L2      DEX
   enddef();
 
 L('ALFA_END'); alfa_defs = def.count - alfa_defs;
+  // fallthrough
 
   ////////////////////////////////////////
   // more special test, or fallbacks
@@ -1321,8 +1371,9 @@ next();
 
 L('find');
   TXA(); // get token
-  CMPAY('U', a=>(a+1)&0xff); // 0: "ptr to next word", 1: "token/name", 2: "code"
+  CMPIY('base', a=>(a+1)&0xff); // 0: "ptr to next word", 1: "token/name", 2: "code"
   BEQ('found');
+  // TODO: this is garbage?
   LDAAX('U'); // link
   TAY();
   BNE('find');
@@ -1371,7 +1422,12 @@ L('FIND_END');
 
 L('#_number_words');
   // get next
-  INY(),LDXAY('U');
+
+  // TODO:LDXIY
+  PHA(); {
+    INY(),LDAIY('base');
+    TAX();
+  } PLA();
   
   // counting loops
   // TODO: 10#(i.) => 10,9,8,7,6,5..1 lol
@@ -1412,10 +1468,23 @@ L('#_number_words');
   }
   enddef();
 
+  // TODO: error?
+  next();
+
+L('inline');
+  // since R stack is different than callstack
+  // (and we're arriving on data stack!)
+  // this will be simple!
+  LDXZ('rp');
+  //LDAAZ('
+
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
   // get next
-  INY(),LDXAY('U');
+  PHA(); {
+    INY(),LDAIY('base');
+    TAX();
+  } PLA();
 
   // lot of indirect stuff
   LDXN(0);
@@ -1459,7 +1528,10 @@ L('printval');
     // TODO: make section for commands where A Y is saved
 
     // next byte
-    INY(),LDXAY('U');
+    PHA(); {
+      INY(),LDAIY('base');
+      TAX();
+    } PLA();
 
     // nightmare! (on stack A Y X)
     PHA(),TYA(),PHA(),TXA(),PHA(); {
@@ -1506,7 +1578,7 @@ L('OP_BackSpace');
     // null out last char
     DEY();
     PHA(); {
-      LDAN(0),STAAY('U');
+      LDAN(0),STAIY('base');
     } PLA();
   }
   RTS();
@@ -1535,7 +1607,7 @@ L('OP_List');
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAN('U', a=>lo(a+1)),LDYN('U', a=>hi(a+1)), JSRA(puts);
+    LDAN('base', a=>lo(a+1)),LDYN('base', a=>hi(a+1)), JSRA(puts);
   } PLA(), TAY();
   TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
   JMPA('edit_next');
@@ -1617,7 +1689,7 @@ L('edit_next');
   CMPN(128),BCC('edit_next'); // meta-
 
   // store character
-  STAAY('U'),INY();
+  STAIY('base'),INY();
 //  next();
 //  JSRA('display');
 //  JMPA('edit_next');
