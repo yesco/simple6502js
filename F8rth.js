@@ -153,6 +153,12 @@ PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
 
 PROGRAM = 'T44.33.255#(i.#)..T';
 
+PROGRAM = '9 3 4 + . .';
+
+// test ALF inline
+PROGRAM = '11d.22d.33d.D...';
+
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -586,12 +592,16 @@ L('quit');
   }
 
   LDAN(0); STAA('state');
-  //LDAN(state_display); STAA('state');
+  LDAN(state_display); STAA('state');
   next();
 
 L('FORTH_INIT_END');
 
-L('edit2'); JMPA('edit');
+L('edit2');
+  //DEY();
+  // TODO:needed?
+  LDXN(state_edit+state_display),STAA('state');
+  JMPA('edit');
 
 // If enabled (why not always?) allow for:
 // 
@@ -621,6 +631,7 @@ L('BRK_NEXT');
   //        basically a normal ALF)
 
   // Solutions:
+  // 0. jump tables!
   // 1. not use A for TOS (what's the loss?)
   // 2. not use BRK for RTS and use real stack
   // 3. 
@@ -716,7 +727,27 @@ L('interpret'); // A has our word
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
-  def(0); { 
+  def(0); {  // EXIT // b23  c33
+    L('EXIT');
+//    TRACE(()=>print("\n<====EXIT"));
+    LDXZ('rp'); {
+      // empty? enter EDIT!
+      CPXN('rstack',lo),BEQ('edit2');
+
+      // load saved "ip" from "rp" stack
+      LDYAX(S+1),STYZ('base'),INX(); // lo
+//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+      LDYAX(S+1),STYZ('base', inc),INX(); // hi
+//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+      LDYAX(S+1),INX(); // "ip"
+//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+    } STXZ('rp');
+//TRACE(()=>print());
+    JMPA('NEXT'); // save 3 cycles
+    L('EXIT_END');
+
+    // TODO: how to enter EDIT?
+
     DEY(),LDXN(state_edit+state_display),STAA('state');
     // terminal debug help
     TRACE(()=>{
@@ -854,12 +885,12 @@ L('L2');
 
   // TODO: JMPA('dex_txs');
   //        /get stack ptr                    /drop one
-  def('+'); TSX(),CLC(),ADCAX(S+1),           DEX(),TXS(); // b7 c12 : TOS in A winner!
-  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),DEX(),TXS(); // haha CLC,NOT==M-A
-  def('&'); TSX(),      ANDAX(S+1),           DEX(),TXS();
+  def('+'); TSX(),CLC(),ADCAX(S+1),           INX(),TXS(); // b7 c12 : TOS in A winner!
+  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),INX(),TXS(); // haha CLC,NOT==M-A
+  def('&'); TSX(),      ANDAX(S+1),           INX(),TXS();
   // actually not symbol (32-64)
-  def('|'); TSX(),      ORAAX(S+1),           DEX(),TXS();
-  def('^'); TSX(),      EORAX(S+1),           DEX(),TXS();
+  def('|'); TSX(),      ORAAX(S+1),           INX(),TXS();
+  def('^'); TSX(),      EORAX(S+1),           INX(),TXS();
 
   def('~'); EORN(0xff)                                     // WINNER!
 
@@ -1092,7 +1123,7 @@ L2      DEX
   // w op  : - & | ^ ~ = d \ o n t (12)
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
-  def('D', ''); JSRA('inline'); string('d3+.');
+  def('D', ''); JSRA('ENTER'); string('d9+.');
 
   def('a'); { L('OP_allot_next');
     CLC(),ADCZ('here'),
@@ -1470,12 +1501,30 @@ L('#_number_words');
   // TODO: error?
   next();
 
-L('inline');
+L('ENTER'); // b37 c61
   // since R stack is different than callstack
   // (and we're arriving on data stack!)
   // this will be simple!
-  LDXZ('rp');
-  //LDAAZ('
+  // save address from stack
+//  TRACE(()=>print('\n====>ENTER'));
+  STAZ(0); { // save TOS
+    // push "ip"Y, "IP"base on "rp" stack
+    LDXZ('rp'); {
+      // TODO: if rp-stack moves to ZP STYZX
+      DEX(),TYA(),STAAX(S+1); // "ip"
+//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+      DEX(),LDAZ('base',inc),STAAX(S+1); // hi
+//TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
+      DEX(),LDAZ('base'),STAAX(S+1); // lo
+//TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
+    } STXZ('rp');
+    // get address from source RTS
+    PLA(),STAZ('base'); // lo
+    PLA(),STAZ('base', inc); // hi
+    LDYN(0); // 'NEXT' will skip over "current"
+  } LDAZ(0); // restore TOS
+  JMPA('NEXT'); // save some cycles
+L('ENTER_END');
 
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
@@ -1615,7 +1664,8 @@ L('OP_List');
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
 L('edit');
-  LDYA('edit_pos');
+  // TODO: ???
+  //LDYA('edit_pos');
 
   TRACE(()=>princ(ansi.show()));
 
@@ -1924,6 +1974,8 @@ prsize("FORTH :", l.FORTH_END-l.FORTH_BEGIN);
 prsize(" INIT :", l.FORTH_INIT_END-l.FORTH_BEGIN);
 prsize(" NEXT :", l.NEXT_END-l.NEXT);
 prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
+prsize(" ENTR :", l.ENTER_END-l.ENTER);
+prsize(" EXIT :", l.EXIT_END-l.ENTER);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
