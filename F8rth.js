@@ -722,6 +722,10 @@ L('NEXT');
   // PHA(),POP() on ops that modify TOS only...
   PHA(); { // b3 c7 // PHA+PLA overhead // b2 c7
     LDAIY('base'); // c5+
+    // TODO: there is argument for NOT
+    // special handling, just dispatch
+    // in table? Especially for tracing...
+    // Also, 2 cycles could be saved!
     BEQ('EXIT'); // c2+1
     TAX(); // c2
   } PLA();
