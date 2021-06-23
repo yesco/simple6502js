@@ -137,15 +137,6 @@ PROGRAM = '8 9 42R.17.i..r.';
 // check j
 PROGRAM = '8 9 42R.99R255R17R.i.j..r.r.r.';
 
-// counted loops #( #)
-PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
-PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
-PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
-PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
-PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
-
-PROGRAM = '44.33.255#(i.#)T';
-
 // tail recurse on last ')', lol
 // (however, this has overhead of one PH,PL
 //  for interpreted words :-( )
@@ -153,6 +144,14 @@ PROGRAM = '44.33.255#(i.#)T';
 //  another word for tailrecurse :-( )
 PROGRAM = ':1.)2 3 4;';
 
+// counted loops #( #)
+PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
+PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
+PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
+PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
+PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
+
+PROGRAM = 'T44.33.255#(i.#)..T';
 
 // zzzz to find fast!
 
