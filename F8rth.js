@@ -158,6 +158,12 @@ PROGRAM = '9 3 4 + . .';
 // test ALF inline
 PROGRAM = '11d.22d.33d.D...';
 
+// test ALF inline cycles
+PROGRAM = '11d.22d.33d.Td9+T...';
+PROGRAM = '11d.22d.33d.TDT...';
+PROGRAM = 'TTETFT';
+PROGRAM = 'TTETEEEEEEEEEET';
+
 
 // zzzz to find fast!
 
@@ -592,7 +598,7 @@ L('quit');
   }
 
   LDAN(0); STAA('state');
-  LDAN(state_display); STAA('state');
+//  LDAN(state_display); STAA('state');
   next();
 
 L('FORTH_INIT_END');
@@ -602,6 +608,64 @@ L('edit2');
   // TODO:needed?
   LDXN(state_edit+state_display),STAA('state');
   JMPA('edit');
+
+  //  9.6 cycles / enter-exit saved w noECHO
+  // 55.6 cycles / enter-exit saved w ECHO
+L('EXIT');
+
+  PLA(); // because we PHA() before read :-(
+
+  //    TRACE(()=>print("\n<====EXIT"));
+  LDXZ('rp'); {
+    // empty? enter EDIT!
+    CPXN('rstack',lo),BEQ('edit2');
+
+    // load saved "ip" from "rp" stack
+    LDYAX(S+1),STYZ('base'),INX(); // lo
+    //TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+    LDYAX(S+1),STYZ('base', inc),INX(); // hi
+    //TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+    LDYAX(S+1),INX(); // "ip"
+    //TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+  } STXZ('rp');
+  //TRACE(()=>print());
+  JMPA('NEXT'); // save 3 cycles
+  L('EXIT_END');
+
+  // TODO: how to enter EDIT?
+
+  DEY(),LDXN(state_edit+state_display),STAA('state');
+  // terminal debug help
+  TRACE(()=>{
+    // assumes to have printed screen first
+    let used= cpu.reg('y');
+    let free= SYSTEM-S-used;
+    let rstack= jasm.getLabels().rstack+1;
+    let stack= jasm.getLabels().stack+1;
+    print();
+    print();
+    //for(let i=0; i<free; i++) {
+    for(let i=0; i<256; i++) {
+      //princ(m[SYSTEM+used+i]?'x':'.');
+      princ(m[S+i]?'x':'.');
+    }
+    print();
+    for(let i=0; i<DS_SIZE; i++) {
+      princ(m[stack+i-DS_SIZE]?'D':':');
+    }
+    print();
+    for(let i=0; i<RS_SIZE; i++) {
+      princ(m[rstack+i-RS_SIZE]?'R':':');
+    }
+
+    // OMG: TODO: somuch cheating!
+    princ(gotorc(1,1)+`(${used} free: ${free})`); 
+    princ(ansi.cleol());
+    princ(cursorRestore());
+  });
+
+  JMPA('edit');
+
 
 // If enabled (why not always?) allow for:
 // 
@@ -652,9 +716,14 @@ L('NEXT');
   //BEQ('edit2');
 
   // no LDXIY :-( ... make better...
+  // Actually, not much more expensive than
+  // INC (5) + test overflow (3) = 8
+  // Only benefit with this is if we save
+  // PHA(),POP() on ops that modify TOS only...
   PHA(); { // b3 c7 // PHA+PLA overhead // b2 c7
-    LDAIY('base');
-    TAX();
+    LDAIY('base'); // c5+
+    BEQ('EXIT'); // c2+1
+    TAX(); // c2
   } PLA();
 
   BITA('state');
@@ -727,59 +796,7 @@ L('interpret'); // A has our word
   // -- "interpretation" or running
   // LOL: we incstate by dec!
   // neg num can test with BIT!
-  def(0); {  // EXIT // b23  c33
-    L('EXIT');
-//    TRACE(()=>print("\n<====EXIT"));
-    LDXZ('rp'); {
-      // empty? enter EDIT!
-      CPXN('rstack',lo),BEQ('edit2');
 
-      // load saved "ip" from "rp" stack
-      LDYAX(S+1),STYZ('base'),INX(); // lo
-//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
-      LDYAX(S+1),STYZ('base', inc),INX(); // hi
-//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
-      LDYAX(S+1),INX(); // "ip"
-//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
-    } STXZ('rp');
-//TRACE(()=>print());
-    JMPA('NEXT'); // save 3 cycles
-    L('EXIT_END');
-
-    // TODO: how to enter EDIT?
-
-    DEY(),LDXN(state_edit+state_display),STAA('state');
-    // terminal debug help
-    TRACE(()=>{
-      // assumes to have printed screen first
-      let used= cpu.reg('y');
-      let free= SYSTEM-S-used;
-      let rstack= jasm.getLabels().rstack+1;
-      let stack= jasm.getLabels().stack+1;
-      print();
-      print();
-      //for(let i=0; i<free; i++) {
-      for(let i=0; i<256; i++) {
-        //princ(m[SYSTEM+used+i]?'x':'.');
-        princ(m[S+i]?'x':'.');
-      }
-      print();
-      for(let i=0; i<DS_SIZE; i++) {
-        princ(m[stack+i-DS_SIZE]?'D':':');
-      }
-      print();
-      for(let i=0; i<RS_SIZE; i++) {
-        princ(m[rstack+i-RS_SIZE]?'R':':');
-      }
-
-      // OMG: TODO: somuch cheating!
-      princ(gotorc(1,1)+`(${used} free: ${free})`); 
-      princ(ansi.cleol());
-      princ(cursorRestore());
-    });
-
-    JMPA('edit');
-  }
 
   L('INTERPRET_END');
 
@@ -1124,6 +1141,8 @@ L2      DEX
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
   def('D', ''); JSRA('ENTER'); string('d9+.');
+  def('E', ''); JSRA('ENTER'); string('');
+  def('F', ''); JSRA('ENTER'); string('');
 
   def('a'); { L('OP_allot_next');
     CLC(),ADCZ('here'),
@@ -1975,7 +1994,7 @@ prsize(" INIT :", l.FORTH_INIT_END-l.FORTH_BEGIN);
 prsize(" NEXT :", l.NEXT_END-l.NEXT);
 prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" ENTR :", l.ENTER_END-l.ENTER);
-prsize(" EXIT :", l.EXIT_END-l.ENTER);
+prsize(" EXIT :", l.EXIT_END-l.EXIT);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
