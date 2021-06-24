@@ -632,7 +632,6 @@ L('quit');
 L('FORTH_INIT_END');
 
 L('edit2');
-  //DEY();
   // TODO:needed?
   LDXN(state_edit+state_display),STAA('state');
   JMPA('edit');
@@ -1775,15 +1774,16 @@ L('OP_Run');
   JMPA('FORTH_BEGIN');
 
 L('OP_List');
-  TRACE(()=>princ(ansi.cursorSave()));
+  //TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAN('base', a=>lo(a+1)),LDYN('base', a=>hi(a+1)), JSRA(puts);
+    LDAZ('base'),LDYZ('base', inc), JSRA(puts);
   } PLA(), TAY();
-  TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
+  //TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
+  TRACE(()=>princ(ansi.show()));
   JMPA('edit_next');
   // TODO: FALLTHROUGH!
 
