@@ -508,6 +508,7 @@ ORG(SYSTEM-1);                 L('rstack');
 ORG(0xf0);
   L('here');      word(0);
   L('latest');    word(0);
+  L('upbase');    word(0);
 
   L('rp');        byte(0);
 
@@ -545,8 +546,6 @@ L('SYSTEM');
   L('state');     byte(0); // why local?
                            // use for loop counting?
   L('sp');        byte(0); // might
-
-  L('LATEST');    word(0); 
 
 L('SYSTEMS_END');
 ////////////////////////////////////////
@@ -611,7 +610,7 @@ L('edit2');
 
   //  9.6 cycles / enter-exit saved w noECHO
   // 55.6 cycles / enter-exit saved w ECHO
-L('EXIT');
+L('EXIT'); // c52
 
   PLA(); // because we PHA() before read :-(
 
@@ -1310,19 +1309,34 @@ L2      DEX
   // - two bytes
   // - one letter ( < 127 )
   // - two letters ??? alloc string? (waste)
+  //   use constant string in zp > 128 (3 bytes)
+  //   or use input buffer, or here!
+  //   (here is safe! for one 'word')
   // - address of string ( > 127 )
   // - address of machine code/word? from table?
+  //   (see possible?) (
   // - need to know if should interpret or run
   // - strings need to be zero terminated?
-  //   (rewrite second '"' when copy?
+  //   (or copy and change ending ""' to 0)
   // - strings can come from:
-  //    + inline words
-  //    + constructed w allot
+  //    + inline words (with no 0 terminator...)
+  //    + constructed w allot \0
   //    + be a char (< 127)
+  //      (this disallows any string in lower ZP)
   //    + be malloced
-  //    + be a user defined word (string)
+  //    + be a user defined word (string) \0
   //    + be a { ..  } expression
   //
+  // TODO: problem constant string;
+  // no zero terminator!
+  // 0. only allow {} type strings; end at '}'
+  // 1. actually change it to a 0 (ROM?)
+  // 2..modify pointer to that Y wraps around
+  //    after INC, if 0 then exit? Use this!
+  //    Move back so ending " is a Y=0
+  //    and have getnext exit in such case.
+  //    Basically set Y=255-len, base-=len
+  // 
   def('x'); TAX(),PLA(),JMPA('interpret');
 
   //def('S'); TSX(),TXA();
@@ -1828,9 +1842,23 @@ L('EDIT_END');
 // High-Level words go here
 L('WORDS_BEGIN');
 
-  WORD('ones', 0, '11111.....');
-  WORD('twos', 0, '2222....');
-  WORD('threes', 0, '333...');
+  // Problem solved! Longwords must start
+  // with a Capital Letter! LOL
+  // Problems remain:
+  // 1. how to distinguish longwords and Uppercase
+  //    lol
+  // Solves few problems
+  // 1. How to identify it's a longword
+  // 2. 'space' terminates it.
+  //     OrAnotherLongWord???
+  // 3. assign to that one letter!
+  //    (maybe only if there is one letter?)
+  // 4. give error if duplicate first letter?
+  // 5. Does it even need to be in linked list?
+  // 6. maybe only if >1 letter
+  WORD('Ones', 0, '1 1 1 1 1.....');
+  WORD('Duper', 0, 'dd');
+  WORD('Peek', 0, 'd.');
 
 L('WORDS_END');
 
@@ -1856,43 +1884,74 @@ L('INITIAL_HERE');
 // Usage:
 //   CREATE('square', 0, 'd*');
 // Returns start address
-var latest = 0
+var latest = 0, firstUppersAddress = 0;
 function WORD(name, imm, prog, datas=[], qsize=0) {
   if (!!prog.match(/:/) !== !!prog.match(/;/))
-      throw `%% WORD: '${word} must either use : and ; or neither`;
-  let start = jasm.address();
-  let l = gensym('WORD_cod_'+name);
+    throw `%% WORD: '${word}' must either use : and ; or neither`;
+  if (name[0].toUpperCase() !== name[0])
+    throw `%% WORD: Name '${name}' must start with uppercase`;
+
+  let addr = jasm.address();
+
+  // S(ingleletteruppercase)
+  // - can use offset table A-Z if all defs
+  //   fitst in 256 bytes
+  //
+  // TODO: how about [`{\\}] hmmmm
+  if ((name.length === 1) && !imm && !datas && !qsize) {
+    if (!firstUppersAddress) {
+      firstUppersAddress = a;
+    }
+
+    // patch table
+    let index = ord(name);
+    index ^= 0x20; // flip 00x0 0000
+   ORG(jasm.getLabels().DISPATCH + index);
+    byte(addr - firstUpperAddress);
+
+    // store string
+   ORG(addr);
+    stringz(prog);
+
+    if (jasm.address() >= firstUppersAddress+255)
+      throw `%% WORD: '${word}' doesn't fit in 255 bytes block`;
+    
+    return;
+  }
+
+  let lab = gensym('WORD_cod_'+name);
 
   // link
   word(latest);
   // imm / flags
   byte(imm);
   // cod
-  byte(l, a=>a-start);
+  byte(lab, a=>a-addr);
   // name
-  hibit(name);
+  hibit(name); // TODO?
   // dataset
   // (TODO: how to find it?)
   datas.forEach(x=>data(x));
   // program
- L(l);
+ L(lab);
   string(prog);
   // circular queue/buffer
   // (TODO: howto find it?)
   allot(qsize);
   
-  let len = jasm.address() - start;
+  let len = jasm.address() - addr;
   if (len > 256)
     throw `%% WORD: '${name}' bigger than 256 bytes: ${len}`;
 
   latest = jasm.address();
-
-  // pathc/put first in linked-list
-//  ORG(jasm.getLabels().LATEST); word(latest);
-
-  // let's continue
-//  ORG(latest);
 } 
+
+// patch in last word
+ORG('latest');
+  word(latest);
+
+ORG(jasm.getLabels().upbase);
+  word(firstUppersAddress);
 
 
 // generates 6502 code for create
