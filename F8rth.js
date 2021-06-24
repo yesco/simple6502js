@@ -172,6 +172,26 @@ PROGRAM = 'T0 1 17#(F#)T';
 
 PROGRAM = 'T1 2 3TGT...T';
 
+PROGRAM = '9d.::G:Rsrs;1 2 3 ... .';
+
+PROGRAM = `9d.
+::G:Rsrs;
+1 2 3 GGG... .`;
+
+PROGRAM = `9d.
+::F:o.d Rsrs +;
+0 1 (F)
+.`;
+
+PROGRAM = `9d.
+::G:Rsrs;
+::F:o.dG+;
+0 1 100#(F#)
+`;
+
+
+
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -521,6 +541,8 @@ ORG(0xf0);
 
   L('base');      word(0); // base + Y == "IP"
 
+// Temprary in zp
+ORG(0xe0); L('UDF_offsets'); allot(32);
 
 //variables
 ORG(SYSTEM);
@@ -604,7 +626,7 @@ L('quit');
   }
 
   LDAN(0); STAA('state');
-//  LDAN(state_display); STAA('state');
+  //LDAN(state_display); STAA('state');
   next();
 
 L('FORTH_INIT_END');
@@ -1111,14 +1133,37 @@ L2      DEX
   }
 
   // COLON (not ENTER) and ; (EXIT)
-  def(':', 'do'); // dispatch does ENTER
+  //def(':', 'do'); // dispatch does ENTER
+  def(':'); {
+    PHA(); {
+      INY(),LDAIY('base'),DEY(); // peek
+      // if not ':' then we're running word
+      CMPN(ord(':')),BNE('do');
+      // We're defining a word
+      INY(); // lol
+      INY(),LDAIY('base'); // get name
+      CLC(),SBCN(ord('A')),TAX();
+//      TRACE(()=>print("\n---define.x: ",hex(2,cpu.reg('x'))));
+      // TODO: boundary checks...
+      // Store next ':' Y "ip" as start of function!
+      INY();
+      // for now these are "local" functions!
+//      TRACE(()=>print("\n---define.offset: ",hex(2,cpu.reg('y'))));
+      STYZX('UDF_offsets');
+
+      // skip to ;
+      L('_:'),INY(),LDAIY('base');
+      CMPN(ord(';')),BNE('_:');
+    } PLA();
+  }
+
   def(';'); {
     L('_;_mid');
-    LDXZ('rp');
-    DEX(); // drop address of 'begin'
-    // do "RTS"
-    DEX();
-    LDYAX(S+2);
+    // get Y for return loop
+    LDXZ('rp'); {
+      LDYAX(S+1),INX();
+//      LDYAX(S+2),INX();
+    } STXZ('rp');
   }
 
   def(','); { L('OP_,_tail');
@@ -1153,9 +1198,9 @@ L2      DEX
   def('D', ''); JSRA('ENTER'); string('d9+.');
   def('E', ''); JSRA('ENTER'); string('');
   // F(ib) iterator
-  def('F', ''); JSRA('ENTER'); string('o.dG+');
+//  def('F', ''); JSRA('ENTER'); string('o.dG+');
   // rot = 1 2 3 >r swap r> swap .s
-  def('G'); JSRA('ENTER');
+  //def('G'); JSRA('ENTER'); // lol
   string('Rsrs');
 
   def('a'); { L('OP_allot_next');
@@ -1430,7 +1475,40 @@ L('NUMBER_END');
 
 L('FIND_BEGIN');
 L('findword'); 
+// TODO: make it more general
+
+// for now just lookup and ENTER word
+// "same page"
+// local 'ENTER'
+PHA(); {
+  // load Y of A
+  // TODO: just adjust offset of UDF...
+  TXA(),CLC(),SBCN(ord('A')),TAX();
+//  TRACE(()=>print("\n---enter.x: ",hex(2,cpu.reg('x'))));
+  LDAZX('UDF_offsets');
+//  TRACE(()=>print("\n---enter.offset: ",hex(2,cpu.reg('a'))));
+  PHA(); {
+
+    // save Y
+    LDXZ('rp'); {
+//      TRACE(()=>print("\n---enter.save: ",hex(2,cpu.reg('y'))));
+      TYA();
+      // ';' loads one drops one ?
+//      DEX(),STAAX(S+1);
+      DEX(),STAAX(S+1);
+    } STXZ('rp');
+    
+  } PLA();
+  // set "ip" of local function
+  TAY();
+//  TRACE(()=>print("\n---enter: ",hex(2,cpu.reg('y'))));
+
+} PLA();
+
 next();
+
+
+
 
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
   STXA('tmp');
@@ -1756,9 +1834,6 @@ L('edit_next');
     });
     //cpu.dump(S, 256/8, 8, 1);
   });
-
-  // hmmm
-  //def(':'); colon(),INCA('state');
 
   cmd(0x7f, 'OP_BackSpace');
   cmd('^R', 'OP_Run');
