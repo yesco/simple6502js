@@ -164,6 +164,13 @@ PROGRAM = '11d.22d.33d.TDT...';
 PROGRAM = 'TTETFT';
 PROGRAM = 'TTETEEEEEEEEEET';
 
+// Got (Rot)
+PROGRAM = '1 2 3 G ...';
+
+// Fib iterator
+PROGRAM = 'T0 1 17#(F#)T';
+
+PROGRAM = 'T1 2 3TGT...T';
 
 // zzzz to find fast!
 
@@ -1145,7 +1152,11 @@ L2      DEX
 
   def('D', ''); JSRA('ENTER'); string('d9+.');
   def('E', ''); JSRA('ENTER'); string('');
-  def('F', ''); JSRA('ENTER'); string('');
+  // F(ib) iterator
+  def('F', ''); JSRA('ENTER'); string('o.dG+');
+  // rot = 1 2 3 >r swap r> swap .s
+  def('G'); JSRA('ENTER');
+  string('Rsrs');
 
   def('a'); { L('OP_allot_next');
     CLC(),ADCZ('here'),
