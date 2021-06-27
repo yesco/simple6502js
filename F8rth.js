@@ -190,8 +190,6 @@ PROGRAM = `9d.
 `;
 
 
-
-
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -345,6 +343,13 @@ let start = 0x501;
 let trace = 0;
 let tracecyc = 0;
 
+// uncomment to see cycle counts!
+
+//tracecyc = 1;
+
+
+
+
 // TODO: if not this, hang!
 //process.exit(0);
 
@@ -403,78 +408,133 @@ function meta(c) {
   return 0x80 + ord(c[1].toUpperCase());
 }
   
-
-// def('d');     .....; // def add next
-// def('d', ''); (jmp); // no next
-// def('x', 'NEXT');    // rel jmp
-
-let last, last_ret;
-
-function def(a, optJmp, cmp=CPXN, ret=next) {
-  let aa = typeof a==='string' && a.length==1? ord(a) : a;
-  console.error("DEF", a, aa, optJmp);
-  let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
-  let match = gensym('OP_'+a+'_$'+cpu.hex(2,aa));
-
-  def.count++;
-
-  enddef();
-  last_ret = ret;
-
-  L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
-
-  cmp(aa);
-  if (optJmp) {
-
-    BEQ(optJmp);
-    last= undefined; // ! supress
-
-  } else {
-    
-    BNE(tryother);
-    last= tryother;
-    // the words def comes after
-    // ... till the next def!
-    L(match);
+function parseKey(c) {
+  // parse cmd chars
+  if (typeof c === 'string') {
+    if (c.length === 1) {
+      return ord(c);
+    } else if (c[0] === '^') {
+      return ctrl(c[1]);
+    } else if (c[0] === '_') {
+      return meta(c1[1]);
+    }
   }
+
+  return c;
 }
-def.count = 0;
 
+if (1) {
+  // def('d');     .....; // def add next
+  // def('d', ''); (jmp); // no next
+  // def('x', 'NEXT');    // rel jmp
 
-// end def, optNext:
-//   default: next();
-//   ''     : no next
-//   'lab'  : JMAP('lab');
-function enddef(optNext) {
-  if (last) {
-    if (typeof optNext==='undefined') {
-      last_ret();
-    } else if (optNext === '') {
-      // none
+  let last, last_ret;
+
+  function def(a, optJmp, cmp=CPXN, ret=next) {
+    let aa = parseKey(a);
+    console.error("DEF", a, aa, optJmp);
+    let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
+    let match = gensym('OP_'+a+'_$'+cpu.hex(2,aa));
+
+    def.count++;
+
+    enddef();
+    last_ret = ret;
+
+    L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
+
+    cmp(aa);
+    if (optJmp) {
+
+      BEQ(optJmp);
+      last= undefined; // ! supress
+
     } else {
-      JMPA(optNext);
+      
+      BNE(tryother);
+      last= tryother;
+      // the words def comes after
+      // ... till the next def!
+      L(match);
+    }
+  }
+  def.count = 0;
+
+
+  // end def, optNext:
+  //   default: next();
+  //   ''     : no next
+  //   'lab'  : JMAP('lab');
+  function enddef(optNext) {
+    if (last) {
+      if (typeof optNext==='undefined') {
+        last_ret();
+      } else if (optNext === '') {
+        // none
+      } else {
+        JMPA(optNext);
+      }
+
+      L(last);
+    }
+    last= undefined;
+  }
+
+} else {
+// table driven DEF
+
+  let tab = [], skip;
+
+  function def(a, optJmp, cmp=CPXN, ret=next) {
+    let aa = parseKey(a);
+    let lab = gensym('OP_'+a+'_$'+hex(2,aa));
+    console.error("TAB.DEF", lab, optJmp);
+
+    def.count++;
+
+    // if ever arrive here, skip over table
+    if (!skip) {
+      skip = gensym('tab');
+      JMPA(skip);
     }
 
-    L(last);
+    // label code (that comes after this call)
+   L(lab);
+
+    // store jump label
+    if (tab[aa]) {
+      //throw `%% DEF: '${a} already set`;
+      console.error(ansi.red, `%% DEF: '${a} already set`, ansi.off);
+    }
+
+    tab[aa] = lab;
   }
-  last= undefined;
+
+  function enddef() {
+    print("TABLE----------------");
+    if (0) {
+      Object.keys(tab).sort((a,b)=>a-b).forEach(aa=>{
+        print('  TAB:', hex(2,aa), tab[aa]);
+      });
+    } else {
+      for(let i=0; i<0x80; i++) {
+        print('  [0x'+hex(2,i)+'] = ',
+              tab[i] ? tab[i] : '-');
+        if (i%32==31) print();
+      }
+    }
+
+   L(skip);
+    skip = undefined;
+//    tab = [];
+  }
+
 }
 
 // compare if A has command if so invoke
 // optionally, call jmp instead
 // (similar ot def)
 function cmd(c, optJmp) {
-  // parse cmd chars
-  if (typeof c === 'string') {
-    if (c.length === 1) {
-      c = ord(c);
-    } else if (c[0] === '^') {
-      c = ctrl(c[1]);
-    } else if (c[0] === '_') {
-      c = meta(c1[1]);
-    }
-  }
-
   def(c, optJmp, CMPN, RTS);
 }
 
@@ -553,8 +613,11 @@ L('SYSTEM');
   // editing 
 // effects initial evaulation?
 //  L('edit_pos');  byte(PROGRAM.length>>1);
-  L('edit_pos');  byte(0);
 
+// TODO: move all to ZP!
+  L('edit_pos');  byte(0);
+  L('edit_key');  byte(0);
+  L('ed_repeat'); byte(0);
   L('line_pos');  byte(0); // one before?
   L('eol_pos');   byte(0); // one before?
   L('end_pos');   byte(0);
@@ -731,7 +794,7 @@ L('NEXT');
   TRACE(()=>{
     if (!tracecyc) return;
     let c = cpu.state().cycles;
-    princ('\t(C:'+(c-savcyc)+')\n');
+    princ('\t(cyc:'+(c-savcyc)+')\n');
     savcyc= c;
   });
 
@@ -825,9 +888,23 @@ L('interpret'); // A has our word
   });
 
   // -- "interpretation" or running
-  // LOL: we incstate by dec!
-  // neg num can test with BIT!
 
+  if (0) {
+    // benchmark various next
+    switch(3) {
+    case 1: {
+      CLC();
+      BCC('NEXT'); // c34 if right flag
+      break; }
+    case 2: {
+      JMPA('NEXT');} // c35
+    case 3: {
+      BRK(); } // c54
+    default: ;
+    }
+    
+    TRACE(()=>print("---NOTHERE---"));
+  }
 
   L('INTERPRET_END');
 
@@ -1651,6 +1728,8 @@ L('ENTER'); // b37 c61
   JMPA('NEXT'); // save some cycles
 L('ENTER_END');
 
+L('FORTH_END');
+
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
   // get next
@@ -1689,8 +1768,6 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
 L('DOUBLE_WORDS_END'); double_defs = def.count - double_defs;
 
 //   (to much growth: implement as word?)
-L('FORTH_END');
-
 ////////////////////////////////////////
 // Extras (not core)
 
@@ -1736,26 +1813,6 @@ L('XTRAS_END');
 
 L('EDIT_BEGIN');
 
-L('OP_BackSpace');
-  // nothing to delete?
-  CPYN(1),BMI('edit_next');
-  //CPYN(2),BMI('edit');
-
-  PHA(); {
-    // delete on screen (BS+SPC+BS) // b12
-    // (TODO: optimize with a putsi)
-    LDAN(8),JSRA(putc);
-    LDAN(32),JSRA(putc);
-    LDAN(8),JSRA(putc);
-
-    // null out last char
-    DEY();
-    PHA(); {
-      LDAN(0),STAIY('base');
-    } PLA();
-  }
-  RTS();
-
 L('OP_Run');
   TRACE(()=>{
     princ(ansi.hide());
@@ -1763,8 +1820,8 @@ L('OP_Run');
   });
 
   PHA(); {
-    LDAN(ord('\n')),LDYN(0),JSRA(putc);
-    LDAN(ord('\n')),LDYN(0),JSRA(putc);
+    LDAN(ord('\n')),JSRA(putc);
+    LDAN(ord('\n')),JSRA(putc);
   } PLA();
   LDYN(0xff);
   
@@ -1780,18 +1837,60 @@ L('OP_List');
     LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
-    LDAZ('base'),LDYZ('base', inc), JSRA(puts);
+    LDAZ('base'),CLC(),ADCN(1);
+    LDYZ('base', inc),BCC('_List'),INY(),L('_List');
+    JSRA(puts);
+
+    TRACE(()=>{
+      return;
+      print("\n\n");
+      let a = cpu.w(jasm.getLabels().base);
+      for(let i=1;i<256;i++) {
+        princ(chr(m[a+i]));
+      }
+    });
+
   } PLA(), TAY();
   //TRACE(()=>princ(ansi.cursorRestore()+ansi.show()));
   TRACE(()=>princ(ansi.show()));
   JMPA('edit_next');
   // TODO: FALLTHROUGH!
 
+L('OP_BackSpace');
+  // nothing to delete?
+  CPYN(1),BMI('edit_next');
+  //CPYN(2),BMI('edit');
+
+  // delete on screen (BS+SPC+BS) // b12
+  // (TODO: optimize with a putsi)
+  LDAN(8),JSRA(putc);
+  LDAN(32),JSRA(putc);
+  LDAN(8),JSRA(putc);
+  
+  DECA('end_pos');
+  
+  // move everything down
+ L('_OP_BS');
+  // copy current
+  LDAIY('base');
+  //TRACE(()=>princ(' @'+hex(2,cpu.reg('y'))+'='+chr(cpu.reg('a'))));
+  // overwrite last
+  DEY(),STAIY('base'),INY();
+
+  INY();
+  CPYA('end_pos');
+  BCS('_OP_BS');
+
+  LDYA('edit_pos');
+  DEY();
+
+  RTS();
+
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
 L('edit');
-  // TODO: ???
-  //LDYA('edit_pos');
+  // TODO: last pos executed is length?
+  STYA('end_pos');
 
   TRACE(()=>princ(ansi.show()));
 
@@ -1800,11 +1899,15 @@ L('edit');
   // this so can use RTS for 'edit_next'!
  L('_edit');
   JSRA('edit_next');
+  // TODO: maybe not needed?
   BITA('state'),BMI('_edit')
-
   // if no longer editing
   PLA(); // restore TOS
   next();
+
+L('edit_redisplay');
+  PHA(),JSRA('OP_List'),PLA();
+  JMPA('_edit.gotkey');
 
 L('edit_next');
   // save cursor position
@@ -1812,18 +1915,25 @@ L('edit_next');
 
   TRACE(()=>{
     princ(cursorSave());
-    princ(gotorc(1, 30));
-    princ(cpu.reg('y')+'   ');
+    princ(gotorc(1, 1));
+    princ('(EDIT) ');
+    princ(cpu.reg('y')+' / ');
+    princ(m[jasm.getLabels().end_pos]+'   ');
+    princ(m[jasm.getLabels().line_pos]+'   ');
+    princ(m[jasm.getLabels().eol_pos]+'   ');
+    princ(m[jasm.getLabels().last_line]+'   ');
     princ(cursorRestore());
   });
 
  L('edit_next_waitkey');
-  NOP(); // just to display different label
+  NOP(); // TODO: remove; it's just for label
+
  L('_edit.waitkey'),
   JSRA(getc),
   BEQ('_edit.waitkey');
+  // jump here to simulate keystroke
+ L('_edit.gotkey');
 
-  if(1)
   terminal.TRACE(jasm, ()=>{
     return;
     console.log('edit', {
@@ -1835,36 +1945,65 @@ L('edit_next');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  cmd(0x7f, 'OP_BackSpace');
+  // FREE: Custom Xxtra
+  //   Wkillregion Zleep
+  //   Quote Urepeat
   cmd('^R', 'OP_Run');
-  cmd('^H', 'OP_BackSpace');
   cmd('^L', 'OP_List');
+  //cmd('^T', 'OP_Trace');
+  //cmd('^J', 'OP_RunLine');
+  //cmd('^S', 'OP_SearchWord');
+  //cmd('^R', 'OP_SearchRef');
 
-  cmd('^F'); L('e+'),INY(),
-    BEQ('e-');
+  cmd(0x7f, 'OP_BackSpace');
+  cmd('^H', 'OP_BackSpace');
+  cmd('^D'); 
+  cmd('^F'); L('e+'),INY(),BEQ('e-');
     TRACE(()=>princ(ansi.forward())); NOP();
-  cmd('^B'); L('e-'),DEY(),
-    BEQ('e+');
+  cmd('^B'); L('e-'),DEY(),BEQ('e+');
     TRACE(()=>princ(ansi.back())); NOP();
-  cmd('^P'); DEY(),BEQ('e+');
-    TRACE(()=>princ(ansi.up())); NOP();
-  cmd('^N'); INY();
-    TRACE(()=>princ(ansi.down())); NOP();
+  cmd('^P', ''); DEY(),BEQ('e+');
+    TRACE(()=>princ(ansi.up())); JMPA('edit_redisplay');
+  cmd('^N', ''); INY();
+    TRACE(()=>princ(ansi.down())); JMPA('edit_redisplay');
   cmd('^A'); LDYA('line_pos');
-    TRACE(()=>princ(chr(10)));
+    TRACE(()=>princ(chr(10))); // TODO: no cheat
   cmd('^E'); LDYA('eol_pos');
-  cmd('^G'); TYA(),CLC(),ROR(),TAY();
+  cmd('^V', ''); LDYA('end_pos'),JMPA('edit_redisplay');
+  cmd('^G', ''); TYA(),CLC(),ROR(),TAY(),INY(),JMPA('edit_redisplay');
+  cmd('^O', ''); LDAN(10),STAIY('base', inc),JMPA('edit_redisplay');
+  // cmd('^K'); // move the line to end
+  // cmd('^Y'); // move the last line to here
+
   endcmd();
 
+L('insert');
   // non-printable
   CMPN(31),BCS('edit_next'); // ctrl-
   CMPN(128),BCC('edit_next'); // meta-
 
-  // store character
-  STAIY('base'),INY();
-//  next();
-//  JSRA('display');
-//  JMPA('edit_next');
+  // to insert we need to shift all
+  // after one forward
+  JSRA(putc);
+
+  INCA('end_pos'); // add one to count
+ L('_insert');
+  // "swap" char to insert and current
+  STAZ(0),       LDAIY('base'),
+  TAX(),         LDAZ(0),
+  STAIY('base'), TXA();
+
+  INY();
+  CPYA('end_pos'),BNE('_insert');
+  
+  LDYA('edit_pos');
+  INY();
+  INY();
+  CPYA('end_pos'),BCC('_insert.end');
+  RTS();
+ L('_insert.end');
+  DEY();
+  RTS();
 
   // TODO: can we be in vt100 insert char mode?
 
