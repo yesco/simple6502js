@@ -186,12 +186,6 @@ PROGRAM = `9d.
 PROGRAM = '9d."abba"t"foo"t .';
 
 
-PROGRAM = `9d.
-::G:Rsrs;
-::F:o.dG+;
-0 1 100#(F#)
-`;
-
 PROGRAM = '9d.3 3-d. ?+. ..';
 
 PROGRAM = `
@@ -204,6 +198,12 @@ PROGRAM = `
 9d.3 4?=#('ee#)\\.
 9d.3 7?<#('le#)\\.
 9d.3 2?>#('ge#)\\.
+`;
+
+PROGRAM = `9d.
+::G:Rsrs;
+::F:o.dG+;
+0 1 100#(F#)
 `;
 
 
@@ -580,7 +580,7 @@ const RS_SIZE= 24*CELL;
 // (so we can use PHA(), PLA(), lol)
 // (DON'T JSR/RTS any, you hear?)
 const      S= 0x0100;
-const SYSTEM= 0x01f0;  
+const SYSTEM= 0x0200;
 
 // For now user page/memory is stack!
 // TODO: zp would save code bytes,
@@ -597,18 +597,23 @@ ORG(_U);
 L('U'); // U = user space (1 page)
   L('PASCAL_PROGRAM_Z'); pascalz(PROGRAM); // LOL
 
-// 0x100-- program/editor
+// 0x100-- stacks
 // 
-// "top" of memory
+// bottom of data stack
 ORG(SYSTEM-1-RS_SIZE-DS_SIZE); L('top');
 
 // Data Stack (Params)
 ORG(SYSTEM-1-RS_SIZE);         L('stack');
 
 // Return Stack
+// TODO: ? move to ZP? cheaper addressing!
 ORG(SYSTEM-1);                 L('rstack');
 
-// Zero Page
+////////////////////////////////////////
+// ZERO PAGE
+
+// 0x00--0x0f use for any
+
 ORG(0xf0);
   L('here');      word(0);
   L('latest');    word(0);
@@ -618,32 +623,19 @@ ORG(0xf0);
 
   L('base');      word(0); // base + Y == "IP"
 
-// Temprary in zp
-ORG(0xe0); L('UDF_offsets'); allot(32);
-
-//variables
-ORG(SYSTEM);
-L('SYSTEM');
-  // I think we want the concept
-  // of local data:
-
-  // editing 
-// effects initial evaulation?
-//  L('edit_pos');  byte(PROGRAM.length>>1);
-
-// TODO: move all to ZP!
+  // editing
   L('edit_pos');  byte(0);
-  L('edit_key');  byte(0);
-  L('ed_repeat'); byte(0);
   L('line_pos');  byte(0); // one before?
   L('eol_pos');   byte(0); // one before?
   L('end_pos');   byte(0);
-  L('last_line'); byte(0); // tmp3 ?
+  L('last_line'); byte(0);
+
   L('num_pos');   byte(0);
 
-  // make ZP global?
+  // tmps (or 0?)
   L('tmp');       byte(0); // tmp?
   L('tmp2');      byte(0); // tmp?
+
   // these may be local page related?
   // "state" (or rather mode)  test with BITA!
   //   0d-- ---- : run ("interpreting") // BPL
@@ -656,20 +648,12 @@ L('SYSTEM');
                            // use for loop counting?
   L('sp');        byte(0); // might
 
-L('SYSTEMS_END');
+
+// Temprary in zp
+ORG(0xe0); L('UDF_offsets'); allot(32);
+
 ////////////////////////////////////////
-
-if (jasm.address() > 0x0200)
-  throw `%% SYSTEM area too big! ends at ${hex(4,jasm.address())}`;
-////////////////////////////////////////
-
-// separate code (ROM) & RAM
-// == Harward Architecture
-
-//TODO:remove debug
-//ORG(0x80); word(0x9876);
-//ORG(0x9876); byte(0x66); byte(0x88);
-
+// Code start
 ORG(start);
 
 L('FORTH_BEGIN');
@@ -692,7 +676,7 @@ L('quit');
   LDXN('rstack', lo),STXZ('rp');
 
   // init base "IP"
-  LDAN(0xff),STAA('num_pos');;
+  LDAN(0xff),STAZ('num_pos');;
 
   LDAN('U', lo),STAZ('base');
   LDAN('U', hi),STAZ('base', inc);
@@ -1284,7 +1268,7 @@ L2      DEX
   //def('G'); JSRA('ENTER'); // lol
   //string('Rsrs');
 
-  def('a'); { L('OP_allot_next');
+  def('a'); { L('allot');
     CLC(),ADCZ('here'),
     BNE('_a'),INCZ('here',inc),L('_a');
   }
@@ -1527,7 +1511,7 @@ L('NUMBER_BEGIN');
   
   STAZ(1);
 
-  DEY(),CPYA('num_pos'),BEQ('_num.cont'); {
+  DEY(),CPYZ('num_pos'),BEQ('_num.cont'); {
     // It's a new number
     //TRACE(()=>princ('<LDAN0>'));
     LDAN(0);
@@ -1537,7 +1521,7 @@ L('NUMBER_BEGIN');
   }
   INY();
 
-  STYA('num_pos');
+  STYZ('num_pos');
 
   // multiply A by 10
   STAZ(0);
@@ -1855,8 +1839,7 @@ L('OP_Run');
   });
 
   PHA(); {
-    LDAN(ord('\n')),JSRA(putc);
-    LDAN(ord('\n')),JSRA(putc);
+    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
   } PLA();
   LDYN(0xff);
   
@@ -1869,7 +1852,7 @@ L('OP_List');
   //TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
-    LDAN(ord('\n')),JSRA(putc);
+    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
     LDXN(0xff);
     LDAZ('base'),CLC(),ADCN(1);
     LDYZ('base', inc),BCC('_List'),INY(),L('_List');
@@ -1901,7 +1884,7 @@ L('OP_BackSpace');
   LDAN(32),JSRA(putc);
   LDAN(8),JSRA(putc);
   
-  DECA('end_pos');
+  DECZ('end_pos');
   
   // move everything down
  L('_OP_BS');
@@ -1912,10 +1895,10 @@ L('OP_BackSpace');
   DEY(),STAIY('base'),INY();
 
   INY();
-  CPYA('end_pos');
+  CPYZ('end_pos');
   BCS('_OP_BS');
 
-  LDYA('edit_pos');
+  LDYZ('edit_pos');
   DEY();
 
   RTS();
@@ -1924,7 +1907,7 @@ L('OP_BackSpace');
 // (what if we want to do editing in forth?)
 L('edit');
   // TODO: last pos executed is length?
-  STYA('end_pos');
+  STYZ('end_pos');
 
   TRACE(()=>princ(ansi.show()));
 
@@ -1945,7 +1928,7 @@ L('edit_redisplay');
 
 L('edit_next');
   // save cursor position
-  STYA('edit_pos');
+  STYZ('edit_pos');
 
   TRACE(()=>{
     princ(cursorSave());
@@ -2000,10 +1983,10 @@ L('edit_next');
     TRACE(()=>princ(ansi.up())); JMPA('edit_redisplay');
   cmd('^N', ''); INY();
     TRACE(()=>princ(ansi.down())); JMPA('edit_redisplay');
-  cmd('^A'); LDYA('line_pos');
+  cmd('^A'); LDYZ('line_pos');
     TRACE(()=>princ(chr(10))); // TODO: no cheat
-  cmd('^E'); LDYA('eol_pos');
-  cmd('^V', ''); LDYA('end_pos'),JMPA('edit_redisplay');
+  cmd('^E'); LDYZ('eol_pos');
+  cmd('^V', ''); LDYZ('end_pos'),JMPA('edit_redisplay');
   cmd('^G', ''); TYA(),CLC(),ROR(),TAY(),INY(),JMPA('edit_redisplay');
   cmd('^O', ''); LDAN(10),STAIY('base', inc),JMPA('edit_redisplay');
   // cmd('^K'); // move the line to end
@@ -2020,7 +2003,7 @@ L('insert');
   // after one forward
   JSRA(putc);
 
-  INCA('end_pos'); // add one to count
+  INCZ('end_pos'); // add one to count
  L('_insert');
   // "swap" char to insert and current
   STAZ(0),       LDAIY('base'),
@@ -2028,12 +2011,12 @@ L('insert');
   STAIY('base'), TXA();
 
   INY();
-  CPYA('end_pos'),BNE('_insert');
+  CPYZ('end_pos'),BNE('_insert');
   
-  LDYA('edit_pos');
+  LDYZ('edit_pos');
   INY();
   INY();
-  CPYA('end_pos'),BCC('_insert.end');
+  CPYZ('end_pos'),BCC('_insert.end');
   RTS();
  L('_insert.end');
   DEY();
@@ -2052,12 +2035,12 @@ L('insert');
 
   // tell terminal to save cursor when
   // it's at edit_pos!
-  CPYA('edit_pos'),BNE('_display.nopos');
+  CPYZ('edit_pos'),BNE('_display.nopos');
  L('display_pos');
   NOP();
   TRACE(()=>princ(ansi.cursorSave()));
-  LDXA('last_line'),STXA('line_pos');
-  LDXN(0),STXA('eol_pos');
+  LDXZ('last_line'),STXZ('line_pos');
+  LDXN(0),STXZ('eol_pos');
   NOP();
   if(0) TRACE(()=>print("<<<HERE"+JSON.stringify({
     A: cpu.reg('a'),
@@ -2071,11 +2054,11 @@ L('insert');
     TRACE(()=>princ(ansi.cleol()));
     PHA(),LDAN(13),JSRA(putc),PLA();
 
-    STYA('line_pos');
+    STYZ('line_pos');
   
     // if eol_pos is zero it'll be set!
-    LDXA('eol_pos'),BNE('_display.notnl');
-    STYA('eol_pos');
+    LDXZ('eol_pos'),BNE('_display.notnl');
+    STYZ('eol_pos');
   } L('_display.notnl');
 
   // actually print char!
@@ -2086,7 +2069,7 @@ L('insert');
     LDAN(state_edit); // stay edit/run
     ANDA('state');
     STAA('state');
-    STYA('end_pos');
+    STYZ('end_pos');
   } L('_display.noend');
 
   // TODO: don't cheat!
