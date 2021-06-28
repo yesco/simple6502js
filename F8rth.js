@@ -948,40 +948,43 @@ L('interpret'); // A has our word
     JMPA('_*');
   }
 
-  def('M'); {
-    // TODO: remove
-    TRACE(()=>{
-      if (!tracecyc) return;
-      savcyc= cpu.state().cycles;
-      print();
-    });
+  if (0) {
+    
+    def('M'); {
+      // TODO: remove
+      TRACE(()=>{
+        if (!tracecyc) return;
+        savcyc= cpu.state().cycles;
+        print();
+      });
 
-    // c144 Z1156
-    STAZ(1);
-    PLA(),STAZ(2);
+      // c144 Z1156
+      STAZ(1);
+      PLA(),STAZ(2);
 
-    LDAN(0x80); // sentiel bit
-    STAZ(0);
-    CLC(),ROL();  // hi byte = 0 /// ASL?
-    DECZ(1);
-L('L1');
-    LSRZ(2); // lo bit of NUM2
-    BCC('L2');
-    ADCZ(1); // If 1, add (NUM1-1)+1
-L('L2');
-    ROR(); // "Stairstep" shift (catching carry from add)
-    RORZ(0);
-    BCC('L1'); // When sentinel falls off into carry, we're done
-    //STA RESULT+1
-    LDAZ(0);
+      LDAN(0x80); // sentiel bit
+      STAZ(0);
+      CLC(),ROL();  // hi byte = 0 /// ASL?
+      DECZ(1);
+     L('L1');
+      LSRZ(2); // lo bit of NUM2
+      BCC('L2');
+      ADCZ(1); // If 1, add (NUM1-1)+1
+     L('L2');
+      ROR(); // "Stairstep" shift (catching carry from add)
+      RORZ(0);
+      BCC('L1'); // When sentinel falls off into carry, we're done
+      //STA RESULT+1
+      LDAZ(0);
 
-    // TODO: remove
-    TRACE(()=>{
-      if (!tracecyc) return;
-      print('MUL.c: ', cpu.state().cycles-savcyc);
-    });
+      // TODO: remove
+      TRACE(()=>{
+        if (!tracecyc) return;
+        print('MUL.c: ', cpu.state().cycles-savcyc);
+      });
+    }
   }
-
+  
   def('*'); { // b19 avg c73 c26-172
     // TODO: remove
     TRACE(()=>{
@@ -2320,6 +2323,7 @@ prsize("  ( # :", alfa_defs, '/ 30)');
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
+prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
 print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
