@@ -211,6 +211,12 @@ PROGRAM = `9d.
 0 1 100(F)
 `;
 
+PROGRAM = "9d.'ae'be'ce 0 100(100(i+)). .";
+
+PROGRAM = "9d.'ae'be'ce 0 255(255(ij+.)).";
+
+PROGRAM = "9d.'ae'be'ce 0 10(255(10(i+i+i+i+)d.)). .";
+
 
 
 // zzzz to find fast!
@@ -363,11 +369,21 @@ let getc = terminal.agetc;
 
 let start = 0x501;
 
+
+
+// Turn off BRK and on table_next
+// speeed: b1944
+//         b1759 (+ 144 bytes)
+let speed = 0;
+
+
+
+
 let trace = 0;
 let tracecyc = 0;
+let table_next = speed;
 
 // uncomment to see cycle counts!
-
 //tracecyc = 1;
 
 
@@ -378,7 +394,7 @@ let tracecyc = 0;
 
 // using BRK is slower, but saves bytes
 // 95 bytes for 40 functions!
-let brk= 1; // save space!
+let brk= !speed; // save space!
 function next() {
   if (brk) {
     // use only 1 saves 2 bytes!
@@ -452,8 +468,9 @@ if (1) {
   // def('x', 'NEXT');    // rel jmp
 
   let last, last_ret;
+  let tab = [];
 
-  function def(a, optJmp, cmp=CPXN, ret=next) {
+  function def(a, optJmp, cmp=CPXN, ret=next, sub) {
     let aa = parseKey(a);
     console.error("DEF", a, aa, optJmp);
     let tryother = gensym('_is_not_'+a+'_$'+cpu.hex(2,aa));
@@ -472,6 +489,8 @@ if (1) {
       BEQ(optJmp);
       last= undefined; // ! supress
 
+      if (!sub && aa >= 31)
+        tab[aa] = optJmp;
     } else {
       
       BNE(tryother);
@@ -479,6 +498,9 @@ if (1) {
       // the words def comes after
       // ... till the next def!
       L(match);
+
+      if (!sub && aa >= 31)
+        tab[aa] = match;
     }
   }
   def.count = 0;
@@ -503,12 +525,24 @@ if (1) {
     last= undefined;
   }
 
+  function gentab() {
+   L('DISPATCH');
+    for(let i=0; i<0x80; i++) {
+      let a = tab[i] || 'NEXT';
+      word(a);
+      print('  [0x'+hex(2,i)+'] = ',
+            tab[i] ? tab[i] : '-');
+      if (i%32==31) print();
+    }
+  }
+
+
 } else {
 // table driven DEF
 
   let tab = [], skip;
 
-  function def(a, optJmp, cmp=CPXN, ret=next) {
+  function def(a, optJmp, cmp=CPXN, ret=next, sub) {
     let aa = parseKey(a);
     let lab = gensym('OP_'+a+'_$'+hex(2,aa));
     console.error("TAB.DEF", lab, optJmp);
@@ -562,6 +596,18 @@ function cmd(c, optJmp) {
 }
 
 function endcmd(foo) {
+  // because we have stuff on stack?
+  if (foo) throw `"%% endcmd can't JMP to '${foo}'`;
+  
+  enddef();
+}
+
+// used to define a sub-command
+function sub(c, optJmp) {
+  def(c[1], optJmp, undefined, undefined, c[0]);
+}
+
+function endsub(foo) {
   // because we have stuff on stack?
   if (foo) throw `"%% endcmd can't JMP to '${foo}'`;
   
@@ -811,6 +857,22 @@ L('NEXT');
     princ('\t(cyc:'+(c-savcyc)+')\n');
     savcyc= c;
   });
+
+  if (table_next) { // b29 c50 + c17 f BRK (c67)
+    PHA(); {
+      INY(),LDAIY('base');
+      BEQ('EXIT'); // c2+1 // TODO: remove?
+      PHA(); {
+        CLC(),ROL(),TAX(); // TODO: ASL?
+        LDAAX('DISPATCH'),STAA('jmp',a=>a+1); // TODO: Z
+        LDAAX('DISPATCH',inc),STAA('jmp',a=>a+2); // TODO: Z
+      } PLA();
+      TAX();
+    } PLA();
+   L('jmp');
+    // JMPI not working?
+    JMPA('NEXT');
+  }
 
 // TODO: Use some tricks from Token Threaded Forth
 // - http://6502org.wikidot.com/software-token-threading
@@ -1529,6 +1591,12 @@ L('ALFA_END'); alfa_defs = def.count - alfa_defs;
   //JMPA('printcontrol');
 
 L('NUMBER_BEGIN');
+ if (table_next) {
+   for(i=0; i<10; i++)
+     def(chr(ord('0')+i), 'number?');
+   enddef();
+ }
+
  L('number?')
   //TRACE(()=>princ('<number?>'));
 
@@ -1687,20 +1755,24 @@ L('QUESTION');
   // TODO: refactor PHA,CMPN(0) PHP, PLP ???
   // most of these is just test, no next // b4
   //    // b28 can be done in 14
-  def('0', ''); PHA(),CMPN(0),JMPA('?0');
-  def('-', ''); PHA(),CMPN(0),BMI('=>1'),BPL('=>0');
-  def('+', ''); PHA(),CMPN(0),BEQ('=>0'),BPL('=>1'),BMI('=>0');
-  def('1'); PHA(),CMPN(1),LDAN(0),ADCN(0); // b7
-  def('>', ''); TSX(),CMPAX(S+1),LDAN(0),ADCN(0),JMPA('?0');
-  def('<', ''); TSX(),CMPAX(S+1),BCC('=>0'),BEQ('=>0'),BCS('=>1');
-  def('='); TSX(),SBCAX(S+1),L('?0'),BEQ('=>1'),L('=>0'),LDAN(0),BRK(),L('=>1'),LDAN(1);
-  enddef();
+  sub('?0', ''); PHA(),CMPN(0),JMPA('?0');
+  sub('?-', ''); PHA(),CMPN(0),BMI('=>1'),BPL('=>0');
+  sub('?+', ''); PHA(),CMPN(0),BEQ('=>0'),BPL('=>1'),BMI('=>0');
+  sub('?1'); PHA(),CMPN(1),LDAN(0),ADCN(0); // b7
+  sub('?>', ''); TSX(),CMPAX(S+1),LDAN(0),ADCN(0),JMPA('?0');
+  sub('?<', ''); TSX(),CMPAX(S+1),BCC('=>0'),BEQ('=>0'),BCS('=>1');
+  sub('?='); TSX(),SBCAX(S+1),L('?0'),BEQ('=>1'),L('=>0'),LDAN(0),BRK(),L('=>1'),LDAN(1);
+  endsub();
   // ?~= ?!=
   // ?~< ?>=
   // ?~> ?<=
   next();
 
 L('QUESTION_END');
+
+L('TABLE');
+  gentab();
+L('TABLE_END');
 
 L('FORTH_END');
 
@@ -1715,21 +1787,21 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
   LDXN(0);
 
   // Not very efficient... better on ZP stack...
-  def('@'); { // b20 c36+4 (fig: b14 c31 c-3 next!)
+  sub('w@'); { // b20 c36+4 (fig: b14 c31 c-3 next!)
     STAZ(0),PLA(),STAZ(1), // lo, hi addr
     LDAXI(0),STAZ(2), // lo, data
     INCZ(0),BNE('_w@'),INCZ(1),L('_w@'),
     LDAXI(0),PHA(); // hi, data
     LDAZ(2); // lo
   }
-  def('!'); { // b18 c41+4
+  sub('w!'); { // b18 c41+4
     STAZ(0),PLA(),STAZ(1), // lo, hi addr
     PLA(),STAXI(0), // lo, data
     INCZ(0),BNE('_w!'),INCZ(1),L('_w!'),
     PLA(),STAXI(0), // hi, data
     PLA();
   }
-  def('+'); TSX(); { // b16
+  sub('w+'); TSX(); { // b16
           CLC(),ADCAX(S+2),STAAX(S+2); // lo
     PLA(),CLC(),ADCAX(S+3),STAAX(S+3); // hi
   } PLA();
@@ -1740,7 +1812,7 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
   // w| = rt|rtrt|s ...
 
 
-  enddef();
+  endsub();
 
   // no match
   // TODO: error
@@ -2269,6 +2341,7 @@ prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
+prsize(" TABLE:", l.TABLE_END-l.TABLE);
 print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
@@ -2291,10 +2364,10 @@ delete l['_edit.waitkey'];
 
 cpu.setLabels(l);
 
-cpu.setTraceLevel(1);
-cpu.setTraceLevel(2);
-cpu.setTraceLevel(0);
 
+cpu.setTraceLevel(2);
+cpu.setTraceLevel(1);
+cpu.setTraceLevel(0);
 
 cpu.setOutput(1);
 cpu.setOutput(0);
