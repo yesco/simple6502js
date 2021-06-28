@@ -185,23 +185,25 @@ PROGRAM = `9d.
 
 PROGRAM = '9d."abba"t"foo"t .';
 
-PROGRAM = `
-9d. "?0 01= " t 7?0.\\ 0?0.\\ . 10e
-9d. "?1 10= " t 7?1.\\ 0?1.\\ . 10e
-9d. "> 010= " t 3 4?>.\\ 4 3?>.\\ 3 3?>.\\ . 10e
-9d. "< 100= " t 3 4?<.\\ 4 3?<.\\ 3 3?<.\\ . 10e
-9d. "?= 001= " t 3 4?=.\\ 4 3?=.\\ 3 3?=.\\ . 10e
-`;
-
-PROGRAM = '9d. 3 3?=#("equal"t#)\\.';
-PROGRAM = '9d. 3 4?=#("equal"t#)\\.';
-PROGRAM = '9d. 3 4?<#("less"t#)\\.';
-PROGRAM = '9d. 3 2?>#("greater"t#)\\.';
 
 PROGRAM = `9d.
 ::G:Rsrs;
 ::F:o.dG+;
 0 1 100#(F#)
+`;
+
+PROGRAM = '9d.3 3-d. ?+. ..';
+
+PROGRAM = `
+9d."?0 01= "t7?0.\\ 0?0.\\.10e
+9d."?1 10= "t7?1.\\ 0?1.\\.10e
+9d."> 010= "t3 4?>.\\4 3?>.\\3 3?>.\\.10e
+9d."< 100= "t3 4?<.\\4 3?<.\\3 3?<.\\.10e
+9d."?= 001= "t3 4?=.\\4 3?=.\\3 3?=.\\.10e
+9d.3 3?=#('ee#)\\.
+9d.3 4?=#('ee#)\\.
+9d.3 7?<#('le#)\\.
+9d.3 2?>#('ge#)\\.
 `;
 
 
@@ -1053,7 +1055,7 @@ L('L2');
   }
   def(' '); // do not interpret as number! lol
   def('?'); JMPA('QUESTION');
-  def("'"); PHA(),INY(),LDAIY('base'),JSRA(putc); // got the char!
+  def("'"); PHA(),INY(),LDAIY('base');
 
 // TODO: word relative addressing?
 //  def('@'); TAX(),LDAAX('U'); // cool!
@@ -1732,18 +1734,19 @@ L('ENTER'); // b37 c61
 L('ENTER_END');
 
 L('QUESTION');
-  // get next
+  // get next // b7 c17
   PHA(); {
     INY(),LDAIY('base'),TAX();
   } PLA();
 
-  def('0'); LDXN(0),PHA(),CMPN(0),BNE('_0'),INX(),L('_0'),TXA();
-  def('1'); PHA(),CMPN(1),LDAN(0),ADCN(0);
+  // TODO: refactor PHA,CMPN(0)
+  def('0', ''); PHA(),CMPN(0),JMPA('?0');
+  def('-', ''); PHA(),CMPN(0),BMI('=>1'),BPL('=>0');
+  def('+', ''); PHA(),CMPN(0),BEQ('=>0'),BPL('=>1'),BMI('=>0');
+  def('1'); PHA(),CMPN(1),LDAN(0),ADCN(0); // b7
   def('>', ''); TSX(),CMPAX(S+1),LDAN(0),ADCN(0),JMPA('?0');
   def('<', ''); TSX(),CMPAX(S+1),BCC('=>0'),BEQ('=>0'),BCS('=>1');
   def('='); TSX(),SBCAX(S+1),L('?0'),BEQ('=>1'),L('=>0'),LDAN(0),BRK(),L('=>1'),LDAN(1);
-  def('-', ''); PHA(),BMI('=>1'),BPL('=>0');
-  def('+', ''); PHA(),BPL('=>1'),BMI('=>0');
   enddef();
   // ?~= ?!=
   // ?~< ?>=
@@ -2317,7 +2320,8 @@ prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, '/ 30)');
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
-prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
+prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
+prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
