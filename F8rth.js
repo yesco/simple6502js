@@ -1739,7 +1739,9 @@ L('QUESTION');
     INY(),LDAIY('base'),TAX();
   } PLA();
 
-  // TODO: refactor PHA,CMPN(0)
+  // TODO: refactor PHA,CMPN(0) PHP, PLP ???
+  // most of these is just test, no next // b4
+  //    // b28 can be done in 14
   def('0', ''); PHA(),CMPN(0),JMPA('?0');
   def('-', ''); PHA(),CMPN(0),BMI('=>1'),BPL('=>0');
   def('+', ''); PHA(),CMPN(0),BEQ('=>0'),BPL('=>1'),BMI('=>0');
