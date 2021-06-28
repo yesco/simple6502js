@@ -616,8 +616,8 @@ ORG(SYSTEM-1);                 L('rstack');
 
 ORG(0xc0);
   L('here');      word(0);
-  L('latest');    word(0);
-  L('upbase');    word(0);
+  L('latest');    word(0); // TODO: use!
+  L('upbase');    word(0); // TODO: use!
 
 // Harward stack is shared with RStack and DStack!
   L('rp');        byte(0);
@@ -707,6 +707,9 @@ L('edit2');
   //  9.6 cycles / enter-exit saved w noECHO
   // 55.6 cycles / enter-exit saved w ECHO
 L('EXIT'); // c52
+
+  // not valid anymore
+  LDAN(0xff),STAZ('num_pos');;
 
   PLA(); // because we PHA() before read :-(
 
@@ -1565,6 +1568,9 @@ PHA(); {
       // ';' loads one drops one ?
 //      DEX(),STAAX(S+1);
       DEX(),STAAX(S+1);
+
+      // not valid anymore
+      LDAN(0xff),STAZ('num_pos');;
     } STXZ('rp');
     
   } PLA();
@@ -1701,8 +1707,11 @@ L('ENTER'); // b37 c61
   // (and we're arriving on data stack!)
   // this will be simple!
   // save address from stack
-//  TRACE(()=>print('\n====>ENTER'));
+  //  TRACE(()=>print('\n====>ENTER'));
   STAZ(0); { // save TOS
+    // not valid anymore
+    LDAN(0xff),STAZ('num_pos');;
+
     // push "ip"Y, "IP"base on "rp" stack
     LDXZ('rp'); {
       // TODO: if rp-stack moves to ZP STYZX
