@@ -1282,7 +1282,7 @@ L2      DEX
 //  def('F', ''); JSRA('ENTER'); string('o.dG+');
   // rot = 1 2 3 >r swap r> swap .s
   //def('G'); JSRA('ENTER'); // lol
-  string('Rsrs');
+  //string('Rsrs');
 
   def('a'); { L('OP_allot_next');
     CLC(),ADCZ('here'),
