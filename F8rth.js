@@ -183,6 +183,21 @@ PROGRAM = `9d.
 0 1 (F)
 .`;
 
+PROGRAM = '9d."abba"t"foo"t .';
+
+PROGRAM = `
+9d. "?0 01= " t 7?0.\\ 0?0.\\ . 10e
+9d. "?1 10= " t 7?1.\\ 0?1.\\ . 10e
+9d. "> 010= " t 3 4?>.\\ 4 3?>.\\ 3 3?>.\\ . 10e
+9d. "< 100= " t 3 4?<.\\ 4 3?<.\\ 3 3?<.\\ . 10e
+9d. "?= 001= " t 3 4?=.\\ 4 3?=.\\ 3 3?=.\\ . 10e
+`;
+
+PROGRAM = '9d. 3 3?=#("equal"t#)\\.';
+PROGRAM = '9d. 3 4?=#("equal"t#)\\.';
+PROGRAM = '9d. 3 4?<#("less"t#)\\.';
+PROGRAM = '9d. 3 2?>#("greater"t#)\\.';
+
 PROGRAM = `9d.
 ::G:Rsrs;
 ::F:o.dG+;
@@ -1029,7 +1044,7 @@ L('L2');
   
   def('"'); {
     PHA(),
-    INY(),LDAN('base',hi),PHA(),TYA(),PHA(),
+    INY(),LDAA('base',inc),PHA(),TYA(),PHA(),
     LDXN(0),LDAN(ord('"'));
     L('_"'),CMPIY('base'),BEQ('_".done'); {
       INY(),INX();
@@ -1037,20 +1052,14 @@ L('L2');
     L('_".done'),TXA();
   }
   def(' '); // do not interpret as number! lol
+  def('?'); JMPA('QUESTION');
+  def("'"); PHA(),INY(),LDAIY('base'),JSRA(putc); // got the char!
 
 // TODO: word relative addressing?
 //  def('@'); TAX(),LDAAX('U'); // cool!
 //  def('!'); TAX(),PLA(),STAAX('U'),PLA();
 
-  // ?=
-  // ?<
-  // ?>
-  // ?~=
-  // ?~<
-  // ?~>
-
   def('='); { // Unsigned <=>  ==> -1, 0, 1
-    TSX(),CMPAX(S, inc);
     // Had to do some thinking about this one...
     //
     // N  Z  C               C  !Z         -2
@@ -1142,9 +1151,6 @@ L('L2');
     next();
   }
 
-  // TODO:color\ make a JSR "getc" that echoes?
-  def("'"); PHA(),INY(),LDAIY('base'),JSRA(putc); // got the char!
-
   if(0) { // dispatch and next for these 
 
 
@@ -1153,9 +1159,6 @@ L('L2');
     
   }
   
-  // TODO: if
-//  def('?');
-
   // TODO: GOTO ?
   // TAY(),PLA();
 
@@ -1290,18 +1293,18 @@ L2      DEX
   def('s'); STAA('tmp'),PLA(),TAX(),LDAA('tmp'),PHA(),TXA(); // b10 c19
 
   def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
-  def('i'); PHA(),LDXZ('rp'),LDAAX(S+1);
-  def('j'); PHA(),LDXZ('rp'),LDAAX(S+3);
+  def('i'); PHA(),LDXZ('rp'),LDAAX(S+1),SEC(),SBCN(1);
+  def('j'); PHA(),LDXZ('rp'),LDAAX(S+3),SEC(),SBCN(1);
 
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
-  def('t'); TAX(),STYZ(0x10); {
-    PLA(),STAZ(0x11),PLA(),TAY(),LDAZ(0x11),
+  def('t'); TAX(),STYZ(0); {
+    PLA(),STAZ(1),PLA(),TAY(),LDAZ(1),
     // TODO: change it to puts_AY_X
     // now it's puts_YA_X (save some juggle)
     JSRA(puts);
-  } LDYZ(0x10),PLA();
+  } LDYZ(0),PLA();
 
   def('q', ''); JMPA('quit');
 
@@ -1504,7 +1507,7 @@ L('ALFA_END'); alfa_defs = def.count - alfa_defs;
   ////////////////////////////////////////
   // more special test, or fallbacks
 
-//  CPXN(31),BCC('number?');
+//  CPXN(31),BCS('number?');
   //JMPA('printcontrol');
 
 L('NUMBER_BEGIN');
@@ -1515,7 +1518,7 @@ L('NUMBER_BEGIN');
 
   // extract number from digit
   TXA(),SEC(),SBCN(ord('0'));
-  CMPN(10),BCS('have_num'); {
+  CMPN(10),BCC('have_num'); {
     PLA(); // restore
     JMPA('not_number');
   } L('have_num');
@@ -1728,14 +1731,34 @@ L('ENTER'); // b37 c61
   JMPA('NEXT'); // save some cycles
 L('ENTER_END');
 
+L('QUESTION');
+  // get next
+  PHA(); {
+    INY(),LDAIY('base'),TAX();
+  } PLA();
+
+  def('0'); LDXN(0),PHA(),CMPN(0),BNE('_0'),INX(),L('_0'),TXA();
+  def('1'); PHA(),CMPN(1),LDAN(0),ADCN(0);
+  def('>', ''); TSX(),CMPAX(S+1),LDAN(0),ADCN(0),JMPA('?0');
+  def('<', ''); TSX(),CMPAX(S+1),BCC('=>0'),BEQ('=>0'),BCS('=>1');
+  def('='); TSX(),SBCAX(S+1),L('?0'),BEQ('=>1'),L('=>0'),LDAN(0),BRK(),L('=>1'),LDAN(1);
+  def('-', ''); PHA(),BMI('=>1'),BPL('=>0');
+  def('+', ''); PHA(),BPL('=>1'),BMI('=>0');
+  enddef();
+  // ?~= ?!=
+  // ?~< ?>=
+  // ?~> ?<=
+  next();
+
+L('QUESTION_END');
+
 L('FORTH_END');
 
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
   // get next
   PHA(); {
-    INY(),LDAIY('base');
-    TAX();
+    INY(),LDAIY('base'),TAX();
   } PLA();
 
   // lot of indirect stuff
@@ -1760,6 +1783,13 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
           CLC(),ADCAX(S+2),STAAX(S+2); // lo
     PLA(),CLC(),ADCAX(S+3),STAAX(S+3); // hi
   } PLA();
+  // w, = ,,
+  // wd = oo
+  // w\ = \\
+  // w& = rt&rtrt&s
+  // w| = rt|rtrt|s ...
+
+
   enddef();
 
   // no match
@@ -1816,7 +1846,7 @@ L('EDIT_BEGIN');
 L('OP_Run');
   TRACE(()=>{
     princ(ansi.hide());
-    princ(ansi.home());
+    princ(ansi.cls());
   });
 
   PHA(); {
@@ -1834,7 +1864,6 @@ L('OP_List');
   //TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
-    LDAN(ord('\n')),JSRA(putc);
     LDAN(ord('\n')),JSRA(putc);
     LDXN(0xff);
     LDAZ('base'),CLC(),ADCN(1);
@@ -1979,8 +2008,8 @@ L('edit_next');
 
 L('insert');
   // non-printable
-  CMPN(31),BCS('edit_next'); // ctrl-
-  CMPN(128),BCC('edit_next'); // meta-
+  CMPN(31),BCC('edit_next'); // ctrl-
+  CMPN(128),BCS('edit_next'); // meta-
 
   // to insert we need to shift all
   // after one forward

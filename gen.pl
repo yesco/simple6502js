@@ -60,9 +60,9 @@
 #  uint16_t result = regs.y - mem_read(addr);
 #
 #  regs.p.c = result > 255;
-    'cmp', 'sc(0 >= n(z(g= a - (MEM))))',
-    'cpx', 'sc(0 >= n(z(g= x - (MEM))))',
-    'cpy', 'sc(0 >= n(z(g= y - (MEM))))',
+    'cmp', 'sc(0 <= n(z(g= a - (MEM))))',
+    'cpx', 'sc(0 <= n(z(g= x - (MEM))))',
+    'cpy', 'sc(0 <= n(z(g= y - (MEM))))',
 
     'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1)))',
     'asl_a', 'g=       a= n(z(c(       a << 1)))',
