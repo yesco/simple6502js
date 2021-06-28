@@ -287,7 +287,7 @@ PROGRAM = `9d.
 //         If you want to use Y, save it.
 //
 //         Either TYA,PHA .... PLA,TAY
-//         Or     STAA('tmp') LDAA('tmp')
+//         Or     STAZ('tmp') LDAA('tmp')
 //
 //         (BIP+ip) == token stored in X
 //         ...except when function parsing
@@ -614,12 +614,14 @@ ORG(SYSTEM-1);                 L('rstack');
 
 // 0x00--0x0f use for any
 
-ORG(0xf0);
+ORG(0xc0);
   L('here');      word(0);
   L('latest');    word(0);
   L('upbase');    word(0);
 
+// Harward stack is shared with RStack and DStack!
   L('rp');        byte(0);
+//  L('sp');        byte(0);
 
   L('base');      word(0); // base + Y == "IP"
 
@@ -646,8 +648,10 @@ ORG(0xf0);
   const state_run = 0;
   L('state');     byte(0); // why local?
                            // use for loop counting?
-  L('sp');        byte(0); // might
 
+
+if (jasm.address() >= 0xe0)
+  throw "%% ZP vars needs start earlier!";
 
 // Temprary in zp
 ORG(0xe0); L('UDF_offsets'); allot(32);
@@ -683,21 +687,21 @@ L('quit');
 
   // init other stuff
   LDAN(0); {
-    STAA('tmp');
-    STAA('latest');
+    STAZ('tmp');
+    STAZ('latest');
     // init state of interpreter
     TAY(); // "ip"
   }
 
-  LDAN(0); STAA('state');
-  //LDAN(state_display); STAA('state');
+  LDAN(0); STAZ('state');
+  //LDAN(state_display); STAZ('state');
   next();
 
 L('FORTH_INIT_END');
 
 L('edit2');
   // TODO:needed?
-  LDXN(state_edit+state_display),STAA('state');
+  LDXN(state_edit+state_display),STAZ('state');
   JMPA('edit');
 
   //  9.6 cycles / enter-exit saved w noECHO
@@ -725,7 +729,7 @@ L('EXIT'); // c52
 
   // TODO: how to enter EDIT?
 
-  DEY(),LDXN(state_edit+state_display),STAA('state');
+  DEY(),LDXN(state_edit+state_display),STAZ('state');
   // terminal debug help
   TRACE(()=>{
     // assumes to have printed screen first
@@ -821,13 +825,13 @@ L('NEXT');
     TAX(); // c2
   } PLA();
 
-  BITA('state');
+  BITZ('state');
   BVC('nodisplay'); {
     PHA(),TXA(); { // save TOS
       JSRA('display');
     } PLA();
 
-    BITA('state');
+    BITZ('state');
     // loop if in editing: (re)display all!
     BMI('NEXT'); 
   }
@@ -1020,7 +1024,7 @@ L('L2');
 
   def('~'); EORN(0xff)                                     // WINNER!
 
-  def('.'); STYA('tmp'),LDYN(0),JSRA(putd),LDYA('tmp'),PLA();
+  def('.'); STYZ('tmp'),LDYN(0),JSRA(putd),LDYZ('tmp'),PLA();
 
   def('<'); CLC(),ROL(); // TODO: ASL(); save 1B
   def('>'); CLC(),ROR(); // TODO: LSR()
@@ -1112,7 +1116,7 @@ L('L2');
 
     } else if (1) { // b10
 
-      STYA('tmp'); // not counting
+      STYZ('tmp'); // not counting
 
       LDYN(0);
       CMPAX(S, inc); // no count
@@ -1128,7 +1132,7 @@ L('L2');
       
       L('_=end');
 
-    LDYA('tmp');
+    LDYZ('tmp');
 
     }
     // all variants cleanup
@@ -1276,7 +1280,7 @@ L2      DEX
   def('d'); PHA();
   def('\\'); PLA();
   def('o'); PHA(),TSX(),LDAAX(S+2);
-  def('s'); STAA('tmp'),PLA(),TAX(),LDAA('tmp'),PHA(),TXA(); // b10 c19
+  def('s'); STAZ('tmp'),PLA(),TAX(),LDAZ('tmp'),PHA(),TXA(); // b10 c19
 
   def('p'); PHA(),TSX(),TXA(),ADCAX(S+1),TAX(),PLA(),LDAAX(S+1);
   def('i'); PHA(),LDXZ('rp'),LDAAX(S+1),SEC(),SBCN(1);
@@ -1576,7 +1580,7 @@ next();
 
 
   // -- ENTER If not a primitive, then it's "interpreted" ends with ;
-  STXA('tmp');
+  STXZ('tmp');
 
   // save data stack
   TSX(); STXA('stack'); {
@@ -1586,7 +1590,7 @@ next();
     } TSX(); STXA('rstack');
   } LDXA('stack'); TXS();
 
-  LDXA('tmp');
+  LDXZ('tmp');
   // Find word from token (TODO:' ?)
   LDYA('latest');
 
@@ -1917,7 +1921,7 @@ L('edit');
  L('_edit');
   JSRA('edit_next');
   // TODO: maybe not needed?
-  BITA('state'),BMI('_edit')
+  BITZ('state'),BMI('_edit')
   // if no longer editing
   PLA(); // restore TOS
   next();
@@ -2067,8 +2071,8 @@ L('insert');
   // end? - turn off display
   CMPN(0),BPL('_display.noend'); {
     LDAN(state_edit); // stay edit/run
-    ANDA('state');
-    STAA('state');
+    ANDZ('state');
+    STAZ('state');
     STYZ('end_pos');
   } L('_display.noend');
 
@@ -2206,11 +2210,11 @@ function create() {
 
 // TODO: 3 pushes in BEGIN END is cheaper
 function R_BEGIN() { // b9 zp:b8
-  TSX(),STXA('sp'),LDXZ('rp'),TXS();
+  TSX(),STXZ('sp'),LDXZ('rp'),TXS();
 }
 
 function R_END() { // b9 zp:b8
-  TSX(),STXZ('rp'),LDXA('sp'),TXS();
+  TSX(),STXZ('rp'),LDXZ('sp'),TXS();
 }
 
 // use these twice and you might as well...
