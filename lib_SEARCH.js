@@ -26,7 +26,7 @@ L('LINKEY');
 L('_linkey.next'); // c10
   INY();
   CMPIY(0);
-  BCC('_linkey.next');
+  BCS('_linkey.next');
   RTS();
   // BEQ if found
   // BNE if !found
@@ -40,19 +40,48 @@ function lib_iLINKEY(table) {
 L(next); // c9
   INY();
   CMPAY(table);
-  BCC(next);
+  BCS(next);
   // BEQ if found
   // BNE if !found
   // Y is offset, A is still char
 }
 
 function lib_BINKEY(table) {
-  // A: key, Y: table zpaddress
-  // => X: index (trashes AY)
+  // A: key, X: table zpaddress
 L('BINKEY');
-  
+  LDYZX(0),STYZ(0);
+  LDYZX(1),STYZ(1);
 
+  TAX();
+  // first byte is N items
+  LDYN(0),LDAIY(0);
+
+
+ L('_BINKEY'); L('_BINKEY.toobig');
+  // half the interval size
+  TAX(); {
+    TYA(),LSR(),TAY();
+    BEQ('_BINKEY.fail');
+  } TXA();
+  // compare first choice at Y
+  CMPIY(0);
+  BEQ('_BINKEY.found');
+  BCS('_BINKEY.toobig');
+ L('_BINKEY.toosmall');
+  // change the base
+  TAX(); {
+    TYA(),CLC(),ADCZ(0),STAZ(0);
+  } TXA();
+  BNE('_BINKEY'); // always
+ 
+ L('_BINKEY.found');
+  CLC(),ADCZ(0),STAZ(0);
+ L('_BINKEY.fail');
   RTS();
+
+  // BEQ if failed Y=0
+  // BNE if found Y is lo byte offset
+  //                   (not good)
 }
 
 ////////////////////////////////////////
