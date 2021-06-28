@@ -1185,26 +1185,44 @@ L2      DEX
 `;
 
   // loop stuff
-  def('#', ''); JMPA('#_number_words');
+  //def('#', ''); JMPA('#_number_words');
 
-  // TODO: remove the eternal loop ()
-  // use only #( #) (renmae those to ())
-  // do we need a w( and w) - yes...
-  // .. then need wi wj, lol...
-  def('('); {
-    L('do');
-    PHA(); {
-      // TODO: on zp can do STYZX(), save bytes!
-      // push "ip"
-      TYA(),R_PHA();
-    } PLA();
-  }
+  // counting loops
+  // TODO: 10#(i.) => 10,9,8,7,6,5..1 lol
+  // should start w 9 and exit?
+  def('('); { // #( 
+    LDXN(1); // means skip one ')'
+    CMPN(0),BNE('_#('); {
+      // TODO: make it near to ']' ???
+      JMPA('_]skip.next');
+    } L('_#(');
+    // init (R: -- "ip" "counter")
+    STAZ(0);
 
-  def(')'); {
-    // restore "ip"
     LDXZ('rp');
-    LDYAX('S',inc);
-    // (jumps back to just after '(')
+    TYA(),DEX(),STAAX(S+1);
+    LDAZ(0),DEX(),STAAX(S+1);
+    STXZ('rp');
+
+    PLA();
+  }
+  def(')'); { // #)
+    LDXZ('rp');
+    // TODO: dec! then no DECAX below
+    // also SBC above can be removed!
+    DECAX(S+1); // get count to TOS
+    //TRACE(()=>print('  #) '));
+    BNE('#)_repeat');
+    // ready to unroll and leave!
+    //R_DROP(),R_DROP(); // b6 c10
+    INX(),INX(),STXZ('rp'); // b5 c7
+    // this will pass ')'
+    //TRACE(()=>print('  #)leave '));
+    next();
+    // restore "ip" to beginning of loop
+  L('#)_repeat');
+    //TRACE(()=>print('  #)repeat '));
+    LDYAX(S+2);
   }
 
   // COLON (not ENTER) and ; (EXIT)
@@ -1654,7 +1672,8 @@ L('FIND_END');
 // b??   : to JMPA       // i2  c6
 //         BRK           // i1 c16
 
-L('#_number_words');
+if (0) {
+  L('#_number_words');
   // get next
 
   // TODO:LDXIY
@@ -1663,47 +1682,11 @@ L('#_number_words');
     TAX();
   } PLA();
   
-  // counting loops
-  // TODO: 10#(i.) => 10,9,8,7,6,5..1 lol
-  // should start w 9 and exit?
-  def('('); { // #( 
-    LDXN(1); // means skip one ')'
-    CMPN(0),BNE('_#('); {
-      // TODO: make it near to ']' ???
-      JMPA('_]skip.next');
-    } L('_#(');
-    // init (R: -- "ip" "counter")
-    STAZ(0);
-
-    LDXZ('rp');
-    TYA(),DEX(),STAAX(S+1);
-    LDAZ(0),DEX(),STAAX(S+1);
-    STXZ('rp');
-
-    PLA();
-  }
-  def(')'); { // #)
-    LDXZ('rp');
-    // TODO: dec! then no DECAX below
-    // also SBC above can be removed!
-    DECAX(S+1); // get count to TOS
-//TRACE(()=>print('  #) '));
-    BNE('#)_repeat');
-    // ready to unroll and leave!
-    //R_DROP(),R_DROP(); // b6 c10
-    INX(),INX(),STXZ('rp'); // b5 c7
-    // this will pass ')'
-//TRACE(()=>print('  #)leave '));
-    next();
-    // restore "ip" to beginning of loop
-  L('#)_repeat');
-//TRACE(()=>print('  #)repeat '));
-    LDYAX(S+2);
-  }
-  enddef();
+  //enddef();
 
   // TODO: error?
   next();
+}
 
 L('ENTER'); // b37 c61
   // since R stack is different than callstack
@@ -1719,11 +1702,11 @@ L('ENTER'); // b37 c61
     LDXZ('rp'); {
       // TODO: if rp-stack moves to ZP STYZX
       DEX(),TYA(),STAAX(S+1); // "ip"
-//TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
+      //TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
       DEX(),LDAZ('base',inc),STAAX(S+1); // hi
-//TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
+      //TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
       DEX(),LDAZ('base'),STAAX(S+1); // lo
-//TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
+      //TRACE(()=>princ(' (a='+hex(2,cpu.reg('a'))+') '));
     } STXZ('rp');
     // get address from source RTS
     PLA(),STAZ('base'); // lo
@@ -1981,6 +1964,7 @@ L('edit_next');
   // FREE: Custom Xxtra
   //   Wkillregion Zleep
   //   Quote Urepeat
+  //   Oinsertnl
   cmd('^R', 'OP_Run');
   cmd('^L', 'OP_List');
   //cmd('^T', 'OP_Trace');
@@ -1990,7 +1974,6 @@ L('edit_next');
 
   cmd(0x7f, 'OP_BackSpace');
   cmd('^H', 'OP_BackSpace');
-  cmd('^D'); 
   cmd('^F'); L('e+'),INY(),BEQ('e-');
     TRACE(()=>princ(ansi.forward())); NOP();
   cmd('^B'); L('e-'),DEY(),BEQ('e+');
