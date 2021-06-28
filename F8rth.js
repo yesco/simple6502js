@@ -144,14 +144,14 @@ PROGRAM = '8 9 42R.99R255R17R.i.j..r.r.r.';
 //  another word for tailrecurse :-( )
 PROGRAM = ':1.)2 3 4;';
 
-// counted loops #( #)
-PROGRAM = '4D.9D.0#("never"t.i.8.#)7. ..';
-PROGRAM = '4D.9D.5#("fives"t.i.8.#)7. ..';
-PROGRAM = '4D.9D.1#("once"t.i.8.#)7. ..';
-PROGRAM = '55d.66d.77d.88d..10#(10#(i.j.#)#)...';
+// counted loops ()
+PROGRAM = '4D.9D.0("never"t.i.8.)7. ..';
+PROGRAM = '4D.9D.5("fives"t.i.8.)7. ..';
+PROGRAM = '4D.9D.1("once"t.i.8.)7. ..';
+PROGRAM = '55d.66d.77d.88d..10(10(i.j.))...';
 PROGRAM = 'T55d.44d.33d.(1.2.3.4.)...T';
 
-PROGRAM = 'T44.33.255#(i.#)..T';
+PROGRAM = 'T44.33.255(i.)..T';
 
 PROGRAM = '9 3 4 + . .';
 
@@ -168,7 +168,7 @@ PROGRAM = 'TTETEEEEEEEEEET';
 PROGRAM = '1 2 3 G ...';
 
 // Fib iterator
-PROGRAM = 'T0 1 17#(F#)T';
+PROGRAM = 'T0 1 17(F)T';
 
 PROGRAM = 'T1 2 3TGT...T';
 
@@ -194,17 +194,23 @@ PROGRAM = `
 9d."> 010= "t3 4?>.\\4 3?>.\\3 3?>.\\.10e
 9d."< 100= "t3 4?<.\\4 3?<.\\3 3?<.\\.10e
 9d."?= 001= "t3 4?=.\\4 3?=.\\3 3?=.\\.10e
-9d.3 3?=#('ee#)\\.
-9d.3 4?=#('ee#)\\.
-9d.3 7?<#('le#)\\.
-9d.3 2?>#('ge#)\\.
+9d.3 3?=('ee)\\.
+9d.3 4?=('ee)\\.
+9d.3 7?<('le)\\.
+9d.3 2?>('ge)\\.
 `;
+
+PROGRAM = '9d. : 1.2.3. ; .';
+PROGRAM = '9d. ::Q:33;  .';
+
+PROGRAM = '9d.::P:77; ::Q:33P; 5(Q..) .';
 
 PROGRAM = `9d.
 ::G:Rsrs;
 ::F:o.dG+;
-0 1 100#(F#)
+0 1 100(F)
 `;
+
 
 
 // zzzz to find fast!
@@ -1188,74 +1194,72 @@ L2      DEX
   //def('#', ''); JMPA('#_number_words');
 
   // counting loops
-  // TODO: 10#(i.) => 10,9,8,7,6,5..1 lol
+  // TODO: 10(i.) => 10,9,8,7,6,5..1 lol
   // should start w 9 and exit?
-  def('('); { // #( 
+  def('('); { // ( 
     LDXN(1); // means skip one ')'
-    CMPN(0),BNE('_#('); {
+    CMPN(0),BNE('_('); {
       // TODO: make it near to ']' ???
       JMPA('_]skip.next');
-    } L('_#(');
+    } L('_(');
     // init (R: -- "ip" "counter")
     STAZ(0);
 
-    LDXZ('rp');
-    TYA(),DEX(),STAAX(S+1);
-    LDAZ(0),DEX(),STAAX(S+1);
-    STXZ('rp');
+   L('do');
+    LDXZ('rp'); {
+      TYA(),DEX(),STAAX(S+1);
+      LDAZ(0),DEX(),STAAX(S+1);
+    } STXZ('rp');
 
     PLA();
   }
-  def(')'); { // #)
+  def(')'); {
     LDXZ('rp');
     // TODO: dec! then no DECAX below
     // also SBC above can be removed!
     DECAX(S+1); // get count to TOS
-    //TRACE(()=>print('  #) '));
-    BNE('#)_repeat');
+    //TRACE(()=>print('  ) '));
+    BNE(')_repeat');
     // ready to unroll and leave!
     //R_DROP(),R_DROP(); // b6 c10
     INX(),INX(),STXZ('rp'); // b5 c7
     // this will pass ')'
-    //TRACE(()=>print('  #)leave '));
+    //TRACE(()=>print('  )leave '));
     next();
     // restore "ip" to beginning of loop
-  L('#)_repeat');
-    //TRACE(()=>print('  #)repeat '));
+  L(')_repeat');
+    //TRACE(()=>print('  )repeat '));
     LDYAX(S+2);
   }
 
   // COLON (not ENTER) and ; (EXIT)
-  //def(':', 'do'); // dispatch does ENTER
   def(':'); {
     PHA(); {
       INY(),LDAIY('base'),DEY(); // peek
       // if not ':' then we're running word
-      CMPN(ord(':')),BNE('do');
+      CMPN(ord(':')),BNE('_:end');
       // We're defining a word
       INY(); // lol
       INY(),LDAIY('base'); // get name
       CLC(),SBCN(ord('A')),TAX();
-//      TRACE(()=>print("\n---define.x: ",hex(2,cpu.reg('x'))));
+      // TRACE(()=>print("\n---define.x: ",hex(2,cpu.reg('x'))));
       // TODO: boundary checks...
       // Store next ':' Y "ip" as start of function!
       INY();
       // for now these are "local" functions!
-//      TRACE(()=>print("\n---define.offset: ",hex(2,cpu.reg('y'))));
+      // TRACE(()=>print("\n---define.offset: ",hex(2,cpu.reg('y'))));
       STYZX('UDF_offsets');
 
       // skip to ;
-      L('_:'),INY(),LDAIY('base');
+     L('_:'),INY(),LDAIY('base');
       CMPN(ord(';')),BNE('_:');
-    } PLA();
+    } L('_:end'),PLA();
   }
 
   def(';'); {
     L('_;_mid');
-    // get Y for return loop
     LDXZ('rp'); {
       LDYAX(S+1),INX();
-//      LDYAX(S+2),INX();
     } STXZ('rp');
   }
 
@@ -1567,79 +1571,37 @@ L('not_number');
 L('NUMBER_END');
 
 L('FIND_BEGIN');
-L('findword'); 
 // TODO: make it more general
 
-// for now just lookup and ENTER word
-// "same page"
-// local 'ENTER'
-PHA(); {
-  // load Y of A
-  // TODO: just adjust offset of UDF...
-  TXA(),CLC(),SBCN(ord('A')),TAX();
-//  TRACE(()=>print("\n---enter.x: ",hex(2,cpu.reg('x'))));
-  LDAZX('UDF_offsets');
-//  TRACE(()=>print("\n---enter.offset: ",hex(2,cpu.reg('a'))));
+  // for now just lookup and ENTER word
+  // "same page"
+  // local 'ENTER'
+ L('enter');
   PHA(); {
-
-    // save Y
-    LDXZ('rp'); {
-//      TRACE(()=>print("\n---enter.save: ",hex(2,cpu.reg('y'))));
-      TYA();
-      // ';' loads one drops one ?
-//      DEX(),STAAX(S+1);
-      DEX(),STAAX(S+1);
-
-      // not valid anymore
-      LDAN(0xff),STAZ('num_pos');;
-    } STXZ('rp');
-    
+    // load Y of A
+    // TODO: just adjust offset of UDF...
+    TXA(),CLC(),SBCN(ord('A')),TAX();
+    // TRACE(()=>print("\n---enter.x: ",hex(2,cpu.reg('x'))));
+    LDAZX('UDF_offsets');
+    // TRACE(()=>print("\n---enter.offset: ",hex(2,cpu.reg('a'))));
+    PHA(); {
+      // save Y
+      LDXZ('rp'); {
+        // TRACE(()=>print("\n---enter.save: ",hex(2,cpu.reg('y'))));
+        TYA(),DEX(),STAAX(S+1);
+        // ';' loads one drops one ?
+        // DEX(),STAAX(S+1);
+        // not valid anymore
+        LDAN(0xff),STAZ('num_pos');;
+      } STXZ('rp');
+    } PLA();
+    // set "ip" of local function
+    TAY();
+    //  TRACE(()=>print("\n---enter: ",hex(2,cpu.reg('y'))));
   } PLA();
-  // set "ip" of local function
-  TAY();
-//  TRACE(()=>print("\n---enter: ",hex(2,cpu.reg('y'))));
-
-} PLA();
-
-next();
-
-
-
-
-  // -- ENTER If not a primitive, then it's "interpreted" ends with ;
-  STXZ('tmp');
-
-  // save data stack
-  TSX(); STXA('stack'); {
-    // restore rstack
-    LDXA('rstack'); TXS(); {
-      TYA(),PHA(); // save "ip"
-    } TSX(); STXA('rstack');
-  } LDXA('stack'); TXS();
-
-  LDXZ('tmp');
-  // Find word from token (TODO:' ?)
-  LDYA('latest');
-
-L('find');
-  TXA(); // get token
-  CMPIY('base', a=>(a+1)&0xff); // 0: "ptr to next word", 1: "token/name", 2: "code"
-  BEQ('found');
-  // TODO: this is garbage?
-  LDAAX('U'); // link
-  TAY();
-  BNE('find');
-  // 0 is end
-  // TODO: ERROR: not found!
-L('error');
-  JSRA(putc);
-  LDAN(ord('?')),JSRA(putc);
-  LDAN(ord('\n')),JSRA(putc);
+  
   next();
 
-L('found');
-  INY(); // !! skip ptr,
-  next();
 L('FIND_END');
 
 
