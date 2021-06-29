@@ -262,7 +262,7 @@ let tcpu = {
         if (traceLevel > 2) {
           cpu.dump(h.ipc,1);
           // this.prinstack not work
-          c.printstack(); print("\n\n");
+          //c.printstack(); print("\n\n");
         }
 
         // WTF?
