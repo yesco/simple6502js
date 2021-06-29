@@ -215,6 +215,8 @@ PROGRAM = "9d.'ae'be'ce 0 100(100(i+)). .";
 
 PROGRAM = "9d.'ae'be'ce 0 255(255(ij+.)).";
 
+PROGRAM = '9d.3 4+..';
+
 PROGRAM = "9d.'ae'be'ce 0 10(255(10(i+i+i+i+)d.)). .";
 
 
@@ -371,26 +373,39 @@ let start = 0x501;
 
 
 
-// Turn off BRK and on table_next
+// Turn off BRK, off TOS and on table_next
 // speeed: b1944
-//         b1759 (+ 144 bytes)
-let speed = 0;
+//         b1759 (+ 144 bytes + 256)
+let speed = 1;
 
-
-
+let tosopt = !speed;
 
 let trace = 0;
 let tracecyc = 0;
 let table_next = speed;
 
 // uncomment to see cycle counts!
-//tracecyc = 1;
-
+tracecyc = 1;
 
 
 
 // TODO: if not this, hang!
 //process.exit(0);
+
+// TODO: not this easy, haha!
+function tos() {
+  if (tosopt) {
+  } else {
+    PLA();
+  }
+}
+function endtos() {
+  if (tosopt) {
+  } else {
+    PHA();
+  }
+}
+
 
 // using BRK is slower, but saves bytes
 // 95 bytes for 40 functions!
@@ -526,6 +541,9 @@ if (1) {
   }
 
   function gentab() {
+    // align on page boundary
+    while(jasm.address()%256) data(0);
+
    L('DISPATCH');
     for(let i=0; i<0x80; i++) {
       let a = tab[i] || 'NEXT';
@@ -858,20 +876,17 @@ L('NEXT');
     savcyc= c;
   });
 
-  if (table_next) { // b29 c50 + c17 f BRK (c67)
+  if (table_next) { // b16 c29
     PHA(); {
       INY(),LDAIY('base');
       BEQ('EXIT'); // c2+1 // TODO: remove?
-      PHA(); {
-        CLC(),ROL(),TAX(); // TODO: ASL?
-        LDAAX('DISPATCH'),STAA('jmp',a=>a+1); // TODO: Z
-        LDAAX('DISPATCH',inc),STAA('jmp',a=>a+2); // TODO: Z
-      } PLA();
       TAX();
+      ASL();
+      STAA('jmp', a=>a+1);
     } PLA();
    L('jmp');
     // JMPI not working?
-    JMPA('NEXT');
+    JMPI('DISPATCH');
   }
 
 // TODO: Use some tricks from Token Threaded Forth
@@ -1770,9 +1785,9 @@ L('QUESTION');
 
 L('QUESTION_END');
 
-L('TABLE');
+L('TABLESPACE');
   gentab();
-L('TABLE_END');
+L('TABLESPACE_END');
 
 L('FORTH_END');
 
@@ -2131,9 +2146,10 @@ L('WORDS_BEGIN');
   // 4. give error if duplicate first letter?
   // 5. Does it even need to be in linked list?
   // 6. maybe only if >1 letter
-  WORD('Ones', 0, '1 1 1 1 1.....');
-  WORD('Duper', 0, 'dd');
-  WORD('Peek', 0, 'd.');
+  // TODO: not correct patching
+  //WORD('Ones', 0, '1 1 1 1 1.....');
+  //WORD('Duper', 0, 'dd');
+  //WORD('Peek', 0, 'd.');
 
 L('WORDS_END');
 
@@ -2178,6 +2194,7 @@ function WORD(name, imm, prog, datas=[], qsize=0) {
       firstUppersAddress = a;
     }
 
+//TODO: fix    
     // patch table
     let index = ord(name);
     index ^= 0x20; // flip 00x0 0000
@@ -2341,7 +2358,8 @@ prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
-prsize(" TABLE:", l.TABLE_END-l.TABLE);
+prsize(" ALIGN:", l.DISPATCH-l.TABLESPACE);
+prsize(" TABLE:", l.TABLESPACE_END-l.DISPATCH);
 print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);

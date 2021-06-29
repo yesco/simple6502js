@@ -418,6 +418,7 @@ function dgen(delta, s, base) {
   // fixing
   genf(0x6c, 'JMPI', 'JMP', 'indirect', 3, 5);
   genf(0x4c, 'JMPA', 'JMP', 'abs', 3, 3);
+  genf(0x0a, 'ASL', 'ASL', '', 1, 2);
 
   // they didn't  override any opcodes
   delete global.JMPAY;
@@ -428,8 +429,8 @@ function dgen(delta, s, base) {
 }
 function gen(s, base) {
   dgen(1 << 5, s, base);
-  ops[0x6c] = global['JMPI'] =
-  ops[0x4c] = global['JMPA'] = global['JMPA'];
+//  ops[0x6c] = global['JMPI'] =
+//  ops[0x4c] = global['JMPA'] = global['JMPA'];
 }
 
 //  ffv 100 00 = branch instructions:
