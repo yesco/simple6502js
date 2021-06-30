@@ -1,4 +1,4 @@
-//               READLINE-65
+//                  SEARCH-65
 // 
 //          (>) 2021 Jonas S Karlsson
 //                jsk@yesco.org
@@ -52,55 +52,32 @@ L('BINKEY');
   LDYZX(0),STYZ(0);
   LDYZX(1),STYZ(1);
 
-  LDYN(0),STYZ(2);
-
   TAX();
-  // first byte is N items
+  // y = len
   LDYN(0),LDAIY(0),TAY();
-  INCZ(0),BNE('_BINKEY.inc'),INCZ(1),L('_BINKEY.inc');
+  INCZ(0); // skip one
 
   CLC();
- L('_BINKEY'); L('_BINKEY.toobig');
-  // half the interval size
-  TYA(),LSR(),TAY();
-  BEQ('_BINKEY.fail');
-  TXA();
-  // compare first choice at Y
-  CMPIY(0);
+
+ L('_BINKEY'); // b20 c32
+  TYA(),BEQ('_BINKEY.done');  // while (y > 0) {
+  LSR(),TAY();                //   y >> 1
+  TXA(),CMPIY(0);             //   c = s[b+y]
+  BEQ('_BINKEY'),BCC('_BINKEY');// if (c < a)
+  TYA(),ADCZ(0),STAZ(0);      //     b += y+1
+  TYA(),BNE('_BINKEY');       // }
+ 
+ L('_BINKEY.done');
+  // TODO: how to signal not found?
+  // need to fallthrough to get right index!!!
+ L('_BINKEY.found');
   terminal.TRACE(jasm, ()=>print(
-    'binkey', {
+    'BINKEY', {
       b: m[0],
-      w: m[2],
       a: cpu.reg('a'),
       x: chr(cpu.reg('x')),
       y: cpu.reg('y'),
       c: chr(m[cpu.w(0)+cpu.reg('y')]),
-      flags: cpu.flags(),
-    }));
-  //BEQ('_BINKEY.toobig');
-  BEQ('_BINKEY.found');
-  BCC('_BINKEY.toobig');
- L('_BINKEY.toosmall');
-  // change the base
-  TYA(),SEC(),ADCZ(2),STAZ(2);
-  TYA(),SEC(),ADCZ(0),STAZ(0); // lo
-//  LDAZ(1),ADCZ(1),STAZ(1); // hi
-  BNE('_BINKEY'); // always
- 
- L('_BINKEY.fail'); // TODO: just means done?
-  // TODO: how to signal not found?
-  SEC();
-  // need to fallthrough to get right index!!!
- L('_BINKEY.found');
-  TYA(),SEC(),ADCZ(2),TAY();
-  terminal.TRACE(jasm, ()=>print(
-    'BINKEY', {
-      b: m[0],
-      w: m[2],
-      a: cpu.reg('a'),
-      x: chr(cpu.reg('x')),
-      y: cpu.reg('y'),
-      c: chr(m[cpu.w(0x70)+cpu.reg('y')]),
       flags: cpu.flags(),
     }));
   RTS();
@@ -188,8 +165,11 @@ ORG(0x70); L('TABLE'); word('keys');
 let keys = "*@MQY^cegir";
 print('KEYS: === "',keys,'"');
 ORG(0x300);
-L('keys'); pascalz(keys);
+L('keys');
+  byte(keys.length); chars(keys); byte(0xff);
+// fill with dummy data
 for(let i=1; i<64; i++) data(0);
+
 L('searching'); string('searching...');
 L('found'); string('found');
 L('fail');  string('FAIL!');
@@ -201,16 +181,17 @@ ORG(start);
   putl('searching');
 
   LDXN('TABLE');
-  LDAN(ord('A'));
   LDAN(17);
   LDAN(ord('Y'));
   LDAN(ord('Y'));
   LDAN(ord('Q'));
-  LDAN(ord('r'));
+  LDAN(ord('A'));
   LDAN(ord('c'));
   LDAN(ord('^'));
   LDAN(ord('@'));
   LDAN(ord('*'));
+  LDAN(ord('r'));
+  LDAN(ord('i'));
   // A: key, X: table zpaddress
   JSRA('BINKEY');
   BCS('failed');
