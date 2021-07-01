@@ -63,13 +63,14 @@ L('BINKEY');
   LDYN(0),LDAIY(0),TAY();
   INCZ(0); // skip one
 
- L('_BINKEY'); // b20 c32
-  TYA(),BEQ('_BINKEY.done');  // while (y > 0) {
+ L('_BINKEY'); // b17+3 c20/26
+  TYA(),BEQ('_BINKEY.done');  // goto "while"
+ L('_BINKEY.1'); // b17 c20/26
   LSR(),TAY();                //   y >>= 1;
   TXA(),CMPIY(0);             //   c = s[b+y];
   BEQ('_BINKEY'),BCC('_BINKEY');// if (c < a)
   TYA(),ADCZ(0),STAZ(0);      //     b += y+1
-  TYA(),BNE('_BINKEY');       // }
+  TYA(),BNE('_BINKEY.1');     // while (y > 0) {
  
  L('_BINKEY.done'); // c7
    TXA(),CMPIY(0);             //   key == s[b+y];
