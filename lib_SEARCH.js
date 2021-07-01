@@ -69,6 +69,7 @@ L('BINKEY');
   LSR(),TAY();                //   y >>= 1;
   TXA(),CMPIY(0);             //   c = s[b+y];
   BEQ('_BINKEY'),BCC('_BINKEY');// if (c < a)
+  // Carry is always set so no need CLC()
   TYA(),ADCZ(0),STAZ(0);      //     b += y+1
   TYA(),BNE('_BINKEY.1');     // while (y > 0) {
  
