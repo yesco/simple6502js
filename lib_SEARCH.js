@@ -48,42 +48,34 @@ L(next); // c9
 
 function lib_BINKEY(table) {
   // A: key, X: table zpaddress
+  // Table is:
+  // - address%256 < 256-len-2 (or so)
+  //   i.e. the table must reside in a page
+  // - (len, sorted bytes, 0xff, 0xff)
+  // Note: resulting address in w[0]
+  // TODO: make smaller!
 L('BINKEY');
   LDYZX(0),STYZ(0);
   LDYZX(1),STYZ(1);
 
-  TAX();
+  TAX(),CLC();
   // y = len
   LDYN(0),LDAIY(0),TAY();
   INCZ(0); // skip one
 
-  CLC();
-
  L('_BINKEY'); // b20 c32
   TYA(),BEQ('_BINKEY.done');  // while (y > 0) {
-  LSR(),TAY();                //   y >> 1
-  TXA(),CMPIY(0);             //   c = s[b+y]
+  LSR(),TAY();                //   y >>= 1;
+  TXA(),CMPIY(0);             //   c = s[b+y];
   BEQ('_BINKEY'),BCC('_BINKEY');// if (c < a)
   TYA(),ADCZ(0),STAZ(0);      //     b += y+1
   TYA(),BNE('_BINKEY');       // }
  
- L('_BINKEY.done');
-  // TODO: how to signal not found?
-  // need to fallthrough to get right index!!!
- L('_BINKEY.found');
-  terminal.TRACE(jasm, ()=>print(
-    'BINKEY', {
-      b: m[0],
-      a: cpu.reg('a'),
-      x: chr(cpu.reg('x')),
-      y: cpu.reg('y'),
-      c: chr(m[cpu.w(0)+cpu.reg('y')]),
-      flags: cpu.flags(),
-    }));
+ L('_BINKEY.done'); // c7
+   TXA(),CMPIY(0);             //   key == s[b+y];
   RTS();
-
-  // BCS failed
-  // BCC found. [0],Y=0  points at it
+  // BNE not found w(0) points where it should be
+  // BEQ found     w(0) points to 
 }
 
 ////////////////////////////////////////
@@ -166,7 +158,7 @@ let keys = "*@MQY^cegir";
 print('KEYS: === "',keys,'"');
 ORG(0x300);
 L('keys');
-  byte(keys.length); chars(keys); byte(0xff);
+  byte(keys.length);chars(keys);data(0xff,0xff);
 // fill with dummy data
 for(let i=1; i<64; i++) data(0);
 
@@ -189,12 +181,12 @@ ORG(start);
   LDAN(ord('c'));
   LDAN(ord('^'));
   LDAN(ord('@'));
-  LDAN(ord('*'));
   LDAN(ord('r'));
   LDAN(ord('i'));
+  LDAN(ord('*'));
   // A: key, X: table zpaddress
   JSRA('BINKEY');
-  BCS('failed');
+  BNE('failed');
   putl('found');
   terminal.TRACE(jasm, ()=>{ process.exit() });
   BRK();

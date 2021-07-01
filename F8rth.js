@@ -392,7 +392,7 @@ tracecyc = 1;
 // TODO: if not this, hang!
 //process.exit(0);
 
-// TODO: not this easy, haha!
+// TODO: not this easy, haha
 function tos() {
   if (tosopt) {
   } else {
@@ -877,6 +877,18 @@ L('NEXT');
   });
 
   if (table_next) { // b16 c29
+
+    if (0) {
+    // selfmod base stored inside instruction
+    // c21, zp.c:19
+    INY(),LDXAY('base'); // c6
+    BEQ('EXIT');         // c2
+    STYA('jmp', a=>a+1); // c4 zp.c:3
+    ASLA('jmp', a=>a+1); // c6 zp.c:5
+   L('jmp');
+    JMPI('DISPATCH');    // c5
+    }
+
     PHA(); {
       INY(),LDAIY('base');
       BEQ('EXIT'); // c2+1 // TODO: remove?
