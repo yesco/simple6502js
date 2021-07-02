@@ -219,6 +219,12 @@ PROGRAM = '9d.3 4+..';
 
 PROGRAM = "9d.'ae'be'ce 0 10(255(10(i+i+i+i+)d.)). .";
 
+// TODO: not working right
+PROGRAM = '9.9.9.:1.2.3.0]4.;';
+
+// unloop+leave in one!
+PROGRAM = 'A9d.3(1.4(2.3.1]4.)5.)6..';
+PROGRAM = 'A9d.3(1.4(2.3.2]4.)5.)6..';
 
 
 // zzzz to find fast!
@@ -261,14 +267,6 @@ PROGRAM = "9d.'ae'be'ce 0 10(255(10(i+i+i+i+)d.)). .";
 //   (to much growth: implement as word?)
 // - r and R, and move printcontrol (590 +69)
 //
-//
-//
-// TODO:  60 bytes next()==BRK 30 nexts
-// TODO  120 bytes CMP,BCC (4b) x 30 OPS
-//           (can do a ' '..'@' (32 B)
-//           (offset jmptable make compact)
-//           - 23 routines ( don't count num)
-//           - 256/23 => 11
 
 // DICTIONARY ENTRY (longword)
 //               ____________________________ 
@@ -287,6 +285,11 @@ PROGRAM = "9d.'ae'be'ce 0 10(255(10(i+i+i+i+)d.)). .";
 //         orienterd, data is after code
 //         known by the code (?)
 // 
+// TODO: TODO: TODO:
+// - When local functions are defined, "cod"
+// moves forward, so they are not run again.
+// - Where to store local dispatch? linked list?
+// - need extra "link-field"
 
 // INTERPREATION
 // 
@@ -385,7 +388,7 @@ let tracecyc = 0;
 let table_next = speed;
 
 // uncomment to see cycle counts!
-tracecyc = 1;
+//tracecyc = 1;
 
 
 
@@ -1289,7 +1292,7 @@ L2      DEX
     LDXN(1); // means skip one ')'
     CMPN(0),BNE('_('); {
       // TODO: make it near to ']' ???
-      JMPA('_]skip.next');
+      JMPA('_].skip.next');
     } L('_(');
     // init (R: -- "ip" "counter")
     STAZ(0);
@@ -1327,7 +1330,8 @@ L2      DEX
       INY(),LDAIY('base'),DEY(); // peek
       // if not ':' then we're running word
       CMPN(ord(':')),BNE('_:end');
-      // We're defining a word
+
+      // DEFINE local word!
       INY(); // lol
       INY(),LDAIY('base'); // get name
       CLC(),SBCN(ord('A')),TAX();
@@ -1335,6 +1339,7 @@ L2      DEX
       // TODO: boundary checks...
       // Store next ':' Y "ip" as start of function!
       INY();
+      // TODO: where to store? local linked?
       // for now these are "local" functions!
       // TRACE(()=>print("\n---define.offset: ",hex(2,cpu.reg('y'))));
       STYZX('UDF_offsets');
@@ -1346,10 +1351,11 @@ L2      DEX
   }
 
   def(';'); {
-    L('_;_mid');
-    LDXZ('rp'); {
-      LDYAX(S+1),INX();
-    } STXZ('rp');
+    INCZ('rp');
+   L('_;_mid');
+    LDXZ('rp'); { // b7 c12
+      LDYAX(S+1);
+    } INCZ('rp'); // 1b less than INX,STX
   }
 
   def(','); { L('OP_,_tail');
@@ -1422,101 +1428,49 @@ L2      DEX
 
   //def('l'); PHA(),LDAAX('latest');
 
-  def(']'); { // b44 (HUGE! because of interpret)
-    // TODO: idea; have a "skip mode",
-    // only then we need a stack of modes?
-    //
-    // Hmmmm STATE = 0  Immediate mode (running)
-    //       STATE = 1  Skipping mode!
-    //                  just reacting to editing
-    //                  and maybe [ ] ?
-    //                  but [] 
-    // possibly    > 1  is the count of {} to skip?
-    //                  do we need to match correctly?
-    //                  LOL: only "..." and then
-    //                  counting ({}) no count[]
-    //   !!! During "skipping" / compilation mode
-    //     we can use the data stack to store
-    //     expected token!
-    //
-    // Maybe STATE = -1   Immediate
-    //                0   Compiling
-    //               >1   Loops that needs dec?
-    //       can have separate words for ();
-    //  maybe won't work when enter immediate mode?
-    //  may need to have separate counter. Hmmm
-    //
-    // CONCLUSION: (?)
-    //   it's cheaper and much more effective
-    //   to "compile" the code... the traditional
-    //   way. It's probably smaller even!
-    //
-    // OR>...
-    //   We could just enter "compile mode"?
-    //   That skips matching stuff?
-    //   (it doesn't have to normally, but...)
-    //
-    //   So just name it "skip mode"?
-    PHA(); {
+  // TODO: 
+  def(']'); { // b37 (was 44!)
+    // drop n items from rstack
+    TAX(),BEQ('_].end'); // 0 == NOP
 
-      TXA();
-      LDXN(0); // count of depth of ()
+   L('_].skip.next');
+    INY();
+   L('_].skip');
+    LDAIY('base');
+    // TODO: nesting of {{{
+    // TODO: handle ".(.."
 
-      // TODO: count the number of ]]]]
-    L('_]]');
-      TRACE(_=>['].count', cpu.reg('x')]);
-      CMPN(ord(']'));
-      BNE('_]skip');
-      INX(),INY(),LDAIY('base');
-      BNE('_]]');
-      // never falls out (unless at 00)
-      // TODO: test...
-      DEY();
+    // ';' - TODO: EXIT (to local sub?)
+    // TODO: not working now remove?
+    CMPN(ord(';')),BNE('_;_nomid');
+      JMPA('EXIT');
+      //JMPA('_;_mid');
+    L('_;_nomid');
 
-      // Takes an f to run at emulation time
-      // if it returns an array, pass on to
-      // console.log
-
-    L('_]skip.next');
+    // skip inline backtick value (could be any)
+    // TODO: remove?
+    CMPN(ord('`')),BNE('_not_backtick');
       INY();
-    L('_]skip');
-      LDAIY('base');
-      terminal.TRACE(jasm, ()=>{
-        //princ(' <skip: '+chr(cpu.reg('x'))+'> ');
-      });
+    L('_not_backtick');
 
-      // TODO: "  [  ) "
-      // TODO: nesting of "{ ..{ ...  } .. }" ???
+    CMPN(ord('(')),BNE('_not(');
+      DECZ('rp'); // "rpush"
+      DECZ('rp'); // "rpush"
+      INX();
+    L('_not(');
 
-      CMPN(ord(';'));
-      BNE('_;_nomid');
-      JMPA('_;_mid');
-      L('_;_nomid');
-
-      // skip inline backtick value (could be any)
-      CMPN(ord('`'));
-      BNE('_not_backtick');
-        INY();
-      L('_not_backtick');
-
-      CMPN(ord('('))
-      BNE('_not(');
-        INX();
-      L('_not(');
-
-      CMPN(ord(')'));
-      BNE('_]skip.next');
+    CMPN(ord(')')),BNE('_].skip.next');
+      INCZ('rp'); // "rdrop"
+      INCZ('rp'); // "rdrop"
       DEX();
-      BNE('_]skip.next');
-      // you'll fall through here when at
-      // and the last matching ')'
+    BNE('_].skip.next');
 
-      // found last matching ')'
-      // similar to ';' but w/o PLA
-      R_PLA(); // drop "ip"
-    }
-    PLA();
+    // last matching ')'
+   L('_].end');
+    PLA(); // set TOS
   }
+
+
 
 // 0 -> 1 other +: 0
 //  def('z'); CMPN(0),LDAN(0),ADCN(0);
