@@ -226,6 +226,13 @@ PROGRAM = '9.9.9.:1.2.3.0]4.;';
 PROGRAM = 'A9d.3(1.4(2.3.1]4.)5.)6..';
 PROGRAM = 'A9d.3(1.4(2.3.2]4.)5.)6..';
 
+// w_
+PROGRAM = '9d8dw\\..';
+PROGRAM = '1 2..1 2s..';
+
+PROGRAM = '1 2 3 4....1 2 3 4ws....';
+PROGRAM = '1 2 4 8....9 9 1 2 4 8w+.. ..';
+PROGRAM = '9 9 10 5 8 4w-.. ..';
 
 // zzzz to find fast!
 
@@ -379,7 +386,8 @@ let start = 0x501;
 // Turn off BRK, off TOS and on table_next
 // speeed: b1944
 //         b1759 (+ 144 bytes + 256)
-let speed = 1;
+let speed = 0;
+//speed = 1; // if enabled, w... not work
 
 let tosopt = !speed;
 
@@ -1382,9 +1390,6 @@ L2      DEX
   //
   //  (No def: b f g l m u v z)
   //
-  // 27 words... for double... :-(
-  // w must: * + . < > " @ ! ( ) o s i j r R (15)
-  // w op  : - & | ^ ~ = d \ o n t (12)
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
   def('D', ''); JSRA('ENTER'); string('d9+.');
@@ -1764,9 +1769,6 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
     INY(),LDAIY('base'),TAX();
   } PLA();
 
-  // lot of indirect stuff
-  LDXN(0);
-
   // Not very efficient... better on ZP stack...
   sub('w@'); { // b20 c36+4 (fig: b14 c31 c-3 next!)
     STAZ(0),PLA(),STAZ(1), // lo, hi addr
@@ -1775,23 +1777,45 @@ L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
     LDAXI(0),PHA(); // hi, data
     LDAZ(2); // lo
   }
-  sub('w!'); { // b18 c41+4
+  sub('w!'); LDXN(0); { // b20 c41+4
     STAZ(0),PLA(),STAZ(1), // lo, hi addr
     PLA(),STAXI(0), // lo, data
     INCZ(0),BNE('_w!'),INCZ(1),L('_w!'),
-    PLA(),STAXI(0), // hi, data
-    PLA();
-  }
-  sub('w+'); TSX(); { // b16
-          CLC(),ADCAX(S+2),STAAX(S+2); // lo
-    PLA(),CLC(),ADCAX(S+3),STAAX(S+3); // hi
+    PLA(),STAXI(0); // hi, data
   } PLA();
+//  sub('w+'); TSX(); { // b20
+//    CLC(),ADCAX(S+2),STAAX(S+2); // lo
+//    PLA(),ADCAX(S+3),STAAX(S+3); // hi
+//  } PLA();
+  sub('w+'); CLC(),LDXN(0x7d); { // ADCAX // b3
+    // Self-mod code // b29
+    L('_ww'),STXA('_wop1'),STXA('_wop2');
+    PHA(),TSX(); {
+      LDAAX(S+3),L('_wop1'),ADCAX(S+1),STAAX(S+3); // lo
+      LDAAX(S+4),L('_wop2'),ADCAX(S+2),STAAX(S+4); // hi
+    } PLA(),PLA(),PLA();
+  }
+  sub('w-',''); SEC(),LDXN(0xfd),BNE('_ww'); // SBCAX // b5
+  sub('w&',''); LDXN(0x3d),BNE('_ww'); // ANDAX // b4
+  sub('w|',''); LDXN(0x1d),BNE('_ww'); // ORAAX // b4
+  sub('w^',''); LDXN(0x5d),BNE('_ww'); // EORAX // b4
+  sub('w~'); EORN(0xff),TAX(),PLA(),EORN(0xff),PHA(),TXA(); // b8
+  sub('w\\'); PLA(),PLA();
+  sub('wo'); PHA(),TSX(),LDAAX(S+2),PHA(),LDAAX(S+2); // b9
+  sub('ws'); { // b25
+    STAZ(0),PLA(),STAZ(1); // store lo,hi
+    TSX(); {
+      LDAAX(S+2),PHA(),LDAZ(1),STAAX(S+2); // hi
+      LDAAX(S+1),PHA(),LDAZ(0),STAAX(S+1); // lo
+    } PLA();
+  }
+
+  // 27 words... for double... :-(
+  // . < > " ( ) i j r R d n ?....
+
+
   // w, = ,,
   // wd = oo
-  // w\ = \\
-  // w& = rt&rtrt&s
-  // w| = rt|rtrt|s ...
-
 
   endsub();
 
