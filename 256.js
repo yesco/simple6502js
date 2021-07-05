@@ -698,8 +698,6 @@ ORG(SYSTEM-1);                 L('rstack');
 // 0x00--0x0f use for any
 
 ORG(0xc0);
-  L('here');      word(0);
-  L('latest');    word(0); // TODO: use!
   L('upbase');    word(0); // TODO: use!
 
 // Harward stack is shared with RStack and DStack!
@@ -747,9 +745,6 @@ L('FORTH_BEGIN');
   // init stack pointers
   LDXN('stack', lo),TXS();
 
-  LDAN('INITIAL_HERE', lo),STAZ('here');
-  LDAN('INITIAL_HERE', hi),STAZ('here',inc);
-  
   if (brk) {
     // modify BRK as short cut for JMPA('next'); (save 2 bytes/call)
     LDAN('BRK_NEXT', lo),STAA(cpu.consts().IRQ);
@@ -771,7 +766,6 @@ L('quit');
   // init other stuff
   LDAN(0); {
     STAZ('tmp');
-    STAZ('latest');
     // init state of interpreter
     TAY(); // "ip"
   }
@@ -957,22 +951,6 @@ L('NEXT');
 
 L('NEXT_END');
 
-// Dispatch sketch:
-// 
-// 0 00x xxxx edit commands      (32B offset)
-// 0 01x xxxx [ -@] symbols machine code (32B offset)
-// 0 10x xxxx [A-Z] UDF in ALF (UDFs 64 address)
-// 0 11x xxxx [a-z] letters machine code (32B offset)
-// 1 xxx xxxx hi bit mark for ALF code? (128B  adress)
-//            or just UDFs in ALF (256 bytes)
-//
-//   ^^     ~    ORDER
-//   00 E  01 E  000 S
-//   01 S  00 S  001 E
-//   10 U  11 U  010 L
-//   11 L  10 L  011 U >= 96 --- ALF!!! 2b addr
-//( 1xx U        1xX (also bit reverse) ALF? )
-
 ////////////////////////////////////////
 // Interpreter
 
@@ -1007,23 +985,6 @@ L('interpret'); // A has our word
 
   // -- "interpretation" or running
 
-  if (0) {
-    // benchmark various next
-    switch(3) {
-    case 1: {
-      CLC();
-      BCC('NEXT'); // c34 if right flag
-      break; }
-    case 2: {
-      JMPA('NEXT');} // c35
-    case 3: {
-      BRK(); } // c54
-    default: ;
-    }
-    
-    TRACE(()=>print("---NOTHERE---"));
-  }
-
   L('INTERPRET_END');
 
   ////////////////////////////////////////
@@ -1048,17 +1009,17 @@ L('interpret'); // A has our word
   //def('M*'); { // b15 zp
   if (0) {
     TAX(),BEQ('NEXT');
-    PLA(),STAA(0);
+    PLA(),STAZ(0);
 
    L('_*');
     DEX();
     BEQ('NEXT');
     CLC();
-    ADCA(0);
+    ADCZ(0);
     JMPA('_*');
   }
 
-  def('*'); { // b19 avg c73 c26-172
+  def('*'); { // b21 avg c73 c26-172
     // TODO: remove
     TRACE(()=>{
       if (!tracecyc) return;
@@ -1084,24 +1045,15 @@ L('interpret'); // A has our word
     CLC(),ROLZ(1); // asl?
     BNE('_*N')
   }
-
   L('_*done');
-  // TODO: remove
-  TRACE(()=>{
-    if (!tracecyc) return;
-    print('MUL.c: ', cpu.state().cycles-savcyc);
-  });
 
-  // TODO: JMPA('dex_txs');
-  //        /get stack ptr                    /drop one
-  def('+'); TSX(),CLC(),ADCAX(S+1),           INX(),TXS(); // b7 c12 : TOS in A winner!
-  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),INX(),TXS(); // haha CLC,NOT==M-A
-  def('&'); TSX(),      ANDAX(S+1),           INX(),TXS();
+  def('+'); TSX(),CLC(),ADCAX(S+1),  INX(),TXS();
+  def('-'); TSX(),CLC(),SBCAX(S+1),EORN(0xff),INX(),TXS();
+  def('&'); TSX(),      ANDAX(S+1),  INX(),TXS();
   // actually not symbol (32-64)
-  def('|'); TSX(),      ORAAX(S+1),           INX(),TXS();
-  def('^'); TSX(),      EORAX(S+1),           INX(),TXS();
-
-  def('~'); EORN(0xff)                                     // WINNER!
+  def('|'); TSX(),      ORAAX(S+1),  INX(),TXS();
+  def('^'); TSX(),      EORAX(S+1),  INX(),TXS();
+  def('~'); EORN(0xff);
 
   def('.'); STYZ('tmp'),LDYN(0),JSRA(putd),LDYZ('tmp'),PLA();
 
@@ -1146,8 +1098,6 @@ L('interpret'); // A has our word
     next();
   }
 
-  // TODO: 10(i.) => 10,9,8,7,6,5..1 lol
-  // should start w 9 and exit?
   def('('); { // ( 
     LDXN(1); // means skip one ')'
     CMPN(0),BNE('_('); {
@@ -1167,20 +1117,13 @@ L('interpret'); // A has our word
   }
   def(')'); {
     LDXZ('rp');
-    // TODO: dec! then no DECAX below
-    // also SBC above can be removed!
     DECAX(S+1); // get count to TOS
-    //TRACE(()=>print('  ) '));
     BNE(')_repeat');
-    // ready to unroll and leave!
-    //R_DROP(),R_DROP(); // b6 c10
+    // end loop - ready to unroll and leave!
     INX(),INX(),STXZ('rp'); // b5 c7
-    // this will pass ')'
-    //TRACE(()=>print('  )leave '));
     next();
     // restore "ip" to beginning of loop
   L(')_repeat');
-    //TRACE(()=>print('  )repeat '));
     LDYAX(S+2);
   }
 
@@ -1218,11 +1161,6 @@ L('interpret'); // A has our word
     } INCZ('rp'); // 1b less than INX,STX
   }
 
-  def(','); { L('OP_,_tail');
-    LDXN(0),STAXI('here'),
-    INCZ('here'),BNE('_,'),INCZ('here',inc),L('_,');
-  }
-
   L('SYMS_END'); syms_defs = def.count - syms_defs;
 
 
@@ -1252,11 +1190,6 @@ L('interpret'); // A has our word
   //def('G'); JSRA('ENTER'); // lol
   //string('Rsrs');
 
-  def('a'); { L('allot');
-    CLC(),ADCZ('here'),
-    BNE('_a'),INCZ('here',inc),L('_a');
-  }
-
   def('d'); PHA();
   def('\\'); PLA();
   def('o'); PHA(),TSX(),LDAAX(S+2);
@@ -1277,13 +1210,9 @@ L('interpret'); // A has our word
   } LDYZ(0),PLA();
 
   def('q', ''); JMPA('quit');
+  //def('y'); PHA(),TYA();
 
-  def('h'); PHA(),LDAZ('here',inc),PHA(),LDAZ('here');
-  def('y'); PHA(),TYA();
-
-  //def('l'); PHA(),LDAAX('latest');
-
-  // TODO: 
+  // TODO: ] - exit
   def(']'); { // b37 (was 44!)
     // drop n items from rstack
     TAX(),BEQ('_].end'); // 0 == NOP
@@ -1292,9 +1221,6 @@ L('interpret'); // A has our word
     INY();
    L('_].skip');
     LDAIY('base');
-    // TODO: nesting of {{{
-    // TODO: handle ".(.."
-
     // ';' - TODO: EXIT (to local sub?)
     // TODO: not working now remove?
     CMPN(ord(';')),BNE('_;_nomid');
@@ -1324,89 +1250,31 @@ L('interpret'); // A has our word
    L('_].end');
     PLA(); // set TOS
   }
-
-  //def('N'); TSX(),ANDAX(S+2),EORN(0xff);
-
   def('n'); CLC(),SBCN(0),EORN(255);
   def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
   def('e'); JSRA(putc),PLA();
 
-  // TODO:
-  //   xx execute  \_____ could be same!
-  //   xe eval     /      if it's an address
-  //  (xs jsr w regs)
-  //  (xa jmp w regs)
-  //  (xr rts)
-  //
-  // Representation:
-  // - two bytes
-  // - one letter ( < 127 )
-  // - two letters ??? alloc string? (waste)
-  //   use constant string in zp > 128 (3 bytes)
-  //   or use input buffer, or here!
-  //   (here is safe! for one 'word')
-  // - address of string ( > 127 )
-  // - address of machine code/word? from table?
-  //   (see possible?) (
-  // - need to know if should interpret or run
-  // - strings need to be zero terminated?
-  //   (or copy and change ending ""' to 0)
-  // - strings can come from:
-  //    + inline words (with no 0 terminator...)
-  //    + constructed w allot \0
-  //    + be a char (< 127)
-  //      (this disallows any string in lower ZP)
-  //    + be malloced
-  //    + be a user defined word (string) \0
-  //    + be a { ..  } expression
-  //
-  // TODO: problem constant string;
-  // no zero terminator!
-  // 0. only allow {} type strings; end at '}'
-  // 1. actually change it to a 0 (ROM?)
-  // 2..modify pointer to that Y wraps around
-  //    after INC, if 0 then exit? Use this!
-  //    Move back so ending " is a Y=0
-  //    and have getnext exit in such case.
-  //    Basically set Y=255-len, base-=len
-  // 
-  def('x'); TAX(),PLA(),JMPA('interpret');
-
-  //def('S'); TSX(),TXA();
-
-
   // -- printers and formatters
   def(10); // do not interpret NL as number! lol
   def('`', ''); JMPA('printval');
-
   // 0=
   def('z'); TSX(),CMPN(0),CMPAX(S);
-  //  def('z'); CMPN(0),LDAN(0),SBCN(0);
-
-  if (0) {
-  def('T'); { // Timing for debugging
-    PHA();
-    NOP();
-    TRACE(()=>{
-      let c = cpu.state().cycles;
-      princ('\n----- (cycles:'+c+')\n');
-      cpu.reg('cycles', 0);
-    });
-    NOP();
-    PLA();
-  }
-  }
 
   enddef();
 
 L('ALFA_END'); alfa_defs = def.count - alfa_defs;
   // fallthrough
 
+
+
+
   ////////////////////////////////////////
   // more special test, or fallbacks
 
-  //  CPXN(31),BCS('number?');
-  //JMPA('printcontrol');
+
+
+
+
 
 L('NUMBER_BEGIN');
  if (table_next) {
@@ -1456,6 +1324,9 @@ L('NUMBER_BEGIN');
 L('not_number');
 L('NUMBER_END');
 
+
+
+
 L('FIND_BEGIN');
   // TODO: make it more general
 
@@ -1489,6 +1360,8 @@ L('FIND_BEGIN');
   next();
 
 L('FIND_END');
+
+
 
 
 L('ENTER'); // b37 c61
@@ -1551,6 +1424,12 @@ L('TABLESPACE_END');
 
 L('FORTH_END');
 
+
+
+
+
+
+
 //   (to much growth: implement as word?)
 ////////////////////////////////////////
 // Extras (not core)
@@ -1581,22 +1460,15 @@ L('printval');
   } PLA();
   next();
 
-  // control codes, quote them!
-  if (0) {
-L('printcontrol');
-  PHA(),TYA(),PHA(); {
-    LDAN(ord('<')),JSRA(putc);
-    TXA(),LDYN(0),JSRA(putd);
-    LDAN(ord('>')),JSRA(putc);
-  }; PLA(),TAY(),PLA();
-  next();
-}
 L('XTRAS_END');
   
 ////////////////////////////////////////
-// Emacs
+// EDITOR
 
 L('EDIT_BEGIN');
+
+
+
 
 L('OP_Run');
   TRACE(()=>{
@@ -1613,6 +1485,9 @@ L('OP_Run');
   // stack is lost etc, only memory remain!
   TRACE(()=>princ(ansi.hide()));
   JMPA('FORTH_BEGIN');
+
+
+
 
 L('OP_List');
   //TRACE(()=>princ(ansi.cursorSave()));
@@ -1638,6 +1513,7 @@ L('OP_List');
   TRACE(()=>princ(ansi.show()));
   JMPA('edit_next');
   // TODO: FALLTHROUGH!
+
 
 L('OP_BackSpace');
   // nothing to delete?
@@ -1668,6 +1544,7 @@ L('OP_BackSpace');
   DEY();
 
   RTS();
+
 
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
@@ -1728,28 +1605,13 @@ L('edit_next');
     //cpu.dump(S, 256/8, 8, 1);
   });
 
-  // FREE: Custom Xxtra
-  //   Wkillregion Zleep
-  //   Quote Urepeat
-  //   Oinsertnl
   cmd('^R', 'OP_Run');
   cmd('^L', 'OP_List');
   //cmd('^T', 'OP_Trace');
   //cmd('^J', 'OP_RunLine');
-  //cmd('^S', 'OP_SearchWord');
-  //cmd('^R', 'OP_SearchRef');
 
   cmd(0x7f, 'OP_BackSpace');
   cmd('^H', 'OP_BackSpace');
-  cmd('^F'); L('e+'),INY(),BEQ('e-');
-    TRACE(()=>princ(ansi.forward())); NOP();
-  cmd('^B'); L('e-'),DEY(),BEQ('e+');
-    TRACE(()=>princ(ansi.back())); NOP();
-  cmd('^A'); LDYZ('line_pos');
-    TRACE(()=>princ(chr(10))); // TODO: no cheat
-  cmd('^E'); LDYZ('eol_pos');
-  cmd('^V', ''); LDYZ('end_pos'),JMPA('edit_redisplay');
-  cmd('^G', ''); TYA(),CLC(),ROR(),TAY(),INY(),JMPA('edit_redisplay');
   endcmd();
 
 L('insert');
@@ -1762,22 +1624,9 @@ L('insert');
   JSRA(putc);
 
   INCZ('end_pos'); // add one to count
- L('_insert');
-  // "swap" char to insert and current
-  STAZ(0),       LDAIY('base'),
-  TAX(),         LDAZ(0),
-  STAIY('base'), TXA();
+  STAIY('base');
+  INY();
 
-  INY();
-  CPYZ('end_pos'),BNE('_insert');
-  
-  LDYZ('edit_pos');
-  INY();
-  INY();
-  CPYZ('end_pos'),BCC('_insert.end');
-  RTS();
- L('_insert.end');
-  DEY();
   RTS();
 
   // TODO: can we be in vt100 insert char mode?
@@ -1805,6 +1654,7 @@ L('insert');
     Y: cpu.reg('y'),
     edit_pos: m[jasm.getLabels().edit_pos]})));
   NOP();
+
   L('_display.nopos');
 
   // need CR NL
@@ -1838,128 +1688,15 @@ L('insert');
   // (to keep display bytes correct)
 L('EDIT_END');
 
-////////////////////////////////////////
-// High-Level words go here
-L('WORDS_BEGIN');
-
-  // Problem solved! Longwords must start
-  // with a Capital Letter! LOL
-  // Problems remain:
-  // 1. how to distinguish longwords and Uppercase
-  //    lol
-  // Solves few problems
-  // 1. How to identify it's a longword
-  // 2. 'space' terminates it.
-  //     OrAnotherLongWord???
-  // 3. assign to that one letter!
-  //    (maybe only if there is one letter?)
-  // 4. give error if duplicate first letter?
-  // 5. Does it even need to be in linked list?
-  // 6. maybe only if >1 letter
-  // TODO: not correct patching
-  //WORD('Ones', 0, '1 1 1 1 1.....');
-  //WORD('Duper', 0, 'dd');
-  //WORD('Peek', 0, 'd.');
-
-L('WORDS_END');
-
 L('resultColor'); string(amber);
 L('colorOff'); string(off());
 L('hide'); string(ansi.hide());
 L('show'); string(ansi.show());
 
-
-//              This must be LAST!
-//
-//                   WARNING:
-//
-//      any code after will be overwritten
-L('INITIAL_HERE');
-} // F8rth
-
-////////////////////////////////////////
-// word functions
-
-// define a high level word
-// at "pre-process time" (macro)
-// Usage:
-//   CREATE('square', 0, 'd*');
-// Returns start address
-var latest = 0, firstUppersAddress = 0;
-function WORD(name, imm, prog, datas=[], qsize=0) {
-  if (!!prog.match(/:/) !== !!prog.match(/;/))
-    throw `%% WORD: '${word}' must either use : and ; or neither`;
-  if (name[0].toUpperCase() !== name[0])
-    throw `%% WORD: Name '${name}' must start with uppercase`;
-
-  let addr = jasm.address();
-
-  // S(ingleletteruppercase)
-  // - can use offset table A-Z if all defs
-  //   fitst in 256 bytes
-  //
-  // TODO: how about [`{\\}] hmmmm
-  if ((name.length === 1) && !imm && !datas && !qsize) {
-    if (!firstUppersAddress) {
-      firstUppersAddress = a;
-    }
-
-//TODO: fix    
-    // patch table
-    let index = ord(name);
-    index ^= 0x20; // flip 00x0 0000
-   ORG(jasm.getLabels().DISPATCH + index);
-    byte(addr - firstUpperAddress);
-
-    // store string
-   ORG(addr);
-    stringz(prog);
-
-    if (jasm.address() >= firstUppersAddress+255)
-      throw `%% WORD: '${word}' doesn't fit in 255 bytes block`;
-    
-    return;
-  }
-
-  let lab = gensym('WORD_cod_'+name);
-
-  // link
-  word(latest);
-  // imm / flags
-  byte(imm);
-  // cod
-  byte(lab, a=>a-addr);
-  // name
-  hibit(name); // TODO?
-  // dataset
-  // (TODO: how to find it?)
-  datas.forEach(x=>data(x));
-  // program
- L(lab);
-  string(prog);
-  // circular queue/buffer
-  // (TODO: howto find it?)
-  allot(qsize);
-  
-  let len = jasm.address() - addr;
-  if (len > 256)
-    throw `%% WORD: '${name}' bigger than 256 bytes: ${len}`;
-
-  latest = jasm.address();
-} 
-
-// patch in last word
-ORG('latest');
-  word(latest);
-
-ORG(jasm.getLabels().upbase);
-  word(firstUppersAddress);
+}  // F8rth
 
 
-// generates 6502 code for create
-function create() {
-  
-}
+
 
 ////////////////////////////////////////
 // Generic Library
@@ -2006,6 +1743,9 @@ function TRACE(f) {
     print(' >>> ', ...r);
   });
 }
+
+
+
 
 ////////////////////////////////////////
 // RUN
@@ -2071,11 +1811,9 @@ prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
 prsize(" ALIGN:", l.DISPATCH-l.TABLESPACE);
 prsize(" TABLE:", l.TABLESPACE_END-l.DISPATCH);
 print();
-prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
 prsize(" displ:", l.EDIT_END-l.display);
-prsize("WORDS :", l.WORDS_END-l.WORDS_BEGIN);
 prsize("TOTAL :", jasm.address()-start);
 
 
