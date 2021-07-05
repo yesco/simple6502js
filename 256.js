@@ -688,8 +688,8 @@ L('FORTH');
     LDAN('BRK_NEXT', hi),STAA(cpu.consts().IRQ, inc);
   }
 
-  LDAN('FORTH', lo),STAA(cpu.consts().RESET);
-  LDAN('FORTH', hi),STAA(cpu.consts().RESET, inc);
+//  LDAN('FORTH', lo),STAA(cpu.consts().RESET);
+//  LDAN('FORTH', hi),STAA(cpu.consts().RESET, inc);
 
 L('quit');
   // clear return stack
