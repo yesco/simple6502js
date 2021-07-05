@@ -720,10 +720,9 @@ L('edit2');
   JMPA('edit');
 
 
-
-
   //  9.6 cycles / enter-exit saved w noECHO
   // 55.6 cycles / enter-exit saved w ECHO
+if (0) {
 L('EXIT'); // c52
 
   // not valid anymore
@@ -747,9 +746,9 @@ L('EXIT'); // c52
   //TRACE(()=>print());
   JMPA('NEXT'); // save 3 cycles
   L('EXIT_END');
+}
 
-
-
+  // TODO: what is this?
   DEY(),LDXN(state_edit+state_display),STAZ('state');
 
   // terminal debug help
@@ -829,7 +828,7 @@ L('NEXT');
   if (table_next) { // b16 c29
     PHA(); {
       INY(),LDAIY('base');
-      BEQ('EXIT'); // c2+1 // TODO: remove?
+//      BEQ('EXIT'); // c2+1 // TODO: remove?
       TAX();
       ASL();
       STAA('jmp', a=>a+1);
@@ -845,7 +844,7 @@ L('NEXT');
 
     PHA(); { // b5 c14
       LDAIY('base'); // c5+
-      BEQ('EXIT'); // c2+1
+//      BEQ('EXIT'); // c2+1
       TAX(); // c2
     } PLA();
 
@@ -906,8 +905,6 @@ L('interpret'); // A has our word
 
   // -- "interpretation" or running
 
-  L('INTERPRET_END');
-
   // symbols "out of place"
 
   def('\\'); PLA();
@@ -925,8 +922,9 @@ L('interpret'); // A has our word
     // ';' - TODO: EXIT (to local sub?)
     // TODO: not working now remove?
     CMPN(ord(';')),BNE('_;_nomid');
-      JMPA('EXIT');
-      //JMPA('_;_mid');
+    // JMPA('EXIT');
+    // local fun 'exit'
+    JMPA('_;_mid');
     L('_;_nomid');
 
     // skip inline backtick value (could be any)
@@ -955,6 +953,7 @@ L('interpret'); // A has our word
   // -- printers and formatters
   def(10); // do not interpret NL as number! lol
   def('`', ''); JMPA('printval');
+  def(0, 'edit2');
 
   // TODO: ???
   //def('D', ''); JSRA('ENTER'); string('d9+.');
@@ -965,6 +964,7 @@ L('interpret'); // A has our word
   //def('G'); JSRA('ENTER'); // lol
   //string('Rsrs');
 
+  L('INTERPRET_END');
 
 
   ////////////////////////////////////////
@@ -1289,9 +1289,9 @@ L('FIND_BEGIN');
 
 L('FIND_END');
 
+if (0) {
 
-
-
+// TODO: only used by JSR('ENTER'); for inline...
 L('ENTER'); // b37 c61
   // since R stack is different than callstack
   // (and we're arriving on data stack!)
@@ -1319,6 +1319,7 @@ L('ENTER'); // b37 c61
   } LDAZ(0); // restore TOS
   JMPA('NEXT'); // save some cycles
 L('ENTER_END');
+}
 
 L('QUESTION');
   // get next // b7 c17
@@ -1703,10 +1704,10 @@ function prsize(nam, len, more) {
 }
 prsize("FORTH :", l.FORTH_END-l.FORTH);
 prsize(" INIT :", l.FORTH_INIT_END-l.FORTH);
-prsize(" NEXT :", l.NEXT_END-l.NEXT);
-prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" ENTR :", l.ENTER_END-l.ENTER);
 prsize(" EXIT :", l.EXIT_END-l.EXIT);
+prsize(" NEXT :", l.NEXT_END-l.NEXT);
+prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
