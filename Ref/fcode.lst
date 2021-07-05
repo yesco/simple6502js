@@ -1,0 +1,3571 @@
+(https://docs.oracle.com/cd/E19957-01/802-3239-10/appref.html)
+
+A FCode Reference
+
+
+FCode Primitives
+This appendix contains three lists:
+
+FCodes sorted according to functional group
+FCodes sorted by byte value
+FCodes sorted alphabetically by name
+FCodes by Function
+The following tables describe FCodes currently supported by OpenBoot. Both the FCode token values and Forth names are included. A token value entry of CR indicates a tokenizer-generated sequence, while - indicates that no FCode is generated.
+
+Table A-1 Stack Manipulation
+
+-------------------------------------------------------------------------------------------------------------------
+
+                                                                
+Value  Function  Stack                                          Description
+-------------------------------------------------------------------------------------------------------------------
+
+                                                                
+51     depth     ( -- u )                                       How many items on stack?
+                                                                
+46     drop      ( x -- )                                       Removes x from the stack
+                                                                
+52     2drop     ( x1 x2 -- )                                   Removes 2 items from stack
+                                                                
+CR     3drop     ( x1 x2 x3 -- )                                Removes 3 items from stack
+                                                                
+47     dup       ( x -- x x )                                   Duplicates x
+                                                                
+53     2dup      ( x1 x2 --  x1 x2  x1 x2 )                     Duplicates 2 stack items
+                                                                
+CR     3dup      ( x1 x2 x3 -- x1 x2 x3 x1 x2 x3 )              Copies top 3 stack items
+                                                                
+50     ?dup      ( x -- 0 | x x)                                Duplicates x if it is non-zero
+                                                                
+4D     nip       ( x1 x2 -- x2 )                                Discards the second stack item
+                                                                
+48     over      ( x1 x2 -- x1 x2 x1 )                          Copies second stack item to top of stack
+                                                                
+54     2over     ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 )           Copies 2 stack items
+                                                                
+4E     pick      ( xu ... x1 x0 u -- xu ... x1 x0 xu )          Copies u-th stack item
+                                                                
+30     >r         ( x -- ) ( R: -- x)                            Moves a stack item to the return stack
+                                                                
+31     r'>       ( -- x ) ( R: x -- )                           Moves  item from return stack to data stack
+                                                                
+32     r@        ( -- x ) ( R: x -- x )                         Copies the top of the return stack to the data stack
+                                                                
+4F     roll      ( xu ... x1 x0 u -- xu-1 ... x1 x0 xu )        Rotates u stack items
+                                                                
+4A     rot       ( x1 x2 x3 -- x2 x3 x1 )                       Rotates 3 stack items
+                                                                
+4B     -rot      ( x1 x2 x3 -- x3 x1 x2 )                       Shuffles top 3 stack items
+                                                                
+56     2rot      ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 )     Rotates 3 pairs of stack items
+                                                                
+49     swap      ( x1 x2 -- x2 x1 )                             Exchanges the top 2 stack items
+                                                                
+55     2swap     ( x1 x2 x3 x4 -- x3 x4 x1 x2 )                 Exchanges 2 pairs of stack items
+                                                                
+4C     tuck      ( x1 x2 -- x2 x1 x2 )                          Copies the top stack item below the second item
+
+-------------------------------------------------------------------------------------------------------------------
+
+Table A-2 Arithmetic Operations
+
+--------------------------------------------------------------------------------------------------------------------
+
+                                                
+Value  Function  Stack                          Description
+--------------------------------------------------------------------------------------------------------------------
+
+                                                
+20     *         ( nu1 nu2 -- prod )            Multiplies nu1 times nu2
+                                                
+1E     +         ( nu1 nu2 -- sum )             Adds nu1+nu2
+                                                
+1F     -         ( nu1 nu2 -- diff )            Subtracts nu1-nx2
+                                                
+21     /         ( n1 n2 -- quot )              Divides n1/n2
+                                                
+CR     1+        ( nu1 -- nu2 )                 Adds one
+                                                
+CR     1-        ( nu1 -- nu2 )                 Subtracts one
+                                                
+CR     2+        ( nu1 -- nu2 )                 Adds 2
+                                                
+CR     2-        ( nu1 -- nu2 )                 Subtracts 2
+                                                
+59     2*        ( x1 -- x2 )                   Multiplies by 2
+                                                
+57     2/        ( x1 -- x2 )                   Divides by 2
+                                                
+27     lshift    ( x1 u -- x2 )                 Left shifts x1 by u places
+                                                
+28     rshift    ( x1 u -- x2 )                 Right shifts x1 by u places
+                                                
+CR     <<a         ( n1 u -- n2 )                 Arithmetic left shifts (same as lshift)
+                                                
+29     >a         ( x1 u -- x2 )                 Arithmetic right shifts n1 by u places
+                                                
+2D     abs       ( n -- u )                     Absolute value
+                                                
+AE     aligne    ( n1 -- n1|a-addr )            Adjusts an address to a machine word boundary
+       d                                                                                                               
+                                                
+23     and       ( x1 x2 -- x3 )                Logical and
+                                                
+AC     bounds    ( n cnt -- n+cnt n )           Converts start,len to end,start for do loop
+                                                
+2F     max       ( n1 n2 -- n1|n2 )             n3 is maximum of n1 and n2
+                                                
+2E     min       ( n1 n2 -- n1|n2 )             n3 is minimum of n1 and n2
+                                                
+22     mod       ( n1 n2 -- rem )               Remainder of n1/n2
+                                                
+CR     */mod     ( n1 n2 n3 -- rem quot )       Remainder, quotient of n1*n2/n3
+                                                
+2A     /mod      ( n1 n2 -- rem quot )          Remainder, quotient of n1/n2
+                                                
+2C     negate    ( n1 -- n2 )                   Changes the sign of n1
+                                                
+26     invert    ( x1 -- x2 )                   One's complement
+                                                
+CR     not       ( x1 -- x2 )                   Synonym for invert
+                                                
+24     or        ( x1 x2 -- x3 )                Logical or
+                                                
+2B     u/mod     ( u1 u2 -- urem uquot )        Unsigned 32-bit divide of u1/u2
+                                                
+58     u2/       ( x1 -- x2 )                   Logical right shifts 1 bit
+                                                
+25     xor       ( x1 x2 -- x3 )                Exclusive or
+                                                
+D4     um*       ( u1 u2 -- ud.prod )           Multiplies two unsigned quadlets, yields an unsigned 64-bit 
+                                                product.  
+                                                
+D5     um/mod    ( ud u -- urem uquot )         Divides an unsigned 64-bit number by an unsigned quadlet, yields a 
+                                                32-bit remainder and quotient  
+                                                
+D8     d+        ( d1 d2 --d.sum )              Adds two 64-bit numbers  
+                                                
+D9     d-        ( d1 d2 -- d.diff )            Subtracts two 64-bit numbers  
+
+--------------------------------------------------------------------------------------------------------------------
+
+Table A-3 Memory Operations
+
+-----------------------------------------------------------------------------------------------------------------
+
+                                                
+Value  Function  Stack                          Description
+-----------------------------------------------------------------------------------------------------------------
+
+                                                
+72     !         ( x a-addr -- )                Stores a number into the variable at a-addr
+                                                
+6C     +!        ( nu a-addr -- )               Adds nu to the number stored in the variable at a-addr
+                                                
+77     2!        ( x1 x2 a-addr -- )            Stores 2 numbers at a-addr; x2 at lower address
+                                                
+76     2@        ( a-addr -- x1 x2 )            Fetches 2 numbers from a-addr; x2 from lower address
+                                                
+6D     @         ( a-addr -- x )                Fetches a number from the variable at a-addr
+                                                
+CR     ?         ( a-addr  -- )                 Displays the  number at a-addr
+                                                
+75     c!        ( byte addr -- )               Stores low byte of n at addr
+                                                
+71     c@        ( addr -- byte )               Fetches a byte from addr
+                                                
+CR     blank     ( addr len -- )                Sets len bytes of memory to ASCII space, starting at addr
+                                                
+7A     comp      ( addr1 addr2 len -- n )       Compares two byte arrays including case.  n=0 if same
+                                                
+CR     erase     ( addr len -- )                Sets len bytes of memory to zero, starting at addr
+                                                
+79     fill      ( addr len byte -- )           Sets len bytes of memory to value byte
+                                                
+0228   lbflip    ( qaddr len -- )               Reverses bytes within each quadlet in given region
+       s                                                                                                            
+                                                
+0237   lwflip    ( qaddr len -- )               Exchanges doublets within quadlets in qaddr len  
+       s                                                                                                            
+                                                
+73     l!        ( quad qaddr -- )              Stores the quadlet at qaddr, must be 32-bit aligned
+                                                
+6E     l@        ( qaddr -- quad )              Fetches the quadlet at qaddr, must be 32-bit aligned
+                                                
+78     move      ( src-addr dest-addr len -- )  Copies len bytes from src-addr to dest-addr, handles overlap 
+                                                correctly.
+                                                
+6B     off       ( a-addr -- )                  Stores false  (32-bit 0)  at a-addr
+                                                
+6A     on        ( a-addr -- )                  Stores true  (32-bit -1)  at a-addr
+                                                
+0236   wbflip    ( waddr len -- )               Exchanges bytes within doublets in the specified region  
+       s                                                                                                            
+                                                
+74     w!        ( w waddr -- )                 Stores a doublet at waddr, must be 16-bit aligned
+                                                
+6F     w@        ( waddr -- w )                 Fetches the unsigned doublet at waddr, must be 16-bit aligned
+                                                
+70     <w@        ( waddr -- n )                 Fetches the signed doublet at waddr, must be 16-bit aligned
+
+-----------------------------------------------------------------------------------------------------------------
+
+Table A-4 Atomic Access
+
+-------------------------------------------------------------------------------------------------
+
+                                        
+Value  Function  Stack                  Description
+-------------------------------------------------------------------------------------------------
+
+                                        
+0230   rb@       ( addr -- byte )       Reads the 8-bit value at the given address, atomically  
+                                        
+0231   rb!       ( byte  addr -- )      Writes the 8-bit value at the given address, atomically  
+                                        
+0232   rw@       ( waddr -- w )         Reads the doublet at the given address, atomically  
+                                        
+0233   rw!       ( w waddr -- )         Writes the doublet at the given address, atomically  
+                                        
+0234   rl@       ( qaddr -- quad )      Reads the quadlet at the given address, atomically  
+                                        
+0235   rl!       ( quad qaddr -- )      Writes the quadlet at the given address, atomically  
+
+-------------------------------------------------------------------------------------------------
+
+Table A-5 Data Exception Tests
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+                                                      
+Value  Function  Stack                                Description
+-----------------------------------------------------------------------------------------------------------------------------
+
+                                                      
+0220   cpeek     ( addr -- false | byte  true )       Reads 8-bit value at given address, returns false if unsuccessful  
+                                                      
+0221   wpeek     ( waddr -- false | w true )          Reads doublet at given address, returns false if unsuccessful  
+                                                      
+0222   lpeek     ( qaddr -- false | quad true )       Reads quadlet at given address, returns false if unsuccessful  
+                                                      
+0223   cpoke     ( byte  addr --  okay? )             Writes 8-bit value at given address, returns false if unsuccessful  
+                                                      
+0224   wpoke     ( w waddr --  okay? )                Writes doublet at given address, returns false if unsuccessful  
+                                                      
+0225   lpoke     ( quad qaddr --  okay? )             Writes quadlet at given address, returns false if unsuccessful  
+
+-----------------------------------------------------------------------------------------------------------------------------
+
+Table A-6 Comparison Operations
+
+---------------------------------------------------------------------------------------------
+
+                                                          
+Value  Function  Stack                                    Description
+---------------------------------------------------------------------------------------------
+
+                                                          
+36     0<         ( n -- less-than-0? )                    True if n < 0
+                                                          
+37     0<=        ( n -- less-or-equal-to-0? )             True if n <= 0
+                                                          
+35     0<'>       ( n -- not-equal-to-0? )                 True if n < 0
+                                                          
+34     0=        ( nulflag -- equal-to-0? )               True if n = 0, also inverts any flag
+                                                          
+38     0'>       ( n -- greater-than-0? )                 True if n  0
+                                                          
+39     0=        ( n -- greater-or-equal-to-0? )          True if n = 0
+<
+                                                          
+3A               ( n1 n2 -- less? )                       True if n1 < n2
+                                                          
+43     <=         ( n1 n2 -- less-or-equal? )              True if n1 <= n2
+                                                          
+3D     <'>        ( x1 x2 -- not-equal? )                  True if x1 < x2
+                                                          
+3C     =         ( x1 x2 -- equal? )                      True if x1 = x2
+>
+                                                          
+3B               ( n1 n2 -- greater? )                    True if n1  n2
+                                                          
+42     >=         ( n1 n2 -- greater-or-equal? )           True if n1 = n2
+                                                          
+44     between   ( n min max --  min<=n<=max? )             True if min <= n <= max
+                                                          
+CR     false     ( -- false )                             The value false
+                                                          
+CR     true      ( --  true )                             The value true
+                                                          
+40     u<         ( u1 u2 -- unsigned-less? )              True if u1 < u2, unsigned
+                                                          
+3F     u<=        ( u1 u2 -- unsigned-less-or-equal? )     True if u1 <= u2, unsigned
+                                                          
+3E     u'>       ( u1 u2 -- unsigned-greater? )           True if u1  u2, unsigned
+                                                          
+41     u=        ( u1 u2 -- unsigned-greater-or-equal? )  True if u1 = u2, unsigned
+                                                          
+45     within    ( n min max --  min<=n<max? )              True if min <= n < max
+
+---------------------------------------------------------------------------------------------
+
+Table A-7 Text Input
+
+---------------------------------------------------------------------------------------------------------------
+
+                                           
+Value  Function  Stack                     Description
+---------------------------------------------------------------------------------------------------------------
+
+                                           
+-      (         ( [text<) --)              Begins a comment (ignored)
+                                           
+-      \         ( -- )                    Ignore rest of line (comment)
+                                           
+CR     ascii     ( [text< ] -- char )       ASCII value of next character
+                                           
+CR     control   ( [text< ] -- char )       Interprets next character as ASCII control character
+                                           
+8E     key       ( -- char )               Reads a character from the keyboard
+                                           
+8D     key?      ( -- pressed? )           True if a key has been typed on the keyboard
+                                           
+CR     accept    ( addr len1 -- len2 )     Gets an edited input line, stores it at addr
+                                           
+8A     expect    ( addr len -- )           Gets a line of edited input from the keyboard; stores it at addr
+                                           
+88     span      ( -- a-addr )             Variable containing the number of characters read by expect
+
+---------------------------------------------------------------------------------------------------------------
+
+Table A-8 ASCII Constants
+
+------------------------------------------------------------------------------------------
+
+                               
+Value  Function  Stack         Description
+------------------------------------------------------------------------------------------
+
+                               
+AB     bell      ( -- 0x07 )   The ASCII code for the bell character; decimal 7
+                               
+A9     bl        ( -- 0x20 )   The ASCII code for the space character; decimal 32
+                               
+AA     bs        ( -- 0x08 )   The ASCII code for the backspace character; decimal 8
+                               
+CR     carret    ( -- 0x0D )   The ASCII code for the carriage return character; decimal 13
+                               
+CR     linefeed  ( -- 0x0A )   The ASCII code for the linefeed character; decimal 10
+                               
+CR     newline   ( -- n )      The ASCII code for the newline character; decimal 10
+
+------------------------------------------------------------------------------------------
+
+Table A-9 Numeric Input
+
+-------------------------------------------------------------------------------------
+
+                                      
+Value  Function  Stack                Description
+-------------------------------------------------------------------------------------
+
+                                      
+A4     -1        ( -- -1 )            Constant -1
+                                      
+A5     0         ( -- 0 )             Constant 0
+                                      
+A6     1         ( -- 1 )             Constant 1
+                                      
+A7     2         ( -- 2 )             Constant 2
+                                      
+A8     3         ( -- 3 )             Constant 3
+                                      
+CR     d#        ( [number< ] -- n )   Interprets next number in decimal
+                                      
+-      decimal   ( -- )               If outside definition, input text in decimal
+                                      
+CR     h#        ( [number< ] -- n )   Interprets next number in hexadecimal
+                                      
+-      hex       ( -- )               If outside definition, input text in hexadecimal
+                                      
+CR     o#        ( [number< ] -- n )   Interprets next number in octal
+                                      
+-      octal     ( -- )               If outside definition, input text in octal
+
+-------------------------------------------------------------------------------------
+
+Table A-10 Numeric Primitives
+
+------------------------------------------------------------------------------------------------------------------
+
+                                                           
+Value  Function  Stack                                     Description
+------------------------------------------------------------------------------------------------------------------
+
+                                                           
+99     u#        ( u1 -- u2 )                              Converts a digit in pictured numeric output
+                                                           
+97     u#'>      ( u -- str len )                          Ends pictured numeric output
+                                                           
+96     <#         ( -- )                                    Initializes pictured numeric output
+                                                           
+C7     #         ( ud1 -- ud2 )                            Converts a digit in pictured numeric output 
+                                                           conversion
+                                                           
+C9     #'>       ( ud -- str len )                         Ends pictured numeric output conversion
+                                                           
+A0     base      ( -- a-addr )                             Variable containing number base
+                                                           
+A3     digit     ( char base -- digit true | char false )  Converts a character to a digit
+                                                           
+95     hold      ( char -- )                               Inserts the char in the pictured numeric output string
+                                                           
+C8     #s        ( ud -- 0 0 )                             Converts remaining digits in pictured numeric 
+                                                           output
+                                                           
+9A     u#s       ( u1 -- u2 )                              Converts rest of the digits in pictured numeric output
+                                                           
+98     sign      ( n -- )                                  Sets sign of pictured output
+                                                           
+A2     $numbe    ( addr len -- true | n false )            Converts a string to a number  
+       r                                                                                                             
+
+------------------------------------------------------------------------------------------------------------------
+
+Table A-11 Numeric Output
+
+---------------------------------------------------------------------------------
+
+                                  
+Value  Function  Stack            Description
+---------------------------------------------------------------------------------
+
+                                  
+9D     .         ( nu -- )        Displays a number
+                                  
+CR     .d        ( n -- )         Displays number in decimal
+                                  
+CR     decimal   ( -- )           If inside definition, output  in decimal
+                                  
+CR     .h        ( n -- )         Displays number in hexadecimal
+                                  
+CR     hex       ( -- )           If inside definition, output in hexadecimal
+                                  
+CR     octal     ( -- )           If inside definition, output  in octal
+                                  
+9E     .r        ( n size -- )    Displays a number in a fixed width field
+                                  
+9F     .s        ( ... -- ... )   Displays the contents of the data stack
+                                  
+CR     s.        ( n -- )         Displays n as a signed number
+                                  
+9B     u.        ( u -- )         Displays an unsigned number
+                                  
+9C     u.r       ( u size -- )    Prints an unsigned number in a fixed width field
+
+---------------------------------------------------------------------------------
+
+Table A-12 General-purpose Output
+
+---------------------------------------------------------------------------------
+
+                                            
+Value  Function  Stack                      Description
+---------------------------------------------------------------------------------
+
+                                            
+CR     .(        ( [text<)] -- )             Displays a string now
+                                            
+91     (cr       ( -- )                     Outputs ASCII CR character; decimal 13
+                                            
+92     cr        ( -- )                     Starts a new line of display output
+                                            
+8F     emit      ( char -- )                Displays the character
+                                            
+CR     space     ( -- )                     Outputs a single space character
+                                            
+CR     spaces    ( cnt -- )                 Outputs cnt spaces
+                                            
+90     type      ( text-str text-len -- )   Displays n characters
+
+---------------------------------------------------------------------------------
+
+Table A-13 Formatted Output
+
+-----------------------------------------------------------------------------------------
+
+                                   
+Value  Function  Stack             Description
+-----------------------------------------------------------------------------------------
+
+                                   
+94     #line     ( -- a-addr )     Variable holding the line number on the output device
+                                   
+93     #out      ( -- a-addr )     Variable holding the column number on the output device
+
+-----------------------------------------------------------------------------------------
+
+Table A-14 begin Loops
+
+-------------------------------------------------------------------------------------------------------
+
+                                                        
+Value  Function  Stack                                  Description
+-------------------------------------------------------------------------------------------------------
+
+                                                        
+CR     again     ( C: dest-sys -- )                     Ends begin...again (infinite) loop
+                                                        
+CR     begin     ( C: -- dest-sys ) ( -- )              Starts conditional loop
+                                                        
+CR     repeat    ( C: orig-sys dest-sys -- ) ( -- )     Returns to loop start
+                                                        
+CR     until     ( C: dest-sys -- ) ( done? -- )        If true, exits begin...until loop
+                                                        
+CR     while     ( C: dest-sys -- orig-sys dest-sys )   If true, continues begin...while...repeat loop, 
+                 ( continue? -- )                       else exits loop
+
+-------------------------------------------------------------------------------------------------------
+
+Table A-15 Conditionals
+
+----------------------------------------------------------------------------------------------------
+
+                                                       
+Value  Function  Stack                                 Description
+----------------------------------------------------------------------------------------------------
+
+                                                       
+CR     if        ( C: -- orig-sys ) ( do-next? -- )    If true, executes next FCode(s)
+                                                       
+CR     else      ( C: orig-sys1 -- orig-sys2 ) ( -- )  (optional) Executes next FCode(s) if if failed
+                                                       
+CR     then      ( C: orig-sys -- ) ( -- )             Terminates if...else...then
+
+----------------------------------------------------------------------------------------------------
+
+Table A-16 Case Statements
+
+---------------------------------------------------------------------------------------------------------
+
+                                                              
+Value  Function  Stack                                        Description
+---------------------------------------------------------------------------------------------------------
+
+                                                              
+CR     case      ( C: -- case-sys) ( sel -- sel )             Begins a case (multiple selection) statement
+                                                              
+CR     endcase   ( C: case-sys -- ) ( sel | <nothing -- )      Marks end of a case statement
+                                                              
+CR     of        ( C: case-sys1 -- case-sys2 of-sys )         Returns to loop start
+                                                                                                            
+                  ( sel of-val -- sel | <nothing )                                                           
+                                                              
+CR     endof     ( C: case-sys1 of-sys -- case-sys2 ) ( -- )  If true, exits begin...until loop
+
+---------------------------------------------------------------------------------------------------------
+
+Table A-17 do Loops
+
+---------------------------------------------------------------------------------------------------------------
+
+                                                     
+Value  Function  Stack                               Description
+---------------------------------------------------------------------------------------------------------------
+
+                                                     
+CR     do        ( C: -- dodest-sys )                Loops, index start to end-1 inclusive
+                                                                                                                  
+                  ( limit start -- ) (R: -- sys )                                                                 
+                                                     
+CR     ?do       ( C: -- dodest-sys )                Like do, but skips loop if end = start
+                                                                                                                  
+                  ( limit start -- ) ( R: -- sys  )                                                               
+                                                     
+19     i         ( -- index ) ( R: sys -- sys )      Returns current loop index value
+                                                     
+1A     j         ( --  index ) ( R: sys -- sys )     Returns value of  next outer loop index
+                                                     
+CR     leave     ( -- ) ( R: sys -- )                Exits do loop immediately
+                                                     
+CR     ?leave    ( exit? -- ) ( R: sys -- )          If flag is true, exits do loop
+                                                     
+CR     loop      ( C: dodest-sys -- ) ( -- )         Increments index, returns to do
+                                                                                                                  
+                  ( R: sys1 -- <nothing | sys2)                                                                    
+                                                     
+CR     +loop     ( C: dodest-sys -- ) ( delta -- )   Increments by n, returns to do.  If n<0, index start  to 
+                                                     end
+                  ( R: sys1 -- <nothing | sys2 )                                                                   
+                                                     
+89     unloop    ( -- ) ( R: sys -- )                Discards loop control parameters
+
+---------------------------------------------------------------------------------------------------------------
+
+Table A-18 Control Words
+
+------------------------------------------------------------------------------------------------
+
+                                      
+Value  Function  Stack                Description
+------------------------------------------------------------------------------------------------
+
+                                      
+1D     execute   ( ... xt -- ??? )    Executes the word whose compilation address is on the stack
+                                      
+33     exit      ( -- ) (R: sys -- )  Returns from the current word
+
+------------------------------------------------------------------------------------------------
+
+Table A-19 Strings
+
+------------------------------------------------------------------------------------------------------
+
+                                                         
+Value  Function     Stack                                Description
+------------------------------------------------------------------------------------------------------
+
+                                                         
+CR     "            ( [text<"< ] -- text-str text-len )    Collects a string
+                                                         
+CR     s"           ( [text<"] -- test-str text-len )     Gathers the immediately-following string
+                                                         
+84     count        ( pstr -- str len )                  Unpacks a packed string
+                                                         
+82     lcc          ( char1 -- char2 )                   Converts char to lower case
+                                                         
+83     pack         ( str len addr -- pstr )             Makes a packed string from addr len, 
+                                                         placing it at pstr
+                                                         
+81     upc          ( char1 -- char2 )                   Converts char to upper case
+                                                         
+0240   left-parse-  ( str len char                       Splits a string at the given delimiter (which 
+       string                                            is discarded) 
+                     -- R-str R-len L-str L-len )                                                        
+                                                         
+011B   parse-2int   ( str len  -- val.lo val.hi )        Converts a string into a physical address 
+                                                         and space  
+
+------------------------------------------------------------------------------------------------------
+
+Table A-20 Defining Words
+
+----------------------------------------------------------------------------------------------------
+
+                                                                   
+Value  Function    Stack                                           Description
+----------------------------------------------------------------------------------------------------
+
+                                                                   
+CR     : (colon)   ( -- )                                          Begins colon definition
+       name                                                                                            
+                                                                   
+CR     ;           ( -- )                                          Ends colon definition
+       (semicolon                                                                                      
+       )                                                                                               
+                                                                   
+-      alias       ( E: ... -- ???)                                Creates newname with behavior of 
+                                                                   oldname
+                   ( "new-name< old-name< " -- )                                                         
+                                                                   
+CR     buffer:     ( E: -- a-addr )                                Creates data array of size bytes
+                                                                                                       
+                   ( len "new-name< " -- )                                                              
+                                                                   
+CR     constant    ( E: -- x ) ( x "new-name< " -- )                Creates a constant 
+                                                                   
+CR     create      ( E: -- a-addr ) ( "new-name< " -- )             Generic defining word
+                                                                   
+CR     defer       ( E: ... -- ??? ) ( "new-name< " -- )            Execution vector (change with is)
+                                                                   
+CR     field       ( E: addr -- addr+offset ) ( offset size "new-  Creates a named offset pointer
+                   name< " -- offset+size )                                                             
+                                                                   
+C0     instance    ( -- )                                          Declare a data type to be local  
+                                                                   
+CR     struct      ( -- 0 )                                        Initializes for field creation
+                                                                   
+CR     variable    ( E: -- a-addr ) ( "new-name< "-- )              Creates a data variable
+                                                                   
+CR     value       ( E: -- x) ( x "new-name< "-- )                  Creates named value-type variable 
+                                                                   (change with is)
+
+----------------------------------------------------------------------------------------------------
+
+Table A-21 Dictionary Compilation
+
+--------------------------------------------------------------------------------------------
+
+                                             
+Value  Function  Stack                       Description
+--------------------------------------------------------------------------------------------
+
+                                             
+D3     ,         ( x -- )                    Places a number in the dictionary
+                                             
+D0     c,        ( byte -- )                 Places a byte in the dictionary
+                                             
+AD     here      ( -- addr )                 Address of top of dictionary
+                                             
+D2     l,        ( quad -- )                 Places a quadlet in the dictionary
+                                             
+D1     w,        ( w -- )                    Places a doublet in the dictionary
+                                             
+CR     allot     ( len -- )                  Allocates len bytes in the dictionary
+                                             
+CR     to        ( param [old-name< ]  -- )   Changes value in a defer word or a value
+                                             
+DD     compile   ( -- )                      Compiles following command at run time
+                                             
+DC     state     ( -- a-addr )               Variable containing true if in compilation state
+
+--------------------------------------------------------------------------------------------
+
+Table A-22 Dictionary Search
+
+----------------------------------------------------------------------------------------------------
+
+                                                          
+Value  Function  Stack                                    Description
+----------------------------------------------------------------------------------------------------
+
+                                                          
+CR     '         ( "old-name< " -- xt )                    Finds the word (while executing)
+                                                          
+CR     ['] name  ( -- xt )                                Finds word (while compiling)
+                                                          
+CB     $find     ( name-str name-len                      Finds a name in the dictionary
+                                                                                                       
+                  -- xt true | name-str name-len false )                                               
+                                                          
+CD     eval      ( ... str len -- ??? )                   Executes Forth commands within a string  
+                                                          
+CD     evaluate  ( ... str len -- ??? )                   Interprets Forth text from the given string
+
+----------------------------------------------------------------------------------------------------
+
+Table A-23 Conversion Operators
+
+--------------------------------------------------------------------------------------------
+
+                                                      
+Value  Function  Stack                                Description
+--------------------------------------------------------------------------------------------
+
+                                                      
+7F     bljoin    ( bl.lo b2 b3 b4.hi -- quad )        Joins four bytes to form a quadlet
+                                                      
+B0     bwjoin    ( b.lo b.hi -- w )                   Joins two bytes to form a doublet
+                                                      
+5A     /c        ( -- n )                             Address increment for a byte; 1
+                                                      
+-      /c*       ( nu1 -- nu2 )                       Synonym for chars
+                                                      
+66     chars     ( nu1 -- nu2 )                       Multiplies by /c
+                                                      
+5E     ca+       ( addr1 index -- addr2 )             Increments addr1 by index times /c
+                                                      
+CR     ca1+      ( addr1 -- addr2 )                   Synonym for chars+
+                                                      
+62     char+     ( addr1 -- addr2 )                   Increments addr1 by /c
+                                                      
+80     wbflip    ( w1 -- w2 )                         Swaps the bytes within a doublet
+                                                      
+5C     /l        ( -- n )                             Address increment for a quadlet;
+                                                      
+68     /l*       ( nu1 -- nu2 )                       Multiplies by /l
+                                                      
+60     la+       ( addr1 index -- addr2 )             Increments addr1 by index times /l
+                                                      
+64     la1+      ( addr1 -- addr2 )                   Increments addr1 by /l
+                                                      
+0227   lbflip    ( quad1 -- quad2 )                   Reverses the bytes within a quadlet
+                                                      
+7E     lbsplit   ( quad -- b.lo b2 b3 b4.hi )         Splits a quadlet into four bytes
+                                                      
+7E     lwflip    ( quad1 -- quad2 )                   Swaps the doublets within a quadlet
+                                                      
+7C     lwsplit   ( quad -- w1.lo w2.hi )              Splits a quadlet into two doublets
+                                                      
+5D     /n        ( -- n )                             Address increment for a normal;
+                                                      
+CR     /n*       ( nu1 -- nu2 )                       Synonym for cells
+                                                      
+69     cells     ( nu1 -- nu2 )                       Multiplies by /n
+                                                      
+61     na+       ( addr1 index -- addr2 )             Increments addr1 by index times /n
+                                                      
+CR     na1+      ( addr1 -- addr2 )                   Synonym for cell+
+                                                      
+65     cell+     ( addr1 -- addr2 )                   Increments addr1 by /n
+                                                      
+5B     /w        ( -- n )                             Address increment for a doublet;
+                                                      
+67     /w*       ( nu1 -- nu2 )                       Multiplies by /w
+                                                      
+5F     wa+       ( addr1 index -- addr2 )             Increments addr1 by index times /w
+                                                      
+63     wa1+      ( addr1 -- addr2 )                   Increments addr1 by /w
+                                                      
+AF     wbsplit   ( w -- b1.lo b2.hi )                 Splits a doublet into two bytes
+                                                      
+7D     wljoin    ( w.lo w.hi -- quad )                Joins two doublets to form a quadlet
+
+--------------------------------------------------------------------------------------------
+
+Table A-24 Memory Buffers Allocation
+
+-----------------------------------------------------------------------------------------
+
+                                        
+Value  Function  Stack                  Description
+-----------------------------------------------------------------------------------------
+
+                                        
+8B     alloc-    ( len -- a-addr )      Allocates nbytes of memory and returns its address
+       mem                                                                                  
+                                        
+8C     free-mem  ( a-addr len -- )      Frees memory allocated by alloc-mem
+
+-----------------------------------------------------------------------------------------
+
+Table A-25 Miscellaneous Operators
+
+--------------------------------------------------------------------------------------------------
+
+                                         
+Value  Function    Stack                 Description
+--------------------------------------------------------------------------------------------------
+
+                                         
+86     >body        ( xt -- a-addr )      Finds parameter field address from compilation address
+                                         
+85     body'>      ( a-addr -- xt )      Finds compilation address from parameter field address
+                                         
+DA     get-token   ( FCode# -- xt        Converts FCode Number to function execution token
+                   immediate? )                                                                      
+                                         
+DB     set-token   ( xt immediate?       Assigns FCode Number to existing function
+                   FCode# -- )                                                                       
+                                         
+00     end0        ( -- )                Marks the end of FCode
+                                         
+FF     end1        ( -- )                Alternates form for end0  (not recommended)
+                                         
+CR     fcode-      ( -- )                Begins FCode program
+       version1                                                                                      
+                                         
+023E   byte-load   ( addr xt -- )        Interprets FCode beginning at location addr
+                                         
+-      fload       ( [filename<cr] -- )   Begins tokenizing filename
+                                         
+-      headerless  ( -- )                Creates new names with new-token (no name fields)
+                                         
+-      headers     ( -- )                Creates new names with named-token (default)
+                                         
+7B     noop        ( -- )                Does nothing
+                                         
+CC     offset16    ( -- )                All further branches use 16-bit offsets (instead of 8-bit)
+                                         
+-      tokenizer[  ( -- )                Begins tokenizer program commands
+                                         
+-      ]tokenizer  ( -- )                Ends tokenizer program commands
+                                         
+CR     fcode-      ( -- )                Begins 2.0 FCode program, compiles start1  
+       version2                                                                                      
+                                         
+-      external    ( -- )                Creates new names with external-token  
+
+--------------------------------------------------------------------------------------------------
+
+Table A-26 Internal Operators, (invalid for program text)
+
+---------------------------------------------------------------------------------------------------------------
+
+                                                         
+Value  Function     Stack                                Description
+---------------------------------------------------------------------------------------------------------------
+
+                                                         
+01-0F                                                    First byte of a two byte FCode
+                                                         
+10     b(lit)       ( -- n ) ( F: /FCode-num32/ -- )     Followed by 32-bit#.  Compiled by numeric data
+                                                         
+11     b(')         ( -- xt ) ( F: /FCode#/ -- )         Followed by a token (1 or 2-byte code) .  Compiled 
+                                                         by ['] or '
+                                                         
+12     b(")         ( -- str len )                       Followed by count byte, text.  Compiled by " or ."
+                     ( F: /FCode-string/ -- )                                                                     
+                                                         
+C3     b(to)        ( x -- )                             Compiled by to
+                                                         
+FD     version1     ( -- )                               Followed by reserved byte, checksum (2 bytes) , 
+                                                         length (4 bytes).  Compiled by fcode-version1, as 
+                                                         the first FCode bytes
+                                                         
+13     bbranch      ( -- ) ( F: /FCode-offset/ -- )      Followed by offset.  Compiled by else or again
+                                                         
+14     b?branch     ( don't-branch? -- )                 Followed by offset.  Compiled by if or until
+                    ( F: /FCode-offset/ -- )                                                                      
+                                                         
+15     b(loop)      ( -- ) ( F: /FCode-offset/ -- )      Followed by offset.  Compiled by loop
+                                                         
+16     b(+loop)     ( delta -- )                         Followed by offset.  Compiled by +loop
+                    ( F: /FCode-offset/ -- )                                                                      
+                                                         
+17     b(do)        ( limit start -- )                   Followed by offset.  Compiled by do
+                                                                                                                  
+                    ( F: /FCode-offset/ -- )                                                                      
+                                                         
+18     b(?do)       ( limit start -- )                   Followed by offset.  Compiled by ?do
+                                                                                                                  
+                    ( F: /FCode-offset/ -- )                                                                      
+                                                         
+1B     b(leave)     ( F: -- )                            Compiled by leave or ?leave
+                                                         
+B1     b(<mark)      ( F: -- )                            Compiled by begin
+                                                         
+B2     b(resolve)   ( -- ) ( F: -- )                     Compiled by else or then
+                                                         
+C4     b(case)      ( sel -- sel ) ( F: -- )             Compiled by case
+                                                         
+C5     b(endcase)   ( sel | <nothing -- ) ( F: -- )       Compiled by endcase
+                                                         
+C6     b(endof)     ( -- ) ( F: /FCode-offset/ -- )      Compiled by endof
+                                                         
+1C     b(of)        ( sel of-val -- sel | <nothing )      Followed by offset.  Compiled by of
+                                                                                                                  
+                    (F: /FCode-offset/ -- )                                                                       
+                                                         
+B5     new-token    ( -- ) ( F: /FCode#/ -- )            Followed by table#, code#, token-type.  Compiled 
+                                                         by any defining word. Headerless, not used 
+                                                         normally.
+                                                         
+B6     named-token  ( -- )                               Followed by packed string (count,text), table#, 
+                                                         code#, token-type.  Compiled by any defining 
+                    ( F: /FCode-string FCode#/ -- )      word  (: value constant etc.)
+                                                         
+B7     b(:)         ( E: ... -- ??? ) ( F: -- colon-sys )Token-type compiled by :
+                                                         
+B8     b(value)     ( E: -- x ) ( F: x -- )              Token-type compiled by value
+                                                         
+B9     b(variable)  ( E: -- a-addr ) ( F: -- )           Token-type compiled by variable
+                                                         
+BA     b(constant)  ( E: -- n ) ( F: n -- )              Token-type compiled by constant
+                                                         
+BB     b(create)    ( E: -- a-addr ) ( F: -- )           Token-type compiled by create
+                                                         
+BC     b(defer)     ( E: ... -- ??? ) ( F: -- )          Token-type compiled by defer
+                                                         
+BD     b(buffer:)   ( E: -- a-addr ) ( F: size -- )      Token-type compiled by buffer:
+                                                         
+BE     b(field)     ( E: addr -- addr+offset )           Token-type compiled by field
+                                                                                                                  
+                    ( F: offset size -- offset+size)                                                              
+                                                         
+C2     b(;)         ( -- ) ( F: colon-sys -- )           End a colon definition.  Compiled by ;
+                                                         
+CA     external-    ( -- )                               vt
+       token                                                                                                      
+                     ( F: /FCode-string FCode#/ -- )                                                              
+                                                         
+F0     start0       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+                                                         bit branches.  Fetches successive tokens from same 
+                                                         address  
+                                                         
+F1     start1       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+                                                         bit branches.  Fetches successive tokens from 
+                                                         consecutive addresses.  Compiled by fcode-
+                                                         version2  
+                                                         
+F2     start2       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+                                                         bit branches.  Fetches successive tokens from 
+                                                         consecutive 16-bit addresses  
+                                                         
+F3     start4       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+                                                         bit branches.  Fetches successive tokens from 
+                                                         consecutive 32-bit addresses  
+
+---------------------------------------------------------------------------------------------------------------
+
+Table A-27 Memory Allocation
+
+-----------------------------------------------------------------------------------------
+
+                                   
+Value  Function  Stack             Description
+-----------------------------------------------------------------------------------------
+
+                                   
+0105   free-     ( virt size -- )  Frees virtual memory from memmap, dma-alloc,or map-low
+       virtual                                                                              
+
+-----------------------------------------------------------------------------------------
+
+Table A-28 Properties
+
+----------------------------------------------------------------------------------------------------------
+
+                                                                      
+Value  Function         Stack                                         Description
+----------------------------------------------------------------------------------------------------------
+
+                                                                      
+0110   property         ( prop-addr prop-len name-str name-len -- )   Declares a property with the 
+                                                                      given value structure, for the 
+                                                                      given name string.
+                                                                      
+021E   delete-property  ( nam-str nam-len -- )                        Deletes the property with the 
+                                                                      given name  
+                                                                      
+0115   encode-bytes     ( data-addr data-len -- prop-addr prop-len )  Converts a byte array into an 
+                                                                      prop-format string  
+                                                                      
+0111   encode-int       ( n -- prop-addr prop-len )                   Converts a number into an prop-
+                                                                      format string
+                                                                      
+0113   encode-phys      ( phys.lo ... phys.hi -- prop-addr  prop-len )Converts physical address and 
+                                                                      space into an prop-format string
+                                                                      
+0114   encode-string    ( str  len -- prop-addr  prop-len )           Converts a string into an prop-
+                                                                      format string
+                                                                      
+0112   encode+          ( prop-addr1 prop-len1 prop-addr2 prop-       Merges two prop-format strings. 
+                        len2                                          They must  have been created 
+                                                                      sequentially
+                         -- prop-addr3 prop-len3 )                                                           
+                                                                      
+CR     decode-bytes     ( prop-addr1 prop-len1 data-len --            Decodes a byte array from a 
+                                                                      prop-encoded-array
+                         prop-addr2 prop-len2 data-addr data-len )                                           
+                                                                      
+021B   decode-int       ( prop-addr1 prop-len1                        Converts the beginning of an 
+                         -- prop-addr2 prop-len2 n )                  prop-format string to an integer  
+                                                                      
+021C   decode-string    ( prop-addr1 prop-len1                        Converts the beginning of a prop-
+                         -- prop-addr2 prop-len2 str len )            format string to a normal string  
+                                                                      
+0128   decode-phys      ( prop-addr1 prop-len1 --                     Decode a unit-address from a 
+                                                                      prop-encoded array
+                         prop-addr2 prop-len2 phys.lo ... phys.hi )                                          
+                                                                      
+021A   get-my-property  ( nam-str nam-len                             Returns the prop-format string for 
+                         -- true | prop-addr prop-len false )         the given property name 
+                                                                      
+021D   get-inherited-   ( nam-str nam-len                             Returns the value string for the 
+       property          -- true | prop-addr prop-len false )         given property, searches parents' 
+                                                                      properties if not found  
+                                                                      
+021F   get-package-     ( name-str name-len phandle                   Returns the prop-format string for 
+       property          -- true | prop-addr prop-len false )         the given property name in the 
+                                                                      package phandle  
+
+----------------------------------------------------------------------------------------------------------
+
+Table A-29 Commonly-used Properties
+
+-----------------------------------------------------------------------------------------------------
+
+                                                
+Value  Function  Stack                          Description
+-----------------------------------------------------------------------------------------------------
+
+                                                
+0116   reg       ( phys.lo ... phys.hi size -- )Declares location and size of device registers
+                                                
+0119   model     ( str len -- )                 Declares model# for this device, such as " SUNW,501-
+                                                1415-01"
+                                                
+011A   device-   ( str len -- )                 Declares type of device, e.g. " display", " block", " 
+       type                                     network",  or " byte"
+                                                
+CR     name      ( addr len -- )                Declares SunOS driver name, as in  " SUNW,zebra"
+                                                
+0201   device-   ( str len -- )                 Creates the "name" property with the given value  
+       name                                                                                             
+
+-----------------------------------------------------------------------------------------------------
+
+Table A-30 System Version Information
+
+----------------------------------------------------------------------
+
+                           
+Value  Function  Stack     Description
+----------------------------------------------------------------------
+
+                           
+87     fcode-    ( -- n )  Returns major/minor FCode interface version
+       revision                                                          
+
+----------------------------------------------------------------------
+
+Table A-31 Device Activation Vector Setup
+
+----------------------------------------------------------------------------------------
+
+                                
+Value  Function     Stack       Description
+----------------------------------------------------------------------------------------
+
+                                
+011C   is-install   ( xt -- )   Identifies "install" routine to allocate a frame buffer
+                                
+011D   is-remove    ( xt -- )   Identifies "remove" routine, to deallocate a frame buffer
+                                
+011E   is-selftest  ( xt -- )   Identifies "selftest" routine for this frame buffer
+                                
+011F   new-device   ( -- )      Opens an additional device, using this driver package
+                                
+0127   finish-      ( -- )      Closes out current device, ready for new-device
+       device                                                                              
+
+----------------------------------------------------------------------------------------
+
+Table A-32 Self-test Utility Routines
+
+-----------------------------------------------------------------------------------------------
+
+                                              
+Value  Function        Stack                  Description
+-----------------------------------------------------------------------------------------------
+
+                                              
+0120   diagnostic-     ( -- diag? )           Returns "true" if extended diagnostics are desired
+       mode?                                                                                      
+                                              
+0121   display-status  ( n -- )               Obsolete
+                                              
+0122   memory-test-    ( addr len -- fail? )  Calls memory tester for given region
+       suite                                                                                      
+                                              
+0124   mask            ( -- a-addr )          Variable, holds "mask" used by memory-test-suite
+
+-----------------------------------------------------------------------------------------------
+
+Table A-33 Time Utilities
+
+--------------------------------------------------------------------------------------
+
+                                
+Value  Function   Stack         Description
+--------------------------------------------------------------------------------------
+
+                                
+0125   get-msecs  ( -- n )      Returns the current time, in milliseconds, approx.
+                                
+0126   ms         ( n -- )      Delays for n milliseconds.  Resolution is 1 millisecond
+                                
+0213   alarm      ( xt n -- )   Periodically execute xt. If n=0, stop. 
+
+--------------------------------------------------------------------------------------
+
+Table A-34 Machine-specific Support
+
+-----------------------------------------------------------------------------------------------
+
+                                               
+Value  Function  Stack                         Description
+-----------------------------------------------------------------------------------------------
+
+                                               
+0130   map-low   ( phys.lo ... size -- virt )  Maps a region of memory in 'sbus' address space
+                                               
+0131   sbus-     ( sbus-intr# -- cpu-intr# )   Translates SBus interrupt# into CPU interrupt#
+       intrcpu                                                                                    
+
+-----------------------------------------------------------------------------------------------
+
+Note - Table A-35 through Table A-41 apply only to display device-types.
+
+Table A-35 User-set Terminal Emulation Values
+
+---------------------------------------------------------------------------------------------------------------
+
+                                 
+Value  Function  Stack           Description
+---------------------------------------------------------------------------------------------------------------
+
+                                 
+0150   #lines    ( -- rows )     Number of lines of text being used for display.  This word must be 
+                                 initialized (using is). fbx-install does this automatically, and also properly 
+                                 incorporates the NVRAM parameter "screen-#rows"
+                                 
+0151   #column   ( -- columns )  Number of columns (chars/line)  used for display.  This word must be 
+       s                         initialized  (using is).   fbx-install does this  automatically, and also 
+                                 properly incorporates the NVRAM  parameter "screen-#columns"
+
+---------------------------------------------------------------------------------------------------------------
+
+Table A-36 Terminal Emulator-set Terminal Emulation Values
+
+-------------------------------------------------------------------------------------------
+
+                                         
+Value  Function  Stack                   Description
+-------------------------------------------------------------------------------------------
+
+                                         
+0152   line#     ( -- line# )            Current cursor position (line#).  0 is top line
+                                         
+0153   column#   ( -- column# )          Current cursor position.  0 is left char.
+                                         
+0154   inverse?  ( -- white-on-black? )  True if output is inverted (white-on-black)
+                                         
+0155   inverse-  ( -- black? )           True if screen has been inverted (black background)
+       screen?                                                                                
+
+-------------------------------------------------------------------------------------------
+
+Table A-37 Terminal Emulation Routines*
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+                                                                                
+Value                           Function        Stack                           Description
+-----------------------------------------------------------------------------------------------------------------------------------
+
+                                                                                
+0157                            draw-character  ( char -- )                     Paints the given character and advances the 
+                                                                                cursor
+                                                                                
+0158                            reset-screen    ( -- )                          Initializes the display device
+                                                                                
+0159                            toggle-cursor   ( -- )                          Draws or erase the cursor
+                                                                                
+015A                            erase-screen    ( -- )                          Clears all pixels on the display
+                                                                                
+015B                            blink-screen    ( -- )                          Flashes the display momentarily
+                                                                                
+015C                            invert-screen   ( -- )                          Changes all pixels to the opposite color
+                                                                                
+015D                            insert-         ( n -- )                        Inserts n blanks just before the cursor
+                                characters                                                                                            
+                                                                                
+015E                            delete-         ( n -- )                        Deletes n characters to the right of the cursor 
+                                characters                                      Remaining chars slide left
+                                                                                
+015F                            insert-lines    ( n -- )                        Inserts n blank lines just before the current line, 
+                                                                                lower lines are scrolled downward
+                                                                                
+0160                            delete-lines    ( n -- )                        Deletes n lines starting with the current line, 
+                                                                                lower lines are scrolled upward
+                                                                                
+0161                            draw-logo       ( line# addr width height -- )  Draws the logo
+                                                                                
+*defer-type loadable routines.                                                  
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+Table A-38 Frame Buffer Parameter Values*
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+                                                                                                      
+Value                                                           Function       Stack                  Description
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+                                                                                                      
+016C                                                            char-height    ( -- height )          Height (in pixels)  of a character (usually 22)
+                                                                                                      
+016D                                                            char-width     ( -- width )           Width (in pixels) of a character (usually 12)
+                                                                                                      
+016F                                                            fontbytes      ( -- bytes )           Number of bytes/scan line for font entries (usually 2)
+                                                                                                      
+0162                                                            frame-buffer-  ( -- addr )            Address of frame buffer memory
+                                                                adr                                                                                                
+                                                                                                      
+0163                                                            screen-height  ( -- height )          Total height of the display (in pixels)
+                                                                                                      
+0164                                                            screen-width   ( -- width )           Total width of the display (in pixels)
+                                                                                                      
+0165                                                            window-top     ( -- border-height )   Distance (in pixels) between display top and text window
+                                                                                                      
+0166                                                            window-left    ( -- border-width )    Distance  (in pixels) between display left edge and text 
+                                                                                                      window left edge
+                                                                                                      
+*These must all be initialized before using any fbx- routines.                                        
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Table A-39 Font Operators
+
+-----------------------------------------------------------------------------------------------------------
+
+                                                                     
+Value  Function  Stack                                               Description
+-----------------------------------------------------------------------------------------------------------
+
+                                                                     
+016A   default-  ( -- addr width height advance min- char #glyphs )  Returns default font values, plugs 
+       font                                                          directly into set-font
+                                                                     
+016B   set-font  ( addr width height advance min-char #glyphs -- )   Sets the character font for text output
+                                                                     
+016E   >font      ( char -- addr )                                    Returns font address for given ASCII 
+                                                                     character
+
+-----------------------------------------------------------------------------------------------------------
+
+Table A-40 One-bit Frame Buffer Utilities
+
+------------------------------------------------------------------------------------------------------------
+
+                                                        
+Value  Function       Stack                             Description
+------------------------------------------------------------------------------------------------------------
+
+                                                        
+0170   fb1-draw-      ( char -- )                       Paints the character and advance the cursor
+       character                                                                                               
+                                                        
+0171   fb1-reset-     ( -- )                            Initializes the display device (noop)
+       screen                                                                                                  
+                                                        
+0172   fb1-toggle-    ( -- )                            Draws or erases the cursor
+       cursor                                                                                                  
+                                                        
+0173   fb1-erase-     ( -- )                            Clears all pixels on the display
+       screen                                                                                                  
+                                                        
+0174   fb1-blink-     ( -- )                            Inverts the screen, twice (slow)
+       screen                                                                                                  
+                                                        
+0175   fb1-invert-    ( -- )                            Changes all pixels to the opposite color
+       screen                                                                                                  
+                                                        
+0176   fb1-insert-    ( n -- )                          Inserts n blanks just before the cursor
+       characters                                                                                              
+                                                        
+0177   fb1-delete-    ( n -- )                          Deletes n characters, starting at with cursor 
+       characters                                       character, rightward.   Remaining chars slide left
+                                                        
+0178   fb1-insert-    ( n -- )                          Inserts n blank lines just before the current line, 
+       lines                                            lower lines are scrolled downward
+                                                        
+0179   fb1-delete-    ( n -- )                          Deletes n lines starting with the current line,lower 
+       lines                                            lines are scrolled upward
+                                                        
+017A   fb1-draw-logo  ( line# addr width height -- )    Draws the logo
+                                                        
+017B   fb1-install    ( width height #columns           Installs the one-bit built-in routines
+                      #lines -- )                                                                              
+                                                        
+017C   fb1-slide-up   ( n -- )                          Like fb1-delete-lines, but doesn't clear lines at 
+                                                        bottom
+
+------------------------------------------------------------------------------------------------------------
+
+Table A-41 Eight-bit Frame Buffer Utilities
+
+-----------------------------------------------------------------------------------------------------------
+
+                                                            
+Value  Function       Stack                                 Description
+-----------------------------------------------------------------------------------------------------------
+
+                                                            
+0180   fb8-draw-      ( char -- )                           Paints the character and advance the cursor
+       character                                                                                              
+                                                            
+0181   fb8-reset-     ( -- )                                Initializes the display device (noop)
+       screen                                                                                                 
+                                                            
+0182   fb8-toggle-    ( -- )                                Draws or erases the cursor
+       cursor                                                                                                 
+                                                            
+0183   fb8-erase-     ( -- )                                Clears all pixels on the display
+       screen                                                                                                 
+                                                            
+0184   fb8-blink-     ( -- )                                Inverts the screen, twice (slow)
+       screen                                                                                                 
+                                                            
+0185   fb8-invert-    ( -- )                                Changes all pixels to the opposite color
+       screen                                                                                                 
+                                                            
+0186   fb8-insert-    ( n -- )                              Inserts n blanks just before the cursor
+       characters                                                                                             
+                                                            
+0187   fb8-delete-    ( n -- )                              Deletes n characters starting with cursor char, 
+       characters                                           rightward.  Remaining chars slide left
+                                                            
+0188   fb8-insert-    ( n -- )                              Inserts n blank lines just before the current  
+       lines                                                line, lower lines are scrolled downward
+                                                            
+0189   fb8-delete-    ( n -- )                              Deletes n lines starting with the current line, 
+       lines                                                lower lines are scrolled upward
+                                                            
+018A   fb8-draw-logo  ( line# addr width height -- )        Draws the logo
+                                                            
+018B   fb8-install    ( width height #columns #lines -- )   Installs the eight-bit built-in routines
+
+-----------------------------------------------------------------------------------------------------------
+
+Table A-42 Package Support
+
+-------------------------------------------------------------------------------------------------------
+
+                                                           
+Value  Function       Stack                                Description
+-------------------------------------------------------------------------------------------------------
+
+                                                           
+023C   peer           ( phandle -- phandle.sibling )       Returns phandle of package that is the next 
+                                                           child of the the parent of the package 
+                                                           
+023B   child          ( phandle.parent -- phandle.child )  Returns phandle of the package that is the 
+                                                           first child of the package parent-phandle 
+                                                           
+0204   find-package   ( name-str name-len                  Finds a package named "name-str"  
+                                                                                                          
+                       -- false | phandle true )                                                          
+                                                           
+0205   open-package   ( arg-str arg-len phandle            Opens an instance of the package "phandle," 
+                                                           passes arguments "arg-str arg-len"  
+                       -- ihandle | 0 )                                                                   
+                                                           
+020F   $open-package  ( arg-str arg-len name-str name-len  Finds a package "name-str name-len" then 
+                                                           opens it with arguments "arg-str arg-len"  
+                       -- ihandle | 0 )                                                                   
+                                                           
+020A   my-parent      ( -- ihandle )                       Returns the ihandle of the parent of the 
+                                                           current package instance  
+                                                           
+0203   my-self        ( -- ihandle )                       Returns the instance handle of currently-
+                                                           executing package instance  
+                                                           
+020B   ihandlephand   ( ihandle -- phandle )               Converts an ihandle to a phandle  
+       le                                                                                                 
+                                                           
+0206   close-package  ( ihandle -- )                       Closes an instance of  a package  
+                                                           
+0207   find-method    ( method-str method-len phandle      Finds the method (command) named 
+                                                           "method-str" in the package "phandle"  
+                       -- false | xt true )                                                               
+                                                           
+0208   call-package   ( ... xt ihandle -- ??? )            Executes the method "xt" in the instance 
+                                                           "ihandle"  
+                                                           
+020E   $call-method   ( ... method-str method-len ihandle  Executes the method named "method-str" in 
+                                                           the instance "ihandle"  
+                       -- ??? )                                                                           
+                                                           
+0209   $call-parent   ( ... method-str method-len -- ??? ) Executes the method "method-str" in the 
+                                                           parent's package  
+                                                           
+0202   my-args        ( -- arg-str arg-len )               Returns the argument str passed when this 
+                                                           package was opened  
+                                                           
+020D   my-unit        ( -- phys.lo ... phys.hi )           Returns the physical unit number pair for 
+                                                           this package  
+                                                           
+0102   my-address     ( -- phys.lo ... )                   Returns the physical addr of  this plug-in 
+                                                           device.  "phys" is a "magic" number, usable 
+                                                           by other routines  
+                                                           
+0103   my-space       ( -- phys.hi )                       Returns address space of  plug-in device.  
+                                                           "space" is a "magic" number, usable by other 
+                                                           routines  
+
+-------------------------------------------------------------------------------------------------------
+
+Table A-43 Asynchronous Support
+
+-------------------------------------------------------------------------------------------------------------
+
+                                       
+Value  Function  Stack                 Description
+-------------------------------------------------------------------------------------------------------------
+
+                                       
+0213   alarm     ( xt n -- )           Executes method (command) indicated by "xt" every "n" milliseconds  
+                                       
+0219   user-     ( ... -- ) ( R: ... -- )Abort after alarm routine finishes execution
+       abort                                                                                                    
+
+-------------------------------------------------------------------------------------------------------------
+
+Table A-44 Miscellaneous Operations
+
+---------------------------------------------------------------------------------------------------------
+
+                                                
+Value  Function   Stack                         Description
+---------------------------------------------------------------------------------------------------------
+
+                                                
+0214   (is-user-  ( E: ... -- ??? )             Creates a new word called "name-str" which executes "xt"  
+       word)                                                                                                
+                   ( name-str name-len xt -- )                                                              
+                                                
+01A4   mac-       ( -- mac-str mac-len )        Returns the MAC address  
+       address                                                                                              
+
+---------------------------------------------------------------------------------------------------------
+
+Table A-45 Interpretation
+
+------------------------------------------------------------------------------------------------
+
+                         
+Value  Function  Stack   Description
+------------------------------------------------------------------------------------------------
+
+                         
+0215   suspend-  ( -- )  Suspends execution of FCode, resumes later if an undefined command is 
+       fcode             required
+
+------------------------------------------------------------------------------------------------
+
+Table A-46 Error Handling
+
+-----------------------------------------------------------------------------------------------------------------
+
+                                                          
+Value  Function  Stack                                    Description
+-----------------------------------------------------------------------------------------------------------------
+
+                                                          
+0216   abort      ( ... -- ) (R:... -- )                  Aborts FCode execution, returns to the "ok" prompt
+                                                          
+0217   catch      ( ... xt -- ??? error-code | ??? false )Executes "xt," returns throw error code or 0 if throw 
+                                                          not encountered  
+                                                          
+0218   throw      ( ... error-code -- ??? error-code | ...)Returns given error code to catch  
+                                                          
+FC     ferror    ( -- )                                   Displays "Unimplemented FCode" and stops FCode 
+                                                          interpretation
+
+-----------------------------------------------------------------------------------------------------------------
+
+FCodes by Byte Value
+The following table lists, in hexadecimal order, currently-assigned FCode byte values.
+
+Table A-47 FCodes by Byte Value
+
+------------------------------------------------------------------------------------------
+
+                   
+Value  Function    Stack
+------------------------------------------------------------------------------------------
+
+                   
+00     end0        ( -- )
+                   
+10     b(lit)      ( -- n ) ( F: /FCode-num32/ -- )
+                   
+11     b(')        ( -- xt ) ( F: /FCode#/ -- )
+                   
+12     b(")        ( -- str len ) ( F: /FCode-string/ -- )
+                   
+13     bbranch     ( -- ) ( F: /FCode-offset/ -- )
+                   
+14     b?branch    ( don't-branch? -- )  ( F: /FCode-offset/ --)
+                   
+15     b(loop)     ( -- ) ( F: /FCode-offset/ -- )
+                   
+16     b(+loop)    ( delta -- ) ( F: /FCode-offset/ -- )
+                   
+17     b(do)       ( limit start -- ) ( F: /FCode-offset/ -- )
+                   
+18     b(?do)      ( limit start -- ) ( F: /FCode-offset/ -- )
+                   
+19     i           ( -- index ) ( R: sys -- sys )
+                   
+1A     j           ( --  index ) ( R: sys -- sys )
+                   
+1B     b(leave)    ( F: -- )
+                   
+1C     b(of)       ( sel of-val -- sel | <nothing ) ( F: /FCode-offset/ -- )
+                   
+1D     execute     ( ... xt -- ??? )
+                   
+1E     +           ( nu1 nu2 -- sum )
+                   
+1F     -           ( nu1 nu2 -- diff )
+                   
+20     *           ( nu1 nu2 -- prod )
+                   
+21     /           ( n1 n2 -- quot )
+                   
+22     mod         ( n1 n2 -- rem )
+                   
+23     and         ( x1 x2 -- x3 )
+                   
+24     or          ( x1 x2 -- x3 )
+                   
+25     xor         ( x1 x2 -- x3 )
+                   
+26     invert      ( x1 -- x2 )
+                   
+27     lshift      ( x1 u -- x2 )
+                   
+28     rshift      ( x1 u -- x2 )
+                   
+29     >a           ( x1 u -- x2 )
+                   
+2A     /mod        ( n1 n2 -- rem quot )
+                   
+2B     u/mod       ( u1 u2 -- urem uquot )
+                   
+2C     negate      ( n1 -- n2 )
+                   
+2D     abs         ( n -- u )
+                   
+2E     min         ( n1 n2 -- n1|n2 )
+                   
+2F     max         ( n1 n2 -- n1|n2 )
+                   
+30     >r           ( x -- ) ( R: -- x)
+                   
+31     r'>         ( -- x ) ( R: x -- )
+                   
+32     r@          ( -- x ) ( R: x -- x )
+                   
+33     exit        ( -- ) (R: sys -- )
+                   
+34     0=          ( nulflag -- equal-to-0? )
+                   
+35     0<'>         ( n -- not-equal-to-0? )
+                   
+36     0<           ( n -- less-than-0? )
+                   
+37     0<=          ( n -- less-or-equal-to-0? )
+                   
+38     0'>         ( n -- greater-than-0? )
+                   
+39     0=          ( n -- greater-or-equal-to-0? )
+<
+                   
+3A                 ( n1 n2 -- less? )
+>
+                   
+3B                 ( n1 n2 -- greater? )
+                   
+3C     =           ( x1 x2 -- equal? )
+                   
+3D     <'>          ( x1 x2 -- not-equal? )
+                   
+3E     u'>         ( u1 u2 -- unsigned-greater? )
+                   
+3F     u<=          ( u1 u2 -- unsigned-less-or-equal? )
+                   
+40     u<           ( u1 u2 -- unsigned-less? )
+                   
+41     u=          ( u1 u2 -- unsigned-greater-or-equal? )
+                   
+42     >=           ( n1 n2 -- greater-or-equal? )
+                   
+43     <=           ( n1 n2 -- less-or-equal? )
+                   
+44     between     ( n min max --  min<=n<=max? )
+                   
+45     within      ( n min max --  min<=n<max? )
+                   
+46     drop        ( x -- )
+                   
+47     dup         ( x -- x x )
+                   
+48     over        ( x1 x2 -- x1 x2 x1 )
+                   
+49     swap        ( x1 x2 -- x2 x1 )
+                   
+4A     rot         ( x1 x2 x3 -- x2 x3 x1 )
+                   
+4B     -rot        ( x1 x2 x3 -- x3 x1 x2 )
+                   
+4C     tuck        ( x1 x2 -- x2 x1 x2 )
+                   
+4D     nip         ( x1 x2 -- x2 )
+                   
+4E     pick        ( xu ... x1 x0 u -- xu ... x1 x0 xu )
+                   
+4F     roll        ( xu ... x1 x0 u -- xu-1 ... x1 x0 xu )
+                   
+50     ?dup        ( x -- 0 | x x)
+                   
+51     depth       ( -- u )
+                   
+52     2drop       ( x1 x2 -- )
+                   
+53     2dup        ( x1 x2 --  x1 x2  x1 x2 )
+                   
+54     2over       ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 )
+                   
+55     2swap       ( x1 x2 x3 x4 -- x3 x4 x1 x2 )
+                   
+56     2rot        ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 )
+                   
+57     2/          ( x1 -- x2 )
+                   
+58     u2/         ( x1 -- x2 )
+                   
+59     2*          ( x1 -- x2 )
+                   
+5A     /c          ( -- n )
+                   
+5B     /w          ( -- n )
+                   
+5C     /l          ( -- n )
+                   
+5D     /n          ( -- n )
+                   
+5E     ca+         ( addr1 index -- addr2 )
+                   
+5F     wa+         ( addr1 index -- addr2 )
+                   
+60     la+         ( addr1 index -- addr2 )
+                   
+61     na+         ( addr1 index -- addr2 )
+                   
+62     char+       ( addr1 -- addr2 )
+                   
+63     wa1+        ( addr1 -- addr2 )
+                   
+64     la1+        ( addr1 -- addr2 )
+                   
+65     cell+       ( addr1 -- addr2 )
+                   
+66     chars       ( nu1 -- nu2 )
+                   
+67     /w*         ( nu1 -- nu2 )
+                   
+68     /l*         ( nu1 -- nu2 )
+                   
+69     cells       ( nu1 -- nu2 )
+                   
+6A     on          ( a-addr -- )
+                   
+6B     off         ( a-addr -- )
+                   
+6C     +!          ( nu a-addr -- )
+                   
+6D     @           ( a-addr -- x )
+                   
+6E     l@          ( qaddr -- quad )
+                   
+6F     w@          ( waddr -- w )
+                   
+70     <w@          ( waddr -- n )
+                   
+71     c@          ( addr -- byte )
+                   
+72     !           ( x a-addr -- )
+                   
+73     l!          ( quad qaddr -- )
+                   
+74     w!          ( w waddr -- )
+                   
+75     c!          ( byte addr -- )
+                   
+76     2@          ( a-addr -- x1 x2 )
+                   
+77     2!          ( x1 x2 a-addr -- )
+                   
+78     move        ( src-addr dest-addr len -- )
+                   
+79     fill        ( addr len byte -- )
+                   
+7A     comp        ( addr1 addr2 len -- n )
+                   
+7B     noop        ( -- )
+                   
+7C     lwsplit     ( quad -- w1.lo w2.hi )
+                   
+7D     wljoin      ( w.lo w.hi -- quad )
+                   
+7E     lbsplit     ( quad -- b.lo b2 b3 b4.hi )
+                   
+7F     bljoin      ( bl.lo b2 b3 b4.hi -- quad )
+                   
+80     wbflip      ( w1 -- w2 )
+                   
+81     upc         ( char1 -- char2 )
+                   
+82     lcc         ( char1 -- char2 )
+                   
+83     pack        ( str len addr -- pstr )
+                   
+84     count       ( pstr -- str len )
+                   
+85     body'>      ( a-addr -- xt )
+                   
+86     >body        ( xt -- a-addr )
+                   
+87     fcode-      ( -- n )
+       revision                                                                             
+                   
+88     span        ( -- a-addr )
+                   
+89     unloop      ( -- ) ( R: sys -- )
+                   
+8A     expect      ( addr len -- )
+                   
+8B     alloc-mem   ( len -- a-addr )
+                   
+8C     free-mem    ( a-addr len -- )
+                   
+8D     key?        ( -- pressed? )
+                   
+8E     key         ( -- char )
+                   
+8F     emit        ( char -- )
+                   
+90     type        ( text-str text-len -- )
+                   
+91     (cr         ( -- )
+                   
+92     cr          ( -- )
+                   
+93     #out        ( -- a-addr )
+                   
+94     #line       ( -- a-addr )
+                   
+95     hold        ( char -- )
+                   
+96     <#           ( -- )
+                   
+97     u#'>        ( u -- str len )
+                   
+98     sign        ( n -- )
+                   
+99     u#          ( u1 -- u2 )
+                   
+9A     u#s         ( u1 -- u2 )
+                   
+9B     u.          ( u -- )
+                   
+9C     u.r         ( u size -- )
+                   
+9D     .           ( nu -- )
+                   
+9E     .r          ( n size -- )
+                   
+9F     .s          ( ... -- ... )
+                   
+A0     base        ( -- a-addr )
+                   
+A2     $number     ( addr len -- true | n false )
+                   
+A3     digit       ( char base -- digit true | char false )
+                   
+A4     -1          ( -- -1 )
+                   
+A5     0           ( -- 0 )
+                   
+A6     1           ( -- 1 )
+                   
+A7     2           ( -- 2 )
+                   
+A8     3           ( -- 3 )
+                   
+A9     bl          ( -- 0x20 )
+                   
+AA     bs          ( -- 0x08 )
+                   
+AB     bell        ( -- 0x07 )
+                   
+AC     bounds      ( n cnt -- n+cnt n )
+                   
+AD     here        ( -- addr )
+                   
+AE     aligned     ( n1 -- n1|a-addr )
+                   
+AF     wbsplit     ( w -- b1.lo b2.hi )
+                   
+B0     bwjoin      ( b.lo b.hi -- w )
+                   
+B1     b(<mark)     ( F: -- )
+                   
+B2     b(resolve   ( -- ) ( F: -- )
+       )                                                                                    
+                   
+B5     new-token   ( -- ) ( F: /FCode#/ -- )
+                   
+B6     named-      ( -- ) ( F: /FCode-string FCode#/ -- )
+       token                                                                                
+                   
+B7     b(:)        ( E: ... -- ??? ) ( F: -- colon-sys )
+                   
+B8     b(value)    ( E: -- x ) ( F: x -- )
+                   
+B9     b(variable  ( E: -- a-addr ) ( F: -- )
+       )                                                                                    
+                   
+BA     b(constant  ( E: -- n ) ( F: n -- )
+       )                                                                                    
+                   
+BB     b(create)   ( E: -- a-addr ) ( F: -- )
+                   
+BC     b(defer)    ( E: ... -- ??? ) ( F: -- )
+                   
+BD     b(buffer:)  ( E: -- a-addr ) ( F: size -- )
+                   
+BE     b(field)    ( E: addr -- addr+offset ) ( F: offset size -- offset+size )
+                   
+C0     instance    ( -- )
+                   
+C2     b(;)        ( -- ) ( F: colon-sys -- )
+                   
+C3     b(to)       ( x -- )
+                   
+C4     b(case)     ( sel -- sel ) ( F: -- )
+                   
+C5     b(endcase)  ( sel | <nothing -- ) ( F: -- )
+                   
+C6     b(endof)    ( -- ) ( F: /FCode-offset/ -- )
+                   
+C7     #           ( ud1 -- ud2 )
+                   
+C8     #s          ( ud -- 0 0 )
+                   
+C9     #'>         ( ud -- str len )
+                   
+CA     external-   ( -- ) ( F: /FCode-string FCode#/ -- )
+       token                                                                                
+                   
+CB     $find       ( name-str name-len -- xt true | name-str name-len false )
+                   
+CC     offset16    ( -- )
+                   
+CD     eval        ( ... str len -- ??? )
+                   
+D0     c,          ( byte -- )
+                   
+D1     w,          ( w -- )
+                   
+D2     l,          ( quad -- )
+                   
+D3     ,           ( x -- )
+                   
+D4     um*         ( u1 u2 -- ud.prod )
+                   
+D5     um/mod      ( ud u -- urem uquot )
+                   
+D8     d+          ( d1 d2 --d.sum )
+                   
+D9     d-          ( d1 d2 -- d.diff )
+                   
+DA     get-token   ( fcode# -- xt immediate? )
+                   
+DB     set-token   ( xt immediate? fcode# -- )
+                   
+DC     state       ( -- a-addr )
+                   
+DD     compile,    ( xt -- )
+                   
+DE     behavior    ( defer-xt -- contents-xt )
+                   
+F0     start0      ( -- )
+                   
+F1     start1      ( -- )
+                   
+F2     start2      ( -- )
+                   
+F3     start4      ( -- )
+                   
+FC     ferror      ( -- )
+                   
+FD     version1    ( -- )
+                   
+FF     end1        ( -- )
+                   
+0102   my-address  ( -- phys.lo ... )
+                   
+0103   my-space    ( -- phys.hi )
+                   
+0105   free-       ( virt size -- )
+       virtual                                                                              
+                   
+0110   property    ( prop-addr prop-len name-str name-len -- )
+                   
+0111   encode-int  ( n -- prop-addr prop-len )
+                   
+0112   encode+     ( prop-addr1 prop-len1 prop-addr2 prop-len2 -- prop-addr3 prop-len3 )
+                   
+0113   encode-     ( phys.lo ... phys.hi -- prop-addr  prop-len )
+       phys                                                                                 
+                   
+0114   encode-     ( str  len -- prop-addr  prop-len )
+       string                                                                               
+                   
+0115   encode-     ( data-addr data-len -- prop-addr prop-len )
+       bytes                                                                                
+                   
+0116   reg         ( phys.lo ... phys.hi size -- )
+                   
+0119   model       ( str len -- )
+                   
+011A   device-     ( str len -- )
+       type                                                                                 
+                   
+011B   parse-2int  ( str len  -- val.lo val.hi )
+                   
+011C   is-install  ( xt -- )
+                   
+011D   is-remove   ( xt -- )
+                   
+011E   is-         ( xt -- )
+       selftest                                                                             
+                   
+011F   new-device  ( -- )
+                   
+0120   diagnostic  ( -- diag? )
+       -mode?                                                                               
+                   
+0121   display-    ( n -- )
+       status                                                                               
+                   
+0122   memory-     ( addr len -- fail? )
+       test-suite                                                                           
+                   
+0124   mask        ( -- a-addr )
+                   
+0125   get-msecs   ( -- n )
+                   
+0126   ms          ( n -- )
+                   
+0127   finish-     ( -- )
+       device                                                                               
+                   
+0128   decode-     ( prop-addr1 prop-len1 -- prop-addr2 prop-len2 phys.lo ... phys.hi )
+       phys                                                                                 
+                   
+0130   map-low     ( phys.lo ... size -- virt )
+                   
+0131   sbus-       ( sbus-intr# -- cpu-intr# )
+       intrcpu                                                                              
+                   
+0150   #lines      ( -- rows )
+                   
+0151   #columns    ( -- columns )
+                   
+0152   line#       ( -- line# )
+                   
+0153   column#     ( -- column# )
+                   
+0154   inverse?    ( -- white-on-black? )
+                   
+0155   inverse-    ( -- black? )
+       screen?                                                                              
+                   
+0157   draw-       ( char -- )
+       character                                                                            
+                   
+0158   reset-      ( -- )
+       screen                                                                               
+                   
+0159   toggle-     ( -- )
+       cursor                                                                               
+                   
+015A   erase-      ( -- )
+       screen                                                                               
+                   
+015B   blink-      ( -- )
+       screen                                                                               
+                   
+015C   invert-     ( -- )
+       screen                                                                               
+                   
+015D   insert-     ( n -- )
+       characters                                                                           
+                   
+015E   delete-     ( n -- )
+       characters                                                                           
+                   
+015F   insert-     ( n -- )
+       lines                                                                                
+                   
+0160   delete-     ( n -- )
+       lines                                                                                
+                   
+0161   draw-logo   ( line# addr width height -- )
+                   
+0162   frame-      ( -- addr )
+       buffer-adr                                                                           
+                   
+0163   screen-     ( -- height )
+       height                                                                               
+                   
+0164   screen-     ( -- width )
+       width                                                                                
+                   
+0165   window-top  ( -- border-height )
+                   
+0166   window-     ( -- border-width )
+       left                                                                                 
+                   
+016A   default-    ( -- addr width height advance min-char #glyphs )
+       font                                                                                 
+                   
+016B   set-font    ( addr width height advance min-char #glyphs -- )
+                   
+016C   char-       ( -- height )
+       height                                                                               
+                   
+016D   char-width  ( -- width )
+                   
+016E   >font        ( char -- addr )
+                   
+016F   fontbytes   ( -- bytes )
+                   
+0170   fb1-draw-   ( char -- )
+       character                                                                            
+                   
+0171   fb1-reset-  ( -- )
+       screen                                                                               
+                   
+0172   fb1-        ( -- )
+       toggle-                                                                              
+       cursor                                                                               
+                   
+0173   fb1-erase-  ( -- )
+       screen                                                                               
+                   
+0174   fb1-blink-  ( -- )
+       screen                                                                               
+                   
+0175   fb1-        ( -- )
+       invert-                                                                              
+       screen                                                                               
+                   
+0176   fb1-        ( n -- )
+       insert-                                                                              
+       characters                                                                           
+                   
+0177   fb1-        ( n -- )
+       delete-                                                                              
+       characters                                                                           
+                   
+0178   fb1-        ( n -- )
+       insert-                                                                              
+       lines                                                                                
+                   
+0179   fb1-        ( n -- )
+       delete-                                                                              
+       lines                                                                                
+                   
+017A   fb1-draw-   ( line# addr width height -- )
+       logo                                                                                 
+                   
+017B   fb1-        ( width height #columns #lines -- )
+       install                                                                              
+                   
+017C   fb1-slide-  ( n -- )
+       up                                                                                   
+                   
+0180   fb8-draw-   ( char -- )
+       character                                                                            
+                   
+0181   fb8-reset-  ( -- )
+       screen                                                                               
+                   
+0182   fb8-        ( -- )
+       toggle-                                                                              
+       cursor                                                                               
+                   
+0183   fb8-erase-  ( -- )
+       screen                                                                               
+                   
+0184   fb8-blink-  ( -- )
+       screen                                                                               
+                   
+0185   fb8-        ( -- )
+       invert-                                                                              
+       screen                                                                               
+                   
+0186   fb8-        ( n -- )
+       insert-                                                                              
+       characters                                                                           
+                   
+0187   fb8-        ( n -- )
+       delete-                                                                              
+       characters                                                                           
+                   
+0188   fb8-        ( n -- )
+       insert-                                                                              
+       lines                                                                                
+                   
+0189   fb8-        ( n -- )
+       delete-                                                                              
+       lines                                                                                
+                   
+018A   fb8-draw-   ( line# addr width height -- )
+       logo                                                                                 
+                   
+018B   fb8-        ( width height #columns #lines -- )
+       install                                                                              
+                   
+01A4   mac-        ( -- mac-str mac-len )
+       address                                                                              
+                   
+0201   device-     ( str len -- )
+       name                                                                                 
+                   
+0202   my-args     ( -- arg-str arg-len )
+                   
+0203   my-self     ( -- ihandle )
+                   
+0204   find-       ( name-str name-len -- false | phandle true )
+       package                                                                              
+                   
+0205   open-       ( arg-str arg-len phandle -- ihandle | 0 )
+       package                                                                              
+                   
+0206   close-      ( ihandle -- )
+       package                                                                              
+                   
+0207   find-       ( method-str method-len phandle -- false | xt true )
+       method                                                                               
+                   
+0208   call-       ( ... xt ihandle -- ??? )
+       package                                                                              
+                   
+0209   $call-      ( ... method-str method-len -- ??? )
+       parent                                                                               
+                   
+020A   my-parent   ( -- ihandle )
+                   
+020B   ihandleph   ( ihandle -- phandle )
+       andle                                                                                
+                   
+020D   my-unit     ( -- phys.lo ... phys.hi )
+                   
+020E   $call-      ( ... method-str method-len ihandle -- ??? )
+       method                                                                               
+                   
+020F   $open-      ( arg-str arg-len name-str name-len -- ihandle | 0 )
+       package                                                                              
+                   
+0213   alarm       ( xt n -- )
+                   
+0214   (is-user-   ( E: ... -- ??? ) ( name-str name-len xt -- )
+       word)                                                                                
+                   
+0215   suspend-    ( -- )
+       fcode                                                                                
+                   
+0216   abort       ( ... -- ) (R:... -- )
+                   
+0217   catch       ( ... xt -- ??? error-code | ??? false )
+                   
+0218   throw       ( ... error-code -- ??? error-code | ...)
+                   
+0219   user-abort  ( ... -- ) ( R: ... -- )
+                   
+021A   get-my-     ( nam-str nam-len -- true | prop-addr prop-len false )
+       property                                                                             
+                   
+021B   decode-int  ( prop-addr1 prop-len1 -- prop-addr2 prop-len2 n )
+                   
+021C   decode-     ( prop-addr1 prop-len1 -- prop-addr2 prop-len2 str len )
+       string                                                                               
+                   
+021D   get-        ( nam-str nam-len -- true | prop-addr prop-len false )
+       inherited-                                                                           
+       property                                                                             
+                   
+021E   delete-     ( nam-str nam-len -- )
+       property                                                                             
+                   
+021F   get-        ( name-str name-len phandle -- true | prop-addr prop-len false )
+       package-                                                                             
+       property                                                                             
+                   
+0220   cpeek       ( addr -- false | byte  true )
+                   
+0221   wpeek       ( waddr -- false | w true )
+                   
+0222   lpeek       ( qaddr -- false | quad true )
+                   
+0223   cpoke       ( byte  addr --  okay? )
+                   
+0224   wpoke       ( w waddr --  okay? )
+                   
+0225   lpoke       ( quad qaddr --  okay? )
+                   
+0226   lwflip      ( quad1 -- quad2 )
+                   
+0227   lbflip      ( quad1 -- quad2 )
+                   
+0228   lbflips     ( qaddr  len -- )
+                   
+0230   rb@         ( addr -- byte )
+                   
+0231   rb!         ( byte  addr -- )
+                   
+0232   rw@         ( waddr -- w )
+                   
+0233   rw!         ( w  waddr -- )
+                   
+0234   rl@         ( qaddr -- quad )
+                   
+0235   rl!         ( quad qaddr -- )
+                   
+0236   wbflips     ( waddr len -- )
+                   
+0237   lwflips     ( qaddr len -- )
+                   
+023B   child       ( phandle.parent -- phandle.child )
+                   
+023C   peer        ( phandle -- phandle.sibling )
+                   
+023D   next-       ( previous-str previous-len phandle -- false | name-str name-len true )
+       property                                                                             
+                   
+023E   byte-load   ( addr xt -- )
+                   
+023F   set-args    ( arg-str arg-len unit-str unit-len -- )
+                   
+0240   left-       ( str len char -- R-str R-len L-str L-len )
+       parse-                                                                               
+       string                                                                               
+                   
+-      (           ( [text<) --)
+                   
+-      ]tokenizer  ( -- )
+                   
+-      \           ( -- )
+                   
+-      alias       ( E: ... -- ???)
+                   
+                   ( "new-name< old-name< " -- )
+                   
+-      decimal     ( -- )
+                   
+-      external    ( -- )
+                   
+-      fload       ( [filename<cr] -- )
+                   
+-      headerless  ( -- )
+                   
+-      headers     ( -- )
+                   
+-      hex         ( -- )
+                   
+-      octal       ( -- )
+                   
+-      tokenizer[  ( -- )
+                   
+CR     "           ( [text<"< ] -- text-str text-len )
+                   
+CR     '           ( "old-name< " -- xt )
+                   
+CR     (.)         ( n -- str len )
+                   
+CR     ."          ( [text<)] -- )
+                   
+CR     .(          ( [text<)] -- )
+                   
+CR     : (colon)   ( "new-name< " -- colon-sys ) ( E: ... -- ??? )
+                   
+CR     ;           ( -- )
+       (semicolon                                                                           
+       )                                                                                    
+<<
+                   
+CR                 ( x1 u -- x2 )
+                   
+CR     >'>          ( x1 u -- x2 )
+                   
+CR     ?           ( addr  -- )
+                   
+CR     [']         ( [old-name< ] -- xt )
+                   
+CR     1+          ( nu1 -- nu2 )
+                   
+CR     1-          ( nu1 -- nu2 )
+                   
+CR     2+          ( nu1 -- nu2 )
+                   
+CR     2-          ( nu1 -- nu2 )
+                   
+CR     accept      ( addr len1 -- len2 )
+                   
+CR     again       ( C: dest-sys -- )
+                   
+CR     allot       ( len -- )
+                   
+CR     ascii       ( [text< ] -- char )
+                   
+CR     begin       ( C: -- dest-sys ) ( -- )
+                   
+CR     blank       ( addr len -- )
+                   
+CR     buffer:     ( E: -- a-addr ) ( len "new-name< " -- )
+                   
+CR     /c*         ( nu1 -- nu2 )
+                   
+CR     ca1+        ( addr1 -- addr2 )
+                   
+CR     carret      ( -- 0x0D )
+                   
+CR     case        ( C: -- case-sys) ( sel -- sel )
+                   
+CR     constant    ( E: -- x ) ( x "new-name< " -- )
+                   
+CR     control     ( [text< ] -- char )
+                   
+CR     create      ( E: -- a-addr ) ( "new-name< " -- )
+                   
+CR     d#          ( [number< ] -- n )
+                   
+CR     .d          ( n -- )
+                   
+CR     decimal     ( -- )
+                   
+CR     decode-     ( prop-addr1 prop-len1 data-len -- prop-addr2 prop-len2 data-addr 
+       bytes       data-len )
+                   
+CR     defer       ( E: ... -- ??? ) ( "new-name< " -- )
+                   
+CR     do          ( C: -- dodest-sys ) ( limit start -- ) (R: -- sys )
+                   
+CR     ?do         ( C: -- dodest-sys ) ( limit start -- ) ( R: -- sys  )
+                   
+CR     3drop       ( x1 x2 x3 -- )
+                   
+CR     3dup        ( x1 x2 x3 -- x1 x2 x3 x1 x2 x3 )
+                   
+CR     else        ( C: orig-sys1 -- orig-sys2 ) ( -- )
+                   
+CR     endcase     ( C: case-sys -- ) ( sel | <nothing -- )
+                   
+CR     endof       ( C: case-sys1 of-sys -- case-sys2 ) ( -- )
+                   
+CR     erase       ( addr len -- )
+                   
+CR     eval        ( ... str len -- ??? )
+                   
+CR     false       ( -- false )
+                   
+CR     fcode-      ( -- )
+       version2                                                                             
+                   
+CR     field       ( E: addr -- addr+offset ) ( offset size "new-name< " -- offset+size )
+                   
+CR     h#          ( [number< ] -- n )
+                   
+CR     .h          ( n -- )
+                   
+CR     hex         ( -- )
+                   
+CR     if          ( C: -- orig-sys ) ( do-next? -- )
+                   
+CR     leave       ( -- ) ( R: sys -- )
+                   
+CR     ?leave      ( exit? -- ) ( R: sys -- )
+                   
+CR     linefeed    ( -- 0x0A )
+                   
+CR     loop        ( C: dodest-sys -- ) ( -- ) ( R: sys1 -- <nothing | sys2)
+                   
+CR     +loop       ( C: dodest-sys -- ) ( delta -- ) ( R: sys1 -- <nothing | sys2 )
+                   
+CR     /n*         ( nu1 -- nu2 )
+                   
+CR     na1+        ( addr1 -- addr2 )
+                   
+CR     not         ( x1 -- x2 )
+                   
+CR     o#          ( [number< ] -- n )
+                   
+CR     octal       ( -- )
+                   
+CR     of          ( C: case-sys1 -- case-sys2 of-sys ) ( sel of-val -- sel | <nothing )
+                   
+CR     repeat      ( C: orig-sys dest-sys -- ) ( -- )
+                   
+CR     s"          ( [text<"] -- test-str text-len )
+                   
+CR     s.          ( n -- )
+                   
+CR     space       ( -- )
+                   
+CR     spaces      ( cnt -- )
+                   
+CR     struct      ( -- 0 )
+                   
+CR     then        ( C: orig-sys -- ) ( -- )
+                   
+CR     to          ( param [old-name< ]  -- )
+                   
+CR     true        ( --  true )
+                   
+CR     (u.)        ( u -- str len )
+                   
+CR     until       ( C: dest-sys -- ) ( done? -- )
+                   
+CR     value       ( E: -- x) ( x "new-name< "-- )
+                   
+CR     variable    ( E: -- a-addr ) ( "new-name< "-- )
+                   
+CR     while       ( C: dest-sys -- orig-sys dest-sys ) ( continue? -- )
+
+------------------------------------------------------------------------------------------
+
+FCodes by Name
+The following table lists, in alphabetic order, currently-assigned FCodes.
+
+Table A-48 Fcodes by Name
+
+---------------------------------------------------------------------
+
+                
+Va  Function    Stack
+lu                                                                     
+e                                                                      
+---------------------------------------------------------------------
+
+                
+72  !           ( x a-addr -- )
+                
+CR  "           ( [text<"< ] -- text-str text-len )
+                
+C7  #           ( ud1 -- ud2 )
+                
+C9  #'>         ( ud -- str len )
+                
+CR  '           ( "old-name< " -- xt )
+                
+-   (           ( [text<) --)
+                
+CR  (.)         ( n -- str len )
+                
+20  *           ( nu1 nu2 -- prod )
+                
+1E  +           ( nu1 nu2 -- sum )
+                
+6C  +!          ( nu a-addr -- )
+                
+D3  ,           ( x -- )
+                
+1F  -           ( nu1 nu2 -- diff )
+                
+9D  .           ( nu -- )
+                
+CR  ."          ( [text<)] -- )
+                
+CR  .(          ( [text<)] -- )
+                
+21  /           ( n1 n2 -- quot )
+                
+CR  : (colon)   ( "new-name< " -- colon-sys ) ( E: ... -- ??? )
+                
+C   ;           ( -- )
+R   (semicolo                                                          
+    n)                                                                 
+<
+                
+3A              ( n1 n2 -- less? )
+                
+96  <#           ( -- )
+<<
+                
+CR              ( x1 u -- x2 )
+                
+43  <=           ( n1 n2 -- less-or-equal? )
+                
+3D  <'>          30
+                
+3C  =           ( n1 n2 -- greater? )
+>
+                
+0B              ( n1 n2 -- greater? )
+                
+42  >=           ( n1 n2 -- greater-or-equal? )
+                
+CR  >'>          ( x1 u -- x2 )
+                
+CR  ?           ( addr  -- )
+                
+6D  @           ( a-addr -- x )
+                
+CR  [']         ( [old-name< ] -- xt )
+                
+-   \           ( -- )
+                
+-   ]tokenize   ( -- )
+    r                                                                  
+                
+A5  0           ( -- 0 )
+                
+36  0<           ( n -- less-than-0? )
+                
+37  0<=          ( n -- less-or-equal-to-0? )
+                
+35  0<'>         ( n -- not-equal-to-0? )
+                
+34  0=          ( nulflag -- equal-to-0? )
+                
+38  0'>         ( n -- greater-than-0? )
+                
+39  0=          ( n -- greater-or-equal-to-0? )
+                
+A6  1           ( -- 1 )
+                
+CR  1+          ( nu1 -- nu2 )
+                
+CR  1-          ( nu1 -- nu2 )
+                
+A4  -1          ( -- -1 )
+                
+A7  2           ( -- 2 )
+                
+77  2!          ( x1 x2 a-addr -- )
+                
+59  2*          ( x1 -- x2 )
+                
+CR  2+          ( nu1 -- nu2 )
+                
+CR  2-          ( nu1 -- nu2 )
+                
+57  2/          ( x1 -- x2 )
+                
+76  2@          ( a-addr -- x1 x2 )
+                
+A8  3           ( -- 3 )
+                
+29  >a           ( x1 u -- x2 )
+                
+02  abort       ( ... -- ) (R:... -- )
+16                                                                     
+                
+2D  abs         ( n -- u )
+                
+CR  accept      ( addr len1 -- len2 )
+                
+CR  again       ( C: dest-sys -- )
+                
+02  alarm       ( xt n -- )
+13                                                                     
+                
+-   alias       ( E: ... -- ???) ( "new-name< old-name< " -
+                - )
+                
+A   aligned     ( n1 -- n1|a-addr )
+E                                                                      
+                
+8B  alloc-mem   ( len -- a-addr )
+                
+CR  allot       ( len -- )
+                
+23  and         ( x1 x2 -- x3 )
+                
+CR  ascii       ( [text< ] -- char )
+                
+12  b(")        ( -- str len ) ( F: /FCode-string/ -- )
+                
+11  b(')        ( -- xt ) ( F: /FCode#/ -- )
+                
+B7  b(:)        ( E: ... -- ??? ) ( F: -- colon-sys )
+                
+C2  b(;)        ( -- ) ( F: colon-sys -- )
+                
+A0  base        ( -- a-addr )
+                
+13  bbranch     ( -- ) ( F: /FCode-offset/ -- )
+                
+14  b?branch    ( don't-branch? -- )  ( F: /FCode-offset/ --)
+                
+B   b(buffer:   ( E: -- a-addr ) ( F: size -- )
+D   )                                                                  
+                
+C4  b(case)     ( sel -- sel ) ( F: -- )
+                
+B   b(constan   ( E: -- n ) ( F: n -- )
+A   t)                                                                 
+                
+BB  b(create)   ( E: -- a-addr ) ( F: -- )
+                
+BC  b(defer)    ( E: ... -- ??? ) ( F: -- )
+                
+17  b(do)       ( limit start -- ) ( F: /FCode-offset/ -- )
+                
+18  b(?do)      ( limit start -- ) ( F: /FCode-offset/ -- )
+                
+CR  begin       ( C: -- dest-sys ) ( -- )
+                
+D   behavior    ( defer-xt -- contents-xt )
+E                                                                      
+                
+A   bell        ( -- 0x07 ) 
+B                                                                      
+                
+C5  b(endcase   ( sel | <nothing -- ) ( F: -- )
+    )                                                                  
+                
+C6  b(endof)    ( -- ) ( F: /FCode-offset/ -- )
+                
+44  between     ( n min max --  min<=n<=max? )
+                
+BE  b(field)    ( E: addr -- addr+offset ) ( F: offset size -- 
+                offset+size )
+                
+A9  bl          ( -- 0x20 )
+                
+CR  blank       ( addr len -- )
+                
+1B  b(leave)    ( F: -- )
+                
+01  blink-      ( -- )
+5B  screen                                                             
+                
+10  b(lit)      ( -- n ) ( F: /FCode-num32/ -- )
+                
+7F  bljoin      ( bl.lo b2 b3 b4.hi -- quad )
+                
+15  b(loop)     ( -- ) ( F: /FCode-offset/ -- )
+                
+16  b(+loop)    ( delta -- ) ( F: /FCode-offset/ -- )
+                
+B1  b(<mark)     ( F: -- )
+                
+85  body'>      ( a-addr -- xt )
+                
+86  >body        ( xt -- a-addr )
+                
+1C  b(of)       ( sel of-val -- sel | <nothing ) ( F: /FCode-
+                offset/ -- )
+                
+A   bounds      ( n cnt -- n+cnt n )
+C                                                                      
+                
+B2  b(resolv    ( -- ) ( F: -- )
+    e)                                                                 
+                
+A   bs          ( -- 0x08 )
+A                                                                      
+                
+C3  b(to)       ( x -- )
+                
+CR  buffer:     ( E: -- a-addr ) ( len "new-name< " -- )
+                
+B8  b(value)    ( E: -- x ) ( F: x -- )
+                
+B9  b(variabl   ( E: -- a-addr ) ( F: -- )
+    e)                                                                 
+                
+B0  bwjoin      ( b.lo b.hi -- w )
+                
+02  byte-load   ( addr xt -- )
+3E                                                                     
+                
+75  c!          ( byte addr -- )
+                
+D0  c,          ( byte -- )
+                
+5A  /c          ( -- n )
+                
+-   /c*         ( nu1 -- nu2 )
+                
+71  c@          ( addr -- byte )
+                
+5E  ca+         ( addr1 index -- addr2 )
+                
+CR  ca1+        ( addr1 -- addr2 )
+                
+62  char+       ( addr1 -- addr2 )
+                
+02  $call-      ( ... method-str method-len ihandle -- ??? )
+0E  method                                                             
+                
+02  call-       ( ... xt ihandle -- ??? )
+08  package                                                            
+                
+02  $call-      ( ... method-str method-len -- ??? )
+09  parent                                                             
+                
+CR  carret      ( -- 0x0D )
+                
+CR  case        ( C: -- case-sys) ( sel -- sel )
+                
+02  catch        ( ... xt -- ??? error-code | ??? false )
+17                                                                     
+                
+65  cell+       ( addr1 -- addr2 )
+                
+69  cells       ( nu1 -- nu2 )
+                
+62  char+       ( addr1 -- addr2 )
+                
+01  char-       ( -- height )
+6C  height                                                             
+                
+66  chars       ( nu1 -- nu2 )
+                
+01  char-       ( -- width )
+6D  width                                                              
+                
+02  child       ( phandle.parent -- phandle.child )
+36                                                                     
+                
+02  close-      ( ihandle -- )
+06  package                                                            
+                
+01  column#     ( -- column# )
+53                                                                     
+                
+01  #columns    ( -- columns )
+51                                                                     
+                
+7A  comp        ( addr1 addr2 len -- n )
+                
+D   compile,    ( xt -- )
+D                                                                      
+                
+CR  constant    ( E: -- x ) ( x "new-name< " -- )
+                
+CR  control     ( [text< ] -- char )
+                
+84  count       ( pstr -- str len )
+                
+02  cpeek       ( addr -- false | byte  true )
+20                                                                     
+                
+02  cpoke       ( byte  addr --  okay? )
+23                                                                     
+                
+92  cr          ( -- )
+                
+91  (cr         ( -- )
+                
+CR  create      ( E: -- a-addr ) ( "new-name< " -- )
+                
+CR  d#          ( [number< ] -- n )
+                
+D8  d+          ( d1 d2 --d.sum )
+                
+D9  d-          ( d1 d2 -- d.diff )
+                
+CR  .d          ( n -- )
+                
+-   decimal     ( -- )
+                
+CR  decimal     ( -- )
+                
+02  decode-     ( prop-addr1 prop-len1 -- prop-addr2 prop-
+1B  int         len2 n )
+                
+01  decode-     ( prop-addr1 prop-len1 -- prop-addr2 prop-
+28  phys        len2 phys.lo ... phys.hi )
+                
+02  decode-     ( prop-addr1 prop-len1 -- prop-addr2 prop-
+1C  string      len2 str len )
+                
+01  default-    ( -- addr width height advance min-char 
+6A  font        #glyphs )
+                
+CR  defer       ( E: ... -- ??? ) ( "new-name< " -- )
+                
+01  delete-     ( n -- )
+5E  character                                                          
+    s                                                                  
+                
+01  delete-     ( n -- )
+60  lines                                                              
+                
+02  delete-     ( nam-str nam-len -- )
+1E  property                                                           
+                
+51  depth       ( -- u )
+                
+02  device-     ( str len -- )
+01  name                                                               
+                
+01  device-     ( str len -- )
+1A  type                                                               
+                
+01  diagnosti   ( -- diag? )
+20  c-mode?                                                            
+                
+A3  digit       ( char base -- digit true | char false )
+                
+01  display-    ( n -- )
+21  status                                                             
+                
+CR  do          ( C: -- dodest-sys ) ( limit start -- ) (R: -- sys )
+                
+CR  ?do         ( C: -- dodest-sys ) ( limit start -- ) ( R: -- sys  
+                )
+                
+01  draw-       ( char -- )
+57  character                                                          
+                
+01  draw-logo   ( line# addr width height -- ) 
+61                                                                     
+                
+46  drop        ( x -- )
+                
+52  2drop       ( x1 x2 -- )
+                
+CR  3drop       ( x1 x2 x3 -- )
+                
+47  dup         ( x -- x x )
+                
+53  2dup        ( x1 x2 --  x1 x2  x1 x2 )
+                
+CR  3dup        ( x1 x2 x3 -- x1 x2 x3 x1 x2 x3 )
+                
+50  ?dup        ( x -- 0 | x x)
+                
+CR  else        ( C: orig-sys1 -- orig-sys2 ) ( -- )
+                
+8F  emit        ( char -- )
+                
+01  encode+     ( prop-addr1 prop-len1 prop-addr2 prop-
+12              len2 -- prop-addr3 prop-len3 )
+                
+01  encode-     ( data-addr data-len -- prop-addr prop-len )
+15  bytes                                                              
+                
+01  encode-     ( n -- prop-addr prop-len )
+11  int                                                                
+                
+01  encode-     ( phys.lo ... phys.hi -- prop-addr prop-len )
+13  phys                                                               
+                
+01  encode-     ( str  len -- prop-addr  prop-len )
+14  string                                                             
+                
+00  end0        ( -- )
+                
+FF  end1        ( -- )
+                
+CR  endcase     ( C: case-sys -- ) ( sel | <nothing -- )
+                
+CR  endof       ( C: case-sys1 of-sys -- case-sys2 ) ( -- )
+                
+CR  erase       ( addr len -- )
+                
+01  erase-      ( -- )
+5A  screen                                                             
+                
+CR  eval        ( ... str len -- ??? )
+                
+C   evaluate    (... str len -- ??? )
+D                                                                      
+                
+1D  execute     ( ... xt -- ??? )
+                
+33  exit        ( -- ) (R: sys -- )
+                
+8A  expect      ( addr len -- )
+                
+-   external    ( -- )
+                
+C   external-   ( -- ) ( F: /FCode-string FCode#/ -- )
+A   token                                                              
+                
+CR  false       ( -- false )
+                
+01  fb1-        ( -- )
+74  blink-                                                             
+    screen                                                             
+                
+01  fb1-        ( n -- )
+77  delete-                                                            
+    character                                                          
+    s                                                                  
+                
+01  fb1-        ( n -- )
+79  delete-                                                            
+    lines                                                              
+                
+01  fb1-draw-   ( char -- )
+70  character                                                          
+                
+01  fb1-draw-   ( line# addr width height -- )
+7A  logo                                                               
+                
+01  fb1-        ( -- )
+73  erase-                                                             
+    screen                                                             
+                
+01  fb1-        ( n -- )
+76  insert-                                                            
+    character                                                          
+    s                                                                  
+                
+01  fb1-        ( n -- )
+78  insert-                                                            
+    lines                                                              
+                
+01  fb1-        ( width height #columns #lines -- )
+7B  install                                                            
+                
+01  fb1-        ( -- )
+75  invert-                                                            
+    screen                                                             
+                
+01  fb1-        ( -- )
+71  reset-                                                             
+    screen                                                             
+                
+01  fb1-        ( n -- )
+7C  slide-up                                                           
+                
+01  fb1-        ( -- )
+72  toggle-                                                            
+    cursor                                                             
+                
+01  fb8-        ( -- )
+84  blink-                                                             
+    screen                                                             
+                
+01  fb8-        ( n -- )
+87  delete-                                                            
+    character                                                          
+    s                                                                  
+                
+01  fb8-        ( n -- )
+89  delete-                                                            
+    lines                                                              
+                
+01  fb8-draw-   ( char -- )
+80  character                                                          
+                
+01  fb8-draw-   ( line# addr width height -- )
+8A  logo                                                               
+                
+01  fb8-        ( -- )
+83  erase-                                                             
+    screen                                                             
+                
+01  fb8-        ( n -- )
+86  insert-                                                            
+    character                                                          
+    s                                                                  
+                
+01  fb8-        ( n -- )
+88  insert-                                                            
+    lines                                                              
+                
+01  fb8-        ( width height #columns #lines -- )
+8B  install                                                            
+                
+01  fb8-        ( -- )
+85  invert-                                                            
+    screen                                                             
+                
+01  fb8-        ( -- )
+81  reset-                                                             
+    screen                                                             
+                
+01  fb8-        ( -- )
+82  toggle-                                                            
+    cursor                                                             
+                
+87  fcode-      ( -- n )
+    revision                                                           
+                
+CR  fcode-      ( -- )
+    version2                                                           
+                
+FC  ferror      ( -- )
+                
+CR  field       ( E: addr -- addr+offset ) ( offset size "new-
+                name< " -- offset+size )
+                
+79  fill        ( addr len byte -- )
+                
+CB  $find       ( name-str name-len -- xt true | name-str 
+                name-len false )
+                
+02  find-       ( method-str method-len phandle -- false | 
+07  method      xt true )
+                
+02  find-       ( name-str name-len -- false | phandle true )
+04  package                                                            
+                
+01  finish-     ( -- )
+27  device                                                             
+                
+01  >font        ( char -- addr )
+6E                                                                     
+                
+-   fload       ( [filename<cr] -- )
+                
+01  fontbytes   ( -- bytes )
+6F                                                                     
+                
+01  frame-      ( -- addr )
+62  buffer-                                                            
+    adr                                                                
+                
+8C  free-mem    ( a-addr len -- )
+                
+01  free-       ( virt size -- )
+05  virtual                                                            
+                
+02  get-        ( nam-str nam-len -- true | prop-addr prop-
+1d  inherited   len false )
+    -property                                                          
+                
+01  get-msecs   ( -- n )
+25                                                                     
+                
+02  get-my-     ( nam-str nam-len -- true | prop-addr prop-
+1A  property    len false )
+                
+02  get-        ( name-str name-len phandle -- true | prop-
+1F  package-    addr prop-len false )
+    property                                                           
+                
+D   get-token   ( fcode# -- xt immediate? )
+A                                                                      
+                
+CR  h#          ( [number< ] -- n )
+                
+CR  .h          ( n -- )
+                
+-   headerles   ( -- )
+    s                                                                  
+                
+-   headers     ( -- )
+                
+A   here        ( -- addr )
+D                                                                      
+                
+-   hex         ( -- )
+                
+CR  hex         ( -- )
+                
+95  hold        ( char -- )
+                
+19  i           ( -- index ) ( R: sys -- sys )
+                
+CR  if          ( C: -- orig-sys ) ( do-next? -- )
+                
+02  ihandlep    ( ihandle -- phandle )
+0B  handle                                                             
+                
+01  insert-     ( n -- )
+5D  character                                                          
+    s                                                                  
+                
+01  insert-     ( n -- )
+5F  lines                                                              
+                
+C0  instance    ( -- )
+                
+01  inverse?    ( -- white-on-black? )
+54                                                                     
+                
+01  inverse-    ( -- black? )
+55  screen?                                                            
+                
+26  invert      ( x1 -- x2 )
+                
+01  invert-     ( -- )
+5C  screen                                                             
+                
+01  is-         ( xt -- )
+1C  install                                                            
+                
+01  is-remove   ( xt -- )
+1D                                                                     
+                
+01  is-         ( xt -- )
+1E  selftest                                                           
+                
+02  (is-user-   ( E: ... -- ??? ) ( name-str name-len xt -- )
+14  word)                                                              
+                
+1A  j           ( --  index ) ( R: sys -- sys )
+                
+8E  key         ( -- char )
+                
+8D  key?        ( -- pressed? )
+                
+73  l!          ( quad qaddr -- )
+                
+D2  l,          ( quad -- )
+                
+6E  l@          ( qaddr -- quad )
+                
+5C  /l          ( -- n )
+                
+68  /l*         ( nu1 -- nu2 )
+                
+60  la+         ( addr1 index -- addr2 )
+                
+64  la1+        ( addr1 -- addr2 )
+                
+02  lbflip      ( quad1 -- quad2 )
+27                                                                     
+                
+02  lbflips     ( qaddr  len -- )
+28                                                                     
+                
+7E  lbsplit     ( quad -- b.lo b2 b3 b4.hi )
+                
+82  lcc         ( char1 -- char2 )
+                
+CR  leave       ( -- ) ( R: sys -- )
+                
+CR  ?leave      ( exit? -- ) ( R: sys -- )
+                
+02  left-       ( str len char -- R-str R-len L-str L-len )
+40  parse-                                                             
+    string                                                             
+                
+01  line#       ( -- line# )
+52                                                                     
+                
+94  #line       ( -- a-addr )
+                
+CR  linefeed    ( -- 0x0A )
+                
+01  #lines      ( -- rows )
+50                                                                     
+                
+CR  loop        ( C: dodest-sys -- ) ( -- ) ( R: sys1 -- 
+                <nothing | sys2) 
+                
+CR  +loop       ( C: dodest-sys -- ) ( delta -- ) ( R: sys1 -- 
+                <nothing | sys2 )
+                
+02  lpeek       ( qaddr -- false | quad true )
+22                                                                     
+                
+02  lpoke       ( quad qaddr --  okay? )
+25                                                                     
+                
+27  lshift      ( x1 u -- x2 )
+                
+02  lwflip      ( quad1 -- quad2 )
+26                                                                     
+                
+02  lwflips     ( qaddr len -- )
+37                                                                     
+                
+7C  lwsplit     ( quad -- w1.lo w2.hi )
+                
+01  mac-        ( -- mac-str mac-len )
+A4  address                                                            
+                
+01  map-low     ( phys.lo ... size -- virt )
+30                                                                     
+                
+01  mask        ( -- a-addr )
+24                                                                     
+                
+2F  max         ( n1 n2 -- n1|n2 )
+                
+01  memory-     ( addr len -- fail? )
+22  test-                                                              
+    suite                                                              
+                
+2E  min         ( n1 n2 -- n1|n2 )
+                
+22  mod         ( n1 n2 -- rem )
+                
+2A  /mod        ( n1 n2 -- rem quot )
+                
+01  model       ( str len -- )
+19                                                                     
+                
+78  move        ( src-addr dest-addr len -- )
+                
+01  ms          ( n -- )
+26                                                                     
+                
+01  my-         ( -- phys.lo ... )
+02  address                                                            
+                
+02  my-args     ( -- arg-str arg-len )
+02                                                                     
+                
+02  my-parent   ( -- ihandle )
+0A                                                                     
+                
+02  my-self     ( -- ihandle )
+03                                                                     
+                
+01  my-space    ( -- phys.hi )
+03                                                                     
+                
+02  my-unit     ( -- phys.lo ... phys.hi )
+0D                                                                     
+                
+5D  /n          ( -- n )
+                
+CR  /n*         ( nu1 -- nu2 )
+                
+61  na+         ( addr1 index -- addr2 )
+                
+CR  na1+        ( addr1 -- addr2 )
+                
+B6  named-      ( -- ) ( F: /FCode-string FCode#/ -- )
+    token                                                              
+                
+2C  negate      ( n1 -- n2 )
+                
+01  new-        ( -- )
+1F  device                                                             
+                
+B5  new-token   ( -- ) ( F: /FCode#/ -- )
+                
+02  next-       ( previous-str previous-len phandle -- false | 
+3D  property    name-str name-len true )
+                
+4D  nip         ( x1 x2 -- x2 )
+                
+7B  noop        ( -- )
+                
+CR  not         ( x1 -- x2 )
+                
+A2  $number     ( addr len -- true | n false )
+                
+CR  o#          ( [number< ] -- n )
+                
+-   octal       ( -- )
+                
+CR  octal       ( -- )
+                
+CR  of          ( C: case-sys1 -- case-sys2 of-sys ) ( sel of-val 
+                -- sel | <nothing )
+                
+6B  off         ( a-addr -- )
+                
+C   offset16    ( -- )
+C                                                                      
+                
+6A  on          ( a-addr -- )
+                
+02  open-       ( arg-str arg-len phandle -- ihandle | 0 )
+05  package                                                            
+                
+02  $open-      ( arg-str arg-len name-str name-len -- 
+0F  package     ihandle | 0 )
+                
+24  or          ( x1 x2 -- x3 )
+                
+93  #out        ( -- a-addr )
+                
+48  over        ( x1 x2 -- x1 x2 x1 )
+                
+54  2over       ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 )
+                
+83  pack        ( str len addr -- pstr )
+                
+01  parse-      ( str len  -- val.lo val.hi )
+1B  2int                                                               
+                
+02  peer        ( phandle -- phandle.sibling )
+3C                                                                     
+                
+4E  pick        ( xu ... x1 x0 u -- xu ... x1 x0 xu )
+                
+01  property    ( prop-addr prop-len name-str name-len -- )
+10                                                                     
+                
+31  r'>         ( -- x ) ( R: x -- )
+                
+32  r@          ( -- x ) ( R: x -- x )
+                
+9E  .r          ( n size -- )
+                
+30  >r           ( x -- ) ( R: -- x)
+                
+02  rb!         ( byte  addr -- )
+31                                                                     
+                
+02  rb@         ( addr -- byte )
+30                                                                     
+                
+01  reg         ( phys.lo ... phys.hi size -- )
+16                                                                     
+                
+CR  repeat      ( C: orig-sys dest-sys -- ) ( -- )
+                
+01  reset-      ( -- )
+58  screen                                                             
+                
+02  rl!         ( quad qaddr -- )
+35                                                                     
+                
+02  rl@         ( qaddr -- quad )
+34                                                                     
+                
+4F  roll        ( xu ... x1 x0 u -- xu-1 ... x1 x0 xu )
+                
+4A  rot         ( x1 x2 x3 -- x2 x3 x1 )
+                
+4B  -rot        ( x1 x2 x3 -- x3 x1 x2 )
+                
+56  2rot        ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 )
+                
+28  rshift      ( x1 u -- x2 )
+                
+02  rw!         ( w waddr -- )
+33                                                                     
+                
+02  rw@         ( waddr -- w )
+32                                                                     
+                
+CR  s"          ( [text<"] -- test-str text-len )
+                
+CR  s.          ( n -- )
+                
+C8  #s          ( ud -- 0 0 )
+                
+9F  .s          ( ... -- ... )
+                
+01  sbus-       ( sbus-intr# -- cpu-intr# )
+31  intrcpu                                                            
+                
+01  screen-     ( -- height )
+63  height                                                             
+                
+01  screen-     ( -- width )
+64  width                                                              
+                
+02  set-args    ( arg-str arg-len unit-str unit-len -- )
+3F                                                                     
+                
+01  set-font    ( addr width height advance min-char 
+6B              #glyphs -- )
+                
+D   set-token   ( xt immediate? fcode# -- )
+B                                                                      
+                
+98  sign        ( n -- )
+                
+CR  space       ( -- )
+                
+CR  spaces      ( cnt -- )
+                
+88  span        ( -- a-addr )
+                
+F0  start0      ( -- )
+                
+F1  start1      ( -- )
+                
+F2  start2      ( -- )
+                
+F3  start4      ( -- )
+                
+D   state       ( -- a-addr )
+C                                                                      
+                
+CR  struct      ( -- 0 )
+                
+02  suspend-    ( -- )
+15  fcode                                                              
+                
+49  swap        ( x1 x2 -- x2 x1 )
+                
+55  2swap       ( x1 x2 x3 x4 -- x3 x4 x1 x2 )
+                
+CR  then        ( C: orig-sys -- ) ( -- )
+                
+02  throw       ( ... error-code -- ??? error-code | ...)
+18                                                                     
+                
+CR  to          ( param [old-name< ]  -- )
+                
+01  toggle-     ( -- )
+59  cursor                                                             
+                
+-   tokenizer   ( -- )
+    [                                                                  
+                
+CR  true        ( --  true )
+                
+4C  tuck        ( x1 x2 -- x2 x1 x2 )
+                
+90  type        ( text-str text-len -- )
+                
+99  u#          ( u1 -- u2 )
+                
+97  u#'>        ( u -- str len )
+                
+9A  u#s         ( u1 -- u2 )
+                
+9B  u.          ( u -- )
+                
+40  u<           ( u1 u2 -- unsigned-less? )
+                
+3F  u<=          ( u1 u2 -- unsigned-less-or-equal? )
+                
+3E  u'>         ( u1 u2 -- unsigned-greater? )
+                
+41  u=          ( u1 u2 -- unsigned-greater-or-equal? )
+                
+CR  (u.)        ( n -- addr len )
+                
+58  u2/         ( x1 -- x2 )
+                
+D4  um*         ( u1 u2 -- ud.prod )
+                
+D5  um/mod      ( ud u -- urem uquot )
+                
+2B  u/mod       ( u1 u2 -- urem uquot )
+                
+89  unloop      ( -- ) ( R: sys -- )
+                
+CR  until       ( C: dest-sys -- ) ( done? -- )
+                
+81  upc         ( char1 -- char2 )
+                
+9C  u.r         ( u size -- )
+                
+02  user-       ( ... -- ) ( R: ... -- )
+19  abort                                                              
+                
+CR  value       ( E: -- x) ( x "new-name< "-- )
+                
+CR  variable    ( E: -- a-addr ) ( "new-name< "-- )
+                
+FD  version1    ( -- )
+                
+74  w!          ( w waddr -- )
+                
+D1  w,          ( w -- )
+                
+6F  w@          ( waddr -- w )
+                
+5B  /w          ( -- n )
+                
+67  /w*         ( nu1 -- nu2 )
+                
+70  <w@          ( waddr -- n )
+                
+5F  wa+         ( addr1 index -- addr2 )
+                
+63  wa1+        ( addr1 -- addr2 )
+                
+80  wbflip      ( w1 -- w2 )
+                
+02  wbflips     ( waddr len -- )
+36                                                                     
+                
+AF  wbsplit     ( w -- b1.lo b2.hi )
+                
+CR  while       ( C: dest-sys -- orig-sys dest-sys ) ( continue? 
+                -- )
+                
+01  window-     ( -- border-width )
+66  left                                                               
+                
+01  window-     ( -- border-height )
+65  top                                                                
+                
+45  within      ( n min max -- min<=n<max? )
+                
+7D  wljoin      ( w.lo w.hi -- quad )
+                
+02  wpeek       ( waddr -- false | w true )
+21                                                                     
+                
+02  wpoke       ( w waddr --  okay? )
+24                                                                     
+                
+25  xor         ( x1 x2 -- x3 )
+
+---------------------------------------------------------------------
+
+
+Cookie PreferencesAd Choices

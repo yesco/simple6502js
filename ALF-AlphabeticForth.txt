@@ -217,9 +217,39 @@ C ( #b  base )
 
     $l  sliteral
 
+
   Memory:
-    @  @
-    !  !
+    @   @
+    !   !
+    c@  c@
+    c!  c!
+  ( mv  move )
+    z   fill/zero
+
+    mi  0mi  ===  1 $00 m+
+    md  0mi  ===  1 $00 m-
+    m+  1 0 m+  ===  1 $00 @ + $00 !
+    m-  
+
+    ci
+    cd   (defer clash)
+    c+
+    c-
+
+    c:   s o c@ 1+
+    c;   s o c! 1+
+
+
+  (optional 'variables' reserved in ZP)
+    v@x    variable 'x' fetch (zp)
+    v!x    variable 'x' store (zp)
+
+    viX    X @ 1 + X !
+    vdX    X @ 1 - X !
+    v+X    X @ + X !
+    v-X    X @ - X !
+  ( vX     X @ )
+
 
   Char:
     'c  char
@@ -242,76 +272,95 @@ C ( #b  base )
     ?d   ?dup
     rc   recurse
 
-    ]    exit (or use ';'!)
-    ]    leave
-    ]    unloop
-    
     q    quit
     q"   quit"
     rt   throw
     re   catch (errcatch)
 
-    ?(   if_-1_?__<then>_]_<else>_
-    ]    else
-    )    then
+  Ifs (chainables):
+    '?x' returns 0 or 1, follow by () for loop
+    0 or 1 time === if ... then)
 
-    ?(   if
-    ?]   if-exit/leave
-    ?]]  if-unroll-exit
-    ?[   if-next
+    ?0   :(a--a a?0:1)
+    ?1   :(0--0 a?1:0)
+    ?=   :(a a--a a=b?1:0)
+    ?<   :(a b--a a<b?1:0)
+    ?>   :(a b--a a>b?1:0)
+    ?+   :(a--a a>0?1:0)
+    ?-   :(a--a a<0?1:0)
+    ?b   :(a l h--a l<=a<=h?1:0)
+
+    ?(   ?1(
+    ?]   ?1]
+
+  and-or-xor Ifs:
+    // test opposite and leave!
+
+    : inside[3,10]
+    "no" s ( 3 ?<] 10 ?>]
+      "yes" s
+    ) \
+
+    : outside[3,10]
+    "no" s ( 2 ?>] 11 ?<]
+      "yes" s
+    ) \
+
+
+
+  Loops:
+    (    for (n --), skip if 0
+    i    index (-- i) of innermost loop
+    j    index (-- j) of outer loop
+    )    next (leaves if i==0)
+
+    ]    exit/leave/unloop (n --)
+         (0: ignore)
+         (n: exit n levels of loops,or calls)
     
-   Chainables (redundant - nah?)
-    ?=(  over_swap_=_if
-    ?<(  over_swap_<_if
-    ?>(  over_swap_>_if
-    ?<=( ?<n(
-    ?>=( ?>n(
-    ?=~( <>_if
-    ?+(  positive 7d0>?(3) == 7?+(3) == 7 3
-    ?-(  negative
-    ?~(
-    ?&(
-    ?|(
-    ?^(
+    w)   while repeat
+    u)   until repeat
+    ?]   ?1 ]
+    ?[   ?1 [  ==  if "next"
+
+    (    for (m --) leave if 0
+    )    loop (if 0, leave 0, decrease m, loop)
+    #)   repeat (n --) (if n >= "m" leave)
+    w)   while (n --) repeat leave if n==0
+    u)   until (n --) leave if n!=0
+
+  Loop examples:
+    0  ( never run )
+    1  ( run once )
+    3  ( run three times )
+    3  ( i )    (-- 2 1 0)
     
-  ( ?[0-9](                    )
-  (      dup 1 <digit> << & if )
+    ?  ( run once if true )
+    ?1 ( run once if true )
+    ?0 ( run once if false )
+    ?< ( run once if < )
 
-    #(   for
-    #)   loop
-    #+)  +loop
+    3  ( run once 1] norun ) run
+    3  ( run this 3 times  0 ] run*3 ) run
+    3  ( 5 ( run once  2 ]  norun ) norun ) run
 
-    (... begin / do (counts up from zero!)
-    )    again / repeat
-    i    index of innnermost loop
-    j    index of next level loop
-    ?)   while
-    ]    leave (go to matching ')')
-    ?]   if-leave
-    [    next (go back to '(')
+    7  ( run this forever  1 #) never
+    7  ( run this once  0 #) run
+  1 8  ( d . 2* d #) \ -- prints: 1 2 4
+    1  ( ?k d u)  (-- k) wait until key press
+ 3 10  ( d. 1+ 7 ?< w) \ -- prints 3 4 5 6
+ 3 10  ( d. 1+ 7 ?> u) \ -- prints 3 4 5 6 7
 
-  ( #(   numbered for )
-  ( ##(  numbered do loop )
-  ( $(   loop over chars a pointer )
+
+
+
+  Case simulation:
+  1( k                   -- key case
+    3 ?=(\"clear" 2] )   --  3 of "break" endof
+   12 ?=(\"break" 2] )   -- 12 of "clear" endof
+   65 ?=(\"A"     2] )   -- 65 of "A"
+   \)                    -- endcase
     
-    ]]   unroll-leave
-    ]]]  unroll-unroll-leave
-    ]]]]...
-
-    ?]]  if-unroll-leave
-    ?]]]...
-
-    ?[   if-next
-
-    ?(  if     )   then   ]    exit
-
-    (   begin  )   again  ?]   if-exit
-              ?)   until  n?]  while
-               )   repeat
-
-    $(  do     $)  loop   #+)  +loop
-
-
   Allocation:
     al   allot
     
@@ -342,12 +391,6 @@ A   ax   assoc execute
 
     [      [ (relocate code during "compilation")
     ]      ]
-
-A   vx@    variable 'x' fetch (zp)
-A   vx!    variable 'x' store (zp)
-
-A ( v+X    inc var X)
-A ( v-X    dec var X)
 
     h      here
 A   g      gere (memory, lol. use M?)
@@ -385,6 +428,9 @@ A   xr     return (RTS / quit?)
     wr> 2r>
     wr@ 2r@
 
+    w:  s o @ 2+
+    w;  s o ! 2+
+
     w<  s>d
 A   w>  d>s  (s\)
 
@@ -394,7 +440,11 @@ A   w>  d>s  (s\)
   ( #.     number print (same as .) )
     $.     hex print
     $t     type (string)
-    $k     key 
+
+     k     key   wait for key press
+    $k     key     == 1(?kdu)
+    ?k     key? (-- key)
+
     $l     accept (line)
 
   Float
@@ -504,16 +554,14 @@ A   w>  d>s  (s\)
     bd     buffer-dump? lol
     be     empty-buffers
 
-
     ld     load
     bi     >in (?)
     bi ?   source-id (?)
            save-input
            restore-input
 
-    
-
   Locals:
+    (probably not good idea)
     3{     nlocals = 3dr<#(,)r>,
     }      dealloc_locals = r,2*nal
     la     first_local
@@ -531,12 +579,10 @@ A   w>  d>s  (s\)
 
    ' ' - space (ignore or use for longnames?)
     `  - (backtick special quoting function?)
-    b  - (byte? binary? bit?)
-    k  - (key? is $k)
+  ( k  - (key   or is it $k)
     l  - (la=local a)
-    m  - (min max move memory?)
-    n  - negate
-  ( t  - to x='x! tuck=so)
+  ( m  - move )
+  ( t  - type to x='x! tuck=so)
   ( u  - Unsigned prefix)
   ( v  - variable value)
   ( w  - 2... )
@@ -712,3 +758,5 @@ REFERENCES
     Forth words defined in Forth:
     - https://github.com/flagxor/eforth/blob/main/ueforth/common/boot.fs
     
+    Fcode (Open Boot) manual opcodes by function:
+    - https://docs.oracle.com/cd/E19957-01/802-3239-10/appref.html#30630

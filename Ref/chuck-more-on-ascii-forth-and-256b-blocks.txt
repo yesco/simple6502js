@@ -1,0 +1,2313 @@
+https://groups.google.com/g/comp.lang.forth/c/m243lvaAWPk
+
+On Saturday July 26 1997 Chuck
+Moore gave a presentation to the
+
+35 views
+Jeff Fox
+7/27/97
+
+On Saturday July 26 1997 Chuck
+Moore gave a presentation to the
+Silicon Valley Chapter of the
+Forth Interest Group. Before his
+presentation he was given an
+award in appreciation of the
+development of the original
+Forth. Chuck was asked to clarify
+the dates involved. His response
+was that things started with the
+first Forth at Mohasco in 1968,
+they had a Forth at NRAO in 1970,
+Forth Inc. was founded in 1973,
+and that since it was almost 1998
+and he had been born in 1938 that
+he had been working with Forth
+for almost half of his life.  I
+took these notes so that more
+people could encounter many of
+the ideas he presented. This is
+not an official transcript as I
+missed some of what he said. I
+made an effort to get a recording
+but there were technical
+problems. In the actual speech
+some of the thoughts were a
+little better connected with some
+material that is lost here. I
+have included the questions or
+discussion. I will leave that for
+other people who were there. I
+have also put a copy on the web
+at
+http://www.dnai.com/~jfox/color4th.html
+
+Jeff Fox 7/27/97
+
+Charles Moore:
+
+I'm back.
+
+OKAD was a mistake. I have added
+Forth to OKAD. It was done in the
+most expedient way but not the
+best. Forth is running under OKAD
+and I will eventually get OKAD
+running in Forth.
+
+A few years ago I gave up on
+Forth, it was too complicated.
+It was about the time of the work
+of the standard committee and I
+wanted something simple. I
+abandoned source and used a
+decompiler to view the object
+code. It did not really work. I
+also wanted to get away from the
+keyboard.
+
+OKAD was object code on the
+Pentium with a 7 key interface. I
+still think it is the best way to
+edit layout but it is bad for
+everything else. The problem with
+menus is the scripting. You can't
+easily edit a script that
+navigates menus. It was brought
+home to me when testing chip
+layout. I have lots of tests that
+I have to do and I couldn't
+easily construct them or repeat
+them automatically.
+
+For years I have been saying "The
+map is not the territory."  A
+description of a program is not
+the program, a description of a
+test sequence is not the test
+sequence, a description of a chip
+is not the chip. I was partially
+wrong. The map is a better
+representation.
+
+I never claimed to be one right,
+or two consistent. (laughter) I
+hope I keep learning.
+
+Given that I won't be working
+with object code manipulation I
+need more than 7 keys. I need a
+standard 83 key keyboard.  I
+don't need all 101 keys to use
+source. In 30 years I still see
+that Forth is the best way.
+
+First of all it has a data
+stack. It is the only language
+with a separate data
+stack. Second it has colon
+definitions.
+
+: XYZ ;
+
+is a beautiful and simple
+concept. What could be simpler?
+It forms the entire metaphoric
+background for factoring.
+
+There is a problem that I first
+saw at iTV. It was the first time
+I have been in the presence of a
+Forth project that I wasn't
+contributing to. I saw how other
+programmers use Forth.  They
+don't always get it right.
+
+Besides stacks plus colon
+definitions there is something
+else.  There needs to be another
+book written about writing good
+code.
+
+In my case it all goes back to my
+father. Where I grew up we had a
+fall season. In the fall one of
+my jobs was to get the leaves out
+of the hedge. My hands were small
+and I could get my hands in where
+he couldn't. I had to get all the
+leaves.  It was an impossible job
+because there are an infinite
+supply of leaves. I developed an
+attitude known as perfectionism.
+It is not popular but it does
+lead to success in some things
+like programming.
+
+The best way I have done Forth
+was cmForth. I think of it as too
+complex. I want to talk about
+what Forth should be.
+
+(Chuck showed an overhead with a
+screen dump from an OKAD
+diagnostic screen with many
+traces.)
+
+This is the reason I wanted to
+get back to Forth. I am using
+Forth as a scripting language for
+chip tests in OKAD. The ability
+to display many signals at one
+time is new and very very
+productive. Here you see pads,
+these dots show the state of each
+net on the chip, and these lines
+are signal traces. This is a hard
+copy of a screen in OKAD. I added
+print screen to OKAD. I reversed
+the background color and made
+some other transformations. This
+is not the Windows PrtSc, it is
+mine. It was a tiny amount of
+work. I can now build up a book
+showing which tests were run and
+the results for a given chip
+providing that there is a way to
+describe a test. (Forth)
+
+(jsk: 256 byte block!)
+(jsk: 1K asm for i21 "forth")
+
+(chuck: "This is the smallest one
+and it seems you can fit more on
+256 byte blocks than 1024 byte
+blocks.")
+
+What do I mean by Forth? Here is
+code for i21. (Chuck showed
+another overhead with a different
+screen dump from OKAD) Notice the
+big letters and that this is a
+256 byte block. A 1024 byte block
+would be too big to fit on this
+screen. I have written four i21
+compilers. This one is a 1K
+source code assembler.  I am
+pleased with it. This is the
+smallest one and it seems you can
+fit more on 256 byte blocks than
+1024 byte blocks. (Chuck showed
+second screen)
+
+(jsk: 6-bit character set 0-Z O=0 
+(1=l?))
+
+(chuck: 'Ten "G"s is simpler than a loop.')
+
+At the top is a comment. The
+comment ends in a single quote.
+I use my own 0-Z character
+set. It is a six bit character
+set. It only has upper case and
+there is no distinction between
+the letter "O" and zero. This was
+not a problem with the menus but
+I do now have to deal with it in
+the source.  The word COUNTER' is
+a comment. The word EMPTY is well
+known. 11 LOAD is the command to
+load screen 11. Then you see : G0
+C0 ON G G G G G G G G G G PRINT ;
+Ten "G"s is simpler than a loop.
+
+I don't smudge and unsmudge words
+so you must redefine words with a
+new name. If you redefine a word
+it would call itself
+recursively. This is the simplest
+way to do it.
+
+(chuck: command line - obsolete!)
+
+(chuck: "They don't need to know
+it is a compiler, just that it
+has a stack and colon
+definitions.")
+
+(jsk: Ok, remove the compiler!)
+
+OKAD is written in assembler. It
+was converted from object code
+only. A chunk of OKAD is Forth. I
+have a symbol table in OKAD and
+it is used by the Forth. The
+compiler compiles code for the
+Pentium and it is subroutine
+threaded. + AND OR 2* 2/ are
+inlined other things are
+subroutine calls. It runs
+fast. It compiles fast.  You
+don't see it compiling at all on
+my small programs. You load a
+block and the definitions are
+available before your finger
+leaves the key. They don't need
+to know it is a compiler, just
+that it has a stack and colon
+definitions.
+
+It should take five to ten
+minutes for anyone to learn this
+language.
+
+(chuck: "There is no reason for a
+computer that is not attached to
+the internet.")
+
+(chuck: "The computer can be this
+big plus a keyboard.")
+
+Things have changed in 30
+years. For one thing there is
+lots of memory. You can't buy a
+computer with a small amount of
+memory.  So blocks are in RAM. I
+have 100 256 byte block
+buffers. I use DOS to read these
+in from disk when I start. There
+is no need for disk access while
+running. Also we now have the
+internet.  There is no reason for
+a computer that is not attached
+to the internet. When attached to
+the internet there is no need for
+a disk, you just read from the
+server. The computer can be this
+big plus a keyboard.
+
+(chuck: "I was enamored of
+tokenized Forth")
+
+(jsk: here you go!)
+
+(chuck: "...we can have tokenized
+Forth like Java. But it would
+require a standards committee.")
+
+(jsk: I did it already)
+
+I saw an article the other day on
+web languages. I read the article
+and visited the web site. Forth
+was not one of the languages. It
+is clear that Java is only one
+among many and Forth should be
+there. I was enamored of
+tokenized Forth, we can have
+tokenized Forth like Java. But it
+would require a standards
+committee.
+
+(chuck: Forth Standard: "Any
+spirit of innovation has been
+thoroughly quenched.")
+
+(chuck: "Underground Forths are
+still needed.")
+
+(jsk: 6502 is underground 256 cm under? 8"4, actually, it's not dead!)
+
+I had reservations about ANSI. I
+worried that it would be a
+disaster and not merely a dubious
+advantage. All of my fears of the
+standard and none of the
+advantages of the standard have
+come to pass. Any spirit of
+innovation has been thoroughly
+quenched. Underground Forths are
+still needed. I said I thought
+the standard should be a
+publication standard but they
+wanted an execution standard.
+
+On the net we have no time to
+make a net Forth standard. So
+that means source code. Mine will
+have color change words.
+
+(chuck: Forth - "The most
+mysterious is why it works so
+well.")
+
+(chuck: logarithmic growth)
+
+There are several components to
+Forth. The most mysterious is why
+it works so well. There is the
+explanation by that it has to do
+with logarithmic rather than
+linear growth. And factorization
+promoted by the language
+encourages factorization of the
+problem in thought.
+
+(chuck: "I won't use your code
+anyway I will rewrite it.")
+
+The medium of interchange is
+ideas not code. Tell me how you
+did a heap sort, don't give me
+your code. I have objected to
+Forth Dimension's pages and pages
+of source when one block has the
+key definition. It just makes it
+harder to find what I want to
+know. I won't use your code
+anyway I will rewrite it.
+
+(chuck: UI-half the code is
+display; A command line
+elimininates that.")
+
+There is a problem with
+conversion of some of OKAD from
+being menu driven to a command
+line. I find that about one half
+of OKAD is displaying. Most of
+Windows is presenting I/O to the
+user. A command line eliminates
+that.
+
+(chuck: 6-bit "ascii")
+(jsk: 2 bits for me!)
+
+On the net you can easily access
+other people's code. You can
+share code though I don't do
+that. You can share code if you
+both use the same type of
+source. Source code is
+characters. What I have in mine
+is not ascii. I have colorful
+delimiters. I could use ascii but
+I like the 0-Z set as six bits. I
+wonder if the NSA would figure
+out that you couldn't decode my
+text down to eight bit
+characters. We get compression
+from not using ascii. It is a
+form of encryption.  I know email
+protocols use seven rather than
+eight bit characters.
+
+(jsk: tail-entry to other word)
+
+I want multiple entry points to
+defined words so I don't need a
+semicolon. I may not want a
+semicolon to stop the
+compiling. That is easy for me to
+do this way.
+
+(chuck: "I don't like the idea of
+a Forth, old or new, that does
+everything.")
+
+I don't like the idea of a Forth,
+old or new, that does everything.
+
+(jsk: Internet is addr + GET/PUT)
+
+You have to get connected on the
+net. I don't know if you really
+need a full TCP/IP protocol, just
+something to get out there and
+talk.
+
+The advantage of customizing your
+browser is almost nil. You can
+only customize Netscape so
+much. I can't eliminate cookies
+completely but I can get a
+message and stop them whenever
+they are requested. There is much
+more choice on the net than I am
+aware of. There are lots of
+things to download and I don't do
+that. You can easily write your
+own software if you can use other
+people's software easily.
+
+(chuck: "I am utterly frustrated with (the) software...")
+
+(chuck: "There is no reason for
+an OS. It is a non-thing.")
+
+I am utterly frustrated with the
+software I have to deal with.
+Windows is beyond comprehension!
+UNIX is no better. DOS is no
+better. There is no reason for an
+OS. It is a non-thing. Maybe it
+was needed at one time.
+
+I detest Netscape. I switched to
+the Internet Explorer even though
+I detest MicroSoft worse than I
+detest Netscape. I detest MASM.
+I discovered MASM clobbers my
+reserved memory. It says it will
+respect it but it doesn't. I've
+tried Word, WordPad, and Edit and
+they are unusable.
+
+I would like a floppy, one meg is
+enough. It would have a 10K
+program and the rest is
+data. When it boots it gets into
+memory and is ready for operation
+while the rest of memory is
+loaded.  It should start in a
+second or two. You don't want to
+do this on your hard disk and
+turn it into a dedicated machine.
+
+The OS companies have not changed
+with the world. It is not needed
+but they are doing very well.
+
+(chuck: "I would like to surf the
+internet in my own fashion.")
+
+What I am proposing, free access
+to the internet, could be
+rendered illegal. I use six bit
+characters so it is even more
+dense than eight bit tokens. I
+would like to surf the internet
+in my own fashion.
+
+There is an opposition to
+standard Forth. The word WORD is
+an anathema, it shouldn't
+exist. The word WORDS is just as
+bad.  It just confuses a beginner
+to see a long list of words that
+they don't understand.
+
+(chuck: I want a browser, word
+processor for short emails, and
+OKAD)
+
+What I want is a browser, a word
+processor suitable for editing
+short email messages, and OKAD. I
+don't want games or a spread
+sheet. If I want games I will put
+them on a different computer.
+
+(chuck: "You can do three things
+with a computer"; try make
+money-unlikely; become
+famous-never happends; have
+fun-always works!)
+
+You can do three things with a
+computer. You can try to make
+money and that is unlikely. You
+can try to become famous and that
+never happens. And you can have
+fun and that always works.
+Though at times for me it has
+become work rather than fun.
+
+I am not in the business of
+promoting Forth. I am not
+promoting what I am doing here. I
+am just reporting it. I know that
+Forth is a better solution.
+
+I have twenty more years. The
+whole world was keen on the pull
+down menus and grunt idea so I
+tried it. It does not work. It
+gets back to "the map is not the
+territory." I must edit test
+scripts in OKAD so I use Forth.
+
+If I run out of things to do in
+the future I will work on voice
+recognition. But I think there is
+the problem that if their is
+someone else around I don't want
+to be muttering to my computer.
+I will need a keyboard.
+
+The concept that programming is
+something that you need special
+education to do is not right. It
+is something that is promoted by
+the priesthood.
+
+One year ago I encouraged
+everyone to write their own
+OKAD. Since you didn't do that I
+don't feel guilty. I assure you
+that I am now on the right track
+and I encourage you to experiment
+with color Forth.
+
+------------------------------
+
+(jsk: selected responses)
+
+Jeff Fox <jf...@ricochet.net> writes:
+
+Wow, strong stuff! Do you have
+more of that? :-)
+
+[notes on a talk by Chuck Moore]
+[...]
+
+> I encourage people to write
+> their own Forth. The standard
+> doesn't mean that you cannot
+> invent something. I propose
+> here to make use of color.
+
+Colorcoding is a good visual
+hint, but it should not be more
+than that. The reason is not
+monochrome displays (which are on
+the verge of extinction), but
+colorblindness.
+
+[...]
+
+> I saw an article the other day
+> on web languages. I read the
+> article and visited the web
+> site. Forth was not one of the
+> languages. It is clear that
+> Java is only one among many and
+> Forth should be there. I was
+> enamored of tokenized Forth, we
+> can have tokenized Forth like
+> Java. But it would require a
+> standards committee.
+
+We already have a tokenized Forth
+standard. It's called Open
+FirmWare and is an IEEE standard
+(IEEE 1275). It comes free with
+all SPARC and CHRP compliant
+PowerPC boxes. There is the
+slight problem that it becomes
+invisible once the OS is booted,
+but everything including raw
+TCP/IP capabilities is there.
+
+[...]
+
+
+> You have to get connected on
+> the net. I don't know if you
+> really need a full TCP/IP
+> protocol, just something to get
+> out there and talk.
+
+This one definitely leaves me
+puzzled. Jeff, is this one of the
+places where you left something
+out?
+
+Achim Gratz.
+
+--+<[ It's the small pleasures that make life so miserable. ]>+--
+WWW: http://www.inf.tu-dresden.de/~ag7/{english/}
+E-Mail: gr...@ite.inf.tu-dresden.de
+Phone: +49 351 463 - 8325
+
+Not really. At least I don't
+think so. I think the point he
+was making is that if you have a
+conventional ISP then you will be
+talking to that ISP via SLIP or
+PPP and will use TCP/IP from your
+computer out over the
+net. However it is possible that
+you could talk to an ISP with a
+less sophisticated protocol and
+that it would use TCP/IP out over
+the internet. You might be able
+to get by with a primitive
+service between your computer and
+your ISP. I think that is what
+Chuck was suggesting.
+
+--
+
+BobSmith4
+unread,
+8/3/97
+to
+
+I'm sorry that I could not attend
+that meeting where Chuck gave the
+talk.
+
+I am glad to see that he has
+taken up at least one suggestion
+from "LaForth" (co-authored by
+LaFarr Stuart and myself. Namely,
+the idea of immediate execution,
+where thereis no carriage return
+or line feed to worry about. Each
+word just gets executed as it is
+encountered.
+
+LaForth also had another nice
+idea which has been largely
+ignored, namely to do numeric
+conversion on the stack, rather
+than use the damnable "PAD".  It
+is really much cleaner to use and
+avoids the use of a global
+variable. For one thing, it makes
+debugging much cleaner. The only
+problem, is that the low level
+words are slightly different and
+"non-standard".
+
+The simplest implemenation puts a
+non-character terminator on the
+stack and converts the number one
+character at a time (least
+significant part first). The
+digits are then output until the
+terminator is encountered. The
+terminator was originally a
+numeric zero, but perhaps should
+be something like -1.
+
+Bob Smith
+
+
+--------------------------------
+Wil Baden's profile photo
+Wil Baden
+unread,
+8/3/97
+to
+
+BobSmith4 (bobs...@aol.com) wrote:
+
+> LaForth also had another nice
+  idea which has been largely
+  ignored, namely
+
+
+> to do numeric conversion on the
+> stack, rather than use the
+> damnable "PAD".  It is really
+> much cleaner to use and avoids
+> the use of a global
+> variable. For one thing, it
+> makes debugging much
+> cleaner. The only problem, is
+> that the low level words are
+> slightly different and
+> "non-standard".
+
+Hi Bob,
+
+It works nicely using recusion.
+
+: <.#> 0 BASE @ UM/MOD ?DUP ?? RECURSE DUP 9 > 7 AND + 48 + EMIT ;
+
+: .# BASE @ 10 = IF DUP 0< IF [CHAR] - EMIT ABS THEN THEN <.#> SPACE ;
+
+As you said, good for
+debugging. I use it in `.S`.
+
+--
+
+Keith Wootten wrote:
+>FWIW we have found the 'tabbed notebook' style supported by Delphi to be
+>very effective for data presentation and machine operation. Horses for
+>Courses, but IMO this works far better than pull down menus as the
+>overall mechanism; pull downs are used within tabs as appropriate.
+>
+>--
+>Keith Wootten
+
+Protel (schematic editor, simulator, PCB layout, etc) uses tabs to select
+major options (along the left edge) and menus and tool bars in a big mix
+that is not too bad if you have a really big monitor.
+
+My first memory of the tabs and folders model is from AppleWorks on the
+Apple II and it may have been in AppleWriter, which would be earlier, and
+it worked very well.
+
+Charlie Springer
+
+Regnirps's profile photo
+Regnirps
+unread,
+8/4/97
+to
+
+
+
+Wolfgang Allinger's profile photo
+Wolfgang Allinger
+unread,
+8/8/97
+to
+
+On 07 Aug 97 in article
+<pfrenger-070...@hou-tx34-18.ix.netcom.com>
+<pfre...@ix.netcom.com> (Paul
+Frenger MD) wrote:
+
+Hi Paul,
+
+I don't want to blame you, and if
+I'm telling here a lot of things,
+you know already, it's only to
+clarify my point of view to
+people who don't know it. If you
+like, you may copy these to other
+groups.
+
+>The NEAR NASA satellite, which
+>is taking pictures of real big
+>asteroids even as we speak, has
+>RTX 2010 Forth chips
+>inside. WHY? Probably not
+>because of Forth per se, but
+>because the chips are RAD HARD
+>and fit within the power and
+>performance constraints of the
+>mission. The Harris chips got
+>Forth into the mission, not the
+>other way around.
+
+I think that there is still
+another way around:
+
+One principle of Forth is KEEP IT
+SIMPLE!
+
+Because a (virtual) Forth Engine needs only 6 Elements: a (data)stack, a
+stack pointer, a returnstack, a returnstack pointer, an interpretive
+pointer and a work register, it was easy to do this by a few assembler
+routines for a virtual engine and by very few gates and very few
+instructions (RISC reduced instruction computer) on real engines.
+
+The name of one is RTX2000, the
+2000 is the number of used
+gates. ( Yes, there are 6000 free
+gates on the Harris chip. But the
+bad Harris management never
+realized, what to do with the
+6000 free gates...)  The RTX2000
+could be build in a very cheap
+process (If I remember right, a 2
+micrometer structure) uses few
+power and was/is very fast. The
+large structure is or could be
+made easily very rad hard.
+
+The mainstream people (idiots?)
+think always, that power
+increases with complexity. So
+they developed and extended the
+CISC (Complex instruction
+computer) engines. With these
+complex engines, you need a
+tremendous amount of gates and
+because they need more real
+estate, than the size of wafers
+can give and waste more (too
+much) power, they reduced the
+structure... Narrow structures
+also needs less electrons
+(because they reduced the power
+consumption...), so making it
+harder or nearly impossible to
+rad hard the chips, because alpha
+particles have an easy game, to
+trigger low power gates...
+
+Also the 'complex is beautiful'
+people waste a lot of space with
+complex programs, they waste also
+Mega bytes of complex program
+size, needing faster and smaller
+structures in RAM and
+PROMs.... So these structures are
+shrinking also making it nearly
+impossible to rad hard them...
+
+The WINTEL lobby has no interest
+to have simplicity, because
+complexity sells!!!! You can see
+it in every day life. The
+creative people find small and
+simple solutions. The uncrative
+people never find any solution,
+so they add complexity to known
+simple solution, just to proof
+that they are neccessary and very
+important (impotent?) people.
+
+The 8080 and 8085 are very old
+CPU's with very large structures
+easy to rad hard and so they are
+on mars and not a Pentium! I
+think its likely never see
+Pentiums travelling to the stars.
+
+Because modesty is not the virtue
+of Gadaffi, Saddam Hussein and
+other of these idiots, it's
+unlikely, that they find out,
+that they can possibly make use
+of these easy and large
+structures to roll their own
+powerful RISC computers.
+
+>So, if you want to program in
+>Forth, get a Forth CPU into your
+>project's
+>specification. Otherwise, Visual
+>Basic will clobber your plans.
+
+Agree
+
+By the way, some guys in the
+Munic area developed a SINGLE
+!!!!  instruction computer. The
+only instruction is MOVE, so you
+need no opcode ( because you know
+the instruction already, no
+cache, no prediction... no
+instruction decoder... necessary)
+only addresses where to move.
+
+So what's? Smells of Forth?
+
+Yes, only 2 !!!! guys (Jens Wilke
+and Bernd Paysan if I remember
+right) developed in a little more
+than 2 days (from friday evening
+till sunday night) a Forth system
+running on this engine. They also
+found out, that the hardware guys
+had some bugs on the chip, wrote
+an additional emulator on a PC to
+debug the Forth also and
+delivered the complete system
+including the emulator on monday,
+so the hardware guys could
+correct their system.
+
+Hope we will hear more of this
+SISC (Single instruction
+computer). I think NISC (No
+instruction computer) could be an
+alternative name, because in
+germany there is a saying: Einmal
+ist keinmal! ( translation tried:
+onetimes is nothing)
+
+Never heard of a C++ engine, even
+of delivering a development
+system in 2 month by 2 thousands
+of developers, using 2 mega of
+what so ever...
+
+
+Bye bye by Wolfgang
+
+--
+FORTHing @ work Cheap ...pick any
+Dipl.-Ing. Wolfgang Allinger Fast
+Good ... two of them
+Germany
+## CrossPoint v3.11 R ##
+
+--------------------------------
+Roger Ivie
+8/8/97
+
+There have been many such
+machines over the years. The
+earliest one of which I am aware
+is the British DEUCE, from about
+1955. It was described in a book
+entitled "High-Speed Computing"
+from that time period;
+unfortunately, I've misplaced my
+copy of it, so I can't give a
+more complete reference.
+
+The book also covers EDSAC, but
+it discusses DEUCE in more detail
+as that was the new hot machine
+in the author's lab at the
+time. The author's lab had two
+DEUCE machines.
+
+In general, a move machine works
+by having memory addresses with
+side effects; i.e., you move a
+value to location A and another
+value to location B then location
+C magically contains the sum of
+the values. In DEUCE, I/O was
+also done this way; reading a
+special location would give you a
+copy of what was on the front
+panel switches and writing the
+location would set the front
+panel lights (there was an option
+to take the switches from the
+card reader and write the lights
+to a card punch for off-line
+storage).
+
+I've seen another move-machine
+scheme which did not need memory
+with side effects. It worked by
+having byte-addressable memory
+with word addresses and having a
+memory-mapped PC (ok, so there's
+_one_ address with a side
+effect). Addition was done by
+collecting bytes into a pointer
+and using the pointer to perform
+lookup in a table.
+
+Other single-instruction machines
+use an instruction like Subtract
+and Branch if Borrow.
+
+This topic comes up occasionally
+comp.arch; surely dejanews has
+archived one of the many
+discussions...
+
+--
+Roger Ivie
+Design Analysis Associates
+75 West 100 South
+Logan, UT 84321
+mailto:ri...@daa-utah.com
+phoneto:(801)753-2212
+
+
+
+Chris Jakeman's profile photo
+Chris Jakeman
+unread,
+8/9/97
+to
+
+Dick Pountain (well-known
+Forther) published a more recent
+and very readable article in Byte
+Feb '95, calling it
+"transport-triggered
+architecture" and describing it
+as "the ultimate expression of
+the RISC philosophy".
+
+A simple add R1 + R2 -> R3 becomes
+
+r1 -> add_o
+r2 -> add_t
+add_r -> r3
+
+which is 3 MOVE operations. The
+2nd MOVE triggers the addition.
+
+The idea is to remove all
+decoding, scheduling and
+allocation concerns from the
+silicon into the compiler and
+devote the silicon space to
+supporting as many fast parallel
+MOVE instructions as possible.
+
+Bye for now
+
+My article "Using a 3-key
+Keyboard for Text" (1990 FORML
+Conference Proceedings pp. 49-69)
+shows how I used a regular PC
+keyboard (and a PC) to experiment
+with this. I used the '1', '2',
+and '3' keys on the numeric
+keypad. I took over the INT9
+keyboard interrupt to capture the
+keyboard scancodes as the keys
+were pressed and released. I
+think I was using a PC XT (8088)
+at the time. I may have had some
+trouble running the code on a
+'386, I can't remember the
+details. If I were to do it again
+today, I might read the keyboard
+port directly rather than using
+the interrupt. Anyway, the code
+in that article might give you a
+starting point for your MKEY
+word. If you can't locate the
+article, let me know and I might
+be able to track it down on disk
+somewhere.
+
+William Tanksley's profile photo
+William Tanksley
+unread,
+8/10/97
+to
+
+In article <pn54zYv1...@eskimo.com>,
+
+py...@eskimo.com (Frank Sergeant) wrote:
+
+>In article
+><33DC23...@ricochet.net>, Jeff
+>Fox <jf...@ricochet.net> wrote:
+>> On Saturday July 26 1997 Chuck
+>Moore gave a presentation to the
+>> I took these notes so that
+>more people could encounter many
+>of > the ideas he
+>presented. This is not an
+>official transcript as ...
+
+> Jeff, I surely do appreciate
+>your posting this description of
+>the meeting, especially of
+>Chuck's talk.
+
+Many times agreed. I always find
+Chuck's talks facinating.
+
+> I am juxtaposing the following
+>two quotes for the humor value.
+
+They appear to be
+contradictions. Perhaps they form
+a koan -- let me see what I can
+do.
+
+>> I never claimed to be one
+>> right, or two
+>> consistent. (laughter) I hope
+>> I keep learning.
+
+>> One year ago I encouraged
+>> everyone to write their own
+>> OKAD. Since you didn't do that
+>> I don't feel guilty. I assure
+>> you that I am now on the right
+>> track and I encourage you to
+>> experiment with color Forth.
+
+>and, in another year ...?
+
+Ah, I see. In another year he
+will still be on the right track
+-- the track of learning (and
+experimenting). He hopes that we
+all occupy that track. :)
+
+I'm intrigued by the idea of
+color Forth. Why should it be
+colored?  What save format should
+it use? Why should it hide that
+format from the programmer?
+Should it? Why not use (parse)
+delimiters instead of or in
+addition to colors?
+
+--------------key--------------
+:myName: *definition words (comment)*
+
+<<word(s) not in dictionary, error>>
+{computer output}
+---------------example--------
+
+:example: *"Hello! " TYPE* 10 10 + 2 / LITERAL * . * {ok}
+(Quotes are delimiters too. Why not? Of course, it wouldn't be
+Forth if the programmer couldn't add new delimiters.)
+example {Hello! 10ok}
+<<gibberish>> {?}
+-------------end--------------
+
+Am I misreading what he was
+saying? Am I saying something
+useless?
+
+>> Given that I won't be working
+>> with object code manipulation
+>> I need more than 7 keys. I
+>> need a standard 83 key
+>> keyboard.  I don't need all
+>> 101 keys to use source. In 30
+>> years I
+
+>(The 7 keys correspond to the 7
+>combinations of a 3-key chorded
+>keyboard.) I still love the idea
+>of a 3-key keyboard. I've
+
+>felt for sometime that it just
+>isn't enough. I still have hopes
+>for a one-handed chorded
+>keyboard with more than 3 keys
+>but far short of a standard
+>keyboard.
+
+Such things exist, but are far
+too expensive. You can get INSANE
+speeds on them in very short
+amounts of time. An inexpensive
+one would be amazingly useful.
+
+>> There is a problem that I
+>> first saw at iTV. It was the
+>> first time I have been in the
+>> presence of a Forth project
+>> that I wasn't contributing
+>> to. I saw how other
+>> programmers use Forth.  They
+>> don't always get it right.
+
+> Oooh, I wish he'd given an
+>example here of where and how
+>they might have gone wrong and
+>what he would recommend instead.
+
+You ain't just whistling dixie.
+
+>> There is an opposition to
+>> standard Forth. The word WORD
+>> is an anathema, it shouldn't
+>> exist.
+
+> Why is that? Does anyone know
+  his reasoning here?
+
+As in "BL WORD"? Maybe he's
+bothered by the fact that it
+misuses standard Forth vocabulary
+AND is duplicated by PARSE (in a
+better factored way).
+
+A WORD is a name together with
+code, not some letters between
+delimiters.
+
+> -- Frank
+
+-Billy
+
+
+
+William Tanksley's profile photo
+William Tanksley
+unread,
+8/10/97
+to
+
+In article <7hdcLIA8...@foobar.co.uk>,
+Paul Shirley <Pa...@no.spam.please> wrote:
+>The most depressing thing is that some of the 'new' directions Chuck
+>seems to be adopting are accepted orthodoxy in most of the computing
+>world,
+
+We can all profit from each other, of course.
+
+>the sadness is that they seem to be new to many Forth users
+
+I hadn't noticed the newness... BUT, we have to start somewhere.
+Newness isn't cause for sorrow.
+
+>(and seem to trigger rabid responses from some Forth advocates)
+
+But this is cause for sorrow. Out of curiosity, to what things do
+you refer? My newsreader seems to have never recieved any posts
+rabidly attacking Chuck's new ideas. Perhaps it's broken. Or
+perhaps I'm reading hyperbole as though it were literal.
+
+>(Specifically loop unrolling is good,
+
+I didn't see Chuck say that, nor did I see the argument. Loop
+unrolling, IMO, is a tool to be used like any other -- do it for
+speed, don't do it for size.
+
+It's a question between the programmer and his/her optimizer,
+nothing more. A private decision, so to speak. Why not?
+
+>conditionals are bad,
+
+You mean in the sense of "Avoid Decisions"? I thought that we'd
+been preaching that for YEARS. Didn't Julian V. Noble write an
+article on it a long time ago? We certainly spent a while
+discussing it, and gloating over how we Forthers recognized its
+value while few other languages did.
+
+You know, using "AND +" instead of "IF + ELSE DROP THEN".
+
+Again, optimization.
+
+>function inlining from Jeffs post)
+
+You seem to think that Forth should be more optimized. Why? It
+seems to me that Forth optimizers, as such, have done a good job;
+the real problem is that there are so few of them. That's not an
+ideological problem with Forth programmers, I don't think.
+
+>Paul Shirley: my email address is 'obvious'ly anti-spammed
+
+-Billy
+
+Wolfgang Allinger
+8/11/97
+
+>Bob Smith
+
+Hi Bob, hi Roger,
+
+Roger Ivie gave a good
+explanation on several SISC's. It
+was funny to see his answers some
+days before your question. So you
+took your chance and got a good
+answer from Roger instead of a
+bad one from me :-)
+
+The Munic machine was reported on
+26apr97 at the anual members
+meeting of the Deutsche Forth
+Gesellschaft e.V. at
+Ludwigshafen. Jens Wilke and
+Bernd Paysan named it MISC
+(Minimal Instruction Computer),
+it uses 1500 gates, i.e. 500 less
+than the RTX2000. I don't know
+more, but I'm shure that Jens and
+Bernd are reading this group,
+maybe they could give more
+explanations.
+
+However, what's the best name for
+these type of machines or should
+we have several names/classes?
+
+MISC (Minimal Instruction Computer)
+
+SISC (Single Instruction
+Computer) a subset of MISC?
+
+NISC (No Instruction Computer) a
+subset of MISC (my favorite one)
+
+Chris Jakeman
+8/11/97
+
+Well, this isn't Forth and it
+isn't my subject either. I'm just
+reporting Dick Pountain's Byte
+magazine article (Feb
+'95). Anyone, here goes...  In
+article
+<33f31364...@news.tornado.be>,
+Bart Lateur
+<bart.me...@tornado.be> writes
+
+
+
+
+Pountain writes "This
+finer-grained approach can offer
+higher performance through
+greater instruction parallelism."
+He is highlighting the movement
+of data as the
+bottleneck. Whether you use an
+ADD or 3 MOVE instructions, there
+are still 3 moves to take
+place. But if you have a
+transport network that permits
+many moves in parallel, then you
+can use the silicon more
+effectively.
+
+>How many special registers do you need?
+
+Register is not really the right
+term here. In a conventional
+processor, your code R1 + R2 ->
+R3 is implemented by 2 moves into
+internal latches, followed by an
+ADD and a move out of the
+accumulator latch to register
+3. What Transport-Triggered
+Architecture does is provide
+access to the individual
+"latches".
+
+The other advantage is that access to the latches allows compiler
+optimisations to eliminate moves which would not be possible on a RISC
+processor.
+
+Pountain calls the integer
+register set a "functional unit"
+(FU) and his diagram suggests FUs
+for integer arithmetic, floating
+point arithmetic, logical
+operation and comparison
+operations. My guess is that the
+integer arithmetic FU would
+operate as does C.Moore's MISC,
+doing addition and subtraction in
+parallel and putting the results
+in different registers.
+
+The article refers to a 32-bit processor using 2-micron technology and
+running at 80MHz. Benchmarks "suggest that it's between 25% to 50%
+faster than a RISC processor with equivalent FUs."
+
+
+Bernd Paysan
+8/15/97
+
+Bruce R. McFarling wrote:
+
+> 16 is an attractive number,
+> since that permits, e.g., 4 at
+> a time in a 16-bit wide address
+> bus, and 8 at a time with a 32
+> bit wide address bus. (Bringing
+> up memories of the burning and
+> *important* ;) question whether
+> a single memory fetch that is
+> executed as a sequence of
+> instructions is, after all, an
+> instruction cache.)  What are
+> the 16?  I would better give
+> the whole discussion, such that
+> you can make a picture of how
+> to build a minimal stack
+> computer:
+
+Bare minimum: one stack, at least
+two elements deep, instructions
+as follows:
+
+nand
+@
+!
+goto jumps to value on TOS, if not -1
+0=
+noop
+lit takes next instruction word as literal
+
+: branch lit goto ;
+: ?branch 0= lit nand goto ; \ branch target address stored inverted!
+
+You can use this to write a
+threaded implementation of
+Forth. The alternative for lit to
+take the next IW is to take the
+next instruction (0..7) as
+literal. Together with @, +, and
+a Huffman coded b-tree (root
+pointer at 0), you can generate
+all constants you need, while the
+most important (small integers)
+are easy available. Caveat: a
+third stack entry is
+needed. Third solution: take the
+rest of the word as literal, if
+lit is at the end, take the next
+word. Caveat: more difficult to
+decode.
+
+Better: two stacks, both at least
+4 elements deep:
+
+lit
++
+and
+xor
+
+@
+!
+>r
+r>
+
+goto jump to PC on TOS if not 0
+execute
+0=
+2/
+
+over
+dup
+drop
+noop
+
+Some operations have to be
+synthesized, thus take more than
+one opcode:
+
+: ?branch 0= lit and goto ; macro
+: branch lit goto ; macro
+: ;s r> goto ; macro
+: call lit execute ; macro
+
+I don't like swap, since it
+doesn't fit in well. Chuck Moore
+uses a temporary variable to
+swap, but you can do
+
+over >r >r drop r> r>
+
+More elegantly would be to have a
+swap>r, then swap would be
+"swap>r r>". This gives you
+exactly two classes of
+operations: those that push one
+value and those that take one
+value. Exceptions: @ and !.
+
+You can get some additional
+opcodes, if you see that goto and
+execute can only happen once per
+instruction word, since they
+change control flow. If you allow
+goto and execute only to happen
+on the last slot, you can use the
+opcode for another operation if
+it's found on another slot,
+e.g. for -. If you use a
+Chuck-Moore-like approach for
+addition (adders are slow,
+compared with the rest of the
+operations), you can use noop to
+select a different set of
+operations. Noops are normally
+only used to pad instruction
+words, thus if noop preceeds an
+operation, it changes it's
+meaning.
+
+This can give you + and -, which
+must be written with a noop
+before, even on the 3 bit
+instruction case, and you have
+room for other operations.
+
+With Chuck's A (used for fetch
+and store), and this approach,
+you would have
+
+3 bits, one stack:
+
+immediately following
+lit
+and
+xor
+>a !
+@
+c!
+c@
+goto continue at A
+?goto continue at A if TOS is 0
+noop +
+-
+0=
+2/
+drop
+
+You see, even 3 bits can give a
+quite comfortable machine, if you
+use prefixes. Both prefixes (noop
+and >a) don't cause performance
+drop, since they are applied to
+slower operations. >a latches up
+the address bus, this is a work
+the real hardware has to do,
+anyway, both for instruction
+fetches (goto) and for
+load/stores.
+
+My estimation is that it takes me
+some hours to write a
+syntesizable Verilog
+implementation of the 3 or 4 bit
+instruction CPU, and after a day
+(while the FPGA router does it's
+job), I've running Gforth on it
+(with threaded code, not
+native). Things I need: the
+universal simple CPU (one FGPA +
+downloadable RAM and RS232). The
+stunning thing is that at least
+the 4-bit instruction CPU
+implemented with 32 bit register
+width and a .35u process with
+on-chip RAM/caches could easily
+outperform any of Intel's
+processors on Forth code (and
+most other code, if recompiled,
+too). Estimated clock: 2GHz
+(needs a sub-ns adder, but I've
+one). And a Pentium die will
+allow to put 100s of these on it
+(with a small portion of private
+RAM for each one).
+
+Achim Gratz's profile photo
+Achim Gratz
+unread,
+8/15/97
+to
+
+Julian V. Noble
+8/15/97
+
+There are two main ways to avoid
+decisions. The simpler uses
+logical arithmetic --
+environmentally dependent,
+because it assumes TRUE is all
+bits set to 1 (and C does not do
+this). This may or may not be a
+representation of -1 (e.g. if the
+cpu is not 2's complement).
+
+Tanksley's example would have
+been safer if written
+
+0<> AND + instead of IF + ELSE DROP THEN
+
+But another way to program
+without explicit
+IF...ELSE...THEN's uses finite
+state machines (or a simpler
+variant, the decision table).
+
+I have given code for a simple
+method of defining FSM's (either
+deterministic or
+nondeterministic) in the article
+for JFAR, which is now going to
+appear online. This article
+should come out soon.  Possibly a
+version of it exists on
+www.taygeta.com also--I haven't
+checked lately. Basically, one
+compiles a state transition table
+representation of the FSM. It is
+not a new idea--there were some
+commercial products that did it
+for C--but it is very simple to
+do in Forth (also it _was_
+original--the commercial product
+was brought to my attention
+later).
+
+An early version of the code
+appears in my book, "Scientific
+FORTH" where it is used for
+parsing, etc.
+
+FSM's, as I have emphasized
+several times here, offer a more
+debuggable and maintainable, not
+to mention transparent, alterna-
+tive to deeply nested
+IF...THEN...ELSE's, even if they
+are well factored. I would say
+that at least 50% of serious
+program bugs arise from errors in
+formulating such code. (The rest
+arise from range or scope
+errors. These are the kind that
+can be-- partially--eliminated by
+range checking and strong
+typing.)
+
+Several commercial products, I am
+proud to say, employ the FSM
+technology. The authors have both
+told me it made writing the
+programs much simpler. It has
+certainly been the case in my own
+work, so you ought to give it a
+try.
+
+Finally, I should note that,
+sadly, most compiled languages
+(including most of the Forths I
+have examined) fail to take
+advantage of decisionless
+programming. That is, their
+implementation of such words as
+0> or ABS employ jumps in the
+code.  That is, even if you think
+you are avoiding decisions, you
+may not be. Most cpu's provide
+sign-extend instructions that can
+eliminate branches from such
+machine code, but few use these
+techniques. Part of the reason, I
+guess, is that many big CISC
+machines use branch prediction
+that reduces considerably the
+speed penalty of using jumps in
+the code.  -- Julian V. Noble
+j...@virginia.edu
+
+John Brien's profile photo
+John Brien
+unread,
+8/16/97
+to
+
+It turns out the BAT is a 7-key,
+but not, I think the board
+mentioned in the original
+article. It comes in left and
+right-handed versions for either
+PC or Mac and can be
+daisy-chained, so that both can
+be used together, or in
+conjuction with a normal
+keyboard.  Like the Microwriter,
+the four finger keys and the main
+thumb key produce printable
+characters, but it has two
+command keys for thumb to cope
+with shifts, controls and
+macros. It also has a battery so
+you can carry your individual
+macros between machines. All of
+which should please Frank, and
+for just $199 apiece! :) Their
+Web page makes a good pitch and
+is at
+http://www/infogrip.com/infogrip
+
+It would be interesting to know
+the difference between the BAT
+chords and those of the
+Microwriter. A hand-built version
+could of course use either. Which
+chord to use for which letter
+depends on how easy it is to form
+and remember. The mnemonics I
+gave make more sense if you
+imagine the five keys in a
+horseshoe shape and the letter in
+question drawn on top of
+them. That is why O and 0 have
+the same keystroke; because they
+are the same shape. You need a
+command stroke to shift between
+one and the other, though, so
+there is less possibility of
+confusion than there is between O
+and o. There are no labels on the
+keys, so you don't get confused
+by looking at them!
+
+
+Not having that money to hand,
+I'm still trying to emulate it on
+the PC keyboard. First I wrote a
+code word SCANK to read the
+keyboard port at 60H. Then I
+experimented with
+
+: TEST 0 BEGIN SCANK 1 <> WHILE \ not escape key
+2DUP <> IF DUP . THEN \ print code on
+first appearance
+NIP REPEAT ;
+
+And tested a few chords.
+
+Two problems:
+
+1. The key buffer quickly filled
+up and started beeping.  I needed
+KEY? IF KEY DROP THEN in the
+loop.
+
+2. Even with the shorter loop, I
+often missed keystrokes: press
+five together and maybe three
+would register. This doesn't seem
+to be affected by the location of
+the keys. The problem is that the
+port can only display one key at
+a time, and even if I span the
+loop faster, there's no guarantee
+that it would distinguish between
+simultaneous keypresses.
+
+Which leaves me back where I started :(
+--
+Jack Brien Ballinamallard Co Fermanagh N Ireland
+
+
+
+Christopher Biggs's profile photo
+Christopher Biggs
+unread,
+8/18/97
+to
+
+py...@eskimo.com (Frank Sergeant)
+moved upon the face of the 'Net
+and spake thusly:
+
+> I've been trying to trace that
+> reference to the seven key
+> board. It was an article in
+> someone else's magazine, and
+> I've just got him on the phone
+> today. It seems it's still
+> being produced for the special
+> needs education market. He's
+> promised the details in a few
+> days.  I've since learned that
+> there was a similar American
+> device called the BAT, but I
+> think that only had five keys.
+
+No, the BAT has seven keys, one
+for each finger and three for the
+thumb. It's a large desktop lump,
+not an easy thing to use while
+lounging back with your feet up.
+
+I like the look of the "data egg"
+but I hear it is not in
+production and is unlikely to be
+so. I'm building my own in my
+Copious Spare Time.
+
+The "Twiddler" is an interesting
+design, actually available to buy
+right now, popular with the
+wearable computing crowd, but too
+many keys for my taste.
+
+Details of these and other
+unusual keyboards and chorders
+can be found here:
+
+http://www.cs.princeton.edu/~dwallach/tifaq/keyboards.html
+
+Chris.
+
+--
+__
+/ \
+/ \
+/MORONS\
+/ \
+\ next /
+\ 15 /
+\msgs/
+\__/
+||
+||
+||ch...@stallion.oz.au
+One more infobahn cliche couldn't hurt...
+
+
+
+Mike Coughlin's profile photo
+Mike Coughlin
+unread,
+8/18/97
+to
+
+Non typewriter keyboards have a
+long and interesting history.
+Over a hundred years ago they
+invented the printer for a
+telegraph, which used a five bit
+code. But they didn't invent the
+keyboard to make a teletype
+machine at the same time. So for
+a while some people had to learn
+to use a five key telegraph, one
+for each finger.  There is a
+machine for writing from
+dictation called a Stenotype. Its
+used in courts in the United
+States since, unlike hand written
+shorthand, its cryptically
+encoded output can be read by all
+trained operators. The keyboard
+is corded one and it uses many
+strange combinations along with
+abbreviated phonetic
+spellings. The human brain and
+fingers cannot cope with the
+usual English spelling at speeds
+high enough to take dictation in
+a court room. Also the noise of a
+typewriter would be very
+distracting. This machine has
+been computerized to produce
+normal English output. I've
+always meant to find out how the
+latest version of this machine
+worked, but haven't gotten around
+to it yet. Perhaps there is an
+application for a Forth computer
+dictation machine for non English
+languages that could improve on
+the ideas of the Stenotype.
+
+--
+Michael Coughlin mi...@gnu.ai.mit.edu Cambridge, MA USA
+
+Jeff Fox's profile photo
+Jeff Fox
+unread,
+8/18/97
+to
+
+Mike Coughlin wrote:
+
+> could improve on the ideas of
+> the Stenotype.
+
+My second job in California was
+with Baron Data Systems the
+largest supplier of computerized
+steno equipment. The steno
+machines have twenty six keys
+that can be pressed in any
+combination and when released
+will move the paper printout one
+line. (lf)
+
+The steno operator uses standard
+keystrokes for many common words
+and phonetic spelling for
+everything else. Our machines
+compressed the data and logged it
+to tape (they later switched to
+disks). The tapes could be read
+on a mini or micro and translated
+into English and formatted for
+printout as they are often paid
+per printed page.
+
+A fast operator will be more than
+twice as fast as anyone on a
+conventional keyboard. As I
+recall the record was around 270
+words per minute. There will be
+some editing required in most
+cases to resolve any errors in
+the machine translation. Users
+maintain individual dictionaries
+with their own shorthand
+representations in addition to
+standard one. The shorthand and
+phonetic spellings are not always
+unique and sometimes more than
+one translation is possible.
+
+I have always wanted to make a
+version of Forth that matches
+phrases rather than words for
+doing this sort of application,
+that is matching data to a stream
+of phonetic symbols and
+dictionary entries that can
+include spaces.
+
+One spin off application was
+close captioning. People realized
+that with the real time
+translation software they could
+use people who were not the best
+court reporters to do real time
+captioning much better with their
+computerized steno machines than
+people using conventional
+keyboards.
+
+Some things have changed since
+then. Tape recordings are now
+often used in courts today but
+were not back then. Also laptops
+are commonly available now. I
+have wondered why someone has not
+written software to allow someone
+to enter something very much like
+steno input on a normal
+keyboard. We normally read ascii
+from one layer of software but we
+can read each up and down stroke
+of each key and accept any
+combination of keys including all
+keys pressed at once. So someone
+could develop a steno like system
+for a laptop that might compete
+with computerized steno
+equipment.
+
+If you can. (a little steno pun)
+
+--
+Jeff Fox jf...@dnai.com
+Ultra Technology Inc. http://www.dnai.com/~jfox/
+
+Achim Gratz's profile photo
+Achim Gratz
+unread,
+8/18/97
+to
+
+Bernd Paysan <pay...@informatik.tu-muenchen.de> writes:
+[interesting stuff]
+
+
+> More elegantly would be to have a swap>r, then swap would be "swap>r r>".
+
+Would this not better be over>r (over-to-r)?
+
+[more interesting stuff]
+
+Bruce R. McFarling's profile photo
+Bruce R. McFarling
+unread,
+8/18/97
+to
+
+On 15 Aug 1997, Achim Gratz wrote:
+> "Bruce R. McFarling" <ec...@cc.newcastle.edu.au> writes:
+>
+> > 16 is an attractive number, since that permits, e.g., 4 at a time
+> > in a 16-bit wide address bus, and 8 at a time with a 32 bit wide address
+> > bus. (Bringing up memories of the burning and *important* ;) question
+> > whether a single memory fetch that is executed as a sequence of
+> > instructions is, after all, an instruction cache.)
+>
+> It's not an instruction cache, but a form of instruction prefetch, a
+> bet on sequential locality of code. Caches are there to exploit
+> spatial and temporal locality (not necessarily sequential).
+
+Well, it wasn't an issue that I took all that seriously
+(hence the smiley) but it struck me as odd to call it a cache unless
+you could branch back to an instruction in the group of instructions
+and reexecute them. I think that calling it an instruction prefetch
+is a kinder and gentler use of the language.
+
+Uwe Kloss's profile photo
+Uwe Kloss
+unread,
+8/18/97
+to
+
+Bernd Paysan <pay...@informatik.tu-muenchen.de> writes:
+Slight 'improvement':
+
+If you have 'xor','+' and '0=' you can get rid of 'lit'.
+(and stack ops ofcourse!)
+
+' dup dup 0= xor ' gives 1 or -1 (depends on '0=')
+
+the rest is addition.
+
+or you use '>r', '@' and 'r>' to define 'lit'.
+
+> lit
+> +
+> and
+> xor
+>
+> @
+> !
+> >r
+> r>
+>
+> goto jump to PC on TOS if not 0
+> execute
+> 0=
+> 2/
+
+hmm, if you don't need 'swap' why do you need 'over'?
+I can think of defining 'over' in terms of 'swap' and
+'>r', 'r>' and 'dup' but not vice versa. !?!?!
+
+> over
+> dup
+> drop
+> noop
+
+
+--
+Song fuer frustrierte Informatiker:
+No Woman,
+No Cray! (frei nach Bob Marley)
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Uwe Kloss UweK...@lionbbs.escape.de
+Rebenring 47 U.K...@tu-bs.de
+38106 Braunschweig y000...@tu-bs.de
+Tel.: 0531/336908
+
+Anton Ertl's profile photo
+Anton Ertl
+unread,
+8/19/97
+to Chris Jakeman
+
+In article <9b7U0jAW...@apvpeter.demon.co.uk>, Chris Jakeman <cjak...@apvpeter.demon.co.uk> writes:
+> In article <33f31364...@news.tornado.be>, Bart Lateur
+> <bart.me...@tornado.be> writes
+> >Chris Jakeman <cjak...@apvpeter.demon.co.uk> wrote:
+> >
+> >>A simple add R1 + R2 -> R3 becomes
+> >>
+> >> r1 -> add_o
+> >> r2 -> add_t
+> >> add_r -> r3
+> >>
+> >>which is 3 MOVE operations. The 2nd MOVE triggers the addition.
+> >>
+> >>The idea is to remove all decoding, scheduling and allocation concerns
+> >>from the silicon into the compiler and devote the silicon space to
+> >>supporting as many fast parallel MOVE instructions as possible.
+What this allows them to do is to save on buses, bypass logic, and
+register ports. OTOH, they have to provide a higher instruction
+bandwidth.
+
+Some literature:
+
+@InProceedings{hoogerbrugge&corporaal94,
+author = "Jan Hoogerbrugge and Henk Corporaal",
+title = "Register File Port Requirements of Transport
+Triggered Architectures",
+crossref = "micro94",
+pages = "191--195",
+annote = "The rationale for transport triggered architectures
+is that the compiler will allocate resources like
+ports and busses better than is usually done by
+hardware. This paper supports this claim empirically
+for register ports. With only one read and one
+write port to the register file they achieve 1.98
+operations per cycle (however, FUs and buses are
+present in abundance). With 3 read and write ports
+3.63 operations/cycle are achieved, pretty close to
+the maximum of 3.8 with 6 read and write
+ports. Overall, transport triggered architectures
+need 0.5 read and 0.35 write ports per operation,
+compared to 2 read and 1 write port on a conventional
+architecture."
+}
+
+@Proceedings{micro94,
+title = "International Symposium on Microarchitecture (MICRO-27)",
+booktitle = "International Symposium on Microarchitecture (MICRO-27)",
+year = "1994",
+key = "MICRO-27"
+}
+
+> Pountain calls the integer register set a "functional unit" (FU) and his
+> diagram suggests FUs for integer arithmetic, floating point arithmetic,
+> logical operation and comparison operations.
+
+An ALU or an FPU is a functional unit. A register set is not an FU.
+
+- anton
+--
+M. Anton Ertl Some things have to be seen to be believed
+an...@mips.complang.tuwien.ac.at Most things have to be believed to be seen
+http://www.complang.tuwien.ac.at/anton/home.html
+
+Bernd Paysan's profile photo
+Bernd Paysan
+unread,
+8/19/97
+to
+
+Achim Gratz wrote:
+
+> Achim Gratz
+> <gr...@ite.inf.tu-dresden.de>
+> writes: > Would this not better
+> be over>r (over-to-r)?  I think
+> I was overly brief here. Bernd
+> stated (in the context of his
+> posting) that he doesn't like
+> swap and thinks that swap>r
+> would be a better choice for a
+> hardware implementation. I
+> can't see why swap>r would be
+> easier/faster to implement than
+> swap, hence my thinking that
+> over>r might be more
+> appropriate here.
+
+The main problem with SWAP or
+your OVER>R is that it doesn't
+change the stack pointer. All
+other operations (except NOOP) do
+either push something or pop
+something. NOOP just freezes the
+hardware, so doing nothing is not
+a big problem. SWAP or OVER>R do
+something, but they don't change
+the stack level. This adds
+complexity (it's a third choise),
+and adding complexity is easy,
+although it slows the whole thing
+down, and makes it more difficult
+to debug. BTW: I recognised that
+I don't need a NOOP, if GOTO
+flushes the rest of the
+instruction; so no padding is
+necessary.
+
+BTW: Removing LIT is a bad
+idea. Although it's possible to
+synthesize every constant without
+it, it's a time and memory
+consuming job. And if the code
+bloat outgrowth the spared gates
+in the CPU (even if each one is
+1000 times as expensive as a RAM
+bit), you have lost.
+
+Achim Gratz's profile photo
+Achim Gratz
+unread,
+8/19/97
+to
+
+Achim Gratz <gr...@ite.inf.tu-dresden.de> writes:
+> Would this not better be over>r (over-to-r)?
+
+I think I was overly brief
+here. Bernd stated (in the
+context of his posting) that he
+doesn't like swap and thinks that
+swap>r would be a better choice
+for a hardware implementation. I
+can't see why swap>r would be
+easier/faster to implement than
+swap, hence my thinking that
+over>r might be more appropriate
+here.
+
+Bruce R. McFarling's profile photo
+Bruce R. McFarling
+unread,
+8/20/97
+to
+
+On 18 Aug 1997, Uwe Kloss wrote:
+> Bernd Paysan <pay...@informatik.tu-muenchen.de> writes:
+
+> Slight 'improvement': If you
+>have 'xor','+' and '0=' you can
+>get rid of 'lit'.  (and stack
+>ops ofcourse!)  ' dup dup 0= xor
+>' gives 1 or -1 (depends on
+>'0=') the rest is addition.
+
+I had a friend from Buffalo who
+had a technical term for that.
+"C'mon". It's one thing to dump
+constants for a huffman encoded
+constant table -- that's cool --
+but to add them up? It's an
+argument for 1 and 2* to do it
+quicker, which kindof suggests to
+me that lit is an efficient way
+to do it. Otherwise, use the 3
+bit code, drop the lit in favor
+of 2*, instead of + and - have A+
+and A- using the value latched
+into A by >A, and have the three
+bit code following a noop be
+
+Following noop
+0 0
+1 1
+2 2
+3 3
+4 noop*
+5 -3
+6 -2
+7 -1
+
+*note that in the version that
+uses + and - after noop, a noop
+instruction is required in that
+state, so that noop can be used
+for padding, so that only leaves
+7 available codes is noop is used
+as a prefix.
+
+OTOH, just using A+ and A- means
+that noop can simply be noop, and
+if you look at the "A> @"
+instructions as a single
+instruction pair, gives a 15 3-6
+bit instruction set
+computer. Cool.
+
+
+> or you use '>r', '@' and 'r>' to define 'lit'.
+
+This I found intriguing. Is it
+possible to get by without
+literals in low level MISC code,
+and only provide them in the
+higher level Forth code? Is it
+practical? And how do you define
+the r stack on the one stack
+versions?
+
+> hmm, if you don't need 'swap'
+> why do you need 'over'?  I can
+> think of defining 'over' in
+> terms of 'swap' and '>r', 'r>'
+> and 'dup' but not vice
+> versa. !?!?!
+
+Isn't this "OVER >R >R DROP R>
+R>". But I reckon the point is
+that code optimising can
+eliminate SWAPS in favor of OVERs
+and DROPs, if it is set up so
+that OVER is much quicker than
+SWAP, and OVER is 'cleaner' in
+involving no modification of
+existing stack entries, while
+requiring the same ability to
+access the second entry that and,
+xor, + and - require, and the
+same ability to put the result on
+top of stack that dup requires.

@@ -234,6 +234,25 @@ PROGRAM = '1 2 3 4....1 2 3 4ws....';
 PROGRAM = '1 2 4 8....9 9 1 2 4 8w+.. ..';
 PROGRAM = '9 9 10 5 8 4w-.. ..';
 
+// BENCH sieve primes // b77
+// counter stored at 0 (zp)
+// flags stored at [2] (here)
+PROGRAM = `
+0d! 8192 h 2!da
+2@ d 1 cm
+10(
+  2@(
+    2@i+ c@ ?1(
+      0mi
+      id+ id+3+ 2@(
+        0 2@o+c!
+      o+d#)\\ \\
+    )\\
+  )
+)
+0@.
+`;
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -380,7 +399,6 @@ let puts = terminal.aputs;
 let getc = terminal.agetc;
 
 let start = 0x501;
-
 
 
 // Turn off BRK, off TOS and on table_next

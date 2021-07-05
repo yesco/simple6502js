@@ -1,0 +1,316 @@
+00     end0        ( -- )                Marks the end of FCode
+0102   my-address     ( -- phys.lo ... )                   Returns the physical addr of  this plug-in 
+0103   my-space       ( -- phys.hi )                       Returns address space of  plug-in device.  
+0105   free-     ( virt size -- )  Frees virtual memory from memmap, dma-alloc,or map-low
+0110   property         ( prop-addr prop-len name-str name-len -- )   Declares a property with the 
+0111   encode-int       ( n -- prop-addr prop-len )                   Converts a number into an prop-
+0114   encode-string    ( str  len -- prop-addr  prop-len )           Converts a string into an prop-
+0115   encode-bytes     ( data-addr data-len -- prop-addr prop-len )  Converts a byte array into an 
+0119   model     ( str len -- )                 Declares model# for this device, such as " SUNW,501-
+011A   device-   ( str len -- )                 Declares type of device, e.g. " display", " block", " 
+011B   parse-2int   ( str len  -- val.lo val.hi )        Converts a string into a physical address 
+011C   is-install   ( xt -- )   Identifies "install" routine to allocate a frame buffer
+011D   is-remove    ( xt -- )   Identifies "remove" routine, to deallocate a frame buffer
+011E   is-selftest  ( xt -- )   Identifies "selftest" routine for this frame buffer
+011F   new-device   ( -- )      Opens an additional device, using this driver package
+0120   diagnostic-     ( -- diag? )           Returns "true" if extended diagnostics are desired
+0121   display-status  ( n -- )               Obsolete
+0122   memory-test-    ( addr len -- fail? )  Calls memory tester for given region
+0124   mask            ( -- a-addr )          Variable, holds "mask" used by memory-test-suite
+0125   get-msecs  ( -- n )      Returns the current time, in milliseconds, approx.
+0126   ms         ( n -- )      Delays for n milliseconds.  Resolution is 1 millisecond
+0127   finish-      ( -- )      Closes out current device, ready for new-device
+0130   map-low   ( phys.lo ... size -- virt )  Maps a region of memory in 'sbus' address space
+0131   sbus-     ( sbus-intr# -- cpu-intr# )   Translates SBus interrupt# into CPU interrupt#
+0150   #lines    ( -- rows )     Number of lines of text being used for display.  This word must be 
+0151   #column   ( -- columns )  Number of columns (chars/line)  used for display.  This word must be 
+0152   line#     ( -- line# )            Current cursor position (line#).  0 is top line
+0153   column#   ( -- column# )          Current cursor position.  0 is left char.
+0154   inverse?  ( -- white-on-black? )  True if output is inverted (white-on-black)
+0155   inverse-  ( -- black? )           True if screen has been inverted (black background)
+0157                            draw-character  ( char -- )                     Paints the given character and advances the 
+0158                            reset-screen    ( -- )                          Initializes the display device
+0159                            toggle-cursor   ( -- )                          Draws or erase the cursor
+015A                            erase-screen    ( -- )                          Clears all pixels on the display
+015B                            blink-screen    ( -- )                          Flashes the display momentarily
+015C                            invert-screen   ( -- )                          Changes all pixels to the opposite color
+015D                            insert-         ( n -- )                        Inserts n blanks just before the cursor
+015E                            delete-         ( n -- )                        Deletes n characters to the right of the cursor 
+015F                            insert-lines    ( n -- )                        Inserts n blank lines just before the current line, 
+0160                            delete-lines    ( n -- )                        Deletes n lines starting with the current line, 
+0161                            draw-logo       ( line# addr width height -- )  Draws the logo
+0162                                                            frame-buffer-  ( -- addr )            Address of frame buffer memory
+0163                                                            screen-height  ( -- height )          Total height of the display (in pixels)
+0164                                                            screen-width   ( -- width )           Total width of the display (in pixels)
+0165                                                            window-top     ( -- border-height )   Distance (in pixels) between display top and text window
+0166                                                            window-left    ( -- border-width )    Distance  (in pixels) between display left edge and text 
+016A   default-  ( -- addr width height advance min- char #glyphs )  Returns default font values, plugs 
+016B   set-font  ( addr width height advance min-char #glyphs -- )   Sets the character font for text output
+016C                                                            char-height    ( -- height )          Height (in pixels)  of a character (usually 22)
+016D                                                            char-width     ( -- width )           Width (in pixels) of a character (usually 12)
+016E   >font      ( char -- addr )                                    Returns font address for given ASCII 
+016F                                                            fontbytes      ( -- bytes )           Number of bytes/scan line for font entries (usually 2)
+0170   fb1-draw-      ( char -- )                       Paints the character and advance the cursor
+0171   fb1-reset-     ( -- )                            Initializes the display device (noop)
+0172   fb1-toggle-    ( -- )                            Draws or erases the cursor
+0173   fb1-erase-     ( -- )                            Clears all pixels on the display
+0174   fb1-blink-     ( -- )                            Inverts the screen, twice (slow)
+0175   fb1-invert-    ( -- )                            Changes all pixels to the opposite color
+0176   fb1-insert-    ( n -- )                          Inserts n blanks just before the cursor
+0177   fb1-delete-    ( n -- )                          Deletes n characters, starting at with cursor 
+0178   fb1-insert-    ( n -- )                          Inserts n blank lines just before the current line, 
+0179   fb1-delete-    ( n -- )                          Deletes n lines starting with the current line,lower 
+017A   fb1-draw-logo  ( line# addr width height -- )    Draws the logo
+017C   fb1-slide-up   ( n -- )                          Like fb1-delete-lines, but doesn't clear lines at 
+0180   fb8-draw-      ( char -- )                           Paints the character and advance the cursor
+0181   fb8-reset-     ( -- )                                Initializes the display device (noop)
+0182   fb8-toggle-    ( -- )                                Draws or erases the cursor
+0183   fb8-erase-     ( -- )                                Clears all pixels on the display
+0184   fb8-blink-     ( -- )                                Inverts the screen, twice (slow)
+0185   fb8-invert-    ( -- )                                Changes all pixels to the opposite color
+0186   fb8-insert-    ( n -- )                              Inserts n blanks just before the cursor
+0187   fb8-delete-    ( n -- )                              Deletes n characters starting with cursor char, 
+0188   fb8-insert-    ( n -- )                              Inserts n blank lines just before the current  
+0189   fb8-delete-    ( n -- )                              Deletes n lines starting with the current line, 
+018A   fb8-draw-logo  ( line# addr width height -- )        Draws the logo
+018B   fb8-install    ( width height #columns #lines -- )   Installs the eight-bit built-in routines
+01A4   mac-       ( -- mac-str mac-len )        Returns the MAC address  
+0201   device-   ( str len -- )                 Creates the "name" property with the given value  
+0202   my-args        ( -- arg-str arg-len )               Returns the argument str passed when this 
+0203   my-self        ( -- ihandle )                       Returns the instance handle of currently-
+0206   close-package  ( ihandle -- )                       Closes an instance of  a package  
+0207   find-method    ( method-str method-len phandle      Finds the method (command) named 
+0208   call-package   ( ... xt ihandle -- ??? )            Executes the method "xt" in the instance 
+0209   $call-parent   ( ... method-str method-len -- ??? ) Executes the method "method-str" in the 
+020A   my-parent      ( -- ihandle )                       Returns the ihandle of the parent of the 
+020B   ihandlephand   ( ihandle -- phandle )               Converts an ihandle to a phandle  
+020D   my-unit        ( -- phys.lo ... phys.hi )           Returns the physical unit number pair for 
+0213   alarm      ( xt n -- )   Periodically execute xt. If n=0, stop. 
+0213   alarm     ( xt n -- )           Executes method (command) indicated by "xt" every "n" milliseconds  
+0214   (is-user-  ( E: ... -- ??? )             Creates a new word called "name-str" which executes "xt"  
+0215   suspend-  ( -- )  Suspends execution of FCode, resumes later if an undefined command is 
+0216   abort      ( ... -- ) (R:... -- )                  Aborts FCode execution, returns to the "ok" prompt
+0219   user-     ( ... -- ) ( R: ... -- )Abort after alarm routine finishes execution
+021E   delete-property  ( nam-str nam-len -- )                        Deletes the property with the 
+0220   cpeek     ( addr -- false | byte  true )       Reads 8-bit value at given address, returns false if unsuccessful  
+0221   wpeek     ( waddr -- false | w true )          Reads doublet at given address, returns false if unsuccessful  
+0222   lpeek     ( qaddr -- false | quad true )       Reads quadlet at given address, returns false if unsuccessful  
+0223   cpoke     ( byte  addr --  okay? )             Writes 8-bit value at given address, returns false if unsuccessful  
+0224   wpoke     ( w waddr --  okay? )                Writes doublet at given address, returns false if unsuccessful  
+0225   lpoke     ( quad qaddr --  okay? )             Writes quadlet at given address, returns false if unsuccessful  
+0227   lbflip    ( quad1 -- quad2 )                   Reverses the bytes within a quadlet
+0228   lbflip    ( qaddr len -- )               Reverses bytes within each quadlet in given region
+0230   rb@       ( addr -- byte )       Reads the 8-bit value at the given address, atomically  
+0231   rb!       ( byte  addr -- )      Writes the 8-bit value at the given address, atomically  
+0232   rw@       ( waddr -- w )         Reads the doublet at the given address, atomically  
+0233   rw!       ( w waddr -- )         Writes the doublet at the given address, atomically  
+0234   rl@       ( qaddr -- quad )      Reads the quadlet at the given address, atomically  
+0235   rl!       ( quad qaddr -- )      Writes the quadlet at the given address, atomically  
+0236   wbflip    ( waddr len -- )               Exchanges bytes within doublets in the specified region  
+0237   lwflip    ( qaddr len -- )               Exchanges doublets within quadlets in qaddr len  
+023B   child          ( phandle.parent -- phandle.child )  Returns phandle of the package that is the 
+023C   peer           ( phandle -- phandle.sibling )       Returns phandle of package that is the next 
+023E   byte-load   ( addr xt -- )        Interprets FCode beginning at location addr
+10     b(lit)       ( -- n ) ( F: /FCode-num32/ -- )     Followed by 32-bit#.  Compiled by numeric data
+11     b(')         ( -- xt ) ( F: /FCode#/ -- )         Followed by a token (1 or 2-byte code) .  Compiled 
+12     b(")         ( -- str len )                       Followed by count byte, text.  Compiled by " or ."
+13     bbranch      ( -- ) ( F: /FCode-offset/ -- )      Followed by offset.  Compiled by else or again
+14     b?branch     ( don't-branch? -- )                 Followed by offset.  Compiled by if or until
+15     b(loop)      ( -- ) ( F: /FCode-offset/ -- )      Followed by offset.  Compiled by loop
+16     b(+loop)     ( delta -- )                         Followed by offset.  Compiled by +loop
+17     b(do)        ( limit start -- )                   Followed by offset.  Compiled by do
+18     b(?do)       ( limit start -- )                   Followed by offset.  Compiled by ?do
+19     i         ( -- index ) ( R: sys -- sys )      Returns current loop index value
+1A     j         ( --  index ) ( R: sys -- sys )     Returns value of  next outer loop index
+1B     b(leave)     ( F: -- )                            Compiled by leave or ?leave
+1C     b(of)        ( sel of-val -- sel | <nothing )      Followed by offset.  Compiled by of
+1D     execute   ( ... xt -- ??? )    Executes the word whose compilation address is on the stack
+1E     +         ( nu1 nu2 -- sum )             Adds nu1+nu2
+1F     -         ( nu1 nu2 -- diff )            Subtracts nu1-nx2
+20     *         ( nu1 nu2 -- prod )            Multiplies nu1 times nu2
+21     /         ( n1 n2 -- quot )              Divides n1/n2
+22     mod       ( n1 n2 -- rem )               Remainder of n1/n2
+23     and       ( x1 x2 -- x3 )                Logical and
+24     or        ( x1 x2 -- x3 )                Logical or
+25     xor       ( x1 x2 -- x3 )                Exclusive or
+26     invert    ( x1 -- x2 )                   One's complement
+27     lshift    ( x1 u -- x2 )                 Left shifts x1 by u places
+28     rshift    ( x1 u -- x2 )                 Right shifts x1 by u places
+29     >a         ( x1 u -- x2 )                 Arithmetic right shifts n1 by u places
+2A     /mod      ( n1 n2 -- rem quot )          Remainder, quotient of n1/n2
+2B     u/mod     ( u1 u2 -- urem uquot )        Unsigned 32-bit divide of u1/u2
+2C     negate    ( n1 -- n2 )                   Changes the sign of n1
+2D     abs       ( n -- u )                     Absolute value
+2E     min       ( n1 n2 -- n1|n2 )             n3 is minimum of n1 and n2
+2F     max       ( n1 n2 -- n1|n2 )             n3 is maximum of n1 and n2
+30     >r         ( x -- ) ( R: -- x)                            Moves a stack item to the return stack
+31     r'>       ( -- x ) ( R: x -- )                           Moves  item from return stack to data stack
+32     r@        ( -- x ) ( R: x -- x )                         Copies the top of the return stack to the data stack
+33     exit      ( -- ) (R: sys -- )  Returns from the current word
+34     0=        ( nulflag -- equal-to-0? )               True if n = 0, also inverts any flag
+35     0<'>       ( n -- not-equal-to-0? )                 True if n < 0
+36     0<         ( n -- less-than-0? )                    True if n < 0
+37     0<=        ( n -- less-or-equal-to-0? )             True if n <= 0
+38     0'>       ( n -- greater-than-0? )                 True if n  0
+39     0=        ( n -- greater-or-equal-to-0? )          True if n = 0
+3A               ( n1 n2 -- less? )                       True if n1 < n2
+3B               ( n1 n2 -- greater? )                    True if n1  n2
+3C     =         ( x1 x2 -- equal? )                      True if x1 = x2
+3D     <'>        ( x1 x2 -- not-equal? )                  True if x1 < x2
+3E     u'>       ( u1 u2 -- unsigned-greater? )           True if u1  u2, unsigned
+3F     u<=        ( u1 u2 -- unsigned-less-or-equal? )     True if u1 <= u2, unsigned
+40     u<         ( u1 u2 -- unsigned-less? )              True if u1 < u2, unsigned
+41     u=        ( u1 u2 -- unsigned-greater-or-equal? )  True if u1 = u2, unsigned
+42     >=         ( n1 n2 -- greater-or-equal? )           True if n1 = n2
+43     <=         ( n1 n2 -- less-or-equal? )              True if n1 <= n2
+44     between   ( n min max --  min<=n<=max? )             True if min <= n <= max
+45     within    ( n min max --  min<=n<max? )              True if min <= n < max
+46     drop      ( x -- )                                       Removes x from the stack
+47     dup       ( x -- x x )                                   Duplicates x
+48     over      ( x1 x2 -- x1 x2 x1 )                          Copies second stack item to top of stack
+49     swap      ( x1 x2 -- x2 x1 )                             Exchanges the top 2 stack items
+4A     rot       ( x1 x2 x3 -- x2 x3 x1 )                       Rotates 3 stack items
+4B     -rot      ( x1 x2 x3 -- x3 x1 x2 )                       Shuffles top 3 stack items
+4C     tuck      ( x1 x2 -- x2 x1 x2 )                          Copies the top stack item below the second item
+4D     nip       ( x1 x2 -- x2 )                                Discards the second stack item
+4E     pick      ( xu ... x1 x0 u -- xu ... x1 x0 xu )          Copies u-th stack item
+4F     roll      ( xu ... x1 x0 u -- xu-1 ... x1 x0 xu )        Rotates u stack items
+50     ?dup      ( x -- 0 | x x)                                Duplicates x if it is non-zero
+51     depth     ( -- u )                                       How many items on stack?
+52     2drop     ( x1 x2 -- )                                   Removes 2 items from stack
+53     2dup      ( x1 x2 --  x1 x2  x1 x2 )                     Duplicates 2 stack items
+54     2over     ( x1 x2 x3 x4 -- x1 x2 x3 x4 x1 x2 )           Copies 2 stack items
+55     2swap     ( x1 x2 x3 x4 -- x3 x4 x1 x2 )                 Exchanges 2 pairs of stack items
+56     2rot      ( x1 x2 x3 x4 x5 x6 -- x3 x4 x5 x6 x1 x2 )     Rotates 3 pairs of stack items
+57     2/        ( x1 -- x2 )                   Divides by 2
+58     u2/       ( x1 -- x2 )                   Logical right shifts 1 bit
+59     2*        ( x1 -- x2 )                   Multiplies by 2
+5A     /c        ( -- n )                             Address increment for a byte; 1
+5B     /w        ( -- n )                             Address increment for a doublet;
+5C     /l        ( -- n )                             Address increment for a quadlet;
+5D     /n        ( -- n )                             Address increment for a normal;
+5E     ca+       ( addr1 index -- addr2 )             Increments addr1 by index times /c
+5F     wa+       ( addr1 index -- addr2 )             Increments addr1 by index times /w
+60     la+       ( addr1 index -- addr2 )             Increments addr1 by index times /l
+61     na+       ( addr1 index -- addr2 )             Increments addr1 by index times /n
+62     char+     ( addr1 -- addr2 )                   Increments addr1 by /c
+63     wa1+      ( addr1 -- addr2 )                   Increments addr1 by /w
+64     la1+      ( addr1 -- addr2 )                   Increments addr1 by /l
+65     cell+     ( addr1 -- addr2 )                   Increments addr1 by /n
+66     chars     ( nu1 -- nu2 )                       Multiplies by /c
+67     /w*       ( nu1 -- nu2 )                       Multiplies by /w
+68     /l*       ( nu1 -- nu2 )                       Multiplies by /l
+69     cells     ( nu1 -- nu2 )                       Multiplies by /n
+6A     on        ( a-addr -- )                  Stores true  (32-bit -1)  at a-addr
+6B     off       ( a-addr -- )                  Stores false  (32-bit 0)  at a-addr
+6C     +!        ( nu a-addr -- )               Adds nu to the number stored in the variable at a-addr
+6D     @         ( a-addr -- x )                Fetches a number from the variable at a-addr
+6E     l@        ( qaddr -- quad )              Fetches the quadlet at qaddr, must be 32-bit aligned
+6F     w@        ( waddr -- w )                 Fetches the unsigned doublet at waddr, must be 16-bit aligned
+70     <w@        ( waddr -- n )                 Fetches the signed doublet at waddr, must be 16-bit aligned
+71     c@        ( addr -- byte )               Fetches a byte from addr
+72     !         ( x a-addr -- )                Stores a number into the variable at a-addr
+73     l!        ( quad qaddr -- )              Stores the quadlet at qaddr, must be 32-bit aligned
+74     w!        ( w waddr -- )                 Stores a doublet at waddr, must be 16-bit aligned
+75     c!        ( byte addr -- )               Stores low byte of n at addr
+76     2@        ( a-addr -- x1 x2 )            Fetches 2 numbers from a-addr; x2 from lower address
+77     2!        ( x1 x2 a-addr -- )            Stores 2 numbers at a-addr; x2 at lower address
+78     move      ( src-addr dest-addr len -- )  Copies len bytes from src-addr to dest-addr, handles overlap 
+79     fill      ( addr len byte -- )           Sets len bytes of memory to value byte
+7A     comp      ( addr1 addr2 len -- n )       Compares two byte arrays including case.  n=0 if same
+7B     noop        ( -- )                Does nothing
+7C     lwsplit   ( quad -- w1.lo w2.hi )              Splits a quadlet into two doublets
+7D     wljoin    ( w.lo w.hi -- quad )                Joins two doublets to form a quadlet
+7E     lbsplit   ( quad -- b.lo b2 b3 b4.hi )         Splits a quadlet into four bytes
+7E     lwflip    ( quad1 -- quad2 )                   Swaps the doublets within a quadlet
+7F     bljoin    ( bl.lo b2 b3 b4.hi -- quad )        Joins four bytes to form a quadlet
+80     wbflip    ( w1 -- w2 )                         Swaps the bytes within a doublet
+81     upc          ( char1 -- char2 )                   Converts char to upper case
+82     lcc          ( char1 -- char2 )                   Converts char to lower case
+83     pack         ( str len addr -- pstr )             Makes a packed string from addr len, 
+84     count        ( pstr -- str len )                  Unpacks a packed string
+85     body'>      ( a-addr -- xt )      Finds compilation address from parameter field address
+86     >body        ( xt -- a-addr )      Finds parameter field address from compilation address
+87     fcode-    ( -- n )  Returns major/minor FCode interface version
+88     span      ( -- a-addr )             Variable containing the number of characters read by expect
+89     unloop    ( -- ) ( R: sys -- )                Discards loop control parameters
+8A     expect    ( addr len -- )           Gets a line of edited input from the keyboard; stores it at addr
+8B     alloc-    ( len -- a-addr )      Allocates nbytes of memory and returns its address
+8C     free-mem  ( a-addr len -- )      Frees memory allocated by alloc-mem
+8D     key?      ( -- pressed? )           True if a key has been typed on the keyboard
+8E     key       ( -- char )               Reads a character from the keyboard
+8F     emit      ( char -- )                Displays the character
+90     type      ( text-str text-len -- )   Displays n characters
+91     (cr       ( -- )                     Outputs ASCII CR character; decimal 13
+92     cr        ( -- )                     Starts a new line of display output
+93     #out      ( -- a-addr )     Variable holding the column number on the output device
+94     #line     ( -- a-addr )     Variable holding the line number on the output device
+95     hold      ( char -- )                               Inserts the char in the pictured numeric output string
+96     <#         ( -- )                                    Initializes pictured numeric output
+97     u#'>      ( u -- str len )                          Ends pictured numeric output
+98     sign      ( n -- )                                  Sets sign of pictured output
+99     u#        ( u1 -- u2 )                              Converts a digit in pictured numeric output
+9A     u#s       ( u1 -- u2 )                              Converts rest of the digits in pictured numeric output
+9B     u.        ( u -- )         Displays an unsigned number
+9C     u.r       ( u size -- )    Prints an unsigned number in a fixed width field
+9D     .         ( nu -- )        Displays a number
+9E     .r        ( n size -- )    Displays a number in a fixed width field
+9F     .s        ( ... -- ... )   Displays the contents of the data stack
+A0     base      ( -- a-addr )                             Variable containing number base
+A2     $numbe    ( addr len -- true | n false )            Converts a string to a number  
+A3     digit     ( char base -- digit true | char false )  Converts a character to a digit
+A4     -1        ( -- -1 )            Constant -1
+A5     0         ( -- 0 )             Constant 0
+A6     1         ( -- 1 )             Constant 1
+A7     2         ( -- 2 )             Constant 2
+A8     3         ( -- 3 )             Constant 3
+A9     bl        ( -- 0x20 )   The ASCII code for the space character; decimal 32
+AA     bs        ( -- 0x08 )   The ASCII code for the backspace character; decimal 8
+AB     bell      ( -- 0x07 )   The ASCII code for the bell character; decimal 7
+AC     bounds    ( n cnt -- n+cnt n )           Converts start,len to end,start for do loop
+AD     here      ( -- addr )                 Address of top of dictionary
+AE     aligne    ( n1 -- n1|a-addr )            Adjusts an address to a machine word boundary
+AF     wbsplit   ( w -- b1.lo b2.hi )                 Splits a doublet into two bytes
+B0     bwjoin    ( b.lo b.hi -- w )                   Joins two bytes to form a doublet
+B1     b(<mark)      ( F: -- )                            Compiled by begin
+B2     b(resolve)   ( -- ) ( F: -- )                     Compiled by else or then
+B5     new-token    ( -- ) ( F: /FCode#/ -- )            Followed by table#, code#, token-type.  Compiled 
+B6     named-token  ( -- )                               Followed by packed string (count,text), table#, 
+B7     b(:)         ( E: ... -- ??? ) ( F: -- colon-sys )Token-type compiled by :
+B8     b(value)     ( E: -- x ) ( F: x -- )              Token-type compiled by value
+B9     b(variable)  ( E: -- a-addr ) ( F: -- )           Token-type compiled by variable
+BA     b(constant)  ( E: -- n ) ( F: n -- )              Token-type compiled by constant
+BB     b(create)    ( E: -- a-addr ) ( F: -- )           Token-type compiled by create
+BC     b(defer)     ( E: ... -- ??? ) ( F: -- )          Token-type compiled by defer
+BD     b(buffer:)   ( E: -- a-addr ) ( F: size -- )      Token-type compiled by buffer:
+BE     b(field)     ( E: addr -- addr+offset )           Token-type compiled by field
+C0     instance    ( -- )                                          Declare a data type to be local  
+C2     b(;)         ( -- ) ( F: colon-sys -- )           End a colon definition.  Compiled by ;
+C3     b(to)        ( x -- )                             Compiled by to
+C4     b(case)      ( sel -- sel ) ( F: -- )             Compiled by case
+C5     b(endcase)   ( sel | <nothing -- ) ( F: -- )       Compiled by endcase
+C6     b(endof)     ( -- ) ( F: /FCode-offset/ -- )      Compiled by endof
+C7     #         ( ud1 -- ud2 )                            Converts a digit in pictured numeric output 
+C8     #s        ( ud -- 0 0 )                             Converts remaining digits in pictured numeric 
+C9     #'>       ( ud -- str len )                         Ends pictured numeric output conversion
+CA     external-    ( -- )                               vt
+CC     offset16    ( -- )                All further branches use 16-bit offsets (instead of 8-bit)
+CD     eval      ( ... str len -- ??? )                   Executes Forth commands within a string  
+CD     evaluate  ( ... str len -- ??? )                   Interprets Forth text from the given string
+D0     c,        ( byte -- )                 Places a byte in the dictionary
+D1     w,        ( w -- )                    Places a doublet in the dictionary
+D2     l,        ( quad -- )                 Places a quadlet in the dictionary
+D3     ,         ( x -- )                    Places a number in the dictionary
+D4     um*       ( u1 u2 -- ud.prod )           Multiplies two unsigned quadlets, yields an unsigned 64-bit 
+D5     um/mod    ( ud u -- urem uquot )         Divides an unsigned 64-bit number by an unsigned quadlet, yields a 
+D8     d+        ( d1 d2 --d.sum )              Adds two 64-bit numbers  
+D9     d-        ( d1 d2 -- d.diff )            Subtracts two 64-bit numbers  
+DC     state     ( -- a-addr )               Variable containing true if in compilation state
+DD     compile   ( -- )                      Compiles following command at run time
+F0     start0       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+F1     start1       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+F2     start2       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+F3     start4       ( -- )                               Like version1, but for version 2.0 FCodes.  Uses 16-
+FC     ferror    ( -- )                                   Displays "Unimplemented FCode" and stops FCode 
+FD     version1     ( -- )                               Followed by reserved byte, checksum (2 bytes) , 
+FF     end1        ( -- )                Alternates form for end0  (not recommended)

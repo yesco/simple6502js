@@ -1,0 +1,130 @@
+CR     "            ( [text<"< ] -- text-str text-len )    Collects a string
+CR     '         ( "old-name< " -- xt )                    Finds the word (while executing)
+CR     (.)         ( n -- str len )
+CR     (u.)        ( u -- str len )
+CR     */mod     ( n1 n2 n3 -- rem quot )       Remainder, quotient of n1*n2/n3
+CR     +loop       ( C: dodest-sys -- ) ( delta -- ) ( R: sys1 -- <nothing | sys2 )
+CR     +loop     ( C: dodest-sys -- ) ( delta -- )   Increments by n, returns to do.  If n<0, index start  to 
+CR     ."          ( [text<)] -- )
+CR     .(          ( [text<)] -- )
+CR     .(        ( [text<)] -- )             Displays a string now
+CR     .d        ( n -- )         Displays number in decimal
+CR     .h        ( n -- )         Displays number in hexadecimal
+CR     /n*       ( nu1 -- nu2 )                       Synonym for cells
+CR     1+        ( nu1 -- nu2 )                 Adds one
+CR     1-        ( nu1 -- nu2 )                 Subtracts one
+CR     2+        ( nu1 -- nu2 )                 Adds 2
+CR     2-        ( nu1 -- nu2 )                 Subtracts 2
+CR     3drop     ( x1 x2 x3 -- )                                Removes 3 items from stack
+CR     3dup      ( x1 x2 x3 -- x1 x2 x3 x1 x2 x3 )              Copies top 3 stack items
+CR     : (colon)   ( "new-name< " -- colon-sys ) ( E: ... -- ??? )
+CR     : (colon)   ( -- )                                          Begins colon definition
+CR     ;           ( -- )                                          Ends colon definition
+CR     <<a         ( n1 u -- n2 )                 Arithmetic left shifts (same as lshift)
+CR     ?         ( a-addr  -- )                 Displays the  number at a-addr
+CR     ?do         ( C: -- dodest-sys ) ( limit start -- ) ( R: -- sys  )
+CR     ?do       ( C: -- dodest-sys )                Like do, but skips loop if end = start
+CR     ?leave      ( exit? -- ) ( R: sys -- )
+CR     ?leave    ( exit? -- ) ( R: sys -- )          If flag is true, exits do loop
+CR     ['] name  ( -- xt )                                Finds word (while compiling)
+CR     accept    ( addr len1 -- len2 )     Gets an edited input line, stores it at addr
+CR     again     ( C: dest-sys -- )                     Ends begin...again (infinite) loop
+CR     allot     ( len -- )                  Allocates len bytes in the dictionary
+CR     ascii     ( [text< ] -- char )       ASCII value of next character
+CR     begin       ( C: -- dest-sys ) ( -- )
+CR     begin     ( C: -- dest-sys ) ( -- )              Starts conditional loop
+CR     blank     ( addr len -- )                Sets len bytes of memory to ASCII space, starting at addr
+CR     buffer:     ( E: -- a-addr )                                Creates data array of size bytes
+CR     buffer:     ( E: -- a-addr ) ( len "new-name< " -- )
+CR     ca1+      ( addr1 -- addr2 )                   Synonym for chars+
+CR     carret    ( -- 0x0D )   The ASCII code for the carriage return character; decimal 13
+CR     case        ( C: -- case-sys) ( sel -- sel )
+CR     case      ( C: -- case-sys) ( sel -- sel )             Begins a case (multiple selection) statement
+CR     constant    ( E: -- x ) ( x "new-name< " -- )
+CR     constant    ( E: -- x ) ( x "new-name< " -- )                Creates a constant 
+CR     control   ( [text< ] -- char )       Interprets next character as ASCII control character
+CR     create      ( E: -- a-addr ) ( "new-name< " -- )
+CR     create      ( E: -- a-addr ) ( "new-name< " -- )             Generic defining word
+CR     d#        ( [number< ] -- n )   Interprets next number in decimal
+CR     decimal   ( -- )           If inside definition, output  in decimal
+CR     defer       ( E: ... -- ??? ) ( "new-name< " -- )
+CR     defer       ( E: ... -- ??? ) ( "new-name< " -- )            Execution vector (change with is)
+CR     do          ( C: -- dodest-sys ) ( limit start -- ) (R: -- sys )
+CR     do        ( C: -- dodest-sys )                Loops, index start to end-1 inclusive
+CR     else        ( C: orig-sys1 -- orig-sys2 ) ( -- )
+CR     else      ( C: orig-sys1 -- orig-sys2 ) ( -- )  (optional) Executes next FCode(s) if if failed
+CR     endcase     ( C: case-sys -- ) ( sel | <nothing -- )
+CR     endcase   ( C: case-sys -- ) ( sel | <nothing -- )      Marks end of a case statement
+CR     endof       ( C: case-sys1 of-sys -- case-sys2 ) ( -- )
+CR     endof     ( C: case-sys1 of-sys -- case-sys2 ) ( -- )  If true, exits begin...until loop
+CR     erase     ( addr len -- )                Sets len bytes of memory to zero, starting at addr
+CR     false     ( -- false )                             The value false
+CR     fcode-      ( -- )                Begins 2.0 FCode program, compiles start1  
+CR     fcode-      ( -- )                Begins FCode program
+CR     field       ( E: addr -- addr+offset ) ( offset size "new-  Creates a named offset pointer
+CR     field       ( E: addr -- addr+offset ) ( offset size "new-name< " -- offset+size )
+CR     h#        ( [number< ] -- n )   Interprets next number in hexadecimal
+CR     hex       ( -- )           If inside definition, output in hexadecimal
+CR     if          ( C: -- orig-sys ) ( do-next? -- )
+CR     if        ( C: -- orig-sys ) ( do-next? -- )    If true, executes next FCode(s)
+CR     leave       ( -- ) ( R: sys -- )
+CR     leave     ( -- ) ( R: sys -- )                Exits do loop immediately
+CR     linefeed  ( -- 0x0A )   The ASCII code for the linefeed character; decimal 10
+CR     loop        ( C: dodest-sys -- ) ( -- ) ( R: sys1 -- <nothing | sys2)
+CR     loop      ( C: dodest-sys -- ) ( -- )         Increments index, returns to do
+CR     na1+      ( addr1 -- addr2 )                   Synonym for cell+
+CR     name      ( addr len -- )                Declares SunOS driver name, as in  " SUNW,zebra"
+CR     newline   ( -- n )      The ASCII code for the newline character; decimal 10
+CR     not       ( x1 -- x2 )                   Synonym for invert
+CR     o#        ( [number< ] -- n )   Interprets next number in octal
+CR     octal     ( -- )           If inside definition, output  in octal
+CR     of          ( C: case-sys1 -- case-sys2 of-sys ) ( sel of-val -- sel | <nothing )
+CR     of        ( C: case-sys1 -- case-sys2 of-sys )         Returns to loop start
+CR     repeat      ( C: orig-sys dest-sys -- ) ( -- )
+CR     repeat    ( C: orig-sys dest-sys -- ) ( -- )     Returns to loop start
+CR     s"           ( [text<"] -- test-str text-len )     Gathers the immediately-following string
+CR     s.        ( n -- )         Displays n as a signed number
+CR     space     ( -- )                     Outputs a single space character
+CR     spaces    ( cnt -- )                 Outputs cnt spaces
+CR     struct      ( -- 0 )                                        Initializes for field creation
+CR     then        ( C: orig-sys -- ) ( -- )
+CR     then      ( C: orig-sys -- ) ( -- )             Terminates if...else...then
+CR     to        ( param [old-name< ]  -- )   Changes value in a defer word or a value
+CR     true      ( --  true )                             The value true
+CR     until       ( C: dest-sys -- ) ( done? -- )
+CR     until     ( C: dest-sys -- ) ( done? -- )        If true, exits begin...until loop
+CR     value       ( E: -- x) ( x "new-name< "-- )
+CR     value       ( E: -- x) ( x "new-name< "-- )                  Creates named value-type variable 
+CR     variable    ( E: -- a-addr ) ( "new-name< "-- )
+CR     variable    ( E: -- a-addr ) ( "new-name< "-- )              Creates a data variable
+CR     while       ( C: dest-sys -- orig-sys dest-sys ) ( continue? -- )
+CR     while     ( C: dest-sys -- orig-sys dest-sys )   If true, continues begin...while...repeat loop, 
+CR  (.)         ( n -- str len )
+CR  (u.)        ( n -- addr len )
+CR  +loop       ( C: dodest-sys -- ) ( delta -- ) ( R: sys1 -- 
+CR  ."          ( [text<)] -- )
+CR  .(          ( [text<)] -- )
+CR  : (colon)   ( "new-name< " -- colon-sys ) ( E: ... -- ??? )
+CR  ?do         ( C: -- dodest-sys ) ( limit start -- ) ( R: -- sys  
+CR  ?leave      ( exit? -- ) ( R: sys -- )
+CR  begin       ( C: -- dest-sys ) ( -- )
+CR  buffer:     ( E: -- a-addr ) ( len "new-name< " -- )
+CR  case        ( C: -- case-sys) ( sel -- sel )
+CR  constant    ( E: -- x ) ( x "new-name< " -- )
+CR  create      ( E: -- a-addr ) ( "new-name< " -- )
+CR  defer       ( E: ... -- ??? ) ( "new-name< " -- )
+CR  do          ( C: -- dodest-sys ) ( limit start -- ) (R: -- sys )
+CR  else        ( C: orig-sys1 -- orig-sys2 ) ( -- )
+CR  endcase     ( C: case-sys -- ) ( sel | <nothing -- )
+CR  endof       ( C: case-sys1 of-sys -- case-sys2 ) ( -- )
+CR  field       ( E: addr -- addr+offset ) ( offset size "new-
+CR  if          ( C: -- orig-sys ) ( do-next? -- )
+CR  leave       ( -- ) ( R: sys -- )
+CR  loop        ( C: dodest-sys -- ) ( -- ) ( R: sys1 -- 
+CR  of          ( C: case-sys1 -- case-sys2 of-sys ) ( sel of-val 
+CR  repeat      ( C: orig-sys dest-sys -- ) ( -- )
+CR  then        ( C: orig-sys -- ) ( -- )
+CR  until       ( C: dest-sys -- ) ( done? -- )
+CR  value       ( E: -- x) ( x "new-name< "-- )
+CR  variable    ( E: -- a-addr ) ( "new-name< "-- )
+CR  while       ( C: dest-sys -- orig-sys dest-sys ) ( continue? 
