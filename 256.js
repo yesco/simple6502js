@@ -688,6 +688,7 @@ L('FORTH');
     LDAN('BRK_NEXT', hi),STAA(cpu.consts().IRQ, inc);
   }
 
+  // TODO: needed?
 //  LDAN('FORTH', lo),STAA(cpu.consts().RESET);
 //  LDAN('FORTH', hi),STAA(cpu.consts().RESET, inc);
 
@@ -695,30 +696,26 @@ L('quit');
   // clear return stack
   LDXN('rstack', lo),STXZ('rp');
 
-  LDAN(0xff),STAZ('num_pos');;
+  // init = 0xff
+  LDAN(0xff),STAZ('num_pos');
+
+  // init = 00
+  TAY(),INY(); // "ip" = 0
+  TYA(),STAZ('state');
 
   // init state of interpreter
-
   LDAN('U', lo),STAZ('base');
   LDAN('U', hi),STAZ('base', inc);
 
-  // init other stuff
-  LDAN(0); {
-    TAY(); // "ip"
-  }
-
-  LDAN(0); STAZ('state');
   //LDAN(state_display); STAZ('state');
   next();
 L('FORTH_INIT_END');
-
 
 
 L('edit2');
   // TODO:needed?
   LDXN(state_edit+state_display),STAZ('state');
   JMPA('edit');
-
 
   //  9.6 cycles / enter-exit saved w noECHO
   // 55.6 cycles / enter-exit saved w ECHO
@@ -922,9 +919,8 @@ L('interpret'); // A has our word
     // ';' - TODO: EXIT (to local sub?)
     // TODO: not working now remove?
     CMPN(ord(';')),BNE('_;_nomid');
-    // JMPA('EXIT');
-    // local fun 'exit'
-    JMPA('_;_mid');
+      // local fun 'exit'
+      JMPA('_;_mid');
     L('_;_nomid');
 
     // skip inline backtick value (could be any)
@@ -955,16 +951,10 @@ L('interpret'); // A has our word
   def('`', ''); JMPA('printval');
   def(0, 'edit2');
 
-  // TODO: ???
-  //def('D', ''); JSRA('ENTER'); string('d9+.');
-  //def('E', ''); JSRA('ENTER'); string('');
-  // F(ib) iterator
-//  def('F', ''); JSRA('ENTER'); string('o.dG+');
-  // rot = 1 2 3 >r swap r> swap .s
-  //def('G'); JSRA('ENTER'); // lol
-  //string('Rsrs');
-
   L('INTERPRET_END');
+
+
+
 
 
   ////////////////////////////////////////
@@ -1327,6 +1317,8 @@ L('QUESTION');
     INY(),LDAIY('base'),TAX();
   } PLA();
 
+  // TODO: 256 --- remove most? keep one?
+  // ? 0->0 n=>1
   // TODO: refactor PHA,CMPN(0) PHP, PLP ???
   // most of these is just test, no next // b4
   //    // b28 can be done in 14
@@ -1338,18 +1330,20 @@ L('QUESTION');
   sub('?<', ''); TSX(),CMPAX(S+1),BCC('=>0'),BEQ('=>0'),BCS('=>1');
   sub('?='); TSX(),SBCAX(S+1),L('?0'),BEQ('=>1'),L('=>0'),LDAN(0),BRK(),L('=>1'),LDAN(1);
   endsub();
-  // ?~= ?!=
-  // ?~< ?>=
-  // ?~> ?<=
-  next();
 
+  next();
 L('QUESTION_END');
+
+
 
 L('TABLESPACE');
   if (table_next) {
     gentab();
   }
 L('TABLESPACE_END');
+
+
+
 
 L('FORTH_END');
 
@@ -1712,12 +1706,13 @@ prsize(" SYMS :", l.SYMS_END-l.SYMS_BEGIN);
 prsize("  ( # :", syms_defs, '/ 22)');
 prsize(" ALFA :", l.ALFA_END-l.ALFA_BEGIN);
 prsize("  ( # :", alfa_defs, '/ 30)');
-prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
+print();
 prsize(" ALIGN:", l.DISPATCH-l.TABLESPACE);
 prsize(" TABLE:", l.TABLESPACE_END-l.DISPATCH);
+print();
 print();
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
 prsize("EDIT_ :", l.EDIT_END-l.EDIT_BEGIN);
