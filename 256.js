@@ -271,6 +271,8 @@ PROGRAM = `
 0@.
 `;
 
+PROGRAM = '9d. 3 4 + . .';
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -312,29 +314,6 @@ PROGRAM = `
 // - r and R, and move printcontrol (590 +69)
 //
 
-// DICTIONARY ENTRY (longword)
-//               ____________________________ 
-//              /    +------------------+    \
-// offset:     /     |                  |     \
-// |0     |1  /   |2 ^  |3         |4   v      \
-// | link | flags | cod | name...7 | CODE... | data |
-//    #2     #1      #1    #len
-// bytes^^^
-//
-// link  : pointer to previous entry (2B)
-// flags : N=immediate (lo bits data offset)
-// cod   : offset of code (len = cod-2)
-// name  : ascii, hi-bit terminated
-// data  : as this is somewhat object
-//         orienterd, data is after code
-//         known by the code (?)
-// 
-// TODO: TODO: TODO:
-// - When local functions are defined, "cod"
-// moves forward, so they are not run again.
-// - Where to store local dispatch? linked list?
-// - need extra "link-field"
-
 // INTERPREATION
 // 
 // In general execution takes place inside
@@ -358,54 +337,6 @@ PROGRAM = `
 //
 //     A : general register free to use
 //
-// TASKS
-//
-// A word can be seen as a task.
-//
-//   - Limited to 256 bytes (1 page)
-//   - Send and receive messages
-//   - Reactive system ala erlang
-//   - Internal storage
-//   - Check status
-//   - y yield
-//   - Multiple types of message
-//     X: message number
-//     data on global stack?
-//   - Provide and use services
-//     (alarm, 
-//   - local "recv" function (called)
-
-// Local Storage ("User")
-//
-//   * static variables/data
-//   * circular double-headed buffer
-//     - l<     l>  (push, pop)
-//     - q<     q>  (unshift, shift)
-//           #      (size, 0 if empty)
-//       q!     q@  (send, receive)
-//       l!     l@  (1 byte addresses)
-//   * or use Pub/Sub style
-//     emit, subscribers, receive,
-//     channels, ...
-//     - can be implemented by just
-//       producer calling consumers
-//     - a channel can be an instance
-//       of a queue word, code impl
-//       just JSR to other word, no
-//       setup, does not do ENTER as
-//       it's calling an "abstract obj"
-//   
-// Stack usage
-//   * has a single entry point
-//   * the system will call with message
-
-// Private Terminale Window (tty)
-//   * ala Apple ][
-//     (pos r,c  size w,h  cur r,c)
-//   * minimize/maximize (user request)
-//     (META-123... or CTRL-123...)
-//   * can enter EDITOR for the command!
-//     CTRL-R etc...
 
 let utilty = require('./utility.js');
 let terminal = require('./terminal-6502.js');
@@ -417,6 +348,9 @@ let puts = terminal.aputs;
 let getc = terminal.agetc;
 
 let start = 0x501;
+
+
+
 
 
 // Turn off BRK, off TOS and on table_next
@@ -645,8 +579,12 @@ function endsub(foo) {
   enddef();
 }
 
+
+
+
+
 ////////////////////////////////////////
-//  TEST
+//  F8rth generation
 
 var syms_defs, alfa_defs;
 
@@ -680,17 +618,20 @@ ORG(_U);
 L('U'); // U = user space (1 page)
   L('PASCAL_PROGRAM_Z'); pascalz(PROGRAM); // LOL
 
+////////////////////////////////////////
 // 0x100-- stacks
-// 
-// bottom of data stack
+
+//   bottom of data stack
 ORG(SYSTEM-1-RS_SIZE-DS_SIZE); L('top');
 
-// Data Stack (Params)
+//   Data Stack (Params)
 ORG(SYSTEM-1-RS_SIZE);         L('stack');
 
-// Return Stack
-// TODO: ? move to ZP? cheaper addressing!
+//   Return Stack
+//   TODO: ? move to ZP? cheaper addressing!
 ORG(SYSTEM-1);                 L('rstack');
+
+
 
 ////////////////////////////////////////
 // ZERO PAGE
@@ -698,21 +639,16 @@ ORG(SYSTEM-1);                 L('rstack');
 // 0x00--0x0f use for any
 
 ORG(0xc0);
-  L('upbase');    word(0); // TODO: use!
-
-// Harward stack is shared with RStack and DStack!
+  // stacks
   L('rp');        byte(0);
-//  L('sp');        byte(0);
+//  L('sp');        byte(0); // TSX() ?
 
   L('base');      word(0); // base + Y == "IP"
 
-  // editing
-  L('edit_pos');  byte(0);
-  L('line_pos');  byte(0); // one before?
-  L('eol_pos');   byte(0); // one before?
-  L('end_pos');   byte(0);
-  L('last_line'); byte(0);
+  L('upbase');    word(0); // TODO: use!
 
+  // parsing
+  L('end_pos');   byte(0);
   L('num_pos');   byte(0);
 
   // tmps (or 0?)
@@ -727,9 +663,7 @@ ORG(0xc0);
   const state_edit = 0x80;
   const state_display = 0x40;
   const state_run = 0;
-  L('state');     byte(0); // why local?
-                           // use for loop counting?
-
+  L('state');     byte(0);
 
 if (jasm.address() >= 0xe0)
   throw "%% ZP vars needs start earlier!";
@@ -737,11 +671,14 @@ if (jasm.address() >= 0xe0)
 // Temprary in zp
 ORG(0xe0); L('UDF_offsets'); allot(32);
 
+
+
+
 ////////////////////////////////////////
 // Code start
 ORG(start);
 
-L('FORTH_BEGIN');
+L('FORTH');
   // init stack pointers
   LDXN('stack', lo),TXS();
 
@@ -751,35 +688,39 @@ L('FORTH_BEGIN');
     LDAN('BRK_NEXT', hi),STAA(cpu.consts().IRQ, inc);
   }
 
-  LDAN('FORTH_BEGIN', lo),STAA(cpu.consts().RESET);
-  LDAN('FORTH_BEGIN', hi),STAA(cpu.consts().RESET, inc);
+  LDAN('FORTH', lo),STAA(cpu.consts().RESET);
+  LDAN('FORTH', hi),STAA(cpu.consts().RESET, inc);
 
 L('quit');
+  // clear return stack
   LDXN('rstack', lo),STXZ('rp');
 
-  // init base "IP"
   LDAN(0xff),STAZ('num_pos');;
+
+  // init state of interpreter
 
   LDAN('U', lo),STAZ('base');
   LDAN('U', hi),STAZ('base', inc);
 
   // init other stuff
   LDAN(0); {
-    STAZ('tmp');
-    // init state of interpreter
     TAY(); // "ip"
   }
 
   LDAN(0); STAZ('state');
   //LDAN(state_display); STAZ('state');
   next();
-
 L('FORTH_INIT_END');
+
+
 
 L('edit2');
   // TODO:needed?
   LDXN(state_edit+state_display),STAZ('state');
   JMPA('edit');
+
+
+
 
   //  9.6 cycles / enter-exit saved w noECHO
   // 55.6 cycles / enter-exit saved w ECHO
@@ -807,9 +748,10 @@ L('EXIT'); // c52
   JMPA('NEXT'); // save 3 cycles
   L('EXIT_END');
 
-  // TODO: how to enter EDIT?
+
 
   DEY(),LDXN(state_edit+state_display),STAZ('state');
+
   // terminal debug help
   TRACE(()=>{
     // assumes to have printed screen first
@@ -840,6 +782,8 @@ L('EXIT'); // c52
   });
 
   JMPA('edit');
+
+
 
 
 // If enabled (why not always?) allow for:
@@ -873,7 +817,6 @@ L('BRK_NEXT');
   // 0. jump tables!
   // 1. not use A for TOS (what's the loss?)
   // 2. not use BRK for RTS and use real stack
-  // 3. 
 
 L('NEXT');
   TRACE(()=>{
@@ -884,18 +827,6 @@ L('NEXT');
   });
 
   if (table_next) { // b16 c29
-
-    if (0) {
-    // selfmod base stored inside instruction
-    // c21, zp.c:19
-    INY(),LDXAY('base'); // c6
-    BEQ('EXIT');         // c2
-    STYA('jmp', a=>a+1); // c4 zp.c:3
-    ASLA('jmp', a=>a+1); // c6 zp.c:5
-   L('jmp');
-    JMPI('DISPATCH');    // c5
-    }
-
     PHA(); {
       INY(),LDAIY('base');
       BEQ('EXIT'); // c2+1 // TODO: remove?
@@ -908,48 +839,38 @@ L('NEXT');
     JMPI('DISPATCH');
   } else {
 
-// TODO: Use some tricks from Token Threaded Forth
-// - http://6502org.wikidot.com/software-token-threading
+    INY();
+    // wrapped around?
+    //BEQ('edit2');
 
-  INY();
-  // wrapped around?
-  //BEQ('edit2');
-
-  // no LDXIY :-( ... make better...
-  // Actually, not much more expensive than
-  // INC (5) + test overflow (3) = 8
-  // Only benefit with this is if we save
-  // PHA(),POP() on ops that modify TOS only...
-  PHA(); { // b3 c7 // PHA+PLA overhead // b2 c7
-    LDAIY('base'); // c5+
-    // TODO: there is argument for NOT
-    // special handling, just dispatch
-    // in table? Especially for tracing...
-    // Also, 2 cycles could be saved!
-    BEQ('EXIT'); // c2+1
-    TAX(); // c2
-  } PLA();
-
-  BITZ('state');
-  BVC('nodisplay'); {
-    PHA(),TXA(); { // save TOS
-      JSRA('display');
+    PHA(); { // b5 c14
+      LDAIY('base'); // c5+
+      BEQ('EXIT'); // c2+1
+      TAX(); // c2
     } PLA();
 
     BITZ('state');
-    // loop if in editing: (re)display all!
-    BMI('NEXT'); 
-  }
- L('nodisplay');
+    BVC('nodisplay'); {
+      PHA(),TXA(); { // save TOS
+        JSRA('display');
+      } PLA();
 
-  // TODO: replace state with JMP edit!
-  BPL('_not_edit');
-  JMPA('edit_next');
- L('_not_edit');
+      BITZ('state');
+      // loop if in editing: (re)display all!
+      BMI('NEXT'); 
+    } L('nodisplay');
 
-} // not table
+    // TODO: replace state with JMP edit!
+    BPL('_not_edit');
+    JMPA('edit_next');
+    L('_not_edit');
+
+  } // not table
 
 L('NEXT_END');
+
+
+
 
 ////////////////////////////////////////
 // Interpreter
@@ -986,6 +907,65 @@ L('interpret'); // A has our word
   // -- "interpretation" or running
 
   L('INTERPRET_END');
+
+  // symbols "out of place"
+
+  def('\\'); PLA();
+  def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
+
+  // TODO: ] - exit
+  def(']'); { // b37 (was 44!)
+    // drop n items from rstack
+    TAX(),BEQ('_].end'); // 0 == NOP
+
+   L('_].skip.next');
+    INY();
+   L('_].skip');
+    LDAIY('base');
+    // ';' - TODO: EXIT (to local sub?)
+    // TODO: not working now remove?
+    CMPN(ord(';')),BNE('_;_nomid');
+      JMPA('EXIT');
+      //JMPA('_;_mid');
+    L('_;_nomid');
+
+    // skip inline backtick value (could be any)
+    // TODO: remove?
+    CMPN(ord('`')),BNE('_not_backtick');
+      INY();
+    L('_not_backtick');
+
+    CMPN(ord('(')),BNE('_not(');
+      DECZ('rp'); // "rpush"
+      DECZ('rp'); // "rpush"
+      INX();
+    L('_not(');
+
+    CMPN(ord(')')),BNE('_].skip.next');
+      INCZ('rp'); // "rdrop"
+      INCZ('rp'); // "rdrop"
+      DEX();
+    BNE('_].skip.next');
+
+    // last matching ')'
+   L('_].end');
+    PLA(); // set TOS
+  }
+
+  // -- printers and formatters
+  def(10); // do not interpret NL as number! lol
+  def('`', ''); JMPA('printval');
+
+  // TODO: ???
+  //def('D', ''); JSRA('ENTER'); string('d9+.');
+  //def('E', ''); JSRA('ENTER'); string('');
+  // F(ib) iterator
+//  def('F', ''); JSRA('ENTER'); string('o.dG+');
+  // rot = 1 2 3 >r swap r> swap .s
+  //def('G'); JSRA('ENTER'); // lol
+  //string('Rsrs');
+
+
 
   ////////////////////////////////////////
   // Symbol based operators
@@ -1182,16 +1162,7 @@ L('interpret'); // A has our word
   //
   L('ALFA_BEGIN'); alfa_defs = def.count;
 
-  //def('D', ''); JSRA('ENTER'); string('d9+.');
-  //def('E', ''); JSRA('ENTER'); string('');
-  // F(ib) iterator
-//  def('F', ''); JSRA('ENTER'); string('o.dG+');
-  // rot = 1 2 3 >r swap r> swap .s
-  //def('G'); JSRA('ENTER'); // lol
-  //string('Rsrs');
-
   def('d'); PHA();
-  def('\\'); PLA();
   def('o'); PHA(),TSX(),LDAAX(S+2);
   def('s'); STAZ('tmp'),PLA(),TAX(),LDAZ('tmp'),PHA(),TXA(); // b10 c19
 
@@ -1200,7 +1171,6 @@ L('interpret'); // A has our word
   def('j'); PHA(),LDXZ('rp'),LDAAX(S+3),SEC(),SBCN(1);
 
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
-  def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
   def('t'); TAX(),STYZ(0); {
     PLA(),STAZ(1),PLA(),TAY(),LDAZ(1),
@@ -1212,51 +1182,10 @@ L('interpret'); // A has our word
   def('q', ''); JMPA('quit');
   //def('y'); PHA(),TYA();
 
-  // TODO: ] - exit
-  def(']'); { // b37 (was 44!)
-    // drop n items from rstack
-    TAX(),BEQ('_].end'); // 0 == NOP
-
-   L('_].skip.next');
-    INY();
-   L('_].skip');
-    LDAIY('base');
-    // ';' - TODO: EXIT (to local sub?)
-    // TODO: not working now remove?
-    CMPN(ord(';')),BNE('_;_nomid');
-      JMPA('EXIT');
-      //JMPA('_;_mid');
-    L('_;_nomid');
-
-    // skip inline backtick value (could be any)
-    // TODO: remove?
-    CMPN(ord('`')),BNE('_not_backtick');
-      INY();
-    L('_not_backtick');
-
-    CMPN(ord('(')),BNE('_not(');
-      DECZ('rp'); // "rpush"
-      DECZ('rp'); // "rpush"
-      INX();
-    L('_not(');
-
-    CMPN(ord(')')),BNE('_].skip.next');
-      INCZ('rp'); // "rdrop"
-      INCZ('rp'); // "rdrop"
-      DEX();
-    BNE('_].skip.next');
-
-    // last matching ')'
-   L('_].end');
-    PLA(); // set TOS
-  }
   def('n'); CLC(),SBCN(0),EORN(255);
   def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
   def('e'); JSRA(putc),PLA();
 
-  // -- printers and formatters
-  def(10); // do not interpret NL as number! lol
-  def('`', ''); JMPA('printval');
   // 0=
   def('z'); TSX(),CMPN(0),CMPAX(S);
 
@@ -1270,7 +1199,6 @@ L('ALFA_END'); alfa_defs = def.count - alfa_defs;
 
   ////////////////////////////////////////
   // more special test, or fallbacks
-
 
 
 
@@ -1484,7 +1412,7 @@ L('OP_Run');
   // Reinterpret buffer from scratch
   // stack is lost etc, only memory remain!
   TRACE(()=>princ(ansi.hide()));
-  JMPA('FORTH_BEGIN');
+  JMPA('FORTH');
 
 
 
@@ -1535,13 +1463,7 @@ L('OP_BackSpace');
   //TRACE(()=>princ(' @'+hex(2,cpu.reg('y'))+'='+chr(cpu.reg('a'))));
   // overwrite last
   DEY(),STAIY('base'),INY();
-
   INY();
-  CPYZ('end_pos');
-  BCS('_OP_BS');
-
-  LDYZ('edit_pos');
-  DEY();
 
   RTS();
 
@@ -1571,7 +1493,7 @@ L('edit_redisplay');
 
 L('edit_next');
   // save cursor position
-  STYZ('edit_pos');
+  //STYZ('edit_pos');
 
   TRACE(()=>{
     princ(cursorSave());
@@ -1579,9 +1501,6 @@ L('edit_next');
     princ('(EDIT) ');
     princ(cpu.reg('y')+' / ');
     princ(m[jasm.getLabels().end_pos]+'   ');
-    princ(m[jasm.getLabels().line_pos]+'   ');
-    princ(m[jasm.getLabels().eol_pos]+'   ');
-    princ(m[jasm.getLabels().last_line]+'   ');
     princ(cursorRestore());
   });
 
@@ -1640,19 +1559,13 @@ L('insert');
   // TODO: don't cheat!
   TRACE(()=>princ(lime));
 
-  // tell terminal to save cursor when
-  // it's at edit_pos!
-  CPYZ('edit_pos'),BNE('_display.nopos');
  L('display_pos');
   NOP();
   TRACE(()=>princ(ansi.cursorSave()));
-  LDXZ('last_line'),STXZ('line_pos');
-  LDXN(0),STXZ('eol_pos');
-  NOP();
   if(0) TRACE(()=>print("<<<HERE"+JSON.stringify({
     A: cpu.reg('a'),
     Y: cpu.reg('y'),
-    edit_pos: m[jasm.getLabels().edit_pos]})));
+  })));
   NOP();
 
   L('_display.nopos');
@@ -1661,12 +1574,6 @@ L('insert');
   CMPN(10),BNE('_display.notnl'); {
     TRACE(()=>princ(ansi.cleol()));
     PHA(),LDAN(13),JSRA(putc),PLA();
-
-    STYZ('line_pos');
-  
-    // if eol_pos is zero it'll be set!
-    LDXZ('eol_pos'),BNE('_display.notnl');
-    STYZ('eol_pos');
   } L('_display.notnl');
 
   // actually print char!
@@ -1794,8 +1701,8 @@ function prsize(nam, len, more) {
               len.toString().padStart(6),
               more?more:'');
 }
-prsize("FORTH :", l.FORTH_END-l.FORTH_BEGIN);
-prsize(" INIT :", l.FORTH_INIT_END-l.FORTH_BEGIN);
+prsize("FORTH :", l.FORTH_END-l.FORTH);
+prsize(" INIT :", l.FORTH_INIT_END-l.FORTH);
 prsize(" NEXT :", l.NEXT_END-l.NEXT);
 prsize(" inter:", l.INTERPRET_END-l.INTERPRET_BEGIN);
 prsize(" ENTR :", l.ENTER_END-l.ENTER);
