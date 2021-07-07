@@ -1,3 +1,4 @@
+const fs = require('fs');
 const cpu6502 = require('./fil.js');
 const readline = require('readline');
 const utility = require('./utility.js');
@@ -33,7 +34,7 @@ let output= 0;
 
 function _putc(fd, ch) {
   //console.log(`\nJSK:<putc: ${fd}, ${ch}>\n`);
-  if (fd) {
+  if (fd >= 4) {
     throw "NIY:_putc";
     return -1;
   }
@@ -88,14 +89,14 @@ function _putd(d) {
 
 // return 0 if no key
 function _getc(fd) {
-  //console.log(`\nJSK:<getc: ${fd}>`);
-  if (fd) {
+  if (fd >= 4) {
     let fo = _files[fd];
     if (!fo) return -2;
     let b = Buffer.alloc(1);
     // TODO: use async?
     let n = fs.readSync(fo.f, b);
     if (n<=0) return 0;
+    //princ(`<${chr(b[0])}>`);
     return b[0];
   }
 
@@ -124,9 +125,19 @@ function sendKey() {
   cpu.mem[KEYADDR] = 128 + key;
 }	
 
+// fd: 0 stdin, 1 stdout, 2 stderr
+//     (all same, haha!)
+// fd: 3 == CONTROL
+// fd: 128>= (== 255) from fopen => ERROR
 var _files = [];
-var _fdnext = 1;
+var _fdnext = 4;
 var _fnames = {};
+
+{
+  let fd = _fopen('blockfile.4th');
+  if (fd !== 4) 
+    throw `%%fopen blockfile.4th fd!=4==${fd}`;
+}
 
 function _fopen(name, mode) {
   let fo = _fnames[name];
@@ -139,12 +150,12 @@ function _fopen(name, mode) {
   if (_fdnext > 250) return -1;
   // mode - https://nodejs.org/api/fs.html#fs_file_system_flags
   // TODO: handle error
-  let f = fs.open(name, 'r+'); 
+  let f = fs.openSync(name, 'r+'); 
   let fd = _fdnext++;
   fo = _files[fd] = {
     name, mode, fd, f,
   };
-  _fname[name] = fo;
+  _fnames[name] = fo;
   return fo.fd;
 }
 
@@ -370,8 +381,10 @@ let tcpu = {
             cpu.setFlags(c);
           } else {
             // ERROR
+            cpu.reg('a', 0);
             //process.stdout.write('['+c+']');
             cpu.reg('p', "g=sc(1)");
+            cpu.setFlags(c);
           }
 
           if (c){

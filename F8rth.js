@@ -253,7 +253,7 @@ PROGRAM = `
 0@.
 `;
 
-PROGRAM = '9d. 3 4 + . .';
+PROGRAM = '9d. 1. 2. 3. 4b.';
 
 // zzzz to find fast!
 
@@ -801,7 +801,7 @@ L('quit');
 L('FORTH_INIT_END');
 
 L('edit2');
-  // TODO:needed?
+  // TODO:needed? (yes, but maybe move to edit?
   LDXN(state_edit+state_display),STAZ('state');
   JMPA('edit');
 
@@ -1420,6 +1420,25 @@ L2      DEX
   //def('G'); JSRA('ENTER'); // lol
   //string('Rsrs');
 
+  // BLOCK: TODO: make more general
+  def('b'); {
+    // TODO: use A to pick block
+    LDYN(0);
+   L('_b');
+    LDXN(4),JSRA(getc);
+    // TODO: BCC('_b_eof'); ???
+    STAIY('base');
+    BEQ('_b.0'); {
+      STYZ('end_pos');
+    } L('_b.0');
+
+    INY();
+    BNE('_b');
+
+    STYZ(255);
+    PLA();
+    JMPA('edit2'); // TODO: init state, why need?
+  }
   def('a'); { L('allot');
     CLC(),ADCZ('here'),
     BNE('_a'),INCZ('here',inc),L('_a');
