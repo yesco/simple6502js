@@ -1435,6 +1435,8 @@ L2      DEX
   def('r'); L('R>'),PHA(),R_PLA(); // b10 + 7
   def('R'); L('>R'),R_PHA(),PLA(); // b10 + 7
 
+  // propose to add an sprintf?
+  // $4711 4242 "foo" "String: %s, Number: %d, Address: %x'" $t
   def('t'); TAX(),STYZ(0); {
     PLA(),STAZ(1),PLA(),TAY(),LDAZ(1),
     // TODO: change it to puts_AY_X

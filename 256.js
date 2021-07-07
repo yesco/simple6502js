@@ -741,7 +741,7 @@ L('EXIT'); // c52
     //TRACE(()=>princ(' (y='+hex(2,cpu.reg('y'))+') '));
   } STXZ('rp');
   //TRACE(()=>print());
-  JMPA('NEXT'); // save 3 cycles
+  JMPA('NEXT');
   L('EXIT_END');
 }
 
@@ -795,8 +795,6 @@ L('BRK_NEXT');
     TSX(),INX(),INX(),INX(),TXS();
   }
 
-  let savcyc = 0;
-
   // TODO: make 'NEXT' more efficient.
   // Current overheads in priority:
   // 1. def() uses CMP,BNE - OH// b4 c5 * #ops/2
@@ -815,13 +813,6 @@ L('BRK_NEXT');
   // 2. not use BRK for RTS and use real stack
 
 L('NEXT');
-  TRACE(()=>{
-    if (!tracecyc) return;
-    let c = cpu.state().cycles;
-    princ('\t(cyc:'+(c-savcyc)+')\n');
-    savcyc= c;
-  });
-
   if (table_next) { // b16 c29
     PHA(); {
       INY(),LDAIY('base');
@@ -836,13 +827,10 @@ L('NEXT');
   } else {
 
     INY();
-    // wrapped around?
-    //BEQ('edit2');
 
-    PHA(); { // b5 c14
-      LDAIY('base'); // c5+
-//      BEQ('EXIT'); // c2+1
-      TAX(); // c2
+    PHA(); {
+      LDAIY('base');
+      TAX();
     } PLA();
 
     BITZ('state');
