@@ -31,7 +31,13 @@ function TRACE(jasm, f) {
 
 let output= 0;
 
-function _putc(ch) {
+function _putc(fd, ch) {
+  //console.log(`\nJSK:<putc: ${fd}, ${ch}>\n`);
+  if (fd) {
+    throw "NIY:_putc";
+    return -1;
+  }
+
   if (typeof ch==='number')
     c = chr(ch);
   else
@@ -81,7 +87,19 @@ function _putd(d) {
 }
 
 // return 0 if no key
-function _getc() {
+function _getc(fd) {
+  //console.log(`\nJSK:<getc: ${fd}>`);
+  if (fd) {
+    let fo = _files[fd];
+    if (!fo) return -2;
+    let b = Buffer.alloc(1);
+    // TODO: use async?
+    let n = fs.readSync(fo.f, b);
+    if (n<=0) return 0;
+    return b[0];
+  }
+
+  // fd == 0: keyboard, non-blocking
   if (!keybuf.length) return 0;
   let key = keybuf.shift();
   if (!key) return 0;
@@ -106,7 +124,28 @@ function sendKey() {
   cpu.mem[KEYADDR] = 128 + key;
 }	
 
-function _fopen() {
+var _files = [];
+var _fdnext = 1;
+var _fnames = {};
+
+function _fopen(name, mode) {
+  let fo = _fnames[name];
+  if (fo) {
+    fo.mode = mode;
+    // TODO: modify mode?
+    return fo.fd;
+  }
+
+  if (_fdnext > 250) return -1;
+  // mode - https://nodejs.org/api/fs.html#fs_file_system_flags
+  // TODO: handle error
+  let f = fs.open(name, 'r+'); 
+  let fd = _fdnext++;
+  fo = _files[fd] = {
+    name, mode, fd, f,
+  };
+  _fname[name] = fo;
+  return fo.fd;
 }
 
 function _flush() {
@@ -312,8 +351,9 @@ let tcpu = {
 
         // traps
         switch(d) {
-        case(aputc): _putc(cpu.reg('a')); break;
+        case(aputc): _putc(cpu.reg('x'), cpu.reg('a')); break;
         case(aputd): _putd((cpu.reg('y')<<8)+cpu.reg('a')); break;
+          // TODO: remove?
         case(aputs): {
           let end = _puts(
             (cpu.reg('y')<<8)+cpu.reg('a'),
@@ -322,10 +362,18 @@ let tcpu = {
           cpu.reg('y', end >> 8);
           break; }
         case(agetc): {
-          let c= _getc();
-          cpu.reg('a', c);
+          let c= _getc(cpu.reg('x'));
           let consts= cpu.consts();
-          cpu.setFlags(c);
+          if (c >= 0) {
+            cpu.reg('a', c);
+            cpu.reg('p', "g=sc(0)");
+            cpu.setFlags(c);
+          } else {
+            // ERROR
+            //process.stdout.write('['+c+']');
+            cpu.reg('p', "g=sc(1)");
+          }
+
           if (c){
             //process.stdout.write('['+c+']');
           }

@@ -1161,8 +1161,8 @@ L('interpret'); // A has our word
   //def('y'); PHA(),TYA();
 
   def('n'); CLC(),SBCN(0),EORN(255);
-  def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
-  def('e'); JSRA(putc),PLA();
+  def('k'); PHA(),L('_K'),LDXN(0),JSRA(getc),BEQ('_K');
+  def('e'); LDXN(0),JSRA(putc),PLA();
 
   // 0=
   def('z'); TSX(),CMPN(0),CMPAX(S);
@@ -1366,8 +1366,8 @@ L('printval');
     } PLA(),TAX(),PLA(),TAY(),PLA();
 
     // or print hex ???
-    //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),JSRA(putc);
-    //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),JSRA(putc);
+    //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),LDXN(0),JSRA(putc);
+    //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),LDXN(0),JSRA(putc);
   } PLA();
   next();
 
@@ -1388,7 +1388,7 @@ L('OP_Run');
   });
 
   PHA(); {
-    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
+    LDAN(ord('\n')),LDXN(0),JSRA(putc),JSRA(putc);
   } PLA();
   LDYN(0xff);
   
@@ -1404,7 +1404,7 @@ L('OP_List');
   //TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
-    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
+    LDAN(ord('\n')),LDXN(0),JSRA(putc),JSRA(putc);
     LDXN(0xff);
     LDAZ('base'),CLC(),ADCN(1);
     LDYZ('base', inc),BCC('_List'),INY(),L('_List');
@@ -1433,6 +1433,7 @@ L('OP_BackSpace');
 
   // delete on screen (BS+SPC+BS) // b12
   // (TODO: optimize with a putsi)
+  LDXN(0);
   LDAN(8),JSRA(putc);
   LDAN(32),JSRA(putc);
   LDAN(8),JSRA(putc);
@@ -1491,7 +1492,7 @@ L('edit_next');
   NOP(); // TODO: remove; it's just for label
 
  L('_edit.waitkey'),
-  JSRA(getc),
+  LDXN(0),JSRA(getc),
   BEQ('_edit.waitkey');
   // jump here to simulate keystroke
  L('_edit.gotkey');
@@ -1523,7 +1524,7 @@ L('insert');
 
   // to insert we need to shift all
   // after one forward
-  JSRA(putc);
+  LDXN(0),JSRA(putc);
 
   INCZ('end_pos'); // add one to count
   STAIY('base');
@@ -1556,11 +1557,11 @@ L('insert');
   // need CR NL
   CMPN(10),BNE('_display.notnl'); {
     TRACE(()=>princ(ansi.cleol()));
-    PHA(),LDAN(13),JSRA(putc),PLA();
+    PHA(),LDAN(13),LDXN(0),JSRA(putc),PLA();
   } L('_display.notnl');
 
   // actually print char!
-  JSRA(putc);
+  LDXN(0),JSRA(putc);
 
   // end? - turn off display
   CMPN(0),BPL('_display.noend'); {

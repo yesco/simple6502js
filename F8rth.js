@@ -253,6 +253,8 @@ PROGRAM = `
 0@.
 `;
 
+PROGRAM = '9d. 3 4 + . .';
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -1516,8 +1518,8 @@ L2      DEX
   //def('N'); TSX(),ANDAX(S+2),EORN(0xff);
 
   def('n'); CLC(),SBCN(0),EORN(255);
-  def('k'); PHA(),L('_K'),JSRA(getc),BEQ('_K');
-  def('e'); JSRA(putc),PLA();
+  def('k'); PHA(),L('_K'),LDXN(0),JSRA(getc),BEQ('_K');
+  def('e'); LDXN(0),JSRA(putc),PLA();
 
   // TODO:
   //   xx execute  \_____ could be same!
@@ -1869,12 +1871,14 @@ L('printval');
     } PLA(),TAX(),PLA(),TAY(),PLA();
 
     // or print hex ???
-    //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),JSRA(putc);
-    //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),JSRA(putc);
+    //PLA(),LSR(),LSR(),LSR(),LSR(),CLC(),ADCN(ord('0')),LDXN(0),JSRA(putc);
+    //PLA(),ANDN(0x0f),CLC(),ADCN(ord('0')),LDXN(0),JSRA(putc);
   } PLA();
   next();
 
   // control codes, quote them!
+  if (0) {
+    // TODO: putc needs to have X=0 for stdout
 L('printcontrol');
   PHA(),TYA(),PHA(); {
     LDAN(ord('<')),JSRA(putc);
@@ -1882,6 +1886,7 @@ L('printcontrol');
     LDAN(ord('>')),JSRA(putc);
   }; PLA(),TAY(),PLA();
   next();
+    }
 
 L('XTRAS_END');
   
@@ -1897,7 +1902,7 @@ L('OP_Run');
   });
 
   PHA(); {
-    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
+    LDAN(ord('\n')),LDXN(0),JSRA(putc),JSRA(putc);
   } PLA();
   LDYN(0xff);
   
@@ -1910,7 +1915,7 @@ L('OP_List');
   //TRACE(()=>princ(ansi.cursorSave()));
   TRACE(()=>princ(ansi.cls()+ansi.home()+ansi.hide()));
   TYA(),PHA(); {
-    LDAN(ord('\n')),JSRA(putc),JSRA(putc);
+    LDAN(ord('\n')),LDXN(0),JSRA(putc),JSRA(putc);
     LDXN(0xff);
     LDAZ('base'),CLC(),ADCN(1);
     LDYZ('base', inc),BCC('_List'),INY(),L('_List');
@@ -1938,6 +1943,7 @@ L('OP_BackSpace');
 
   // delete on screen (BS+SPC+BS) // b12
   // (TODO: optimize with a putsi)
+  LDXN(0);
   LDAN(8),JSRA(putc);
   LDAN(32),JSRA(putc);
   LDAN(8),JSRA(putc);
@@ -2004,7 +2010,7 @@ L('edit_next');
   NOP(); // TODO: remove; it's just for label
 
  L('_edit.waitkey'),
-  JSRA(getc),
+  LDXN(0),JSRA(getc),
   BEQ('_edit.waitkey');
   // jump here to simulate keystroke
  L('_edit.gotkey');
@@ -2059,7 +2065,7 @@ L('insert');
 
   // to insert we need to shift all
   // after one forward
-  JSRA(putc);
+  LDXN(0),JSRA(putc);
 
   INCZ('end_pos'); // add one to count
  L('_insert');
@@ -2110,7 +2116,7 @@ L('insert');
   // need CR NL
   CMPN(10),BNE('_display.notnl'); {
     TRACE(()=>princ(ansi.cleol()));
-    PHA(),LDAN(13),JSRA(putc),PLA();
+    PHA(),LDAN(13),LDXN(0),JSRA(putc),PLA();
 
     STYZ('line_pos');
   
@@ -2120,7 +2126,7 @@ L('insert');
   } L('_display.notnl');
 
   // actually print char!
-  JSRA(putc);
+  LDXN(0),JSRA(putc);
 
   // end? - turn off display
   CMPN(0),BPL('_display.noend'); {
