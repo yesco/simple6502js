@@ -255,6 +255,19 @@ PROGRAM = `
 
 PROGRAM = '9d. 1. 2. 3. 4b.';
 
+PROGRAM = `9d.
+::G:Rsrs;
+::F:o.dG+;
+0 1 100(F)
+`;
+
+PROGRAM = `9d.
+0 1 4(255(o.dRsrs+))
+..
+.
+`;
+
+
 // zzzz to find fast!
 
 //      -*- truncate-lines: true; -*-
@@ -406,7 +419,9 @@ let start = 0x501;
 // Turn off BRK, off TOS and on table_next
 // speeed: b1944
 //         b1759 (+ 144 bytes + 256)
-let speed = 0;
+let speed = 1;
+
+// 3x speed!
 //speed = 1; // if enabled, w... not work
 
 let tosopt = !speed;
@@ -414,6 +429,10 @@ let tosopt = !speed;
 let trace = 0;
 let tracecyc = 0;
 let table_next = speed;
+
+let brk= !speed; // save space!
+
+brk = 1;
 
 // uncomment to see cycle counts!
 //tracecyc = 1;
@@ -440,7 +459,6 @@ function endtos() {
 
 // using BRK is slower, but saves bytes
 // 95 bytes for 40 functions!
-let brk= !speed; // save space!
 function next() {
   if (brk) {
     // use only 1 saves 2 bytes!
@@ -529,24 +547,28 @@ if (1) {
 
     L(gensym('_test_'+a+'_$'+cpu.hex(2,aa)));
 
-    cmp(aa);
-    if (optJmp) {
-
-      BEQ(optJmp);
-      last= undefined; // ! supress
-
-      if (!sub && aa >= 31)
-        tab[aa] = optJmp;
-    } else {
-      
-      BNE(tryother);
-      last= tryother;
+    if (table_next && (!sub && aa >= 31)) {
+      // store in table if "normal word"
+      tab[aa] = optJmp || match;
       // the words def comes after
       // ... till the next def!
       L(match);
+      last= 'pleasedonext';
+    } else {
+      // generate sequential dispatch code
+      cmp(aa);
+      if (optJmp) {
 
-      if (!sub && aa >= 31)
-        tab[aa] = match;
+        BEQ(optJmp);
+        last= undefined; // ! supress
+      } else {
+      
+        BNE(tryother);
+        last= tryother;
+        // the words def comes after
+        // ... till the next def!
+        L(match);
+      }
     }
   }
   def.count = 0;
@@ -566,7 +588,8 @@ if (1) {
         JMPA(optNext);
       }
 
-      L(last);
+      if (last !== 'pleasedonext')
+        L(last);
     }
     last= undefined;
   }
@@ -1797,11 +1820,18 @@ L('QUESTION');
 
 L('QUESTION_END');
 
+L('FORTH_END');
+
+
+
 L('TABLESPACE');
-  gentab();
+  if (table_next) {
+    gentab();
+  }
 L('TABLESPACE_END');
 
-L('FORTH_END');
+
+
 
 L('DOUBLE_WORDS_BEGIN'); double_defs = def.count;
  L('W_double_words');
@@ -1989,6 +2019,12 @@ L('OP_BackSpace');
 // We're not forthing, so we can use the rstack!
 // (what if we want to do editing in forth?)
 L('edit');
+  TRACE(()=>{
+    let c = cpu.state().cycles;
+    princ('\n----- (cycles:'+c+')\n');
+    cpu.reg('cycles', 0);
+  });
+
   // TODO: last pos executed is length?
   STYZ('end_pos');
 
@@ -2393,8 +2429,10 @@ prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" QUEST:", l.QUESTION_END-l.QUESTION);
 prsize(" NUMS :", l.NUMBER_END-l.NUMBER_BEGIN);
 prsize(" FIND :", l.FIND_END-l.FIND_BEGIN);
-prsize(" ALIGN:", l.DISPATCH-l.TABLESPACE);
-prsize(" TABLE:", l.TABLESPACE_END-l.DISPATCH);
+print();
+prsize("ALIGN:", l.DISPATCH-l.TABLESPACE);
+prsize("TABLE:", l.TABLESPACE_END-l.DISPATCH);
+print();
 print();
 prsize("DOUBLE:", l.DOUBLE_WORDS_END-l.DOUBLE_WORDS_BEGIN);
 prsize("XTRA  :", l.XTRAS_END-l.XTRAS_BEGIN);
