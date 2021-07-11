@@ -1,3 +1,4 @@
+const url = require('url');
 const fs = require('fs');
 const cpu6502 = require('./fil.js');
 const readline = require('readline');
@@ -133,8 +134,10 @@ var _files = [];
 var _fdnext = 4;
 var _fnames = {};
 
+// https://stackoverflow.com/questions/6287297/reading-content-from-url-with-node-js
 {
-  let fd = _fopen('blockfile.4th');
+  //let fd = _fopen('blockfile.4th');
+  let fd = _fopen('index.html');
   if (fd !== 4) 
     throw `%%fopen blockfile.4th fd!=4==${fd}`;
 }

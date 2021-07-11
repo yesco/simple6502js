@@ -1,0 +1,244 @@
+# This document is a list of html tags
+# and a description to how display them
+
+# extract body
+title #extract
+
+# extract attribute
+base href #extract
+* href #extract
+* cite #extract
+* hidden #extract
+* alt #extract
+img src #extract
+area map param object src #extract
+* style #extract
+* style background #extract
+* style text #extract
+* style font-weight #extract
+* style color #extract
+
+# possibly useful iso-8859-1?
+DOCTYPE #extract
+
+# ignore content
+style   #ignore
+script  #ignore
+
+# newline 
+/       \n	(all suffix \n)
+\n*     \n
+p	\n__
+br      \N
+hr      --
+
+pre>\n  \N
+code>\n \N
+
+h*      \n
+blockquote	\n
+code    \n
+pre     \n
+ul      \n
+ol      \n
+li      \n
+dl      \n
+dt      \n
+dd      \n
+table   \n
+tr      \n
+noscript        \n
+address         \n
+
+
+\t*     \t
+\t\T    \T
+\T\t    \T
+
+td      \t
+/td     \T
+th      \t
+/th     \T
+
+h1      #hilite
+h2      #hilite
+h3      #hilite
+h4      #hilite
+h5      #hilite
+h6      #hilite
+
+# font
+strong  #hilite
+em      #hilite
+i       #hilite
+b       #hilite
+u       #hilite
+s       #hilite
+
+q       #hilite
+cite    #hilite
+
+a	\blue
+/a      /blue
+
+ins     #hilite
+del     #hilite
+
+caption #hilite
+
+noscript #hilite
+
+abbr #hilite
+acronym #hilite
+
+bdo #hilite
+kbd #hilite
+dfn #hilite
+samp #hilite
+var #hilite
+
+# form newline
+form
+input #hilite
+textarea #hilite
+select #special
+option #special
+optgroup 
+button #hilite
+label #hilite
+fieldset
+legend #hillite ?
+
+
+
+
+
+
+
+
+
+
+* alt #extract
+* name #extract
+* title #extract
+
+* src #extract
+* href #extract
+* cite #extract
+
+* hidden #extract
+
+* style #extract
+* style background #extract
+* style color #extract
+* style font-weight #extract
+* style text #extract
+
+/       \n	(all suffix \n)
+
+/a      /blue
+/td     \T
+/th     \T
+
+<!DOCTYPE #extract
+
+a	\blue
+(abbr #hilite)
+(acronym #hilite)
+(address         \n)
+(area href #extract)
+
+b       #hilite
+(base href #extract)
+(bdo #hilite)
+blockquote	\n
+br      \N
+button  #hilite
+
+caption #hilite
+cite    #hilite
+code    \n
+code>\n \N
+
+dd      \n
+del     #hilite
+dfn #hilite
+dl      \n
+dt      \n
+
+em      #hilite
+
+fieldset
+form
+
+h*      \n # hilite
+h1      \n #hilite
+h2      \n #hilite
+h3      \n #hilite
+h4      \n #hilite
+h5      \n #hilite
+h6      \n #hilite
+hr      \n --
+
+i       #hilite
+img src #extract
+input   #hilite
+ins     #hilite
+
+kbd     #hilite
+
+label   #hilite
+legend  #hilite
+li      \n
+
+map name
+
+noscript        \n
+noscript #hilite
+
+ol      \n
+object href #extract
+(optgroup)
+option
+
+p	\n__
+pre     \n
+pre>\n  \N
+
+q       #hilite
+
+s       #hilite
+(samp #hilite)
+script  #ignore
+select
+strong  #hilite #CONFLIC:1st2letters!
+style   #ignore #CONFLIC:1st2letters!
+
+table   \n
+td      \t
+textarea
+th      \t
+title #extract
+tr      \n
+
+u       #hilite
+ul      \n
+
+var #hilite
+
+# --- post processing/printing
+\col  # start color
+/col  # end color
+
+\a/a    ''
+/a\b    /b
+\a\b    /b
+
+\T\t    \T
+\n*     \n
+\n\N    \N
+\N\n    \N
+
+\t*     \t
+\t\T    \T
+\T\t    \T

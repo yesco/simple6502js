@@ -253,8 +253,6 @@ PROGRAM = `
 0@.
 `;
 
-PROGRAM = '9d. 1. 2. 3. 4b.';
-
 PROGRAM = `9d.
 ::G:Rsrs;
 ::F:o.dG+;
@@ -266,6 +264,8 @@ PROGRAM = `9d.
 ..
 .
 `;
+
+PROGRAM = '0b';
 
 
 // zzzz to find fast!
@@ -1460,6 +1460,7 @@ L2      DEX
 
     STYZ(255);
     PLA();
+    JSRA('html');
     JMPA('edit2'); // TODO: init state, why need?
   }
   def('a'); { L('allot');
@@ -1900,6 +1901,34 @@ L('DOUBLE_WORDS_END'); double_defs = def.count - double_defs;
 // Extras (not core)
 
 L('XTRAS_BEGIN');
+
+L('html');
+  LDYN(0);
+ L('_html');
+  LDAIY('base');
+  BEQ('_html.next');
+  
+  CMPN(ord('<'));
+  BNE('_html.next');
+  INY(); // keep one char of tag!
+  INY();
+ L('_html.tag');
+  LDAN(1);
+  STAIY('base');
+  INY();
+  BEQ('_html.end');
+  LDAIY('base');
+  CMPN(ord('>'));
+  BNE('_html.tag');
+  LDAN(1);
+  STAIY('base');
+  BEQ('_html.next');
+
+ L('_html.next');
+  INY();
+  BNE('_html');
+ L('_html.end');
+  RTS();
 
 L('printval');
   PHA(); {
