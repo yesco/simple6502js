@@ -106,6 +106,10 @@ let amber     = '[38;5;214m',
     white     =   bold()+fg(WHITE),
     gray      = nobold()+fg(WHITE);
 
+let retrocolors = [
+  black, red, green, yellow,
+  blue, magnenta, cyan, white];
+
 function bold() { return '[1m'; }
 function italic() { return '[3m'; }
 function underline() { return '[4m'; }
