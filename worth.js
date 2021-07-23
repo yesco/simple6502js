@@ -6,9 +6,9 @@
 //                jsk@yesco.org
 
 function Worth() {
-  var DS= [], RS= [], mem= [], Y= -1, toks= [], t, E, X, trace;
+  var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, trace;
   let u= (v)=>(DS.push(v),v), p= ()=>{if(!DS.length)throw "Stack Emtpy";else return DS.pop()}; 
-  let parse= (s)=> toks= s.split(/([^"\S]+|"[^"]*")/).filter(a=>!a.match(/^\s*$/)).map(a=>a.match(/^"/)?['lit',a.replace(/^"(.*)"$/, (_,s)=>s)]:a).map(a=>Number.isNaN(+a)?a:['lit',+a]).flat();
+  let parse= (s)=> s.split(/([^"\S]+|"[^"]*")/).filter(a=>!a.match(/^\s*$/)).map(a=>a.match(/^"/)?['lit',a.replace(/^"(.*)"$/, (_,s)=>s)]:a).map(a=>Number.isNaN(+a)?a:['lit',+a]).flat();
   let princ= (s)=> process.stdout.write(''+s);
   let typ= (o)=>typeof o, isF= (o)=> typ(o)=='function'?o:undefined;
   let isU= (o)=>o===undefined, isA= (o)=> Array.isArray(o), isS= (o)=> typ(o)=='string'?o:undefined;
@@ -29,10 +29,12 @@ function Worth() {
   def('type', ()=>princ(p()));
   def('lit', ()=>u(toks[++Y]));
   //def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
-  def('interpret', ()=>{while(Y<toks.length)next()});
+  def('interpret', ()=>{while(toks)next()});
   def('trace', ()=>trace=!trace);
   def('execute', X= (e=pop())=>next(e));
-  def('eval', E= (s=pop())=>{parse(s);X('quit')});
+  def('eval', E= (s=pop())=>{
+    Y=-1; toks= parse(s);
+    X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
 //  def('.s', ()=>{process.stdout.write('\n'+DS.map(a=>`${''+a+t}`).join(' ')));
 //  def('.s', ()=>process.stdout.write('\n'+DS.join(', ')+' '));
@@ -42,8 +44,6 @@ function Worth() {
   def('new', (tt=t)=>{X('lit');t=tt+' '+p();u(eval(t))});
 
   def('BRANCH', (y=pop())=> Y= y);
-  def('ENTER', (f=p())=>{RS.push([Y,toks]);Y= -1; toks= f});
-  def('EXIT', ()=>{if(RS.length) [Y, toks] = RS.pop()});
 
   def('sq', 'dup *');
 
@@ -54,21 +54,26 @@ function Worth() {
   // TODO: no need to deep print?
   function pp(f, indent=0) {
     if (isA(f)) {
-      princ(f.NAME); princ(' [\n');
+      princ(f.NAME); princ('==[');
       for(let i=0; i<f.length; i++) {
         let ff= f[i];
-        princ(f.NAME, indent+1);
-        if (ff != mem['lit'])
-          princ(' '+f[++i]+'\n');
+        princ(ff.NAME+' ');
+        if (ff == mem['lit'])
+          princ(f[++i]+' ');
       }
+      princ(']');
     }
+    else if (isS(f)) princ(JSON.stringify(f));
+    else if (isF(f)) princ(f.NAME);
+    else if (f) princ('??'+f);
+    else princ('EXIT');
+    princ('\n');
   }
 
   function compile(o) {
     if (isF(o)) return o; // primitive
     if (isS(o) && o.match(/ /)) { // string def
-      parse(o);
-      return compile(toks);
+      return compile(parse(o));
     }
     if (!isA(o)) throw `Compile unknown type ${typ(o)}`;
 
@@ -83,24 +88,30 @@ function Worth() {
     return r;
   }
 
-  function next(n=toks[++Y], arg) {
-    if (isU(n)) n=mem['EXIT'];
+  function next(n=toks[++Y]) {
     t = n;
+
     if (trace > 1) mem['.s']();
-    if (trace) process.stdout.write(` <${isF(t)?t.NAME:t}> `);
+    if (trace) process.stdout.write(` <${t.NAME||'t:'+t}> `);
 
     // dispatch
-    if (isF(t)) return t(arg);
-    //    console.log("\n-----------------\nF.1", pp(t));
+    princ("\nF.0  "); pp(t);
+    if (isF(t)) return t();
+    if (isS(t)) return next(mem[t]);
 
-    let f = mem[t];
-    if (isF(f)) return f();
+    if (isU(t)) {
+      // EXIT
+      princ("\nF.2  <---.EXIT");
+      [Y,toks] = RS.pop() || [-1, undefined];;
+      return;
+    }
 
-    //console.log("F.2", pp(f));
-
-    if (isA(f)) {
-      //console.log("F.3", pp(f));
-      return next(mem['ENTER'], f);
+    if (isA(t)) { 
+      // ENTER
+      princ("\nF.3  ---> ENTER "); pp(t);
+      RS.push([Y,toks]);
+      Y= -1; toks= t;
+      return;
     }
 
     // try o.method or function()
@@ -140,5 +151,8 @@ function Worth() {
  'aa',
  ];//.forEach(s=>{Worth()(s);console.log()});
 
-[  'trace 7 sq .',
-   ].forEach(s=>{Worth()(s);console.log()});
+//[  'trace 7 sq .',
+//[  'trace aa',
+//[  'trace cc',
+[  '7 sq .',
+ ].forEach(s=>{Worth()(s);console.log()});
