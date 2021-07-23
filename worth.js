@@ -88,14 +88,14 @@ function Worth() {
     let f = o && o[t];
     if (isU(f)) f = eval(t);
     if (!isF(f)) return u(f);
-    try {
+//    try {
       // fixed func or oo
       let o = t.indexOf('.')<0 ? p() : null;
       let args = [...Array(f.length).keys()].map(p);
       return u(f.apply(o, args));
-    } catch(e) {
-      throw `${e} Object ${o}: ${typeof o}`;
-    }
+//    } catch(e) {
+//      throw `${e} Object ${o}: ${typeof o}`;
+//    }
   }
 
   def('sq', 'dup *');
