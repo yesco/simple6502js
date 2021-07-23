@@ -10,8 +10,8 @@ function Worth() {
   let u= (v)=>(DS.push(v),v), p= ()=>{if(!DS.length)throw "Stack Emtpy";else return DS.pop()}; 
   let parse= (s)=>toks=s.split(/([^"\S]+|"[^"]*")/).filter(a=>!a.match(/^\s*$/)).map(a=>a.match(/^"/)?['lit',a.replace(/^"(.*)"$/, (_,s)=>s)]:a).map(a=>Number.isNaN(+a)?a:['lit',+a]).flat();
   let princ= (s)=> process.stdout.write(''+s);
+  let typ= (o)=>typeof o, isF= (o)=> typ(o)=='function'?o:undefined, isU= (o)=>o===undefined;
   let def= (name, words)=>mem[name]=compile(words);
-  let compile = (words)=>words;
   '+ - * / % ^ & | && || < <= > >= != !== == ==='.split(' ').map(n=>
     def(n, eval(`(function(a=p(),b=p()){u(a ${n} b)})`)));
   def('~', ()=>u(~p())); def('=', ()=>u(p()===p()));
@@ -40,18 +40,29 @@ function Worth() {
   def('typeof', ()=>u(typeof(p())));
   def('new', (tt=t)=>{X('lit');t=tt+' '+p();u(eval(t))});
 
+  function compile(toks) {
+    return toks;
+    let c = toks.map(t=>{
+      let f = mem[t];
+      if (f);
+    });
+  }
+
   function next(n=toks.shift()) {
     t = n;
     if (trace > 2) X('.s');
     if (trace) process.stdout.write(` [ ${t} ] `);
     let f = mem[t];
-    if (typeof f === 'function') return mem[t]();
+    if (isF(f)) return f();
 
     // try o.method or function()
     let o = DS[DS.length-1];
-    if (typeof o !== 'undefined') f = o[t];
-    if (typeof f === 'undefined') f = eval(t);
-    if (typeof f === 'function') try {
+    if (!isU(o)) f = o[t];
+    // eval?
+    if (isU(f)) f = eval(t);
+    if (!isU(f)) return u(f);
+
+    if (isF(f)) try {
         // fixed func or oo
         let o = t.indexOf('.')<0 ? p() : null;
         let args = [...Array(f.length).keys()].map(p);
@@ -59,8 +70,6 @@ function Worth() {
     } catch(e) {
       throw e;
     }
-    // we did eval it. What did we get?
-    if (typeof f !== 'undefined') return u(f);
     throw `Object ${o}: ${typeof o}`;
   }
 
