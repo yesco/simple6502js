@@ -22,6 +22,8 @@ function Worth() {
   def('over', ()=>u(DS[DS.length-2]));
   def('nip', ()=>DS.splice(-2, 1));
   def('tuck', ()=>DS.splice(-1, 0, DS[DS.length-1]));
+  def('>R', ()=>RS.push(p()));
+  def('R>', ()=>DS.push(RS.pop()));
   def('!', (v=p(),a=p())=>mem[a]=v);
   def('@', (a=p())=>mem[a]);
   def('emit', ()=>princ(String.fromCharCode(p())));
