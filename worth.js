@@ -44,37 +44,10 @@ function Worth() {
   def('.s', ()=>process.stdout.write('\nS:'+JSON.stringify(DS) + ' R:' + JSON.stringify(RS)+'\n -- '));
 
   def('typeof', ()=>u(typeof(p())));
-  def('new', (tt=t)=>{X('lit');t=tt+' '+p();u(eval(t))});
+  def('new', ()=>{t='new '+toks[++Y];u(eval(t))});
 
   def('BRANCH', (y=pop())=> Y= y);
   def('EXIT', ()=>[Y,toks] = RS.pop() || [-1, undefined]);
-
-  def('sq', 'dup *');
-
-  def('cc', '"c" dup . 7 sq . .');
-  def('bb', '"b" dup . cc .');
-  def('aa', '"a" dup . bb .');
-  def('qq', 'aa');
-
-
-  // TODO: no need to deep print?
-  function pp(f, indent=0) {
-    if (isA(f)) {
-      princ(f.NAME); princ('==[');
-      for(let i=0; i<f.length; i++) {
-        let ff= f[i];
-        princ(ff.NAME+' ');
-        if (ff == mem['lit'])
-          princ(f[++i]+' ');
-      }
-      princ(']');
-    }
-    else if (isS(f)) princ(JSON.stringify(f));
-    else if (isF(f)) princ(f.NAME);
-    else if (f) princ('??'+f);
-    else princ('EXIT');
-    princ('\n');
-  }
 
   function compile(o) {
     if (isF(o)) return o; // primitive
@@ -96,6 +69,7 @@ function Worth() {
       RS.push([Y,toks]);
       Y= -1; toks= r;
     };
+    rr.CODE = r;
     return rr;
   }
 
@@ -107,27 +81,45 @@ function Worth() {
 
     // dispatch
     if (isF(t)) return t();
-    if (isS(t)) return next(mem[t]);
+    if (isS(t) && mem[t]) return next(mem[t]);
 
     // try o.method or function()
     let o = DS[DS.length-1];
-    if (!isU(o)) f = o[t];
-    // eval?
+    let f = o && o[t];
     if (isU(f)) f = eval(t);
-    if (!isU(f)) return u(f);
-
-    if (isF(f)) try {
-        // fixed func or oo
-        let o = t.indexOf('.')<0 ? p() : null;
-        let args = [...Array(f.length).keys()].map(p);
-        return u(f.apply(o, args));
+    if (!isF(f)) return u(f);
+    try {
+      // fixed func or oo
+      let o = t.indexOf('.')<0 ? p() : null;
+      let args = [...Array(f.length).keys()].map(p);
+      return u(f.apply(o, args));
     } catch(e) {
-      throw e;
+      throw `${e} Object ${o}: ${typeof o}`;
     }
-    throw `Object ${o}: ${typeof o}`;
   }
 
+  def('sq', 'dup *');
+  def('cc', '"c" dup . 7 sq . .');
+  def('bb', '"b" dup . cc .');
+  def('aa', '"a" dup . bb .');
+  def('qq', 'aa');
+  //pp(mem['aa'].CODE);
+
   return E;
+
+  // TODO: no need to deep print?
+  function pp(f, indent=0) {
+    if (isA(f)) {
+      princ(f.NAME+'==[');
+      f.forEach(f=>princ((f.NAME || ':'+f)+' '));;
+      princ(']');
+    }
+    else if (isS(f)) princ(JSON.stringify(f));
+    else if (isF(f)) princ(f.NAME);
+    else if (f) princ('??'+f);
+    else princ('EXIT');
+    princ('\n');
+  }
 }
 
 ['. 666', // stack underflow
@@ -144,10 +136,10 @@ function Worth() {
  '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
  '"SQuare 7" . 7 sq .',
  'aa',
- ];//.forEach(s=>{Worth()(s);console.log()});
+ ].forEach(s=>{Worth()(s);console.log()});
 
 //[  'trace 7 sq .',
 //[  'trace aa',
-[  'aa',
+//[  'aa',
 //[  '7 sq .',
- ].forEach(s=>{Worth()(s);console.log()});
+// ].forEach(s=>{Worth()(s);console.log()});
