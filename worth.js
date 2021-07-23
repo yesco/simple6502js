@@ -83,12 +83,9 @@ function Worth() {
     // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
-      if (f) return f;
+      if (!f) return t; // dynamic dispatch
 
-      // TODO: more
-
-      // keep string: dynamic runtime dispatch
-      return t;
+      return f;
     });
     // TODO: enable
     //r.push(mem['EXIT']);
