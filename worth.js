@@ -44,9 +44,11 @@ function Worth() {
     let f = mem[t];
     if (typeof f === 'function') return mem[t]();
 
-    // try to call javascript function oo style
+    // try o.method or function()
     let o = DS[DS.length-1];
-    f = o[t] || eval(t);
+    f = o && o[t];
+    if (typeof f === 'undefined')
+      f = eval(t);
     if (typeof f === 'function') {
       try {
         // fixed func or oo
@@ -57,6 +59,8 @@ function Worth() {
         throw e;
       }
     }
+    // we did eval it. What did we get?
+    if (typeof f !== 'undefined') return u(f);
     throw `Object ${o}: ${typeof o}`;
   }
 
@@ -76,5 +80,12 @@ Worth()('"UPPERCASE of foo" . "foo" toUpperCase "=>" . .');
 
 console.log();
 Worth()('"SQRT of 64" . 64 Math.sqrt "=>" . .');
+
+console.log();
+Worth()('"EVAL of 3+4" . 3+4 "=>" . .');
+
+console.log();
+Worth()('"EVAL of global" . global "=>" . .');
+
 
 console.log();
