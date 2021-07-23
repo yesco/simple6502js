@@ -93,24 +93,27 @@ function Worth() {
   function next(n=toks[++Y]) {
     t = n;
 
-    if (trace > 1) mem['.s']();
-    if (trace) process.stdout.write(` <${t.NAME||'t:'+t}> `);
+    if (trace > 0) {
+      princ('\n------Y='+Y+' '); pp(toks);
+    }
+    if (trace) process.stdout.write(` <${t.NAME||'"'+t+'"'}> `);
+    if (trace > 0) mem['.s']();
 
     // dispatch
-    princ("\nF.0  "); pp(t);
+    if (trace) {princ("\nF.0  "); pp(t)}
     if (isF(t)) return t();
     if (isS(t)) return next(mem[t]);
 
     if (isU(t)) {
       // EXIT
-      princ("\nF.2  <---.EXIT");
+      if (trace) princ("\nF.2  <---.EXIT");
       [Y,toks] = RS.pop() || [-1, undefined];;
       return;
     }
 
     if (isA(t)) { 
       // ENTER
-      princ("\nF.3  ---> ENTER "); pp(t);
+      if (trace) {princ("\nF.3  ---> ENTER "); pp(t);}
       RS.push([Y,toks]);
       Y= -1; toks= t;
       return;
@@ -155,6 +158,6 @@ function Worth() {
 
 //[  'trace 7 sq .',
 //[  'trace aa',
-//[  'trace cc',
-[  '7 sq .',
+[  'aa',
+//[  '7 sq .',
  ].forEach(s=>{Worth()(s);console.log()});
