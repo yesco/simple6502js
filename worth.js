@@ -1,4 +1,3 @@
-
 //
 //              WORTH - Web fORTH 
 //
@@ -39,8 +38,7 @@ function Worth() {
     Y=-1; toks= [compile(s)];
     X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
-//  def('.s', ()=>{process.stdout.write('\n'+DS.map(a=>`${''+a+t}`).join(' ')));
-//  def('.s', ()=>process.stdout.write('\n'+DS.join(', ')+' '));
+//  def('.s', ()=>{process.stdout.write('\n'+DS.map(a=>`${''+a+':'+typ(a)}`).join(' ')));
   def('.s', ()=>process.stdout.write('\nS:'+JSON.stringify(DS) + ' R:' + JSON.stringify(RS)+'\n -- '));
 
   def('typeof', ()=>u(typeof(p())));
@@ -53,7 +51,6 @@ function Worth() {
     if (isF(o)) return o; // primitive
     if (isS(o)) return compile(parse(o)); // word
     if (!isA(o)) throw `Compile unknown type ${typ(o)}`;
-
     // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
@@ -62,7 +59,6 @@ function Worth() {
 
       throw `What is F: ${f}`;
     });
-
     r.push(mem['EXIT']);
 
     let rr = function ENTER(){
@@ -75,7 +71,6 @@ function Worth() {
 
   function next(n=toks[++Y]) {
     t = n;
-
     if (trace) process.stdout.write(` <${t.NAME||t.name||'"'+t+'"'}> `);
     if (trace > 1) mem['.s']();
 
@@ -83,19 +78,14 @@ function Worth() {
     if (isF(t)) return t();
     if (isS(t) && mem[t]) return next(mem[t]);
 
-    // try o.method or function()
+    // top.method(args...) / Module.function(top) / eval
     let o = DS[DS.length-1];
     let f = o && o[t];
     if (isU(f)) f = eval(t);
     if (!isF(f)) return u(f);
-//    try {
-      // fixed func or oo
-      let o = t.indexOf('.')<0 ? p() : null;
-      let args = [...Array(f.length).keys()].map(p);
-      return u(f.apply(o, args));
-//    } catch(e) {
-//      throw `${e} Object ${o}: ${typeof o}`;
-//    }
+    o = t.indexOf('.')<0 && p();
+    let args = [...Array(f.length).keys()].map(p);
+    return u(f.apply(o, args));
   }
 
   def('sq', 'dup *');
