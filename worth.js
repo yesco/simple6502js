@@ -36,7 +36,7 @@ function Worth() {
   def('trace', ()=>trace=!trace);
   def('execute', X= (e=pop())=>next(e));
   def('eval', E= (s=pop())=>{
-    Y=-1; toks= parse(s);
+    Y=-1; toks= [compile(s)];
     X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
 //  def('.s', ()=>{process.stdout.write('\n'+DS.map(a=>`${''+a+t}`).join(' ')));
@@ -83,7 +83,6 @@ function Worth() {
 
     // list of tokens
     let r = o.map(t=>{
-      //let f = compile(t) || t;
       let f = mem[t];
       if (!f) return t; // dynamic dispatch
       if (isF(f)) return f;
@@ -93,26 +92,21 @@ function Worth() {
 
     r.push(mem['EXIT']);
 
-    return (function ENTER(){
-      // ENTER
+    let rr = function ENTER(){
       RS.push([Y,toks]);
       Y= -1; toks= r;
-    });
-    //return r;
+    };
+    return rr;
   }
 
   function next(n=toks[++Y]) {
     if (!n) return toks= undefined;
     t = n;
 
-    if (trace > 0) {
-      princ('\n------Y='+Y+' '); pp(toks);
-    }
-    if (trace) process.stdout.write(` <${t.NAME||'"'+t+'"'}> `);
-    if (trace > 0) mem['.s']();
+    if (trace) process.stdout.write(` <${t.NAME||t.name||'"'+t+'"'}> `);
+    if (trace > 1) mem['.s']();
 
     // dispatch
-    if (trace) {princ("\nF.0  "); pp(t)}
     if (isF(t)) return t();
     if (isS(t)) return next(mem[t]);
 
