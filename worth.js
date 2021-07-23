@@ -12,9 +12,9 @@ function Worth() {
   let princ= (s)=> process.stdout.write(''+s);
   let def= (name, words)=>mem[name]=compile(words);
   let compile = (words)=>words;
-  '+ - * / % ^ & | && ||'.split(' ').map(n=>
+  '+ - * / % ^ & | && || < <= > >= != !== == ==='.split(' ').map(n=>
     def(n, eval(`(function(a=p(),b=p()){u(a ${n} b)})`)));
-  def('~', ()=>u(~p()))
+  def('~', ()=>u(~p())); def('=', ()=>u(p()===p()));
   def('drop', ()=>p());
   def('dup', ()=>u(u(p())));
   def('swap', (a=p(), b=p())=>{u(a),u(b)});
@@ -33,10 +33,13 @@ function Worth() {
   def('execute', X= (e=pop())=>next(e));
   def('eval', E= (s=pop())=>{parse(s);X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
-
 //  def('.s', ()=>{process.stdout.write('\n'+DS.map(a=>`${''+a+t}`).join(' ')));
 //  def('.s', ()=>process.stdout.write('\n'+DS.join(', ')+' '));
   def('.s', ()=>process.stdout.write('\nS:'+JSON.stringify(DS) + ' R:' + JSON.stringify(RS)+' >> '));
+
+  def('typeof', ()=>u(typeof(p())));
+  def('new', (tt=t)=>{X('lit');t=tt+' '+p();u(eval(t))});
+
   function next(n=toks.shift()) {
     t = n;
     if (trace > 2) X('.s');
@@ -46,18 +49,15 @@ function Worth() {
 
     // try o.method or function()
     let o = DS[DS.length-1];
-    f = o && o[t];
-    if (typeof f === 'undefined')
-      f = eval(t);
-    if (typeof f === 'function') {
-      try {
+    if (typeof o !== 'undefined') f = o[t];
+    if (typeof f === 'undefined') f = eval(t);
+    if (typeof f === 'function') try {
         // fixed func or oo
         let o = t.indexOf('.')<0 ? p() : null;
         let args = [...Array(f.length).keys()].map(p);
         return u(f.apply(o, args));
-      } catch(e) {
-        throw e;
-      }
+    } catch(e) {
+      throw e;
     }
     // we did eval it. What did we get?
     if (typeof f !== 'undefined') return u(f);
@@ -67,25 +67,16 @@ function Worth() {
   return E;
 }
 
-
-Worth()('. 666');
-Worth()('1 2 3 . . .');
-Worth()('3 4 .s + . "bb"  dup . . "dd dd" .', 1);
-
-console.log();
-Worth()('"foo" Math.sqrtt .');
-
-console.log();
-Worth()('"UPPERCASE of foo" . "foo" toUpperCase "=>" . .');
-
-console.log();
-Worth()('"SQRT of 64" . 64 Math.sqrt "=>" . .');
-
-console.log();
-Worth()('"EVAL of 3+4" . 3+4 "=>" . .');
-
-console.log();
-Worth()('"EVAL of global" . global "=>" . .');
-
-
-console.log();
+['. 666', // stack underflow
+ '1 2 3 . . .',
+ '3 4 .s + . "bb"  dup . . "dd dd" .',
+ '"foo" Math.sqrtt .',
+ '"UPPERCASE of foo" . "foo" toUpperCase "=>" . .',
+ '"SQRT of 64" . 64 Math.sqrt "=>" . .',
+ '"EVAL of 3+4" . 3+4 "=>" . .',
+ '"EVAL of global" . global "=>" . .',
+ '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
+ '"TYPEOF" . 3 4 == dup typeof . .',
+ '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
+ '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
+ ].forEach(s=>{Worth()(s);console.log()});
