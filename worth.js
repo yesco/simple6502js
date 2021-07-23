@@ -83,19 +83,22 @@ function Worth() {
 
     // list of tokens
     let r = o.map(t=>{
+      //let f = compile(t) || t;
       let f = mem[t];
       if (!f) return t; // dynamic dispatch
-
       if (isF(f)) return f;
-      //if (isA(f)) return function(){
-        // ENTER
-        
-      //};
-      return f;
+
+      throw `What is F: ${f}`;
     });
-    // TODO: enable
+
     r.push(mem['EXIT']);
-    return r;
+
+    return (function ENTER(){
+      // ENTER
+      RS.push([Y,toks]);
+      Y= -1; toks= r;
+    });
+    //return r;
   }
 
   function next(n=toks[++Y]) {
@@ -112,14 +115,6 @@ function Worth() {
     if (trace) {princ("\nF.0  "); pp(t)}
     if (isF(t)) return t();
     if (isS(t)) return next(mem[t]);
-
-    if (isA(t)) { 
-      // ENTER
-      if (trace) {princ("\nF.3  ---> ENTER "); pp(t);}
-      RS.push([Y,toks]);
-      Y= -1; toks= t;
-      return;
-    }
 
     // try o.method or function()
     let o = DS[DS.length-1];
