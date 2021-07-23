@@ -47,6 +47,7 @@ function Worth() {
   def('new', (tt=t)=>{X('lit');t=tt+' '+p();u(eval(t))});
 
   def('BRANCH', (y=pop())=> Y= y);
+  def('EXIT', ()=>[Y,toks] = RS.pop() || [-1, undefined]);
 
   def('sq', 'dup *');
 
@@ -85,14 +86,20 @@ function Worth() {
       let f = mem[t];
       if (!f) return t; // dynamic dispatch
 
+      if (isF(f)) return f;
+      //if (isA(f)) return function(){
+        // ENTER
+        
+      //};
       return f;
     });
     // TODO: enable
-    //r.push(mem['EXIT']);
+    r.push(mem['EXIT']);
     return r;
   }
 
   function next(n=toks[++Y]) {
+    if (!n) return toks= undefined;
     t = n;
 
     if (trace > 0) {
@@ -105,13 +112,6 @@ function Worth() {
     if (trace) {princ("\nF.0  "); pp(t)}
     if (isF(t)) return t();
     if (isS(t)) return next(mem[t]);
-
-    if (isU(t)) {
-      // EXIT
-      if (trace) princ("\nF.2  <---.EXIT");
-      [Y,toks] = RS.pop() || [-1, undefined];;
-      return;
-    }
 
     if (isA(t)) { 
       // ENTER
@@ -160,6 +160,6 @@ function Worth() {
 
 //[  'trace 7 sq .',
 //[  'trace aa',
-[  'qq',
+[  'aa',
 //[  '7 sq .',
  ].forEach(s=>{Worth()(s);console.log()});
