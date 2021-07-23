@@ -29,7 +29,7 @@ function Worth() {
   def('lit', ()=>u(toks.shift()));
   def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
   def('interpret', ()=>{while(toks.length)next()});
-  def('trace', ()=>trace==!trace);
+  def('trace', ()=>trace=!trace);
   def('execute', X= (e=pop())=>next(e));
   def('eval', E= (s=pop())=>{parse(s);X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
@@ -41,19 +41,40 @@ function Worth() {
     t = n;
     if (trace > 2) X('.s');
     if (trace) process.stdout.write(` [ ${t} ] `);
-    mem[t]();
+    let f = mem[t];
+    if (typeof f === 'function') return mem[t]();
+
+    // try to call javascript function oo style
+    let o = DS[DS.length-1];
+    f = o[t] || eval(t);
+    if (typeof f === 'function') {
+      try {
+        // fixed func or oo
+        let o = t.indexOf('.')<0 ? p() : null;
+        let args = [...Array(f.length).keys()].map(p);
+        return u(f.apply(o, args));
+      } catch(e) {
+        throw e;
+      }
+    }
+    throw `Object ${o}: ${typeof o}`;
   }
 
-  return (s,trce=0)=>{
-    let save_trace= trace;
-    trace = trce;
-
-    E(s);
-    trace = save_trace;
-  };
+  return E;
 }
 
 
 Worth()('. 666');
 Worth()('1 2 3 . . .');
 Worth()('3 4 .s + . "bb"  dup . . "dd dd" .', 1);
+
+console.log();
+Worth()('"foo" Math.sqrtt .');
+
+console.log();
+Worth()('"UPPERCASE of foo" . "foo" toUpperCase "=>" . .');
+
+console.log();
+Worth()('"SQRT of 64" . 64 Math.sqrt "=>" . .');
+
+console.log();
