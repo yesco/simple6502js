@@ -32,7 +32,8 @@ function Worth() {
   def('type', ()=>princ(p()));
   def('lit', ()=>u(toks[++Y]));
   //def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
-  def('interpret', ()=>{while(toks)next()});
+  //def('interpret', ()=>{while(toks)next()});
+  def('interpret', ()=>{while(Y<toks.length)next()});
   def('trace', ()=>trace=!trace);
   def('execute', X= (e=pop())=>next(e));
   def('eval', E= (s=pop())=>{
