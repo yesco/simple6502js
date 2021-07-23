@@ -1,3 +1,4 @@
+
 //
 //              WORTH - Web fORTH 
 //
@@ -52,6 +53,8 @@ function Worth() {
   def('cc', '"c" dup . 7 sq . .');
   def('bb', '"b" dup . cc .');
   def('aa', '"a" dup . bb .');
+  def('qq', 'aa');
+
 
   // TODO: no need to deep print?
   function pp(f, indent=0) {
@@ -74,18 +77,20 @@ function Worth() {
 
   function compile(o) {
     if (isF(o)) return o; // primitive
-    if (isS(o) && o.match(/ /)) { // string def
-      return compile(parse(o));
-    }
+    if (isS(o)) return compile(parse(o)); // word
     if (!isA(o)) throw `Compile unknown type ${typ(o)}`;
 
+    // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
       if (f) return f;
 
-      // dynamic runtime dispatch
+      // TODO: more
+
+      // keep string: dynamic runtime dispatch
       return t;
     });
+    // TODO: enable
     //r.push(mem['EXIT']);
     return r;
   }
@@ -158,6 +163,6 @@ function Worth() {
 
 //[  'trace 7 sq .',
 //[  'trace aa',
-[  'aa',
+[  'qq',
 //[  '7 sq .',
  ].forEach(s=>{Worth()(s);console.log()});
