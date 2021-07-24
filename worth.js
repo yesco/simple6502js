@@ -7,44 +7,70 @@
 
 function Worth() {
   var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, trace, here=0x501;
-  let u= (v)=>(DS.push(v),v), p= ()=>{if(!DS.length)throw "Stack Emtpy";else return DS.pop()}; 
-  let parse= (s)=> s.split(/([^"\S]+|"[^"]*")/).filter(a=>!a.match(/^\s*$/)).map(a=>a.match(/^"/)?['lit',a.replace(/^"(.*)"$/, (_,s)=>s)]:a).map(a=>Number.isNaN(+a)?a:['lit',+a]).flat();
-  let princ= (s)=>(process.stdout.write(''+s),s);
-  let typ= (o)=>typeof o, isF= (o)=> typ(o)=='function'?o:undefined;
-  let isU= (o)=>o===undefined, isA= (o)=> Array.isArray(o), isS= (o)=> typ(o)=='string'?o:undefined;
-  let def= (name, words)=> (mem[name]= compile(words)).NAME=name;
+  let u= (v)=>(DS.push(v),v),
+      p= ()=>{
+        if (!DS.length) throw "Stack Emtpy";
+        return DS.pop()}; 
+  let parse= (s)=> s
+      .split(/([^"\S]+|"[^"]*")/)
+      .filter(a=>!a.match(/^\s*$/))
+      .map(a=>{let s=a.match(/^"(.*)"$/);
+               return s?['lit', s[0]]:a})
+      .map(a=>Number.isNaN(+a)?a:['lit',+a])
+      .flat();
+  let princ= (...s)=>(process.stdout.write(s.join('')),s[0]);
+  let typ= (o)=> typeof o,
+      isF= (o)=> typ(o)=='function'?o:undefined,
+      isU= (o)=> o===undefined,
+      isA= (o)=> Array.isArray(o),
+      isS= (o)=> typ(o)=='string'?o:undefined;
+  let def= (name, words)=>
+      (mem[name]= compile(words)).NAME=name;
+
   '+ - * / % ^ & | && || < <= > >= != !== == === << >> >>>'.split(' ').map(n=>
     def(n, eval(`(function(a=p(),b=p()){u(a ${n} b)})`)));
-  def('~', ()=>u(~p())); def('=', ()=>u(p()===p()));
-  def('drop', ()=>p()); def('dup', ()=>u(u(p())));
+  def('~', ()=>u(~p()));
+  def('=', ()=>u(p()===p()));
+
+  def('drop', ()=>p());
+  def('dup', ()=>u(u(p())));
   def('swap', (a=p(), b=p())=>{u(a),u(b)});
   def('over', ()=>u(DS[DS.length-2]));
   def('rot',()=>u(DS.splice(-3, 1)));
   def('nip', ()=>DS.splice(-2, 1));
   def('tuck', ()=>DS.splice(-1, 0, DS[DS.length-1]));
   def('depth', ()=>u(DS.length));
-  def('>R', ()=>RS.push(p())); def('R>', ()=>u(RS.pop()));
-  def('!', (a=p(),v=p())=>mem[a]=v); def('@', (a=p())=>u(mem[a]));
+
+  def('>R', ()=>RS.push(p()));
+  def('R>', ()=>u(RS.pop()));
+
+  def('.s', ()=>{princ('\nSTACK: ');pp(DS);princ('\n')});
+  def('.st', ()=>{princ('\nSTACK: '+DS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
+  def('.rt', ()=>{princ('\nSTACK: '+RS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
+
+  def('!', (a=p(),v=p())=>mem[a]=v);
+  def('@', (a=p())=>u(mem[a]));
+
   def('emit', ()=>princ(String.fromCharCode(p())));
-  def('.', ()=>{princ(p());princ(' ')}); def('type', ()=>princ(p()));
-  def('lit', ()=>u(toks[++Y])); def("'", ()=>mem['lit']());
+  def('.', ()=>{princ(p());princ(' ')});
+  def('type', ()=>princ(p()));
+
+  def('lit', ()=>u(toks[++Y]));
+  def("'", ()=>mem['lit']());
+
   def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
   def('interpret', ()=>{while(toks[Y+1])next()});
   def('trace', ()=>trace=!trace);
-  def('execute', X= (e=p())=>next(e));
-  def('eval', E= (s=p())=>{
-    Y=-1; toks= [compile(s)];
-    X('quit')});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
-  def('.s', ()=>{princ('\nSTACK: ');pp(DS);princ('\n')});
-  def('.st', ()=>{process.stdout.write('\nSTACK: '+DS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
-  def('.rt', ()=>{process.stdout.write('\nSTACK: '+RS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
-  def('here', ()=>u(here)); def('allot', ()=>here+=p());
+  def('execute', X= (e=p())=>next(e));
+  def('eval', E= (s=p())=>{Y=-1; toks= [compile(s)]; X('quit')});
+
+  def('here', ()=>u(here));
+  def('allot', ()=>here+=p());
 
   def('BRANCH', (y=p())=> Y= y);
   def('EXIT', ()=>[Y,toks] = RS.pop() || [-1, undefined]);
 
-  // javascript
   def('typeof', ()=>u(typeof(p())));
   def('new', ()=>{t='new '+toks[++Y];u(eval(t))});
 
@@ -91,27 +117,21 @@ function Worth() {
     return u(f.apply(o, args));
   }
 
-  def('sq', 'dup *');
-  def('cc', '"c" dup . 7 sq . .');
-  def('bb', '"b" dup . cc .');
-  def('aa', '"a" dup . bb .');
-  def('qq', 'aa');
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
   return E;
 
-  // TODO: no need to deep print?
   function pp(f, indent=0) {
     if (isA(f)) {
       if (f.NAME) princ(f.NAME+'==');
       princ('[');
-      f.forEach(x=>princ((isS(x)?JSON.stringify(x):''+x)+' '));
+      f.forEach(x=>princ(
+        isS(x)?JSON.stringify(x):x, ' '));
       princ(']');
     }
     else if (isS(f)) princ(JSON.stringify(f));
     else if (isF(f)) princ(f.NAME);
     else if (f) princ('??'+f);
     else princ('EXIT');
-    //princ('\n');
   }
 }
 
@@ -166,6 +186,13 @@ let w = Worth(boot);
  '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
  '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
  '"SQuare 7" . 7 sq .',
+
+//  def('sq', 'dup *');
+//  def('cc', '"c" dup . 7 sq . .');
+//  def('bb', '"b" dup . cc .');
+//  def('aa', '"a" dup . bb .');
+//  def('qq', 'aa');
+
  'aa',
  '1 2 3 rot . . .',
 // '9 dup . 42 "foo" ! 33 . "foo" @ . .',
@@ -174,6 +201,9 @@ let w = Worth(boot);
 
  "9 dup . ' dup . .",
  "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
+
+ ': foo "foo" . "bar" . "fiefum" ;',
+ '9 dup . foo . .',
 
  ].forEach(s=>{console.log(`\n>>> ${s}`);w(s);console.log()});
 
