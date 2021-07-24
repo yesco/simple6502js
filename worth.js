@@ -13,26 +13,22 @@ function Worth() {
   let typ= (o)=>typeof o, isF= (o)=> typ(o)=='function'?o:undefined;
   let isU= (o)=>o===undefined, isA= (o)=> Array.isArray(o), isS= (o)=> typ(o)=='string'?o:undefined;
   let def= (name, words)=> (mem[name]= compile(words)).NAME=name;
-  '+ - * / % ^ & | && || < <= > >= != !== == ==='.split(' ').map(n=>
+  '+ - * / % ^ & | && || < <= > >= != !== == === << >> >>>'.split(' ').map(n=>
     def(n, eval(`(function(a=p(),b=p()){u(a ${n} b)})`)));
   def('~', ()=>u(~p())); def('=', ()=>u(p()===p()));
-  def('drop', ()=>p());
-  def('dup', ()=>u(u(p())));
+  def('drop', ()=>p()); def('dup', ()=>u(u(p())));
   def('swap', (a=p(), b=p())=>{u(a),u(b)});
   def('over', ()=>u(DS[DS.length-2]));
   def('rot',()=>u(DS.splice(-3, 1)));
   def('nip', ()=>DS.splice(-2, 1));
   def('tuck', ()=>DS.splice(-1, 0, DS[DS.length-1]));
-  def('>R', ()=>RS.push(p()));
-  def('R>', ()=>DS.push(RS.pop()));
-  def('!', (a=p(),v=p())=>mem[a]=v);
-  def('@', (a=p())=>u(mem[a]));
+  def('depth', ()=>u(DS.length));
+  def('>R', ()=>RS.push(p())); def('R>', ()=>u(RS.pop()));
+  def('!', (a=p(),v=p())=>mem[a]=v); def('@', (a=p())=>u(mem[a]));
   def('emit', ()=>princ(String.fromCharCode(p())));
-  def('.', ()=>{princ(p());princ(' ')});
-  def('type', ()=>princ(p()));
+  def('.', ()=>{princ(p());princ(' ')}); def('type', ()=>princ(p()));
   def('lit', ()=>u(toks[++Y])); def("'", ()=>mem['lit']());
-
-  //def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
+  def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
   def('interpret', ()=>{while(toks[Y+1])next()});
   def('trace', ()=>trace=!trace);
   def('execute', X= (e=p())=>next(e));
@@ -186,3 +182,9 @@ let w = Worth(boot);
 //[  'aa',
 //[  '7 sq .',
 // ].forEach(s=>{Worth()(s);console.log()});
+
+// REFERENCES:
+// Browsing Forth (ANSI compliant w js extention)
+// - https://github.com/brendanator/jsForth
+// - controls - https://github.com/brendanator/jsForth/blob/gh-pages/forth/forth.fth
+// - Longs? - https://github.com/brendanator/jsForth/blob/gh-pages/kernel/numeric-operations.js
