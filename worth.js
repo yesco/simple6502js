@@ -15,7 +15,7 @@ function Worth() {
       .split(/([^"\S]+|"[^"]*")/)
       .filter(a=>!a.match(/^\s*$/))
       .map(a=>{let s=a.match(/^"(.*)"$/);
-               return s?['lit', s[0]]:a})
+               return s?['lit', s[1]]:a})
       .map(a=>Number.isNaN(+a)?a:['lit',+a])
       .flat();
   let princ= (...s)=>(process.stdout.write(s.join('')),s[0]);
@@ -58,7 +58,12 @@ function Worth() {
   def('lit', ()=>u(toks[++Y]));
   def("'", ()=>mem['lit']());
 
-  def(':', ()=>def(toks.shift(), toks.splice(0, toks.indexOf(';')-1)));
+  def(':', ()=>{
+    ++Y;
+    let end = toks.indexOf(';', Y)
+    def(princ(toks[Y]), toks.splice(Y+1,end-Y-1));
+    Y= end + 1;
+  });
   def('interpret', ()=>{while(toks[Y+1])next()});
   def('trace', ()=>trace=!trace);
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
@@ -73,6 +78,8 @@ function Worth() {
 
   def('typeof', ()=>u(typeof(p())));
   def('new', ()=>{t='new '+toks[++Y];u(eval(t))});
+
+  def('see', (f=p())=>pp(f.CODE || f));
 
   function compile(o) {
     if (isF(o)) return o; // primitive
@@ -202,8 +209,9 @@ let w = Worth(boot);
  "9 dup . ' dup . .",
  "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
 
- ': foo "foo" . "bar" . "fiefum" ;',
- '9 dup . foo . .',
+ ': foo "FOO" . "BAR" . "FIEFUM" 3 ;',
+ '8 9 dup . foo . . . .',
+ '"foo" see "+" see',
 
  ].forEach(s=>{console.log(`\n>>> ${s}`);w(s);console.log()});
 
