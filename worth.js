@@ -59,13 +59,7 @@ function Worth() {
     // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
-      if (!f) return t; // dynamic dispatch
-      if (isF(f)) return f;
-
-      // "variable"
-      return t;
-
-      throw `What is F: ${f}`;
+      return (!f && t) || (isF(f) && f) || t;
     });
     r.push(mem['EXIT']);
 
@@ -81,21 +75,17 @@ function Worth() {
     t = n;
     if (trace > 1) mem['.s']();
 
-    // dispatch
     //princ('---TOK='+t+':'+typ(t)+'----\n');
     if (isS(t) && mem[t]) return next(mem[t]);
 
     // TODO: where the hell is the array coming from? (this is through execute!)
-    if (isA(t) && t.length==1) {
-      t = t[0];
-    }
+    if (isA(t) && t.length==1) t = t[0];
 
     if (isF(t)) {
       if (trace) {princ('{');pp(t);princ('} ')}
       return t();
     }
-
-    // top.method(args...) / Module.function(top) / eval
+    // T.method(args...) / Mod.fun(T) / eval(T)
     let o = DS[DS.length-1];
     let f = o && o[t];
     if (isU(f)) f = eval(t);
