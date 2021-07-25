@@ -7,6 +7,7 @@
 
 function Worth() {
   var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, trace, here=0x501;
+  let iota= (n)=>[...Array(n).keys()];
   let u= (v)=>(DS.push(v),v),
       p= ()=>{
         if (!DS.length) throw "Stack Emtpy";
@@ -61,12 +62,12 @@ function Worth() {
   def(':', ()=>{
     ++Y;
     let end = toks.indexOf(';', Y)
-    def(princ(toks[Y]), toks.splice(Y+1,end-Y-1));
+    def(princ(toks[Y], '=defined '), toks.splice(Y+1,end-Y-1));
     Y= end + 1;
   });
   def('interpret', ()=>{while(toks[Y+1])next()});
   def('trace', ()=>trace=!trace);
-  def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error("\n", (typeof(e)==='string')?`% ${e} at`:'',`? ${t}`) }});
+  def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error(`\n% ${e} at:\n  ? ${t}`) }});
   def('execute', X= (e=p())=>next(e));
   def('eval', E= (s=p())=>{Y=-1; toks= [compile(s)]; X('quit')});
 
@@ -114,14 +115,13 @@ function Worth() {
       if (trace) {princ('{');pp(t);princ('} ')}
       return t();
     }
-    // T.method(args...) / Mod.fun(T) / eval(T)
-    let o = DS[DS.length-1];
-    let f = o && o[t];
-    if (isU(f)) f = eval(t);
-    if (!isF(f)) return u(f);
-    o = t.indexOf('.')<0 && p();
-    let args = [...Array(f.length).keys()].map(p);
-    return u(f.apply(o, args));
+    // .toUpperCase()  Math.sqrt()   state@  3 state!
+    let [_, met, name, access]= t.match(/^(\.?)(.*?)([!@]?|\(\))$/),
+        o= met?p():global,
+        f= name.split(/\./).reduce((o,a)=>o[a], o);
+    if (access=='!') return o[name]= p();
+    else if (access!='()') return u(f);
+    u(f.apply(o, iota(f.length).map(p)));
   }
 
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
@@ -177,17 +177,48 @@ let boot = [
   ': , here ! 1 cells allot ;',
 ];
 
+// TODO:
+// - ( comment )
+// - ms
+// - branch? branch
+// - for i j next
+// - begin again
+// - do i j loop
+// - roll
+// - parse, token, number?
+// - [ ]
+// - immediate
+// - >body does>
+// - defer
+// - T{ ... -> ... }T
+
+// TODO: Webinterop
+// - 8080 www ( start server )
+// - www: /foo ... "foo" req ...
+
+// - h< >
+// - <TAG>
+// - </TAG>
+// - <tag style='foo'>
+// - <tag style='${"foo" "bar" concat}'>
+
+// TODO: brower inop
+// - dom' foo
+// - h<
+// - dom@ dom!
+// - dom:
+// - >dom dom>
+// -
+
 let w = Worth(boot);
+
+gurka = 'mayo'; // global
 
 ['. 666', // stack underflow
  '1 2 3 . . .',
  '3 4 .s + . "bb"  dup . . "dd dd" .',
  '"foo" Math.sqrtt .',
  'drop',
- '"UPPERCASE of foo" . "foo" toUpperCase "=>" . .',
- '"SQRT of 64" . 64 Math.sqrt "=>" . .',
- '"EVAL of 3+4" . 3+4 "=>" . .',
- '"EVAL of global" . global "=>" . .',
  '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
  '"TYPEOF" . 3 4 == dup typeof . .',
  '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
@@ -209,11 +240,29 @@ let w = Worth(boot);
  "9 dup . ' dup . .",
  "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
 
- ': foo "FOO" . "BAR" . "FIEFUM" 3 ;',
+ '1 2 : foo "FOO" . "BAR" . "FIEFUM" 3 ;',
+ '8 7 : bar 5 6 ; 4 bar . . . .',
  '8 9 dup . foo . . . .',
  '"foo" see "+" see',
+ '9 dup . bar . .',
 
- ].forEach(s=>{console.log(`\n>>> ${s}`);w(s);console.log()});
+ ': ab "AB" ;  : ba "BA" ;',
+ 'ab . ba .',
+
+ '99 123 . : q "Q" ; 321 . .',
+ '. . q .',
+
+ '========================================',
+ '"SQRT of 64" . 64 Math.sqrt() "=>" . .',
+ '"EVAL of 3+4" . 3+4 "=>" . .',
+ '"EVAL of global" . global@ "=>" . .',
+
+ '"UPPERCASE of fOo" . "fOo" .toUpperCase() "=>" . .',
+ '"ERROR UPPERCASE of STRING foo" . "foo" .toUpperCase() "=>" . .',
+
+ 'gurka@ . "MAYO" gurka! gurka@ .',
+
+ ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
 
 //[  'trace 7 sq .',
 //[  'trace aa',
@@ -221,8 +270,26 @@ let w = Worth(boot);
 //[  '7 sq .',
 // ].forEach(s=>{Worth()(s);console.log()});
 
-// REFERENCES:
+// R E F E R E N C E S :
+// A web framework (ugly?)
+// - https://www.1-9-9-1.com/ 
+
+// G e n e r i c   S t u f f :
 // Browsing Forth (ANSI compliant w js extention)
 // - https://github.com/brendanator/jsForth
 // - controls - https://github.com/brendanator/jsForth/blob/gh-pages/forth/forth.fth
 // - Longs? - https://github.com/brendanator/jsForth/blob/gh-pages/kernel/numeric-operations.js
+// webForth (forth in forth and good T{ -> } suite
+// - https://github.com/mitra42/webForth/blob/master/index.js
+// forth standard multi-tasking
+// - https://forth-standard.org/proposals/multi-tasking-proposal#reply-186
+// forth NAMING-CONVENTION
+// - https://github.com/ForthHub/discussion/issues/73
+// Forth Foundation Libary (forth written in ANSI)
+// - https://github.com/uho/ffl
+// Well documented test suite for forth
+// - https://github.com/gerryjackson/forth2012-test-suite
+// Event driven programming/impl in forth
+// - https://github.com/bradn123/literateforth/blob/master/src/events_lit.fs
+
+
