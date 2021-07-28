@@ -1,0 +1,104 @@
+HexAsm
+
+I was reading about CHIP-8 and thought how one could use the hexcode as having a meaning.
+
+  .0-e          register r
+  .A            
+  .B
+  .C            Calls/stack
+  .D            Data/stack
+  .E            Extra/stack
+  .F nn nn      Fact
+
+0 0r		zero (out)
+1 ir		inc
+2 2r		2*
+3 mr		3emory -> reg 
+4 4r 	        Half 2/
+5 Sr            S7ore reg -> memory
+6 6             - b? more branch? bit?
+7 70            70ken
+  71            (71ll  71me)
+  72            To 5wap (swan gliding)
+  73            -
+  74            74row
+  75            7ime5tamp
+  77            7ex7 (inline string)
+  7A            TAble (lookup?
+  7B            -
+  7C            -
+  7D            -  
+  7E            7Erminal 7extEqual
+  7F            -
+6 6r		6o register
+8 Xr            Xor octo byte eXit
+9 9r            &nd
+A Ar            And
+B B0 rel        Branch Zero  == 0
+  B1 rel        Branch true  == 1
+  B2 rel        Branch two   == 2
+  B3            Branch 3ask/3emory
+  B4            Branch Home (?)
+  B5 rel        Bramch 5maller <
+  B6 rel        Branch 6reater >
+  B7 rr rel     Branch 7ext equal (r) (r)
+  BB mc rel     Branch Bitmask bit compare
+  B9 rel        Branch &nd
+  BA            Branch 
+  BB rel        Branch Borrow?
+  BC rel        Branch Carry
+  BE rel        Branch Equal
+  BF rel        Branch Full (-1)
+C C0            C0nd C0mpare C0oy
+  C1            C1ear
+  C3            (Co3pare)
+  C4            C4aracter Cr7
+  C5            Carry Set (Cur5or)
+  CC            Carry Clear
+  CA            CAll
+  CB            CallBack
+  CC            CallCC
+  CE            CEll
+  CF            CallForward
+D Dr		Dec
+E E             Extended Encoding 
+  E5            E5cape
+  E8            E8it
+
+  EC            ExeCute E8Cepton
+  ED            EnD
+  		Exit En7er entertain (loop) E9ual E3it ECho 
+
+F F0            F0rth + ForthEnd Field0ffset
+  F1            F1eld F1lter F1nd F1ll F1ag
+  F3            Fill3ord For3at 
+  F4 ar         Find 4ex
+  F5            File5erver
+  F7            File7ype
+  FA            FAr (jump)
+  FB            FillByte
+  FE            ForthEnd
+  FF            FormFeed (cls)
+
+		full F0llow F1ll fall far fix 
+
+
+16 forth functions reg=0 == TOS
+   0	         Or
+   1	         !
+   2             reg!
+   3             e3it
+   4             + (plus)
+   5             5wap
+   6             @
+   7             reg@
+   8             eXecute/eval
+   9             ?/next/return
+   A             And
+   B nn          Byte (literal)
+   C nn nn       Constant (literal)
+   D             Drop
+   E             extend/eval
+   F nn          Function nn dispatch call
+   
+   and,or,xor,not already exist

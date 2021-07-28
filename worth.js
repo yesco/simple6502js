@@ -1,3 +1,15 @@
+// TODO: rename
+// - webForth - taken :-(
+// - jsForthm - taken :-( - have js
+// - wwwFORTH WWWforth we-we-we-forth
+// - FFForth F3rth Fooorth 444th
+// - www4th
+// - w3forth
+// - w34th
+// - www://forth
+// - forth://wwww
+// TODO: move to new repo
+
 //
 //              WORTH - Web fORTH 
 //
