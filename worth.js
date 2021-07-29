@@ -25,7 +25,7 @@ function Worth() {
         if (!DS.length) throw "Stack Emtpy";
         return DS.pop()}; 
   let parse= (s)=> s
-      .split(/([^"\S]+|"[^"]*")/)
+      .split(/(<[^>]>|"[^"]*"|\S+)/)
       .filter(a=>!a.match(/^\s*$/))
       .map(a=>{let s=a.match(/^"(.*)"$/);
                return s?['lit', s[1]]:a})
@@ -93,6 +93,8 @@ function Worth() {
   def('new', ()=>{t='new '+toks[++Y];u(eval(t))});
 
   def('see', (f=p())=>pp(f.CODE || f));
+  def('append', append);
+  def('sprint', (s=p())=>u(s.split(/(%)/).reverse().map((s,i)=>s.replace('%', p)).reverse().join('')));
 
   function compile(o) {
     if (isF(o)) return o; // primitive
@@ -128,9 +130,11 @@ function Worth() {
       return t();
     }
     // .toUpperCase()  Math.sqrt()   state@  3 state!
-    let [_, met, name, access]= t.match(/^(\.?)(.*?)([!@]?|\(\))$/),
-        o= met?p():global,
+    let [_, met, name, access]= t.match(/^([\.<]?)(.*?)([!@]?|\(\))$/);
+    if (met=='<') return html(name);
+    let o= met?p():global,
         f= name.split(/\./).reduce((o,a)=>o[a], o);
+    if (!access) throw 'No function';
     if (access=='!') return o[name]= p();
     else if (access!='()') return u(f);
     u(f.apply(o, iota(f.length).map(p)));
@@ -138,6 +142,22 @@ function Worth() {
 
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
   return E;
+
+  function append(e=p(), s=p()) {
+    if (e.append) return u((e.append(s), e));
+    u(e.concat += '' + s);
+  }
+                           
+  function html(h) {
+    let [_, tag, attr, nocont] = h.match(/^(\S+)(\/?)>$/);
+    if (typeof document==='undefined')
+      return u(`<${h}${''+p()}</${tag}>`);
+    let e = document.createElement('span');
+    e.innerHTML = h; // cheat: this sets attr!
+    e = e.children[0]; // get named element
+    if (!nocont) e.append(p());
+    u(e);
+  }
 
   function pp(f, indent=0) {
     if (isA(f)) {
@@ -274,6 +294,10 @@ gurka = 'mayo'; // global
 
  'gurka@ . "MAYO" gurka! gurka@ .',
 
+ '"Fish" <li> .',
+
+ '1 2 "foo%bar%fie" sprint .',
+
  ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
 
 //[  'trace 7 sq .',
@@ -303,5 +327,3 @@ gurka = 'mayo'; // global
 // - https://github.com/gerryjackson/forth2012-test-suite
 // Event driven programming/impl in forth
 // - https://github.com/bradn123/literateforth/blob/master/src/events_lit.fs
-
-

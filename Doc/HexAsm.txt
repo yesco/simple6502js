@@ -16,8 +16,11 @@ I was reading about CHIP-8 and thought how one could use the hexcode as having a
 3 mr		3emory -> reg 
 4 4r 	        Half 2/
 5 Sr            S7ore reg -> memory
-6 6             - b? more branch? bit?
-7 70            70ken
+
+6           ???          ???
+6             FORTH?
+7           ???
+70            70ken
   71            (71ll  71me)
   72            To 5wap (swan gliding)
   73            -
@@ -30,10 +33,12 @@ I was reading about CHIP-8 and thought how one could use the hexcode as having a
   7D            -  
   7E            7Erminal 7extEqual
   7F            -
+
 6 6r		6o register
-8 Xr            Xor octo byte eXit
-9 9r            &nd
-A Ar            And
+8 Xr nn         Xor octo byte eXit
+9          ???
+
+A Ar nn         And
 B B0 rel        Branch Zero  == 0
   B1 rel        Branch true  == 1
   B2 rel        Branch two   == 2
@@ -100,5 +105,6 @@ F F0            F0rth + ForthEnd Field0ffset
    D             Drop
    E             extend/eval
    F nn          Function nn dispatch call
+                 (using register 'F')
    
    and,or,xor,not already exist
