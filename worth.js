@@ -95,6 +95,8 @@ function Worth() {
   def('see', (f=p())=>pp(f.CODE || f));
   def('append', append);
   def('sprint', (s=p())=>u(sprint(s)));
+  def('$', (s=p())=>u(document.querySelector(s)));
+  def('$', ()=>u(dom(p())));
 
   function compile(o) {
     if (isF(o)) return o; // primitive
@@ -129,9 +131,10 @@ function Worth() {
       if (trace) {princ('{');pp(t);princ('} ')}
       return t();
     }
+    // TODO: move parse->dispatch to compilation!
     // .toUpperCase()  Math.sqrt()   state@  3 state!
     let [_, met, name, access]= t.match(/^([\.<]?)(.*?)([!@]?|\(\))$/);
-    if (met=='<') return html(name);
+    if (met=='<') return dom(t);
     let o= met?p():global,
         f= name.split(/\./).reduce((o,a)=>o[a], o);
     if (!access) throw 'No function';
@@ -149,10 +152,13 @@ function Worth() {
 
   function append(e=p(), s=p()) {
     if (e.append) return u((e.append(s), e));
-    u(e.concat += '' + s);
+      u(e.concat += '' + s);
   }
-                           
-  function html(h) {
+
+  function dom(h) {
+    if (!h.match(/^</))
+      return document.querySelector(h);
+
     let [_, tag, attr, nocont] = h.match(/^(\S+)\s*(.*)(\/?)>$/);
     h = sprint(h); // interpolate
     if (typeof document==='undefined')
