@@ -25,7 +25,7 @@ function Worth() {
         if (!DS.length) throw "Stack Emtpy";
         return DS.pop()}; 
   let parse= (s)=> s
-      .split(/(<[^>]>|"[^"]*"|\S+)/)
+      .split(/(<[^>]*>|"[^"]*"|\S+)/)
       .filter(a=>!a.match(/^\s*$/))
       .map(a=>{let s=a.match(/^"(.*)"$/);
                return s?['lit', s[1]]:a})
@@ -94,7 +94,7 @@ function Worth() {
 
   def('see', (f=p())=>pp(f.CODE || f));
   def('append', append);
-  def('sprint', (s=p())=>u(s.split(/(%)/).reverse().map((s,i)=>s.replace('%', p)).reverse().join('')));
+  def('sprint', (s=p())=>u(sprint(s)));
 
   function compile(o) {
     if (isF(o)) return o; // primitive
@@ -143,13 +143,18 @@ function Worth() {
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
   return E;
 
+  function sprint(s) { // "interpolate"
+    return s.split(/(%)/).reverse().map((s,i)=>s.replace('%', p)).reverse().join('');
+  }
+
   function append(e=p(), s=p()) {
     if (e.append) return u((e.append(s), e));
     u(e.concat += '' + s);
   }
                            
   function html(h) {
-    let [_, tag, attr, nocont] = h.match(/^(\S+)(\/?)>$/);
+    let [_, tag, attr, nocont] = h.match(/^(\S+)\s*(.*)(\/?)>$/);
+    h = sprint(h); // interpolate
     if (typeof document==='undefined')
       return u(`<${h}${''+p()}</${tag}>`);
     let e = document.createElement('span');
@@ -296,7 +301,10 @@ gurka = 'mayo'; // global
 
  '"Fish" <li> .',
 
+ '"Fish" <li style="background:pink"> .',
+
  '1 2 "foo%bar%fie" sprint .',
+ '"Fish" "green" <li style="background:%"> .',
 
  ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
 
