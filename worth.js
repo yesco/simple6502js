@@ -17,8 +17,14 @@
 //          (<) 2021 Jonas S Karlsson
 //                jsk@yesco.org
 
-function Worth() {
-  var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, trace, here=0x501;
+function Worth(boot, opt) {
+  var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, here=0x501;
+  let typ= (o)=> typeof o,
+      isF= (o)=> typ(o)=='function'?o:undefined,
+      isU= (o)=> o===undefined,
+      isA= (o)=> Array.isArray(o),
+      isS= (o)=> typ(o)=='string'?o:undefined;
+  let trace= opt.trace || 0;
   let iota= (n)=>[...Array(n).keys()];
   let u= (v)=>(DS.push(v),v),
       p= ()=>{
@@ -31,12 +37,6 @@ function Worth() {
                return s?['lit', s[1]]:a})
       .map(a=>Number.isNaN(+a)?a:['lit',+a])
       .flat();
-  let princ= (...s)=>(process.stdout.write(s.join('')),s[0]);
-  let typ= (o)=> typeof o,
-      isF= (o)=> typ(o)=='function'?o:undefined,
-      isU= (o)=> o===undefined,
-      isA= (o)=> Array.isArray(o),
-      isS= (o)=> typ(o)=='string'?o:undefined;
   let def= (name, words)=>
       (mem[name]= compile(words)).NAME=name;
 
@@ -57,9 +57,9 @@ function Worth() {
   def('>R', ()=>RS.push(p()));
   def('R>', ()=>u(RS.pop()));
 
-  def('.s', ()=>{princ('\nSTACK: ');pp(DS);princ('\n')});
-  def('.st', ()=>{princ('\nSTACK: '+DS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
-  def('.rt', ()=>{princ('\nSTACK: '+RS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
+  def('.s', ()=>{PRINC('\nSTACK: ');pp(DS);PRINC('\n')});
+  def('.st', ()=>{PRINC('\nSTACK: '+DS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
+  def('.rt', ()=>{PRINC('\nSTACK: '+RS.map(a=>`${''+a+':'+typ(a)}`).join(' ')+'\n')});
 
   def('!', (a=p(),v=p())=>mem[a]=v);
   def('@', (a=p())=>u(mem[a]));
@@ -74,7 +74,7 @@ function Worth() {
   def(':', ()=>{
     ++Y;
     let end = toks.indexOf(';', Y)
-    def(princ(toks[Y], '=defined '), toks.splice(Y+1,end-Y-1));
+    def(toks[Y], toks.splice(Y+1,end-Y-1));
     Y= end + 1;
   });
   def('interpret', ()=>{while(toks[Y+1])next()});
@@ -102,6 +102,7 @@ function Worth() {
     if (isF(o)) return o; // primitive
     if (isS(o)) return compile(parse(o)); // word
     if (!isA(o)) throw `Compile unknown type ${typ(o)}`;
+    if (trace >= 3) PRINC(`\nCOMPILE: ${o}\n`);
     // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
@@ -119,6 +120,7 @@ function Worth() {
 
   function next(n=toks[++Y]) {
     t = n;
+    if (trace > 1) PRINC('\n');
     if (trace > 1) mem['.s']();
 
     //princ('---TOK='+t+':'+typ(t)+'----\n');
@@ -128,7 +130,7 @@ function Worth() {
     if (isA(t) && t.length==1) t = t[0];
 
     if (isF(t)) {
-      if (trace) {princ('{');pp(t);princ('} ')}
+      if (trace > 0) {PRINC('{');pp(t);PRINC('} ')}
       return t();
     }
     // TODO: move parse->dispatch to compilation!
@@ -144,7 +146,22 @@ function Worth() {
   }
 
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
-  return E;
+
+  return function EE(s) {
+    if (trace >= 2) PRINC(`\nEVAL: ${s}`);
+    return E(s);
+  }
+
+  ////////////////////////////////////////
+  // library functions
+
+  function princ(...s) {
+    if (trace < 0) return;
+    if (trace >= 3) PRINC('\nOUTPUT{');
+    PRINC(s);
+    if (trace >= 3) PRINC('}');
+    return s[0];
+  }
 
   function sprint(s) { // "interpolate"
     return s.split(/(%)/).reverse().map((s,i)=>s.replace('%', p)).reverse().join('');
@@ -172,17 +189,28 @@ function Worth() {
 
   function pp(f, indent=0) {
     if (isA(f)) {
-      if (f.NAME) princ(f.NAME+'==');
-      princ('[');
-      f.forEach(x=>princ(
+      if (f.NAME) PRINC(f.NAME+'==');
+      PRINC('[');
+      f.forEach(x=>PRINC(
         isS(x)?JSON.stringify(x):x, ' '));
-      princ(']');
+      PRINC(']');
     }
-    else if (isS(f)) princ(JSON.stringify(f));
-    else if (isF(f)) princ(f.NAME);
-    else if (f) princ('??'+f);
-    else princ('EXIT');
+    else if (isS(f)) PRINC(JSON.stringify(f));
+    else if (isF(f)) PRINC(f.NAME);
+    else if (f) PRINC('??'+f);
+    else PRINC('EXIT');
   }
+}
+
+
+let trace= 0;
+
+// princ arguments as strings, no spaces added
+// returns first argument (for debugging)
+function PRINC(...s) {
+  if (trace < 0) return;
+  process.stdout.write(s.join(''));
+  return s[0];
 }
 
 let boot = [
@@ -253,66 +281,147 @@ let boot = [
 // - >dom dom>
 // -
 
-let w = Worth(boot);
+function test() {
+  let w= Worth(boot);
 
-gurka = 'mayo'; // global
+  gurka = 'mayo'; // global
 
-['. 666', // stack underflow
- '1 2 3 . . .',
- '3 4 .s + . "bb"  dup . . "dd dd" .',
- '"foo" Math.sqrtt .',
- 'drop',
- '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
- '"TYPEOF" . 3 4 == dup typeof . .',
- '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
- '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
- '"SQuare 7" . 7 sq .',
+  ['. 666', // stack underflow
+   '1 2 3 . . .',
+   '3 4 .s + . "bb"  dup . . "dd dd" .',
+   '"foo" Math.sqrtt .',
+   'drop',
+   '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
+   '"TYPEOF" . 3 4 == dup typeof . .',
+   '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
+   '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
+   '"SQuare 7" . 7 sq .',
 
-//  def('sq', 'dup *');
-//  def('cc', '"c" dup . 7 sq . .');
-//  def('bb', '"b" dup . cc .');
-//  def('aa', '"a" dup . bb .');
-//  def('qq', 'aa');
+   //  def('sq', 'dup *');
+   //  def('cc', '"c" dup . 7 sq . .');
+   //  def('bb', '"b" dup . cc .');
+   //  def('aa', '"a" dup . bb .');
+   //  def('qq', 'aa');
 
- 'aa',
- '1 2 3 rot . . .',
-// '9 dup . 42 "foo" ! 33 . "foo" @ . .',
- '99 dup . "FISH" @ . .',
-  '99 dup . 42 "FISH" ! "FISH" @ . .',
+   'aa',
+   '1 2 3 rot . . .',
+   // '9 dup . 42 "foo" ! 33 . "foo" @ . .',
+   '99 dup . "FISH" @ . .',
+   '99 dup . 42 "FISH" ! "FISH" @ . .',
 
- "9 dup . ' dup . .",
- "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
+   "9 dup . ' dup . .",
+   "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
 
- '1 2 : foo "FOO" . "BAR" . "FIEFUM" 3 ;',
- '8 7 : bar 5 6 ; 4 bar . . . .',
- '8 9 dup . foo . . . .',
- '"foo" see "+" see',
- '9 dup . bar . .',
+   '1 2 : foo "FOO" . "BAR" . "FIEFUM" 3 ;',
+   '8 7 : bar 5 6 ; 4 bar . . . .',
+   '8 9 dup . foo . . . .',
+   '"foo" see "+" see',
+   '9 dup . bar . .',
 
- ': ab "AB" ;  : ba "BA" ;',
- 'ab . ba .',
+   ': ab "AB" ;  : ba "BA" ;',
+   'ab . ba .',
 
- '99 123 . : q "Q" ; 321 . .',
- '. . q .',
+   '99 123 . : q "Q" ; 321 . .',
+   '. . q .',
 
- '========================================',
- '"SQRT of 64" . 64 Math.sqrt() "=>" . .',
- '"EVAL of 3+4" . 3+4 "=>" . .',
- '"EVAL of global" . global@ "=>" . .',
+   '========================================',
+   '"SQRT of 64" . 64 Math.sqrt() "=>" . .',
+   '"EVAL of 3+4" . 3+4 "=>" . .',
+   '"EVAL of global" . global@ "=>" . .',
 
- '"UPPERCASE of fOo" . "fOo" .toUpperCase() "=>" . .',
- '"ERROR UPPERCASE of STRING foo" . "foo" .toUpperCase() "=>" . .',
+   '"UPPERCASE of fOo" . "fOo" .toUpperCase() "=>" . .',
+   '"ERROR UPPERCASE of STRING foo" . "foo" .toUpperCase() "=>" . .',
 
- 'gurka@ . "MAYO" gurka! gurka@ .',
+   'gurka@ . "MAYO" gurka! gurka@ .',
 
- '"Fish" <li> .',
+   '"Fish" <li> .',
 
- '"Fish" <li style="background:pink"> .',
+   '"Fish" <li style="background:pink"> .',
 
- '1 2 "foo%bar%fie" sprint .',
- '"Fish" "green" <li style="background:%"> .',
+   '1 2 "foo%bar%fie" sprint .',
+   '"Fish" "green" <li style="background:%"> .',
 
- ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
+  ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
+}
+
+function browser() {
+}
+
+function interactive() {
+}
+
+function program() {
+  let fs= require('fs');
+
+  let args= process.argv;
+
+  let w, nw= ()=> w= Worth(boot, {trace});
+  w = nw();
+
+  let commands = {
+    'fn.ext': ["Load fn.ext source", ()=> w(fs.fileReadSync(argv.shift()))],
+    '-e': ["Eval next string arg", ()=> w(args.shift())],
+    '-n': ["New interpreter", nw],
+    '-q': ["Quite, no pips!", ()=> trace= -1],
+    '-t': ["Tracing level '-t n'", ()=> trace= parseInt(args.shift())],
+    //'-d': ["Dump data using pp", ...],
+    '--bye': ["Bye: exit w3forth here", ()=> process.exit()],
+    '--test': ["Tests: run tests", test],
+    '-i': ["Interactive read-eval loop", interactive],
+    '-h': ["Help", ()=>{
+      PRINC('w3forth - a www forth for nodejs and browser\n');
+      PRINC('(>) 2021 Jonas S Karlsson, jsk@yesco.org\n\n');
+      PRINC('Usage: w3forth ...\n');
+      Object.keys(commands).forEach(k=>{
+        PRINC(` ${k}\t${commands[k][0]}\n`);
+      });
+      PRINC(`
+Trace levels:
+ -1    quiet (-q), even princ is suppressed
+  0    normal
+  1    prints functions while running {fun}
+  2    prints stack before function call
+  3    prefixes princ with 'nOUTPUT{...}'
+  4    trace arguments processing
+'
+`);
+      process.exit();
+    }],
+  }
+  
+  let a;
+  args.shift();
+  args.shift();
+  while (a= args.shift()) {
+    let cmd= commands[a];
+    if (cmd) {
+      if (trace >= 4) PRINC(`\nARGUMENT: ${a} - ${cmd[0]}\n`);
+      cmd[1]();
+    } else {
+      PRINC(`%% W3Forth: unrecognized command argument: ${a}\n  -h for help\n`);
+      break;
+    }
+  }
+
+  process.exit();
+}
+
+function included() {
+}
+
+// -> browser() / program / module
+if (typeof document !== 'undefined') {
+  brower();
+} else if (typeof require !== 'undefined') {
+  // nodejs
+  if (!module.parent) {
+    // invoked as program
+    program();
+  } else {
+    // required by other code as module    
+    included();
+  }
+}
 
 //[  'trace 7 sq .',
 //[  'trace aa',
