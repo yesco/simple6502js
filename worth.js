@@ -102,7 +102,7 @@ function Worth(boot, opt) {
     if (isF(o)) return o; // primitive
     if (isS(o)) return compile(parse(o)); // word
     if (!isA(o)) throw `Compile unknown type ${typ(o)}`;
-    if (trace >= 3) PRINC(`\nCOMPILE: ${o}\n`);
+    if (trace >= 4) PRINC(`\nCOMPILE: ${o}\n`);
     // list of tokens
     let r = o.map(t=>{
       let f = mem[t];
@@ -120,8 +120,8 @@ function Worth(boot, opt) {
 
   function next(n=toks[++Y]) {
     t = n;
-    if (trace > 1) PRINC('\n');
-    if (trace > 1) mem['.s']();
+    if (trace > 2) PRINC('\n');
+    if (trace > 2) mem['.s']();
 
     //princ('---TOK='+t+':'+typ(t)+'----\n');
     if (isS(t) && mem[t]) return next(mem[t]);
@@ -130,7 +130,7 @@ function Worth(boot, opt) {
     if (isA(t) && t.length==1) t = t[0];
 
     if (isF(t)) {
-      if (trace > 0) {PRINC('{');pp(t);PRINC('} ')}
+      if (trace > 1) {PRINC('{');pp(t);PRINC('} ')}
       return t();
     }
     // TODO: move parse->dispatch to compilation!
@@ -148,7 +148,7 @@ function Worth(boot, opt) {
   Function.prototype.toString = function(){return`${this.NAME?'':''}${this.NAME||this.name}`};
 
   return function EE(s) {
-    if (trace >= 2) PRINC(`\nEVAL: ${s}`);
+    if (trace >= 3) PRINC(`\nEVAL: ${s}`);
     return E(s);
   }
 
@@ -156,10 +156,10 @@ function Worth(boot, opt) {
   // library functions
 
   function princ(...s) {
-    if (trace < 0) return;
-    if (trace >= 3) PRINC('\nOUTPUT{');
+    if (!trace) return;
+    if (trace >= 4) PRINC('\nOUTPUT{');
     PRINC(s);
-    if (trace >= 3) PRINC('}');
+    if (trace >= 4) PRINC('}');
     return s[0];
   }
 
@@ -203,7 +203,7 @@ function Worth(boot, opt) {
 }
 
 
-let trace= 0;
+let trace= 1;
 
 // princ arguments as strings, no spaces added
 // returns first argument (for debugging)
@@ -356,14 +356,20 @@ function interactive(w, input=process.stdin) {
     prompt: '3forth> ',
   });
 
-  rl.prompt();
+  function prompt(line) {
+    if (trace >= 1) {
+      if (line!=undefined && line.length)
+        PRINC('\n'); // otherwise deletes!
+      rl.prompt();
+    }
+  }
+
+  prompt('foo');
 
   rl.on('line', (line) => {
-    if (line.length) {
+    if (line.length) 
       w(line);
-      PRINC('\n'); // otherwise deletes!
-    }
-    rl.prompt();
+    prompt(line);
   }).on('close', () => {
     //process.exit(0);
   });
@@ -378,7 +384,7 @@ function program() {
   w = nw();
 
   let commands = {
-    'fn.ext': ["Load fn.ext source", ()=> w(fs.fileReadSync(argv.shift()))],
+    'Fn.Ext': ["Load fn.ext source", _=>0],
     '-e': ["Eval next string arg", ()=> w(args.shift())],
     '-n': ["New interpreter", nw],
     '-q': ["Quite, no pips!", ()=> trace= -1],
@@ -386,7 +392,8 @@ function program() {
     //'-d': ["Dump data using pp", ...],
     '--bye': ["Bye: exit w3forth here", ()=> process.exit()],
     '--test': ["Tests: run tests", test],
-    '-i': ["Interactive read-eval loop", ()=> interactive(w)],
+    // TODO: doesn't work this way
+    // '-i': ["Interactive read-eval loop", ()=> interactive(w)],
     '-h': ["Help", ()=>{
       PRINC('w3forth - a www forth for nodejs and browser\n');
       PRINC('(>) 2021 Jonas S Karlsson, jsk@yesco.org\n\n');
@@ -397,11 +404,12 @@ function program() {
       PRINC(`
 Trace levels:
  -1    quiet (-q), even princ is suppressed
-  0    normal
-  1    prints functions while running {fun}
-  2    prints stack before function call
-  3    prefixes princ with 'nOUTPUT{...}'
-  4    trace arguments processing
+  0    no prompts but explicit princ yes
+  1    normal
+  2    prints functions while running {fun}
+  3    prints stack before function call
+  4    prefixes princ with 'nOUTPUT{...}'
+  5    trace arguments processing
 '
 `);
       process.exit();
@@ -416,13 +424,15 @@ Trace levels:
     if (cmd) {
       if (trace >= 4) PRINC(`\nARGUMENT: ${a} - ${cmd[0]}\n`);
       cmd[1]();
-    } else {
+    } else if (a.match(/^-/)) {
       PRINC(`%% W3Forth: unrecognized command argument: ${a}\n  -h for help\n`);
-      break;
+      process.exit(1);
+    } else {
+      w(fs.fileReadSync(argv.shift()));
     }
   }
-  // exits at EO of input, or when "done"
-  //process.exit();
+
+  interactive(w);
 }
 
 function included() {
