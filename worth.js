@@ -78,7 +78,7 @@ function Worth(boot, opt) {
     Y= end + 1;
   });
   def('interpret', ()=>{while(toks[Y+1])next()});
-  def('trace', ()=>trace=!trace);
+  def('trace', ()=> {u(trace);trace=p()});
   def('quit', ()=>{RS=[]; try{ X('interpret') } catch(e) { console.error(`\n% ${e} at:\n  ? ${t}`) }});
   def('execute', X= (e=p())=>next(e));
   def('eval', E= (s=p())=>{Y=-1; toks= [compile(s)]; X('quit')});
@@ -344,10 +344,29 @@ function test() {
   ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
 }
 
+const readline = require('readline');
+
 function browser() {
 }
 
-function interactive() {
+function interactive(w, input=process.stdin) {
+  const rl = readline.createInterface({
+    input: input,
+    output: process.stdout,
+    prompt: '3forth> ',
+  });
+
+  rl.prompt();
+
+  rl.on('line', (line) => {
+    if (line.length) {
+      w(line);
+      PRINC('\n'); // otherwise deletes!
+    }
+    rl.prompt();
+  }).on('close', () => {
+    //process.exit(0);
+  });
 }
 
 function program() {
@@ -367,7 +386,7 @@ function program() {
     //'-d': ["Dump data using pp", ...],
     '--bye': ["Bye: exit w3forth here", ()=> process.exit()],
     '--test': ["Tests: run tests", test],
-    '-i': ["Interactive read-eval loop", interactive],
+    '-i': ["Interactive read-eval loop", ()=> interactive(w)],
     '-h': ["Help", ()=>{
       PRINC('w3forth - a www forth for nodejs and browser\n');
       PRINC('(>) 2021 Jonas S Karlsson, jsk@yesco.org\n\n');
@@ -402,8 +421,8 @@ Trace levels:
       break;
     }
   }
-
-  process.exit();
+  // exits at EO of input, or when "done"
+  //process.exit();
 }
 
 function included() {
