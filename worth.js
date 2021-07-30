@@ -41,7 +41,7 @@ function Worth(boot, opt) {
       (mem[name]= compile(words)).NAME=name;
 
   '+ - * / % ^ & | && || < <= > >= != !== == === << >> >>>'.split(' ').map(n=>
-    def(n, eval(`(function(a=p(),b=p()){u(a ${n} b)})`)));
+    def(n, eval(`(function(b=p(),a=p()){u(a ${n} b)})`)));
   def('~', ()=>u(~p()));
   def('=', ()=>u(p()===p()));
 
@@ -65,7 +65,7 @@ function Worth(boot, opt) {
   def('@', (a=p())=>u(mem[a]));
 
   def('emit', ()=>princ(String.fromCharCode(p())));
-  def('.', ()=>{princ(p());princ(' ')});
+  def('.', (n=p())=>{princ(n);princ(' ')});
   def('type', ()=>princ(p()));
 
   def('lit', ()=>u(toks[++Y]));
@@ -85,6 +85,7 @@ function Worth(boot, opt) {
 
   def('here', ()=>u(here));
   def('allot', ()=>here+=p());
+  def('words', ()=>Object.keys(mem).forEach(w=>mem['.'](w)));
 
   def('BRANCH', (y=p())=> Y= y);
   def('EXIT', ()=>[Y,toks] = RS.pop() || [-1, undefined]);
