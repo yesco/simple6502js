@@ -17,7 +17,7 @@
 //          (<) 2021 Jonas S Karlsson
 //                jsk@yesco.org
 
-function Worth(boot, opt) {
+function Worth(boot, opt={}) {
   var DS= [], RS= [], mem= [], Y= -1, toks, t, E, X, here=0x501;
   let typ= (o)=> typeof o,
       isF= (o)=> typ(o)=='function'?o:undefined,
@@ -159,7 +159,7 @@ function Worth(boot, opt) {
   function princ(...s) {
     if (!trace) return;
     if (trace >= 4) PRINC('\nOUTPUT{');
-    PRINC(s);
+    PRINC(...s);
     if (trace >= 4) PRINC('}');
     return s[0];
   }
@@ -168,9 +168,9 @@ function Worth(boot, opt) {
     return s.split(/(%)/).reverse().map((s,i)=>s.replace('%', p)).reverse().join('');
   }
 
-  function append(e=p(), s=p()) {
+  function append(s=p(), e=p()) {
     if (e.append) return u((e.append(s), e));
-      u(e.concat += '' + s);
+      u(e.concat('' + s));
   }
 
   function dom(h) {
@@ -203,8 +203,7 @@ function Worth(boot, opt) {
   }
 }
 
-
-let trace= 1;
+trace= 1;
 
 // princ arguments as strings, no spaces added
 // returns first argument (for debugging)
@@ -248,102 +247,6 @@ let boot = [
 //  ': constant quote :',
   ': , here ! 1 cells allot ;',
 ];
-
-// TODO:
-// - ( comment )
-// - ms
-// - branch? branch
-// - for i j next
-// - begin again
-// - do i j loop
-// - roll
-// - parse, token, number?
-// - [ ]
-// - immediate
-// - >body does>
-// - defer
-// - T{ ... -> ... }T
-
-// TODO: Webinterop
-// - 8080 www ( start server )
-// - www: /foo ... "foo" req ...
-
-// - h< >
-// - <TAG>
-// - </TAG>
-// - <tag style='foo'>
-// - <tag style='${"foo" "bar" concat}'>
-
-// TODO: brower inop
-// - dom' foo
-// - h<
-// - dom@ dom!
-// - dom:
-// - >dom dom>
-// -
-
-function test() {
-  let w= Worth(boot);
-
-  gurka = 'mayo'; // global
-
-  ['. 666', // stack underflow
-   '1 2 3 . . .',
-   '3 4 .s + . "bb"  dup . . "dd dd" .',
-   '"foo" Math.sqrtt .',
-   'drop',
-   '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
-   '"TYPEOF" . 3 4 == dup typeof . .',
-   '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
-   '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
-   '"SQuare 7" . 7 sq .',
-
-   //  def('sq', 'dup *');
-   //  def('cc', '"c" dup . 7 sq . .');
-   //  def('bb', '"b" dup . cc .');
-   //  def('aa', '"a" dup . bb .');
-   //  def('qq', 'aa');
-
-   'aa',
-   '1 2 3 rot . . .',
-   // '9 dup . 42 "foo" ! 33 . "foo" @ . .',
-   '99 dup . "FISH" @ . .',
-   '99 dup . 42 "FISH" ! "FISH" @ . .',
-
-   "9 dup . ' dup . .",
-   "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
-
-   '1 2 : foo "FOO" . "BAR" . "FIEFUM" 3 ;',
-   '8 7 : bar 5 6 ; 4 bar . . . .',
-   '8 9 dup . foo . . . .',
-   '"foo" see "+" see',
-   '9 dup . bar . .',
-
-   ': ab "AB" ;  : ba "BA" ;',
-   'ab . ba .',
-
-   '99 123 . : q "Q" ; 321 . .',
-   '. . q .',
-
-   '========================================',
-   '"SQRT of 64" . 64 Math.sqrt() "=>" . .',
-   '"EVAL of 3+4" . 3+4 "=>" . .',
-   '"EVAL of global" . global@ "=>" . .',
-
-   '"UPPERCASE of fOo" . "fOo" .toUpperCase() "=>" . .',
-   '"ERROR UPPERCASE of STRING foo" . "foo" .toUpperCase() "=>" . .',
-
-   'gurka@ . "MAYO" gurka! gurka@ .',
-
-   '"Fish" <li> .',
-
-   '"Fish" <li style="background:pink"> .',
-
-   '1 2 "foo%bar%fie" sprint .',
-   '"Fish" "green" <li style="background:%"> .',
-
-  ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
-}
 
 const readline = require('readline');
 
@@ -480,3 +383,121 @@ if (typeof document !== 'undefined') {
 // - https://github.com/gerryjackson/forth2012-test-suite
 // Event driven programming/impl in forth
 // - https://github.com/bradn123/literateforth/blob/master/src/events_lit.fs
+
+// TODO:
+// - ( comment )
+// - ms
+// - branch? branch
+// - for i j next
+// - begin again
+// - do i j loop
+// - roll
+// - parse, token, number?
+// - [ ]
+// - immediate
+// - >body does>
+// - defer
+// - T{ ... -> ... }T
+
+// - h< >
+// - <TAG>
+// - </TAG>
+// - <tag style='foo'>
+// - <tag style='${"foo" "bar" concat}'>
+
+// TODO: brower inop
+// - dom' foo
+// - h<
+// - dom@ dom!
+// - dom:
+// - >dom dom>
+// -
+
+function test() {
+  let w= Worth(boot);
+
+  gurka = 'mayo'; // global
+
+  ['. 666', // stack underflow
+   '1 2 3 . . .',
+   '3 4 .s + . "bb"  dup . . "dd dd" .',
+   '"foo" Math.sqrtt .',
+   'drop',
+   '3 4 > . 4 3 >= . 3 3 = . 4 4 == .',
+   '"TYPEOF" . 3 4 == dup typeof . .',
+   '"NEW array" . new Array(50) dup dup Array.isArray . typeof . .',
+   '"NEW flower" . new flower(50) dup dup Array.isArray . typeof . .',
+   '"SQuare 7" . 7 sq .',
+
+   //  def('sq', 'dup *');
+   //  def('cc', '"c" dup . 7 sq . .');
+   //  def('bb', '"b" dup . cc .');
+   //  def('aa', '"a" dup . bb .');
+   //  def('qq', 'aa');
+
+   'aa',
+   '1 2 3 rot . . .',
+   // '9 dup . 42 "foo" ! 33 . "foo" @ . .',
+   '99 dup . "FISH" @ . .',
+   '99 dup . 42 "FISH" ! "FISH" @ . .',
+
+   "9 dup . ' dup . .",
+   "9 dup . ' + dup . 3 4 rot execute . . 33 44 + .",
+
+   '1 2 : foo "FOO" . "BAR" . "FIEFUM" 3 ;',
+   '8 7 : bar 5 6 ; 4 bar . . . .',
+   '8 9 dup . foo . . . .',
+   '"foo" see "+" see',
+   '9 dup . bar . .',
+
+   ': ab "AB" ;  : ba "BA" ;',
+   'ab . ba .',
+
+   '99 123 . : q "Q" ; 321 . .',
+   '. . q .',
+
+   '========================================',
+   '"SQRT of 64" . 64 Math.sqrt() "=>" . .',
+   '"EVAL of 3+4" . 3+4 "=>" . .',
+   '"EVAL of global" . global@ "=>" . .',
+
+   '"UPPERCASE of fOo" . "fOo" .toUpperCase() "=>" . .',
+   '"ERROR UPPERCASE of STRING foo" . "foo" .toUpperCase() "=>" . .',
+
+   'gurka@ . "MAYO" gurka! gurka@ .',
+
+   '"Fish" <li> .',
+
+   '"Fish" <li style="background:pink"> .',
+
+   '1 2 "foo%bar%fie" sprint .',
+   '"Fish" "green" <li style="background:%"> .',
+
+   // Web Server
+`8080 w3: WS
+
+   ( methods )
+   m: down  forget-it WS ;
+   m: all   ws-log ;
+   m: catch ws+error ;
+
+   ( handler
+         ( XX WS req [params] -- XX ... )
+   )
+   get:  /hello      "Hello W3orld!" ;
+   get:  /123        1 2 3 ;
+   get:  /iota%d     for . next ;
+   get:  /           ws-index ;
+   get:  /edit       ws-edit ;
+   post: /submit     ws-update ;
+   get:  /search?%d  ws-match-num ;
+   get:  /search?%s  ws-match-word ;
+   get:  /shutdown   "WS" @ :down ;
+   :else             ws-error ;
+ :class; 
+
+`,
+   
+  // if { foo } else { bar } 
+  ].forEach(s=>{console.log(`\n--- ${s}`);w(s);console.log()});
+}

@@ -1,0 +1,7 @@
+cp w3forth.template.html fil.c
+clang fil.c -E 2>/dev/null| grep -v '^#' > w3forth.html 
+ 
+# command to open file in your webbrowser
+termux-open w3forth.html
+
+
