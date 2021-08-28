@@ -30,11 +30,7 @@
 #        2021 Jonas S Karlsson (jsk@yesco.org)
 #
 #
-# ref: The 6502/65C02/65C816
-#      Instruction Set Decoded
-#      - https://llx.com/Neil/a2/opcodes.html
-# opcode:
-#   xxx mmm cc = generic structure
+#   xxx mmm cc = generic structure of OPCODE
 #   ----------
 #   0xx 000 00 = call&stack       BRK JSR RTI RTS
 #   0xx 010 00 = stack            PHP PLP PHA PLA
@@ -75,6 +71,8 @@
 #       stack: PHA/PHP          1  3 +1/PLA/PLP
 #              JSR RTS RTI      3  6 +1/BRK
 #   other implied instructions  1  2 
+#
+# Ref - https://llx.com/Neil/a2/opcodes.html
 
 #
 # ------------ cc = 01
