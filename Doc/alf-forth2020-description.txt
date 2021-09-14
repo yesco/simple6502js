@@ -1,0 +1,27 @@
+BTW, I"d consider using an Alphabetical Letter Forth bytecode:
+
+I've mapped the most common names in forth to 1 letter, and others to two letter sequences. 
+
+I went through all the standard forth words and extras and assigned them 1-2 letters. I feel the mapping is pretty good.
+
+The mapping/bytecode was created for a letter byte coded forth for 6502 (not completed, but experiemnted on in various variants).
+
+https://github.com/yesco/ALForth
+
+There are many nice features with having the byte-code be the same the names. You'll find a number of similar systems of various "forth" charactersistcs by other members.
+
+What I've learned is that this simplifies, if not completely removes the need for a compiler/parser.
+
+I made a prototype one, with 8 bit (byte) "wordsize" with an editor.
+
+256 bytes housed all user defined words (address 0-N, 0 terminated).
+
+and the end of the 256 byte page was 16 bytes for program stack, 16 bytes for user stack.
+
+The program grew up towards the stack that grew down.
+
+I almost had a fullscreen (vt100) editor working for the 256-- bytes. Newlines-formatted.256 bytes quite  a lot of op-codes...
+
+CTRL-R reset the stack and parsed worddefs/ran the code on screen.Instead of immediate/Compile mode I had Edit/Run mode.
+
+I think my 50+ words plus editor was about 1.5KB in 6502.
