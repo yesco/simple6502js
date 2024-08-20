@@ -25,6 +25,8 @@
 //   - no dyn array, only constant...
 //   - no usleep()
 //   - strlen() limited to 255
+//   - if use bytes for 00-99 then upto 512 digits...
+//   - if use int for 0000-9999 can use int count front - unlimited
 
 #include <stdio.h>
 #include <assert.h>
