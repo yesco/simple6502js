@@ -113,6 +113,8 @@ int _z; // dummy, Trr doesn't set z flag
 #define INY LDY ((y+1) & 0xff)
 #define DEY LDY ((y-1) & 0xff)
 
+#define INC *(after(&_, 5, __LINE__, a)) = __ =
+#define DEC *(after(&_, 6, __LINE__, a)) = __ =
 #define CMP *(after(&_, 3, __LINE__, a)) = __ =
 #define CPX *(after(&_, 3, __LINE__, x)) = __ =
 #define CPY *(after(&_, 3, __LINE__, y)) = __ =
@@ -146,8 +148,9 @@ int _z; // dummy, Trr doesn't set z flag
 // after the RHS...
 //
 // ops:
-//  1: LD? 3: CP? 4: ADC
-//   0: ST?
+//  1: LDx 3: CPx 4: ADC
+//  0: STx
+//  5: INC 6: DEC
 int* after(byte *r, int rwc, int line, byte cmp) {
   static int _;
 
@@ -160,18 +163,21 @@ int* after(byte *r, int rwc, int line, byte cmp) {
   int a = __ & 0xffff;
   byte v;
 
-  if (rwc==1 || rwc==3 || rwc==4) { // LD? - READ
+  // memory operation
+  if (rwc==1 || rwc==3 || rwc==4 || rwc==5 || rwc==6) {
     if (isAddress) {
       v = mem[a];  
     } else { // immediate
       v = a;
     }
 
-    if (rwc==4) { // adc
+    if (rwc==5) v++; // inc
+    else if (rwc==6) v=v-1+256; // dec
+    else if (rwc==4) { // adc
       c = (*r + v > 255);
       *r += v + c;
     } else {
-      *r = v;
+      *r = v & 0xff;
     }
 
     if (rwc==3) { // compare, set C
@@ -179,7 +185,8 @@ int* after(byte *r, int rwc, int line, byte cmp) {
       v = cmp - v;
     }
 
-  } else if (rwc==2) { // ST? - WRITE
+  } else if (rwc==2) {
+    // Write operation STx INC DEC
     if (isAddress) {
       v = mem[a] = *r;
     } else {
