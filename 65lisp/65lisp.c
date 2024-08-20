@@ -10,11 +10,66 @@
 
 // ---------------- Lisp Datatypes
 
-// -- Cons
-
 typedef int L;
 const int nil= 0; // hmmm
 int quote= 1; // hmmm, lol
+
+// Encoding of lisp values:
+//
+// 7654 3210  7654 3210
+// ---------  ---------
+// 0000 0000  0000 0000
+// iiii iiii  iiii iii0 = mini-int
+// cccc cccc  cccc cc11 = cons 16K index
+//                   01 = -
+//                 0001 = neg int
+//                 0101 = allocated int
+//                 0101 = atom
+//                 1101 = string
+
+// 000 0 mint ...
+// 001 0
+// 010 0
+// 011 0   [0..32K[
+// 100 0
+// 101 0
+// 110 0
+// 111 0 ... mint
+
+// 00 01
+// 01 01
+// 10 01
+// 11 01 
+
+// 00 11 = cons
+// 01 11 = floats/double
+// 10 11 = strings
+// 11 11 = nil, atoms
+
+// 0--32+2=       34K ints (+2048 haha!)
+// 34--48 = 16-2= 14K string/atom/wfsh
+// 48--64 =       16K cons cells
+
+//       0 miniint 32K
+//
+//  00 0 1 -microint
+//  01 0 1 *int
+
+//  10 0 1 atom
+//  11 0 1 string
+
+//     1 1 cons
+
+// 16 bits === 5*3
+
+// 0 0   positive small numbers
+// 0 1   cons
+// 1 0   negative numbers
+// 1 1   cons
+
+// (/ 65536 4) = 16K cons max
+//
+// -- Cons
 
 // can't be bigger than 32K
 // should be dynamic, allocate page by page?
