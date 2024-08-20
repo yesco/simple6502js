@@ -45,44 +45,37 @@ char* bfix(char* a) {
 }
 
 char* badd(char* a, char* b) {
-  int na= strlen(a), nb= strlen(b), l= (na>nb? na: nb)+3;
-  char r[l];
+  int na= strlen(a), nb= strlen(b), l= (na>nb? na: nb)+1;
+  char r[l+1]; // one for zero termination
   int c= 0;
-  memset(r, 0, l);
-  //memset(r, '0', l-1);
-  putchar('>'); bprint(r); putchar('\n');
-  for(int i=0; i<=l; i++) {
+  memset(r, 0, l+1);
+  // loop one less than length
+  for(int i=0; i<l; i++) {
     c+= (i<na? a[i]-'0': 0) + (i<nb? b[i]-'0': 0);
     r[i]= (c%10) + '0';
     c/= 10;
   }
   assert(!c);
-  bprint(a); putchar('+'); bprint(b); putchar('=');
-  bprint(r); putchar('\n');
+  //bprint(a); putchar('+'); bprint(b); putchar('=');
+  //bprint(r); putchar('\n');
   
   return bfix(r);
 }
 
-// TODO: something in bmul corrupts memory???
 char* bmul(char* a, char* b) {
-  // "simulate" mul - gives no error...
-  return b==b?strdup(a):0;
-
   int na= strlen(a), nb= strlen(b), l= na+nb+3;
   char r[l];
   memset(r, 0, l);
   for(int ia=0; ia<na; ia++) {
     for(int ib=0; ib<nb; ib++) {
       int i= ia+ib;
-      //assert(isdigit(a[ia]));
-      //assert(isdigit(b[ib]));
       int c= (a[ia]-'0') * (b[ib]-'0');
       if (!r[i]) r[i]= '0'; // make sure has digit
       if (0) printf("\t%c * %c = %d\n", a[ia], b[ib], c);
       while(c>0) {
         int v= r[i];
         if (v) v-= '0';
-        c= v+c;
+        c+= v;
         r[i++]= (c%10) + '0';
         assert(i<l);
         c/= 10;
@@ -173,25 +166,24 @@ int main(int argc, char** argv) {
   char *fa= strdup("0"), *fb= strdup("1");
   char *fac= strdup("1"), *n= strdup("1");
   while(1) {
-    //printf("[H[2J[3J"); putchar('\n');
-    bprint(n); putchar('\n');
+    printf("[H[2J[3J"); putchar('\n');
+    printf("n= "); bprint(n); putchar('\n');
     putchar('\n');
     char* nf= bmul(fac, n);
     char* of= fac; fac= nf;
     char* nn= badd(n, "1");
-    bprint(n); putchar('\n');
     free(n);
     n= nn;
 
-    bprint(fa); putchar('\n');
+    printf("fib(n)= "); bprint(fa); putchar('\n');
     char* fc= badd(fa, fb);
     free(fa);
     fa= fb; fb= fc;
 
-    //bprint(of); putchar('\n');
+    printf("fac(n)= "); bprint(of); putchar('\n');
     free(of);
 
-    //usleep(1000*1000);
+    usleep(10*1000);
   }
 }
 
