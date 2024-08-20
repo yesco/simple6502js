@@ -21,36 +21,41 @@
 //   2. do arith on bytes where each byte holds two digits (00-99)
 //   3. don't malloc?
 
+// TODO: for 6502 compiler cc65
+//   - no dyn array, only constant...
+//   - no usleep()
+//   - strlen() limited to 255
+
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h> // isdigit
+#include <string.h>
 
 int bprint(char* a) {
-  int n= strlen(a);
-  for(int i=n-1; i>=0; i--)
+  int n= strlen(a), i;
+  for(i=n-1; i>=0; i--)
     putchar(a[i]);
   return n;
 }
 
 char* bfix(char* a) {
-  int n= strlen(a), first= 1;
-  for(int i=n-1; i>=0; i--) {
+  int n= strlen(a), first= 1, i;
+  for(i=n-1; i>=0; i--) {
     if (a[i]>'0') break;
     a[i]= 0;
     n--;
   }
-  char* r= strndup(a, n);
-  assert(r);
-  return r;
+  //return strndup(a, n);
+  return strdup(a);
 }
 
 char* badd(char* a, char* b) {
   int na= strlen(a), nb= strlen(b), l= (na>nb? na: nb)+1;
   char r[l+1]; // one for zero termination
-  int c= 0;
+  int c= 0, i;
   memset(r, 0, l+1);
   // loop one less than length
-  for(int i=0; i<l; i++) {
+  for(i=0; i<l; i++) {
     c+= (i<na? a[i]-'0': 0) + (i<nb? b[i]-'0': 0);
     r[i]= (c%10) + '0';
     c/= 10;
@@ -63,15 +68,14 @@ char* badd(char* a, char* b) {
 }
 
 char* bmul(char* a, char* b) {
-  int na= strlen(a), nb= strlen(b), l= na+nb+3;
+  int na= strlen(a), nb= strlen(b), l= na+nb+3, ia, ib;
   char r[l];
   memset(r, 0, l);
-  for(int ia=0; ia<na; ia++) {
-    for(int ib=0; ib<nb; ib++) {
+  for(ia=0; ia<na; ia++) {
+    for(ib=0; ib<nb; ib++) {
       int i= ia+ib;
       int c= (a[ia]-'0') * (b[ib]-'0');
       if (!r[i]) r[i]= '0'; // make sure has digit
-      if (0) printf("\t%c * %c = %d\n", a[ia], b[ib], c);
       while(c>0) {
         int v= r[i];
         if (v) v-= '0';
@@ -80,7 +84,6 @@ char* bmul(char* a, char* b) {
         assert(i<l);
         c/= 10;
       }
-      if (0) printf("...i=%d\n", i);
     }
   }
   
@@ -88,12 +91,11 @@ char* bmul(char* a, char* b) {
 }
 
 int bxsub(char* r, char* s, int d) {
-  int nr= strlen(r), ns= strlen(s), c=0;
+  int nr= strlen(r), ns= strlen(s), c=0, i;
   char x[nr+1];
   strcpy(x, r);
-  for(int i=ns-1; i>=0; i--) {
+  for(i=ns-1; i>=0; i--) {
     int ix= i+d;
-    if (0) printf("...%c %c\n", x[ix], s[i]);
     c= (x[ix]-'0') - (s[i]-'0');
     if (c<0) {
       // borrow
@@ -118,72 +120,61 @@ char* bdiv(char* a, char* b) {
   memset(r, 0, na+1);
   strcpy(s, a);
   // hmmm?
-  memset(r, '0', sizeof(r)-1);
+  memset(r, '0', na+1-1);
 
   d= na-nb;
   while(d>=0) {
-    if (0) {
-      printf("---\n");
-      bprint(s); putchar('\n');
-      for(int j=0; j<i; j++) putchar(' ');
-      bprint(b); putchar('\n'); putchar('\n');
-    }
-
-    while(bxsub(s, b, d)) {
-      r[d]++;
-
-      if (0) {
-        bprint(s); putchar('\n');
-        for(int j=0; j<i; j++) putchar(' ');
-        bprint(b); putchar('\n');
-        bprint(r); putchar('\n'); putchar('\n');
-      }
-    }
+    while(bxsub(s, b, d)) r[d]++;
     d--; i++;
   }
  
   return bfix(r);
 }
 
+// ENDWCOUNT
+
 #include <stdlib.h>
 #include <unistd.h>
 
-int main(int argc, char** argv) {
-  if (0) {
-    char* a= strdup("54321000  ");
-    bprint(bfix(a)); putchar('\n');
-    bprint(badd("1234", "12345")); putchar('\n');
-    bprint(bmul("999", "999")); putchar('\n');
-    bprint(bdiv("1248", "12")); putchar('\n');
-    bprint(bdiv("9", "7")); putchar('\n');
-  }
+//int main(int argc, char** argv) {
+int main(void) {
+  char* a= strdup("54321000  ");
+  bprint(bfix(a)); putchar('\n');
+  bprint(badd("1234", "12345")); putchar('\n');
+  bprint(bmul("999", "999")); putchar('\n');
+  bprint(bdiv("1248", "12")); putchar('\n');
+  bprint(bdiv("9", "7")); putchar('\n');
 
   // TODO: this fails later? WTF?
   // memory overwrite?
   bprint(badd("61", "1")); putchar('\n');
 
   printf("\n\nFIB\n");
-  char *fa= strdup("0"), *fb= strdup("1");
-  char *fac= strdup("1"), *n= strdup("1");
-  while(1) {
-    printf("[H[2J[3J"); putchar('\n');
-    printf("n= "); bprint(n); putchar('\n');
-    putchar('\n');
-    char* nf= bmul(fac, n);
-    char* of= fac; fac= nf;
-    char* nn= badd(n, "1");
-    free(n);
-    n= nn;
+  if (1) {
+    char *fa= strdup("0"), *fb= strdup("1");
+    char *fac= strdup("1"), *n= strdup("1");
+    while(1) {
+      char *nf, *of, *nn, *fc;
+      printf("[H[2J[3J"); putchar('\n');
+      printf("n= "); bprint(n); putchar('\n');
+      putchar('\n');
+      nf= bmul(fac, n);
+      of= fac; fac= nf;
+      nn= badd(n, "1");
+      free(n);
+      n= nn;
 
-    printf("fib(n)= "); bprint(fa); putchar('\n');
-    char* fc= badd(fa, fb);
-    free(fa);
-    fa= fb; fb= fc;
+      printf("fib(n)= "); bprint(fa); putchar('\n');
+      fc= badd(fa, fb);
+      free(fa);
+      fa= fb; fb= fc;
 
-    printf("fac(n)= "); bprint(of); putchar('\n');
-    free(of);
+      printf("fac(n)= "); bprint(of); putchar('\n');
+      free(of);
 
-    usleep(10*1000);
+      usleep(10*1000);
+    }
   }
+  
+  return 0;
 }
-
