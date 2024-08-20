@@ -135,7 +135,7 @@ var _fdnext = 4;
 var _fnames = {};
 
 // https://stackoverflow.com/questions/6287297/reading-content-from-url-with-node-js
-{
+if (0) {
   //let fd = _fopen('blockfile.4th');
   let fd = _fopen('index.html');
   if (fd !== 4) 
