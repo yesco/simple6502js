@@ -1,0 +1,21 @@
+rm hello.tap
+rm hello.out
+rm hello.o
+rm hello.s
+
+# TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
+# TODO: linker -D __AUTORUN__=$C7
+
+echo
+cl65 -O -t atmos hello.c -o hello.tap
+cl65 -O -t atmos hello.c
+cc65 -O hello.c
+
+echo
+ls -l hello.*
+
+# simulation
+echo
+cl65 -O -t sim6502 hello.c -o hello.out
+echo "=== RUN ==="
+sim65 -c hello.out ; echo "--- EXIT=$? ---"

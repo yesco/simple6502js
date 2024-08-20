@@ -1,0 +1,22 @@
+rm 65lisp.tap
+rm 65lisp.out
+rm 65lisp.o
+rm 65lisp.s
+
+# TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
+# TODO: linker -D __AUTORUN__=$C7
+
+echo
+cl65 -O -t atmos 65lisp.c -o 65lisp.tap || exit 72
+echo
+cl65 -O -t atmos 65lisp.c 2>/dev/null
+cc65 -O 65lisp.c 2>/dev/null
+
+echo
+ls -l hello.*
+
+# simulation
+echo
+cl65 -O -t sim6502 65lisp.c -o 65lisp.out 2>/dev/null
+echo "=== RUN ==="
+sim65 -c 65lisp.out ; echo "--- EXIT=$? ---"
