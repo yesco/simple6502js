@@ -340,13 +340,15 @@ L lread() {
     unc(c);
     return mknum(n);
   }
-  if (isatomchar(c)) { // symbol
-    char n= 0, s[MAXSYMLEN+1]= {0};
+  if (c=='|' || isatomchar(c)) { // symbol
+    char q=(c=='|'), n= 0, s[MAXSYMLEN+1]= {0};
+    if (q) c= nextc();
     do {
       s[n++]= c;
+      printf("ATOM: '%c'\n", c);
       c= nextc();
       // TODO: breaking chars: <spc>'"()
-    } while(c && isatomchar(c) && n<MAXSYMLEN);
+    } while(c && ((q && c!='|') || (!q && isatomchar(c))) && n<MAXSYMLEN);
     return atom(s);
   }
   if (c=='\'') return cons(quote, lread());
@@ -382,17 +384,22 @@ L prin1(L x) {
   } else if (numberp(x)) {
     printf("%d", num(x));
   } else if (atomp(x)) {
+    // TODO: if |foo  bar| input => prin1 should print s
     printf("%s", atomstr(x));
     //printf("%s|%d|#%2x", atomstr(x), (x>>2), hash(atomstr(x)));
-  // TODO: strings
+  // TODO: strings - or for now use atoms?
   //} else if (stringp(x)) {
   }
   return x;
 }
 
+L terpri() {
+  putchar('\n');
+}
+
 L print(L x) {
   L r= prin1(x);
-  putchar('\n');
+  terpri();
   return r;
 }
 
