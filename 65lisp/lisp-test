@@ -1,0 +1,2 @@
+cat 150.words 150.words 150.words 150.words | ./run
+time (echo "42 (1 2 (3 4) 5) (nil) (()) foo bar foobar foo foobar" | ./run)

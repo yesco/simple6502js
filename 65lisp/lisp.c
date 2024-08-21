@@ -9,19 +9,27 @@
 
 // ---------------- CONFIG
 
+// change to see lisp.tap file size!
+#ifdef TESTCODESIZE
+//#ifndef TESTCODESIZE
+  #define MAXCELL 1
+  #define ARENA_LEN 1
+  #define HASH 1
+#else
 // Number of cells (2 makes a cons)
 //   can't be bigger than 32K
 //   should be dynamic, allocate page by page?
-#define MAXCELL 29*1024/2
+  #define MAXCELL 29*1024/2
 
 // Arena len to store symbols/constants (and global ptr)
-#define ARENA_LEN 1024
+  #define ARENA_LEN 1024
 
 // Defined to use hash-table (with Arena
-#define HASH 256
+  #define HASH 256
+#endif
+
 
 // ---------------- Lisp Datatypes
-
 typedef int L;
 const int nil= 0; // hmmm
 int quote= 1; // hmmm, lol
@@ -171,10 +179,9 @@ void printarena() {
   }
   putchar('\n');
 }
-#endif
 
 // search arena, this could save next link...
-void* searchatom(char* s) {
+void* searchatom2(char* s) {
   char* a= arena;
   a= arena;
   // TODO: more efficient
@@ -184,6 +191,25 @@ void* searchatom(char* s) {
   }
   return NULL;
 }
+
+// slower, lol!
+void* searchatom(char* s) {
+  char *a= arena, *p, *aa;
+  while(a<arptr) {
+    aa= a;
+    a+= 4;
+    p= s;
+    //printf("\t%d '%s'\n", aa-arena, a);
+    while(*a && *a==*p) {
+      ++p; ++a;
+    }
+    if (!*a && *a==*p) return aa;
+    while(*a) ++a;
+    ++a;
+  }
+  return NULL;
+}
+#endif
 
 // search linked list
 void* findatom(char* a, char* s) {
@@ -218,8 +244,9 @@ L atom(char* s) {
 
 #ifdef HASH
   h= hash(s);
-  // p= searchatom(s);
-  p= findatom(syms[h], s);
+  //p= searchatom(s);  // slower 24s for 4x150.words
+  //p= searchatom2(s); // slower 32s for 4x150.words
+  p= findatom(syms[h], s); // fast 14s for 4x150.words
   if (!p) {
     printf("--NEW: %s HASH=%x\n", s, h);
     p= arptr;
@@ -364,8 +391,8 @@ L prin1(L x) {
   } else if (numberp(x)) {
     printf("%d", num(x));
   } else if (atomp(x)) {
-    //printf("%s", atomstr(x));
-    printf("%s|%d|#%2x", atomstr(x), (x>>2), hash(atomstr(x)));
+    printf("%s", atomstr(x));
+    //printf("%s|%d|#%2x", atomstr(x), (x>>2), hash(atomstr(x)));
   // TODO: strings
   //} else if (stringp(x)) {
   }

@@ -7,17 +7,17 @@ rm lisp.s    2>/dev/null
 # TODO: linker -D __AUTORUN__=$C7
 
 echo
+cl65 -O -t sim6502 lisp.c -o lisp.out -m lisp.map 2>/dev/null
 cl65 -O -t atmos lisp.c -o lisp.tap || exit 72
 echo
 cl65 -O -t atmos lisp.c 2>/dev/null
 cc65 -O lisp.c 2>/dev/null
 
 echo
-ls -l hello.*
+ls -l lisp.*
 
 # simulation
 echo
-cl65 -O -t sim6502 lisp.c -o lisp.out 2>/dev/null
 echo "=== RUN ==="
 (time sim65 -c lisp.out ; echo "--- EXIT=$? ---") | tee lisp.log
 echo
