@@ -23,7 +23,7 @@
 
 // ---------------- Lisp Datatypes
 typedef int L;
-const int nil= 0; // hmmm
+const int nil= 0; // hmmm DEFINE faster?
 int quote= 1; // hmmm, lol
 
 // Encoding of lisp values:
@@ -101,10 +101,18 @@ L car(L c) {
   return consp(c)? cell[c>>2]: nil;
 }
 
+L setcar(L c, L a) {
+  return consp(c)? cell[c>>2]= a: nil;  
+}
+
+
 L cdr(L c) {
   return consp(c)? cell[(c>>2)+1]: nil;
 }
 
+L setcdr(L c, L d) {
+  return consp(c)? cell[(c>>2)+1]= d: nil;  
+}
 
 
 // --- Atoms / Symbols / Constants
@@ -155,6 +163,16 @@ char* atomstr(L x) {
   if (!x) return "nil";
   if (!atomp(x)) return NULL;
   return arena + 4 + (x>>2); //ENC
+}
+
+L atomval(L x) {
+  if (!atomp(x)) return nil;
+  return arena[2+(x>>2)]; //ENC
+}
+
+L setatomval(L x, L v) {
+  if (!x || !atomp(x)) return nil;
+  return *(int*)(arena+2+(x>>2))= v;
 }
 
 L print(L); // forward TODO: remove
@@ -345,7 +363,6 @@ L lread() {
     if (q) c= nextc();
     do {
       s[n++]= c;
-      printf("ATOM: '%c'\n", c);
       c= nextc();
       // TODO: breaking chars: <spc>'"()
     } while(c && ((q && c!='|') || (!q && isatomchar(c))) && n<MAXSYMLEN);
@@ -360,8 +377,33 @@ L lread() {
   return -2;
 }
 
+L setval(L x, L v, L e) {
+  L p;
+  while(e) {
+    p= car(e);
+    if (car(p)==x) return setcdr(p, v);
+    e= cdr(e);
+  }
+  return setatomval(x, v); // GLOBAL
+}
+
+L getval(L x, L e) {
+  L p;
+  while(e) {
+    p= car(e);
+    if (car(p)==x) return cdr(p);
+    e= cdr(e);
+  }
+  return atomval(x); // GLOBAL
+}
+
 L eval(L x, L e) {
-  return e?x:x;
+  if (!x || numberp(x) || stringp(x)) return x;
+  if (atomp(x)) return getval(x, e);
+  if (consp(x)) {
+  }
+  printf("%%LISP: unknown data type %04x\n", x);
+  abort();
 }
 
 // print unquoted value without space before/after
@@ -404,16 +446,21 @@ L print(L x) {
 }
 
 int main() {//int argc, char** argv) {
-  L r, env= nil;
+  L r, x, env= nil;
 
   //clrscr(); // in conio but linker can't find (in sim?)
 
+  setval(atom("bar"), mknum(33), nil);
+
+  env= cons(cons(atom("foo"), mknum(42)), env);
   do {
     printf("65> ");
-    r= eval(lread(), env);
+    x= lread();
+    r= eval(x, env);
     print(r);
-  } while (r);
+  } while (!feof(stdin));
 
+  // TODO: remove?
   printf("\n\nExiting 65lisp\nBye\n\n");
   return 0;
 }
