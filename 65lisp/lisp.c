@@ -13,7 +13,7 @@
 //   can't be bigger than 32K
 //   should be dynamic, allocate page by page?
 //   DECREASE if run out of memory. LOL
-#define MAXCELL 29*1024/2
+#define MAXCELL 28*1024/2
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 1024
@@ -87,6 +87,7 @@ int ncell= 0;
 L cell[MAXCELL]= {0};
 
 L prin1(L); // forward TODO: remove
+L terpri();
 
 L cons(L a, L d) {
   cell[ncell++]= a;
@@ -397,11 +398,46 @@ L getval(L x, L e) {
   return atomval(x); // GLOBAL
 }
 
+L eval(L x, L e); // forward
+
+L apply(L s, L a, L e) {
+  L f= s;
+
+  if (s==atom("+")) {
+    int v= 0;
+    while(a) {
+      v+= num(eval(car(a), e));
+      a= cdr(a);
+    }
+    return mknum(v);
+  }
+  
+  if (s==atom("*")) {
+    int v= 1;
+    while(a) {
+      v*= num(eval(car(a), e));
+      a= cdr(a);
+    }
+    return mknum(v);
+  }
+  
+  while (atomp(f)) f= eval(s, e);
+  if (!f) {
+    printf("%%LISP: No such function: "); prin1(s); terpri();
+    return nil;
+  }
+  if (consp(f)) {
+    printf("LAMBDA: %s\n");
+    return nil;
+  }
+  //if (primp(f)) ;
+  return nil;
+}
+
 L eval(L x, L e) {
   if (!x || numberp(x) || stringp(x)) return x;
   if (atomp(x)) return getval(x, e);
-  if (consp(x)) {
-  }
+  if (consp(x)) return apply(car(x), cdr(x), e);
   printf("%%LISP: unknown data type %04x\n", x);
   abort();
 }
@@ -437,6 +473,7 @@ L prin1(L x) {
 
 L terpri() {
   putchar('\n');
+  return nil;
 }
 
 L print(L x) {
