@@ -9,25 +9,17 @@
 
 // ---------------- CONFIG
 
-// change to see lisp.tap file size!
-#ifdef TESTCODESIZE
-//#ifndef TESTCODESIZE
-  #define MAXCELL 1
-  #define ARENA_LEN 1
-  #define HASH 1
-#else
 // Number of cells (2 makes a cons)
 //   can't be bigger than 32K
 //   should be dynamic, allocate page by page?
-  #define MAXCELL 29*1024/2
+//   DECREASE if run out of memory. LOL
+#define MAXCELL 29*1024/2
 
 // Arena len to store symbols/constants (and global ptr)
-  #define ARENA_LEN 1024
+#define ARENA_LEN 1024
 
 // Defined to use hash-table (with Arena
-  #define HASH 256
-#endif
-
+#define HASH 256
 
 // ---------------- Lisp Datatypes
 typedef int L;

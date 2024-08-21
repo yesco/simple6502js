@@ -23,6 +23,14 @@ echo "=== RUN ==="
 echo
 (echo "`grep ' cycles' lisp.log | sed -e 's/ cycles//'` /2/1024/1024" | bc -l ; echo "seconds simulated time");
 
+echo
+grep '^Name' lisp.map
+grep '^CODE' lisp.map
+grep '^RODATA' lisp.map
+grep '^DATA' lisp.map
+echo
+
+
 
 
 
