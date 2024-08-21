@@ -5,11 +5,12 @@
 
 int main() {//int argc, char** argv) {
   char foo[16]= {0};
-  int a;
+  int a, x= 0;
 
   //clrscr(); // in conio but linker can't find (in sim?)
   //kbhit();
 
+#ifdef FOO
   // output test
   printf("printf Hello World\n");
   printf("\n"); // each printf is 100 bytes more???
@@ -32,5 +33,55 @@ int main() {//int argc, char** argv) {
   a= getchar();
   printf("getchar=%d and '%c'\n", a, a);
 
-  return 7;
+#endif
+
+  for(a=32767; a>0; --a) {
+
+// SWITCH is faster 2.98s 
+#ifndef ONE
+#ifdef TWO
+    // 2.98s
+    switch(a) {
+    case 0: x+= 44; break;
+    case 1: x+= 27; break;
+    case 2: x+= 12; break;
+    case 3: x+= 14; break;
+    case 4: x+= 22; break;
+    case 5: x+= 01; break;
+    case 6:
+    case 7: x+= a; break;
+    default: ++x; break;
+    //default: x++; break; // 3.43s
+    }
+#else
+    // same as TWO above: 2.97s
+    switch(a) {
+    case 'a': x+= 44; break;
+    case 'x': x+= 27; break;
+    case 'z': x+= 12; break;
+    case 'Q': x+= 14; break;
+    case 'F': x+= 22; break;
+    case 0: x+= 01; break;
+    case 32:
+    case 42: x+= a; break;
+    default: ++x; break;
+    //default: x++; break; // 3.43s
+    }
+#endif
+#else
+    // 3.62s
+    if (a==0) x+= 44; else
+    if (a==1) x+= 27; else
+    if (a==2) x+= 12; else
+    if (a==3) x+= 14; else
+    if (a==4) x+= 22; else
+    if (a==5) x+= 01; else
+    if (a==6 || a==7) x+= a;
+    else ++x;
+#endif
+  }
+  printf("a=%d\n", a);
+
+  return 0;
+//  return 7;
 }

@@ -13,7 +13,7 @@
 //   can't be bigger than 32K
 //   should be dynamic, allocate page by page?
 //   DECREASE if run out of memory. LOL
-#define MAXCELL 28*1024/2
+#define MAXCELL 26*1024/2
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 1024
@@ -23,8 +23,9 @@
 
 // ---------------- Lisp Datatypes
 typedef int L;
-const int nil= 0; // hmmm DEFINE faster?
-int quote= 1; // hmmm, lol
+
+const L nil= 0; // hmmm DEFINE faster?
+L error, quote;
 
 // Encoding of lisp values:
 //
@@ -87,7 +88,9 @@ int ncell= 0;
 L cell[MAXCELL]= {0};
 
 L prin1(L); // forward TODO: remove
-L terpri();
+
+// smaller!
+#define terpri() putchar('\n')
 
 L cons(L a, L d) {
   cell[ncell++]= a;
@@ -95,26 +98,19 @@ L cons(L a, L d) {
   return ((ncell-2)<<2)+3;
 }
 
-// TODO: make macro
+// macro takes less code than funcall, and is faster
 #define consp(c) (((c)&3)==3)
 
-L car(L c) {
-  return consp(c)? cell[c>>2]: nil;
-}
+// unsafe macro 10% faster,but uses 80 bytes more
+// make sure it's consp first (in loop)!
+#define CAR(c) (cell[ (c)>>2   ])
+#define CDR(c) (cell[((c)>>2)+1])
 
-L setcar(L c, L a) {
-  return consp(c)? cell[c>>2]= a: nil;  
-}
-
-
-L cdr(L c) {
-  return consp(c)? cell[(c>>2)+1]: nil;
-}
-
-L setcdr(L c, L d) {
-  return consp(c)? cell[(c>>2)+1]= d: nil;  
-}
-
+// returning nil is faster than 0! (1%)
+L car(L c)         { return consp(c)? CAR(c): nil; }
+L setcar(L c, L a) { return consp(c)? CAR(c)= a: nil; }
+L cdr(L c)         { return consp(c)? CDR(c): nil; }
+L setcdr(L c, L d) { return consp(c)? CDR(c)= d: nil; } 
 
 // --- Atoms / Symbols / Constants
 // 
@@ -166,9 +162,13 @@ char* atomstr(L x) {
   return arena + 4 + (x>>2); //ENC
 }
 
+// 3% cost of atomp()
+#define ATOMVAL(x) (arena[2+((x)>>2)]) // ENC
+//#define atomval(x) (atomp(x)?arena[2+((x)>>2)]:nil)
+
 L atomval(L x) {
   if (!atomp(x)) return nil;
-  return arena[2+(x>>2)]; //ENC
+  return ATOMVAL(x);
 }
 
 L setatomval(L x, L v) {
@@ -286,22 +286,22 @@ L atom(char* s) {
 // How to distinguish?
 // TODO: if read-eval => "program"
 
-L stringp(L x) {
-  return x?0:0;
-}
-
+// 3 % faster and smaller code
+#define stringp(x) (0)
 
 // --- Numbers
 
-L numberp(L x) {
-  return (!(x&1));
-}
+// macor smaller code and 10% faster
+#define numberp(x) (!((x)&1))
+
+#define NUM(x) ((x)/2-1)
 
 int num(L x) {
   if (!numberp(x)) return 0; // "safe"
-  return x/2-1;
+  return NUM(x);
 }
 
+// no need inline/macro
 L mknum(int n) {
   // TODO: negatives?
   assert(n >= 0);
@@ -367,70 +367,55 @@ L lread() {
       c= nextc();
       // TODO: breaking chars: <spc>'"()
     } while(c && ((q && c!='|') || (!q && isatomchar(c))) && n<MAXSYMLEN);
+    if (!q) unc(c);
     return atom(s);
   }
-  if (c=='\'') return cons(quote, lread());
-  if (c=='"') { // string
-    assert(!"NIY: strings use atom?");
-  }
+  if (c=='\'') return cons(quote, cons(lread(), nil));
+  //if (c=='"') { // string
+    //assert(!"NIY: strings use atom?");
+//}
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
-  return -2;
+  return error;
+}
+
+L assoc(L x, L l) {
+  L p;
+  while(l) {
+    p= car(l);
+    if (car(p)==x) return cdr(p);
+    l= cdr(l);
+  }
+  return nil;
 }
 
 L setval(L x, L v, L e) {
-  L p;
-  while(e) {
-    p= car(e);
-    if (car(p)==x) return setcdr(p, v);
-    e= cdr(e);
-  }
+  L p= assoc(x, e);
+  if (p) return setcdr(p, v);
   return setatomval(x, v); // GLOBAL
 }
 
 L getval(L x, L e) {
-  L p;
-  while(e) {
-    p= car(e);
-    if (car(p)==x) return cdr(p);
-    e= cdr(e);
-  }
+  L p= assoc(x, e);
+  if (p) return cdr(p);
   return atomval(x); // GLOBAL
 }
 
 L eval(L x, L e); // forward
+L apply(L f, L a, L e); // forward
 
-L apply(L s, L a, L e) {
-  L f= s;
+// primops()
+#include "al.c"
 
-  if (s==atom("+")) {
-    int v= 0;
-    while(a) {
-      v+= num(eval(car(a), e));
-      a= cdr(a);
-    }
-    return mknum(v);
-  }
-  
-  if (s==atom("*")) {
-    int v= 1;
-    while(a) {
-      v*= num(eval(car(a), e));
-      a= cdr(a);
-    }
-    return mknum(v);
-  }
-  
-  while (atomp(f)) f= eval(s, e);
-  if (!f) {
-    printf("%%LISP: No such function: "); prin1(s); terpri();
-    return nil;
-  }
-  if (consp(f)) {
-    printf("LAMBDA: %s\n");
-    return nil;
-  }
-  //if (primp(f)) ;
+L apply(L f, L a, L e) {
+  // TODO: trace
+  //terpri();
+  //printf("F= "); print(f);
+  //printf("A= "); print(a);
+  //printf("E= "); print(e);
+  if (atomp(f)) return primop(NUM(ATOMVAL(f)), a, e);
+
+  assert(!"UDF?"); // TODO:
   return nil;
 }
 
@@ -471,19 +456,83 @@ L prin1(L x) {
   return x;
 }
 
-L terpri() {
-  putchar('\n');
-  return nil;
-}
-
 L print(L x) {
   L r= prin1(x);
   terpri();
   return r;
 }
 
+void regc(char* name, char n) {
+  L a= atom(name);
+  setatomval(a, mknum(n)); // TODO: overhead
+}
+
+void reg(char* charspacename) {
+  char c= *charspacename;
+  regc(charspacename+2, c);
+}
+
+// TODO: point to these in arena?
+
+char* names[]= {
+  // nargs
+  ": de", ": define", ": defun",
+  "; df",
+  "I if",
+  "R read",
+  "\' quote",
+  "\\ lambda",
+
+  "* *",
+  "+ +",
+  "L list",
+  "H append",
+  
+  // one arg
+  "A car",
+  "D cdr",
+  "K consp",
+  "O length",
+  "P print",
+  "T terpri",
+  "U null",
+  "W prin1",
+
+  // two args
+  "% %",
+  "& &",
+  "- -",
+  "/ /",
+  "| |",
+
+  "C cons",
+  "B member",
+  "G assoc",
+  "M mapcar",
+  "N nth",
+  NULL};
+
+void initlisp() {
+  char** s= names;
+
+  error= atom("ERROR");
+  quote= atom("quote");
+
+  while(*s) {
+    reg(*s);
+    ++s;
+  }
+}
+
 int main() {//int argc, char** argv) {
+  int i;
   L r, x, env= nil;
+
+  // TODO: define way to test, and measure clocks ticks
+  //int n= 10000;
+  int n= 1;
+
+  initlisp();
 
   //clrscr(); // in conio but linker can't find (in sim?)
 
@@ -493,7 +542,8 @@ int main() {//int argc, char** argv) {
   do {
     printf("65> ");
     x= lread();
-    r= eval(x, env);
+    for(i=n; i>0; --i)
+      r= eval(x, env);
     print(r);
   } while (!feof(stdin));
 

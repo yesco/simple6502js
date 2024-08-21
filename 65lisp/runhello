@@ -7,6 +7,7 @@ rm hello.s
 # TODO: linker -D __AUTORUN__=$C7
 
 echo
+cl65 -O -t sim6502 hello.c -o hello.out -m hello.map
 cl65 -O -t atmos hello.c -o hello.tap
 cl65 -O -t atmos hello.c
 cc65 -O hello.c
@@ -16,6 +17,14 @@ ls -l hello.*
 
 # simulation
 echo
-cl65 -O -t sim6502 hello.c -o hello.out
 echo "=== RUN ==="
-sim65 -c hello.out ; echo "--- EXIT=$? ---"
+(time sim65 -c hello.out ; echo "--- EXIT=$? ---") | tee hello.log
+
+(echo "`grep ' cycles' hello.log | sed -e 's/ cycles//'` /2/1024/1024" | bc -l ; echo "seconds simulated time");
+
+echo
+grep '^Name' hello.map
+grep '^CODE' hello.map
+grep '^RODATA' hello.map
+grep '^DATA' hello.map
+echo
