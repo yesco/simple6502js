@@ -240,7 +240,6 @@ L atom(char* s) {
   //p= searchatom2(s); // slower 32s for 4x150.words
   p= findatom(syms[h], s); // fast 14s for 4x150.words
   if (!p) {
-    printf("--NEW: %s HASH=%x\n", s, h);
     p= arptr;
     pi= (void**)p;
     arptr+= 4+1+strlen(s);
