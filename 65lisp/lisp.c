@@ -307,11 +307,13 @@ int num(L x) {
   return NUM(x);
 }
 
+#define MKNUM(n) (((n)+1)*2)
+
 // no need inline/macro
 L mknum(int n) {
   // TODO: negatives?
   assert(n >= 0);
-  return (n+1)*2;
+  return MKNUM(n);
 }
 
 // ---------------- IO
@@ -536,6 +538,40 @@ void initlisp() {
   }
 }
 
+#define PERFTEST
+int fib(int n) {
+  if (n<2) return n;
+  else return fib(n-1)+fib(n-2);
+}
+
+L lispfib(L n) {
+  n= num(n);
+  if (n<2) return mknum(n);
+  else return mknum(num(lispfib(mknum(n-1)))+num(lispfib(mknum(n-2))));
+}
+
+L flispfib(L n) {
+  n= NUM(n);
+  if (n<2) return MKNUM(n);
+  else return MKNUM(NUM(lispfib(MKNUM(n-1)))+NUM(lispfib(MKNUM(n-2))));
+}
+
+//#define CL
+#ifdef CL
+int fib(int n) {
+  if (n<2) return n;
+  else return fib(n-1)+fib(n-2);
+}
+
+// This will FAIL with -Cl optimization!!!
+int lfib(int n) {
+  int r= n;
+  if (n>=2) { r= lfib(n-1); r+= lfib(n-2); }
+  //if (n>=2) r= lfib(n-1)+lfib(n-2); // works!
+  return r;
+}
+#endif
+
 int main(int argc, char** argv) {
   int i;
   L r, x, env= nil;
@@ -543,6 +579,25 @@ int main(int argc, char** argv) {
   // TODO: define way to test, and measure clocks ticks
   int n= 1;
 
+  #ifdef CL  
+  printf("FIB(7)= %d\n", fib(7));
+  printf("lFIB(7)= %d\n", lfib(7));
+  assert(fib(7)==lfib(7));
+  #endif
+
+  //printf("lispFIB(7)= %d\n", fib(7));
+  #ifdef PERFTEST
+  n= 21;
+  //printf("FIB(%d)= %d\n", n, fib(21)); // 21=>3s
+  //printf("lispFIB(7)= %d\n", num(lispfib(mknum(7))));
+  // same speed? lispfib and flispfib=macro
+  //printf("lispFIB(%d)= %d\n", n, num(lispfib(mknum(n)))); // 21=>17s
+  //printf("FlispFIB(%d)= %d\n", n, NUM(flispfib(MKNUM(n)))); // 21=>17s
+  #endif
+
+  initlisp();
+
+  // read args
   while (--argc) {
     ++argv;
     //printf("ARG: %s\n", *argv);
@@ -550,11 +605,19 @@ int main(int argc, char** argv) {
       n= atoi(argv[1]);
       if (n) --argc,++argc; else n= 10000;
     }
+// TODO: read from memory...
+//    if (0==strcmp("-e", *argv)) {
+//      --argc,++argc;
+//      x= lread();
+//    }
   }
 
-  //printf("TESTS=%d\n", n);
+//  r= 0;
+//  for(i=n; n>0; --n) {
+//    r+= fib(30);
+//  }
 
-  initlisp();
+  //printf("TESTS=%d\n", n);
 
   //clrscr(); // in conio but linker can't find (in sim?)
 
