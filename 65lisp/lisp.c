@@ -1,3 +1,4 @@
+#include <stdint.h> // cc65 uses 29K extra memory???
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -22,10 +23,12 @@
 #define HASH 256
 
 // ---------------- Lisp Datatypes
-typedef int L;
+typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
-const L nil= 0; // hmmm DEFINE faster?
-L error, quote;
+// special atoms
+//const L nil= 0;
+#define nil 0 // slightly faster 0.1% !
+L error, quote=0;
 
 // Encoding of lisp values:
 //
@@ -173,7 +176,7 @@ L atomval(L x) {
 
 L setatomval(L x, L v) {
   if (!x || !atomp(x)) return nil;
-  return *(int*)(arena+2+(x>>2))= v;
+  return *(L*)(arena+2+(x>>2))= v;
 }
 
 L print(L); // forward TODO: remove
@@ -226,7 +229,7 @@ void* searchatom(char* s) {
 void* findatom(char* a, char* s) {
   while(a) {
     if (0==strcmp(s, a+4)) return a;
-    a= *(char**)(int**)a;
+    a= *(char**)(L**)a;
   }
   return NULL;
 }
@@ -240,11 +243,14 @@ L atom(char* s) {
   L r;
   char h, *p;
   void **pi;
+
+  assert(sizeof(void*)==2); // cc65, see below ptr
+
   if (0==strcmp(s, "nil")) return nil;
 
 #ifdef HEAP
   p= strdup(s);
-  r= (int)p;
+  r= (L)p; // not portable
 
   // TODO: keep list of syms?
   //p= malloc(n+2);
@@ -264,8 +270,8 @@ L atom(char* s) {
     arptr+= 4+1+strlen(s);
     assert(arptr<=arend);
     // TODO: memcpy safer? other arch
-    pi[0]= syms[h]; // prev
-    pi[1]= 0;
+    pi[0]= syms[h]; // prev ptr (maybe use offset for portability?)
+    pi[1]= nil; // global val
     strcpy(p+4, s);
     syms[h]= p;
   }
@@ -515,9 +521,15 @@ char* names[]= {
 void initlisp() {
   char** s= names;
 
+  // important assumption for cc65
+  // (supress warning: error is set later, now 0)
+  assert(sizeof(L)+error==2); 
+
+  // special symbols
   error= atom("ERROR");
   quote= atom("quote");
 
+  // register function names
   while(*s) {
     reg(*s);
     ++s;
