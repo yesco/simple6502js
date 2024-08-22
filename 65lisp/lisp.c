@@ -524,13 +524,23 @@ void initlisp() {
   }
 }
 
-int main() {//int argc, char** argv) {
+int main(int argc, char** argv) {
   int i;
   L r, x, env= nil;
 
   // TODO: define way to test, and measure clocks ticks
-  //int n= 10000;
   int n= 1;
+
+  while (--argc) {
+    ++argv;
+    //printf("ARG: %s\n", *argv);
+    if (0==strcmp("-t", *argv)) {
+      n= atoi(argv[1]);
+      if (n) --argc,++argc; else n= 10000;
+    }
+  }
+
+  //printf("TESTS=%d\n", n);
 
   initlisp();
 

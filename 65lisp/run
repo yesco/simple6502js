@@ -19,7 +19,7 @@ ls -l lisp.*
 # simulation
 echo
 echo "=== RUN ==="
-(time sim65 -c lisp.out ; echo "--- EXIT=$? ---") | tee lisp.log
+(time sim65 -c lisp.out $* ; echo "--- EXIT=$? ---") | tee lisp.log
 echo
 (echo "`grep ' cycles' lisp.log | sed -e 's/ cycles//'` /2/1024/1024" | bc -l ; echo "seconds simulated time");
 
