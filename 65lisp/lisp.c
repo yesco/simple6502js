@@ -14,7 +14,11 @@
 //   can't be bigger than 32K
 //   should be dynamic, allocate page by page?
 //   DECREASE if run out of memory. LOL
-#define MAXCELL 26*1024/2
+//#define MAXCELL 25*1024/2 // ~ 12K cells
+
+//#define MAXCELL 4096*2
+#define MAXCELL 4096*3
+//#define MAXCELL 4096*2
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 1024
@@ -89,16 +93,42 @@ L error, quote=0;
 
 int ncell= 0;
 L cell[MAXCELL]= {0};
+L* cnext= 0;
 
 L prin1(L); // forward TODO: remove
 
 // smaller!
 #define terpri() putchar('\n')
 
+// cons(1,2) gives wrong CONS values at 4092 4096-ish
+// works fine up till then if have 2*4096 cells
+
+// (* 4096 2 2)
+
+
 L cons(L a, L d) {
-  cell[ncell++]= a;
-  cell[ncell++]= d;
-  return ((ncell-2)<<2)+3;
+  //assert(ncell<MAXCELL+2); // 0.4% cost
+
+  // 4090 is fine?
+  // starts failing at 4096!!! ???
+  // (* 4096 2 2) 16384 bytes addressed? 32K I'd understand
+
+  // optimial order...
+#ifdef foo
+  cell[ncell]= a; ++ncell;
+  cell[ncell]= d; ++ncell;
+  return ((ncell-2)<<2)+3; // ENC
+#endif
+  // 1.2% faster!
+  /// also fits better with free list? hmmm?
+  *++cnext= a;
+  *++cnext= d;
+
+  // TODO: how about freelist etc?
+  assert(!(ncell&4)); // bit iii011 always zero... hmmm
+  return ncell+= 8; // 1.8% faster than ncell+2 .., 2.4% faster th ptr
+  //ncell+= 2; return ((ncell-2)<<2)+3; // ENC // faster! than ptr (unsafer..)
+  //return ((cnext-cell-1)<<2)+3; // ENC // ptr arith cost
 }
 
 // macro takes less code than funcall, and is faster
@@ -522,6 +552,9 @@ char* names[]= {
 
 void initlisp() {
   char** s= names;
+
+  // optimize linear allocation
+  cnext= cell-1; ncell= -3-2;
 
   // important assumption for cc65
   // (supress warning: error is set later, now 0)
