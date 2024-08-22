@@ -31,8 +31,11 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
 // special atoms
 //const L nil= 0;
-#define nil 0 // slightly faster 0.1% !
+//#define nil 0 // slightly faster 0.1% !
+L nil= 0, T;
 L error, quote=0;
+
+#define null(x) (x==nil)
 
 // Encoding of lisp values:
 //
@@ -105,7 +108,6 @@ L prin1(L); // forward TODO: remove
 
 // (* 4096 2 2)
 
-
 L cons(L a, L d) {
   //assert(ncell<MAXCELL+2); // 0.4% cost
 
@@ -125,6 +127,10 @@ L cons(L a, L d) {
   *++cnext= d;
 
   // TODO: how about freelist etc?
+
+  // TODO: what if enc of CONS == 01 ?? just add 4, no manipulation
+  // TODO: what if consptrs were actual pointers w offset?
+  //printf("%04x\n", cnext+1);
   assert(!(ncell&4)); // bit iii011 always zero... hmmm
   return ncell+= 8; // 1.8% faster than ncell+2 .., 2.4% faster th ptr
   //ncell+= 2; return ((ncell-2)<<2)+3; // ENC // faster! than ptr (unsafer..)
@@ -132,18 +138,18 @@ L cons(L a, L d) {
 }
 
 // macro takes less code than funcall, and is faster
-#define consp(c) (((c)&3)==3)
+#define iscons(c) (((c)&3)==3)
 
 // unsafe macro 10% faster,but uses 80 bytes more
-// make sure it's consp first (in loop)!
+// make sure it's iscons first (in loop)!
 #define CAR(c) (cell[ (c)>>2   ])
 #define CDR(c) (cell[((c)>>2)+1])
 
 // returning nil is faster than 0! (1%)
-L car(L c)         { return consp(c)? CAR(c): nil; }
-L setcar(L c, L a) { return consp(c)? CAR(c)= a: nil; }
-L cdr(L c)         { return consp(c)? CDR(c): nil; }
-L setcdr(L c, L d) { return consp(c)? CDR(c)= d: nil; } 
+L car(L c)         { return iscons(c)? CAR(c): nil; }
+L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
+L cdr(L c)         { return iscons(c)? CDR(c): nil; }
+L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
 
 // --- Atoms / Symbols / Constants
 // 
@@ -184,28 +190,27 @@ char isatomchar(char c) {
   return (char)(int)!strchr(" \t\n\r`'\"\\()[]{}", c);
 }
 
-L atomp(L x) {
-  // TODO: lol
-  return (x&3)==1; // ENC
-}
+#define isatom(x) ((x&3)==1)
 
 char* atomstr(L x) {
-  if (!x) return "nil";
-  if (!atomp(x)) return NULL;
+  //if (!x) return "nil";
+  if (!isatom(x)) return NULL;
   return arena + 4 + (x>>2); //ENC
 }
 
-// 3% cost of atomp()
+// 3% cost of isatom()
 #define ATOMVAL(x) (arena[2+((x)>>2)]) // ENC
-//#define atomval(x) (atomp(x)?arena[2+((x)>>2)]:nil)
+//#define atomval(x) (isatom(x)?arena[2+((x)>>2)]:nil)
 
 L atomval(L x) {
-  if (!atomp(x)) return nil;
+  // TODO: whcih is faster?
+  // TODO: return isatom(x)? ATOMAL(x): nil;
+  if (!isatom(x)) return nil;
   return ATOMVAL(x);
 }
 
 L setatomval(L x, L v) {
-  if (!x || !atomp(x)) return nil;
+  if (null(x) || !isatom(x)) return nil;
   return *(L*)(arena+2+(x>>2))= v;
 }
 
@@ -276,7 +281,7 @@ L atom(char* s) {
 
   assert(sizeof(void*)==2); // cc65, see below ptr
 
-  if (0==strcmp(s, "nil")) return nil;
+  //if (0==strcmp(s, "nil")) return nil;
 
 #ifdef HEAP
   p= strdup(s);
@@ -323,21 +328,21 @@ L atom(char* s) {
 // TODO: if read-eval => "program"
 
 // 3 % faster and smaller code
-#define stringp(x) (0)
+#define isstr(x) (0)
 
 // --- Numbers
 
 // macor smaller code and 10% faster
-#define numberp(x) (!((x)&1))
+#define isnum(x) (!((x)&1))
 
 #define NUM(x) ((x)/2-1)
 
 int num(L x) {
-  if (!numberp(x)) return 0; // "safe"
+  if (!isnum(x)) return 0; // "safe"
   return NUM(x);
 }
 
-#define MKNUM(n) (((n)+1)*2)
+#define MKNUM(n) ((n+1)*2)
 
 // no need inline/macro
 L mknum(int n) {
@@ -451,16 +456,16 @@ L apply(L f, L a, L e) {
   //printf("F= "); print(f);
   //printf("A= "); print(a);
   //printf("E= "); print(e);
-  if (atomp(f)) return primop(NUM(ATOMVAL(f)), a, e);
+  if (isatom(f)) return primop(NUM(ATOMVAL(f)), a, e);
 
   assert(!"UDF?"); // TODO:
   return nil;
 }
 
 L eval(L x, L e) {
-  if (!x || numberp(x) || stringp(x)) return x;
-  if (atomp(x)) return getval(x, e);
-  if (consp(x)) return apply(car(x), cdr(x), e);
+  if (null(x) || isnum(x) || isstr(x)) return x;
+  if (isatom(x)) return getval(x, e);
+  if (iscons(x)) return apply(car(x), cdr(x), e);
   printf("%%LISP: unknown data type %04x\n", x);
   abort();
 }
@@ -468,28 +473,28 @@ L eval(L x, L e) {
 // print unquoted value without space before/after
 L prin1(L x) {
   //printf("%d=%d=%04x\n", num(x), x, x);
-  if (!x) printf("nil");
-  else if (consp(x)) {
+  if (null(x)) printf("nil");
+  else if (iscons(x)) {
     L i= x;
     putchar('(');
     do {
       prin1(car(i));
       i= cdr(i);
       if (i) putchar(' ');
-    } while (i && consp(i));
+    } while (i && iscons(i));
     if (i) {
       printf(". ");
       prin1(i);
     }
     putchar(')');
-  } else if (numberp(x)) {
+  } else if (isnum(x)) {
     printf("%d", num(x));
-  } else if (atomp(x)) {
+  } else if (isatom(x)) {
     // TODO: if |foo  bar| input => prin1 should print s
     printf("%s", atomstr(x));
     //printf("%s|%d|#%2x", atomstr(x), (x>>2), hash(atomstr(x)));
-  // TODO: strings - or for now use atoms?
-  //} else if (stringp(x)) {
+  // TODO: isstring - or for now use atoms?
+  //} else if (isstr(x)) {
   }
   return x;
 }
@@ -561,6 +566,9 @@ void initlisp() {
   assert(sizeof(L)+error==2); 
 
   // special symbols
+  //nil= atom("nil"); // nil==0, NOT!!!
+  T= atom("T");
+  printf("NIL=%d\n", nil);
   error= atom("ERROR");
   quote= atom("quote");
 

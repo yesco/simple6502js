@@ -39,7 +39,7 @@ L evalappend(L args) {
 
 L length(L a) {
   int n= 0;
-  while(consp(a)) {
+  while(iscons(a)) {
     n++;
     a= CDR(a);
   }
@@ -47,20 +47,20 @@ L length(L a) {
 }
 
 L member(L x, L l) {
-  while(consp(l))
+  while(iscons(l))
     if (CAR(x)==x) return l;
   return l;
 }
 
 L mapcar(L f, L l) {
-  return (!l || !consp(l))? nil:
+  return (null(l) || !iscons(l))? nil:
     cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
 }
   
 // TODO: nthcdr
 L nth(L n, L l) {
   n= num(n);
-  while(n-- > 0) if (!consp(l)) return nil; else l= CDR(l);
+  while(n-- > 0) if (!iscons(l)) return nil; else l= CDR(l);
   return CAR(l);
 }
 
@@ -78,13 +78,13 @@ L primop(char f, L args, L env) {
   case ';': return df(args);
   case 'I': return iff(args, env);
   case 'R': return lread();
-  case '\'':return car(args);
+  case '\'':return car(args); // quote
   case '\\':return lambda(args, env);
 
     // - nargs - eval many args
   case '+': a--;
   case '*':
-    while(consp(args)) {
+    while(iscons(args)) {
       b= NUM(eval(CAR(args), env));
       args= CDR(args);
       if (f=='*') a*= b; else a+= b;
@@ -95,14 +95,17 @@ L primop(char f, L args, L env) {
 
 
   // --- one arg
-  if (!consp(args)) return error;
+  if (!iscons(args)) return error;
   a= eval(CAR(args), env);
   args= CDR(args);
 
   switch(f) {
+  case '!': return isatom(a)? T: nil; // TODO: issymbol ???
+  case '#': return isnum(a)? T: nil;
+
   case 'A': return car(a);
   case 'D': return cdr(a);
-  case 'K': return consp(a);
+  case 'K': return iscons(a)? T: nil;
   case 'O': return length(a);
   case 'P': return print(a);
   case 'T': terpri(); return nil;
@@ -112,7 +115,7 @@ L primop(char f, L args, L env) {
 
 
   // --- two args
-  if (!consp(args)) return error;
+  if (!iscons(args)) return error;
   b= eval(CAR(args), env);
   args= CDR(args);
 
