@@ -60,8 +60,8 @@ int main(int argc, char** argv) {
   int i=0;
   //while(f < 10.0 && i < n) {
   while(i < n) {
-    dict[i]= f;
-    //printf("%g\t", f); putj(i); putchar('\n');
+    dict[i]= f/10;
+    printf("%g\t", f); putj(i); putchar('\n');
     f*= s; i++;
   }
   printf("\n\ncount= %d\n\n", i);
