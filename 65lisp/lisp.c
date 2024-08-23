@@ -669,6 +669,7 @@ L eval(L x, L env) {
     L a, b, f; // 2 used by '*' and '-' LOL
     a= 2; // slightly faster this way?
     f= CAR(x); x= CDR(x);
+
     f= NUM(isnum(f)? f: ATOMVAL(f));
 
     // OVERALL: slightly faster, 
@@ -680,8 +681,8 @@ L eval(L x, L env) {
     // 40.57s num CALL -- 10% faster!
 
     // direct address of function
-    //printf("f=%d\n", f);
-    if (f>127) return ((FUN1)f)( eval(car(x), env) );
+    // (test highbyte this was is "cheaper" 1%)
+    if (f &0xff00) return ((FUN1)f)( eval(car(x), env) );
 
 
     // 58.983 - opt/inline using num      = 8.9% FASTER!
