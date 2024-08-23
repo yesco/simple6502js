@@ -683,17 +683,28 @@ L eval(L x, L env) {
     // Based on
     // - https://github.com/yesco/parsie/blob/main/al.c
 
+    // LETTERS FREE:
+    //    "     ()  , . 0123456789     ?
+    //  @                         Z[ ] 
+    //  `abcdefghijklmnopqrstuvwxyz{ }~
+
     // --- nx
     switch(f) {
       // - nlambda - no eval
     case ':': return de(x);
     case ';': return df(x);
     case 'I': return iff(x, env);
-    case 'R': return lread();
+    //case 'X': return TODO: FUNCALL! eXecute
+    case 'Y': return lread();
     case '\'':return car(x); // quote
     case '\\':return lambda(x, env);
+    case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
+    //case '@': return TODO: apply J or @
+    //case 'J': return TODO: apply J or @
 
-      // - nx - eval many x
+      // - nargs - eval many x
+    //case 'V': TODO: or
+    //case '_': TODO: and ???
     case '+': a-=2;
     case '*':
       while(iscons(x)) {
@@ -717,19 +728,21 @@ L eval(L x, L env) {
     switch(f) {
     case '!': return isatom(a)? T: nil; // TODO: issymbol ???
     case '#': return isnum(a)? T: nil;
+    case '$': return isstr()? T: nil;
 
     case 'A': return car(a);
     case 'D': return cdr(a);
     case 'K': return iscons(a)? T: nil;
     case 'O': return length(a);
     case 'P': return print(a);
+    //case 'R' TODO: Reduce?
     case 'T': terpri(); return nil;
     case 'U': return a? mknum(1): nil;
     case 'W': return prin1(a);
     }
 
 
-    // --- two x
+    // --- two args
     if (!iscons(x)) return error;
     b= eval(CAR(x), env);
     x= CDR(x);
@@ -740,7 +753,14 @@ L eval(L x, L env) {
     case '-': return mknum(num(a) - num(b));
     case '/': return mknum(num(a) / num(b));
     case '|': return mknum(num(a) | num(b));
+    //case '<': TODO: lt
+    //case '=': TOOD: eq
+    //case '>': TODO: gt
+    //case '^': TODO: xor bits
 
+    //case 'E': TOOD: Eval
+    //case 'F': TODO: Filter ???
+    //case 'Q': TOOD: eQual
     case 'C': return cons(a, b);
     case 'B': return member(a, b);
     case 'G': return assoc(a, b);
@@ -777,7 +797,7 @@ char* names[]= {
   ": de", ": define", ": defun",
   "; df",
   "I if",
-  "R read",
+  "Y read",
   "\' quote",
   "\\ lambda",
 
