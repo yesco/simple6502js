@@ -76,6 +76,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <time.h>
 
 //#include <conio.h>
 
@@ -743,6 +744,7 @@ int main(int argc, char** argv) {
   } while (!feof(stdin));
   if (!quiet) terpri();
 
+  //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
 }
 
