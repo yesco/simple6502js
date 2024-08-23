@@ -648,7 +648,11 @@ L nth(L n, L l) {
 L eval(L x, L env) {
   // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
-  // 49.73s cons-test if inline apply in eval  (how to do apply?)
+  // TOTAL 38% improvemnts by inliniing apply... LOL
+
+  // 41.54s cons-test remove fn reuse f, init a later!
+  // 42.03s cons-test REMOVING "args" var, reuse X!
+  // 49.73s cons-test if inline apply in eval  (how to do apply?) - not pick... because:
   //   but numbers slowdown... 10% MORE
   // 51.07s NUMCALL if use local var inside iscons => 10% FASTER
   //   ./plus-test is slightly faster 3%    8.4% for (*(+
@@ -659,9 +663,10 @@ L eval(L x, L env) {
   // 58.98s old way, lookup atom
 
   if (iscons(x)) {
-    L a=2, b, fn, f, args; // 2 used by '*' and '-' LOL
-    fn= car(x); args=cdr(x);
-    f= NUM(isnum(fn)? fn: ATOMVAL(fn));
+    L a, b, f; // 2 used by '*' and '-' LOL
+    a= 2; // slightly faster this way?
+    f= CAR(x); x= CDR(x);
+    f= NUM(isnum(f)? f: ATOMVAL(f));
 
     // 58.983 - opt/inline using num      = 8.9% FASTER!
     // 61.462 - opt/inline using atom     = 5.03% fastere
@@ -678,36 +683,36 @@ L eval(L x, L env) {
     // Based on
     // - https://github.com/yesco/parsie/blob/main/al.c
 
-    // --- nargs
+    // --- nx
     switch(f) {
       // - nlambda - no eval
-    case ':': return de(args);
-    case ';': return df(args);
-    case 'I': return iff(args, env);
+    case ':': return de(x);
+    case ';': return df(x);
+    case 'I': return iff(x, env);
     case 'R': return lread();
-    case '\'':return car(args); // quote
-    case '\\':return lambda(args, env);
+    case '\'':return car(x); // quote
+    case '\\':return lambda(x, env);
 
-      // - nargs - eval many args
+      // - nx - eval many x
     case '+': a-=2;
     case '*':
-      while(iscons(args)) {
+      while(iscons(x)) {
         // TODO: do we care if not number?
-        b= eval(CAR(args), env);
+        b= eval(CAR(x), env);
         //if (!isnum(b)) b= 0; // takes away most of savings...
         //assert(isnum(b)); // 1% overhead
-        args= CDR(args);
+        x= CDR(x);
         //if (f=='*') a*= b; else a+= b;
         if (f=='*') a*= b/2; else a+= b;
       } return a;
-    case 'L': return evallist(args, env);
-    case 'H': return evalappend(args);
+    case 'L': return evallist(x, env);
+    case 'H': return evalappend(x);
     }
 
     // --- one arg
-    if (!iscons(args)) return error;
-    a= eval(CAR(args), env);
-    args= CDR(args);
+    if (!iscons(x)) return error;
+    a= eval(CAR(x), env);
+    x= CDR(x);
 
     switch(f) {
     case '!': return isatom(a)? T: nil; // TODO: issymbol ???
@@ -724,10 +729,10 @@ L eval(L x, L env) {
     }
 
 
-    // --- two args
-    if (!iscons(args)) return error;
-    b= eval(CAR(args), env);
-    args= CDR(args);
+    // --- two x
+    if (!iscons(x)) return error;
+    b= eval(CAR(x), env);
+    x= CDR(x);
 
     switch(f) {
     case '%': return mknum(num(a) % num(b));
