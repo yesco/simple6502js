@@ -680,9 +680,12 @@ L eval(L x, L env) {
     // 43.59s letter num but have call code
     // 40.57s num CALL -- 10% faster!
 
-    // direct address of function
+    // CALL direct address of function
     // (test highbyte this was is "cheaper" 1%)
-    if (f &0xff00) return ((FUN1)f)( eval(car(x), env) );
+    if (f & 0xff00) return ((FUN1)f)( eval(car(x), env) );
+
+    // TODO: ADDR NUM in lisp is 10% faster,
+    //    do we replace in the orig code?
 
 
     // 58.983 - opt/inline using num      = 8.9% FASTER!
@@ -740,6 +743,10 @@ L eval(L x, L env) {
     // --- one arg
     if (!iscons(x)) return error;
     a= eval(CAR(x), env);
+
+    // slightly more expensive, passed a switch...
+    //if (f & 0xff00) return ((FUN1)f)(a);
+
     x= CDR(x);
 
     switch(f) {
