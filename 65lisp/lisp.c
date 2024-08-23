@@ -99,7 +99,7 @@
 #define HASH 256
 
 // --- Statisticss
-unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0;
+unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 
 // ---------------- Lisp Datatypes
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
@@ -107,7 +107,7 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil= 0, quote= 0, T;
+L nil, quote= 0, T;
 L error, eof, lambda;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
@@ -443,15 +443,25 @@ char* cused;
 
 #define BIT(arr, n) (((arr)[(n)/8])&(1<<((n)&7)))
 
+char gcdeep= 0;
+
 void mark(L a) {
+  ++nmark;
   if (iscons(a)) {
     // TODO: measure cost of extra vars?
     unsigned int n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
     if (cused[i] & b) return;
+
+    // TODO: what's the maxdepth? check w stack option
+    //   then, limit it, but link to "next" TODO...
     //if (BIT(cused, n)) return;
-    printf(" [MARK: %d] ", n);
+
+    ++gcdeep;
+    printf(" [%d/MARK: %d]", gcdeep, n); prin1(a); putchar(' ');
     mark(CAR(a)); mark(CDR(a));
+    --gcdeep;
+
     cused[n/8]|= 1<<(n&7);
     return;
   }
@@ -459,11 +469,33 @@ void mark(L a) {
   // TODO: strings, or anything heap allocated reclaimable
 }
 
+void sweep() { }
+
 void GC(L env) {
-  // enumerate all variables in program, like env
+  int i;
+  char* a;
   // TODO: anything on the stack if called deeply is problem!!!
   //   (worst case not marked and then deallocated => corruption)
+
+  // -- clear
+  memset(cused, 0, MAXCELL/(sizeof(L)*8));
+
+  // -- enumerate all variables in program, like env
   mark(env);
+
+  // -- walk through all globals, in symbols table
+  for(i=0; i<HASH; ++i) {
+    a= syms[i];
+    while(a) {
+      L v= *(L*)a;
+      mark(v);
+      a= *(char**)(L**)a;
+    }
+  }
+
+  // -- free some
+  sweep();
+
   //if (!quiet)
   terpri();
 }
@@ -905,7 +937,7 @@ void initlisp() {
   assert(sizeof(void*)+error==2); // used in atom function
 
   // special symbols
-    nil= atom("nil");
+    nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
       T= atom("T");     setval(T, T, nil);
   quote= atom("quote");
  lambda= atom("lambda");
@@ -932,7 +964,7 @@ void report(char* what, unsigned int now, unsigned int *last) {
 
 void stats() {
   int cused= cnext-cell+1, hslots= 0, i;
-  static unsigned int latoms, lcons, lalloc, leval; // TODO: arean?
+  static unsigned int latoms, lcons, lalloc, leval, lmark; // TODO: arean?
 
   for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
 
@@ -945,6 +977,7 @@ void stats() {
   report("Cons", ncons, &lcons);
   report("Atom", natoms, &latoms);
   report("Allocs", nalloc, &lalloc);
+  report("Marks", nmark, &lmark);
   terpri();
 
   latoms= natoms; lcons= ncons; lalloc= nalloc;
@@ -998,7 +1031,6 @@ int main(int argc, char** argv) {
     printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
 
   do {
-    if (!quiet) stats();
     if (!quiet) printf("65> ");
     x= lread();
     if (x==eof) break;
@@ -1009,6 +1041,7 @@ int main(int argc, char** argv) {
       print(r); terpri();
     }
     GC(env);
+    if (!quiet) stats();
   } while (!feof(stdin));
   if (!quiet) terpri();
 
