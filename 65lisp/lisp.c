@@ -98,6 +98,9 @@
 // Defined to use hash-table (with Arena
 #define HASH 256
 
+// --- Statisticss
+unsigned int natoms= 0, ncons=0, nalloc= 0;
+
 // ---------------- Lisp Datatypes
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
@@ -169,8 +172,7 @@ L error, eof, quote=0;
 
 int ncell= 0;
 //L cell[MAXCELL]= {0};
-L cell[MAXCELL];
-L* cnext= 0;
+L *cell, *cnext;
 
 L prin1(L); // forward TODO: remove
 
@@ -205,31 +207,11 @@ L cons(L a, L d) {
   // (* 4096 2 2) 16384 bytes addressed? 32K I'd understand
 
   L r;
-  //printf("CONS... %x\n", cnext);
   *++cnext= a;
-  //printf("CAR: "); print(*cnext);
-
   r= (L)cnext;
-  //printf("CAR: "); print(CAR(r));
-
   *++cnext= d;
-  //printf("CDR: "); print(((L*)r)[1]);
-  //printf("CDR: "); print(CDR(r));
-
-  //printf("CONS: "); prin1(a); putchar('.'); prin1(d); terpri();
-  //printf("L= %04x\n", r);
-  //printf("iscons: %d %x %d\n", iscons(r), r, r);
-  //printf("=>: "); print(r);
-  //printf("=>: "); prin1(CAR(r)); putchar('.'); prin1(CDR(r)); terpri();
-  //terpri();
   return r;
 
-  // optimial order...
-#ifdef foo
-  cell[ncell]= a; ++ncell;
-  cell[ncell]= d; ++ncell;
-  return ((ncell-2)<<2)+3; // ENC
-#endif
   // 1.2% faster!
   /// also fits better with free list? hmmm?
 
@@ -269,7 +251,7 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
 #define MAXSYMLEN 32
 
 #ifdef HASH
-  void* syms[HASH]= {0}; // 512 bytes! + ARENA_LEN...
+  void** syms;
 
   char hash(char* s) {
     int c= 4711;
@@ -281,7 +263,7 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
   }
 
   // Arena - simple for now
-  char arena[ARENA_LEN]= {0}, *arptr= arena, *arend= arena+ARENA_LEN;
+  char* arena, *arptr, *arend;
 
 #endif
 
@@ -323,7 +305,7 @@ void printarena() {
     if (isprint(*a)) putchar(*a);
     else if (!*a) putchar('_');
     else putchar('#');
-    a++;
+    ++a;
   }
   putchar('\n');
 }
@@ -386,6 +368,8 @@ L atom(char* s) {
   //p= searchatom2(s); // slower 32s for 4x150.words
   p= findatom(syms[h], s); // fast 14s for 4x150.words
   if (!p) {
+    // create atom
+    ++natoms;
     p= arptr;
     pi= (void**)p;
     arptr+= 4+1+strlen(s);
@@ -502,7 +486,7 @@ L lread() {
     char q=(c=='|'), n= 0, s[MAXSYMLEN+1]= {0};
     if (q) c= nextc();
     do {
-      s[n++]= c;
+      s[n]= c; ++n;
       c= nextc();
       // TODO: breaking chars: <spc>'"()
     } while(c && ((q && c!='|') || (!q && isatomchar(c))) && n<MAXSYMLEN);
@@ -615,7 +599,7 @@ L evalappend(L args) {
 L length(L a) {
   int n= 0;
   while(iscons(a)) {
-    n++;
+    ++n;
     a= CDR(a);
   }
   return mknum(n);
@@ -636,7 +620,7 @@ L mapcar(L f, L l) {
 // TODO: nthcdr
 L nth(L n, L l) {
   n= num(n);
-  while(n-- > 0) if (!iscons(l)) return nil; else l= CDR(l);
+  while(--n >= 0) if (!iscons(l)) return nil; else l= CDR(l);
   return CAR(l);
 }
 
@@ -855,16 +839,25 @@ char* names[]= {
   NULL};
 
 void initlisp() {
+  L x;
   char** s= names;
 
+  // allocate memory
+  arptr= arena= calloc(ARENA_LEN, 1); arend= arena+ARENA_LEN; ++nalloc;
+  syms= (void**)calloc(HASH, sizeof(void*)); ++nalloc;
+  cell= (L*)calloc(MAXCELL, sizeof(L)); ++nalloc;
+
   // Align lower bits == xx01, CONS inc by 4!
-  L x= (L)cell;
-  while(!iscons(x)) x++;
+  x= (L)cell;
+  while(!iscons(x)) ++x;
   //printf("x   = %04x %d\n", x, x);
   cnext= (L*)x;
-  cnext--;
+  --cnext; // as we inc before assign!
   //printf("next= %04x\n", cnext);
   assert(x&1);
+
+  // statistics
+  natoms= ncons= nalloc= 0;
 
   // important assumption for cc65
   // (supress warning: error is set later, now 0)
@@ -889,6 +882,16 @@ void initlisp() {
 #ifdef PERFTEST
 #include "perf-test.c"
 #endif
+
+void stats() {
+  int cused= cnext-cell+1, hslots= 0, i;
+  for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
+
+  printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
+  printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d  Cons:%d\n\n",
+         cused, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN,
+         natoms, ncons);
+}
 
 int main(int argc, char** argv) {
   char echo= 0, noeval= 0, quiet= 0;
@@ -938,6 +941,7 @@ int main(int argc, char** argv) {
     printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
 
   do {
+    if (!quiet) stats();
     if (!quiet) printf("65> ");
     x= lread();
     if (x==eof) break;
