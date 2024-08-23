@@ -577,7 +577,7 @@ L getval(L x, L e) {
 // ---------------- Lisp Functions
 
 L eval(L x, L e); // forward
-L apply(L f, L a, L e); // forward
+//L apply(L f, L a, L e); // forward
 
 L de(L args) {
   //assert(!"NIY: de");
@@ -627,8 +627,9 @@ L member(L x, L l) {
 }
 
 L mapcar(L f, L l) {
-  return (null(l) || !iscons(l))? nil:
-    cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
+  return nil;
+//  return (null(l) || !iscons(l))? nil:
+//    cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
 }
   
 // TODO: nthcdr
@@ -641,112 +642,116 @@ L nth(L n, L l) {
 
 // ---------------- EVAL/APPLY
 
-L apply(L fn, L args, L env) {
-  L a=2, b; // 2 used by '*' and '-' LOL
-  L f= NUM(isnum(fn)? fn: ATOMVAL(fn));
+// TODO: no apply function anymore? lol
+//return apply(car(x), cdr(x), env);
 
-  // TODO: trace
-  //terpri();
-  //printf("F= "); print(f);
-  //printf("A= "); print(a);
-  //printf("E= "); print(e);
-
-  //printf("--> primop %c (%d) ", f, f); prin1(args); terpri();
-
-  // 58.983 - opt/inline using num      = 8.9% FASTER!
-  // 61.462 - opt/inline using atom     = 5.03% fastere
-  // 63.051 - optimized using num       = 2.6% speedup
-  // 64.714 - using atom no opt         = 1 === BASE
-  // 65.129 - overhead w opt using atom = 0.6% slowdown
-  // 65.602 - overhead primop using int, F=int
-  // 67.714 - overhead primpo using int, F=atom
-
-  // AL - Alphabetical Lisp (a byte VM)
-  //
-  // simple primitive function dispatcher
+L eval(L x, L env) {
+  // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
-  // Based on
-  // - https://github.com/yesco/parsie/blob/main/al.c
-
-  // --- nargs
-  switch(f) {
-    // - nlambda - no eval
-  case ':': return de(args);
-  case ';': return df(args);
-  case 'I': return iff(args, env);
-  case 'R': return lread();
-  case '\'':return car(args); // quote
-  case '\\':return lambda(args, env);
-
-    // - nargs - eval many args
-  case '+': a-=2;
-  case '*':
-    while(iscons(args)) {
-      // TODO: do we care if not number?
-      b= eval(CAR(args), env);
-      //if (!isnum(b)) b= 0; // takes away most of savings...
-      //assert(isnum(b)); // 1% overhead
-      args= CDR(args);
-      //if (f=='*') a*= b; else a+= b;
-      if (f=='*') a*= b/2; else a+= b;
-    } return a;
-  case 'L': return evallist(args, env);
-  case 'H': return evalappend(args);
-  }
-
-  // --- one arg
-  if (!iscons(args)) return error;
-  a= eval(CAR(args), env);
-  args= CDR(args);
-
-  switch(f) {
-  case '!': return isatom(a)? T: nil; // TODO: issymbol ???
-  case '#': return isnum(a)? T: nil;
-
-  case 'A': return car(a);
-  case 'D': return cdr(a);
-  case 'K': return iscons(a)? T: nil;
-  case 'O': return length(a);
-  case 'P': return print(a);
-  case 'T': terpri(); return nil;
-  case 'U': return a? mknum(1): nil;
-  case 'W': return prin1(a);
-  }
-
-
-  // --- two args
-  if (!iscons(args)) return error;
-  b= eval(CAR(args), env);
-  args= CDR(args);
-
-  switch(f) {
-  case '%': return mknum(num(a) % num(b));
-  case '&': return mknum(num(a) & num(b));
-  case '-': return mknum(num(a) - num(b));
-  case '/': return mknum(num(a) / num(b));
-  case '|': return mknum(num(a) | num(b));
-
-  case 'C': return cons(a, b);
-  case 'B': return member(a, b);
-  case 'G': return assoc(a, b);
-  case 'M': return mapcar(a, b);
-  case 'N': return nth(a, b);
-
-  default: return error;
-  }
-
-  // assert(!"UDF?"); // TODO:
-  return error;
-}
-
-L eval(L x, L e) {
+  // 49.73s cons-test if inline apply in eval  (how to do apply?)
+  //   but numbers slowdown... 10% MORE
+  // 51.07s NUMCALL if use local var inside iscons => 10% FASTER
+  //   ./plus-test is slightly faster 3%    8.4% for (*(+
+  // 53.584 ATOMCALL but w opt for number in
   // 56.771s if isconst first ./cons-test => 3.76% SPPEDUP
   //   2.5% slowdown for (+ (* ... old: 43.80s
-  // 58.98s old way, 
-  // 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
-  if (iscons(x)) return apply(car(x), cdr(x), e);
-  if (isatom(x)) return getval(x, e);
+  // ===BASE===
+  // 58.98s old way, lookup atom
+
+  if (iscons(x)) {
+    L a=2, b, fn, f, args; // 2 used by '*' and '-' LOL
+    fn= car(x); args=cdr(x);
+    f= NUM(isnum(fn)? fn: ATOMVAL(fn));
+
+    // 58.983 - opt/inline using num      = 8.9% FASTER!
+    // 61.462 - opt/inline using atom     = 5.03% fastere
+    // 63.051 - optimized using num       = 2.6% speedup
+    // 64.714 - using atom no opt         = 1 === BASE
+    // 65.129 - overhead w opt using atom = 0.6% slowdown
+    // 65.602 - overhead primop using int, F=int
+    // 67.714 - overhead primpo using int, F=atom
+
+    // AL - Alphabetical Lisp (a byte VM)
+    //
+    // simple primitive function dispatcher
+  
+    // Based on
+    // - https://github.com/yesco/parsie/blob/main/al.c
+
+    // --- nargs
+    switch(f) {
+      // - nlambda - no eval
+    case ':': return de(args);
+    case ';': return df(args);
+    case 'I': return iff(args, env);
+    case 'R': return lread();
+    case '\'':return car(args); // quote
+    case '\\':return lambda(args, env);
+
+      // - nargs - eval many args
+    case '+': a-=2;
+    case '*':
+      while(iscons(args)) {
+        // TODO: do we care if not number?
+        b= eval(CAR(args), env);
+        //if (!isnum(b)) b= 0; // takes away most of savings...
+        //assert(isnum(b)); // 1% overhead
+        args= CDR(args);
+        //if (f=='*') a*= b; else a+= b;
+        if (f=='*') a*= b/2; else a+= b;
+      } return a;
+    case 'L': return evallist(args, env);
+    case 'H': return evalappend(args);
+    }
+
+    // --- one arg
+    if (!iscons(args)) return error;
+    a= eval(CAR(args), env);
+    args= CDR(args);
+
+    switch(f) {
+    case '!': return isatom(a)? T: nil; // TODO: issymbol ???
+    case '#': return isnum(a)? T: nil;
+
+    case 'A': return car(a);
+    case 'D': return cdr(a);
+    case 'K': return iscons(a)? T: nil;
+    case 'O': return length(a);
+    case 'P': return print(a);
+    case 'T': terpri(); return nil;
+    case 'U': return a? mknum(1): nil;
+    case 'W': return prin1(a);
+    }
+
+
+    // --- two args
+    if (!iscons(args)) return error;
+    b= eval(CAR(args), env);
+    args= CDR(args);
+
+    switch(f) {
+    case '%': return mknum(num(a) % num(b));
+    case '&': return mknum(num(a) & num(b));
+    case '-': return mknum(num(a) - num(b));
+    case '/': return mknum(num(a) / num(b));
+    case '|': return mknum(num(a) | num(b));
+
+    case 'C': return cons(a, b);
+    case 'B': return member(a, b);
+    case 'G': return assoc(a, b);
+    case 'M': return mapcar(a, b);
+    case 'N': return nth(a, b);
+
+    default: return error;
+    }
+
+  }
+
+  if (isatom(x)) return getval(x, env);
   return x;
+
+  // assert(!"UDF?"); // TODO:
+  //return error;
 }
 
 // ---------------- Register Functions
