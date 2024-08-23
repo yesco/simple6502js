@@ -107,8 +107,8 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil= 0, T;
-L error, eof, quote=0;
+L nil= 0, quote= 0, T;
+L error, eof, lambda;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
@@ -567,12 +567,12 @@ L eval(L x, L e); // forward
 
 L de(L args) {
   //assert(!"NIY: de");
-  return error;
+  return args?error:error;
 }
 
 L df(L args) {
   //assert(!"NIY: df");
-  return error;
+  return args?error:error;
 }
 
 // TODO: progn?
@@ -580,21 +580,20 @@ L df(L args) {
 // tailrecursion?
 L iff(L args, L env) {
   //assert(!"NIY: iff");
-  return error;
+  return args?error:env;
 }
 
-L lambda(L args, L env) {
-  return cons(args, env);
-}
+//L lambda(L args, L env) {
+//  return cons(args, env);
+//}
 
 L evallist(L args, L env) {
-  //assert(!"NIY: evallist");
-  return error;
+  return iscons(args)? cons(eval(CAR(args),env), evallist(CDR(args),env)): nil;
 }
 
 L evalappend(L args) {
   //assert(!"NIY: append");
-  return nil;
+  return args?error:error;
 }
 
 L length(L a) {
@@ -607,13 +606,13 @@ L length(L a) {
 }
 
 L member(L x, L l) {
-  while(iscons(l))
-    if (CAR(x)==x) return l;
+  while(iscons(l)) if (CAR(x)==x) return l;
   return l;
 }
 
 L mapcar(L f, L l) {
-  return nil;
+  return f&&l&&l?error:error;
+// TODO: lol, how to do without apply?
 //  return (null(l) || !iscons(l))? nil:
 //    cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
 }
@@ -703,7 +702,7 @@ L eval(L x, L env) {
     //case 'X': return TODO: FUNCALL! eXecute
     case 'Y': return lread();
     case '\'':return car(x); // quote
-    case '\\':return lambda(x, env);
+    case '\\':return cons(lambda, x);
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
     //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
@@ -870,6 +869,7 @@ void initlisp() {
     nil= atom("nil");
       T= atom("T");
   quote= atom("quote");
+ lambda= atom("lambda");
   error= atom("ERROR");
     eof= atom("*EOF*");
 
