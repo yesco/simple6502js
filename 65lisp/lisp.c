@@ -297,8 +297,7 @@ char* atomstr(L x) {
 }
 
 // 3% cost of isatom()
-#define ATOMVAL(x) (arena[2+((x)>>2)]) // ENC
-//#define atomval(x) (isatom(x)?arena[2+((x)>>2)]:nil)
+#define ATOMVAL(x) (*(int*)&(arena[2+((x)>>2)])) // ENC
 
 L atomval(L x) {
   // TODO: whcih is faster?
@@ -307,9 +306,11 @@ L atomval(L x) {
   return ATOMVAL(x);
 }
 
+L getval(L x, L e);
+
 L setatomval(L x, L v) {
   if (null(x) || !isatom(x)) return nil;
-  return *(L*)(arena+2+(x>>2))= v;
+  return ATOMVAL(x)= v;
 }
 
 L print(L); // forward TODO: remove
@@ -645,6 +646,8 @@ L nth(L n, L l) {
 // TODO: no apply function anymore? lol
 //return apply(car(x), cdr(x), env);
 
+typedef L (*FUN1)(L);
+
 L eval(L x, L env) {
   // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
@@ -667,6 +670,19 @@ L eval(L x, L env) {
     a= 2; // slightly faster this way?
     f= CAR(x); x= CDR(x);
     f= NUM(isnum(f)? f: ATOMVAL(f));
+
+    // OVERALL: slightly faster, 
+    // 44.33s using atom name, and no CALL just eval->letter
+    // 41.82s using letter num no CALL
+
+    // 43.94s atom name but have call code
+    // 43.59s letter num but have call code
+    // 40.57s num CALL -- 10% faster!
+
+    // direct address of function
+    //printf("f=%d\n", f);
+    if (f>127) return ((FUN1)f)( eval(car(x), env) );
+
 
     // 58.983 - opt/inline using num      = 8.9% FASTER!
     // 61.462 - opt/inline using atom     = 5.03% fastere
@@ -904,7 +920,11 @@ int main(int argc, char** argv) {
 
   // set some for test
   setval(atom("bar"), mknum(33), nil);
+  setval(atom("bar"), mknum(11), nil);
   env= cons(cons(atom("foo"), mknum(42)), env);
+
+  setval(atom("car"), mknum((int)(char*)car), nil);
+  setval(atom("cdr"), mknum((int)(char*)cdr), nil);
 
   if (!quiet)
     printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
