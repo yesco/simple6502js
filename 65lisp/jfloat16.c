@@ -60,7 +60,8 @@ int main(int argc, char** argv) {
   int i=0;
   //while(f < 10.0 && i < n) {
   while(i < n) {
-    dict[i]= f/10;
+    float x= f;
+    dict[i]= x;
     printf("%g\t", f); putj(i); putchar('\n');
     f*= s; i++;
   }
