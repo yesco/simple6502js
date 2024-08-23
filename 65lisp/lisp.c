@@ -99,7 +99,7 @@
 #define HASH 256
 
 // --- Statisticss
-unsigned int natoms= 0, ncons=0, nalloc= 0;
+unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0;
 
 // ---------------- Lisp Datatypes
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
@@ -207,6 +207,7 @@ L cons(L a, L d) {
   // (* 4096 2 2) 16384 bytes addressed? 32K I'd understand
 
   L r;
+  ++ncons;
   *++cnext= a;
   r= (L)cnext;
   *++cnext= d;
@@ -633,6 +634,7 @@ L nth(L n, L l) {
 typedef L (*FUN1)(L);
 
 L eval(L x, L env) {
+  ++neval;
   // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
   // TOTAL 38% improvemnts by inliniing apply... LOL
@@ -883,14 +885,30 @@ void initlisp() {
 #include "perf-test.c"
 #endif
 
+// TODO: maybe smaller as macro?
+void report(char* what, unsigned int now, unsigned int *last) {
+  if ((*last)!=now) printf("%% %s: +%d  ", what, now-*last);
+  *last= now;
+}
+
 void stats() {
   int cused= cnext-cell+1, hslots= 0, i;
+  static unsigned int latoms, lcons, lalloc, leval;
+
   for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
 
   printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
   printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d  Cons:%d\n\n",
          cused, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN,
          natoms, ncons);
+
+  report("Eval", neval, &leval);
+  report("Cons", ncons, &lcons);
+  report("Atom", natoms, &latoms);
+  report("Allocs", nalloc, &lalloc);
+  terpri();
+
+  latoms= natoms; lcons= ncons; lalloc= nalloc;
 }
 
 int main(int argc, char** argv) {
