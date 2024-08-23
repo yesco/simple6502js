@@ -172,7 +172,7 @@ L error, eof, lambda;
 
 int ncell= 0;
 //L cell[MAXCELL]= {0};
-L *cell, *cnext;
+L *cell, *cnext, *cstart;
 
 L prin1(L); // forward TODO: remove
 
@@ -426,8 +426,46 @@ int num(L x) {
 // no need inline/macro
 L mknum(int n) {
   // TODO: large numbers... bignums?
-  assert(abs(n)<=16384);
+  if(abs(n)>16382) {
+    printf("\n%% ERROR: too big num: %d\n", n);
+    return error;
+  }
+
   return MKNUM(n);
+}
+
+
+// ---------------- GC Garbage Collector
+// just do a simple mark and sweep
+
+// one bit per cell[]
+char* cused;
+
+#define BIT(arr, n) (((arr)[(n)/8])&(1<<((n)&7)))
+
+void mark(L a) {
+  if (iscons(a)) {
+    // TODO: measure cost of extra vars?
+    unsigned int n= ((L*)a)-cstart, i= n/8;
+    char b= 1<<(n&7);
+    if (cused[i] & b) return;
+    //if (BIT(cused, n)) return;
+    printf(" [MARK: %d] ", n);
+    mark(CAR(a)); mark(CDR(a));
+    cused[n/8]|= 1<<(n&7);
+    return;
+  }
+
+  // TODO: strings, or anything heap allocated reclaimable
+}
+
+void GC(L env) {
+  // enumerate all variables in program, like env
+  // TODO: anything on the stack if called deeply is problem!!!
+  //   (worst case not marked and then deallocated => corruption)
+  mark(env);
+  //if (!quiet)
+  terpri();
 }
 
 
@@ -846,13 +884,14 @@ void initlisp() {
   // allocate memory
   arptr= arena= calloc(ARENA_LEN, 1); arend= arena+ARENA_LEN; ++nalloc;
   syms= (void**)calloc(HASH, sizeof(void*)); ++nalloc;
-  cell= (L*)calloc(MAXCELL, sizeof(L)); ++nalloc;
+  cstart= cell= (L*)calloc(MAXCELL, sizeof(L)); ++nalloc;
+  cused= (char*)calloc((MAXCELL+1)/(sizeof(L)*8), 1); ++nalloc;
 
   // Align lower bits == xx01, CONS inc by 4!
   x= (L)cell;
   while(!iscons(x)) ++x;
   //printf("x   = %04x %d\n", x, x);
-  cnext= (L*)x;
+  cstart= cnext= (L*)x;
   --cnext; // as we inc before assign!
   //printf("next= %04x\n", cnext);
   assert(x&1);
@@ -867,11 +906,11 @@ void initlisp() {
 
   // special symbols
     nil= atom("nil");
-      T= atom("T");
+      T= atom("T");     setval(T, T, nil);
   quote= atom("quote");
  lambda= atom("lambda");
-  error= atom("ERROR");
-    eof= atom("*EOF*");
+  error= atom("ERROR"); setval(error, error, nil);
+    eof= atom("*EOF*"); setval(eof, eof, nil);
 
   // register function names
   while(*s) {
@@ -893,14 +932,14 @@ void report(char* what, unsigned int now, unsigned int *last) {
 
 void stats() {
   int cused= cnext-cell+1, hslots= 0, i;
-  static unsigned int latoms, lcons, lalloc, leval;
+  static unsigned int latoms, lcons, lalloc, leval; // TODO: arean?
 
   for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
 
   printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
-  printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d  Cons:%d\n\n",
-         cused, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN,
-         natoms, ncons);
+  printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d\n",
+         ncons, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN,
+         natoms);
 
   report("Eval", neval, &leval);
   report("Cons", ncons, &lcons);
@@ -969,6 +1008,7 @@ int main(int argc, char** argv) {
         r= eval(x, env);
       print(r); terpri();
     }
+    GC(env);
   } while (!feof(stdin));
   if (!quiet) terpri();
 
