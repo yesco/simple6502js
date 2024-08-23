@@ -1,3 +1,74 @@
+// 65LISP02 - an lisp interpeter for 6502 (oric)
+
+// An highly efficent and optimized lisp for the 6502.
+// It's a scheme-style lisp with full closures and
+// lexical bindings. No macros.
+
+// Features:
+// - full closures
+// - lexical scoping
+// - highly optimized
+// - 
+
+// TODO:
+// - closures
+// - GC of cons cells
+// - TODO: strings?
+// - TODO: bignums? wrote a bignum.c
+
+// NO WAY:
+// - no macros, using NLAMBDA and DE
+
+
+// IMPLEMENTION DETAILS
+//
+// Data Representation
+//
+// - iiii iiii  iiii iii0  INT : limited ints -16K to +16K 15 bits
+// - cccc cccc  cccc cc11  CONS: not aligned! step 4B, 16K cons, 64K ram
+// - oooo oooo  oooo o101  ATOM: constants/offset in arena up to 8K ram
+
+// FUTURE:
+//
+// - pppp pppp  pppp p001  HEAP-OBJ: 8 bytes aligned (+1) total 64K
+
+// Here is the fun: for variables sized objects:
+//
+// - malloc doesn't align
+// - (neitehr does compiler of int[]! - can be on odd address)
+// - malloc may waste memory, at least 4 bytes overhead
+// - cc65 malloc(1) smallest chunk is 6 bytes, if alloc 1 adds 5
+
+// Memory System:
+//
+// =  64K address
+// - 256 ZeroPage
+// - 256 Stack Page 1
+// -  16K ROM (rest is RAM)
+//           LISP PROGRAM:
+// -  16K code = 7969 bytes currently, need GC, strings, bignum, etc
+// - 654 RODATA
+// -  26K allocated data, 26285 bytes, 1709
+// 
+
+
+// CHANGES
+//
+// - started with a reader and writer of S-EXP.
+// - nil was 0, easy test, but not flexible...
+// - ...0 = int was [0..32768-1-1], only positives
+// - ..11 = cons required various costly arith 
+// - changing cons/num represenation (big change)
+//   - ...0 = int now [-16K, 16K], simple test => 25-33% FASTER!
+//   - ..11 = cons, actual pointer, no arith except for CDR
+//   - ..01 = atom, ok still index, maybe split to object ptr?
+//   - cons-terst (actually CAR/CDR) 64s instead of 82 => 22% FASTER!
+
+// Alterntive names:
+// - 02lisp 
+// Alread used names by others:
+// - lisp65 lisp/8 lisp02
+
 #include <stdint.h> // cc65 uses 29K extra memory???
 #include <stdio.h>
 #include <unistd.h>
@@ -33,9 +104,10 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
 L nil= 0, T;
-L error, quote=0;
+L error, eof, quote=0;
 
-#define null(x) (x==nil)
+#define null(x) (x==nil) // crazy but this is 81s instead of 91s!
+//#define null(x) (!x) // slight, faster assuming nil=0...
 
 // Encoding of lisp values:
 //
@@ -95,7 +167,8 @@ L error, quote=0;
 // -- Cons
 
 int ncell= 0;
-L cell[MAXCELL]= {0};
+//L cell[MAXCELL]= {0};
+L cell[MAXCELL];
 L* cnext= 0;
 
 L prin1(L); // forward TODO: remove
@@ -108,12 +181,47 @@ L prin1(L); // forward TODO: remove
 
 // (* 4096 2 2)
 
+// macro takes less code than funcall, and is faster
+#define iscons(c) (((c)&3)==3)
+//#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
+//#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
+
+// unsafe macro 10% faster,but uses 80 bytes more
+// make sure it's iscons first (in loop)!
+//#define CAR(c) (cell[ (c)>>2   ])
+//#define CDR(c) (cell[((c)>>2)+1])
+#define CAR(c) (*((L*)(c)))
+#define CDR(c) (((L*)(c))[1])
+
+L print(L x); // forward
+
 L cons(L a, L d) {
+  // remove one more... because 00001 bits...
   //assert(ncell<MAXCELL+2); // 0.4% cost
 
   // 4090 is fine?
   // starts failing at 4096!!! ???
   // (* 4096 2 2) 16384 bytes addressed? 32K I'd understand
+
+  L r;
+  //printf("CONS... %x\n", cnext);
+  *++cnext= a;
+  //printf("CAR: "); print(*cnext);
+
+  r= (L)cnext;
+  //printf("CAR: "); print(CAR(r));
+
+  *++cnext= d;
+  //printf("CDR: "); print(((L*)r)[1]);
+  //printf("CDR: "); print(CDR(r));
+
+  //printf("CONS: "); prin1(a); putchar('.'); prin1(d); terpri();
+  //printf("L= %04x\n", r);
+  //printf("iscons: %d %x %d\n", iscons(r), r, r);
+  //printf("=>: "); print(r);
+  //printf("=>: "); prin1(CAR(r)); putchar('.'); prin1(CDR(r)); terpri();
+  //terpri();
+  return r;
 
   // optimial order...
 #ifdef foo
@@ -123,8 +231,6 @@ L cons(L a, L d) {
 #endif
   // 1.2% faster!
   /// also fits better with free list? hmmm?
-  *++cnext= a;
-  *++cnext= d;
 
   // TODO: how about freelist etc?
 
@@ -136,14 +242,6 @@ L cons(L a, L d) {
   //ncell+= 2; return ((ncell-2)<<2)+3; // ENC // faster! than ptr (unsafer..)
   //return ((cnext-cell-1)<<2)+3; // ENC // ptr arith cost
 }
-
-// macro takes less code than funcall, and is faster
-#define iscons(c) (((c)&3)==3)
-
-// unsafe macro 10% faster,but uses 80 bytes more
-// make sure it's iscons first (in loop)!
-#define CAR(c) (cell[ (c)>>2   ])
-#define CDR(c) (cell[((c)>>2)+1])
 
 // returning nil is faster than 0! (1%)
 L car(L c)         { return iscons(c)? CAR(c): nil; }
@@ -193,7 +291,6 @@ char isatomchar(char c) {
 #define isatom(x) ((x&3)==1)
 
 char* atomstr(L x) {
-  //if (!x) return "nil";
   if (!isatom(x)) return NULL;
   return arena + 4 + (x>>2); //ENC
 }
@@ -279,20 +376,7 @@ L atom(char* s) {
   char h, *p;
   void **pi;
 
-  assert(sizeof(void*)==2); // cc65, see below ptr
-
-  //if (0==strcmp(s, "nil")) return nil;
-
-#ifdef HEAP
-  p= strdup(s);
-  r= (L)p; // not portable
-
-  // TODO: keep list of syms?
-  //p= malloc(n+2);
-  //strcpy(p, s);
-  //syms= cons(r, syms);
-  //print(syms);
-#endif
+  //assert(sizeof(void*)==2); // cc65, see below ptr
 
 #ifdef HASH
   h= hash(s);
@@ -306,17 +390,18 @@ L atom(char* s) {
     assert(arptr<=arend);
     // TODO: memcpy safer? other arch
     pi[0]= syms[h]; // prev ptr (maybe use offset for portability?)
-    pi[1]= nil; // global val
+    pi[1]= (void*)nil; // global val
     strcpy(p+4, s);
     syms[h]= p;
   }
+
+  // TODO: change to actual pointer?
   r= ((p-arena)<<2)+1; // ENC
-  //assert(0==strcmp(s, atomstr(r)));
+  
 #endif
 
   return r;
 }
-
 
 // --- Strings
 
@@ -332,24 +417,32 @@ L atom(char* s) {
 
 // --- Numbers
 
-// macor smaller code and 10% faster
+// With number just being *2 ... 
+// sum 50 x 1 takes 179s instead of 137s => 39% faster
+// mul 50 x 1 takes 206s instead of 253s => 18% faster
+//   (if test num   sum: 186s   mul: 255s  LOL
+// and save 30b code too! LOL
+
+// macro smaller code and 10% faster
 #define isnum(x) (!((x)&1))
 
-#define NUM(x) ((x)/2-1)
+// simple now, but can often avoid if + -, if / need/2
+#define NUM(x)   ((x)/2)
+#define MKNUM(n) ((n)*2)
 
 int num(L x) {
+  // TODO: one line? one return, less code?
   if (!isnum(x)) return 0; // "safe"
   return NUM(x);
 }
 
-#define MKNUM(n) ((n+1)*2)
-
 // no need inline/macro
 L mknum(int n) {
-  // TODO: negatives?
-  assert(n >= 0);
+  // TODO: large numbers... bignums?
+  assert(abs(n)<=16384);
   return MKNUM(n);
 }
+
 
 // ---------------- IO
 
@@ -391,7 +484,8 @@ L lreadlist(char t) {
 L lread() {
   // TODO: skip single "," for more insert nil? [1 2,3 ,, 5]
   char c= spc();
-  if (!c || c=='(' || c=='{' || c=='[') return lreadlist(c);
+  if (!c) return eof;
+  if (c=='(' || c=='{' || c=='[') return lreadlist(c);
   if (isdigit(c)) { // number
     // TODO: negative numbers... large numbers? bignum?
     int n= 0;
@@ -414,41 +508,44 @@ L lread() {
     return atom(s);
   }
   if (c=='\'') return cons(quote, cons(lread(), nil));
-  //if (c=='"') { // string
-    //assert(!"NIY: strings use atom?");
-//}
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
   return error;
 }
 
+// ---------------- Variables
+
 L assoc(L x, L l) {
   L p;
-  while(l) {
-    p= car(l);
-    if (car(p)==x) return cdr(p);
-    l= cdr(l);
+  while(iscons(l)) {
+    p= CAR(l);
+    if (car(p)==x) return p;
+    l= CDR(l);
   }
   return nil;
 }
 
 L setval(L x, L v, L e) {
   L p= assoc(x, e);
-  if (p) return setcdr(p, v);
+  if (!null(p)) return setcdr(p, v);
+  // TODO: optimize as assoc() call is expensive (e==nil)
   return setatomval(x, v); // GLOBAL
 }
 
 L getval(L x, L e) {
   L p= assoc(x, e);
-  if (p) return cdr(p);
+  if (!null(p)) return cdr(p);
+  // TODO: optimize as assoc() call is expensive (e==nil)
   return atomval(x); // GLOBAL
 }
+
+
+// ---------------- EVAL/APPLY
 
 L eval(L x, L e); // forward
 L apply(L f, L a, L e); // forward
 
-// primops()
-#include "al.c"
+#include "al.c" // primops()
 
 L apply(L f, L a, L e) {
   // TODO: trace
@@ -458,44 +555,41 @@ L apply(L f, L a, L e) {
   //printf("E= "); print(e);
   if (isatom(f)) return primop(NUM(ATOMVAL(f)), a, e);
 
-  assert(!"UDF?"); // TODO:
-  return nil;
+  // assert(!"UDF?"); // TODO:
+  return error;
 }
 
 L eval(L x, L e) {
   if (null(x) || isnum(x) || isstr(x)) return x;
   if (isatom(x)) return getval(x, e);
   if (iscons(x)) return apply(car(x), cdr(x), e);
+  print(x);
   printf("%%LISP: unknown data type %04x\n", x);
   abort();
 }
 
+// TODO: princ? prin1?
+
 // print unquoted value without space before/after
 L prin1(L x) {
+  L i= x;
   //printf("%d=%d=%04x\n", num(x), x, x);
   if (null(x)) printf("nil");
-  else if (iscons(x)) {
-    L i= x;
+  else if (isnum(x)) printf("%d", num(x));
+  else if (isatom(x))  printf("%s", atomstr(x));
+  else if (iscons(x)) { // printlist
     putchar('(');
     do {
       prin1(car(i));
       i= cdr(i);
-      if (i) putchar(' ');
-    } while (i && iscons(i));
-    if (i) {
+      if (!null(i)) putchar(' ');
+    } while (!null(i) && iscons(i));
+    if (!null(i)) {
       printf(". ");
       prin1(i);
     }
     putchar(')');
-  } else if (isnum(x)) {
-    printf("%d", num(x));
-  } else if (isatom(x)) {
-    // TODO: if |foo  bar| input => prin1 should print s
-    printf("%s", atomstr(x));
-    //printf("%s|%d|#%2x", atomstr(x), (x>>2), hash(atomstr(x)));
-  // TODO: isstring - or for now use atoms?
-  //} else if (isstr(x)) {
-  }
+  } else printf("LISP: Unknown data %04x\n", x);
   return x;
 }
 
@@ -504,6 +598,9 @@ L print(L x) {
   terpri();
   return r;
 }
+
+
+// ---------------- Register Functions
 
 void regc(char* name, char n) {
   L a= atom(name);
@@ -515,8 +612,7 @@ void reg(char* charspacename) {
   regc(charspacename+2, c);
 }
 
-// TODO: point to these in arena?
-
+// TODO: point to these from arena?
 char* names[]= {
   // nargs
   ": de", ": define", ": defun",
@@ -558,19 +654,26 @@ char* names[]= {
 void initlisp() {
   char** s= names;
 
-  // optimize linear allocation
-  cnext= cell-1; ncell= -3-2;
+  // Align lower bits == xx01, CONS inc by 4!
+  L x= (L)cell;
+  while(!iscons(x)) x++;
+  //printf("x   = %04x %d\n", x, x);
+  cnext= (L*)x;
+  cnext--;
+  //printf("next= %04x\n", cnext);
+  assert(x&1);
 
   // important assumption for cc65
   // (supress warning: error is set later, now 0)
   assert(sizeof(L)+error==2); 
+  assert(sizeof(void*)+error==2); // used in atom function
 
   // special symbols
-  //nil= atom("nil"); // nil==0, NOT!!!
-  T= atom("T");
-  printf("NIL=%d\n", nil);
-  error= atom("ERROR");
+    nil= atom("nil");
+      T= atom("T");
   quote= atom("quote");
+  error= atom("ERROR");
+    eof= atom("*EOF*");
 
   // register function names
   while(*s) {
@@ -579,73 +682,38 @@ void initlisp() {
   }
 }
 
-#define PERFTEST
-int fib(int n) {
-  if (n<2) return n;
-  else return fib(n-1)+fib(n-2);
-}
-
-L lispfib(L n) {
-  n= num(n);
-  if (n<2) return mknum(n);
-  else return mknum(num(lispfib(mknum(n-1)))+num(lispfib(mknum(n-2))));
-}
-
-L flispfib(L n) {
-  n= NUM(n);
-  if (n<2) return MKNUM(n);
-  else return MKNUM(NUM(lispfib(MKNUM(n-1)))+NUM(lispfib(MKNUM(n-2))));
-}
-
-//#define CL
-#ifdef CL
-int fib(int n) {
-  if (n<2) return n;
-  else return fib(n-1)+fib(n-2);
-}
-
-// This will FAIL with -Cl optimization!!!
-int lfib(int n) {
-  int r= n;
-  if (n>=2) { r= lfib(n-1); r+= lfib(n-2); }
-  //if (n>=2) r= lfib(n-1)+lfib(n-2); // works!
-  return r;
-}
+//#define PERFTEST
+#ifdef PERFTEST
+#include "perf-test.c"
 #endif
 
 int main(int argc, char** argv) {
+  char echo= 0, noeval= 0, quiet= 0;
   int i;
   L r, x, env= nil;
 
   // TODO: define way to test, and measure clocks ticks
   int n= 1;
 
-  #ifdef CL  
-  printf("FIB(7)= %d\n", fib(7));
-  printf("lFIB(7)= %d\n", lfib(7));
-  assert(fib(7)==lfib(7));
-  #endif
-
-  //printf("lispFIB(7)= %d\n", fib(7));
   #ifdef PERFTEST
-  n= 21;
-  //printf("FIB(%d)= %d\n", n, fib(21)); // 21=>3s
-  //printf("lispFIB(7)= %d\n", num(lispfib(mknum(7))));
-  // same speed? lispfib and flispfib=macro
-  //printf("lispFIB(%d)= %d\n", n, num(lispfib(mknum(n)))); // 21=>17s
-  //printf("FlispFIB(%d)= %d\n", n, NUM(flispfib(MKNUM(n)))); // 21=>17s
+  perftest();
+  exit(1);
   #endif
 
   initlisp();
 
-  // read args
+  // - read args
   while (--argc) {
     ++argv;
     //printf("ARG: %s\n", *argv);
     if (0==strcmp("-t", *argv)) {
       n= atoi(argv[1]);
       if (n) --argc,++argc; else n= 10000;
-    }
+      echo= 1; quiet= 1;
+    } else
+    if (0==strcmp("-q", *argv)) quiet= 1; else
+    if (0==strcmp("-E", *argv)) echo= 1; else
+    if (0==strcmp("-N", *argv)) noeval= 1;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -653,28 +721,28 @@ int main(int argc, char** argv) {
 //    }
   }
 
-//  r= 0;
-//  for(i=n; n>0; --n) {
-//    r+= fib(30);
-//  }
-
-  //printf("TESTS=%d\n", n);
-
   //clrscr(); // in conio but linker can't find (in sim?)
 
+  // set some for test
   setval(atom("bar"), mknum(33), nil);
-
   env= cons(cons(atom("foo"), mknum(42)), env);
-  do {
-    printf("65> ");
-    x= lread();
-    for(i=n; i>0; --i)
-      r= eval(x, env);
-    print(r);
-  } while (!feof(stdin));
 
-  // TODO: remove?
-  printf("\n\nExiting 65lisp\nBye\n\n");
+  if (!quiet)
+    printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
+
+  do {
+    if (!quiet) printf("65> ");
+    x= lread();
+    if (x==eof) break;
+    if (echo) printf("\n> "),print(x);
+    if (!noeval) {
+      for(i=n; i>0; --i) // run n tests
+        r= eval(x, env);
+      print(r); terpri();
+    }
+  } while (!feof(stdin));
+  if (!quiet) terpri();
+
   return 0;
 }
 

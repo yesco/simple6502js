@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>.
 
 #include <conio.h>
 
@@ -9,6 +10,30 @@ int main() {//int argc, char** argv) {
 
   //clrscr(); // in conio but linker can't find (in sim?)
   //kbhit();
+
+  {
+    char *x= 0, *last= 0;
+    int i, d;
+    int z= 1024, n= 0;
+    int ta= 0, tm= 0;
+    printf("HEAP...\n");
+    do {
+      if (x && last) {
+        i= (int)x;
+        d= x-last-z;
+        printf("%2d\t%d%d%d\n", d, i&4, i&2, i&1);
+        ta+= z;
+        tm+= d+z;
+      }
+      last= x;
+      x = malloc(z);
+      n++;
+    } while(x);
+    printf("\nTOTAL: %u allocs of %d, %u bytes, used %u bytes\n",
+           n, z, ta, tm);
+    exit(0);
+  }
+  
 
 #ifdef FOO
   // output test
@@ -34,6 +59,7 @@ int main() {//int argc, char** argv) {
   printf("getchar=%d and '%c'\n", a, a);
 
 #endif
+
 
   for(a=32767; a>0; --a) {
 
