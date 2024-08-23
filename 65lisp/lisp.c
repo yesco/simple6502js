@@ -740,14 +740,14 @@ L apply(L fn, L args, L env) {
 }
 
 L eval(L x, L e) {
-  if (null(x) || isnum(x) || isstr(x)) return x;
-  if (isatom(x)) return getval(x, e);
+  // 56.771s if isconst first ./cons-test => 3.76% SPPEDUP
+  //   2.5% slowdown for (+ (* ... old: 43.80s
+  // 58.98s old way, 
+  // 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   if (iscons(x)) return apply(car(x), cdr(x), e);
-  print(x);
-  printf("%%LISP: unknown data type %04x\n", x);
-  abort();
+  if (isatom(x)) return getval(x, e);
+  return x;
 }
-
 
 // ---------------- Register Functions
 
