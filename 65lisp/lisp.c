@@ -107,8 +107,8 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, quote= 0, T;
-L error, eof, lambda;
+L nil, T, FREE;
+L error, eof, lambda, quote= 0;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
@@ -445,13 +445,38 @@ char* cused;
 
 char gcdeep= 0;
 
+void printmap() {
+  int n, i; char b;
+  L *a= cstart, *cend= cstart+MAXCELL;
+  printf("\nUSED: ");
+  do {
+    // TODO: measure cost of extra vars?
+    n= a-cstart, i= n/8;
+    b= 1<<(n&7);
+
+    printf("%d", !!(cused[i] & b));
+  } while (++a <= cnext+2);
+  printf("\n");
+}
+
 void mark(L a) {
+  // TODO: BUG: somehow, 42 doesn't get marked. It's the CDR
+  // yeah, it's on a non cons address, but the addition
+  // below below should handle it?
+
+  //if (isatom(a)) return; // this deletes 42...
+  // TODO: but somehow last nil in env get's replaced by *FREE*
+  if (null(a)) return;
+  if (isnum(a)) return;
+
+  printf("\n=>MARK: %d ", ((L*)a)-cstart); print(a);
+
   ++nmark;
   if (iscons(a)) {
     // TODO: measure cost of extra vars?
     unsigned int n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
-    if (cused[i] & b) return;
+    if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
 
     // TODO: what's the maxdepth? check w stack option
     //   then, limit it, but link to "next" TODO...
@@ -459,17 +484,50 @@ void mark(L a) {
 
     ++gcdeep;
     printf(" [%d/MARK: %d]", gcdeep, n); prin1(a); putchar(' ');
-    mark(CAR(a)); mark(CDR(a));
+    // TODO: need to pass address?
+    mark(CAR(a)); //mark(CDR(a)); // hmmm
+    mark(a+2); // hmmm
     --gcdeep;
 
-    cused[n/8]|= 1<<(n&7);
+    cused[n/8]|= (1<<(n&7));
     return;
+  }
+
+  // <= cnext is important! lol (for CDR)
+  if (((L*)a)>=cstart && ((L*)a) <= cnext) {
+    // TODO: measure cost of extra vars?
+    unsigned int n= ((L*)a)-cstart, i= n/8;
+    char b= 1<<(n&7);
+    if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
+    printf(" [%d/mark: %d]", gcdeep, n); prin1(a); putchar(' ');
+    cused[n/8]|= (1<<(n&7));
   }
 
   // TODO: strings, or anything heap allocated reclaimable
 }
 
-void sweep() { }
+void sweep() {
+  unsigned int n, i;
+  char b;
+  L *a= cstart-1, *cend= cstart+MAXCELL;
+  printf("\n-->sweep\n");
+  printmap();
+  do {
+    // TODO: measure cost of extra vars?
+    n= a-cstart, i= n/8;
+    b= 1<<(n&7);
+
+    //printf("%04x %d= ", a, a-cstart); print(*a);
+
+    if (!(cused[i] & b)) {
+      // FREE:
+      printf("UNUSED[%d]= ", a-cstart); print(*a);
+      *a= FREE;
+    }
+
+  } while (++a <= cnext+2);
+  printf("--sweep\n");
+}
 
 void GC(L env) {
   int i;
@@ -937,8 +995,9 @@ void initlisp() {
   assert(sizeof(void*)+error==2); // used in atom function
 
   // special symbols
-    nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
-      T= atom("T");     setval(T, T, nil);
+    nil= atom("nil");    ATOMVAL(nil)= nil; // LOL
+      T= atom("T");      setval(T, T, nil);
+  FREE= atom("*FREE*"); setval(FREE, FREE, nil);
   quote= atom("quote");
  lambda= atom("lambda");
   error= atom("ERROR"); setval(error, error, nil);
@@ -985,18 +1044,22 @@ void stats() {
 
 int main(int argc, char** argv) {
   char echo= 0, noeval= 0, quiet= 0;
-  int i;
-  L r, x, env= nil;
-
-  // TODO: define way to test, and measure clocks ticks
+  int i= 0;
   int n= 1;
 
+  L r, x, env;
+
+  initlisp();
+  env= nil; // must be done after initlisp();
+
+
+  // TODO: define way to test, and measure clocks ticks
   #ifdef PERFTEST
   perftest();
   exit(1);
   #endif
 
-  initlisp();
+  
 
   // - read args
   while (--argc) {
@@ -1042,6 +1105,7 @@ int main(int argc, char** argv) {
     }
     GC(env);
     if (!quiet) stats();
+    print(r); terpri();
   } while (!feof(stdin));
   if (!quiet) terpri();
 
