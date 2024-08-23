@@ -445,7 +445,7 @@ L mknum(int n) {
 }
 
 
-// ---------------- IO
+// ---------------- IO for parsing
 
 int _nc= 0;
 
@@ -513,6 +513,39 @@ L lread() {
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
   return error;
 }
+
+// ---------------- 
+// TODO: princ? prin1?
+
+// print unquoted value without space before/after
+L prin1(L x) {
+  L i= x;
+  //printf("%d=%d=%04x\n", num(x), x, x);
+  if (null(x)) printf("nil");
+  else if (isnum(x)) printf("%d", num(x));
+  else if (isatom(x))  printf("%s", atomstr(x));
+  else if (iscons(x)) { // printlist
+    putchar('(');
+    do {
+      prin1(car(i));
+      i= cdr(i);
+      if (!null(i)) putchar(' ');
+    } while (!null(i) && iscons(i));
+    if (!null(i)) {
+      printf(". ");
+      prin1(i);
+    }
+    putchar(')');
+  } else printf("LISP: Unknown data %04x\n", x);
+  return x;
+}
+
+L print(L x) {
+  L r= prin1(x);
+  terpri();
+  return r;
+}
+
 
 // ---------------- Variables
 
@@ -713,37 +746,6 @@ L eval(L x, L e) {
   print(x);
   printf("%%LISP: unknown data type %04x\n", x);
   abort();
-}
-
-// TODO: princ? prin1?
-
-// print unquoted value without space before/after
-L prin1(L x) {
-  L i= x;
-  //printf("%d=%d=%04x\n", num(x), x, x);
-  if (null(x)) printf("nil");
-  else if (isnum(x)) printf("%d", num(x));
-  else if (isatom(x))  printf("%s", atomstr(x));
-  else if (iscons(x)) { // printlist
-    putchar('(');
-    do {
-      prin1(car(i));
-      i= cdr(i);
-      if (!null(i)) putchar(' ');
-    } while (!null(i) && iscons(i));
-    if (!null(i)) {
-      printf(". ");
-      prin1(i);
-    }
-    putchar(')');
-  } else printf("LISP: Unknown data %04x\n", x);
-  return x;
-}
-
-L print(L x) {
-  L r= prin1(x);
-  terpri();
-  return r;
 }
 
 
