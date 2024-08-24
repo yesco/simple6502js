@@ -1079,8 +1079,8 @@ int main(int argc, char** argv) {
     if (0==strcmp("-N", *argv)) noeval= 1; else
     if (0==strcmp("-gc", *argv)) gc= 1; else
     if (0==strcmp("-d", *argv)) debug= 1; else
-    if (0==strcmp("-v", *argv)) verbose++; else
-    if (0==strcmp("-s", *argv)) stats= 1;
+    if (0==strcmp("-v", *argv)) ++verbose; else
+    if (0==strcmp("-s", *argv)) ++stats;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
