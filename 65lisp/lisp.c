@@ -103,6 +103,11 @@ unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 
 int debug= 0, verbose= 1;
 
+void* zalloc(size_t n) {
+  nalloc+= n;
+  return calloc(n, 1);
+}
+
 // ---------------- Lisp Datatypes
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
@@ -1032,10 +1037,10 @@ void initlisp() {
   char** s= names;
 
   // allocate memory
-  arptr= arena= calloc(ARENA_LEN, 1); arend= arena+ARENA_LEN; ++nalloc;
-  syms= (void**)calloc(HASH, sizeof(void*)); ++nalloc;
-  cstart= cell= (L*)calloc(MAXCELL, sizeof(L)); ++nalloc;
-  cused= (char*)calloc((MAXCELL+1)/(sizeof(L)*8), 1); ++nalloc;
+  arptr= arena= zalloc(ARENA_LEN); arend= arena+ARENA_LEN;
+  syms= (void**)zalloc(HASH*sizeof(void*));
+  cstart= cell= (L*)zalloc(MAXCELL*sizeof(L));
+  cused= (char*)zalloc((MAXCELL+1)/(sizeof(L)*8));
 
   // Align lower bits == xx01, CONS inc by 4!
   x= (L)cell;
@@ -1097,7 +1102,7 @@ void statistics(int level) {
     report("Eval", neval, &leval);
     report("Cons", ncons, &lcons);
     report("Atom", natoms, &latoms);
-    report("Allocs", nalloc, &lalloc);
+    report("Alloc", nalloc, &lalloc);
     report("Marks", nmark, &lmark);
     terpri();
   }
