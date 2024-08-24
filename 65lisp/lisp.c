@@ -5,10 +5,24 @@
 // lexical bindings. No macros.
 
 // Features:
-// - full closures
 // - lexical scoping
-// - highly optimized
-// - 
+// - highly optimized (using misaligned pointers!)
+// - \A gives ascii-code in reader
+// - ({[]}) doesn't care which char, only need to match, all gives list
+//   TODO: {} - could give assoc-list, [] - could give vector
+// - code ; comements
+// - |atom with spaces|
+// - (+ 1 2 3 (* 4 5 6)) - vararg
+
+// - TODO: full closures
+
+// Functions:
+// - math:  + - * / %   & | ^   = cmp
+// - test:  null atomp numberp consp 
+// - list:  cons car cdr consp list length assoc member mapcar(TODO) nth
+// - I/O:   print prin1 terpri read
+// - atoms: foo |with space| cmp
+
 
 // TODO:
 // - closures
@@ -23,14 +37,16 @@
 // IMPLEMENTION DETAILS
 //
 // Data Representation
-//
+
 // - iiii iiii  iiii iii0  INT : limited ints -16K to +16K 15 bits
-// - cccc cccc  cccc cc11  CONS: not aligned! step 4B, 16K cons, 64K ram
-// - oooo oooo  oooo o101  ATOM: constants/offset in arena up to 8K ram
+// - cccc cccc  cccc cc11  CONS: actual ptr, step 4B, 16K cons, 64K ram
+// - oooo oooo  oooo o101  ATOM: actual ptr, const into ARENA of 1K
 
 // FUTURE:
 //
 // - pppp pppp  pppp p001  HEAP-OBJ: 8 bytes aligned (+1) total 64K
+//                  however, requires atoms to do this too
+//                  waste avg 4 bytes per atom/alloc
 
 // Here is the fun: for variables sized objects:
 //
@@ -266,8 +282,8 @@ char hash(char* s) {
 // Arena - simple for now
 char* arena, *arptr, *arend;
 
-char isatomchar(char c) {
-  return (char)(int)!strchr(" \t\n\r`'\"\\()[]{}", c);
+char isatomchar(char c) { //test for non-chars
+  return (char)(int)!strchr(" \t\n\r.;`'\"\\()[]{}", c);
 }
 
 //  57 bytes extra for ptr % 3 ==  01
@@ -629,7 +645,9 @@ L lread() {
     if (!q) unc(c);
     return atom(s);
   }
+  if (c=='\\') return MKNUM(nextc());
   if (c=='\'') return cons(quote, cons(lread(), nil));
+  if (c==';') { while((c=nextc()) && c!='\n' && c!='\r'); return lread(); }
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
   return error;
@@ -809,6 +827,12 @@ L eval(L x, L env) {
     // TODO: bad assumption it's an ATOM, lambda?
     //f= NUM(eval(f, env)); double time!
     // TODO: CHEAT! bad assumption it's an ATOM, lambda?
+
+    // TODO: not lambda?
+    while(iscons(f)) f= eval(f, env);
+
+    //if (!isatom(f))
+
     f= NUM(isnum(f)? f: ATOMVAL(f));
 
     // OVERALL: slightly faster, 
@@ -845,7 +869,7 @@ L eval(L x, L env) {
     // - https://github.com/yesco/parsie/blob/main/al.c
 
     // LETTERS FREE:
-    //    "     ()  , . 0123456789     ?
+    //    "     ()  , . 0123456789     
     //  @                         Z[ ] 
     //  `abcdefghijklmnopqrstuvwxyz{ }~
 
@@ -857,6 +881,7 @@ L eval(L x, L env) {
     case 'I': return iff(x, env);
     //case 'X': return TODO: FUNCALL! eXecute
     case 'Y': return lread();
+      // TODO: non-blocking getchar (0 if none)
     case '\'':return car(x); // quote
     case '\\':return cons(lambda, x);
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
@@ -891,9 +916,10 @@ L eval(L x, L env) {
     x= CDR(x);
 
     switch(f) {
+    // TODO: add this to dictionary!
     case '!': return isatom(a)? T: nil; // TODO: issymbol ???
     case '#': return isnum(a)? T: nil;
-    case '$': return isstr()? T: nil;
+    //case '$': return isstr()? T: nil;
 
     case 'A': return car(a);
     case 'D': return cdr(a);
@@ -986,13 +1012,17 @@ char* names[]= {
 
   "* *",
   "+ +",
+
   "L list",
   "H append",
   
   // one arg
+  "! atom", // "! symbolp", // or symbol?
+  "# numberp", // "# intp"
+  //"$ stringp", 
   "A car",
   "D cdr",
-  "K consp",
+  "K consp", // listP
   "O length",
   "P print",
   "T terpri",
@@ -1144,7 +1174,7 @@ int main(int argc, char** argv) {
   setval(atom("cdr"), mknum((int)(char*)cdr), nil);
 
   if (!quiet)
-    printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
+    printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
 
   if (stats) statistics(3);
   do {
