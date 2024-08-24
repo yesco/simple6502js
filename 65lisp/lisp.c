@@ -14,24 +14,23 @@
 // - |atom with spaces|
 // - (+ 1 2 3 (* 4 5 6)) - vararg
 
-// - TODO: full closures
-
 // Functions:
 // - math:  + - * / %   & | ^   = cmp
-// - test:  null atomp numberp consp 
+// - test:  null atomp numberp consp
 // - list:  cons car cdr consp list length assoc member mapcar(TODO) nth
 // - I/O:   print prin1 terpri read
 // - atoms: foo |with space| cmp
 
+// NO WAY:
+// - no macros, using NLAMBDA and DE!
 
 // TODO:
 // - closures
 // - GC of cons cells
-// - TODO: strings?
-// - TODO: bignums? wrote a bignum.c
-
-// NO WAY:
-// - no macros, using NLAMBDA and DE
+// - Functions: getc putc
+// - strings?
+// - bignums? wrote a bignum.c
+// - ORIC functions, like graphics/5 byte floats?
 
 
 // IMPLEMENTION DETAILS
@@ -104,8 +103,7 @@
 //   DECREASE if run out of memory. LOL
 //#define MAXCELL 25*1024/2 // ~ 12K cells
 
-#define MAXCELL 4096*4
-//#define MAXCELL 8192*4
+#define MAXCELL 8192*2
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 1024
@@ -871,9 +869,17 @@ L eval(L x, L env) {
     // LETTERS FREE:
     //    "     ()  , . 0123456789     
     //  @                         Z[ ] 
-    //  `abcdefghijklmnopqrstuvwxyz{ }~
+    //  `abcdefghijklmnopqrstuvwxyz{ }
 
-    // --- nx
+    // TOOD:'<' '>'   '(' is <=   ')' is >=
+    // TODO: @=peek !=poke
+    // TODO: (=getc )=putc
+    // TODO: [=aref or just use O ]=arrayp
+    // TODO: Z=
+    // TODO: V=and _=or Z=not??? lol
+    // TODO: "=string
+
+    // --- nargs
     switch(f) {
       // - nlambda - no eval
     case ':': return de(x);
@@ -889,7 +895,7 @@ L eval(L x, L env) {
     //case 'J': return TODO: apply J or @
 
       // - nargs - eval many x
-    //case 'V': TODO: or
+    //case 'V': TODO: or ???
     //case '_': TODO: and ???
     case '+': a-=2;
     case '*':
@@ -930,6 +936,7 @@ L eval(L x, L env) {
     case 'T': terpri(); return nil;
     case 'U': return a? mknum(1): nil;
     case 'W': return prin1(a);
+    case '~': return mknum(~num(x));
     }
 
 
@@ -1035,6 +1042,7 @@ char* names[]= {
   "- -",
   "/ /",
   "| |",
+  "~ ~",
   "= eq", "= =",
   "? cmp",
 
