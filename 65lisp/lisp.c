@@ -261,29 +261,29 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
 
 typedef struct Atom {
   // TODO: move val to first pos...
-  struct Atom* next;
+  // - val first saves 40 bytes code
+  // - but not faster, 0.01% slower...?
   L val;
+  struct Atom* next;
   char name[];
 } Atom;
 
 #define MAXSYMLEN 32
 
-#ifdef HASH
-  void** syms;
+void** syms;
 
-  char hash(char* s) {
-    int c= 4711;
-    // TODO: find better hash function?
-    while(*s) {
-      c^= (c<<3) + 3* *s++;
-    }
-    return c & 0xff;
+char hash(char* s) {
+  int c= 4711;
+  // TODO: find better hash function?
+  while(*s) {
+    c^= (c<<3) + 3* *s++;
   }
+  return c & 0xff;
+}
 
-  // Arena - simple for now
-  char* arena, *arptr, *arend;
+// Arena - simple for now
+char* arena, *arptr, *arend;
 
-#endif
 
 char isatomchar(char c) {
   return (char)(int)!strchr(" \t\n\r`'\"\\()[]{}", c);
@@ -293,16 +293,9 @@ char isatomchar(char c) {
 // 141 bytes extra for ptr % 7 == 101
 
 #define isatom(x) (((x)&3)==1) 
-//#define isatom(x) (((x)&7)==(4+1))
+//#define isatom(x) (((x)&7)==(4+1)) // HEAP align 101
 
-char* atomstr(L x) {
-  if (!isatom(x)) return NULL;
-  //return arena + 4 + (x>>2); //ENC
-  return ((Atom*)x)->name;
-}
-
-// 3% cost of isatom()
-//#define ATOMVAL(x) (*(int*)&(arena[2+((x)>>2)])) // ENC
+#define ATOMSTR(a) (((Atom*)a)->name)
 #define ATOMVAL(x) (((Atom*)x)->val)
 
 L atomval(L x) {
@@ -405,6 +398,7 @@ L atom(char* s) {
     a= (Atom*)arptr;
     arptr+= 4+1+strlen(s);
     assert(arptr<=arend);
+
     a->next= syms[h];
     a->val= nil;
     strcpy(a->name, s);
@@ -561,7 +555,7 @@ void sweep() {
 
 void GC(L env) {
   int i;
-  char* a;
+  Atom* a;
   // TODO: anything on the stack if called deeply is problem!!!
   //   (worst case not marked and then deallocated => corruption)
 
@@ -575,9 +569,8 @@ void GC(L env) {
   for(i=0; i<HASH; ++i) {
     a= syms[i];
     while(a) {
-      L v= *(L*)a;
-      mark(v);
-      a= *(char**)(L**)a;
+      mark(a->val);
+      a= a->next;
     }
   }
 
@@ -667,7 +660,7 @@ L prin1(L x) {
   //printf("%d=%d=%04x\n", num(x), x, x);
   if (null(x)) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
-  else if (isatom(x))  printf("%s", atomstr(x));
+  else if (isatom(x)) printf("%s", ATOMSTR(x));
   else if (iscons(x)) { // printlist
     putchar('(');
     do {
@@ -813,6 +806,7 @@ L eval(L x, L env) {
     a= 2; // slightly faster this way?
     f= CAR(x); x= CDR(x);
 
+    // TODO: bad assumption it's an ATOM, lambda?
     f= NUM(isnum(f)? f: ATOMVAL(f));
 
     // OVERALL: slightly faster, 
