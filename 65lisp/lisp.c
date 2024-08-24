@@ -27,9 +27,9 @@
 // TODO:
 // - closures
 // - GC of cons cells
-// - Functions: getc putc
+// - Functions: getc putc setcar setcdr recons
 // - strings?
-// - bignums? wrote a bignum.c
+// - bignums? wrote a bignum.c use as strings/vector?
 // - ORIC functions, like graphics/5 byte floats?
 
 
@@ -873,8 +873,11 @@ L eval(L x, L env) {
 
     // TOOD:'<' '>'   '(' is <=   ')' is >=
     // TODO: @=peek !=poke
+    // TODO: (setcar 42 4711) - write a word to memory
+    // TODO: (setcdr 42 \A) - write a byte to memory
+    // TODO: (setcar array word) - write a word to array pos
     // TODO: (=getc )=putc
-    // TODO: [=aref or just use O ]=arrayp
+    // TODO: [=aref or just use nth? ]=arrayp
     // TODO: Z=
     // TODO: V=and _=or Z=not??? lol
     // TODO: "=string
@@ -1112,7 +1115,7 @@ void statistics(int level) {
   int cused= cnext-cell+1, hslots= 0, i;
   static unsigned int latoms, lcons, lalloc, leval, lmark; // TODO: arean?
 
-  for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
+  for(i=0; i<HASH; ++i) if (syms[i]) ++hslots;
 
   if (level>1) {
     printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
@@ -1128,8 +1131,6 @@ void statistics(int level) {
     report("Marks", nmark, &lmark);
     terpri();
   }
-
-  latoms= natoms; lcons= ncons; lalloc= nalloc;
 }
 
 int main(int argc, char** argv) {
