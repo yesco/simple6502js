@@ -259,6 +259,13 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
 //  b) INDEX:   array of ptrs to mallocs + array of vals
 //  c) HASH:    need linked list anyway...
 
+typedef struct Atom {
+  // TODO: move val to first pos...
+  struct Atom* next;
+  L val;
+  char name[];
+} Atom;
+
 #define MAXSYMLEN 32
 
 #ifdef HASH
@@ -282,15 +289,21 @@ char isatomchar(char c) {
   return (char)(int)!strchr(" \t\n\r`'\"\\()[]{}", c);
 }
 
-#define isatom(x) ((x&3)==1)
+//  57 bytes extra for ptr % 3 ==  01
+// 141 bytes extra for ptr % 7 == 101
+
+#define isatom(x) (((x)&3)==1) 
+//#define isatom(x) (((x)&7)==(4+1))
 
 char* atomstr(L x) {
   if (!isatom(x)) return NULL;
-  return arena + 4 + (x>>2); //ENC
+  //return arena + 4 + (x>>2); //ENC
+  return ((Atom*)x)->name;
 }
 
 // 3% cost of isatom()
-#define ATOMVAL(x) (*(int*)&(arena[2+((x)>>2)])) // ENC
+//#define ATOMVAL(x) (*(int*)&(arena[2+((x)>>2)])) // ENC
+#define ATOMVAL(x) (((Atom*)x)->val)
 
 L atomval(L x) {
   // TODO: whcih is faster?
@@ -322,6 +335,7 @@ void printarena() {
 }
 
 // search arena, this could save next link...
+// TODO: won't work, as aligned ptr now
 void* searchatom2(char* s) {
   char* a= arena;
   a= arena;
@@ -334,6 +348,7 @@ void* searchatom2(char* s) {
 }
 
 // slower, lol!
+// TODO: won't work, as aligned ptr now
 void* searchatom(char* s) {
   char *a= arena, *p, *aa;
   while(a<arptr) {
@@ -353,10 +368,10 @@ void* searchatom(char* s) {
 #endif
 
 // search linked list
-void* findatom(char* a, char* s) {
+Atom* findatom(Atom* a, char* s) {
   while(a) {
-    if (0==strcmp(s, a+4)) return a;
-    a= *(char**)(L**)a;
+    if (0==strcmp(s, a->name)) return a;
+    a= a->next;
   }
   return NULL;
 }
@@ -368,36 +383,38 @@ void* findatom(char* a, char* s) {
 //   (however, I think increase codesize lots!)
 L atom(char* s) {
   L r;
-  char h, *p;
+  char h;
   void **pi;
+  Atom *a;
 
-  //assert(sizeof(void*)==2); // cc65, see below ptr
-
-#ifdef HASH
   h= hash(s);
   //p= searchatom(s);  // slower 24s for 4x150.words
   //p= searchatom2(s); // slower 32s for 4x150.words
-  p= findatom(syms[h], s); // fast 14s for 4x150.words
-  if (!p) {
+  a= findatom(syms[h], s); // fast 14s for 4x150.words
+  if (!a) {
     // create atom
     ++natoms;
-    p= arptr;
-    pi= (void**)p;
+
+    // WHATIF: heap object x01, point at attr value
+    //    char type;
+    // -> L val;
+
+    // align as: not cons: == x01
+    while (!isatom((int)arptr)) ++arptr;
+
+    a= (Atom*)arptr;
     arptr+= 4+1+strlen(s);
     assert(arptr<=arend);
-    // TODO: memcpy safer? other arch
-    pi[0]= syms[h]; // prev ptr (maybe use offset for portability?)
-    pi[1]= (void*)nil; // global val
-    strcpy(p+4, s);
-    syms[h]= p;
+    a->next= syms[h];
+    a->val= nil;
+    strcpy(a->name, s);
+    syms[h]= a;
   }
 
-  // TODO: change to actual pointer?
-  r= ((p-arena)<<2)+1; // ENC
-  
-#endif
-
-  return r;
+  // -- but 120 bytes more storage used
+  // 41.47s ret actual pointer FASTER: 5.2%, BYTES; -120b !!
+  // 43.75s returning complex index
+  return a;
 }
 
 // --- Strings
