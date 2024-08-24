@@ -187,7 +187,15 @@ L prin1(L); // forward TODO: remove
 // (* 4096 2 2)
 
 // macro takes less code than funcall, and is faster
-#define iscons(c) (((c)&3)==3)
+#define iscons(c) (((c)&3)==3) // ==3 takes 1b more/invok
+
+// would be 50 bytes lighter (no cmp)
+//#define iscons(c) (((c)&3)) // lo byte
+//#define iscons(c) (c<0) // hi byte
+
+// Indirection, code: (- 24419 24292) = +127 bytes
+//#define iscons(c) ((*(char*)c)==3)
+
 //#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
 //#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
 
@@ -1101,6 +1109,7 @@ int main(int argc, char** argv) {
   if (!quiet)
     printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
 
+  statistics(3);
   do {
     if (!quiet) printf("65> ");
     x= lread();

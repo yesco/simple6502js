@@ -27,7 +27,7 @@ cl65 -O -t atmos lisp.c 2>/dev/null
 cc65 -O lisp.c 2>/dev/null
 
 echo
-ls -l lisp.*
+ls -l lisp.o lisp.out lisp.tap
 
 # simulation
 echo
