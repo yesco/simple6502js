@@ -521,8 +521,15 @@ void sweep() {
     //printf("%04x %d= ", a, a-cstart); print(*a);
 
     if (!(cused[i] & b)) {
+
       // FREE:
       DEBUG(printf("UNUSED[%d]= ", a-cstart); print(*a));
+
+      // TODO: freelist
+
+      // TODO: what if free CDR but not CAR? 
+      // TODO: test
+
       *a= FREE;
     }
 
