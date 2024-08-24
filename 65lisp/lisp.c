@@ -404,7 +404,7 @@ L atom(char* s) {
   // -- but 120 bytes more storage used
   // 41.47s ret actual pointer FASTER: 5.2%, BYTES; -120b !!
   // 43.75s returning complex index
-  return a;
+  return (L*)a;
 }
 
 // --- Strings
@@ -831,6 +831,8 @@ L eval(L x, L env) {
     // 43.59s letter num but have call code
     // 40.57s num CALL -- 10% faster!
 
+    // BUG: if f => atom (not num) it'll call random stuff!
+
     // CALL direct address of function
     // (test highbyte this was is "cheaper" 1%)
     if (f & 0xff00) return ((FUN1)f)( eval(car(x), env) );
@@ -928,10 +930,13 @@ L eval(L x, L env) {
     case '-': return mknum(num(a) - num(b));
     case '/': return mknum(num(a) / num(b));
     case '|': return mknum(num(a) | num(b));
-    //case '<': TODO: lt
-    //case '=': TOOD: eq
+    case '=': return a==b? T: nil;
+    case '?': if (a==b) return 0;
+      else if (isatom(a) && isatom(b)) return strcmp(ATOMSTR(a), ATOMSTR(b));
+      else return a-b; // no care type!
+    //case '<': TODO: ? 
     //case '>': TODO: gt
-    //case '^': TODO: xor bits
+    case '^': return mknum(num(a) ^ num(b));
 
     //case 'E': TOOD: Eval
     //case 'F': TODO: Filter ???
@@ -1012,6 +1017,8 @@ char* names[]= {
   "- -",
   "/ /",
   "| |",
+  "= eq", "= =",
+  "? cmp",
 
   "C cons",
   "B member",
@@ -1143,6 +1150,7 @@ int main(int argc, char** argv) {
   setval(atom("bar"), mknum(11), nil);
   env= cons(cons(atom("foo"), mknum(42)), env);
 
+  // nearly 10% faster... but little dangerous
   setval(atom("car"), mknum((int)(char*)car), nil);
   setval(atom("cdr"), mknum((int)(char*)cdr), nil);
 
