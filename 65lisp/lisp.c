@@ -263,6 +263,7 @@ typedef struct Atom {
   // TODO: move val to first pos...
   // - val first saves 40 bytes code
   // - but not faster, 0.01% slower...?
+  // echo "foo" | ./run -t ==> 0.01% faster LOL
   L val;
   struct Atom* next;
   char name[];
@@ -284,7 +285,6 @@ char hash(char* s) {
 // Arena - simple for now
 char* arena, *arptr, *arend;
 
-
 char isatomchar(char c) {
   return (char)(int)!strchr(" \t\n\r`'\"\\()[]{}", c);
 }
@@ -298,14 +298,12 @@ char isatomchar(char c) {
 #define ATOMSTR(a) (((Atom*)a)->name)
 #define ATOMVAL(x) (((Atom*)x)->val)
 
-L atomval(L x) {
-  // TODO: whcih is faster?
-  // TODO: return isatom(x)? ATOMAL(x): nil;
-  if (!isatom(x)) return nil;
-  return ATOMVAL(x);
-}
+// no faster? but 10 bytes less code... lol
+//#define atomval(x) (isatom(x)? ATOMVAL(x): nil)
 
-L getval(L x, L e);
+L atomval(L x) {
+  return !isatom(x)? nil: ATOMVAL(x);
+}
 
 L setatomval(L x, L v) {
   if (null(x) || !isatom(x)) return nil;
@@ -375,9 +373,7 @@ Atom* findatom(Atom* a, char* s) {
 //   and make "nil" first atom==offset 0!
 //   (however, I think increase codesize lots!)
 L atom(char* s) {
-  L r;
   char h;
-  void **pi;
   Atom *a;
 
   h= hash(s);
@@ -703,13 +699,29 @@ L setval(L x, L v, L e) {
   return setatomval(x, v); // GLOBAL
 }
 
-L getval(L x, L e) {
-  L p= assoc(x, e);
-  if (!null(p)) return cdr(p);
-  // TODO: optimize as assoc() call is expensive (e==nil)
-  return atomval(x); // GLOBAL
-}
+// TODO: get rid of?
+// only should be used in eval?
+//
+// might as well use eval(x, e) !!!
 
+#ifdef notused
+L getval(L x, L e) {
+//  L p;
+  L p= assoc(x, e);
+  return null(p)? atomval(x): cdr(p);
+
+#ifdef foo
+  // inline assoc (/ 5.29 6.21) => 14.8% faster
+  while(iscons(e)) {
+    p= CAR(e);
+    if (car(p)==x) break;
+    e= CDR(e);
+  }
+
+  return iscons(e)? cdr(p): atomval(x);
+#endif
+}
+#endif
 
 // ---------------- Lisp Functions
 
@@ -807,6 +819,8 @@ L eval(L x, L env) {
     f= CAR(x); x= CDR(x);
 
     // TODO: bad assumption it's an ATOM, lambda?
+    //f= NUM(eval(f, env)); double time!
+    // TODO: CHEAT! bad assumption it's an ATOM, lambda?
     f= NUM(isnum(f)? f: ATOMVAL(f));
 
     // OVERALL: slightly faster, 
@@ -933,7 +947,22 @@ L eval(L x, L env) {
 
   }
 
-  if (isatom(x)) return getval(x, env);
+  if (isatom(x)) {
+    // 4.56s insteadof
+    L p;
+    while(iscons(env)) {
+      p= CAR(env);
+      if (car(p)==x) break;
+      env= CDR(env);
+    }
+    return iscons(env)? cdr(p): atomval(x);
+  }
+
+
+  // TODO: if we assumed all atoms global:
+  //   2.29s same as number, instead of 6.7s
+  //if (isatom(x)) return ATOMVAL(x);
+
   return x;
 
   // assert(!"UDF?"); // TODO:
