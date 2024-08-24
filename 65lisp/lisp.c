@@ -88,9 +88,8 @@
 //   DECREASE if run out of memory. LOL
 //#define MAXCELL 25*1024/2 // ~ 12K cells
 
-//#define MAXCELL 4096*2
-#define MAXCELL 4096*3
-//#define MAXCELL 4096*2
+#define MAXCELL 4096*4
+//#define MAXCELL 8192*4
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 1024
@@ -177,9 +176,8 @@ L error, eof, lambda, quote= 0;
 //
 // -- Cons
 
-int ncell= 0;
-//L cell[MAXCELL]= {0};
-L *cell, *cnext, *cstart;
+unsigned int ncell= 0;
+L *cell, *cnext, *cstart, *cend;
 
 L prin1(L); // forward TODO: remove
 
@@ -191,55 +189,33 @@ L prin1(L); // forward TODO: remove
 
 // (* 4096 2 2)
 
-// macro takes less code than funcall, and is faster
-#define iscons(c) (((c)&3)==3) // ==3 takes 1b more/invok
-
-// would be 50 bytes lighter (no cmp)
-//#define iscons(c) (((c)&3)) // lo byte
-//#define iscons(c) (c<0) // hi byte
-
-// Indirection, code: (- 24419 24292) = +127 bytes
-//#define iscons(c) ((*(char*)c)==3)
-
-//#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
-//#define iscons(c) ((((c)&3)==1) && (c>=(L)cell) && (c<(L)(cell+MAXCELL)))
+#define iscons(c) (((c)&3)==3)
 
 // unsafe macro 10% faster,but uses 80 bytes more
 // make sure it's iscons first (in loop)!
-//#define CAR(c) (cell[ (c)>>2   ])
-//#define CDR(c) (cell[((c)>>2)+1])
 #define CAR(c) (*((L*)(c)))
 #define CDR(c) (((L*)(c))[1])
 
 L print(L x); // forward
 
 L cons(L a, L d) {
-  // remove one more... because 00001 bits...
-  //assert(ncell<MAXCELL+2); // 0.4% cost
-
-  // 4090 is fine?
-  // starts failing at 4096!!! ???
-  // (* 4096 2 2) 16384 bytes addressed? 32K I'd understand
-
   L r;
-  ++ncons;
-  *++cnext= a;
-  r= (L)cnext;
-  *++cnext= d;
-  return r;
+  //if (cnext+1 < cend) { // 10% extra cost
+  if (ncell>0) { // slightly faster
 
-  // 1.2% faster!
-  /// also fits better with free list? hmmm?
+    // TODO: use only one?
+    ++ncons;
+    --ncell;
 
-  // TODO: how about freelist etc?
+    *++cnext= a;
+    r= (L)cnext;
+    *++cnext= d;
+    return r;
+  }
 
-  // TODO: what if enc of CONS == 01 ?? just add 4, no manipulation
-  // TODO: what if consptrs were actual pointers w offset?
-  //printf("%04x\n", cnext+1);
-  assert(!(ncell&4)); // bit iii011 always zero... hmmm
-  return ncell+= 8; // 1.8% faster than ncell+2 .., 2.4% faster th ptr
-  //ncell+= 2; return ((ncell-2)<<2)+3; // ENC // faster! than ptr (unsafer..)
-  //return ((cnext-cell-1)<<2)+3; // ENC // ptr arith cost
+  printf("\n%% ERROR: run out of cons!\n");
+  // TDOO: longjmp?
+  return error;
 }
 
 // returning nil is faster than 0! (1%)
@@ -409,7 +385,7 @@ L atom(char* s) {
   // -- but 120 bytes more storage used
   // 41.47s ret actual pointer FASTER: 5.2%, BYTES; -120b !!
   // 43.75s returning complex index
-  return (L*)a;
+  return (L)a;
 }
 
 // --- Strings
@@ -469,7 +445,7 @@ char gcdeep= 0;
 
 void printmap() {
   int n, i; char b;
-  L *a= cstart, *cend= cstart+MAXCELL;
+  L *a= cstart;
   printf("\nUSED: ");
   do {
     // TODO: measure cost of extra vars?
@@ -1039,7 +1015,7 @@ void initlisp() {
   // allocate memory
   arptr= arena= zalloc(ARENA_LEN); arend= arena+ARENA_LEN;
   syms= (void**)zalloc(HASH*sizeof(void*));
-  cstart= cell= (L*)zalloc(MAXCELL*sizeof(L));
+  cstart= cell= (L*)zalloc(MAXCELL*sizeof(L)); ncell= MAXCELL-2;
   cused= (char*)zalloc((MAXCELL+1)/(sizeof(L)*8));
 
   // Align lower bits == xx01, CONS inc by 4!
@@ -1050,6 +1026,7 @@ void initlisp() {
   --cnext; // as we inc before assign!
   //printf("next= %04x\n", cnext);
   assert(x&1);
+  cend= cstart+MAXCELL;
 
   // statistics
   natoms= ncons= nalloc= 0;
@@ -1095,7 +1072,7 @@ void statistics(int level) {
   if (level>1) {
     printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
     printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d\n",
-      ncons, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN, natoms);
+      ncons, MAXCELL/2,  hslots, HASH,  arptr-arena, ARENA_LEN, natoms);
   }
 
   if (level) {
@@ -1134,7 +1111,7 @@ int main(int argc, char** argv) {
       if (n) --argc,++argc; else n= 10000;
       echo= 1; quiet= 1;
     } else
-    if (0==strcmp("-q", *argv)) quiet= 1; else
+    if (0==strcmp("-q", *argv)) quiet= 1, stats= 0; else
     if (0==strcmp("-E", *argv)) echo= 1; else
     if (0==strcmp("-N", *argv)) noeval= 1; else
     if (0==strcmp("-gc", *argv)) gc= 1; else
@@ -1162,7 +1139,7 @@ int main(int argc, char** argv) {
   if (!quiet)
     printf("65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n");
 
-  statistics(3);
+  if (stats) statistics(3);
   do {
     if (!quiet) printf("65> ");
     x= lread();
@@ -1173,7 +1150,7 @@ int main(int argc, char** argv) {
         r= eval(x, env);
     }
     print(r); terpri();
-    if (!quiet && stats) statistics(stats);
+    if (stats) statistics(stats);
     if (gc) GC(env);
   } while (!feof(stdin));
   if (!quiet) terpri();
