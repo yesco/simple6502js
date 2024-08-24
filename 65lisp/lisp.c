@@ -101,6 +101,8 @@
 // --- Statisticss
 unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 
+int debug= 0, verbose= 1;
+
 // ---------------- Lisp Datatypes
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
@@ -459,6 +461,9 @@ void printmap() {
   printf("\n");
 }
 
+//#define DEBUG(x) do{if(debug)x;}while(0)
+#define DEBUG(x) 
+
 void mark(L a) {
   // TODO: BUG: somehow, 42 doesn't get marked. It's the CDR
   // yeah, it's on a non cons address, but the addition
@@ -469,21 +474,21 @@ void mark(L a) {
   if (null(a)) return;
   if (isnum(a)) return;
 
-  printf("\n=>MARK: %d ", ((L*)a)-cstart); print(a);
+  DEBUG(printf("\n=>MARK: %d ", ((L*)a)-cstart); print(a));
 
   ++nmark;
   if (iscons(a)) {
     // TODO: measure cost of extra vars?
     unsigned int n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
-    if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
+    if (cused[i] & b) { DEBUG(printf(" [used %d %d] ", i, b)); return; }
 
     // TODO: what's the maxdepth? check w stack option
     //   then, limit it, but link to "next" TODO...
     //if (BIT(cused, n)) return;
 
     ++gcdeep;
-    printf(" [%d/MARK: %d]", gcdeep, n); prin1(a); putchar(' ');
+    DEBUG(printf(" [%d/MARK: %d]", gcdeep, n); prin1(a); putchar(' '));
     // TODO: need to pass address?
     mark(CAR(a)); //mark(CDR(a)); // hmmm
     mark(a+2); // hmmm
@@ -499,7 +504,7 @@ void mark(L a) {
     unsigned int n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
     if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
-    printf(" [%d/mark: %d]", gcdeep, n); prin1(a); putchar(' ');
+    DEBUG(printf(" [%d/mark: %d]", gcdeep, n); prin1(a); putchar(' '))
     cused[n/8]|= (1<<(n&7));
   }
 
@@ -510,8 +515,8 @@ void sweep() {
   unsigned int n, i;
   char b;
   L *a= cstart-1, *cend= cstart+MAXCELL;
-  printf("\n-->sweep\n");
-  printmap();
+  DEBUG(printf("\n-->sweep\n"));
+  DEBUG(printmap());
   do {
     // TODO: measure cost of extra vars?
     n= a-cstart, i= n/8;
@@ -521,12 +526,12 @@ void sweep() {
 
     if (!(cused[i] & b)) {
       // FREE:
-      printf("UNUSED[%d]= ", a-cstart); print(*a);
+      DEBUG(printf("UNUSED[%d]= ", a-cstart); print(*a));
       *a= FREE;
     }
 
   } while (++a <= cnext+2);
-  printf("--sweep\n");
+  DEBUG(printf("--sweep\n"));
 }
 
 void GC(L env) {
@@ -555,7 +560,7 @@ void GC(L env) {
   sweep();
 
   //if (!quiet)
-  terpri();
+  DEBUG(terpri());
 }
 
 
@@ -1021,29 +1026,32 @@ void report(char* what, unsigned int now, unsigned int *last) {
   *last= now;
 }
 
-void stats() {
+void statistics(int level) {
   int cused= cnext-cell+1, hslots= 0, i;
   static unsigned int latoms, lcons, lalloc, leval, lmark; // TODO: arean?
 
   for(i=0; i<HASH; ++i) if (syms[i])  ++hslots;
 
-  printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
-  printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d\n",
-         ncons, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN,
-         natoms);
+  if (level>1) {
+    printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
+    printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d\n",
+      ncons, MAXCELL,  hslots, HASH,  arptr-arena, ARENA_LEN, natoms);
+  }
 
-  report("Eval", neval, &leval);
-  report("Cons", ncons, &lcons);
-  report("Atom", natoms, &latoms);
-  report("Allocs", nalloc, &lalloc);
-  report("Marks", nmark, &lmark);
-  terpri();
+  if (level) {
+    report("Eval", neval, &leval);
+    report("Cons", ncons, &lcons);
+    report("Atom", natoms, &latoms);
+    report("Allocs", nalloc, &lalloc);
+    report("Marks", nmark, &lmark);
+    terpri();
+  }
 
   latoms= natoms; lcons= ncons; lalloc= nalloc;
 }
 
 int main(int argc, char** argv) {
-  char echo= 0, noeval= 0, quiet= 0;
+  char echo= 0, noeval= 0, quiet= 0, gc= 1, stats= 1;
   int i= 0;
   int n= 1;
 
@@ -1052,14 +1060,10 @@ int main(int argc, char** argv) {
   initlisp();
   env= nil; // must be done after initlisp();
 
-
   // TODO: define way to test, and measure clocks ticks
   #ifdef PERFTEST
   perftest();
-  exit(1);
   #endif
-
-  
 
   // - read args
   while (--argc) {
@@ -1072,7 +1076,11 @@ int main(int argc, char** argv) {
     } else
     if (0==strcmp("-q", *argv)) quiet= 1; else
     if (0==strcmp("-E", *argv)) echo= 1; else
-    if (0==strcmp("-N", *argv)) noeval= 1;
+    if (0==strcmp("-N", *argv)) noeval= 1; else
+    if (0==strcmp("-gc", *argv)) gc= 1; else
+    if (0==strcmp("-d", *argv)) debug= 1; else
+    if (0==strcmp("-v", *argv)) verbose++; else
+    if (0==strcmp("-s", *argv)) stats= 1;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -1101,11 +1109,10 @@ int main(int argc, char** argv) {
     if (!noeval) {
       for(i=n; i>0; --i) // run n tests
         r= eval(x, env);
-      print(r); terpri();
     }
-    GC(env);
-    if (!quiet) stats();
     print(r); terpri();
+    if (!quiet && stats) statistics(stats);
+    if (gc) GC(env);
   } while (!feof(stdin));
   if (!quiet) terpri();
 
