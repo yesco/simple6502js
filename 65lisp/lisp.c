@@ -917,7 +917,7 @@ L eval(L x, L env) {
         if (isnum(f)) break;
       }
       if (f==a) {
-        printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); print(x);
+        TRACE(printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); print(x));
         return ERROR;
       }
 
@@ -1323,11 +1323,11 @@ int main(int argc, char** argv) {
       for(i=n; i>0; --i) // run n tests
         r= eval(x, env);
     }
-    print(r); terpri();
+    print(r); 
     if (stats) statistics(stats);
     if (gc) GC(env);
   } while (!feof(stdin));
-  if (!quiet) terpri();
+  terpri();
 
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;

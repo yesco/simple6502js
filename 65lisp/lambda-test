@@ -1,22 +1,25 @@
-# forever error
-#echo "(nil 3 4)" | ./run -q -E
-#echo "(T 3 4)" | ./run -q -E
 
-#echo "((+ 0 car) (cons 42 666))" | ./run -q -E
-#echo "(+ 3 4)" | ./run -q E
-#echo "('+ 3 4)" | ./run -q -E
+./run -q -E $* <<HERE
 
-echo "((lambda (car c) (car c)) cdr (cons 42 666))" | ./run -q -E
-echo "((lambda (car c) ('car c)) cdr (cons 666 42))" | ./run -q -E
+(nil 3 4)
+(T 3 4)
 
-exit
+((+ 0 car) (cons 42 666))
+(+ 3 4)
+('+ 3 4)
 
-echo "(lambda () (+ foo 1000))" | ./run -q -E
-echo "((lambda () (+ foo 1000)))" | ./run -q -E
-echo "((lambda (foo) (+ foo 1000)) 77)" | ./run -q -E
-echo "((lambda (a b) (+ a b) (* a b)) 11 22)" | ./run -q -E
+((lambda (car c) (car c)) cdr (cons 42 666))
+((lambda (car c) ('car c)) cdr (cons 666 42))
 
-echo "((lambda (n) 42))" | ./run -q -E
-echo "((lambda (f n) (f n f)) (lambda (n) 42))" | ./run -q -E
+(lambda () (+ foo 1000))
+((lambda () (+ foo 1000)))
+((lambda (foo) (+ foo 1000)) 77)
+((lambda (a b) (+ a b) (* a b)) 11 22)
 
-echo "((lambda (f n) (funcall f 72)) (lambda (n) 42))" | ./run -q -E
+((lambda (n) 42))
+
+((lambda (f n) ('f n)) (lambda (n) (+ n n)) 42))
+((lambda (f n) ('f n f)) (lambda (n) (+ n n)) 3)
+((lambda (f n) ('f n f)) (lambda (n f) (+ n n)) 3)
+
+HERE
