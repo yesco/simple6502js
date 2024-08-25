@@ -6,7 +6,16 @@
 #include <unistd.h>
 #include <math.h>
 
+// --- CONFIG
+
+// show all paths
 int displayfail= 0;
+
+// set to desired screen size
+int h= 24, w= 38;
+
+
+// --- MEAT
 
 size_t len= 0;
 
@@ -24,12 +33,22 @@ void skipspace(char** ps) {
   while(isspace(**ps)) (*ps)++;
 }
 
-int h= 24, w= 38;
+void processatom(char** pr, char** ps, int* pc) {
+  // TDOO: string and |foo bar|
+  while(!isspace(**ps) && **ps!='(' && **ps!=')') {
+    out(pr, *((*ps)++)); ++(*pc);
+  }
+}
 
 float leastarea;
 
 float area(int h, int w, int wsum) {
-  return h * powf(10, w) * (wsum?wsum:1);
+  return powf(2,h)*powf(1.3,w)*powf(20, wsum?wsum:1);
+  return powf(2,h)*powf(w,2)*powf(20, wsum?wsum:1); // prettygood
+  return powf(100.0*w/h, h) * powf(7, w) * powf(100, wsum?wsum:1);
+  return powf(35.0*w/h, h) * powf(7, w);
+  return powf(30, h) * powf(10, w) * powf(1.1, wsum?wsum:1);
+  return h * powf(10, w) * pow(1.1, wsum?wsum:1);
   return h * powf(10, w); // seems goood
   return h * powf(1.5, w); // seems goood
   //return h * powf(1.1, w); // seems goood
@@ -56,12 +75,19 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
 
   // newline
   if (c==0) {
-    wsum+= c;
+    wsum+= r*c;
     r++; c= o; newline(&p, o);
     norecurse++;
+    skipspace(&s);
+    // line cannot start with ')'
+    if (*s==')') return;
+
   }
 
   while(*s) {
+
+    float a= area(r, maxw, wsum);
+    if (a > leastarea) return;
 
     switch(*s) {
     case ' ': case '\n': case '\r': case '\t': // ignore all but first
@@ -69,35 +95,33 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
       skipspace(&s);
       break;
     case '(':
+      //out(&p, 'A'+o);
+
+      // before every '(' choise of newline!
+      // TODO: this may be a never ending choice... delay others
+      if (!norecurse)
+        printer(s, r, 0, o, ostack, res, deep, maxw, sumarea);
+
       //out(&p, '0'+deep); // c++;
       ostack[deep]= o;
 
       ++deep;
       out(&p, *s++); c++;
       skipspace(&s);
-      // do one word
-      // TODO: or list... etc..
       int newo= c+2;
-      // TODO: need handle sexp as one unit?
-      while(!isspace(*s) && *s!='(' && *s!=')') {
-        out(&p, *s++); c++;
-      }
+
+      // process first word, if list, hmmm?
+      processatom(&p, &s, &c);
 
       // 1. choose to continue line
+      // TODO: not recurse
       printer(s, r, c, newo, ostack, res, deep, maxw, sumarea); 
 
-      // TODO: before every '(' choise of newline!
-
-      if (norecurse) --norecurse;
-      else printer(s, r, newo, o, ostack, res, deep, maxw, sumarea);
+      // 2. choose newline, 
+      if (norecurse) --norecurse; // set as will see
+      else printer(s, r, 0, newo, ostack, res, deep, maxw, sumarea);
 
       return;
-
-      // 2. choose newline
-      //r++; c= newo; newline(&p, o); skipspace(&s);
-      printer(s, r, 0, newo, ostack, res, deep, maxw, sumarea);
-      return;
-      break;
     case ')':
       // TODO: pop old offset? or at least at newline?
       deep--;
@@ -112,8 +136,9 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
       // each optimized independeintly
       if (!deep) { 
         sumarea+= area(r, maxw, wsum);
-        maxw= 0; wsum= 0;
-        r++; o= 0; newline(&p, o); c= 1; skipspace(&s);
+        maxw= 0; wsum= 0; o= 0;
+        printer(s, r, 0, o, ostack, res, deep, maxw, sumarea);
+        //r++; o= 0; newline(&p, o); c= 1; skipspace(&s);
       }
       // 1. continue line
       printer(s, r, c, o, ostack, res, deep, maxw, sumarea);
@@ -130,8 +155,9 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
       //r++; c= o; break;
       break;
     default:
-      if (*s < ' ') { skipspace(&s); break; }
-      out(&p, *s++); c++; break;
+      if (*s <= ' ') { skipspace(&s); break; }
+      //out(&p, *s++); c++; break;
+      processatom(&p, &s, &c);
     }
 
     // can't get better...
