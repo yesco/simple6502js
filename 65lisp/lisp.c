@@ -7,6 +7,7 @@
 // Features:
 // - lexical scoping
 // - highly optimized (using misaligned pointers!)
+// - quirk to avoid the (funcall f ...) use ('f ...) ! (see EVAL)
 // - \A gives ascii-code in reader
 // - ({[]}) doesn't care which char, only need to match, all gives list
 //   TODO: {} - could give assoc-list, [] - could give vector
@@ -23,6 +24,61 @@
 
 // NO WAY:
 // - no macros, using NLAMBDA and DE!
+
+// EVAL
+//
+// Eval is the main function of a lisp.
+//
+// 35 nil T ERROR *EOF* (lambda ...)
+//   -> all evaluates to themselves (the symbols are set to themselves)
+//
+// (+ 3 4) ('+ 3 4) (\+ 3 4) (43 3 4) ((+ 42 1) 3 4)
+//   -> 7 7 7 7 7
+//
+// (setq foo 'bar) (setq bar '+) ('foo 3 4)
+//
+// Also works! The CAR, the first argument, the function to call,
+// is evaluated *until* it's a NUMBER or a LAMBDA.
+// If it reaches an fixpoint, same value repated. Like (nil 3 4) .
+// The evaluation is aborted.
+//
+
+// FUNCALL problem
+//
+// The number is a Alphabetical Lisp byte code.
+// It's actually the character '+', in ASCII.
+// See the lisp.c source code in the EVAL functions for docs.
+//
+// Now, consider:
+//
+//    ((lambda (car c) (car c)) cdr (cons 42 666))
+//
+// This function; does it return 42 or 666?
+//
+// As implied: 42. As 666 is bad ;) .
+//
+// Hey, wait? What?
+//
+// It looks scheme-style without the FUNCALL.
+//
+// 6502 is quite a weak machine, to squeeze the last cycles out of
+// it, and the CC65 C Compiler, this is a common optimization of an
+// LISP 2, as COMMON LISPs..
+//
+// It means any function call assumes you're calling global functions.
+// This avoids the costly searching local environment.
+//
+// In COMMON LISP you'd write:
+//
+//    ((lambda (car c) (funcall car c)) cdr (cons 666 42))
+//
+// which is ugly
+//
+// Instead in 65LISP we do the following.
+//
+//    ((lambda (car c) ('car c)) cdr (cons 666 42))
+//
+// 
 
 // TODO:
 // - closures
@@ -95,6 +151,10 @@
 
 //#include <conio.h>
 
+//#define DEBUG(x) do{if(debug)x;}while(0)
+#define DEBUG(x) 
+#define TRACE(x)
+
 // ---------------- CONFIG
 
 // Number of cells (2 makes a cons)
@@ -127,8 +187,7 @@ typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE;
-L error, eof, lambda, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, quote= 0;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
@@ -222,14 +281,15 @@ L cons(L a, L d) {
     --ncell;
 
     *++cnext= a;
-    r= (L)cnext;
+    r= (L)cnext; // misalign it to where CAR was stored
     *++cnext= d;
+    DEBUG(printf("CONS: "); print(r));
     return r;
   }
 
   printf("\n%% ERROR: run out of cons!\n");
   // TDOO: longjmp?
-  return error;
+  return ERROR;
 }
 
 // returning nil is faster than 0! (1%)
@@ -440,7 +500,7 @@ L mknum(int n) {
   // TODO: large numbers... bignums?
   if(abs(n)>16382) {
     printf("\n%% ERROR: too big num: %d\n", n);
-    return error;
+    return ERROR;
   }
 
   return MKNUM(n);
@@ -470,9 +530,6 @@ void printmap() {
   } while (++a <= cnext+2);
   printf("\n");
 }
-
-//#define DEBUG(x) do{if(debug)x;}while(0)
-#define DEBUG(x) 
 
 void mark(L a) {
   // TODO: BUG: somehow, 42 doesn't get marked. It's the CDR
@@ -648,7 +705,7 @@ L lread() {
   if (c==';') { while((c=nextc()) && c!='\n' && c!='\r'); return lread(); }
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
-  return error;
+  return ERROR;
 }
 
 // ---------------- 
@@ -734,12 +791,12 @@ L eval(L x, L e); // forward
 
 L de(L args) {
   //assert(!"NIY: de");
-  return args?error:error;
+  return args?ERROR:ERROR;
 }
 
 L df(L args) {
   //assert(!"NIY: df");
-  return args?error:error;
+  return args?ERROR:ERROR;
 }
 
 // TODO: progn?
@@ -747,7 +804,7 @@ L df(L args) {
 // tailrecursion?
 L iff(L args, L env) {
   //assert(!"NIY: iff");
-  return args?error:env;
+  return args?ERROR:env;
 }
 
 //L lambda(L args, L env) {
@@ -760,7 +817,7 @@ L evallist(L args, L env) {
 
 L evalappend(L args) {
   //assert(!"NIY: append");
-  return args?error:error;
+  return args?ERROR:ERROR;
 }
 
 L length(L a) {
@@ -778,7 +835,7 @@ L member(L x, L l) {
 }
 
 L mapcar(L f, L l) {
-  return f&&l&&l?error:error;
+  return f&&l&&l?ERROR:ERROR;
 // TODO: lol, how to do without apply?
 //  return (null(l) || !iscons(l))? nil:
 //    cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
@@ -797,7 +854,17 @@ L nth(L n, L l) {
 // TODO: no apply function anymore? lol
 //return apply(car(x), cdr(x), env);
 
+#define islambda(x) (iscons(x)&&(car(x)==lambda))
+
 typedef L (*FUN1)(L);
+
+// TODO: inline
+L bindlist(L fargs, L args, L env) {
+  if (null(fargs)) return env;
+  // TODO: fargs= (foo . bar) == &rest
+  return cons( cons(car(fargs),eval(car(args),env)),
+               bindlist(cdr(fargs), cdr(args), env) );
+}
 
 L eval(L x, L env) {
   ++neval;
@@ -817,21 +884,81 @@ L eval(L x, L env) {
   // ===BASE===
   // 58.98s old way, lookup atom
 
+  TRACE(printf("EVAL: "); print(x));
+
   if (iscons(x)) {
-    L a, b, f; // 2 used by '*' and '-' LOL
-    a= 2; // slightly faster this way?
+    L a, b, f;
     f= CAR(x); x= CDR(x);
 
     // TODO: bad assumption it's an ATOM, lambda?
     //f= NUM(eval(f, env)); double time!
     // TODO: CHEAT! bad assumption it's an ATOM, lambda?
 
-    // TODO: not lambda?
-    while(iscons(f)) f= eval(f, env);
+    // first assume it's a global function
+    if (isatom(f)) f= ATOMVAL(f);
 
-    //if (!isatom(f))
+    // 5% slower for ./cons-test even if number
+    // TODO: why is the non-entered loop costly?
+    // ----------------- no loop, no isatom      43.95s, 42.09s BEFORE
+    //while(!isnum(f)) { // merry go-around?     45.03s, 44.22s
+    //while((f&1)==1) { // merry go-around?       44.20s, 43.38s  
 
-    f= NUM(isnum(f)? f: ATOMVAL(f));
+    // slowdown:     (/ 44.13 43.95) = 0.4%  (/ 43.31 42.09) = 2.9%
+    // Fine for doing the right thing!
+    // TODO: +1KB CODE though - see if can minimize bytes???
+    while((f&1)) { // merry go-around?         44.13s, 43.31s - acceptable
+
+      // follow chain of atoms => "local" or global value
+      a= nil;
+      while(isatom(f) && f!=a) {
+        TRACE(printf("ATOM again: "); print(f));
+        a= f; // avoid self loop nil/T etc
+        f= eval(f, env);
+        if (isnum(f)) break;
+      }
+      if (f==a) {
+        printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); print(x);
+        return ERROR;
+      }
+
+      // evaluate any cons until it's not...
+      a= nil;
+      while(iscons(f) && f!=a && !islambda(f)) {
+        TRACE(printf("EVAL again: "); print(f));
+        a= f; // avoid self loop nil/T etc
+        f= eval(f, env);
+      }
+
+      // LAMBDA - Let's APPLY
+      if (islambda(f)) {
+        TRACE(printf("LAMBDA: "); print(f));
+        // APPLY
+        f= cdr(f);
+        env= bindlist(car(f), x, env);
+        f= cdr(f);
+        TRACE(printf("   ENV: "); print(env));
+        // PROGN
+        while(iscons(f)) {
+          TRACE(printf("PROGN: "); print(car(f)));
+          a= eval(car(f), env);
+          f= cdr(f);
+        }
+        return a;
+      }
+
+      if (f==a) {
+        printf("RUN FOREVER.cons: "); prin1(f); printf(" on "); print(x);
+        return ERROR;
+      }
+    }
+
+    TRACE(printf("f => "); print(f));
+
+    // Yeah, now we do have a number!
+
+    //f= NUM(isnum(f)? f: ATOMVAL(f)); // original
+    f= NUM(f);
+
 
     // OVERALL: slightly faster, 
     // 44.33s using atom name, and no CALL just eval->letter
@@ -883,6 +1010,7 @@ L eval(L x, L env) {
     // TODO: "=string
 
     // --- nargs
+    a= 2; // used by + *
     switch(f) {
       // - nlambda - no eval
     case ':': return de(x);
@@ -892,7 +1020,7 @@ L eval(L x, L env) {
     case 'Y': return lread();
       // TODO: non-blocking getchar (0 if none)
     case '\'':return car(x); // quote
-    case '\\':return cons(lambda, x);
+    case '\\':return x;
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
     //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
@@ -916,7 +1044,7 @@ L eval(L x, L env) {
     }
 
     // --- one arg
-    if (!iscons(x)) return error;
+    if (!iscons(x)) return ERROR;
     a= eval(CAR(x), env);
 
     // slightly more expensive, passed a switch...
@@ -944,7 +1072,7 @@ L eval(L x, L env) {
 
 
     // --- two args
-    if (!iscons(x)) return error;
+    if (!iscons(x)) return ERROR;
     b= eval(CAR(x), env);
     x= CDR(x);
 
@@ -971,7 +1099,7 @@ L eval(L x, L env) {
     case 'M': return mapcar(a, b);
     case 'N': return nth(a, b);
 
-    default: return error;
+    default: return ERROR;
     }
 
   }
@@ -995,7 +1123,7 @@ L eval(L x, L env) {
   return x;
 
   // assert(!"UDF?"); // TODO:
-  //return error;
+  //return ERROR;
 }
 
 // ---------------- Register Functions
@@ -1081,8 +1209,8 @@ void initlisp() {
 
   // important assumption for cc65
   // (supress warning: error is set later, now 0)
-  assert(sizeof(L)+error==2); 
-  assert(sizeof(void*)+error==2); // used in atom function
+  assert(sizeof(L)+ERROR==2); 
+  assert(sizeof(void*)+ERROR==2); // used in atom function
 
   // special symbols
     nil= atom("nil");    ATOMVAL(nil)= nil; // LOL
@@ -1090,7 +1218,7 @@ void initlisp() {
   FREE= atom("*FREE*"); setval(FREE, FREE, nil);
   quote= atom("quote");
  lambda= atom("lambda");
-  error= atom("ERROR"); setval(error, error, nil);
+  ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
 
   // register function names
