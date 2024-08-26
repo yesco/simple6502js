@@ -1,48 +1,4 @@
-rm lisp.tap  2>/dev/null
-rm lisp.out  2>/dev/null
-rm lisp.o    2>/dev/null
-rm lisp.s    2>/dev/null
-
-# TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
-# TODO: linker -D __AUTORUN__=$C7
-
-echo
-
-# -Cl = make local variables static ==> 13% faster!
-# BSS: +84 bytes!
-# CODE: +8 bytes
-# - https://www.cc65.org/doc/cc65-2.html#option-Cl
-
-# "makes" all local vars static, however INIT is run every time!
-# cannot do recursion? -- see code in lisp: fibl works?
-
-# "Since the stack is emulated in software, this gives shorter and usually faster code, but the code is no longer reentrant. "
-
-#cl65 -Cl -O -t sim6502 lisp.c -o lisp.out -m lisp.map 2>/dev/null
-cl65 -O -t sim6502 lisp.c -o lisp.out -m lisp.map 2>/dev/null
-
-cl65 -O -t atmos lisp.c -o lisp.tap || exit 72
-echo
-cl65 -O -t atmos lisp.c 2>/dev/null
-cc65 -O lisp.c 2>/dev/null
-
-echo
-ls -l lisp.o lisp.out lisp.tap
-
-# simulation
-echo
-echo "=== RUN ==="
-#(time sim65 -c lisp.out $* ; echo "--- EXIT=$? ---") | tee lisp.log
-(sim65 -c lisp.out $* ; echo "--- EXIT=$? ---") | tee lisp.log
-echo
-(echo "`grep ' cycles' lisp.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
-
-echo
-grep '^Name' lisp.map
-grep '^CODE' lisp.map
-grep '^RODATA' lisp.map
-grep '^DATA' lisp.map
-echo
+./r lisp $*
 
 
 

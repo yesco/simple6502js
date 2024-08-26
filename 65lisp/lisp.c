@@ -152,8 +152,11 @@
 //#include <conio.h>
 
 // +2376 bytes! (a little much?)
-#define BIGMAX 100
-#include "bignum.c"
+//#define BIGMAX 100
+
+#ifdef BIGMAX
+  #include "bignum.c"
+#endif
 
 //#define DEBUG(x) do{if(debug)x;}while(0)
 #define DEBUG(x) 
@@ -1439,7 +1442,9 @@ int main(int argc, char** argv) {
 
   L r, x, env;
 
+  #ifdef BIGMAX
   btest(); return 0;
+  #endif
 
   initlisp();
   env= nil; // must be done after initlisp();
