@@ -12,7 +12,8 @@
 int displayfail= 0;
 
 // set to desired screen size
-int h= 24, w= 38;
+//int h= 24, w= 38;
+int h= 55, w= 80;
 
 
 // --- MEAT
@@ -43,8 +44,9 @@ void processatom(char** pr, char** ps, int* pc) {
 float leastarea;
 
 float area(int h, int w, int wsum) {
-  return powf(2,h)*powf(1.3,w)*powf(20, wsum?wsum:1);
-  return powf(2,h)*powf(w,2)*powf(20, wsum?wsum:1); // prettygood
+  return powf(2,h)*powf(1.3,w)*powf(10.1,wsum?wsum:1); // great for code.lisp
+  return powf(2,h)*powf(1.3,w)*powf(10.1,wsum?wsum:1); // great for code.lisp
+  return powf(2,h)*powf(1.3,w)*powf(10.1,wsum?wsum:1); // great for code.lisp
   return powf(100.0*w/h, h) * powf(7, w) * powf(100, wsum?wsum:1);
   return powf(35.0*w/h, h) * powf(7, w);
   return powf(30, h) * powf(10, w) * powf(1.1, wsum?wsum:1);
@@ -71,11 +73,13 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
   strcat(res, prev);
 
   int norecurse= 0;
-  int wsum= 0;
+  float wsum= 0;
 
   // newline
   if (c==0) {
-    wsum+= r*c;
+    //float rowcost= 10*r*c;
+    float rowcost= r*c;
+    wsum+= rowcost;
     r++; c= o; newline(&p, o);
     norecurse++;
     skipspace(&s);
@@ -190,7 +194,8 @@ void printer(char* s, int r, int c, int o, int* stack, char* prev, int deep, int
   //printf("%f\t%f\t%f\n", a, leastarea, 1e38);
 
   if (sumarea < leastarea) {
-    //printf("[H[2J[3J");
+    usleep(10*1000);
+    printf("[H[2J[3J");
     line(w);
     printf("%s", res);
     line(w);

@@ -171,6 +171,9 @@
 // Defined to use hash-table (with Arena
 #define HASH 256
 
+// max length of atom and constant strings
+#define MAXSYMLEN 32
+
 // --- Statisticss
 unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 
@@ -323,8 +326,6 @@ typedef struct Atom {
   struct Atom* next;
   char name[];
 } Atom;
-
-#define MAXSYMLEN 32
 
 void** syms;
 
@@ -608,7 +609,7 @@ void sweep() {
   DEBUG(printf("--sweep\n"));
 }
 
-void GC(L env) {
+void GC(L env, L alvals) {
   int i;
   Atom* a;
   // TODO: anything on the stack if called deeply is problem!!!
@@ -619,6 +620,7 @@ void GC(L env) {
 
   // -- enumerate all variables in program, like env
   mark(env);
+  mark(alvals);
 
   // -- walk through all globals, in symbols table
   for(i=0; i<HASH; ++i) {
@@ -717,6 +719,7 @@ L prin1(L x) {
   //printf("%d=%d=%04x\n", num(x), x, x);
   if (null(x)) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
+  //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) printf("%s", ATOMSTR(x));
   else if (iscons(x)) { // printlist
     putchar('(');
@@ -1085,7 +1088,7 @@ L eval(L x, L env) {
     case '=': return a==b? T: nil;
     case '?': if (a==b) return 0;
       else if (isatom(a) && isatom(b)) return strcmp(ATOMSTR(a), ATOMSTR(b));
-      else return a-b; // no care type!
+      else return mknum(a-b); // no care type!
     //case '<': TODO: ? 
     //case '>': TODO: gt
     case '^': return mknum(num(a) ^ num(b));
@@ -1125,6 +1128,139 @@ L eval(L x, L env) {
   // assert(!"UDF?"); // TODO:
   //return ERROR;
 }
+
+// ----------------= Alphabetical Lisp VM
+// EXPERIMENTIAL BYTE CODE VM
+
+// AL: 23.728s instead of EVAL: 38.29s => 38% faster
+//   now 27.67s... why?
+
+// define to test...
+
+//#define AL
+
+#ifndef AL
+  #define STACKSIZE 1
+#else
+  #define STACKSIZE 255
+#endif
+
+L stack[STACKSIZE]= {0}, *s= stack, *send;
+L alvals= 0;
+
+#ifdef AL
+#define NEXT goto next
+
+// ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
+//  24.47s added more oops, switch slower?
+L al(char* p) {
+  if (!p) return ERROR;
+  //printf("\nAL.run: %s\n", p);
+  p--;
+
+  s= stack;
+ next:
+  //assert(s<send);
+  //printf("al %c : ", p[1]); print(*s);
+
+  switch(*++p) {
+  case 0  : return *s--;
+  case '+': --s; *s+= s[1]; NEXT; // TODO: fix
+  case '*': --s; *s*= s[1]; *s/=2; NEXT; // TODO: fix
+  case '-': --s; *s= mknum(num(*s)-num(s[1])); NEXT;
+  case '/': --s; *s= mknum(num(*s)/num(s[1])); NEXT;
+
+  case '=': return s[0]==s[1]? T: nil;
+  case '?': if (*s==s[1]) return 0;
+    else if (isatom(*s) && isatom(s[1])) return strcmp(ATOMSTR(*s), ATOMSTR(s[1]));
+    else return mknum(*s-s[1]); // no care type!
+
+  case 'A': *s= car(*s); NEXT;
+  case 'D': *s= cdr(*s); NEXT;
+  case 'C': --s; *s= cons(*s, s[1]); NEXT;
+
+  case ',': ++s; *s= *(L*)++p; p+= sizeof(L)-1; NEXT;
+
+// 27.19s
+  case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': ++s; *s= MKNUM(*p-'0'); NEXT; 
+
+
+// 26.82s
+//  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
+
+// 30.45s
+//  default : if (isdigit(*p)) { ++s; *s= MKNUM(*p-'0'); NEXT; }
+//   printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+  default:
+    printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+  }
+}
+
+// reads lisp program s-exp from stdin
+// returning atom string containing AL code
+#define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
+
+char* alcompile(char* p) {
+  char c; int n= 0; L x, f;
+
+ again:
+  switch((c=nextc())) {
+  case 0  : return p;
+  case ' ': case '\t': case '\n': case '\r': goto again;
+  case'\'': quote:
+    ALC(',');
+    {
+      L* pi= (L*)p;
+      if (*pi) return NULL; // overflow?
+      *pi= lread();
+      p+= sizeof(L);
+      // make sure not GC:ed!
+      alvals= cons(*pi, alvals);
+    }
+    return p;
+
+  case '(': 
+    //spc();
+    f= nextc(); unc(f); // peek
+    if (f=='(') return NULL;
+    x= lread();
+    //printf("ALC.read fun: "); prin1(x);
+    // TODO: handle to do eval?
+    if (!isatom(x)) return NULL;
+    f= ATOMVAL(x);
+    if (!isnum(f)) return NULL;
+    f= NUM(f);
+    if (f=='L') f= 'C';
+    if (f=='\'') goto quote;
+    assert(f<255); // TODO:? handle inline address and 'X' ?
+    printf("=> %c\n", f);
+   
+    while((c=nextc())!=')') {
+      ++n;
+      p= alcompile(p);
+      // implicit FOLDL of nargs + - L
+      if (n>2) ALC(f);
+//      spc();
+    }
+    ALC(f); break;
+  default: ALC(c); break;
+  //default : // parse number
+    //n= 0;
+    //while(isdigit(c)) {
+    //c= nextc();
+  //}
+  }
+  return p;
+}
+
+L alcompileread() {
+  char al[MAXSYMLEN+2]= {0}, *p= al;
+  al[MAXSYMLEN]= 255; // end marker
+  p= alcompile(p);
+  return (p && *p!=255)? atom(al): ERROR;
+}  
+
+#endif
 
 // ---------------- Register Functions
 
@@ -1193,6 +1329,8 @@ void initlisp() {
   syms= (void**)zalloc(HASH*sizeof(void*));
   cstart= cell= (L*)zalloc(MAXCELL*sizeof(L)); ncell= MAXCELL-2;
   cused= (char*)zalloc((MAXCELL+1)/(sizeof(L)*8));
+
+  send= stack+STACKSIZE-1;
 
   // Align lower bits == xx01, CONS inc by 4!
   x= (L)cell;
@@ -1307,25 +1445,39 @@ int main(int argc, char** argv) {
   env= cons(cons(atom("foo"), mknum(42)), env);
 
   // nearly 10% faster... but little dangerous
+#ifndef AL
   setval(atom("car"), mknum((int)(char*)car), nil);
   setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+#endif
 
   if (!quiet)
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
 
   if (stats) statistics(3);
+
+  r= ERROR;
   do {
     if (!quiet) printf("65> ");
+#ifndef AL
     x= lread();
+#else
+    x= alcompileread();
+    printf("AL.compiled: "); print(x);
+#endif
     if (x==eof) break;
     if (echo) printf("\n> "),print(x);
     if (!noeval) {
       for(i=n; i>0; --i) // run n tests
+#ifndef AL
         r= eval(x, env);
+#else
+        r= al(isatom(x)? ATOMSTR(x): NULL);
+//       r= mknum(42);
+#endif
     }
     print(r); 
     if (stats) statistics(stats);
-    if (gc) GC(env);
+    if (gc) GC(env, alvals);
   } while (!feof(stdin));
   terpri();
 
