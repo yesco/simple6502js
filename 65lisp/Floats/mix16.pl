@@ -64,6 +64,7 @@ if (1) {
     # NEW 16
     $method = 'f32word';
     $method = 'j16'; # 
+    $method = 'j12'; # to fit into pointer...
 
 
 
@@ -222,6 +223,18 @@ if (1) {
         #$xxx = 256; # max exponent give 1 101 10...
         #$xxx = 38; # max exponent not give 1 10 10
         $xxx= 64; # 2-3 digits 1 10 100... 256 values 1-10
+        #$xxx = 308; # max exponent // not 1 10 100
+        $base = 10 ** (1/$pirange*$xxx); 
+	$offset = $pirange; # 0..1
+        #$istride = 256; # for display purposes
+    } elsif ($method eq 'j12') {
+        # -1e33 ... -1e-33 0 1e-33 ... 1e33 
+        $maxn = 4096; # 12 bit
+        $pirange = 65536/2/2;
+        #$base = 3.40282e+38 ** (1/$pirange);
+        #$xxx = 256; # max exponent give 1 101 10...
+        #$xxx = 38; # max exponent not give 1 10 10
+        $xxx= 256; # 2-3 digits 1 10 100... 256 values 1-10
         #$xxx = 308; # max exponent // not 1 10 100
         $base = 10 ** (1/$pirange*$xxx); 
 	$offset = $pirange; # 0..1

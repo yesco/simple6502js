@@ -23,15 +23,29 @@
 
 // TODO: for 6502 compiler cc65
 //   - no dyn array, only constant...
-//   - no usleep()
-//   - strlen() limited to 255
 //   - if use bytes for 00-99 then upto 512 digits...
 //   - if use int for 0000-9999 can use int count front - unlimited
 
+
 #include <stdio.h>
 #include <assert.h>
-#include <ctype.h> // isdigit
+#include <ctype.h>
 #include <string.h>
+
+// enable this for ORIC and small systems, no flex size arrays
+// open source alternatives, surely bigger...
+// - https://en.m.wikipedia.org/wiki/List_of_arbitrary-precision_arithmetic_software
+// here is some review: 
+// - 
+
+// Put this befor your include
+//#define BIGMAX 100
+
+#ifdef BIGMAX
+  #define BDIM(v, z) char v[BIGMAX]={0}
+#else
+  #define BDIM(v, z) char v[z]={0}
+#endif
 
 int bprint(char* a) {
   int n= strlen(a), i;
@@ -52,9 +66,10 @@ char* bfix(char* a) {
 }
 
 char* badd(char* a, char* b) {
-  int na= strlen(a), nb= strlen(b), l= (na>nb? na: nb)+1;
-  char r[l+1]; // one for zero termination
-  int c= 0, i;
+  int na= strlen(a), nb= strlen(b), l= (na>nb? na: nb)+1, c=0, i;
+  BDIM(r, l+1); // one for zero termination
+  assert(l<BIGMAX);
+
   memset(r, 0, l+1);
   // loop one less than length
   for(i=0; i<l; i++) {
@@ -63,23 +78,23 @@ char* badd(char* a, char* b) {
     c/= 10;
   }
   assert(!c);
-  //bprint(a); putchar('+'); bprint(b); putchar('=');
-  //bprint(r); putchar('\n');
   
   return bfix(r);
 }
 
 char* bmul(char* a, char* b) {
-  int na= strlen(a), nb= strlen(b), l= na+nb+3, ia, ib;
-  char r[l];
+  int na= strlen(a), nb= strlen(b), l= na+nb+3, ia, ib, i,c,v;
+  BDIM(r,l);
+  assert(l<BIGMAX);
+
   memset(r, 0, l);
   for(ia=0; ia<na; ia++) {
     for(ib=0; ib<nb; ib++) {
-      int i= ia+ib;
-      int c= (a[ia]-'0') * (b[ib]-'0');
+      i= ia+ib;
+      c= (a[ia]-'0') * (b[ib]-'0');
       if (!r[i]) r[i]= '0'; // make sure has digit
       while(c>0) {
-        int v= r[i];
+        v= r[i];
         if (v) v-= '0';
         c+= v;
         r[i++]= (c%10) + '0';
@@ -93,11 +108,13 @@ char* bmul(char* a, char* b) {
 }
 
 int bxsub(char* r, char* s, int d) {
-  int nr= strlen(r), ns= strlen(s), c=0, i;
-  char x[nr+1];
+  int nr= strlen(r), ns= strlen(s), c=0, i, ix;
+  BDIM(x, nr+1); // one for zero termination
+  assert(nr+1<BIGMAX);
+
   strcpy(x, r);
   for(i=ns-1; i>=0; i--) {
-    int ix= i+d;
+    ix= i+d;
     c= (x[ix]-'0') - (s[i]-'0');
     if (c<0) {
       // borrow
@@ -114,10 +131,11 @@ int bxsub(char* r, char* s, int d) {
 }
 
 char* bdiv(char* a, char* b) {
-  int na= strlen(a), nb= strlen(b), l= na-nb+3;
-  char s[na+1];
-  char r[na+1];
-  int d, i= 0;
+  int na= strlen(a), nb= strlen(b), l= na-nb+3, i=0, d;
+  BDIM(s, na+1);
+  BDIM(r, na+1);
+  assert(na+1<BIGMAX);
+
   memset(s, 0, na+1);
   memset(r, 0, na+1);
   strcpy(s, a);
@@ -133,13 +151,14 @@ char* bdiv(char* a, char* b) {
   return bfix(r);
 }
 
+
 // ENDWCOUNT
 
 #include <stdlib.h>
 #include <unistd.h>
 
-//int main(int argc, char** argv) {
-int main(void) {
+#ifdef BIGTEST
+void btest() {
   char* a= strdup("54321000  ");
   bprint(bfix(a)); putchar('\n');
   bprint(badd("1234", "12345")); putchar('\n');
@@ -151,13 +170,13 @@ int main(void) {
   // memory overwrite?
   bprint(badd("61", "1")); putchar('\n');
 
-  printf("\n\nFIB\n");
   if (1) {
     char *fa= strdup("0"), *fb= strdup("1");
     char *fac= strdup("1"), *n= strdup("1");
-    while(1) {
+    printf("\n\nFIB\n");
+    while(strlen(fac)+strlen(n)<BIGMAX-3) {
       char *nf, *of, *nn, *fc;
-      printf("[H[2J[3J"); putchar('\n');
+      //printf("[H[2J[3J"); putchar('\n');
       printf("n= "); bprint(n); putchar('\n');
       putchar('\n');
       nf= bmul(fac, n);
@@ -174,9 +193,17 @@ int main(void) {
       printf("fac(n)= "); bprint(of); putchar('\n');
       free(of);
 
+#ifndef BIGMAX;
       usleep(10*1000);
+#endif
     }
   }
-  
+}  
+#endif
+
+#ifdef BIGMAIN
+//int main(int argc, char** argv) {
+int main(void) {
   return 0;
 }
+#endif

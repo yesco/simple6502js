@@ -20,7 +20,7 @@ echo
 echo "=== RUN ==="
 (time sim65 -c hello.out ; echo "--- EXIT=$? ---") | tee hello.log
 
-(echo "`grep ' cycles' hello.log | sed -e 's/ cycles//'` /2/1024/1024" | bc -l ; echo "seconds simulated time");
+(echo "`grep ' cycles' hello.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
 
 echo
 grep '^Name' hello.map

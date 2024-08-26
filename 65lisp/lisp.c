@@ -151,6 +151,10 @@
 
 //#include <conio.h>
 
+// +2376 bytes! (a little much?)
+#define BIGMAX 100
+#include "bignum.c"
+
 //#define DEBUG(x) do{if(debug)x;}while(0)
 #define DEBUG(x) 
 #define TRACE(x)
@@ -686,11 +690,33 @@ L lread() {
     int n= 0;
     while(c && isdigit(c)) {
       n= n*10 + c-'0';
-      c= getchar();
+      c= nextc();
     }
     unc(c);
     return mknum(n);
   }
+// Need bigger nums as address
+// But this crashes!
+#ifdef FOO
+  if (c=='#') {
+    switch((c=nextc())){
+    case '[': // array
+    case '<': // printed but not readable
+      printf("%% ERROR: #%c format not yet implemented\n");
+      return ERROR;
+    default: { // hex
+      int n= 0;
+      c= nextc();
+      while(isxdigit(c)) {
+        c= toupper(c);
+        if (c>='A') c= c-'A'+10;
+        n= n*16 + c;
+      }
+      unc(c);
+      return n; }
+    }
+  }
+#endif
   if (c=='|' || isatomchar(c)) { // symbol
     char q=(c=='|'), n= 0, s[MAXSYMLEN+1]= {0};
     if (q) c= nextc();
@@ -714,7 +740,7 @@ L lread() {
 // TODO: princ? prin1?
 
 // print unquoted value without space before/after
-L prin1(L x) {
+L princ(L x) {
   L i= x;
   //printf("%d=%d=%04x\n", num(x), x, x);
   if (null(x)) printf("nil");
@@ -736,6 +762,11 @@ L prin1(L x) {
   } else printf("LISP: Unknown data %04x\n", x);
   return x;
 }
+
+// TODO: supposed to print in readable format: atoms/strings
+L prin1(L x) { return princ(x); }
+
+//void prinx(L x) { printf("#%04u", x); } 
 
 L print(L x) {
   L r= prin1(x);
@@ -1070,7 +1101,8 @@ L eval(L x, L env) {
     case 'T': terpri(); return nil;
     case 'U': return a? mknum(1): nil;
     case 'W': return prin1(a);
-    case '~': return mknum(~num(x));
+ // case '.': prinx(a); return nil;
+    case '~': return ~x;
     }
 
 
@@ -1080,11 +1112,13 @@ L eval(L x, L env) {
     x= CDR(x);
 
     switch(f) {
-    case '%': return mknum(num(a) % num(b));
-    case '&': return mknum(num(a) & num(b));
     case '-': return mknum(num(a) - num(b));
     case '/': return mknum(num(a) / num(b));
-    case '|': return mknum(num(a) | num(b));
+    case '%': return mknum(num(a) % num(b));
+
+    case '&': return a & b;
+    case '|': return a | b;
+      
     case '=': return a==b? T: nil;
     case '?': if (a==b) return 0;
       else if (isatom(a) && isatom(b)) return strcmp(ATOMSTR(a), ATOMSTR(b));
@@ -1298,10 +1332,9 @@ char* names[]= {
   "D cdr",
   "K consp", // listP
   "O length",
-  "P print",
   "T terpri",
   "U null",
-  "W prin1",
+  "P print", "W prin1", //". prinx",
 
   // two args
   "% %",
@@ -1405,6 +1438,8 @@ int main(int argc, char** argv) {
   int n= 1;
 
   L r, x, env;
+
+  btest(); return 0;
 
   initlisp();
   env= nil; // must be done after initlisp();
