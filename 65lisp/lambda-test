@@ -1,5 +1,4 @@
-
-./run -q -E $* <<HERE
+./run -b $* <<HERE
 
 (nil 3 4)
 (T 3 4)

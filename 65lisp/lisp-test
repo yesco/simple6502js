@@ -4,13 +4,31 @@ echo "1 'foo 2 'bar 3 '|foo| 4 '|foo bar| 5" | ./run -q -E -t
 ./run -q -E $* <<HERE
 
 42 '(1 2 (3 4) 5) (nil) (()) foo bar foobar foo foobar
+; --- atoms
 '(a ab abc abcd abcde abcdef abcdefg abcdefgh abcdefghi)
+
+; --- list
 (list (+ 1  2) foo bar (* 3 4))
+; --- + * varargs
 (* (+ 1 2) (+ 1 1 1 1) 2)
+; --- quote
 '(1 2 3 4)
+
+; --- variables/setq
 foo
 fie
 (setq fie 4711)
 fie
 foo
+
+; --- lambda
+(lambda (n) (+ n n))
+((lambda (n) (+ n n)) 3)
+
+; --- fail
+(de f (lambda (n) (+ n n)))
+(f 3)
+
+
+
 HERE

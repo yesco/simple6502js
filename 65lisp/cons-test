@@ -1,14 +1,14 @@
 # cons-test as in speed on operations car/cdr lol
 
 # 10% faster... LOL, but these will change as they are ADDRESSES!!!
-#echo "(936 (936 (936 (1007 (1007 (1007 (1007 '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -t $*
+#echo "(936 (936 (936 (1007 (1007 (1007 (1007 '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -b $*
 
-echo "(65 (65 (65 (68 (68 (68 (68 '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -t $*
+echo "(65 (65 (65 (68 (68 (68 (68 '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -b $*
 
-echo "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -t $*
+echo "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -b $*
 
 # uses too many cons - no GC
-#echo "(car (car (car (cdr (cdr (cdr (cdr (cons 1 (cons 2 (cons 3 (cons 4 (cons (cons (cons 5 nil) 6) 7) nil)))))))))))" | ./run -t $*
+#echo "(car (car (car (cdr (cdr (cdr (cdr (cons 1 (cons 2 (cons 3 (cons 4 (cons (cons (cons 5 nil) 6) 7) nil)))))))))))" | ./run -b $*
 
 
 

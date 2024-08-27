@@ -180,10 +180,12 @@
 #define MAXCELL 8192*2
 
 // Arena len to store symbols/constants (and global ptr)
-#define ARENA_LEN 1024
+#define ARENA_LEN 2048
 
 // Defined to use hash-table (with Arena
-#define HASH 256
+//#define HASH 256 // erh number of atoms => 137
+#define HASH 64 //            noatoms => 170 ???
+//#define HASH 32 //           blocked?
 
 // max length of atom and constant strings
 #define MAXSYMLEN 32
@@ -567,6 +569,7 @@ L atom(char* s) {
       //   (filling with extra type info, lol)
     } while (!isatom((int)arptr));
 
+    // must be some bug, atoms missing? lol
     a= (Atom*)arptr;
     arptr+= sizeof(Atom)+strlen(s)+1;
     assert(arptr<=arend);
@@ -889,7 +892,7 @@ L print(L x) {
   return prin1(x);
 }
 
-#define PRINTARRAY(a,b,c,d) ; 
+//#define PRINTARRAY(a,b,c,d) ; 
 #ifndef PRINTARRAY
   #define PRINTARRAY printarray
 
@@ -1598,7 +1601,7 @@ void statistics(int level) {
 }
 
 int main(int argc, char** argv) {
-  char echo= 0, noeval= 0, quiet= 0, gc= 1, stats= 1;
+  char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
   int i= 0;
   int n= 1;
 
@@ -1620,18 +1623,20 @@ int main(int argc, char** argv) {
   while (--argc) {
     ++argv;
     //printf("ARG: %s\n", *argv);
-    if (0==strcmp("-t", *argv)) {
+    if (0==strcmp("-b", *argv)) { // BENCH 5000 times
       n= atoi(argv[1]);
-      if (n) --argc,++argc; else n= 10000;
+      if (n) --argc,++argc; else n= 5000;
       echo= 1; quiet= 1;
     } else
-    if (0==strcmp("-q", *argv)) quiet= 1, stats= 0; else
-    if (0==strcmp("-E", *argv)) echo= 1; else
-    if (0==strcmp("-N", *argv)) noeval= 1; else
-    if (0==strcmp("-gc", *argv)) gc= 1; else
-    if (0==strcmp("-d", *argv)) debug= 1; else
+    if (0==strcmp("-q", *argv)) quiet=1, stats=0; else
+    if (0==strcmp("-E", *argv)) echo=1; else
+    if (0==strcmp("-N", *argv)) noeval=1; else
+    if (0==strcmp("-gc", *argv)) gc=1; else
+    if (0==strcmp("-nogc", *argv)) gc=0; else
+    if (0==strcmp("-d", *argv)) debug=1; else
     if (0==strcmp("-v", *argv)) ++verbose; else
-    if (0==strcmp("-s", *argv)) ++stats;
+    if (0==strcmp("-s", *argv)) ++stats; else
+    if (0==strcmp("-t", *argv)) quiet=1,echo=1,stats=1; test=1;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -1653,7 +1658,6 @@ int main(int argc, char** argv) {
 #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);
-
   PRINTARENA();
 
   if (!quiet)
@@ -1670,7 +1674,6 @@ int main(int argc, char** argv) {
     x= alcompileread();
     printf("AL.compiled: "); prin1(x); NL;
 #endif // AL
-    if (x==eof) break;
     if (echo) { printf("\n> "); prin1(x); NL; }
     if (!noeval) {
       for(i=n; i>0; --i) // run n tests
@@ -1682,11 +1685,14 @@ int main(int argc, char** argv) {
 #endif // AL
     }
     prin1(r); NL; NL;
-    if (stats) statistics(stats);
     if (gc) GC(env, alvals);
+    if (stats || (x==eof && test)) statistics(stats);
+    if (x==eof) break;
   } while (!feof(stdin));
   NL;
 
+  PRINTARRAY(syms, HASH, 0, 1);
+ 
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
 }

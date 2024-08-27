@@ -21,6 +21,7 @@ echo
 #cl65 -Cl -O -t sim6502 $1.c -o $1.out -m $1.map 2>/dev/null
 cl65 -O -t sim6502 $1.c -o $1.out -m $1.map 2>/dev/null
 
+#cl65 --codesize 10 -O -t atmos $1.c -o $1.tap || exit 72
 cl65 -O -t atmos $1.c -o $1.tap || exit 72
 echo
 cl65 -O -t atmos $1.c 2>/dev/null
