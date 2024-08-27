@@ -398,7 +398,7 @@ L cons(L a, L d) {
     *++cnext= a;
     r= (L)cnext; // misalign it to where CAR was stored
     *++cnext= d;
-    DEBUG(printf("CONS: "); prin1(r)); NL;
+    DEBUG(printf("CONS: "); prin1(r); NL);
     return r;
   }
 
@@ -479,7 +479,9 @@ L setatomval(L x, L v) {
   return ATOMVAL(x)= v;
 }
 
-#ifdef DEBUG
+#define PRINTARENA() ;
+#ifndef PRINTARENA
+  #define PRINTARENA printarena
 
 void printarena() {
   
@@ -487,10 +489,8 @@ void printarena() {
   printf("ARENA: ");
   while(a<arptr) {
     if (*a==HATOM) NL;
-    if (*a==' ') printf(' ');
-    else if (*a>' ' && *a<127) printf("%c  ", *a);
-    else if (!*a) printf("_  ");
-    //else putchar('#');
+    if (*a==' ') printf("_  ");
+    else if (*a>' ' && *a<127) printf(" %c ", *a);
     else printf("%X%X ", (*a)>>4, (*a)&0xf);
     ++a;
   }
@@ -528,7 +528,7 @@ void* searchatom(char* s) {
   }
   return NULL;
 }
-#endif // DEBUG
+#endif // PRINTARENA
 
 // search linked list
 Atom* findatom(Atom* a, char* s) {
@@ -889,8 +889,10 @@ L print(L x) {
   return prin1(x);
 }
 
-//#define FISH
-#ifdef FISH
+#define PRINTARRAY(a,b,c,d) ; 
+#ifndef PRINTARRAY
+  #define PRINTARRAY printarray
+
 void printarray(L* arr, int n, char printnil, char ishash) {
   int i;
   // just print symbols per slot
@@ -906,7 +908,7 @@ void printarray(L* arr, int n, char printnil, char ishash) {
   }
   NL;
 }
-#endif // FISH
+#endif // PRINTARRAY
 
 // TODO: instead of a "format" do my own "printf"
 
@@ -949,7 +951,7 @@ L setval(L x, L v, L e) {
   L p= e? assoc(x, e): nil;
   //printf("SETVAL: "); prin1(x); putchar(' '); prin1(v); NL;
   if (!null(p)) return setcdr(p, v);
-  // TODO: optimize as assoc() call is expensive (e==nil)
+  // TODO: optimize? as assoc() call is expensive (e==nil)
   return setatomval(x, v); // GLOBAL
 }
 
@@ -1473,7 +1475,8 @@ void reg(char* charspacename) {
 // TODO: point to these from arena?
 char* names[]= {
   // nargs
-  ": de", ": setq" // BUG: setqI gets defined... lol? WTF
+  ": de",
+  ": setq",
   //"; df",
   "I if",
   "Y read",
@@ -1649,11 +1652,9 @@ int main(int argc, char** argv) {
   setval(atom("cdr"), mknum((int)(char*)cdr), nil);
 #endif // AL
 
-#ifdef FISH
-  printarray(syms, HASH, 0, 1);
-#endif // FISH
+  PRINTARRAY(syms, HASH, 0, 1);
 
-  printarena();
+  PRINTARENA();
 
   if (!quiet)
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
