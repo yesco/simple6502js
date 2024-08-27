@@ -198,7 +198,9 @@ void* zalloc(size_t n) {
   return calloc(n, 1);
 }
 
+
 // ---------------- Lisp Datatypes
+
 typedef int16_t L; // requires #include <stdint.h> uses 26K more!
 
 // special atoms
@@ -275,6 +277,101 @@ L prin1(L); // forward TODO: remove
 #define terpri() putchar('\n')
 #define NL terpri()
 
+// Type number to identify Heap OBJ
+#define HFREE  0xFE
+#define HATOM  0xA7
+#define HARRAY 0xA6
+#define HSLICE 0x51 // do you get it? ;-)
+
+// TODO: not happy, too much code add 550 bytes!?
+
+//#define HEAP
+#ifdef HEAP
+// ---------------- HEAP
+// TODO: Too much code === 550 bytes!!!!
+//
+// Heap of various variable size data for lisp types.
+
+// The OBJ are linked for use by mark() during GC.
+// Code needs to be added per type to the
+// mark() and sweep().
+//
+// Use 
+
+#define HTYP(x) (((char*)(x))[-1]) // TODO: works?
+#define isobj(x) (((x)&0x03)==1)
+
+typedef struct OBJ {
+  // We put twolisp values first, this makes it
+  // safe to use CAR/CDR on the pointer
+  L info; // CAR: a link to used other lisp val
+  struct OBJ* next; // CDR: enumeration of all OBJ for GC marking
+  struct OBJ* prev; // to be able to unlink it from list :-(
+  void* origptr; // for free! :-(
+  char data[];
+} OBJ;
+
+OBJ* objList= NULL;
+
+// similar to isatom, actually atom is "subtype"
+// but little special.
+
+// Test if x lisp value is a OBJ of TYP.
+// 
+// If TYP is 0, then test not HFREE
+// This function is expensive, so last test?
+// if typ==0 return 
+char isTyp(L x, char typ) {
+  if (!isobj(x)) return 0;
+  return typ? HTYP(x)==typ: HTYP(x)!= HFREE;
+}
+
+OBJ* newObj(char typ, void* s, size_t z) {
+  // We add 4 bytes, one extra for type, and 3 to align
+  // If this is considered wasteful: don't use for small!
+  char *orig= (char*)malloc(z+sizeof(OBJ)+4), *p= orig;
+  OBJ *prev= objList, *o;
+
+  // Prepend at least one type byte
+  do {
+    *p++= typ;
+    // align to 0x01
+  } while(!isobj((L)p));
+
+  o= (OBJ*)p;
+  o->origptr= orig;
+  o->info= nil;
+
+  // Hook it up
+  o->prev= NULL;
+  o->next= objList;
+  if (objList) {
+    assert(objList->prev);
+    objList->prev= o;
+  }
+  
+  memcpy(o->data, s, z);
+  
+  return o;
+}
+
+void forgetObj(L x) {
+  // TODO: verify valid obj?
+
+  // Unlink
+  OBJ *o= (OBJ*)x;
+  if (o->prev) o->prev->next= o->next;
+  if (o->next) o->next->prev= o->prev;
+  o->next= NULL;
+  o->prev= NULL;
+
+  HTYP(x)= HFREE;
+}
+
+#endif // HEAP
+
+
+//
 // cons(1,2) gives wrong CONS values at 4092 4096-ish
 // works fine up till then if have 2*4096 cells
 
@@ -315,6 +412,7 @@ L car(L c)         { return iscons(c)? CAR(c): nil; }
 L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L cdr(L c)         { return iscons(c)? CDR(c): nil; }
 L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
+
 
 // --- Atoms / Symbols / Constants
 // 
@@ -459,15 +557,19 @@ L atom(char* s) {
     //    char type;
     // -> L val;
 
-    // align as: not cons: == x01
-    while (!isatom((int)arptr)) ++arptr;
+    // put type byte "before" pointer
+    do {
+      *arptr++= HATOM;
+      // align as: not cons: == x01
+      //   (filling with extra type info, lol)
+    } while (!isatom((int)arptr));
 
     a= (Atom*)arptr;
     arptr+= 4+1+strlen(s);
     assert(arptr<=arend);
 
-    a->next= syms[h];
-    a->val= nil;
+    a->val= nil;      // CAR
+    a->next= syms[h]; // CDR
     strcpy(a->name, s);
     syms[h]= a;
   }
