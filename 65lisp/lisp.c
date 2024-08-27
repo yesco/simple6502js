@@ -1,15 +1,22 @@
 // 65LISP02 - an lisp interpeter for 6502 (oric)
 
 // An highly efficent and optimized lisp for the 6502.
-// It's a scheme-style lisp with full closures and
+// 
+// Written using in C using CC65 it has readable source
+// but performance may suffer compared to a hand-written
+// lisp in assembly... (not too many of them, though).
+//
+// 65LISP is a scheme-style lisp with full closures and
 // lexical bindings. No macros.
 
 // Features:
+// - TODO: full closures - LOL
+// - TODO: tail-recursion using "immediates"
 // - lexical scoping
 // - highly optimized (using misaligned pointers!)
 // - quirk to avoid the (funcall f ...) use ('f ...) ! (see EVAL)
 // - \A gives ascii-code in reader
-// - ({[]}) doesn't care which char, only need to match, all gives list
+// - ({[]}) it doesn't care which char, only need to match, all gives list
 //   TODO: {} - could give assoc-list, [] - could give vector
 // - code ; comements
 // - |atom with spaces|
@@ -19,7 +26,7 @@
 // - math:  + - * / %   & | ^   = cmp
 // - test:  null atomp numberp consp
 // - list:  cons car cdr consp list length assoc member mapcar(TODO) nth
-// - I/O:   print prin1 terpri read
+// - I/O:   print (prin1) terpri read prinx
 // - atoms: foo |with space| cmp
 
 // NO WAY:
@@ -266,6 +273,7 @@ L prin1(L); // forward TODO: remove
 
 // smaller!
 #define terpri() putchar('\n')
+#define NL terpri()
 
 // cons(1,2) gives wrong CONS values at 4092 4096-ish
 // works fine up till then if have 2*4096 cells
@@ -293,7 +301,7 @@ L cons(L a, L d) {
     *++cnext= a;
     r= (L)cnext; // misalign it to where CAR was stored
     *++cnext= d;
-    DEBUG(printf("CONS: "); print(r));
+    DEBUG(printf("CONS: "); prin1(r)); NL;
     return r;
   }
 
@@ -549,7 +557,7 @@ void mark(L a) {
   if (null(a)) return;
   if (isnum(a)) return;
 
-  DEBUG(printf("\n=>MARK: %d ", ((L*)a)-cstart); print(a));
+  DEBUG(printf("\n=>MARK: %d ", ((L*)a)-cstart); prin1(a); NL);
 
   ++nmark;
   if (iscons(a)) {
@@ -563,7 +571,7 @@ void mark(L a) {
     //if (BIT(cused, n)) return;
 
     ++gcdeep;
-    DEBUG(printf(" [%d/MARK: %d]", gcdeep, n); prin1(a); putchar(' '));
+    DEBUG(printf(" [%d/MARK: %d]", gcdeep, n); princ(a); putchar(' '));
     // TODO: need to pass address?
     mark(CAR(a)); //mark(CDR(a)); // hmmm
     mark(a+2); // hmmm
@@ -579,7 +587,7 @@ void mark(L a) {
     unsigned int n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
     if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
-    DEBUG(printf(" [%d/mark: %d]", gcdeep, n); prin1(a); putchar(' '))
+    DEBUG(printf(" [%d/mark: %d]", gcdeep, n); princ(a); putchar(' '))
     cused[n/8]|= (1<<(n&7));
   }
 
@@ -602,7 +610,7 @@ void sweep() {
     if (!(cused[i] & b)) {
 
       // FREE:
-      DEBUG(printf("UNUSED[%d]= ", a-cstart); print(*a));
+      DEBUG(printf("UNUSED[%d]= ", a-cstart); prin1(*a); NL);
 
       // TODO: freelist
 
@@ -642,7 +650,7 @@ void GC(L env, L alvals) {
   sweep();
 
   //if (!quiet)
-  DEBUG(terpri());
+  DEBUG(NL);
 }
 
 
@@ -739,10 +747,8 @@ L lread() {
   return ERROR;
 }
 
-// ---------------- 
-// TODO: princ? prin1?
-
 // print unquoted value without space before/after
+//   no quotes for strings, except inside list? hmmm
 L princ(L x) {
   L i= x;
   //printf("%d=%d=%04x\n", num(x), x, x);
@@ -753,28 +759,28 @@ L princ(L x) {
   else if (iscons(x)) { // printlist
     putchar('(');
     do {
-      prin1(car(i));
+      princ(car(i));
       i= cdr(i);
       if (!null(i)) putchar(' ');
     } while (!null(i) && iscons(i));
     if (!null(i)) {
       printf(". ");
-      prin1(i);
+      princ(i);
     }
     putchar(')');
   } else printf("LISP: Unknown data %04x\n", x);
   return x;
 }
 
-// TODO: supposed to print in readable format: atoms/strings
+// TODO: supposed to print in readable format:
+//   quote strings, and |atom w spaces|
 L prin1(L x) { return princ(x); }
 
-//void prinx(L x) { printf("#%04u", x); } 
+//void prinx(L x) { printf("#%04u", (num)x); } 
 
 L print(L x) {
-  L r= prin1(x);
-  terpri();
-  return r;
+  NL; // lol,always though it was after..
+  return prin1(x);
 }
 
 
@@ -921,7 +927,7 @@ L eval(L x, L env) {
   // ===BASE===
   // 58.98s old way, lookup atom
 
-  TRACE(printf("EVAL: "); print(x));
+  TRACE(printf("EVAL: "); prin1(x); NL);
 
   if (iscons(x)) {
     L a, b, f;
@@ -948,35 +954,35 @@ L eval(L x, L env) {
       // follow chain of atoms => "local" or global value
       a= nil;
       while(isatom(f) && f!=a) {
-        TRACE(printf("ATOM again: "); print(f));
+        TRACE(printf("ATOM again: "); prin1(f); NL);
         a= f; // avoid self loop nil/T etc
         f= eval(f, env);
         if (isnum(f)) break;
       }
       if (f==a) {
-        TRACE(printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); print(x));
+        TRACE(printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); prin1(x); NL);
         return ERROR;
       }
 
       // evaluate any cons until it's not...
       a= nil;
       while(iscons(f) && f!=a && !islambda(f)) {
-        TRACE(printf("EVAL again: "); print(f));
+        TRACE(printf("EVAL again: "); prin1(f); NL);
         a= f; // avoid self loop nil/T etc
         f= eval(f, env);
       }
 
       // LAMBDA - Let's APPLY
       if (islambda(f)) {
-        TRACE(printf("LAMBDA: "); print(f));
+        TRACE(printf("LAMBDA: "); prinq(f); NL);
         // APPLY
         f= cdr(f);
         env= bindlist(car(f), x, env);
         f= cdr(f);
-        TRACE(printf("   ENV: "); print(env));
+        TRACE(printf("   ENV: "); prin1(env); NL);
         // PROGN
         while(iscons(f)) {
-          TRACE(printf("PROGN: "); print(car(f)));
+          TRACE(printf("PROGN: "); prin1(car(f)); NL);
           a= eval(car(f), env);
           f= cdr(f);
         }
@@ -984,12 +990,12 @@ L eval(L x, L env) {
       }
 
       if (f==a) {
-        printf("RUN FOREVER.cons: "); prin1(f); printf(" on "); print(x);
+        printf("RUN FOREVER.cons: "); prin1(f); printf(" on "); prin1(x); NL;
         return ERROR;
       }
     }
 
-    TRACE(printf("f => "); print(f));
+    TRACE(printf("f => "); prin1(f); NL);
 
     // Yeah, now we do have a number!
 
@@ -1062,7 +1068,7 @@ L eval(L x, L env) {
     //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
 
-      // - nargs - eval many x
+    // - nargs - eval many x
     //case 'V': TODO: or ???
     //case '_': TODO: and ???
     case '+': a-=2;
@@ -1101,11 +1107,11 @@ L eval(L x, L env) {
     case 'O': return length(a);
     case 'P': return print(a);
     //case 'R' TODO: Reduce?
-    case 'T': terpri(); return nil;
+    case 'T': NL; return nil;
     case 'U': return a? mknum(1): nil;
     case 'W': return prin1(a);
- // case '.': prinx(a); return nil;
-    case '~': return ~x;
+    case '.': return princ(a);
+    case '~': return mknum(num(~x));
     }
 
 
@@ -1119,8 +1125,8 @@ L eval(L x, L env) {
     case '/': return mknum(num(a) / num(b));
     case '%': return mknum(num(a) % num(b));
 
-    case '&': return a & b;
-    case '|': return a | b;
+    case '&': return mknum(num(a) & num(b));
+    case '|': return mknum(num(a) | num(b));
       
     case '=': return a==b? T: nil;
     case '?': if (a==b) return 0;
@@ -1337,7 +1343,7 @@ char* names[]= {
   "O length",
   "T terpri",
   "U null",
-  "P print", "W prin1", //". prinx",
+  "P print", "W prin1", ". princ",
 
   // two args
   "% %",
@@ -1431,7 +1437,7 @@ void statistics(int level) {
     report("Atom", natoms, &latoms);
     report("Alloc", nalloc, &lalloc);
     report("Marks", nmark, &lmark);
-    terpri();
+    NL;
   }
 }
 
@@ -1502,10 +1508,10 @@ int main(int argc, char** argv) {
     x= lread();
 #else
     x= alcompileread();
-    printf("AL.compiled: "); print(x);
+    printf("AL.compiled: "); prin1(x); NL;
 #endif
     if (x==eof) break;
-    if (echo) printf("\n> "),print(x);
+    if (echo) { printf("\n> "); prin1(x); NL; }
     if (!noeval) {
       for(i=n; i>0; --i) // run n tests
 #ifndef AL
@@ -1515,11 +1521,11 @@ int main(int argc, char** argv) {
 //       r= mknum(42);
 #endif
     }
-    print(r); 
+    prin1(r); NL; NL;
     if (stats) statistics(stats);
     if (gc) GC(env, alvals);
   } while (!feof(stdin));
-  terpri();
+  NL;
 
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
