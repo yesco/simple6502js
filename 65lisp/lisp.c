@@ -163,7 +163,7 @@
 
 #ifdef BIGMAX
   #include "bignum.c"
-#endif
+#endif // BIGMAX
 
 //#define DEBUG(x) do{if(debug)x;}while(0)
 #define DEBUG(x) 
@@ -440,7 +440,7 @@ typedef struct Atom {
   char name[];
 } Atom;
 
-void** syms;
+L* syms;
 
 char hash(char* s) {
   int c= 4711;
@@ -479,16 +479,19 @@ L setatomval(L x, L v) {
   return ATOMVAL(x)= v;
 }
 
-L print(L); // forward TODO: remove
-
 #ifdef DEBUG
+
 void printarena() {
+  
   char* a= arena;
   printf("ARENA: ");
   while(a<arptr) {
-    if (isprint(*a)) putchar(*a);
-    else if (!*a) putchar('_');
-    else putchar('#');
+    if (*a==HATOM) NL;
+    if (*a==' ') printf(' ');
+    else if (*a>' ' && *a<127) printf("%c  ", *a);
+    else if (!*a) printf("_  ");
+    //else putchar('#');
+    else printf("%X%X ", (*a)>>4, (*a)&0xf);
     ++a;
   }
   putchar('\n');
@@ -525,11 +528,11 @@ void* searchatom(char* s) {
   }
   return NULL;
 }
-#endif
+#endif // DEBUG
 
 // search linked list
 Atom* findatom(Atom* a, char* s) {
-  while(a) {
+  while(a && (L)a!=nil) { // LOL
     if (0==strcmp(s, a->name)) return a;
     a= a->next;
   }
@@ -548,7 +551,7 @@ L atom(char* s) {
   h= hash(s);
   //p= searchatom(s);  // slower 24s for 4x150.words
   //p= searchatom2(s); // slower 32s for 4x150.words
-  a= findatom(syms[h], s); // fast 14s for 4x150.words
+  a= findatom((Atom*)syms[h], s); // fast 14s for 4x150.words
   if (!a) {
     // create atom
     ++natoms;
@@ -565,13 +568,13 @@ L atom(char* s) {
     } while (!isatom((int)arptr));
 
     a= (Atom*)arptr;
-    arptr+= 4+1+strlen(s);
+    arptr+= sizeof(Atom)+strlen(s)+1;
     assert(arptr<=arend);
 
-    a->val= nil;      // CAR
-    a->next= syms[h]; // CDR
+    a->val= nil;               // CAR
+    a->next= (Atom*)(syms[h]); // CDR
     strcpy(a->name, s);
-    syms[h]= a;
+    syms[h]= (L)a;
   }
 
   // -- but 120 bytes more storage used
@@ -741,7 +744,7 @@ void GC(L env, L alvals) {
 
   // -- walk through all globals, in symbols table
   for(i=0; i<HASH; ++i) {
-    a= syms[i];
+    a= (Atom*)syms[i];
     while(a) {
       mark(a->val);
       a= a->next;
@@ -829,7 +832,7 @@ L lread() {
       return n; }
     }
   }
-#endif
+#endif // FOO
   if (c=='|' || isatomchar(c)) { // symbol
     char q=(c=='|'), n= 0, s[MAXSYMLEN+1]= {0};
     if (q) c= nextc();
@@ -880,11 +883,55 @@ L prin1(L x) { return princ(x); }
 
 //void prinx(L x) { printf("#%04u", (num)x); } 
 
+// LOL: emacs-lisp does "\n$x\n" !!!
 L print(L x) {
   NL; // lol,always though it was after..
   return prin1(x);
 }
 
+//#define FISH
+#ifdef FISH
+void printarray(L* arr, int n, char printnil, char ishash) {
+  int i;
+  // just print symbols per slot
+  for(i=0; i<n; ++i) {
+    L a= arr[i]; Atom* p= (Atom*)a;
+    if (!printnil && (a==nil || (ishash && !a))) continue;
+    printf("\n%2d: ", i);
+    while (a && a!=nil) {
+      princ(a); putchar(' ');
+      if (!ishash) break;
+      a= (L)((Atom*)a)->next;
+    }
+  }
+  NL;
+}
+#endif // FISH
+
+// TODO: instead of a "format" do my own "printf"
+
+// Printf like unix but for lisp objects
+//   %L - use princ for value
+//   %Q - use prin1 for value (quote strings/atoms)
+//   %F - flatten TODO: don't print () of list
+// Returns a list of objects
+void lprintf(char* f, L a) {
+  L x;
+  do {
+    while(*f && *f!='%') putchar(*f++);
+    if (!*f) break;
+    if (null(a)) continue; // ran out of args, print rest
+    else { // got % arg
+      char fmt[10]={0}, *p= fmt, *e= f;
+      // find end
+      while(*e && !strchr("diouxXeEcsp", *e)) *p= *e++;
+      x= car(a); a= cdr(a);
+      if (e-f==1 || (e[-1]=='L')) princ(x); // %L
+      if (e-f==1 || (e[-1]=='Q')) prin1(x); // %Q
+      else printf(fmt, x); // dispatch to system
+    }
+  } while (1);
+}
 
 // ---------------- Variables
 
@@ -899,7 +946,8 @@ L assoc(L x, L l) {
 }
 
 L setval(L x, L v, L e) {
-  L p= assoc(x, e);
+  L p= e? assoc(x, e): nil;
+  //printf("SETVAL: "); prin1(x); putchar(' '); prin1(v); NL;
   if (!null(p)) return setcdr(p, v);
   // TODO: optimize as assoc() call is expensive (e==nil)
   return setatomval(x, v); // GLOBAL
@@ -911,6 +959,7 @@ L setval(L x, L v, L e) {
 // might as well use eval(x, e) !!!
 
 #ifdef notused
+// inlined in eval, just eval atom X instead?
 L getval(L x, L e) {
 //  L p;
   L p= assoc(x, e);
@@ -925,9 +974,9 @@ L getval(L x, L e) {
   }
 
   return iscons(e)? cdr(p): atomval(x);
-#endif
+#endif // foo
 }
-#endif
+#endif // notused
 
 // ---------------- Lisp Functions
 
@@ -1157,8 +1206,10 @@ L eval(L x, L env) {
     // --- nargs
     a= 2; // used by + *
     switch(f) {
-      // - nlambda - no eval
-    case ':': return de(x);
+    // - nlambda - no eval
+    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    // TODO: if it allows local defines, how to
+    //   extend the env,setq should not, two words?
     case ';': return df(x);
     case 'I': return iff(x, env);
     //case 'X': return TODO: FUNCALL! eXecute
@@ -1288,7 +1339,7 @@ L eval(L x, L env) {
   #define STACKSIZE 1
 #else
   #define STACKSIZE 255
-#endif
+#endif // AL
 
 L stack[STACKSIZE]= {0}, *s= stack, *send;
 L alvals= 0;
@@ -1405,7 +1456,7 @@ L alcompileread() {
   return (p && *p!=255)? atom(al): ERROR;
 }  
 
-#endif
+#endif // AL
 
 // ---------------- Register Functions
 
@@ -1422,8 +1473,8 @@ void reg(char* charspacename) {
 // TODO: point to these from arena?
 char* names[]= {
   // nargs
-  ": de", ": define", ": defun",
-  "; df",
+  ": de", ": setq" // BUG: setqI gets defined... lol? WTF
+  //"; df",
   "I if",
   "Y read",
   "\' quote",
@@ -1468,9 +1519,14 @@ void initlisp() {
   L x;
   char** s= names;
 
+  // important assumption for cc65
+  // (supress warning: error is set later, now 0)
+  assert(sizeof(L)+ERROR==2); 
+  assert(sizeof(void*)+ERROR==2); // used in atom function
+
   // allocate memory
   arptr= arena= zalloc(ARENA_LEN); arend= arena+ARENA_LEN;
-  syms= (void**)zalloc(HASH*sizeof(void*));
+  syms= (L*)zalloc(HASH*sizeof(L));
   cstart= cell= (L*)zalloc(MAXCELL*sizeof(L)); ncell= MAXCELL-2;
   cused= (char*)zalloc((MAXCELL+1)/(sizeof(L)*8));
 
@@ -1488,11 +1544,6 @@ void initlisp() {
 
   // statistics
   natoms= ncons= nalloc= 0;
-
-  // important assumption for cc65
-  // (supress warning: error is set later, now 0)
-  assert(sizeof(L)+ERROR==2); 
-  assert(sizeof(void*)+ERROR==2); // used in atom function
 
   // special symbols
     nil= atom("nil");    ATOMVAL(nil)= nil; // LOL
@@ -1513,7 +1564,7 @@ void initlisp() {
 //#define PERFTEST
 #ifdef PERFTEST
 #include "perf-test.c"
-#endif
+#endif // PREFTEST
 
 // TODO: maybe smaller as macro?
 void report(char* what, unsigned int now, unsigned int *last) {
@@ -1552,7 +1603,7 @@ int main(int argc, char** argv) {
 
   #ifdef BIGMAX
   btest(); return 0;
-  #endif
+  #endif // BIGMAX
 
   initlisp();
   env= nil; // must be done after initlisp();
@@ -1560,7 +1611,7 @@ int main(int argc, char** argv) {
   // TODO: define way to test, and measure clocks ticks
   #ifdef PERFTEST
   perftest();
-  #endif
+  #endif // PERFTEST
 
   // - read args
   while (--argc) {
@@ -1596,7 +1647,13 @@ int main(int argc, char** argv) {
 #ifndef AL
   setval(atom("car"), mknum((int)(char*)car), nil);
   setval(atom("cdr"), mknum((int)(char*)cdr), nil);
-#endif
+#endif // AL
+
+#ifdef FISH
+  printarray(syms, HASH, 0, 1);
+#endif // FISH
+
+  printarena();
 
   if (!quiet)
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
@@ -1611,7 +1668,7 @@ int main(int argc, char** argv) {
 #else
     x= alcompileread();
     printf("AL.compiled: "); prin1(x); NL;
-#endif
+#endif // AL
     if (x==eof) break;
     if (echo) { printf("\n> "); prin1(x); NL; }
     if (!noeval) {
@@ -1621,7 +1678,7 @@ int main(int argc, char** argv) {
 #else
         r= al(isatom(x)? ATOMSTR(x): NULL);
 //       r= mknum(42);
-#endif
+#endif // AL
     }
     prin1(r); NL; NL;
     if (stats) statistics(stats);
