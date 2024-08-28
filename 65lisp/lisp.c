@@ -147,6 +147,11 @@
 // Alread used names by others:
 // - lisp65 lisp/8 lisp02
 
+void startprogram() {}
+char firstvar= 42;
+char firstbss;
+
+
 #include <stdint.h> // cc65 uses 29K extra memory???
 #include <stdio.h>
 #include <unistd.h>
@@ -207,7 +212,8 @@ void* zalloc(size_t n) {
 
 // ---------------- Lisp Datatypes
 
-typedef int16_t L; // requires #include <stdint.h> uses 26K more!
+typedef int16_t L;
+typedef uint16_t uint;
 
 // special atoms
 //const L nil= 0;
@@ -1604,7 +1610,7 @@ void statistics(int level) {
   }
 }
 
-int main(int argc, char** argv) {
+int mainmain(int argc, char** argv, void* main) {
   char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
   int i= 0;
   int n= 1;
@@ -1696,9 +1702,14 @@ int main(int argc, char** argv) {
 
   PRINTARRAY(syms, HASH, 0, 1);
   if (stats || test) statistics(255);
- 
+  printf("Program size: %u bytes(ish) %04x-%04x %04x %04x\n", ((uint)&firstbss)-((uint)startprogram), (uint)startprogram, (uint)main, (uint)&firstvar, (uint)&firstbss);
+
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
+}
+
+int main(int argc, char** argv) {
+  mainmain(argc, argv, main);
 }
 
 // ENDWCOUNT

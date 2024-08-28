@@ -23,9 +23,10 @@ cl65 -O -t sim6502 $1.c -o $1.out -m $1.map 2>/dev/null
 
 #cl65 --codesize 10 -O -t atmos $1.c -o $1.tap || exit 72
 cl65 -O -t atmos $1.c -o $1.tap || exit 72
-echo
+
+echo 
 cl65 -O -t atmos $1.c 2>/dev/null
-cc65 -O $1.c 2>/dev/null
+cc65 -O -T $1.c 2>/dev/null # generate .s file
 
 echo
 ls -l $1.o $1.out $1.tap
