@@ -183,9 +183,13 @@
 #define ARENA_LEN 2048
 
 // Defined to use hash-table (with Arena
+// must be power of two!
+
+//#define HASH 128
 //#define HASH 256 // erh number of atoms => 137
-#define HASH 64 //            noatoms => 170 ???
-//#define HASH 32 //           blocked?
+//#define HASH 64 //            noatoms => 170 ???
+#define HASH 32 //           blocked?
+//#define HASH 1
 
 // max length of atom and constant strings
 #define MAXSYMLEN 32
@@ -550,7 +554,7 @@ L atom(char* s) {
   char h;
   Atom *a;
 
-  h= hash(s);
+  h= hash(s) & (HASH-1);
   //p= searchatom(s);  // slower 24s for 4x150.words
   //p= searchatom2(s); // slower 32s for 4x150.words
   a= findatom((Atom*)syms[h], s); // fast 14s for 4x150.words
@@ -892,7 +896,7 @@ L print(L x) {
   return prin1(x);
 }
 
-//#define PRINTARRAY(a,b,c,d) ; 
+#define PRINTARRAY(a,b,c,d) ; 
 #ifndef PRINTARRAY
   #define PRINTARRAY printarray
 
@@ -900,13 +904,13 @@ void printarray(L* arr, int n, char printnil, char ishash) {
   int i;
   // just print symbols per slot
   for(i=0; i<n; ++i) {
-    L a= arr[i]; Atom* p= (Atom*)a;
-    if (!printnil && (a==nil || (ishash && !a))) continue;
+    L a= arr[i];
+    if (!printnil && (a==nil || !a)) continue;
     printf("\n%2d: ", i);
     while (a && a!=nil) {
       princ(a); putchar(' ');
       if (!ishash) break;
-      a= (L)((Atom*)a)->next;
+      a= (L)(((Atom*)a)->next);
     }
   }
   NL;
@@ -1628,15 +1632,15 @@ int main(int argc, char** argv) {
       if (n) --argc,++argc; else n= 5000;
       echo= 1; quiet= 1;
     } else
-    if (0==strcmp("-q", *argv)) quiet=1, stats=0; else
+    if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
     if (0==strcmp("-E", *argv)) echo=1; else
     if (0==strcmp("-N", *argv)) noeval=1; else
-    if (0==strcmp("-gc", *argv)) gc=1; else
+    if (0==strcmp("-g", *argv)) gc=0; else
     if (0==strcmp("-nogc", *argv)) gc=0; else
     if (0==strcmp("-d", *argv)) debug=1; else
     if (0==strcmp("-v", *argv)) ++verbose; else
     if (0==strcmp("-s", *argv)) ++stats; else
-    if (0==strcmp("-t", *argv)) quiet=1,echo=1,stats=1; test=1;
+    if (0==strcmp("-t", *argv)) echo=0,quiet=test=1;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -1652,10 +1656,10 @@ int main(int argc, char** argv) {
   env= cons(cons(atom("foo"), mknum(42)), env);
 
   // nearly 10% faster... but little dangerous
-#ifndef AL
-  setval(atom("car"), mknum((int)(char*)car), nil);
-  setval(atom("cdr"), mknum((int)(char*)cdr), nil);
-#endif // AL
+  #ifndef AL
+    setval(atom("car"), mknum((int)(char*)car), nil);
+    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+  #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);
   PRINTARENA();
@@ -1668,30 +1672,30 @@ int main(int argc, char** argv) {
   r= ERROR;
   do {
     if (!quiet) printf("65> ");
-#ifndef AL
-    x= lread();
-#else
-    x= alcompileread();
-    printf("AL.compiled: "); prin1(x); NL;
-#endif // AL
+    #ifndef AL
+      x= lread();
+    #else
+      x= alcompileread();
+      printf("AL.compiled: "); prin1(x); NL;
+    #endif // AL
     if (echo) { printf("\n> "); prin1(x); NL; }
     if (!noeval) {
       for(i=n; i>0; --i) // run n tests
-#ifndef AL
+      #ifndef AL
         r= eval(x, env);
-#else
+      #else
         r= al(isatom(x)? ATOMSTR(x): NULL);
-//       r= mknum(42);
-#endif // AL
+      #endif // AL
     }
-    prin1(r); NL; NL;
-    if (gc) GC(env, alvals);
-    if (stats || (x==eof && test)) statistics(stats);
+    if (!quiet) { prin1(r); NL; NL; }
+    if (gc) GC(env, alvals); // TODO: only if needed?
+    if (!quiet & stats) statistics(stats);
     if (x==eof) break;
   } while (!feof(stdin));
   NL;
 
   PRINTARRAY(syms, HASH, 0, 1);
+  if (stats || test) statistics(255);
  
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
