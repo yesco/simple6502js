@@ -10,3 +10,5 @@ echo "(* 1 1 1 1 1  1 1 1 1 1   1 1 1 1 1  1 1 1 1 1    1 1 1 1 1  1 1 1 1 1    
 # - 45s instead of 60S => 25% FASTER
 echo "(* (+ 1 2) (+ 1 1 1 1) 2)" | ./run -b
 
+echo "(* (+ one two) (+ one one one one) two)" | ./run -b
+

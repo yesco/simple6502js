@@ -1025,7 +1025,7 @@ L setval(L x, L v, L e) {
 //
 // might as well use eval(x, e) !!!
 
-#ifdef notused
+#ifndef notused
 // inlined in eval, just eval atom X instead?
 L getval(L x, L e) {
 //  L p;
@@ -1369,7 +1369,16 @@ L evalX(L x, L env) {
     case '+': a-=2;
     case '*':
       while(iscons(x)) {
-        b= eval(CAR(x), env); // don't care if !num !!!
+        // if is num: 43.76 => 38.44 if only num
+        //b= CAR(x);
+        // if is atom: => 96s !!!
+        //if (!isatom(b)) b= getval(b, env);
+        // if if still no num, eval => 80s
+        //if (!isnum(b)) b= eval(CAR(x), env);
+        // num => 43.76s 'num => 64.7hs
+        b= eval(CAR(x), env);
+
+        // don't care if => not num
         //if (!isnum(b)) b= 0; // takes away most of savings...
         x= CDR(x);
         if (f=='*') a*= b/2; else a+= b;
@@ -1862,6 +1871,8 @@ int mainmain(int argc, char** argv, void* main) {
     setval(atom("car"), mknum((int)(char*)car), nil);
     setval(atom("cdr"), mknum((int)(char*)cdr), nil);
     //setval(atom("cons"), mknum((int)(char*)cons), nil);
+    setval(atom("one"), mknum(1), nil);
+    setval(atom("two"), mknum(2), nil);
   #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);
