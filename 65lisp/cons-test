@@ -7,8 +7,9 @@ echo "(65 (65 (65 (68 (68 (68 (68 '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -b $*
 
 echo "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" | ./run -b $*
 
+#echo "(cons 1 2)" | ./run -b 8000
+
 # uses too many cons - no GC
 #echo "(car (car (car (cdr (cdr (cdr (cdr (cons 1 (cons 2 (cons 3 (cons 4 (cons (cons (cons 5 nil) 6) 7) nil)))))))))))" | ./run -b $*
-
 
 

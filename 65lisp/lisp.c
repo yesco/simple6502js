@@ -210,6 +210,10 @@ char firstbss;
 #define DEBUG(x) 
 #define TRACE(x)
 
+// enable to trace EVAL
+//#define ETRACE
+
+
 // ---------------- CONFIG
 
 // Number of cells (2 makes a cons)
@@ -448,7 +452,7 @@ L cons(L a, L d) {
 
     // TODO: use only one?
     ++ncons;
-    --ncell;
+    ncell-= 2;
 
     *++cnext= a;
     r= (L)cnext; // misalign it to where CAR was stored
@@ -457,9 +461,7 @@ L cons(L a, L d) {
     return r;
   }
 
-  printf("\n%% ERROR: run out of cons!\n");
-  // TDOO: longjmp?
-  return ERROR;
+  error("Run out of conses", nil);
 }
 
 // returning nil is faster than 0! (1%)
@@ -1045,7 +1047,23 @@ L getval(L x, L e) {
 
 // ---------------- Lisp Functions
 
-L eval(L x, L e); // forward
+// ETRACE
+
+#ifdef ETRACE
+  #define eval(a,b) evalTrace(a,b)
+int ind= 0;
+void indent() {
+  int i;
+  for(i=ind;i;--i)printf("  ");
+}
+
+L eval(L,L);
+#else
+L evalX(L,L);
+  #define eval(a,b) evalX(a,b)
+  #define indent() ;
+#endif // ETRACE
+
 //L apply(L f, L a, L e); // forward
 
 L de(L args) {
@@ -1114,6 +1132,7 @@ L nth(L n, L l) {
 #define islambda(x) (iscons(x)&&(car(x)==lambda))
 
 typedef L (*FUN1)(L);
+typedef L (*FUN2)(L,L);
 
 // TODO: inline
 L bindevlist(L fargs, L args, L env) {
@@ -1123,7 +1142,7 @@ L bindevlist(L fargs, L args, L env) {
                bindevlist(cdr(fargs), cdr(args), env) );
 }
 
-L eval(L x, L env) {
+L evalX(L x, L env) {
   ++neval;
   // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
@@ -1150,13 +1169,31 @@ L eval(L x, L env) {
     // 0.2% cost (* (+ but LAMBDA time/2 !
     if (f==lambda) return x; // self
 
+    // TODO: bad assumption it's an ATOM, lambda?
+    //f= NUM(eval(f, env)); double time!
+    // TODO: CHEAT! bad assumption it's an ATOM, lambda?
+
+    // first assume it's a global function
+    if (isatom(f)) f= ATOMVAL(f);
+
 //           OLD     NEW      ORG   ORG/NUM
-// ./lambda 41.20s  41.92s   65.73
+// ./lambda 41.20s  41.92s   65.73  !!!!!!!
 // ./plus   43.76s  43.785s  43.56 
-// ./cons-t 49.22s  51.10s   48.77s 49.79s (addr)
+// ./cons-t 49.22s  51.10s   48.77s 49.79s (using addr)
 //            ^--------^-------^---- uses car/cdr addr
-//   num    49.92   52.25    49.86s
-//   name   53.35   55.67    53.30s
+//   num    49.92   52.25    49.86s no-addr for car/cdr
+//   name   53.31   55.67    53.30s lookup name->num
+//
+// two arg calling
+//  CONS    27.56   27.59    45.82s (cons 1 2)x8000
+//            addr: 
+// CONCLUSION: faster:  name/addr << num << name/num
+//    ORIG was slower for lambda
+
+// moved OLD down
+//   addr   49.18
+//   num    50.02
+//   name   53.31   
 //        fun=addr for cons   ^-----(bytecode)
 //          
 //   WHY IS OLD FASTER?????
@@ -1165,13 +1202,6 @@ L eval(L x, L env) {
 #ifdef OLD
     x= CDR(x);
 #endif
-
-    // TODO: bad assumption it's an ATOM, lambda?
-    //f= NUM(eval(f, env)); double time!
-    // TODO: CHEAT! bad assumption it's an ATOM, lambda?
-
-    // first assume it's a global function
-    if (isatom(f)) f= ATOMVAL(f);
 
     // 5% slower for ./cons-test even if number
     // TODO: why is the non-entered loop costly?
@@ -1250,7 +1280,33 @@ L eval(L x, L env) {
 #ifdef OLD
     if (f & 0xff00) return ((FUN1)f)( eval(car(x), env) );
 #else
-    if (f & 0xff00) return ((FUN1)f)( eval(car(cdr(x)), env) );
+
+#ifndef GURKA
+  if (f & 0xff00) return ((FUN1)f)( eval(car(cdr(x)), env) );
+#else
+  if (f & 0xff00) {
+    b= CDR(x); // args
+
+    // one arg
+    a= eval(car(b), env); // eval first arg
+    //indent(); printf("CALL  %04X on ", f); prin1(a); printf(" x="); prin1(x); NL;
+
+    // only one arg?
+    b= cdr(b);
+
+    // NAME 61.9s ??? NUM 52.=22s 
+    if (null(b)) return ((FUN1)f)(a);
+
+    // Two args: NUM => 45.95s  ADDR => 46.87s
+
+    //indent(); printf("CALL2 %04X on ", f);prin1(a); putchar(' '); prin1(b); NL;
+    // two args
+    b= eval(car(b), env);
+    // (46.87s => 48.80s) for (cons 1 2)
+    //if (!null(cdr(b))) error("too many args", x);
+    return ((FUN2)f)(a,b);
+  }
+#endif // GURKA
 #endif
 
     // TODO: ADDR NUM in lisp is 10% faster,
@@ -1301,7 +1357,7 @@ L eval(L x, L env) {
     //case 'X': return TODO: FUNCALL! eXecute
     case 'Y': return lread();
       // TODO: non-blocking getchar (0 if none)
-    case '\'':return car(x); // quote
+    case '\'': return car(x); // quote
     //case '\\':return o;
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
     //case '@': return TODO: apply J or @
@@ -1323,6 +1379,7 @@ L eval(L x, L env) {
     }
 #else
     a= CDR(x); // a is list of args (unevalled)
+    //printf("FFFFFFFFFFF: '%c' x= ", f); prin1(x); NL;
     b= 2;      // b=mknum(1), used by + * for temporary
     //            x is still orig
     switch(f) {
@@ -1391,17 +1448,23 @@ L eval(L x, L env) {
     case '~': return mknum(num(~a));
     }
 
+    // a contains first arg
+    // b rest of args
+    // x orig
 
     // --- two args
     if (!iscons(x)) return ERROR;
 #ifdef OLD
-    b= eval(CAR(x), env);
-    x= CDR(x);
+    b= eval(CAR(x), env); // just get second arg
 #else
-    // reuse b, throw away rest of values, AND NOT EVALUTE!
-    b= eval(CAR(b), env); // throw away rest values...
-    printf("\nTWO ARGS: "); prin1(a); putchar(b); NL;
+    // a contains first arg
+    // b rest of args
+    // x orig
+
+    // b will be second eval arg
+    b= eval(CAR(CDR(b)), env);
 #endif
+    //indent(); printf("TWO ARGS, f='%c'(%d) a=", f,f); prin1(a); putchar(' '); prin1(b); printf(" x="); prin1(x); NL;
     switch(f) {
     case '-': return mknum(num(a) - num(b));
     case '/': return mknum(num(a) / num(b));
@@ -1456,6 +1519,19 @@ L eval(L x, L env) {
   // assert(!"UDF?"); // TODO:
   //return ERROR;
 }
+
+#ifdef ETRACE
+L evalTrace(L x, L env) {
+  L r; int i;
+  NL;
+  indent(); printf("-->EVAL "); prin1(x); NL;
+
+  ++ind; r= evalX(x, env); --ind;
+
+  indent(); printf("<--EVAL "); prin1(r); printf(" <= "); prin1(x); NL;
+  return r;
+}
+#endif // ETRACE
 
 // ----------------= Alphabetical Lisp VM
 // EXPERIMENTIAL BYTE CODE VM
@@ -1750,10 +1826,12 @@ int mainmain(int argc, char** argv, void* main) {
   // - read args
   while (--argc) {
     ++argv;
-    //printf("ARG: %s\n", *argv);
+    if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
     if (0==strcmp("-b", *argv)) { // BENCH 5000 times
+      printf("NUM: %s\n",argv[1]);
       n= atoi(argv[1]);
-      if (n) --argc,++argc; else n= 5000;
+      printf("n=%d\n", n);
+      if (n) --argc,++argv; else n= 5000;
       echo= 1; quiet= 1;
     } else
     if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
@@ -1764,6 +1842,7 @@ int mainmain(int argc, char** argv, void* main) {
     if (0==strcmp("-v", *argv)) ++verbose; else
     if (0==strcmp("-s", *argv)) ++stats; else
     if (0==strcmp("-t", *argv)) echo=1,quiet=test=1;
+    else printf("%% ERROR.args: %s\n", *argv),exit(1);
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -1780,8 +1859,9 @@ int mainmain(int argc, char** argv, void* main) {
 
   // nearly 10% faster... but little dangerous
   #ifndef AL
-//    setval(atom("car"), mknum((int)(char*)car), nil);
-//    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+    setval(atom("car"), mknum((int)(char*)car), nil);
+    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+    //setval(atom("cons"), mknum((int)(char*)cons), nil);
   #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);
