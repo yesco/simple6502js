@@ -9,20 +9,22 @@
 // 65LISP is a scheme-style lisp with full closures and
 // lexical bindings. No macros.
 
-// Features:
+// FEATURES
+//
 // - TODO: full closures - LOL
 // - TODO: tail-recursion using "immediates"
 // - lexical scoping
-// - highly optimized (using misaligned pointers!)
-// - quirk to avoid the (funcall f ...) use ('f ...) ! (see EVAL)
+// - highly optimized (for being in CC65)
+// - no funcall => use ('f ...) instead (see EVAL)
 // - \A gives ascii-code in reader
 // - ({[]}) it doesn't care which char, only need to match, all gives list
 //   TODO: {} - could give assoc-list, [] - could give vector
-// - code ; comements
-// - |atom with spaces|
+// - code ; comement
+// - |atom with spaces| - basically a constant string
 // - (+ 1 2 3 (* 4 5 6)) - vararg
 
-// Functions:
+// FUNCTIONS
+//
 // - math:  + - * / %   & | ^   = cmp
 // - test:  null atomp numberp consp
 // - list:  cons car cdr consp list length assoc member mapcar(TODO) nth
@@ -36,19 +38,52 @@
 //
 // Eval is the main function of a lisp.
 //
+// - Constants
+//
 // 35 nil T ERROR *EOF* (lambda ...)
-//   -> all evaluates to themselves (the symbols are set to themselves)
+//   -> all those evaluates to themselves
+//      (the symbols are set to themselves)
+//
+// - primtive ops
+//
+// They are all listed above in the Functions: section
+// Only + - and list are varargs
+// 
+// - evaluate function fixpoint
+//
+// The CAR, the first argument, the function to call,
+// is evaluated *until* it's a NUMBER or a LAMBDA.
+// If it reaches an fixpoint, as in that same value
+// is repated at last, like (nil 3 4). Then the
+// evaluation is aborted with an error.
 //
 // (+ 3 4) ('+ 3 4) (\+ 3 4) (43 3 4) ((+ 42 1) 3 4)
 //   -> 7 7 7 7 7
 //
+// In each of the cases the CAR (and subvalues) evaluates:
+//    0       2         1        0        3   times
+//
+// -- A number is the ALphabetical Lisp's byte code
+//
+// Once a number is reached the function is dispatched.
+//
+//   > +
+//   43     ; actuall the ASCII of '+'
+//   > \A
+//   43
+//
+// We can then call the function by the byte code:
+// 
+//   > (+ 3 4)
+//   7
+//   > (43 3 4)
+//   7
+
+// -- Indirection to other names:
+//
 // (setq foo 'bar) (setq bar '+) ('foo 3 4)
 //
-// Also works! The CAR, the first argument, the function to call,
-// is evaluated *until* it's a NUMBER or a LAMBDA.
-// If it reaches an fixpoint, same value repated. Like (nil 3 4) .
-// The evaluation is aborted.
-//
+// -- If we
 
 // FUNCALL problem
 //
@@ -160,6 +195,7 @@ char firstbss;
 #include <stdlib.h>
 #include <assert.h>
 #include <time.h>
+#include <setjmp.h>
 
 //#include <conio.h>
 
@@ -296,6 +332,13 @@ L prin1(L); // forward TODO: remove
 #define HSLICE 0x51 // do you get it? ;-)
 
 // TODO: not happy, too much code add 550 bytes!?
+
+
+// --- ERROR
+
+jmp_buf toploop= {0};
+
+void error(char* msg, L a);
 
 //#define HEAP
 #ifdef HEAP
@@ -616,8 +659,9 @@ L atom(char* s) {
 //   (if test num   sum: 186s   mul: 255s  LOL
 // and save 30b code too! LOL
 
-// macro smaller code and 10% faster
-#define isnum(x) (!((x)&1))
+// macro smaller code and 10% faster than C function
+#define notisnum(x) ((x)&1)      // faster
+#define isnum(x) (!notisnum(x))
 
 // simple now, but can often avoid if + -, if / need/2
 #define NUM(x)   ((x)/2)
@@ -948,6 +992,12 @@ void lprintf(char* f, L a) {
   } while (1);
 }
 
+void error(char* msg, L a) {
+  printf("%%ERROR: %s - ", msg);
+  prin1(a); NL;
+  if (toploop) longjmp(toploop, 1);
+}
+  
 // ---------------- Variables
 
 L assoc(L x, L l) {
@@ -1012,13 +1062,11 @@ L df(L args) {
 
 // tailrecursion?
 L iff(L args, L env) {
-  //assert(!"NIY: iff");
-  return args?ERROR:env;
+  if (null(eval(car(args), env)))
+    return eval(car(cdr(cdr(args))),env);
+  else
+    return eval(car(cdr(args)),env);
 }
-
-//L lambda(L args, L env) {
-//  return cons(args, env);
-//}
 
 L evallist(L args, L env) {
   return iscons(args)? cons(eval(CAR(args),env), evallist(CDR(args),env)): nil;
@@ -1068,11 +1116,11 @@ L nth(L n, L l) {
 typedef L (*FUN1)(L);
 
 // TODO: inline
-L bindlist(L fargs, L args, L env) {
+L bindevlist(L fargs, L args, L env) {
   if (null(fargs)) return env;
   // TODO: fargs= (foo . bar) == &rest
   return cons( cons(car(fargs),eval(car(args),env)),
-               bindlist(cdr(fargs), cdr(args), env) );
+               bindevlist(cdr(fargs), cdr(args), env) );
 }
 
 L eval(L x, L env) {
@@ -1096,8 +1144,27 @@ L eval(L x, L env) {
   TRACE(printf("EVAL: "); prin1(x); NL);
 
   if (iscons(x)) {
-    L a, b, f;
-    f= CAR(x); x= CDR(x);
+    L f, a, b;
+    //b= x;
+    f= CAR(x);
+    // 0.2% cost (* (+ but LAMBDA time/2 !
+    if (f==lambda) return x; // self
+
+//           OLD     NEW      ORG   ORG/NUM
+// ./lambda 41.20s  41.92s   65.73
+// ./plus   43.76s  43.785s  43.56 
+// ./cons-t 49.22s  51.10s   48.77s 49.79s (addr)
+//            ^--------^-------^---- uses car/cdr addr
+//   num    49.92   52.25    49.86s
+//   name   53.35   55.67    53.30s
+//        fun=addr for cons   ^-----(bytecode)
+//          
+//   WHY IS OLD FASTER?????
+//
+#define OLD 
+#ifdef OLD
+    x= CDR(x);
+#endif
 
     // TODO: bad assumption it's an ATOM, lambda?
     //f= NUM(eval(f, env)); double time!
@@ -1115,35 +1182,40 @@ L eval(L x, L env) {
     // slowdown:     (/ 44.13 43.95) = 0.4%  (/ 43.31 42.09) = 2.9%
     // Fine for doing the right thing!
     // TODO: +1KB CODE though - see if can minimize bytes???
-    while((f&1)) { // merry go-around?         44.13s, 43.31s - acceptable
+    // merry go-around?         44.13s, 43.31s - acceptable
+    while(notisnum(f)) {
 
       // follow chain of atoms => "local" or global value
-      a= nil;
-      while(isatom(f) && f!=a) {
+      while(isatom(f)) {
         TRACE(printf("ATOM again: "); prin1(f); NL);
         a= f; // avoid self loop nil/T etc
-        f= eval(f, env);
+        f= ATOMVAL(f);
         if (isnum(f)) break;
+        if (f==a) error("eval.loop", a);
       }
-      if (f==a) {
-        TRACE(printf("RUN FOREVER.atom: "); prin1(f); printf(" on "); prin1(x); NL);
-        return ERROR;
-      }
+      if (null(f)) error("nofunc", a);
 
       // evaluate any cons until it's not...
-      a= nil;
-      while(iscons(f) && f!=a && !islambda(f)) {
+      // lambda 66s => 37s by reordering tests!
+      while(iscons(f) && CAR(f)!=lambda) {
         TRACE(printf("EVAL again: "); prin1(f); NL);
-        a= f; // avoid self loop nil/T etc
+        a= f; // avoid self loop
         f= eval(f, env);
+        if (isnum(f)) break;
+        if (f==a) error("eval.loop", a); // can happen?
       }
+      if (null(f)) error("nofunc", a);
 
       // LAMBDA - Let's APPLY
       if (islambda(f)) {
         TRACE(printf("LAMBDA: "); prinq(f); NL);
         // APPLY
         f= cdr(f);
-        env= bindlist(car(f), x, env);
+#ifdef OLD
+        env= bindevlist(car(f), x, env);
+#else
+        env= bindevlist(car(f), a, env);
+#endif
         f= cdr(f);
         TRACE(printf("   ENV: "); prin1(env); NL);
         // PROGN
@@ -1154,11 +1226,6 @@ L eval(L x, L env) {
         }
         return a;
       }
-
-      if (f==a) {
-        printf("RUN FOREVER.cons: "); prin1(f); printf(" on "); prin1(x); NL;
-        return ERROR;
-      }
     }
 
     TRACE(printf("f => "); prin1(f); NL);
@@ -1167,7 +1234,6 @@ L eval(L x, L env) {
 
     //f= NUM(isnum(f)? f: ATOMVAL(f)); // original
     f= NUM(f);
-
 
     // OVERALL: slightly faster, 
     // 44.33s using atom name, and no CALL just eval->letter
@@ -1181,7 +1247,11 @@ L eval(L x, L env) {
 
     // CALL direct address of function
     // (test highbyte this was is "cheaper" 1%)
+#ifdef OLD
     if (f & 0xff00) return ((FUN1)f)( eval(car(x), env) );
+#else
+    if (f & 0xff00) return ((FUN1)f)( eval(car(cdr(x)), env) );
+#endif
 
     // TODO: ADDR NUM in lisp is 10% faster,
     //    do we replace in the orig code?
@@ -1219,7 +1289,8 @@ L eval(L x, L env) {
     // TODO: "=string
 
     // --- nargs
-    a= 2; // used by + *
+#ifdef OLD
+    a= 2;
     switch(f) {
     // - nlambda - no eval
     case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
@@ -1231,7 +1302,7 @@ L eval(L x, L env) {
     case 'Y': return lread();
       // TODO: non-blocking getchar (0 if none)
     case '\'':return car(x); // quote
-    case '\\':return x;
+    //case '\\':return o;
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
     //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
@@ -1242,21 +1313,59 @@ L eval(L x, L env) {
     case '+': a-=2;
     case '*':
       while(iscons(x)) {
-        // TODO: do we care if not number?
-        b= eval(CAR(x), env);
+        b= eval(CAR(x), env); // don't care if !num !!!
         //if (!isnum(b)) b= 0; // takes away most of savings...
-        //assert(isnum(b)); // 1% overhead
         x= CDR(x);
-        //if (f=='*') a*= b; else a+= b;
         if (f=='*') a*= b/2; else a+= b;
-      } return a;
+      } return a & 0xfffe; // make sure safe num!
+    case 'L': return evallist(a, env);
+    case 'H': return evalappend(a);
+    }
+#else
+    a= CDR(x); // a is list of args (unevalled)
+    b= 2;      // b=mknum(1), used by + * for temporary
+    //            x is still orig
+    switch(f) {
+    // - nlambda - no eval
+    case ':': return setval(car(a), eval(car(cdr(a)), env), env); 
+    // TODO: if it allows local defines, how to
+    //   extend the env,setq should not, two words?
+    case ';': return df(a);
+    case 'I': return iff(a, env);
+    //case 'X': return TODO: FUNCALL! eXecute
+    case 'Y': return lread();
+      // TODO: non-blocking getchar (0 if none)
+    case '\'':return car(a); // quote
+    //case '\\':return o;
+    case 'S': return setval(car(a), eval(car(cdr(a)), env), env); // TODO: set local means update 'env' here...
+    //case '@': return TODO: apply J or @
+    //case 'J': return TODO: apply J or @
+
+    // - nargs - eval many x
+    //case 'V': TODO: or ???
+    //case '_': TODO: and ???
+    case '+': b-=2; // -1 for number!
+    case '*':
+      while(iscons(a)) {
+        x= eval(CAR(a), env); // don't care if !num !!!
+        //if (!isnum(b)) b= 0; // takes away most of savings...
+        a= CDR(a);
+        if (f=='*') b*= x/2; else b+= x;
+      } return b & 0xfffe; // make sure safe num!
     case 'L': return evallist(x, env);
     case 'H': return evalappend(x);
     }
+#endif
 
     // --- one arg
+#ifdef OLD
     if (!iscons(x)) return ERROR;
     a= eval(CAR(x), env);
+#else
+    if (!iscons(a)) return ERROR;
+    b= a;
+    a= eval(CAR(a), env);
+#endif
 
     // slightly more expensive, passed a switch...
     //if (f & 0xff00) return ((FUN1)f)(a);
@@ -1274,20 +1383,25 @@ L eval(L x, L env) {
     case 'K': return iscons(a)? T: nil;
     case 'O': return length(a);
     case 'P': return print(a);
-    //case 'R' TODO: Reduce?
+    //case 'R' TODO: Recurse/Reduce?
     case 'T': NL; return nil;
     case 'U': return a? mknum(1): nil;
     case 'W': return prin1(a);
     case '.': return princ(a);
-    case '~': return mknum(num(~x));
+    case '~': return mknum(num(~a));
     }
 
 
     // --- two args
     if (!iscons(x)) return ERROR;
+#ifdef OLD
     b= eval(CAR(x), env);
     x= CDR(x);
-
+#else
+    // reuse b, throw away rest of values, AND NOT EVALUTE!
+    b= eval(CAR(b), env); // throw away rest values...
+    printf("\nTWO ARGS: "); prin1(a); putchar(b); NL;
+#endif
     switch(f) {
     case '-': return mknum(num(a) - num(b));
     case '/': return mknum(num(a) / num(b));
@@ -1295,17 +1409,17 @@ L eval(L x, L env) {
 
     case '&': return mknum(num(a) & num(b));
     case '|': return mknum(num(a) | num(b));
+    case '^': return mknum(num(a) ^ num(b));
       
     case '=': return a==b? T: nil;
-    case '?': if (a==b) return 0;
-      else if (isatom(a) && isatom(b)) return strcmp(ATOMSTR(a), ATOMSTR(b));
-      else return mknum(a-b); // no care type!
-    //case '<': TODO: ? 
-    //case '>': TODO: gt
-    case '^': return mknum(num(a) ^ num(b));
+    case '<': case '>':
+    case '?': if (a==b) x= 0; // use x as temp
+      else if (isatom(a) && isatom(b)) x= strcmp(ATOMSTR(a), ATOMSTR(b));
+      else x= mknum(a-b); // no care type!
+      return (f=='<'? x<0: f=='>'? x>0: mknum(x))? T: nil;
 
-    //case 'E': TOOD: Eval
-    //case 'F': TODO: Filter ???
+    case 'E': return eval(a, b);
+    //case 'F': TODO: Filter/Fold
     //case 'Q': TOOD: eQual
     case 'C': return cons(a, b);
     case 'B': return member(a, b);
@@ -1313,9 +1427,12 @@ L eval(L x, L env) {
     case 'M': return mapcar(a, b);
     case 'N': return nth(a, b);
 
-    default: return ERROR;
+    default: error("NO such FUN, or too many args", x);
     }
 
+    // If three args need to use narg !
+
+    assert(!"Can't get here");
   }
 
   if (isatom(x)) {
@@ -1523,7 +1640,8 @@ char* names[]= {
   "~ ~",
   "= eq", "= =",
   "? cmp",
-
+  "< <",
+  "> >",
   "C cons",
   "B member",
   "G assoc",
@@ -1562,8 +1680,8 @@ void initlisp() {
   natoms= ncons= nalloc= 0;
 
   // special symbols
-    nil= atom("nil");    ATOMVAL(nil)= nil; // LOL
-      T= atom("T");      setval(T, T, nil);
+    nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
+      T= atom("T");     setval(T, T, nil);
   FREE= atom("*FREE*"); setval(FREE, FREE, nil);
   quote= atom("quote");
  lambda= atom("lambda");
@@ -1642,11 +1760,10 @@ int mainmain(int argc, char** argv, void* main) {
     if (0==strcmp("-E", *argv)) echo=1; else
     if (0==strcmp("-N", *argv)) noeval=1; else
     if (0==strcmp("-g", *argv)) gc=0; else
-    if (0==strcmp("-nogc", *argv)) gc=0; else
     if (0==strcmp("-d", *argv)) debug=1; else
     if (0==strcmp("-v", *argv)) ++verbose; else
     if (0==strcmp("-s", *argv)) ++stats; else
-    if (0==strcmp("-t", *argv)) echo=0,quiet=test=1;
+    if (0==strcmp("-t", *argv)) echo=1,quiet=test=1;
 // TODO: read from memory...
 //    if (0==strcmp("-e", *argv)) {
 //      --argc,++argc;
@@ -1663,8 +1780,8 @@ int mainmain(int argc, char** argv, void* main) {
 
   // nearly 10% faster... but little dangerous
   #ifndef AL
-    setval(atom("car"), mknum((int)(char*)car), nil);
-    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+//    setval(atom("car"), mknum((int)(char*)car), nil);
+//    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
   #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);
@@ -1676,6 +1793,7 @@ int mainmain(int argc, char** argv, void* main) {
   if (stats) statistics(3);
 
   r= ERROR;
+  if (setjmp(toploop)) printf("%% Recovering...\n");
   do {
     if (!quiet) printf("65> ");
     #ifndef AL
@@ -1693,9 +1811,9 @@ int mainmain(int argc, char** argv, void* main) {
         r= al(isatom(x)? ATOMSTR(x): NULL);
       #endif // AL
     }
-    if (!quiet) { prin1(r); NL; NL; }
+    if (echo || !quiet || test) { prin1(r); NL; }
     if (gc) GC(env, alvals); // TODO: only if needed?
-    if (!quiet & stats) statistics(stats);
+    if (!quiet & stats) {NL; statistics(stats); }
     if (x==eof) break;
   } while (!feof(stdin));
   NL;
@@ -1709,7 +1827,7 @@ int mainmain(int argc, char** argv, void* main) {
 }
 
 int main(int argc, char** argv) {
-  mainmain(argc, argv, main);
+  return mainmain(argc, argv, main);
 }
 
 // ENDWCOUNT

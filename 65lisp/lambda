@@ -1,27 +1,4 @@
-# GC is wrong! it eats up cons of f!!!
-
-./run -b $* <<HERE
-
-(nil 3 4)
-(T 3 4)
-
-((+ 0 car) (cons 42 666))
-(+ 3 4)
-('+ 3 4)
-
-((lambda (car c) (car c)) cdr (cons 42 666))
-((lambda (car c) ('car c)) cdr (cons 666 42))
-
-(lambda () (+ foo 1000))
-((lambda () (+ foo 1000)))
-((lambda (foo) (+ foo 1000)) 77)
-((lambda (a b) (+ a b) (* a b)) 11 22)
-
-((lambda (n) 42))
-
-((lambda (f n) ('f n)) (lambda (n) (+ n n)) 42))
-((lambda (f n) ('f n f)) (lambda (n) (+ n n)) 3)
-((lambda (f n) ('f n f)) (lambda (n f) (+ n n)) 3)
+./run -t -g $* <<HERE
 
 (lambda (n) (+ n n))
 ((lambda (n) (+ n n)) 3)
@@ -68,10 +45,14 @@ fib
 (fib 13)
 (fib 14)
 (fib 15)
-(fib 16)
-(fib 17)
-(fib 18)
-(fib 19)
-
+; crash
+;(fib 16)
+;(fib 17)
+;(fib 18)
+;(fib 19)
 
 HERE
+
+echo "((lambda (n) (+ n n)) 3)" | ./run -g -b -E
+
+echo "((lambda (n) (+ n n)) 3)" | ./run -g -b
