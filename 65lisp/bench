@@ -1,0 +1,3 @@
+./65lisp -q -e '"--globalvar"'         -b -e "foo"
+./65lisp -q -e '"--dynamic varg"' '    -b -e "bar"
+

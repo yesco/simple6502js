@@ -1908,16 +1908,18 @@ L readeval(char *ln, L env) {
 
   r= ERROR;
   do {
-    if (_rs) printf("_rs=%s\n", _rs);
+
     // read
-    if (!quiet || !echo) printf("65> "); // TODO: maybe make nextc echo???
+    if (!quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
     #ifndef AL
       x= lread();
     #else
       x= alcompileread();
       printf("AL.compiled: "); prin1(x); NL;
     #endif // AL
-    if (echo) { printf("\n> "); prin1(x); NL; }
+
+    if (x==eof || x==bye) break;
+    if (echo) { printf("> "); prin1(x); NL; }
 
     // eval
     if (!noeval) {
@@ -1937,7 +1939,7 @@ L readeval(char *ln, L env) {
     if (gc) GC(env, alvals); // TODO: only if needed?
     if (!quiet & stats) {NL; statistics(stats); }
 
-  } while (x!=eof && x!=bye);
+  } while (1);
   NL;
 
   _rs= saved;
@@ -1968,7 +1970,7 @@ L testing(env) {
 }
 
 int mainmain(int argc, char** argv, void* main) {
-  L env= nil;
+  L env= nil; char doi= 1;
 
   initlisp();
   env= nil; // must be done after initlisp();
@@ -1984,8 +1986,8 @@ int mainmain(int argc, char** argv, void* main) {
     } else
     if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
     if (0==strcmp("-E", *argv)) echo=1; else
-    if (0==strcmp("-e", *argv)) env= readeval(*++argv, env),--argc; else
-    if (0==strcmp("-i", *argv)) env= readeval(NULL, env); else // once ^D
+    if (0==strcmp("-e", *argv)) doi=0,env= readeval(*++argv, env),--argc; else
+    if (0==strcmp("-i", *argv)) doi=0,env= readeval(NULL, env); else // once ^D
     if (0==strcmp("-N", *argv)) noeval=1; else
     if (0==strcmp("--nogc", *argv)) gc=0; else
     if (0==strcmp("-d", *argv)) debug=1; else
@@ -1995,7 +1997,7 @@ int mainmain(int argc, char** argv, void* main) {
     else printf("%% ERROR.args: %s\n", *argv),exit(1);
   }
 
-  if (!quiet || bench==1) clrscr(); // || only if interactive?
+  if (doi && !quiet && bench==1) clrscr(); // || only if interactive?
 
   if (!quiet) {
     PRINTARRAY(syms, HASH, 0, 1);
@@ -2008,12 +2010,14 @@ int mainmain(int argc, char** argv, void* main) {
 
   // TODO: if used -e and -i do we want to do this again? also in batch? stdin?
   // The Meat
-  env= readeval(NULL, env);
+  if (doi) env= readeval(NULL, env);
 
   // Info
   PRINTARRAY(syms, HASH, 0, 1);
-  if (stats || test) statistics(255);
-  printf("Program size: %u bytes(ish) %04x-%04x %04x %04x\n", ((uint)&firstbss)-((uint)startprogram), (uint)startprogram, (uint)main, (uint)&firstvar, (uint)&firstbss);
+  if (stats || test) {
+    statistics(255);
+    printf("Program size: %u bytes(ish) %04x-%04x %04x %04x\n", ((uint)&firstbss)-((uint)startprogram), (uint)startprogram, (uint)main, (uint)&firstvar, (uint)&firstbss);
+  }
 
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;

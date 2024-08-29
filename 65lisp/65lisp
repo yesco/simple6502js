@@ -1,0 +1,11 @@
+name="lisp"
+
+cl65 -O -t sim6502 $name.c -o $name.out -m $name.map && (sim65 -c $name.out $* ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time")
+
+
+
+
+
+
+
+
