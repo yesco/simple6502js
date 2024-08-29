@@ -1,7 +1,7 @@
+echo "unix> ./r $*"
+
 name=$1
 shift
-echo "name= $name"
-echo "args= $*"
 
 rm $name.tap  2>/dev/null
 rm $name.out  2>/dev/null
@@ -43,6 +43,8 @@ echo "=== RUN ==="
 (sim65 -c $name.out $* ; echo "--- EXIT=$? ---") | tee $name.log
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
+
+ls -l $name.o $name.out $name.tap
 
 echo
 grep '^Name' $name.map

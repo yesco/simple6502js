@@ -1,0 +1,11 @@
+cc65
+- ability to inline specific callsites of function: a= INLINE(slowfunc(b))
+
+sim65:
+- conio (no have?), no clrscr, etc... maybe assume VT100?
+- clock_t clock (void); missing on sim65
+- any variables from which I can deduce size of program *inside* the program, CODE, RODATA, DATA, RSS?
+- a realtime approximation flag would be nice, too see how slow it would be
+- an option setting --clock=2M could make more time functions simulated
+
+

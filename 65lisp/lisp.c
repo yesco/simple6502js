@@ -204,6 +204,7 @@ char firstbss;
 #include <setjmp.h>
 
 //#include <conio.h>
+#include "simconio.c"
 
 // +2376 bytes! (a little much?)
 //#define BIGMAX 100
@@ -264,7 +265,7 @@ typedef uint16_t uint;
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, closure, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, bye, quote= 0;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
@@ -941,6 +942,7 @@ L lread() {
   return ERROR;
 }
 
+#ifdef FOO
 // Read from string, gives *EOF* internally until pointer reset;
 L lreads(char* x) {
   char* saved= _rs; L r; // could be recursive?
@@ -948,6 +950,7 @@ L lreads(char* x) {
   _rs= saved;
   return r;
 }
+#endif
 
 // print unquoted value without space before/after
 //   no quotes for strings, except inside list? hmmm
@@ -1832,12 +1835,23 @@ void initlisp() {
 closure= atom("closure");
   ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
+    bye= atom("bye"); setval(bye, bye, nil);
 
   // register function names
   while(*s) {
     reg(*s);
     ++s;
   }
+
+  // direct code pointers
+  // nearly 10% faster... but little dangerous
+  #ifndef AL
+    setval(atom("car"), mknum((int)(char*)car), nil);
+    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+    // only for ... TODO: remove
+    //setval(atom("cons"), mknum((int)(char*)cons), nil);
+  #endif // AL
+
 }
 
 //#define PERFTEST
@@ -1873,83 +1887,30 @@ void statistics(int level) {
   }
 }
 
-int mainmain(int argc, char** argv, void* main) {
-  char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
-  int i= 0;
-  int n= 1;
+char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
+unsigned long bench=1;
 
-  L r, x, env;
+L readeval(char *ln, L env) {
+  // TODO: not sure what function env has an toplevel:
+  //   we're setting/modifying globals, right?
+  //   so it would reasonably be nil. LOL
+  //   Ah, how about this? Use it for *special* variables!
+  //   As long as they aren't defined, TODO: or we need
+  //   setval to differentiate because of the name?
+  //   Alt is to do "pushdown" (use property value?)
+  long i= 0;
+  L r, x;
+  char* saved= _rs;
+  _rs= ln;
 
-  #ifdef BIGMAX
-  btest(); return 0;
-  #endif // BIGMAX
-
-  initlisp();
-  env= nil; // must be done after initlisp();
-
-  // TODO: define way to test, and measure clocks ticks
-  #ifdef PERFTEST
-  perftest();
-  #endif // PERFTEST
-
-  // - read args
-  while (--argc) {
-    ++argv;
-    //if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
-    if (0==strcmp("-b", *argv)) { // BENCH 5000 times
-      n= atoi(argv[1]);
-      if (n) --argc,++argv; else n= 5000;
-      echo= 1; quiet= 1;
-    } else
-    if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
-    if (0==strcmp("-E", *argv)) echo=1; else
-    if (0==strcmp("-N", *argv)) noeval=1; else
-    if (0==strcmp("-g", *argv)) gc=0; else
-    if (0==strcmp("-d", *argv)) debug=1; else
-    if (0==strcmp("-v", *argv)) ++verbose; else
-    if (0==strcmp("-s", *argv)) ++stats; else
-    if (0==strcmp("-t", *argv)) echo=1,quiet=test=1;
-    else printf("%% ERROR.args: %s\n", *argv),exit(1);
-// TODO: read from memory...
-//    if (0==strcmp("-e", *argv)) {
-//      --argc,++argc;
-//      x= lread();
-//    }
-  }
-
-  //clrscr(); // in conio but linker can't find (in sim?)
-
-  // set some for test
-  setval(atom("bar"), mknum(33), nil);
-  setval(atom("bar"), mknum(11), nil);
-  env= cons(cons(atom("foo"), mknum(42)), env);
-
-  // nearly 10% faster... but little dangerous
-  #ifndef AL
-    setval(atom("car"), mknum((int)(char*)car), nil);
-    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
-    // only for ... TODO: remove
-    //setval(atom("cons"), mknum((int)(char*)cons), nil);
-
-    // TODO: remove, because -b doesn't have onerun?
-    setval(atom("one"), mknum(1), nil);
-    setval(atom("two"), mknum(2), nil);
-
-    eval(lreads("(de clos (lambda (n) (+ n n)))"), env);
-  #endif // AL
-
-  PRINTARRAY(syms, HASH, 0, 1);
-  PRINTARENA();
-
-  if (!quiet)
-    printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
-
-  if (stats) statistics(3);
+  // TODO wanted result, abort rest?
+  if (setjmp(toploop)) printf("%% Recovering...\n");
 
   r= ERROR;
-  if (setjmp(toploop)) printf("%% Recovering...\n");
   do {
-    if (!quiet) printf("65> ");
+    if (_rs) printf("_rs=%s\n", _rs);
+    // read
+    if (!quiet || !echo) printf("65> "); // TODO: maybe make nextc echo???
     #ifndef AL
       x= lread();
     #else
@@ -1957,21 +1918,99 @@ int mainmain(int argc, char** argv, void* main) {
       printf("AL.compiled: "); prin1(x); NL;
     #endif // AL
     if (echo) { printf("\n> "); prin1(x); NL; }
+
+    // eval
     if (!noeval) {
-      for(i=n; i>0; --i) // run n tests
+      // option to compare results? slow but equal
+      for(i=bench; i>0; --i) // run n tests
       #ifndef AL
         r= eval(x, env);
       #else
         r= al(isatom(x)? ATOMSTR(x): NULL);
       #endif // AL
     }
-    if (echo || !quiet || test) { prin1(r); NL; }
+
+    // print
+    if (echo || !quiet || bench) { prin1(r); NL; }
+
+    // info
     if (gc) GC(env, alvals); // TODO: only if needed?
     if (!quiet & stats) {NL; statistics(stats); }
-    if (x==eof) break;
-  } while (!feof(stdin));
+
+  } while (x!=eof && x!=bye);
   NL;
 
+  _rs= saved;
+  return env;
+}
+
+L testing(env) {
+  #ifdef BIGMAX
+  btest(); return 0;
+  #endif // BIGMAX
+
+  // TODO: define way to test, and measure clocks ticks
+  #ifdef PERFTEST
+  perftest();
+  #endif // PERFTEST
+
+  // set some for test
+  setval(atom("bar"), mknum(33), nil);
+  setval(atom("bar"), mknum(11), nil);
+  env= cons(cons(atom("foo"), mknum(42)), env);
+
+  // TODO: remove, because -b doesn't have onerun?
+  setval(atom("one"), mknum(1), nil);
+  setval(atom("two"), mknum(2), nil);
+
+  env= readeval("(de clos (lambda (n) (+ n n)))", env);
+  return env;
+}
+
+int mainmain(int argc, char** argv, void* main) {
+  L env= nil;
+
+  initlisp();
+  env= nil; // must be done after initlisp();
+
+  // - read args
+  while (--argc) {
+    ++argv;
+    //if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
+    if (0==strcmp("-b", *argv)) { // BENCH 5000 times
+      bench= atoi(argv[1]);
+      if (bench) --argc,++argv; else bench= 5000;
+      echo= 1; quiet= 1;
+    } else
+    if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
+    if (0==strcmp("-E", *argv)) echo=1; else
+    if (0==strcmp("-e", *argv)) env= readeval(*++argv, env),--argc; else
+    if (0==strcmp("-i", *argv)) env= readeval(NULL, env); else // once ^D
+    if (0==strcmp("-N", *argv)) noeval=1; else
+    if (0==strcmp("--nogc", *argv)) gc=0; else
+    if (0==strcmp("-d", *argv)) debug=1; else
+    if (0==strcmp("-v", *argv)) ++verbose; else
+    if (0==strcmp("-s", *argv)) ++stats; else
+    if (0==strcmp("-t", *argv)) echo=1,quiet=test=1,env=testing(env);
+    else printf("%% ERROR.args: %s\n", *argv),exit(1);
+  }
+
+  if (!quiet || bench==1) clrscr(); // || only if interactive?
+
+  if (!quiet) {
+    PRINTARRAY(syms, HASH, 0, 1);
+    PRINTARENA();
+
+    printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
+  }
+
+  if (stats) statistics(3);
+
+  // TODO: if used -e and -i do we want to do this again? also in batch? stdin?
+  // The Meat
+  env= readeval(NULL, env);
+
+  // Info
   PRINTARRAY(syms, HASH, 0, 1);
   if (stats || test) statistics(255);
   printf("Program size: %u bytes(ish) %04x-%04x %04x %04x\n", ((uint)&firstbss)-((uint)startprogram), (uint)startprogram, (uint)main, (uint)&firstvar, (uint)&firstbss);
@@ -1983,5 +2022,3 @@ int mainmain(int argc, char** argv, void* main) {
 int main(int argc, char** argv) {
   return mainmain(argc, argv, main);
 }
-
-// ENDWCOUNT

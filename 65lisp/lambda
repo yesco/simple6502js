@@ -1,4 +1,4 @@
-./run -t -g $* <<HERE
+./run -t --nogc $* <<HERE
 
 (lambda (n) (+ n n))
 ((lambda (n) (+ n n)) 3)
