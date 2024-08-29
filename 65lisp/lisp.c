@@ -10,11 +10,17 @@
 // lexical bindings. No macros.
 
 // FEATURES
-//
-// - TODO: full closures - LOL
-// - TODO: tail-recursion using "immediates"
-// - lexical scoping
 // - highly optimized (for being in CC65)
+// - int15:   efficient inline in pointer, minimal overhead
+// - atoms:   foo bar fie\ fum |fish crap| fie\nfush
+// - conss:   (cons 1 2) TODO: (cons 1 . 2)
+// - strings: "foo" "bar fie" "fish\ngurka"
+// - dec28:   TODO: int: [0,2^20[ 
+//            TODO: dec: +- [0,999999ish] E +- [0,125]
+//                  NaN, -inf, +inf
+// - lexical scoping
+// - full closures
+// - TODO: tail-recursion using "immediates"
 // - no funcall => use ('f ...) instead (see EVAL)
 // - \A gives ascii-code in reader
 // - ({[]}) it doesn't care which char, only need to match, all gives list
@@ -210,8 +216,8 @@ char firstbss;
 #define DEBUG(x) 
 #define TRACE(x)
 
-// enable to trace EVAL
-//#define ETRACE
+// comment to enable EVAL TRACE
+#define ETRACE(x) ;
 
 
 // ---------------- CONFIG
@@ -258,7 +264,7 @@ typedef uint16_t uint;
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, quote= 0;
 
 #define null(x) (x==nil) // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
@@ -344,6 +350,8 @@ jmp_buf toploop= {0};
 
 void error(char* msg, L a);
 
+#define HTYP(x) (*((char*)(((L)x)-1)))
+
 //#define HEAP
 #ifdef HEAP
 // ---------------- HEAP
@@ -357,7 +365,6 @@ void error(char* msg, L a);
 //
 // Use 
 
-#define HTYP(x) (((char*)(x))[-1]) // TODO: works?
 #define isobj(x) (((x)&0x03)==1)
 
 typedef struct OBJ {
@@ -512,7 +519,7 @@ char hash(char* s) {
 char* arena, *arptr, *arend;
 
 char isatomchar(char c) { //test for non-chars
-  return (char)(int)!strchr(" \t\n\r.;`'\"\\()[]{}", c);
+  return (char)(int)!strchr(" \t\n\r.;`'\"()[]{}", c);
 }
 
 //  57 bytes extra for ptr % 3 ==  01
@@ -588,9 +595,9 @@ void* searchatom(char* s) {
 #endif // PRINTARENA
 
 // search linked list
-Atom* findatom(Atom* a, char* s) {
+Atom* findatom(Atom* a, char* s, unsigned char typ) {
   while(a && (L)a!=nil) { // LOL
-    if (0==strcmp(s, a->name)) return a;
+    if (HTYP(a)==typ && 0==strcmp(s, a->name)) return a;
     a= a->next;
   }
   return NULL;
@@ -601,14 +608,22 @@ Atom* findatom(Atom* a, char* s) {
 // TODO: should use nil() test everywhere?
 //   and make "nil" first atom==offset 0!
 //   (however, I think increase codesize lots!)
-L atom(char* s) {
+//
+// Looks up an atom of NAME and returns it
+// 
+// If already exists, return that
+// Otherwise create it.
+//
+// TYP: use this type code to match and create
+// (This means an ATOM and "ATOM" could both exist)
+L atomstr(char* s, unsigned char typ) {
   char h;
   Atom *a;
 
   h= hash(s) & (HASH-1);
   //p= searchatom(s);  // slower 24s for 4x150.words
   //p= searchatom2(s); // slower 32s for 4x150.words
-  a= findatom((Atom*)syms[h], s); // fast 14s for 4x150.words
+  a= findatom((Atom*)syms[h], s, typ); // fast 14s for 4x150.words
   if (!a) {
     // create atom
     ++natoms;
@@ -619,14 +634,14 @@ L atom(char* s) {
 
     // put type byte "before" pointer
     do {
-      *arptr++= HATOM;
+      *arptr++= typ; // HTYP
       // align as: not cons: == x01
       //   (filling with extra type info, lol)
     } while (!isatom((int)arptr));
 
-    // must be some bug, atoms missing? lol
     a= (Atom*)arptr;
     arptr+= sizeof(Atom)+strlen(s)+1;
+    // TODO: better test? LOL this crashes
     assert(arptr<=arend);
 
     a->val= nil;               // CAR
@@ -641,6 +656,9 @@ L atom(char* s) {
   return (L)a;
 }
 
+// TODO: measure code size overhead?L
+L atom(char* s) { return atomstr(s, 0xA7); }
+
 // --- Strings
 
 // There are two type of strings:
@@ -650,8 +668,11 @@ L atom(char* s) {
 // How to distinguish?
 // TODO: if read-eval => "program"
 
-// 3 % faster and smaller code
-#define isstr(x) (0)
+#define ISSTR(x) (isatom(x)&&HTYP(x)==0x57)
+#define isstr(x) ISSTR(x) // unsafe
+
+// TODO: measure code size overhead?
+L mkstr(char* s) { return atomstr(s, 0x57); }
 
 // --- Numbers
 
@@ -820,8 +841,13 @@ void GC(L env, L alvals) {
 
 // ---------------- IO for parsing
 
+// next character, buffer for unc()
 int _nc= 0;
 
+// read from string
+char* _rs= 0;
+
+// ungetc
 void unc(char c) {
   assert(!_nc); // can't do twice!
   _nc= c;
@@ -829,9 +855,11 @@ void unc(char c) {
 
 char nextc() {
   int r;
-  if (_nc) { r= _nc; _nc= 0; } else r= getchar();
-  if (r==-1) r=0;
-  return r;
+  if (_nc) { r= _nc; _nc= 0; }
+  else if (_rs) { r= *_rs; if (r) ++_rs; }
+  else r= getchar();
+
+  return r>=0? r: 0;
 }
 
 char spc() {
@@ -857,7 +885,7 @@ L lreadlist(char t) {
 // TODO: maybe 1,2,3= (1 2 3) ? implicit by comma?
 L lread() {
   // TODO: skip single "," for more insert nil? [1 2,3 ,, 5]
-  char c= spc();
+  char c= spc(), q= 0;
   if (!c) return eof;
   if (c=='(' || c=='{' || c=='[') return lreadlist(c);
   if (isdigit(c)) { // number
@@ -872,43 +900,53 @@ L lread() {
   }
 // Need bigger nums as address
 // But this crashes!
-#ifdef FOO
-  if (c=='#') {
-    switch((c=nextc())){
-    case '[': // array
-    case '<': // printed but not readable
-      printf("%% ERROR: #%c format not yet implemented\n");
-      return ERROR;
-    default: { // hex
-      int n= 0;
-      c= nextc();
-      while(isxdigit(c)) {
-        c= toupper(c);
-        if (c>='A') c= c-'A'+10;
-        n= n*16 + c;
-      }
-      unc(c);
-      return n; }
+#ifdef HEX
+  if (c=='#') { // read hex
+    int n= 0;
+    c= nextc();
+    c= nextc();
+    while(isxdigit(c)) {
+      c= toupper(c);
+      if (c>='A') c= c-'A'+10;
+      n= n*16 + c;
     }
+    unc(c);
+    return n; }
   }
-#endif // FOO
-  if (c=='|' || isatomchar(c)) { // symbol
-    char q=(c=='|'), n= 0, s[MAXSYMLEN+1]= {0};
+#endif // HEX
+  if (c=='\\') return MKNUM(nextc()); // \A before
+  q= (c=='|' || c=='"')? c: 0;
+  if (q || isatomchar(c)) { // symbol/stringconst
+    // TODO: handle larger string const?
+    char n= 0, s[MAXSYMLEN+1]= {0};
     if (q) c= nextc();
     do {
+      // TODO: handle \t \n \r \e \007 ???
+      if (c=='\\') { char *s;
+        c= nextc();
+        s= strchr("t\tn\nr\re", c);
+        c= s? s[1]: c;
+      }
       s[n]= c; ++n;
       c= nextc();
       // TODO: breaking chars: <spc>'"()
-    } while(c && ((q && c!='|') || (!q && isatomchar(c))) && n<MAXSYMLEN);
+    } while(c && ((q && c!=q) || (!q && isatomchar(c))) && n<MAXSYMLEN);
     if (!q) unc(c);
-    return atom(s);
+    return q=='"'? mkstr(s): atom(s);
   }
-  if (c=='\\') return MKNUM(nextc());
   if (c=='\'') return cons(quote, cons(lread(), nil));
   if (c==';') { while((c=nextc()) && c!='\n' && c!='\r'); return lread(); }
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
   return ERROR;
+}
+
+// Read from string, gives *EOF* internally until pointer reset;
+L lreads(char* x) {
+  char* saved= _rs; L r; // could be recursive?
+  _rs= x; r= lread();
+  _rs= saved;
+  return r;
 }
 
 // print unquoted value without space before/after
@@ -938,7 +976,13 @@ L princ(L x) {
 
 // TODO: supposed to print in readable format:
 //   quote strings, and |atom w spaces|
-L prin1(L x) { return princ(x); }
+L prin1(L x) {
+  L r; char str= isstr(x);
+  if (str) putchar('"');
+  r= princ(x);
+  if (str) putchar('"');
+  return r;
+}
 
 //void prinx(L x) { printf("#%04u", (num)x); } 
 
@@ -1025,7 +1069,7 @@ L setval(L x, L v, L e) {
 //
 // might as well use eval(x, e) !!!
 
-#ifndef notused
+#ifdef notused
 // inlined in eval, just eval atom X instead?
 L getval(L x, L e) {
 //  L p;
@@ -1049,7 +1093,9 @@ L getval(L x, L e) {
 
 // ETRACE
 
-#ifdef ETRACE
+#ifndef ETRACE
+  #define ETRACERUN
+  #define ETRACE(x) do { x; } while(0)
   #define eval(a,b) evalTrace(a,b)
 int ind= 0;
 void indent() {
@@ -1129,17 +1175,18 @@ L nth(L n, L l) {
 // TODO: no apply function anymore? lol
 //return apply(car(x), cdr(x), env);
 
+// TODO: remove?
 #define islambda(x) (iscons(x)&&(car(x)==lambda))
 
 typedef L (*FUN1)(L);
 typedef L (*FUN2)(L,L);
 
-// TODO: inline
-L bindevlist(L fargs, L args, L env) {
+// TODO: inline, safe many function calls!
+L bindevlist(L fargs, L args, L env, L evalenv) {
   if (null(fargs)) return env;
   // TODO: fargs= (foo . bar) == &rest
-  return cons( cons(car(fargs),eval(car(args),env)),
-               bindevlist(cdr(fargs), cdr(args), env) );
+  return cons( cons(car(fargs),eval(car(args),evalenv)),
+               bindevlist(cdr(fargs), cdr(args), env, evalenv) );
 }
 
 L evalX(L x, L env) {
@@ -1167,7 +1214,9 @@ L evalX(L x, L env) {
     //b= x;
     f= CAR(x);
     // 0.2% cost (* (+ but LAMBDA time/2 !
-    if (f==lambda) return x; // self
+    if (f==lambda) return cons(closure, cons(CDR(x), env));
+    // TODO: needed?
+    if (f==closure) return x;
 
     // TODO: bad assumption it's an ATOM, lambda?
     //f= NUM(eval(f, env)); double time!
@@ -1214,10 +1263,11 @@ L evalX(L x, L env) {
     // TODO: +1KB CODE though - see if can minimize bytes???
     // merry go-around?         44.13s, 43.31s - acceptable
     while(notisnum(f)) {
+      ETRACE(printf("f= "); prin1(f); NL);
 
       // follow chain of atoms => "local" or global value
       while(isatom(f)) {
-        TRACE(printf("ATOM again: "); prin1(f); NL);
+        ETRACE(printf("ATOM again: "); prin1(f); NL);
         a= f; // avoid self loop nil/T etc
         f= ATOMVAL(f);
         if (isnum(f)) break;
@@ -1227,8 +1277,8 @@ L evalX(L x, L env) {
 
       // evaluate any cons until it's not...
       // lambda 66s => 37s by reordering tests!
-      while(iscons(f) && CAR(f)!=lambda) {
-        TRACE(printf("EVAL again: "); prin1(f); NL);
+      while(iscons(f) && CAR(f)!=closure) {
+        ETRACE(printf("EVAL again: "); prin1(f); NL);
         a= f; // avoid self loop
         f= eval(f, env);
         if (isnum(f)) break;
@@ -1236,23 +1286,27 @@ L evalX(L x, L env) {
       }
       if (null(f)) error("nofunc", a);
 
-      // LAMBDA - Let's APPLY
-      if (islambda(f)) {
-        TRACE(printf("LAMBDA: "); prinq(f); NL);
+      // TODO: really needed? or put limit on it?
+      if (isatom(f)) continue;
+
+      // A closure let's APPLY
+      if (CAR(f)==closure) {
+        ETRACE(printf("CLOSURE: "); prin1(f); NL);
         // APPLY
-        f= cdr(f);
+        f= CDR(f); // now contains (((n) (+ n n)) ENV)
+        ETRACE(printf("FARGS: "); prin1(CAR(CAR(f)));  NL);
 #ifdef OLD
-        env= bindevlist(car(f), x, env);
+        env= bindevlist(CAR(CAR(f)), x, CDR(f), env);
 #else
-        env= bindevlist(car(f), a, env);
+        env= bindevlist(CAR(CAR(f)), a, CDR(f), env);
 #endif
-        f= cdr(f);
-        TRACE(printf("   ENV: "); prin1(env); NL);
+        ETRACE(printf("   ENV: "); prin1(env); NL);
         // PROGN
+        f= CDR(CAR(f));
         while(iscons(f)) {
-          TRACE(printf("PROGN: "); prin1(car(f)); NL);
-          a= eval(car(f), env);
-          f= cdr(f);
+          ETRACE(printf("PROGN: "); prin1(CAR(f)); NL);
+          a= eval(CAR(f), env);
+          f= CDR(f);
         }
         return a;
       }
@@ -1507,15 +1561,20 @@ L evalX(L x, L env) {
     assert(!"Can't get here");
   }
 
-  if (isatom(x)) {
-    // 4.56s insteadof
+  if (isatom(x)) { // getval inlined
+    // 4.56s insteadof 8s?
     L p;
+    // TODO: make @var be global, no search, or just *var*?
+    //if (isglobalatom(x)) return ATOMVAL(x);
     while(iscons(env)) {
       p= CAR(env);
       if (car(p)==x) break;
       env= CDR(env);
     }
-    return iscons(env)? cdr(p): atomval(x);
+    if (ISSTR(x)) return x;
+    //return iscons(env)? cdr(p): atomval(x);
+    // 9.95s => 9.28s using ATOMVAL
+    return iscons(env)? cdr(p): ATOMVAL(x);
   }
 
 
@@ -1529,9 +1588,9 @@ L evalX(L x, L env) {
   //return ERROR;
 }
 
-#ifdef ETRACE
+#ifdef ETRACERUN
 L evalTrace(L x, L env) {
-  L r; int i;
+  L r;
   NL;
   indent(); printf("-->EVAL "); prin1(x); NL;
 
@@ -1540,7 +1599,7 @@ L evalTrace(L x, L env) {
   indent(); printf("<--EVAL "); prin1(r); printf(" <= "); prin1(x); NL;
   return r;
 }
-#endif // ETRACE
+#endif // ETRACERUN
 
 // ----------------= Alphabetical Lisp VM
 // EXPERIMENTIAL BYTE CODE VM
@@ -1770,6 +1829,7 @@ void initlisp() {
   FREE= atom("*FREE*"); setval(FREE, FREE, nil);
   quote= atom("quote");
  lambda= atom("lambda");
+closure= atom("closure");
   ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
 
@@ -1835,11 +1895,9 @@ int mainmain(int argc, char** argv, void* main) {
   // - read args
   while (--argc) {
     ++argv;
-    if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
+    //if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
     if (0==strcmp("-b", *argv)) { // BENCH 5000 times
-      printf("NUM: %s\n",argv[1]);
       n= atoi(argv[1]);
-      printf("n=%d\n", n);
       if (n) --argc,++argv; else n= 5000;
       echo= 1; quiet= 1;
     } else
@@ -1870,9 +1928,14 @@ int mainmain(int argc, char** argv, void* main) {
   #ifndef AL
     setval(atom("car"), mknum((int)(char*)car), nil);
     setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+    // only for ... TODO: remove
     //setval(atom("cons"), mknum((int)(char*)cons), nil);
+
+    // TODO: remove, because -b doesn't have onerun?
     setval(atom("one"), mknum(1), nil);
     setval(atom("two"), mknum(2), nil);
+
+    eval(lreads("(de clos (lambda (n) (+ n n)))"), env);
   #endif // AL
 
   PRINTARRAY(syms, HASH, 0, 1);

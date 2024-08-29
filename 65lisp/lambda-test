@@ -1,16 +1,32 @@
 # GC is wrong! it eats up cons of f!!!
 
-./run -b $* <<HERE
+./run -t $* <<HERE
 
+; make sure eval doesn't loop on eval fun
 (nil 3 4)
 (T 3 4)
 
-((+ 0 car) (cons 42 666))
+; eval dispatches on byte code number
+; these are all same
+(car (cons 42 666))
+('car (cons 42 666))      ; first try to lookup car
+
+"BUG: WHAT HAPPENS HERE? becomse self recurseive"
+
+(65 (cons 42 666))        ; what it boils down to (caveat)
+
+(\A (cons 42 666)         ; Alphabetical Lisp "byte code"
+((+ 0 car) (cons 42 666)) ; lol
+
+; (4711 (cons 42 66)) ; actually it uses address! f speed
+
 (+ 3 4)
 ('+ 3 4)
+(43 3 4)
 
-((lambda (car c) (car c)) cdr (cons 42 666))
-((lambda (car c) ('car c)) cdr (cons 666 42))
+; lambda gives closure
+(lambda (n) (+ n n))
+;'(closure ((n) (+ n)) (foo . 32)) ; TODO: read (3 . 4)
 
 (lambda () (+ foo 1000))
 ((lambda () (+ foo 1000)))
@@ -19,15 +35,23 @@
 
 ((lambda (n) 42))
 
-((lambda (f n) ('f n)) (lambda (n) (+ n n)) 42))
-((lambda (f n) ('f n f)) (lambda (n) (+ n n)) 3)
-((lambda (f n) ('f n f)) (lambda (n f) (+ n n)) 3)
-
 (lambda (n) (+ n n))
 ((lambda (n) (+ n n)) 3)
 (de f (lambda (n) (+ n n)))
 f
 (f 3)
+
+; use ('f ...) instead of ugly (funcall f ...)
+; (f ...) means use global f
+
+((lambda (f n) ('f n)) (lambda (n) (+ n n)) 42))
+((lambda (f n) ('f n f)) (lambda (n) (+ n n)) 3)
+((lambda (f n) ('f n f)) (lambda (n f) (+ n n)) 3)
+
+((lambda (car c) (car c)) cdr (cons 42 666))
+((lambda (car c) ('car c)) cdr (cons 666 42))
+
+;; "real life" usage
 
 (de fac (lambda (n)
   (if (= n 0) 1
