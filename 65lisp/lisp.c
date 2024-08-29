@@ -37,8 +37,22 @@
 // - I/O:   print (prin1) terpri read prinx
 // - atoms: foo |with space| cmp
 
-// NO WAY:
+// NO WAY
 // - no macros, using NLAMBDA and DE!
+
+// PROGRAM ARGUMENTS
+// -q          qiet
+// -b [N]      bench mark (default 5000 times) (turns on -E)
+// -e "expr"   evaluate expression
+// -E          echo on (show what evaluate and response)
+// -i          interactive from terminal, can use several times
+//               end with *EOF* or bye
+// -N          noeval
+// --nogc      turn off GC (otherwise run after every expr)
+// -d          debug on
+// -v          verbose increase
+// -s          increase statistics, print it
+
 
 // EVAL
 //
@@ -1910,7 +1924,7 @@ L readeval(char *ln, L env) {
   do {
 
     // read
-    if (!quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
+    if (!ln && !quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
     #ifndef AL
       x= lread();
     #else
@@ -1978,7 +1992,8 @@ int mainmain(int argc, char** argv, void* main) {
   // - read args
   while (--argc) {
     ++argv;
-    //if (verbose) printf("--ARGC=%d *ARGV=%s\n", argc, *argv);
+    if (verbose) printf("--ARGC: %d *ARGV: \"%s\"\n", argc, *argv);
+    continue;
     if (0==strcmp("-b", *argv)) { // BENCH 5000 times
       bench= atoi(argv[1]);
       if (bench) --argc,++argv; else bench= 5000;
@@ -1992,12 +2007,15 @@ int mainmain(int argc, char** argv, void* main) {
     if (0==strcmp("--nogc", *argv)) gc=0; else
     if (0==strcmp("-d", *argv)) debug=1; else
     if (0==strcmp("-v", *argv)) ++verbose; else
-    if (0==strcmp("-s", *argv)) ++stats; else
+    if (0==strcmp("-s", *argv)) ++stats,statistics(stats); else
     if (0==strcmp("-t", *argv)) echo=1,quiet=test=1,env=testing(env);
     else printf("%% ERROR.args: %s\n", *argv),exit(1);
   }
+  exit(0);
 
-  if (doi && !quiet && bench==1) clrscr(); // || only if interactive?
+  if (!doi) return 0;
+
+  if (!quiet && bench==1) clrscr(); // || only if interactive?
 
   if (!quiet) {
     PRINTARRAY(syms, HASH, 0, 1);
@@ -2010,7 +2028,10 @@ int mainmain(int argc, char** argv, void* main) {
 
   // TODO: if used -e and -i do we want to do this again? also in batch? stdin?
   // The Meat
-  if (doi) env= readeval(NULL, env);
+  env= readeval(NULL, env);
+
+  NL;
+
 
   // Info
   PRINTARRAY(syms, HASH, 0, 1);

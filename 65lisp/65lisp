@@ -5,7 +5,3 @@ cl65 -O -t sim6502 $name.c -o $name.out -m $name.map && (sim65 -c $name.out $* ;
 
 
 
-
-
-
-
