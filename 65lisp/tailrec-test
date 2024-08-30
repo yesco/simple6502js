@@ -1,0 +1,10 @@
+./run -g -E <<HERE
+
+(de rec (lambda (n)
+  (if (= n 0) 0
+    (rec (- n 1)))))
+(rec 0)
+(rec 1000)
+(rec 10000)
+
+HERE

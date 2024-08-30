@@ -2,7 +2,6 @@ cc65
 - ability to inline specific callsites of function: a= INLINE(slowfunc(b))
 
 sim65:
-- arguments not quoted correctly "foo bar" breaks a the space...
 - conio (no have?), no clrscr, etc... maybe assume VT100?
 - clock_t clock (void); missing on sim65
 - any variables from which I can deduce size of program *inside* the program, CODE, RODATA, DATA, RSS?

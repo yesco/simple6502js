@@ -39,7 +39,7 @@ ls -l $name.o $name.out $name.tap
 # simulation
 echo
 echo "=== RUN ==="
-#(time sim65 -c $name.out $* ; echo "--- EXIT=$? ---") | tee ${name}.log
+#(time sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
 (sim65 -c $name.out $* ; echo "--- EXIT=$? ---") | tee $name.log
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
@@ -52,11 +52,4 @@ grep '^CODE' $name.map
 grep '^RODATA' $name.map
 grep '^DATA' $name.map
 echo
-
-
-
-
-
-
-
-
+echo "`./wcode lisp.c` LOC of C-code (wc: `wc lisp.c`)"

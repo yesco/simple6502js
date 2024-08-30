@@ -1,8 +1,22 @@
 *~
+\#*\#
+.*
+*.x
+
 diff
+
 foo
+bar
+fish
+
 fil.*
 fil
-bar
+
 a.out
+*.o
+*.s
+*.log
+*.map
+*.out
+*.tap
 

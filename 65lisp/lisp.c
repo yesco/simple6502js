@@ -40,18 +40,20 @@
 // NO WAY
 // - no macros, using NLAMBDA and DE!
 
-// PROGRAM ARGUMENTS
-// -q          qiet
+// PROGRAM OPTIONS
+// -q          quiet, no echo, no stats, no results
 // -b [N]      bench mark (default 5000 times) (turns on -E)
-// -e "expr"   evaluate expression
+// -p "str"    print str\n used by bench.pl
+// -e "expr"   evaluate expression and print
+// -x "expr"   just evaluate
 // -E          echo on (show what evaluate and response)
 // -i          interactive from terminal, can use several times
 //               end with *EOF* or bye
 // -N          noeval
-// --nogc      turn off GC (otherwise run after every expr)
-// -d          debug on
+// -d          debug on (may need to recompile)
 // -v          verbose increase
 // -s          increase statistics, print it
+// --nogc      turn off GC (otherwise run after every expr)
 
 
 // EVAL
@@ -263,7 +265,7 @@ char firstbss;
 // --- Statisticss
 unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 
-int debug= 0, verbose= 1;
+int debug= 0, verbose= 0;
 
 void* zalloc(size_t n) {
   nalloc+= n;
@@ -281,7 +283,8 @@ typedef uint16_t uint;
 //#define nil 0 // slightly faster 0.1% !
 L nil, T, FREE, ERROR, eof, lambda, closure, bye, quote= 0;
 
-#define null(x) (x==nil) // crazy but this is 81s instead of 91s!
+#define notnull(x) (x!=nil) // faster than !null
+#define null(x) (x==nil)    // crazy but this is 81s instead of 91s!
 //#define null(x) (!x) // slight, faster assuming nil=0...
 
 // Encoding of lisp values:
@@ -350,12 +353,6 @@ L prin1(L); // forward TODO: remove
 #define terpri() putchar('\n')
 #define NL terpri()
 
-// Type number to identify Heap OBJ
-#define HFREE  0xFE
-#define HATOM  0xA7
-#define HARRAY 0xA6
-#define HSLICE 0x51 // do you get it? ;-)
-
 // TODO: not happy, too much code add 550 bytes!?
 
 
@@ -365,7 +362,15 @@ jmp_buf toploop= {0};
 
 void error(char* msg, L a);
 
+// Type number to identify Heap OBJ
+#define HFREE   0xFE
+#define HATOM   0xA7
+#define HARRAY  0xA6
+#define HSTRING 0x57
+#define HSLICE  0x51 // do you get it? ;-)
+
 #define HTYP(x) (*((char*)(((L)x)-1)))
+
 
 //#define HEAP
 #ifdef HEAP
@@ -451,8 +456,41 @@ void forgetObj(L x) {
 
 #endif // HEAP
 
+// --- Numbers
 
-//
+// With number just being *2 ... 
+// sum 50 x 1 takes 179s instead of 137s => 39% faster
+// mul 50 x 1 takes 206s instead of 253s => 18% faster
+//   (if test num   sum: 186s   mul: 255s  LOL
+// and save 30b code too! LOL
+
+// macro smaller code and 10% faster than C function
+#define notisnum(x) ((x)&1)      // faster
+#define isnum(x) (!notisnum(x))
+
+// simple now, but can often avoid if + -, if / need/2
+#define NUM(x)   ((x)/2)
+#define MKNUM(n) ((n)*2)
+
+int num(L x) {
+  // TODO: one line? one return, less code?
+  if (!isnum(x)) return 0; // "safe"
+  return NUM(x);
+}
+
+// no need inline/macro
+L mknum(int n) {
+  // TODO: large numbers... bignums?
+  if(abs(n)>16382) {
+    printf("\n%% ERROR: too big num: %d\n", n);
+    return ERROR;
+  }
+
+  return MKNUM(n);
+}
+
+
+// ---------------- CONS
 // cons(1,2) gives wrong CONS values at 4092 4096-ish
 // works fine up till then if have 2*4096 cells
 
@@ -540,6 +578,8 @@ char isatomchar(char c) { //test for non-chars
 //  57 bytes extra for ptr % 3 ==  01
 // 141 bytes extra for ptr % 7 == 101
 
+// TODO: really should be named issym()
+//   number is an atom, lol
 #define isatom(x) (((x)&3)==1) 
 //#define isatom(x) (((x)&7)==(4+1)) // HEAP align 101
 
@@ -659,9 +699,13 @@ L atomstr(char* s, unsigned char typ) {
     // TODO: better test? LOL this crashes
     assert(arptr<=arend);
 
-    a->val= nil;               // CAR
-    a->next= (Atom*)(syms[h]); // CDR
+    // CAR len if str!/arra
+    a->val= typ==HSTRING? MKNUM(strlen(s)): 0;
+    // copy name
     strcpy(a->name, s);
+    // CDR link it up
+    // TODO: add specific cdr? could be the maxsize for array?
+    a->next= (Atom*)(syms[h]);
     syms[h]= (L)a;
   }
 
@@ -672,7 +716,7 @@ L atomstr(char* s, unsigned char typ) {
 }
 
 // TODO: measure code size overhead?L
-L atom(char* s) { return atomstr(s, 0xA7); }
+L atom(char* s) { return atomstr(s, HATOM); }
 
 // --- Strings
 
@@ -683,44 +727,11 @@ L atom(char* s) { return atomstr(s, 0xA7); }
 // How to distinguish?
 // TODO: if read-eval => "program"
 
-#define ISSTR(x) (isatom(x)&&HTYP(x)==0x57)
+#define ISSTR(x) (isatom(x)&&HTYP(x)==HSTRING)
 #define isstr(x) ISSTR(x) // unsafe
 
 // TODO: measure code size overhead?
-L mkstr(char* s) { return atomstr(s, 0x57); }
-
-// --- Numbers
-
-// With number just being *2 ... 
-// sum 50 x 1 takes 179s instead of 137s => 39% faster
-// mul 50 x 1 takes 206s instead of 253s => 18% faster
-//   (if test num   sum: 186s   mul: 255s  LOL
-// and save 30b code too! LOL
-
-// macro smaller code and 10% faster than C function
-#define notisnum(x) ((x)&1)      // faster
-#define isnum(x) (!notisnum(x))
-
-// simple now, but can often avoid if + -, if / need/2
-#define NUM(x)   ((x)/2)
-#define MKNUM(n) ((n)*2)
-
-int num(L x) {
-  // TODO: one line? one return, less code?
-  if (!isnum(x)) return 0; // "safe"
-  return NUM(x);
-}
-
-// no need inline/macro
-L mknum(int n) {
-  // TODO: large numbers... bignums?
-  if(abs(n)>16382) {
-    printf("\n%% ERROR: too big num: %d\n", n);
-    return ERROR;
-  }
-
-  return MKNUM(n);
-}
+L mkstr(char* s) { return atomstr(s, HSTRING); }
 
 
 // ---------------- GC Garbage Collector
@@ -980,9 +991,9 @@ L princ(L x) {
     do {
       princ(car(i));
       i= cdr(i);
-      if (!null(i)) putchar(' ');
-    } while (!null(i) && iscons(i));
-    if (!null(i)) {
+      if (notnull(i)) putchar(' ');
+    } while (notnull(i) && iscons(i));
+    if (notnull(i)) {
       printf(". ");
       princ(i);
     }
@@ -1076,7 +1087,7 @@ L assoc(L x, L l) {
 L setval(L x, L v, L e) {
   L p= e? assoc(x, e): nil;
   //printf("SETVAL: "); prin1(x); putchar(' '); prin1(v); NL;
-  if (!null(p)) return setcdr(p, v);
+  if (notnull(p)) return setcdr(p, v);
   // TODO: optimize? as assoc() call is expensive (e==nil)
   return setatomval(x, v); // GLOBAL
 }
@@ -1160,6 +1171,7 @@ L evalappend(L args) {
 
 L length(L a) {
   int n= 0;
+  if (isstr(a)) return CAR(a);
   while(iscons(a)) {
     ++n;
     a= CDR(a);
@@ -1374,7 +1386,7 @@ L evalX(L x, L env) {
     // two args
     b= eval(car(b), env);
     // (46.87s => 48.80s) for (cons 1 2)
-    //if (!null(cdr(b))) error("too many args", x);
+    //if (notnull(cdr(b))) error("too many args", x);
     return ((FUN2)f)(a,b);
   }
 #endif // GURKA
@@ -1522,7 +1534,7 @@ L evalX(L x, L env) {
     case 'P': return print(a);
     //case 'R' TODO: Recurse/Reduce?
     case 'T': NL; return nil;
-    case 'U': return a? mknum(1): nil;
+    case 'U': return notnull(a)? T: nil; // faster than null
     case 'W': return prin1(a);
     case '.': return princ(a);
     case '~': return mknum(num(~a));
@@ -1904,7 +1916,7 @@ void statistics(int level) {
 char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
 unsigned long bench=1;
 
-L readeval(char *ln, L env) {
+L readeval(char *ln, L env, char noprint) {
   // TODO: not sure what function env has an toplevel:
   //   we're setting/modifying globals, right?
   //   so it would reasonably be nil. LOL
@@ -1947,14 +1959,14 @@ L readeval(char *ln, L env) {
     }
 
     // print
-    if (echo || !quiet || bench) { prin1(r); NL; }
+    if (!noprint && (echo || !quiet || bench)) { prin1(r); NL; }
 
     // info
     if (gc) GC(env, alvals); // TODO: only if needed?
     if (!quiet & stats) {NL; statistics(stats); }
 
   } while (1);
-  NL;
+  if (!noprint) NL;
 
   _rs= saved;
   return env;
@@ -1973,18 +1985,20 @@ L testing(env) {
   // set some for test
   setval(atom("bar"), mknum(33), nil);
   setval(atom("bar"), mknum(11), nil);
-  env= cons(cons(atom("foo"), mknum(42)), env);
+  env= cons( cons(atom("*fie*"), mknum(99)),
+       cons( cons(atom("*foo*"), mknum(42)),
+             env));
 
   // TODO: remove, because -b doesn't have onerun?
   setval(atom("one"), mknum(1), nil);
   setval(atom("two"), mknum(2), nil);
 
-  env= readeval("(de clos (lambda (n) (+ n n)))", env);
+  env= readeval("(de clos (lambda (n) (+ n n)))", env, quiet);
   return env;
 }
 
 int mainmain(int argc, char** argv, void* main) {
-  L env= nil; char doi= 1;
+  L env= nil; char interpret= 1;
 
   initlisp();
   env= nil; // must be done after initlisp();
@@ -1992,28 +2006,29 @@ int mainmain(int argc, char** argv, void* main) {
   // - read args
   while (--argc) {
     ++argv;
-    if (verbose) printf("--ARGC: %d *ARGV: \"%s\"\n", argc, *argv);
-    continue;
+    if (verbose) printf("--ARGC: %d *ARGV: \"%s\" %d\n", argc, *argv, *argv);
+
     if (0==strcmp("-b", *argv)) { // BENCH 5000 times
-      bench= atoi(argv[1]);
+      bench= atol(argv[1]);
       if (bench) --argc,++argv; else bench= 5000;
-      echo= 1; quiet= 1;
-    } else
+      echo= 1; quiet= 1; } else
     if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
+    if (0==strcmp("-p", *argv)) printf("%s\n", *++argv),--argc; else
     if (0==strcmp("-E", *argv)) echo=1; else
-    if (0==strcmp("-e", *argv)) doi=0,env= readeval(*++argv, env),--argc; else
-    if (0==strcmp("-i", *argv)) doi=0,env= readeval(NULL, env); else // once ^D
+    if (0==strcmp("-i", *argv)) interpret=0,echo=quiet=0,env= readeval(NULL, env, 0); else
+    if (0==strcmp("-x", *argv) || 0==strcmp("-e", *argv)) {
+      env=readeval(argv[1],env,argv[0][1]=='x');
+      interpret= 0; --argc; ++argv; } else
     if (0==strcmp("-N", *argv)) noeval=1; else
     if (0==strcmp("--nogc", *argv)) gc=0; else
     if (0==strcmp("-d", *argv)) debug=1; else
-    if (0==strcmp("-v", *argv)) ++verbose; else
+    if (0==strcmp("-v", *argv)) ++verbose,++stats; else
     if (0==strcmp("-s", *argv)) ++stats,statistics(stats); else
-    if (0==strcmp("-t", *argv)) echo=1,quiet=test=1,env=testing(env);
+    if (0==strcmp("-t", *argv)) test=1,quiet=1,echo=0,env=testing(env);
     else printf("%% ERROR.args: %s\n", *argv),exit(1);
   }
-  exit(0);
 
-  if (!doi) return 0;
+  if (!interpret) return 0;
 
   if (!quiet && bench==1) clrscr(); // || only if interactive?
 
@@ -2028,7 +2043,7 @@ int mainmain(int argc, char** argv, void* main) {
 
   // TODO: if used -e and -i do we want to do this again? also in batch? stdin?
   // The Meat
-  env= readeval(NULL, env);
+  env= readeval(NULL, env, 0);
 
   NL;
 

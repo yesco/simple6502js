@@ -1,2 +1,20 @@
-./65lisp -t -q -e '"--globalvar"'         -b $* -e "foo"
-./65lisp -t -q -e '"--dynamic varg"'      -b $* -e "bar"
+( 
+./65lisp -t -p "global var"    -b $* -e "bar";
+./65lisp -t -p "dynamic var"   -b $* -e "*fie*"
+./65lisp -t -p "dynamic deep"  -b $* -e "*foo*"
+echo
+./65lisp -t -p "cons"          -b $* -e "(cons 11 22)"
+./65lisp -t -p "car"           -b $* -e "(car '(11 22))"
+./65lisp -t -p "cdr"           -b $* -e "(cdr '(11 22))"
+echo
+./65lisp -t -p "null"          -b $* -e "(null nil)"
+./65lisp -t -p "null"          -b $* -e "(null T)"
+./65lisp -t -p "null'"         -b $* -e "(null 'nil)"
+./65lisp -t -p "null'"         -b $* -e "(null 'T)"
+echo
+./65lisp -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
+./65lisp -t -p "* + var"       -b $* -e "(+ one two) (+ one one one one) two)"
+
+) | tee bench.log | perl bench.pl
+
+
