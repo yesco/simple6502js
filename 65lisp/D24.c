@@ -102,7 +102,6 @@ ulong xsqrtl(ulong x) {
 
 
 int main(int argc, char** argv) {
-  
   // Wow, ulong takes double time on my tablet...
   ulong rl, sl= 0;
   uint nl, r, s= 0;

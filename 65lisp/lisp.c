@@ -651,7 +651,7 @@ void* searchatom(char* s) {
 
 // search linked list
 Atom* findatom(Atom* a, char* s, unsigned char typ) {
-  while(a && (L)a!=nil) { // LOL
+  while(a) { // lol not nil...
     if (HTYP(a)==typ && 0==strcmp(s, a->name)) return a;
     a= a->next;
   }
@@ -692,7 +692,7 @@ L atomstr(char* s, unsigned char typ) {
       *arptr++= typ; // HTYP
       // align as: not cons: == x01
       //   (filling with extra type info, lol)
-    } while (!isatom((int)arptr));
+    } while (!isatom((L)arptr));
 
     a= (Atom*)arptr;
     arptr+= sizeof(Atom)+strlen(s)+1;
@@ -727,8 +727,8 @@ L atom(char* s) { return atomstr(s, HATOM); }
 // How to distinguish?
 // TODO: if read-eval => "program"
 
+// unsafe eval twice
 #define ISSTR(x) (isatom(x)&&HTYP(x)==HSTRING)
-#define isstr(x) ISSTR(x) // unsafe
 
 // TODO: measure code size overhead?
 L mkstr(char* s) { return atomstr(s, HSTRING); }
@@ -879,6 +879,7 @@ void unc(char c) {
   _nc= c;
 }
 
+//char nextcx() {
 char nextc() {
   int r;
   if (_nc) { r= _nc; _nc= 0; }
@@ -887,6 +888,12 @@ char nextc() {
 
   return r>=0? r: 0;
 }
+
+//char nextc() {
+//  char c= nextcx();
+//  printf("NEXTC: '%c' (%d)\n", c, c);
+//  return c;
+//}
 
 char spc() {
   char c= nextc();
@@ -1005,7 +1012,7 @@ L princ(L x) {
 // TODO: supposed to print in readable format:
 //   quote strings, and |atom w spaces|
 L prin1(L x) {
-  L r; char str= isstr(x);
+  L r; char str= ISSTR(x);
   if (str) putchar('"');
   r= princ(x);
   if (str) putchar('"');
@@ -1117,6 +1124,69 @@ L getval(L x, L e) {
 }
 #endif // notused
 
+
+// ---------------- ARRAY / VECTOR
+
+#ifdef ARRAY
+
+// unsafe, eval twice, lol
+#define ISARR(x) (isatom(x)&&HTYP(x)==HARRAY)
+
+#define ARROFF 3
+#define ARRSTEP 16
+
+L mkarr(L dim, L val) {
+  size_t n= num(dim);
+  size_t bytes= (n+ARROFF)*sizeof(L), i;
+  char *p= zalloc(bytes+4), *orig= p;
+  L* a;
+  if (n==0) n= ARRSTEP;
+  if (!isnum(dim)) error("Array dimensions", dim);
+
+  do {
+    *p++= HARRAY;
+  } while(!isatom((L)p));
+  a= (L*)p;
+
+  *a++ = MKNUM(0); // 1. CAR = length
+  *a++ = MKNUM(n); // 2. CDR = size
+  *a++ = (L)orig; // 3. save orig mem ptr
+
+  // fill
+  for(i= ARROFF; i<n+ARROFF; ++i) *a++ = val;
+
+  return (L)p;
+}
+
+void arrfree(L arr) {
+  if (!ISARR(arr)) error("Not array", arr);
+  HTYP(arr)= HFREE;
+  free((char*)((L*)arr)[2]);
+}
+
+L arrpush(L arr, L val) {
+  L* a= (L*)arr; int n, z;
+  if (!ISARR(arr)) error("Not array", arr);
+  n= a[0];
+  z= a[1];
+  n+= 2; // LOL inc num:1 !
+  // TODO: groiw
+  if (n>=z) error("Array full", arr);
+  a[0]= n;
+  return *(L*)(ARROFF-2+arr+n)= val;
+}
+
+L arrpop(L arr) {
+  L* a= (L*)arr; int n;
+  if (!ISARR(arr)) error("Not array", arr);
+  n= a[0]-2; // LOL dec. num:1 !
+  if (n<=0) error("Array empty", arr);
+  a[0]= n;
+  return *(L*)(ARROFF+2+arr+n);
+}
+
+#endif // ARRAY
+
 // ---------------- Lisp Functions
 
 // ETRACE
@@ -1171,7 +1241,7 @@ L evalappend(L args) {
 
 L length(L a) {
   int n= 0;
-  if (isstr(a)) return CAR(a);
+  if (ISSTR(a)) return CAR(a);
   while(iscons(a)) {
     ++n;
     a= CDR(a);
@@ -1525,7 +1595,7 @@ L evalX(L x, L env) {
     // TODO: add this to dictionary!
     case '!': return isatom(a)? T: nil; // TODO: issymbol ???
     case '#': return isnum(a)? T: nil;
-    //case '$': return isstr()? T: nil;
+    case '$': return ISSTR(a)? T: nil;
 
     case 'A': return car(a);
     case 'D': return cdr(a);
@@ -1590,20 +1660,24 @@ L evalX(L x, L env) {
     assert(!"Can't get here");
   }
 
-  if (isatom(x)) { // getval inlined
-    // 4.56s insteadof 8s?
+  if (isatom(x)) { // getval inlined 4.56s insteadof 8s
     L p;
+
+    // TODO: string is kind of an atom for now... LOL
+    if (ISSTR(x)) return x;
+
     // TODO: make @var be global, no search, or just *var*?
     //if (isglobalatom(x)) return ATOMVAL(x);
+
+    // assoc inlined
     while(iscons(env)) {
       p= CAR(env);
-      if (car(p)==x) break;
+      if (iscons(p) && CAR(p)==x) break;
       env= CDR(env);
     }
-    if (ISSTR(x)) return x;
-    //return iscons(env)? cdr(p): atomval(x);
+    return iscons(env)? cdr(p): atomval(x);
     // 9.95s => 9.28s using ATOMVAL
-    return iscons(env)? cdr(p): ATOMVAL(x);
+    //return iscons(env)? CDR(p): ATOMVAL(x);
   }
 
 
@@ -1638,7 +1712,7 @@ L evalTrace(L x, L env) {
 
 // define to test...
 
-//#define AL
+#define AL
 
 #ifndef AL
   #define STACKSIZE 1
@@ -1654,6 +1728,63 @@ L alvals= 0;
 
 // ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
 //  24.47s added more oops, switch slower?
+
+#define TOP
+
+#ifdef TOP
+L al(char* p) {
+  L top= nil; // todo pull from stack for subs?
+  if (!p) return ERROR;
+
+  //if (verbose) printf("\nAL.run: %s\n", p);
+  p--;
+
+  s= stack;
+ next:
+  //assert(s<send);
+  //if (verbose) { printf("al %c : ", p[1]); prin1(*s); NL; }
+
+  switch(*++p) {
+  case 0  : return top;
+  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
+
+  // make sure at least safe number, correct if in bounds and all nums
+  #define NUM_MASK 0xfffe
+  case '+': top+= *s; --s; top&=NUM_MASK; NEXT;
+  case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NEXT; 
+  case '-': top= *s-top; --s; top&=NUM_MASK; NEXT;
+  case '/': top= *s/top*2; --s; top&=NUM_MASK; NEXT;
+
+  case '=': s--; return *s==top? T: nil;
+  case '?': if (top==*s) return 0;
+    else if (isatom(*s) && isatom(top)) return strcmp(ATOMSTR(*s), ATOMSTR(top));
+    else return mknum(*s-top); // no care type!
+
+  case 'A': top= car(top); NEXT;
+  case 'D': top= cdr(top); NEXT;
+  case 'C': top= cons(*s, top); --s; NEXT;
+
+  case 'U': top= (top==nil)? T: nil; NEXT;    
+  case 'K': top= (iscons(top))? T: nil; NEXT;
+
+  case '@': top= ATOMVAL(top); NEXT; // same car 'A' lol
+  case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NEXT;
+
+// 27.19s
+  case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+    *++s= top; top= MKNUM(*p-'0'); NEXT;
+
+// 26.82s
+//  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
+
+// 30.45s
+//  default : if (isdigit(*p)) { ++s; *s= MKNUM(*p-'0'); NEXT; }
+//   printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+  default:
+    printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+  }
+}
+#else
 L al(char* p) {
   if (!p) return ERROR;
   //printf("\nAL.run: %s\n", p);
@@ -1666,6 +1797,8 @@ L al(char* p) {
 
   switch(*++p) {
   case 0  : return *s--;
+  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
+
   case '+': --s; *s+= s[1]; NEXT; // TODO: fix
   case '*': --s; *s*= s[1]; *s/=2; NEXT; // TODO: fix
   case '-': --s; *s= mknum(num(*s)-num(s[1])); NEXT;
@@ -1680,6 +1813,10 @@ L al(char* p) {
   case 'D': *s= cdr(*s); NEXT;
   case 'C': --s; *s= cons(*s, s[1]); NEXT;
 
+  case 'U': *s= (*s==nil)? T: nil; NEXT;    
+  case 'K': *s= (iscons(*s))? T: nil; NEXT;
+
+  case '@': *s= ATOMVAL(*s); NEXT; // same 'A' lol
   case ',': ++s; *s= *(L*)++p; p+= sizeof(L)-1; NEXT;
 
 // 27.19s
@@ -1696,60 +1833,66 @@ L al(char* p) {
     printf("%% AL: illegal op '%c'\n", *p); return ERROR;
   }
 }
+#endif TOP
 
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code
 #define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
 
 char* alcompile(char* p) {
-  char c; int n= 0; L x, f;
+ char c, extra= 0; int n= 0; L x, f;
 
  again:
   switch((c=nextc())) {
   case 0  : return p;
   case ' ': case '\t': case '\n': case '\r': goto again;
+
   case'\'': quote:
-    ALC(',');
+   ALC(','); // reads next value and compiles to put it on stack
+     // TODO: make subroutine
     {
       L* pi= (L*)p;
       if (*pi) return NULL; // overflow?
       *pi= lread();
       p+= sizeof(L);
-      // make sure not GC:ed!
+      // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
     }
+    if (extra) ALC(extra);
     return p;
 
+  // TODO: function call... of lisp
   case '(': 
     //spc();
     f= nextc(); unc(f); // peek
-    if (f=='(') return NULL;
+    if (f=='(') return NULL; // TODO: ,..X
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
     // TODO: handle to do eval?
-    if (!isatom(x)) return NULL;
+    if (!isatom(x)) return NULL; // TODO: ,..X
     f= ATOMVAL(x);
-    if (!isnum(f)) return NULL;
+    if (!isnum(f)) return NULL; // TODO: ,..X
     f= NUM(f);
     if (f=='L') f= 'C';
     if (f=='\'') goto quote;
     assert(f<255); // TODO:? handle inline address and 'X' ?
-    printf("=> %c\n", f);
-   
+    //prin1(x); printf(" => %c\n", f);
+
     while((c=nextc())!=')') {
       ++n;
       p= alcompile(p);
-      // implicit FOLDL of nargs + - L
+      // implicit FOLDL of nargs + - L ! LOL
       if (n>2) ALC(f);
-//      spc();
     }
     ALC(f); break;
-  default: ALC(c); break;
-  //default : // parse number
-    //n= 0;
-    //while(isdigit(c)) {
-    //c= nextc();
-  //}
+
+  default:
+    if (isdigit(c)) { ALC(c); return p; }
+
+    // atom name... TODO: test?
+    extra= '@'; // read atom val TODO: or 'X'/'E'
+    unc(c);
+    goto quote;
   }
   return p;
 }
@@ -1855,13 +1998,13 @@ void initlisp() {
   // special symbols
     nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
       T= atom("T");     setval(T, T, nil);
-  FREE= atom("*FREE*"); setval(FREE, FREE, nil);
+   FREE= atom("*FREE*");setval(FREE, FREE, nil);
   quote= atom("quote");
  lambda= atom("lambda");
 closure= atom("closure");
   ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
-    bye= atom("bye"); setval(bye, bye, nil);
+    bye= atom("bye");   setval(bye, bye, nil);
 
   // register function names
   while(*s) {
@@ -1941,21 +2084,26 @@ L readeval(char *ln, L env, char noprint) {
       x= lread();
     #else
       x= alcompileread();
-      printf("AL.compiled: "); prin1(x); NL;
+      if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
     #endif // AL
 
+    if (isatom(x) && !strlen(ATOMSTR(x))) break;
     if (x==eof || x==bye) break;
     if (echo) { printf("> "); prin1(x); NL; }
 
     // eval
-    if (!noeval) {
+    if (!noeval && x!=ERROR) {
       // option to compare results? slow but equal
-      for(i=bench; i>0; --i) // run n tests
-      #ifndef AL
+      for(i=bench; i>0; --i) { // run n tests
+
+        #ifndef AL
         r= eval(x, env);
-      #else
+        #else
         r= al(isatom(x)? ATOMSTR(x): NULL);
-      #endif // AL
+        #endif // AL
+
+        if (r==ERROR) break;
+      }
     }
 
     // print
@@ -1969,6 +2117,8 @@ L readeval(char *ln, L env, char noprint) {
   if (!noprint) NL;
 
   _rs= saved;
+  
+  memset(toploop, 0, sizeof(toploop));
   return env;
 }
 

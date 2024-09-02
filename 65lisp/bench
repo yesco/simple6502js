@@ -3,9 +3,9 @@
 ./65lisp -t -p "dynamic var"   -b $* -e "*fie*"
 ./65lisp -t -p "dynamic deep"  -b $* -e "*foo*"
 echo
-./65lisp -t -p "cons"          -b $* -e "(cons 11 22)"
-./65lisp -t -p "car"           -b $* -e "(car '(11 22))"
-./65lisp -t -p "cdr"           -b $* -e "(cdr '(11 22))"
+./65lisp -t -p "cons"          -b $* -e "(cons 3 4)"
+./65lisp -t -p "car"           -b $* -e "(car '(3 4))"
+./65lisp -t -p "cdr"           -b $* -e "(cdr '(3 4))"
 echo
 ./65lisp -t -p "null"          -b $* -e "(null nil)"
 ./65lisp -t -p "null"          -b $* -e "(null T)"
@@ -13,8 +13,8 @@ echo
 ./65lisp -t -p "null'"         -b $* -e "(null 'T)"
 echo
 ./65lisp -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
-./65lisp -t -p "* + var"       -b $* -e "(+ one two) (+ one one one one) two)"
-
+./65lisp -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
+./65lisp -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
 ) | tee bench.log | perl bench.pl
 
 
