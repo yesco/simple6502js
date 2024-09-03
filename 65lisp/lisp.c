@@ -1733,19 +1733,44 @@ L alvals= 0;
 
 #ifdef TOP
 L al(char* p) {
-  L top= nil; // todo pull from stack for subs?
+  char n=0, *orig= p;
+  L top= nil, *s= stack-1, *frame= s, *params= s;
+
+  // TODO: remove?
+  // pretend we have some local vars (we've no been invoked yet)
+  *++s= (L)NULL;   // top frame
+  frame= s;
+  *++s= (L)NULL;   // orig
+  *++s= (L)NULL;   // p
+  *++s= (L)NULL;   // no prev stack
+  // args for testing
+  *++s= MKNUM(11); // a
+  params= s;
+  *++s= MKNUM(22); // b
+  *++s= MKNUM(33); // c
+  *++s= MKNUM(44); // d // lol
+  top = MKNUM(4);  // argc // TODO: maybe useful
+
   if (!p) return ERROR;
 
-  //if (verbose) printf("\nAL.run: %s\n", p);
-  p--;
+  #define PARAM_OFF 4
 
-  s= stack;
+  //if (verbose) printf("\nAL.run: %s\n", p);
+
+ call:
+  params= frame+PARAM_OFF;
+  if (s<params) s= params; // TODO: hmmm... TODO: assert?
+  p--; // as pre-inc is faster in the loop
+
+  printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
+  printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
  next:
   //assert(s<send);
   //if (verbose) { printf("al %c : ", p[1]); prin1(*s); NL; }
 
   switch(*++p) {
-  case 0  : return top;
+  // TOOD: *s-- or ...
+  case 0: return top; // all functions should end with ^ ?
   case ' ': case '\t': case '\n': case '\r': case 12: goto next;
 
   // make sure at least safe number, correct if in bounds and all nums
@@ -1770,8 +1795,76 @@ L al(char* p) {
   case '@': top= ATOMVAL(top); NEXT; // same car 'A' lol
   case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NEXT;
 
-// 27.19s
-  case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
+  // TODO: need a drop?
+
+  case 'P': print(top); NEXT;
+
+  // calling user compiled AL or normal lisp
+
+#ifdef CALLONE // a b c ,FF@X
+  // stack layout at call (top separate)
+  
+  //stack  : ... <new a> <new b> <new c> (@new frame) <old frame> <old orig> <old p> ... | call in top
+  //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
+
+  case'\\': n=0; frame=s; while(*p=='\\'){p++;n++;frame--;} NEXT; // lambda \\\ = \abc (TODO)
+  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig+n; goto call;
+  case 'X': // "apply" TODO: if X^ make tail-call
+    // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
+    // or fixed:                     \ a3<I{a^}{a a1= ,PPX  *^}^
+    *++s=(L)frame; *++s=(L)orig; *++s=(L)p; *++s=(L)n; // PARAM_OFF
+    frame= s; p= orig= ATOMSTR(top); n= 0; goto call;
+  case '^': n=(L)*s--; p=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NEXT;
+    // top contains result! no need copy
+  // parameter a-h (warning need others for local let vars!)
+  case 'a':case'b':case'c':case'd':case e':case'f':case'g':case'h':
+    *s++= top; top= frame[*p-('a'-PARAM_OFF)]; NEXT;
+
+#endif // CALLONE
+
+#define CALLTWO
+#ifdef CALLTWO 
+  // stack layout at call (top separate)
+
+  // require extra variable: keep track of current params
+  // late binding: (fac 42) == 42  \ a3<I{a}{ a ( a1- ,FF ) *}^
+  
+  // stack  : @frame= <prev frame> <prev orig> <prev p> <prev n> a b c ...
+  //          @(=     <old frame>  <old orig>  <old p>  <n>      <new a> <new b> <new c> ...
+  //          @)=     | call in top
+  // return :  
+
+  case'\\': n=0; while(*++p=='\\')++n; --p; NEXT; // lambda \\\ = \abc (TODO)
+  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig; goto call; // TOOD: p= orig+n ???
+  case '(': { L* newframe= frame;
+      *++s=(L)frame;
+      *++s=(L)orig;
+      *++s=(L)p;
+      //*++s=(L)n; // TODO: save s ???
+      *++s=(L)n; // save stack pointer
+
+      frame= newframe; NEXT; }
+  case ')': // "apply" TODO: if X^ make tail-call, top == address
+    p= orig= ATOMSTR(top); goto call;
+
+  case '^':
+    params= (L*)(frame[0]); // tmp
+    orig=(char*)(frame[1]);
+    p=(char*)(frame[2]);
+    //n=(int)(frame[3]); // TODO: n is not needed!
+    s=(L*)(frame[3]); // restore stack
+
+    frame= params; goto call; // lol, return is call
+    // top contains result! no need copy
+
+  // parameter a-h
+  case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
+    *s++= top; top= params[*p-'a']; NEXT;
+
+#endif // CALLTWO
+
+  // single digit, small number, very compact (27.19s, is faster than isdigit in default)
+  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':case'9':
     *++s= top; top= MKNUM(*p-'0'); NEXT;
 
 // 26.82s
@@ -1784,7 +1877,8 @@ L al(char* p) {
     printf("%% AL: illegal op '%c'\n", *p); return ERROR;
   }
 }
-#else
+
+#else // AL TOP
 L al(char* p) {
   if (!p) return ERROR;
   //printf("\nAL.run: %s\n", p);
@@ -1865,29 +1959,43 @@ char* alcompile(char* p) {
   case '(': 
     //spc();
     f= nextc(); unc(f); // peek
-    if (f=='(') return NULL; // TODO: ,..X
+    if (f=='(') return NULL; // TODO: ,..X inline lambda?
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
     // TODO: handle to do eval?
     if (!isatom(x)) return NULL; // TODO: ,..X
     f= ATOMVAL(x);
-    if (!isnum(f)) return NULL; // TODO: ,..X
-    f= NUM(f);
-    if (f=='L') f= 'C';
-    if (f=='\'') goto quote;
-    assert(f<255); // TODO:? handle inline address and 'X' ?
-    //prin1(x); printf(" => %c\n", f);
+
+    f= num(f);
+
+    // is it another compiled AL? or lisp S-EXP?
+    if (!f) {
+      prin1(x); printf(" => %04X ", f); prin1(f); NL;
+    } else if (f=='\'') goto quote;
+    else if (f=='L') f= 'C';
+    else assert(f<255);
+
+    prin1(x); printf(" => '%c' (%d)\n", f, f);
 
     while((c=nextc())!=')') {
       ++n;
       p= alcompile(p);
       // implicit FOLDL of nargs + - L ! LOL
-      if (n>2) ALC(f);
+      if (n>2 && f<255 && f!='R') ALC(f);
     }
-    ALC(f); break;
+    // push the actual call
+    if (f<255) {ALC(f); break;}
+    // it's a user defined function/compiled
+    assert(isatom(f)); // TODO: handle lisp/s-exp
+    extra= ')';
+    unc(c);
+    goto quote;
 
   default:
-    if (isdigit(c)) { ALC(c); return p; }
+    // 0-9: inline small int, a-z: local variable on stack
+    printf("DFAULT: '%c'\n", c);
+    if (isdigit(c) || islower(c)) { ALC(c); return p; }
+    printf("-- atom...\n");
 
     // atom name... TODO: test?
     extra= '@'; // read atom val TODO: or 'X'/'E'
@@ -1963,6 +2071,8 @@ char* names[]= {
   "G assoc",
   "M mapcar",
   "N nth",
+
+  "R rec", // recurse on self
   NULL};
 
 void initlisp() {
