@@ -208,6 +208,8 @@ void startprogram() {}
 char firstvar= 42;
 char firstbss;
 
+// for included files, enable lisp extensions
+#define LISP
 
 #include <stdint.h> // cc65 uses 29K extra memory???
 #include <stdio.h>
@@ -529,7 +531,6 @@ L car(L c)         { return iscons(c)? CAR(c): nil; }
 L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L cdr(L c)         { return iscons(c)? CDR(c): nil; }
 L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
-
 
 // --- Atoms / Symbols / Constants
 // 
@@ -901,6 +902,20 @@ char spc() {
   return c;
 }
 
+
+// ---------------- DEC30 - floating point decimals!
+// (optional)
+
+#define DEC
+
+#ifdef DEC
+#include <limits.h>
+#include "dec30.c"
+#endif // DEC
+
+
+// ---------------- LISP READER
+
 L lread(); // forward
 
 // read a list of type: '(' '{' '['
@@ -921,6 +936,10 @@ L lread() {
   char c= spc(), q= 0;
   if (!c) return eof;
   if (c=='(' || c=='{' || c=='[') return lreadlist(c);
+
+#ifdef DEC
+  if (isdigit(c)) return readdec(c, 10); // TODO: base prefixes?
+#else
   if (isdigit(c)) { // number
     // TODO: negative numbers... large numbers? bignum?
     int n= 0;
@@ -931,22 +950,8 @@ L lread() {
     unc(c);
     return mknum(n);
   }
-// Need bigger nums as address
-// But this crashes!
-#ifdef HEX
-  if (c=='#') { // read hex
-    int n= 0;
-    c= nextc();
-    c= nextc();
-    while(isxdigit(c)) {
-      c= toupper(c);
-      if (c>='A') c= c-'A'+10;
-      n= n*16 + c;
-    }
-    unc(c);
-    return n; }
-  }
-#endif // HEX
+#endif // DEC
+
   if (c=='\\') return MKNUM(nextc()); // \A before
   q= (c=='|' || c=='"')? c: 0;
   if (q || isatomchar(c)) { // symbol/stringconst
@@ -994,6 +999,11 @@ L princ(L x) {
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) printf("%s", ATOMSTR(x));
   else if (iscons(x)) { // printlist
+
+    #ifdef DEC
+    if (isdec(x)) { dputf((dec30*)x); return x; }
+    #endif // DEC
+
     putchar('(');
     do {
       princ(car(i));
@@ -1762,8 +1772,8 @@ L al(char* p) {
   if (s<params) s= params; // TODO: hmmm... TODO: assert?
   p--; // as pre-inc is faster in the loop
 
-  printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
-  printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
+  if (verbose) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
+  if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
  next:
   //assert(s<send);
   //if (verbose) { printf("al %c : ", p[1]); prin1(*s); NL; }
@@ -1934,7 +1944,7 @@ L al(char* p) {
 #define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
 
 char* alcompile(char* p) {
- char c, extra= 0; int n= 0; L x, f;
+ char c, extra= 0; int n= 0; L x= 0, f;
 
  again:
   switch((c=nextc())) {
@@ -1947,7 +1957,7 @@ char* alcompile(char* p) {
     {
       L* pi= (L*)p;
       if (*pi) return NULL; // overflow?
-      *pi= lread();
+      *pi= x? x: lread();
       p+= sizeof(L);
       // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
@@ -1962,7 +1972,7 @@ char* alcompile(char* p) {
     if (f=='(') return NULL; // TODO: ,..X inline lambda?
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
-    // TODO: handle to do eval?
+    // TODO: handle funcall etc - do eval?
     if (!isatom(x)) return NULL; // TODO: ,..X
     f= ATOMVAL(x);
 
@@ -1989,12 +1999,22 @@ char* alcompile(char* p) {
     assert(isatom(f)); // TODO: handle lisp/s-exp
     extra= ')';
     unc(c);
+    x= 0;
     goto quote;
 
   default:
     // 0-9: inline small int, a-z: local variable on stack
     printf("DFAULT: '%c'\n", c);
-    if (isdigit(c) || islower(c)) { ALC(c); return p; }
+    if (islower(c)) { ALC(c); return p; }
+    if (isdigit(c) || c=='.' || c=='-') {
+      n= tolower(nextc());
+      // single digit integer, compile as is
+      if (!isdigit(n) && n!='e' && n!='d' && n!='.') { ALC(c); return p; }
+      unc(n);
+      x= readdec(c, 10);
+      goto quote;
+    }
+
     printf("-- atom...\n");
 
     // atom name... TODO: test?
@@ -2207,9 +2227,9 @@ L readeval(char *ln, L env, char noprint) {
       for(i=bench; i>0; --i) { // run n tests
 
         #ifndef AL
-        r= eval(x, env);
+          r= eval(x, env);
         #else
-        r= al(isatom(x)? ATOMSTR(x): NULL);
+          r= al(isatom(x)? ATOMSTR(x): NULL);
         #endif // AL
 
         if (r==ERROR) break;

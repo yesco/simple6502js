@@ -22,6 +22,7 @@
 // Why only 30 bits? It's for it to fit into a concell,
 // of the 65lisp, with 15 bits each from two 15-bit ints.
 
+#define DEC
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,9 +31,17 @@
 typedef   int8_t S;
 typedef  uint8_t C;
 typedef  int16_t I;
+#ifndef LISP
 typedef uint16_t L;
+#endif // LISP
 typedef  int32_t W;
 typedef uint32_t U;
+
+// A decimal30 IS a cons of two numbers!
+
+#ifdef LISP
+char isdec(L x) { return iscons(x) && isnum(CAR(x)) && isnum(CDR(x)); }
+#endif
 
 typedef union dec30 {
   U uabcd;
@@ -50,7 +59,7 @@ int decexp(dec30 *a) {
 
 long decman(dec30 *a) { // sign extend .b take 7 high bits
   // TODO: verify...
-  return ((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1);
+  return ((((W)((S)((a->ub)<<2)))>>3)<<15) | ((a->ucd)>>1);
 }
 
 void dmake(long m, int e, dec30 *r) {
@@ -63,10 +72,48 @@ void dmake(long m, int e, dec30 *r) {
   if (neg) m= -m;
 
   // encode
-  r->ab= e<<(7-1);
+  r->ab= e<<6;
   r->cd= (m<<1)&0xffff;
-  r->b|= (m>>15)&0x1f;
+  r->b|= (m>>14)&0x7e; // 6 bits from m stored in b
 }
+
+#ifdef LISP
+// Returns a lisp value, either a normal num if fits
+// or a dec30 if needed.
+L mkdec(long m, int e) {
+  dec30 d;
+  if (!e && labs(m)<INT_MAX/2) return mknum(m);
+
+  dmake(m, e, &d);
+
+  // remove after testing
+  assert(isnum(d.cd));
+  assert(isnum(d.ab));
+
+  return cons(d.cd, d.ab);
+}
+
+L readdec(char c, char base) {
+  long m= 0;
+  int e= 0;
+  signed char d= 1, neg= 0;
+  while (c) {
+    if ((d>1 && isdigit(c)) || c=='.') d++;
+    c= tolower(c);
+    if (d>=0 && c=='-') neg= 1;
+    else if (base==10 && (c=='e' || c=='d'))  d= -d;
+    else if (isdigit(c) || (c>='a' && c<='a'+base-10)) {
+      if (d>=0) m= m*base + (c<='9'? c-'0': c-'a'+10);
+      else      e= e*base + c-'0';
+    } else if (c!='.') error("Illegal char in dec", NUM(c));
+
+    c= nextc();
+  } while(isdigit(c));
+  unc(c);
+  printf("dec: m=%ld d=%d e=%d -> %d\n", m, d, e, e-(abs(d)-1)); // debug
+  return mkdec(neg? -m: m, e-(abs(d)-1));
+}
+#endif // LISP
 
 char dlog10(long m) {
   char i= 0; m= labs(m);
@@ -129,7 +176,7 @@ void dadd(dec30 *a, dec30 *b, dec30 *r) {
 
 void dsub(dec30 *a, dec30 *b, dec30 *r) {
   dec30 rb; dmake(-decman(b), decexp(b), &rb);
-  return dadd(a, &rb, r);
+  dadd(a, &rb, r);
 }
 
 void dput(dec30 *a) {
@@ -138,7 +185,13 @@ void dput(dec30 *a) {
 
 void dputf(dec30 *a) {
   char s[16]= {0};
-  int m= decman(a), e= decexp(a) + dlog10(m);
+  long m= decman(a);
+  int e= decexp(a) + dlog10(m);
+  #ifdef LISP
+  printf("\nDPUTF: m=%ld e=%d (", m, e); // debug
+  prin1(CAR((L)a)); printf(" . "); prin1(CDR((L)a)); putchar(')'); NL; // debug
+  NL;
+  #endif //LISP
   if (m < 0) { putchar('-'); m= -m; }
   snprintf(s, sizeof(s), "%d", m);
   if (e>=0 && e<9) { printf("%s", s); while(e-->0)putchar('0'); putchar('d'); }
@@ -172,6 +225,9 @@ void ddput(dec30 *a) {
   dputf(a);
 }
 
+// ENDWCOUNT
+
+#ifndef LISP
 int main(int argc, char** argv) {
   
 #ifdef FOO
@@ -244,3 +300,4 @@ int main(int argc, char** argv) {
    dec30 d; dmul(&e, &e, &d);  dputf(&d); putchar('\n');
  }
 }
+#endif // LISP

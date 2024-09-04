@@ -52,4 +52,5 @@ grep '^CODE' $name.map
 grep '^RODATA' $name.map
 grep '^DATA' $name.map
 echo
-echo "`./wcode lisp.c` LOC of C-code (wc: `wc lisp.c`)"
+echo "`./wcode lisp.c ` LOC of LISP  C-code (wc: `wc lisp.c`)"
+echo "`./wcode dec30.c` LOC of DEC30 C-code (wc: `wc dec30.c`)"
