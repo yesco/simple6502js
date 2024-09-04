@@ -30,10 +30,10 @@
 // HMMM
 typedef   int8_t S;
 typedef  uint8_t C;
-typedef  int16_t I;
 #ifndef LISP
-typedef uint16_t L;
+typedef  int16_t L; // hmmm
 #endif // LISP
+typedef uint16_t X; // hmmm
 typedef  int32_t W;
 typedef uint32_t U;
 
@@ -46,8 +46,8 @@ char isdec(L x) { return iscons(x) && isnum(CAR(x)) && isnum(CDR(x)); }
 typedef union dec30 {
   U uabcd;
   W abcd;
-  struct { I ucd, uab; };
   struct { L cd, ab; };
+  struct { X ucd, uab; };
   struct { S d, c, b, a; };
   struct { C ud, uc, ub, ua; };
 } dec30;
@@ -57,12 +57,34 @@ int decexp(dec30 *a) {
   return (a->ab)>>7; // sign extend, 9 bits => 16 bits
 }
 
+// TODO: hide behind debug
+void bput(U m) {
+  int i;
+  putchar(' ');
+  for(i=0; i<32; ++i) {
+    if (i%4==0) putchar(' ');
+    if (i%8==0) putchar(' ');
+    if (i%16==0) putchar(' ');
+    putchar( (m&0x80000000)? '1': '0' );
+    m<<=1;
+  }
+  putchar('\n');
+}
+
 long decman(dec30 *a) { // sign extend .b take 7 high bits
   // TODO: verify...
-  return ((((W)((S)((a->ub)<<2)))>>3)<<15) | ((a->ucd)>>1);
+  printf("decman:\n");
+  printf("dec="); bput(a->uabcd);
+  printf("mlo="); bput((a->ucd)>>1);
+  printf("mhi="); bput((a->ub)<<1);
+  printf("his="); bput((S)((a->ub)<<1));
+  printf("hia="); bput(((W)((S)((a->ub)<<1)))>>2);
+  printf("m  ="); bput(((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1));
+  return ((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1);
 }
 
 void dmake(long m, int e, dec30 *r) {
+  long o= m; // debug TODO: remove
   char neg= (m<0);
   m= labs(m);
 
@@ -71,10 +93,18 @@ void dmake(long m, int e, dec30 *r) {
   while(m&0xffe00000) { m+= 5; m/= 10; ++e;}
   if (neg) m= -m;
 
+  if (o!=m) printf("adjusted dec: m=%ld e=%d -> %d\n", m, e); // debug
+
+  // TODO: inf and nan?
+  assert(e<=254);
+  assert(e>=-254);
+
   // encode
-  r->ab= e<<6;
-  r->cd= (m<<1)&0xffff;
-  r->b|= (m>>14)&0x7e; // 6 bits from m stored in b
+  bput(m);
+  r->ab= (e<<7)&0xff80; // 9 bits from e stored in ab: 1111 1111 1000 0000
+  r->cd= (m<<1)&0xfffe;
+  r->b|= (m>>14)&0x7e; // 6 bits from m stored in b:             0111 1110
+  bput(r->uabcd);
 }
 
 #ifdef LISP
@@ -96,22 +126,40 @@ L mkdec(long m, int e) {
 L readdec(char c, char base) {
   long m= 0;
   int e= 0;
-  signed char d= 1, neg= 0;
-  while (c) {
+  signed char d= 1, neg= 0, eneg= 0;
+
+  // base prefix? 0x 0b 0ctal
+  char b= base;
+  if (c=='0') {
+    c= tolower(nextc());
+    if (c=='x') b= 16; else if (c=='b') b= 2; else if (isdigit(c)) b= 8;
+    else error("Unknown base char: ", MKNUM(c));
+    c= nextc();
+  }
+
+  while (c && !isspace(c)) {
     if ((d>1 && isdigit(c)) || c=='.') d++;
     c= tolower(c);
-    if (d>=0 && c=='-') neg= 1;
-    else if (base==10 && (c=='e' || c=='d'))  d= -d;
-    else if (isdigit(c) || (c>='a' && c<='a'+base-10)) {
-      if (d>=0) m= m*base + (c<='9'? c-'0': c-'a'+10);
-      else      e= e*base + c-'0';
+    //printf("READDEC: '%c' (%d)\n", c, c); // debug
+    if (c=='+') ; // ignore
+    else if (c=='-') { if (d>=0) neg= 1; else eneg= 1; }
+    else if (b==10 && (c=='e' || c=='d'))  d= -d;
+    else if (isdigit(c) || (c>='a' && c<='a'+b-10)) {
+      if (d>=0) m= m*b + (c<='9'? c-'0': c-'a'+10);
+      else      e= e*b + c-'0';
     } else if (c!='.') error("Illegal char in dec", NUM(c));
 
+    // overflow, throw away lower digit
+    // (rounding w +5 isn't perfect...)
+    while(((U)m) >= 0x00100000) { m+= 5; m/= 10; e++; }
+
     c= nextc();
+
   } while(isdigit(c));
   unc(c);
   printf("dec: m=%ld d=%d e=%d -> %d\n", m, d, e, e-(abs(d)-1)); // debug
-  return mkdec(neg? -m: m, e-(abs(d)-1));
+  e-= (abs(d)-1);
+  return mkdec(neg? -m: m, eneg? -e: e);
 }
 #endif // LISP
 
@@ -186,16 +234,17 @@ void dput(dec30 *a) {
 void dputf(dec30 *a) {
   char s[16]= {0};
   long m= decman(a);
-  int e= decexp(a) + dlog10(m);
+  int ae= decexp(a), e=ae+dlog10(m);
   #ifdef LISP
-  printf("\nDPUTF: m=%ld e=%d (", m, e); // debug
+  putchar('\n'); dput(a);
+  printf("\nDPUTF: m=%ld e=%d re=%d (", m, ae, e); // debug
   prin1(CAR((L)a)); printf(" . "); prin1(CDR((L)a)); putchar(')'); NL; // debug
   NL;
   #endif //LISP
   if (m < 0) { putchar('-'); m= -m; }
-  snprintf(s, sizeof(s), "%d", m);
-  if (e>=0 && e<9) { printf("%s", s); while(e-->0)putchar('0'); putchar('d'); }
-  else if (e<0 && e>-5) { printf("0."); while(++e<0)putchar('0'); printf("%sd", s); }
+  snprintf(s, sizeof(s), "%ld", m);
+  if (ae>=0 && ae<9) { printf("%s", s); while(ae-->0)putchar('0'); putchar('d'); }
+  else if (ae<0 && ae>-5) { printf("0."); while(++ae<0)putchar('0'); printf("%sd", s); }
   else printf("%c%s%sd%+d", s[0], s[1]?".":"", s+1, e+dlog10(m));
 }
 

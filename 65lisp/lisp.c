@@ -277,6 +277,7 @@ void* zalloc(size_t n) {
 
 // ---------------- Lisp Datatypes
 
+//typedef int16_t L;
 typedef int16_t L;
 typedef uint16_t uint;
 
@@ -916,6 +917,8 @@ char spc() {
 
 // ---------------- LISP READER
 
+char base= 10;
+
 L lread(); // forward
 
 // read a list of type: '(' '{' '['
@@ -938,7 +941,8 @@ L lread() {
   if (c=='(' || c=='{' || c=='[') return lreadlist(c);
 
 #ifdef DEC
-  if (isdigit(c)) return readdec(c, 10); // TODO: base prefixes?
+  // TODO: base prefixes...
+  if (isdigit(c)) return readdec(c, 10);
 #else
   if (isdigit(c)) { // number
     // TODO: negative numbers... large numbers? bignum?
@@ -1084,8 +1088,9 @@ void lprintf(char* f, L a) {
 }
 
 void error(char* msg, L a) {
-  printf("%%ERROR: %s - ", msg);
-  prin1(a); NL;
+  printf("%%ERROR: %s - ", msg); prin1(a);
+  if (num(a)>31 && NUM(a)<127) printf(" '%c'", NUM(a)); NL;
+  // TODO: have arg opt to quit on error?
   if (toploop) longjmp(toploop, 1);
 }
   
@@ -2004,14 +2009,12 @@ char* alcompile(char* p) {
 
   default:
     // 0-9: inline small int, a-z: local variable on stack
-    printf("DFAULT: '%c'\n", c);
+    printf("\nDFAULT: '%c'\n", c);
     if (islower(c)) { ALC(c); return p; }
-    if (isdigit(c) || c=='.' || c=='-') {
-      n= tolower(nextc());
-      // single digit integer, compile as is
-      if (!isdigit(n) && n!='e' && n!='d' && n!='.') { ALC(c); return p; }
-      unc(n);
-      x= readdec(c, 10);
+    if (isdigit(c) || c=='.' || c=='-' || c=='+') {
+      x= readdec(c, base);
+      // result is single digit, compile as is
+      if (isnum(x) && x>=0 && x<10*2) { ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
