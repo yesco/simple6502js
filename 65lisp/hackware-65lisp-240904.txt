@@ -1,0 +1,839 @@
+Best viewed using ./presentation hack...
+(basically >> less -c -r -R -p page "$@" )
+
+[H[2J[3J
+page 1   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+Jonas S Karlsson, Swede in exile (28 years)
+
+Lived	: Sweden, Linkoping, Stockholm, Berlin, Amsterdam, Silicon Valley, San Francisco, Sydney, Hong Kong, Shanghai/Beijing/China, Bangkok
+
+Worked	: ISO-software startup, Technical University of Linkoping (MSc/Lic), CWI Mathematical Research Institute (PhD), IBM (DB2 Everyplace), Google ("Google Megastore")
+
+Likes	: (HK) Milktea, Lasagna, Programming, Kaya Sandwhiches, Cider, Sex, Mah Lai Goh, Tai Chi, Motorcycle - WROOM, Porn, Gong Fu Cha, Cheese, Computers, ESP-32, !Arduino, Embedded Systems, Electronics, C Programming, Lisp, Forth, Make You Own (Programming) Languages, Minimalism
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 2   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+CPU 6502 - A Home Computer Revolution!
+
+= 1975
+= 3510 transistors only
+= 8-bit CPU
+= 56 instructions, 
+= 13 addressing modes
+= 64KB max RAM/ROM
+= 25 USD - CHEAP: 1/6th of the price of other CPUs (300 USD)
+= Video Games, Atari 2600, Atari 8-bit, Apple II, Nintendo E.S., Commodore 64, Atari Lynx, BBC Micro, ORIC ATMOS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 3   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+LISP
+
+65> 42
+42
+
+65> (+ 2 (* 2 2 2) 7)
+17
+
+65> (de (double n) (+ n n))
+65> (double 3)
+6
+
+65> 'double
+double
+
+65> (car (cons 'double 'trouble))
+double
+65> (cdr (cons 'double 'trouble))
+trouble
+
+65> (eval (list 'double 3))
+6
+
+65> (de (iota a b)
+      (if (> a b) nil
+        (cons a (iota (+ a 1) b))
+
+65> (iota 2 7)
+(2 3 4 5 6 7)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 4   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+"The Maxwell Equations for Software" - Alan Kay
+
+(de (evalq fn x) (apply fn x nil))
+(de (apply fn x env)
+  (cond ((eq 'car fn) (caar x))
+        ((eq 'cdr fn) (cdar x))
+        ((eq 'cons fn) (cons (car x) (cadr x)))
+        ((eq 'atom fn) (atom (car x)))
+        ((eq 'eq fn) (eq (car x) (cadr x)))
+        ((eq 'lambda (car fn)) (eval (caddr fn) (pairlis (cadr fn) x env)))
+        (T (apply (eval fn env) x env)))
+
+(de (eval e env)
+  (cond ((atom e) (assoc e env))
+        ((eq 'quote (car e)) (cadr e))
+        ((eq 'cond (car e))  (evcon (cdr e) env))
+        (T (apply (car e) (evlis (cdr e) env) env))))
+
+(de (envcon c env)
+  (cond ((eval (caar c) env) (eval (cadar c) env))
+        (T (evcon (cdr c) env))))
+
+(de (evlis m a)
+  (cond ((null m) nil)
+        (T (cons (eval (car m) env) (evlis (cdr m) env)))))
+
+* www.righto.com/2008/07/maxwells-equations-of-software-examined.html
+* from original - Lisp 1.5 manual McCarthy
+* in python - http://norvig.com/lispy.html
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 5   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+How to write a LISP for 6502?
+
+* assembly
+  - yeah, right...
+  - fast
+  - difficult to write
+
+* CC65 it's pretty complete C compiler
+  - slow code (10x?)
+  - 10x faster than BASIC, lol
+  - how to squeeze out the most?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 6   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+L eval(L x, L env) {
+  if (x==nil) return nil;
+  if (isatom(x)) return cdr(assoc(x, env));
+  if (isnum(x)) return x;
+  return apply(car(x), cdr(x), env);
+}
+
+L apply(L f, L x, L env) {
+  if (f==CAR) return car(cdr(a));
+  if (f==CDR) return cdr(cdr(a));
+  if (f==CONS) return cons(car(x), car(cdr(x)));
+  if (f==EQ) return car(x)==car(cdr(x))? T: nil;
+  if (f==PLUS) return car(x)+car(cdr(x));
+  if (f==LAMBDA) return eval(
+    car(cdr(cdr(f))), evallist(car(cdr(f)), x, env))
+  return apply(eval(f, env), x, env);
+}
+
+L evallist(L b, L v, L env) {
+  if (b==nil) return nil;
+  return cons( cons( car(b), eval(car(v),env) ),
+           evallist(cdr(b), cdr(v), env) );
+}
+
+L assoc(L a, L env) {
+  if (env==nil) return nil;
+  if (a==car(car(env))) return car(env);
+  return assoc(a, cdr(env));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 7   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+// Nitty gritty C memory stuff, cheat
+
+typedef uint16_t L;
+
+L cell[MAXCELLS]= {0};
+L *C= (L*)(((char*)cell)+3); // "misalign"
+
+#define iscons(n) (((n)&3)==3) // xxxx11
+
+// Every cons on 4 increments!
+L cons(L a, L d) {
+  *++C= a;
+  *++C= d;
+  return (L)(C-2); // lol
+}
+#define car(c) (*(c))
+#define cdr(c) (c[1])
+
+#define mknum(n) ((n)<<1)      // xxxx0
+#define isnum(n) (((n)&1)==0)  // xxxx0
+
+#define isatom(n) (((n)&3)==1) // xxx01
+
+char *atoms[MAXATOM]= {0};
+char **A= (char**)(((char*)atoms)+1); // misalign
+
+L atom(char* s) {
+  char** x;
+  for(x= atoms; x<atoms; ++x)
+    if (0==strcmp(*x, s)) return x;
+  *atoms++= s; // or strdup(s); ?
+  return atoms-1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 8   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+Performance on 6502?
+
+* Slow, but workable
+* Need a GC (I have)
+* Experiment with a compiler and byte-code VM?
+
+65> (car (car (car (cdr (cdr (cdr (cdr (quote (1 2 3 4 ((5 6) 7) 8)))))))))
+
+ EVAL  -   856 ops/s        0% faster
+   VM  -  1626 ops/s       90% faster 
+
+
+FUTURE, potential:
+
+6502   - 18000 ops/s assembly
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 9   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+65> (car (car (car (cdr (cdr (cdr (cdr (quote (1 2 3 4 ((5 6) 7) 8)))))))))
+
+Byte code: ",xxDDDDAAA"
+
+// Minimal VM, only AD'
+
+L vm(char* p) {
+  while(*p) {
+
+    switch(*p) {
+    case 'A': *stack= car(*stack); break;
+    case 'D': *stack= cdr(*stack); break;
+    case 'C': --stack; *stack= cons(*stack, stack[1]); break;
+    case'\'': break;
+    }
+
+    ++p;
+  }
+}
+
+ EVAL  -   856 ops/s        0% faster
+   VM  -  1626 ops/s       90% faster 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 10   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+// Minimal VM, only AD' using TOP
+
+#define NEXT goto next
+
+L vm(char* p) {
+  --p;
+
+ next:
+
+  switch(*++p) {
+  case 'A': top= car(top); NEXT;
+  case 'D': top= cdr(top); NEXT;
+  case 'C': --stack; top= cons(*stack, top); NEXT;
+  case'\'': NEXT;
+  }
+
+}
+
+ EVAL  -   856 ops/s        0% faster
+   VM  -  1626 ops/s       90% faster 
+VMtop  -  1900 ops/s      121% faster  (+ 17% faster!)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 11   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 12   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
