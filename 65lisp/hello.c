@@ -11,7 +11,7 @@ int main() {//int argc, char** argv) {
   //clrscr(); // in conio but linker can't find (in sim?)
   //kbhit();
 
-  {
+  if (0) {
     char *x= 0, *last= 0;
     int i, d;
     int z= 1024, n= 0;
@@ -35,6 +35,8 @@ int main() {//int argc, char** argv) {
   }
   
 
+#define FOO
+
 #ifdef FOO
   // output test
   printf("printf Hello World\n");
@@ -55,9 +57,11 @@ int main() {//int argc, char** argv) {
 
   printf("read=%d and '%s'\n", a, foo);
 
-  a= getchar();
-  printf("getchar=%d and '%c'\n", a, a);
-
+  do {
+    a= getchar();
+    printf("getchar=%d and '%c'\n", a, a);
+  } while(a!=4 && a!=3);
+  printf("DONE: ^c\n");
 #endif
 
 

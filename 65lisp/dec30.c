@@ -22,6 +22,9 @@
 // Why only 30 bits? It's for it to fit into a concell,
 // of the 65lisp, with 15 bits each from two 15-bit ints.
 
+#define DECDEBUG(a) do{ }while(0)
+//#define DECDEBUG(a) do{ a; }while(0)
+
 #define DEC
 
 #include <stdio.h>
@@ -73,13 +76,13 @@ void bput(U m) {
 
 long decman(dec30 *a) { // sign extend .b take 7 high bits
   // TODO: verify...
-  printf("decman:\n");
-  printf("dec="); bput(a->uabcd);
-  printf("mlo="); bput((a->ucd)>>1);
-  printf("mhi="); bput((a->ub)<<1);
-  printf("his="); bput((S)((a->ub)<<1));
-  printf("hia="); bput(((W)((S)((a->ub)<<1)))>>2);
-  printf("m  ="); bput(((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1));
+  DECDEBUG(printf("decman:\n"));
+  DECDEBUG(printf("dec="); bput(a->uabcd));
+  DECDEBUG(printf("mlo="); bput((a->ucd)>>1));
+  DECDEBUG(printf("mhi="); bput((a->ub)<<1));
+  DECDEBUG(printf("his="); bput((S)((a->ub)<<1)));
+  DECDEBUG(printf("hia="); bput(((W)((S)((a->ub)<<1)))>>2));
+  DECDEBUG(printf("m  ="); bput(((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1)));
   return ((((W)((S)((a->ub)<<1)))>>2)<<15) | ((a->ucd)>>1);
 }
 
@@ -93,7 +96,7 @@ void dmake(long m, int e, dec30 *r) {
   while(m&0xffe00000) { m+= 5; m/= 10; ++e;}
   if (neg) m= -m;
 
-  if (o!=m) printf("adjusted dec: m=%ld e=%d -> %d\n", m, e); // debug
+  DECDEBUG(if (o!=m) printf("adjusted dec: m=%ld e=%d -> %d\n", m, e));
 
   // TODO: inf and nan?
   assert(e<=254);
@@ -157,7 +160,7 @@ L readdec(char c, char base) {
 
   } while(isdigit(c));
   unc(c);
-  printf("dec: m=%ld d=%d e=%d -> %d\n", m, d, e, e-(abs(d)-1)); // debug
+  DECDEBUG(printf("dec: m=%ld d=%d e=%d -> %d\n", m, d, e, e-(abs(d)-1)));
   e-= (abs(d)-1);
   return mkdec(neg? -m: m, eneg? -e: e);
 }
@@ -236,16 +239,16 @@ void dputf(dec30 *a) {
   long m= decman(a);
   int ae= decexp(a), e=ae+dlog10(m);
   #ifdef LISP
-  putchar('\n'); dput(a);
-  printf("\nDPUTF: m=%ld e=%d re=%d (", m, ae, e); // debug
-  prin1(CAR((L)a)); printf(" . "); prin1(CDR((L)a)); putchar(')'); NL; // debug
-  NL;
+  DECDEBUG(putchar('\n'); dput(a));
+  DECDEBUG(printf("\nDPUTF: m=%ld e=%d de=%d (", m, ae, e));
+  DECDEBUG(prin1(CAR((L)a)); printf(" . "); prin1(CDR((L)a)); putchar(')'); NL);
+  DECDEBUG(NL);
   #endif //LISP
   if (m < 0) { putchar('-'); m= -m; }
   snprintf(s, sizeof(s), "%ld", m);
-  if (ae>=0 && ae<9) { printf("%s", s); while(ae-->0)putchar('0'); putchar('d'); }
-  else if (ae<0 && ae>-5) { printf("0."); while(++ae<0)putchar('0'); printf("%sd", s); }
-  else printf("%c%s%sd%+d", s[0], s[1]?".":"", s+1, e+dlog10(m));
+  if (e>=0 && e<9) { printf("%s", s); while(ae-->0)putchar('0'); putchar('d'); }
+  else if (e<0 && e>-5) { printf("0."); while(++ae<0)putchar('0'); printf("%sd", s); }
+  else printf("%c%s%sd%+d", s[0], s[1]?".":"", s+1, e);
 }
 
 long xsqrtl(long x) {

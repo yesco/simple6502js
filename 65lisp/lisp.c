@@ -1764,8 +1764,12 @@ L al(char* p) {
   *++s= MKNUM(22); // b
   *++s= MKNUM(33); // c
   *++s= MKNUM(44); // d // lol
-  top = MKNUM(4);  // argc // TODO: maybe useful
+  *++s= MKNUM(4);  // argc // TODO: maybe useful
+  // can't access 4 as e? hmmm?
 
+  top= *s;
+
+  // HHMMMM>?
   if (!p) return ERROR;
 
   #define PARAM_OFF 4
@@ -2009,21 +2013,25 @@ char* alcompile(char* p) {
 
   default:
     // 0-9: inline small int, a-z: local variable on stack
-    printf("\nDFAULT: '%c'\n", c);
-    if (islower(c)) { ALC(c); return p; }
+    //printf("\nDFAULT: '%c'\n", c);
+
     if (isdigit(c) || c=='.' || c=='-' || c=='+') {
-      x= readdec(c, base);
+      x= readdec(c, base); // x use by quote if !0
       // result is single digit, compile as is
       if (isnum(x) && x>=0 && x<10*2) { ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
-    printf("-- atom...\n");
-
-    // atom name... TODO: test?
-    extra= '@'; // read atom val TODO: or 'X'/'E'
-    unc(c);
-    goto quote;
+    // atom name...
+    if (isalpha(c)) {
+      unc(c);
+      x= lread(); // x use by quote if !0
+      assert(isatom(x));
+      if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
+      printf("----ATOM---"); prin1(x); NL;
+      extra= '@'; // read atom val TODO: or 'X'/'E'
+      goto quote;
+    }
   }
   return p;
 }
@@ -2266,17 +2274,18 @@ L testing(env) {
   #endif // PERFTEST
 
   // set some for test
+  setval(atom("foo"), mknum(42), nil);
   setval(atom("bar"), mknum(33), nil);
   setval(atom("bar"), mknum(11), nil);
   env= cons( cons(atom("*fie*"), mknum(99)),
-       cons( cons(atom("*foo*"), mknum(42)),
+       cons( cons(atom("*foo*"), mknum(777)),
              env));
 
   // TODO: remove, because -b doesn't have onerun?
   setval(atom("one"), mknum(1), nil);
   setval(atom("two"), mknum(2), nil);
 
-  env= readeval("(de clos (lambda (n) (+ n n)))", env, quiet);
+  //env= readeval("(de clos (lambda (n) (+ n n)))", env, quiet);
   return env;
 }
 

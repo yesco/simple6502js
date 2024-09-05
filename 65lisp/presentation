@@ -1,0 +1,2 @@
+less -c -r -R -p page "$@"
+

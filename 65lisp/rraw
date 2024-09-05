@@ -30,15 +30,16 @@ cl65 -O -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 cl65 -O -t atmos $name.c -o $name.tap || exit 72
 
 echo 
-cc65 -O -T $name.c 2>/dev/null # generate .s file
+cl65 -O -t atmos $name.c -o $name.out 2>/dev/null
+cc65 -O -T $name.c -o $name.out 2>/dev/null # generate .s file
 
 echo
 ls -l $name.o $name.out $name.tap
 
 # -- enable NON-blocking getchar!!!
 
-##stty cbreak raw -echo min 0
-#stty cbreak -echo
+#stty cbreak raw -echo min 0
+stty cbreak -echo
 
 
 # -- simulation
