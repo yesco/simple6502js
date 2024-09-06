@@ -10,22 +10,23 @@
 #include <string.h>
 #include <assert.h>
 
+// ---------------- CONFIG
 #define MAXCONS  1024*8
 #define MAXATOM  1024
 
-typedef unsigned int D;
-D nil, LAMBDA, QUOTE, T,  PLUS, CAR, CDR, CONS, EQ;
+// ---------------- lisp Datatype
+typedef unsigned int D;  D nil, LAMBDA, QUOTE, T,  PLUS, CAR, CDR, CONS, EQ;
 
 D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
 
 typedef struct { D car, cdr; } Cons;  Cons *C;
 
-void* callaign(size_t n, char bits) {
-  char* p= calloc(n+1, sizeof(Cons)); // same size Atom!
-  while((((D)p) & 0x03) != bits) p++;
-  return p;
+// return N multiple of 4 bytes, aligned bits (bPPP..PPP01) if bits==01
+void* callaign(size_t n, char bits) { char* p= calloc(n+1, sizeof(Cons)); 
+  while((((D)p) & 0x03) != bits) p++; return p;
 }
 
+// ---------------- Type Testers, and num stuff
 #define mknum(n) ((n)<<1)      // nnnn0
 #define num(n)   ((n)>>1)      // nnnn0
 #define isnum(n) (((n)&1)==0)  // nnnn0
@@ -37,24 +38,21 @@ D cons(D a, D d) { ++C; C->car= a; C->cdr= d; return (D)C; }
 #define cdr(c) (((Cons*)c)->cdr)
 
 // Atoms stored as: (D global  value, char*)
+//   (Note: nil, car(nil)= nil, cdr(nil)= nil
+//   car(atom) == global value
 typedef struct { D val; char* str; } Atom;  Atom *A;
 
-D atom(char* s) {
-  Atom* x= (Atom*)nil;
+D atom(char* s) { Atom* x= (Atom*)nil;
   if (0==strcmp(s, "nil")) return nil; // special
   while(s && ++x<=A) if (0==strcmp(x->str, s)) return (D)x;
-  ++A; A->val= nil; A->str= s? s: (char*)nil;
-  return (D)A;
+  ++A; A->val= nil; A->str= s? s: (char*)nil;  return (D)A;
 }
 
-D princ(D x) {
-  if (x==nil) printf("nil");
+D princ(D x) { if (x==nil) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
   else if (isatom(x)) printf("%s", ((Atom*)x)->str);
   else { putchar('('); while(iscons(x)) {
-      princ(car(x));
-      x= cdr(x);
-      if (iscons(x)) putchar(' ');
+      princ(car(x)); x= cdr(x); if (iscons(x)) putchar(' ');
     }
     if (!iscons(x) && x!=nil) { printf(" . "); princ(x); }
     putchar(')');
@@ -65,7 +63,7 @@ D princ(D x) {
 // poor mans ungetchar...
 char unc= 0;
 
-D readlist() {
+D readlist() { 
   char c= unc? unc: getchar(); unc= 0;
   if (isspace(c)) return readlist();
   if (c==')') return nil;
@@ -73,8 +71,7 @@ D readlist() {
   unc= c; return cons(lread(), readlist()); // order of eval 1...2
 }
 
-D lread() {
-  int n= 0, c= unc? unc: getchar(); unc= 0;
+D lread() { int n= 0, c= unc? unc: getchar(); unc= 0;
   if (isspace(c)) return lread();
   if (c<=0 || c==')') return nil;
   while(isdigit(c)) { n= n*10 + c-'0';
@@ -101,8 +98,7 @@ D bind(D b, D v, D env) {
 }
 
 D assoc(D a, D env) {
-  if (a==car(car(env))) return car(env);
-  return env==nil? nil: assoc(a, cdr(env));
+  return a==car(car(env))? car(env): env==nil? nil: assoc(a, cdr(env));
 }
 
 D eval(D x, D env) {
@@ -111,13 +107,13 @@ D eval(D x, D env) {
   return car(x)==QUOTE? car(cdr(x)): apply(car(x), evallist(cdr(x),env), env);
 }
 
-D apply(D f, D x, D env) {
+D apply(D f, D x, D env) { D y= car(cdr(x));
   //printf("APPLY: "); princ(f); printf(" ARGS= "); princ(x); putchar('\n');
   if (f==CAR) return car(car(x));
   if (f==CDR) return cdr(car(x));
-  if (f==CONS) return cons(car(x), car(cdr(x)));
-  if (f==EQ) return car(x)==car(cdr(x))? T: nil;
-  if (f==PLUS) return car(x)+car(cdr(x));
+  if (f==CONS) return cons(car(x), y);
+  if (f==EQ) return car(x)==y? T: nil;
+  if (f==PLUS) return car(x)+y;
   if (f==LAMBDA) return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
   return apply(eval(f, env), x, env);
 }
