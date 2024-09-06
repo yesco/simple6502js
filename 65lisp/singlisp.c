@@ -1,0 +1,153 @@
+// A 6502 lisp from Hackware presentation in Singapore
+// (>) 2024 Jonas S Karlsson
+
+// Based on the "Maxwell Equations of Software",
+// almost directly translated to C from McCarthy.
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <string.h>
+#include <assert.h>
+
+#define MAXCONS  1024*8
+#define MAXATOM  1024
+
+typedef unsigned int D;
+D nil, LAMBDA, QUOTE, T;
+
+typedef struct { D car, cdr; } Cons;
+Cons *C;
+
+void* callaign(size_t n, char bits) {
+  char* p= calloc(n+1, sizeof(Cons)); // same size Atom!
+  while(((D)p & 0x03) != bits) p++;
+  return p;
+}
+
+#define mknum(n) ((n)<<1)      // nnnn0
+#define num(n)   ((n)>>1)      // nnnn0
+#define isnum(n) (((n)&1)==0)  // nnnn0
+#define isatom(n) (((n)&3)==1) // ppp01
+#define iscons(n) (((n)&3)==3) // ppp11
+
+D cons(D a, D d) {
+  ++C;
+  C->car= a;
+  C->cdr= d;
+  return (D)C;
+}
+#define car(c) (*(D*)c)
+#define cdr(c) (((D*)c)[1])
+
+// Atoms stored as: (D global  value, char*)
+typedef struct { D val; char* str; } Atom;
+Atom *A;
+
+D atom(char* s) {
+  Atom* x= (Atom*)nil;
+  if (0==strcmp(s, "nil")) return nil; // special
+  while(s && ++x<=A) if (0==strcmp(x->str, s)) return (D)x;
+  ++A; A->val= nil; A->str= s? s: (char*)nil;
+  return (D)A;
+}
+
+D princ(D x) {
+  if (x==nil) printf("nil");
+  else if (isnum(x)) printf("%d", num(x));
+  else if (isatom(x)) printf("%s", ((Atom*)x)->str);
+  else { putchar('('); while(iscons(x)) {
+      princ(car(x));
+      if (isatom(cdr(x))) { if (cdr(x)!=nil) { printf(" . "); princ(cdr(x)); } putchar(')'); break; }
+      putchar(' ');
+      x= cdr(x);
+    }} return x;
+}
+
+D eval(D, D); D apply(D, D, D); D lread(); // forward
+
+char unc= 0;
+
+D readlist() {
+  char c= unc? unc: getchar(); unc= 0;
+  if (isspace(c)) return readlist();
+  if (c==')') return nil;
+  if (c=='.') { D x= lread(); if (!unc) getchar(); unc= 0; return x; }
+  unc= c;
+  return cons(lread(), readlist()); // order of eval 1...2
+}
+
+D lread() {
+  int n= 0, c= unc? unc: getchar(); unc= 0;
+  if (isspace(c)) return lread();
+  if (c<=0 || c==')') return nil;
+  while(isdigit(c)) {
+    n= n*10 + c-'0';
+    unc= c= getchar();
+    if (!isdigit(c)) return mknum(n);
+  }
+  if (c=='\'') return cons(QUOTE, cons(lread(), nil));
+  if (c=='(') return cons(lread(), readlist());
+  { char s[32]={0}, *p= s; // overflow?
+    do { *p++= c; c= getchar(); }while(c>0 && !isspace(c) && c!='(' && c!=')');
+    unc= c;
+    return atom(strdup(s));
+  }
+}
+
+
+// --------------- lisp eval
+
+D evallist(D v, D env) {
+  if (v==nil) return nil;
+  return cons( eval(car(v),env), evallist(cdr(v),env) );
+}
+
+D bind(D b, D v, D env) {
+  if (b==nil) return nil;
+  return cons( cons( car(b), eval(car(v),env) ),
+           bind(cdr(b), cdr(v), env) );
+}
+
+D assoc(D a, D env) {
+  if (env==nil) return nil;
+  if (a==car(car(env))) return car(env);
+  return assoc(a, cdr(env));
+}
+
+D eval(D x, D env) {
+  if (x==nil) return nil;
+  if (isnum(x)) return x;
+  if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(x); }
+  if (car(x)==QUOTE) return car(cdr(x));
+  return apply(car(x), evallist(cdr(x),env), env);
+}
+
+D apply(D f, D x, D env) {
+  if (f==atom("car")) return car(car(x));
+  if (f==atom("cdr")) return cdr(car(x));
+  if (f==atom("cons")) return cons(car(x), car(cdr(x)));
+  if (f==atom("eq")) return car(x)==car(cdr(x))? T: nil;
+  if (f==atom("plus")) return car(x)+car(cdr(x));
+  if (f==LAMBDA) return eval(
+    car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
+  return apply(eval(f, env), x, env);
+}
+
+int main(int argc, char** argv) {
+  D x, r;
+
+  C= ((Cons*)callaign(MAXCONS, 3))-1;
+  nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
+  A= 1+(Atom*)nil; LAMBDA= atom("lambda"); QUOTE= atom("quote"); T= atom("T"); car(T)= T;
+
+  while(!feof(stdin)) {
+    printf("65> ");
+    x= lread();
+    putchar('>'); princ(x); putchar('\n');
+    r= eval(x, nil);
+    princ(r); putchar('\n');
+  }
+
+  return argv? argc-1: 0; // BS
+}
