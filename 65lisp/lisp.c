@@ -1972,22 +1972,18 @@ char* alcompile(char* p) {
   case 0  : return p;
   case ' ': case '\t': case '\n': case '\r': goto again;
 
-  case'\'': quote:
-   ALC(','); // reads next value and compiles to put it on stack
-     // TODO: make subroutine
-    {
-      L* pi= (L*)p;
-      if (*pi) return NULL; // overflow?
-      *pi= x? x: lread();
-      p+= sizeof(L);
+  case'\'': quote: ALC(','); // reads next value and compiles to put it on stack
+    // TODO: make subroutine
+    { L* pi= (L*)p; if (*pi) return NULL; // overflow?
+      *pi= x? x: lread(); p+= sizeof(L);
       // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
     }
-    if (extra) ALC(extra);
-    return p;
+    if (extra) ALC(extra);  return p;
 
   // TODO: function call... of lisp
   case '(': 
+    // detmine function, try get a number
     //spc();
     f= nextc(); unc(f); // peek
     if (f=='(') return NULL; // TODO: ,..X inline lambda?
@@ -1996,14 +1992,11 @@ char* alcompile(char* p) {
     // TODO: handle funcall etc - do eval?
     if (!isatom(x)) return NULL; // TODO: ,..X
     f= ATOMVAL(x);
-
     f= num(f);
-
     // is it another compiled AL? or lisp S-EXP?
-    if (!f) {
-      prin1(x); printf(" => %04X ", f); prin1(f); NL;
-    } else if (f=='\'') goto quote;
-    else if (f=='L') f= 'C';
+    if (!f) { prin1(x); printf(" => %04X ", f); prin1(f); NL; }
+    else if (f=='\'') goto quote;
+    else if (f=='L') f= 'C'; // foldr
     else assert(f<255);
 
     prin1(x); printf(" => '%c' (%d)\n", f, f);
@@ -2030,20 +2023,20 @@ char* alcompile(char* p) {
     if (isdigit(c) || c=='.' || c=='-' || c=='+') {
       x= readdec(c, base); // x use by quote if !0
       // result is single digit, compile as is
-      if (isnum(x) && x>=0 && x<10*2) { ALC(NUM(x)+'0'); return p; }
+      if (isnum(x) && x>=0 && x<MKNUM(10)) { ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
-    // atom name...
-    if (isalpha(c)) {
-      unc(c);
-      x= lread(); // x use by quote if !0
-      assert(isatom(x));
-      if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
-      printf("----ATOM---"); prin1(x); NL;
-      extra= '@'; // read atom val TODO: or 'X'/'E'
-      goto quote;
-    }
+    // atom name
+    unc(c); x= lread(); // x use by quote if !0
+    assert(isatom(x));
+    // local variable a-z
+    if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
+    printf("----ATOM---"); prin1(x); NL;
+    // compile address on stack and @ to read value at runtime
+    extra= '@'; // read atom val TODO: or 'X'/'E'
+    goto quote;
+
   }
   return p;
 }
@@ -2058,10 +2051,6 @@ L alcompileread() {
 #endif // AL
 
 // ---------------- Register Functions
-
-void reg(char* charspacename) {
-  setatomval(atom(charspacename+2), MKNUM(*charspacename));
-}
 
 // TODO: point to these from arena?
 char* names[]= {
@@ -2154,10 +2143,7 @@ closure= atom("closure");
     bye= atom("bye");   setval(bye, bye, nil);
 
   // register function names
-  while(*s) {
-    reg(*s);
-    ++s;
-  }
+  while(*s) { setatomval(atom(2+*s), MKNUM(**s)); ++s; }
 
   // direct code pointers
   // nearly 10% faster... but little dangerous
