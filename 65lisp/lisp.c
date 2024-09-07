@@ -2059,14 +2059,8 @@ L alcompileread() {
 
 // ---------------- Register Functions
 
-void regc(char* name, char n) {
-  L a= atom(name);
-  setatomval(a, mknum(n)); // TODO: overhead
-}
-
 void reg(char* charspacename) {
-  char c= *charspacename;
-  regc(charspacename+2, c);
+  setatomval(atom(charspacename+2), MKNUM(*charspacename));
 }
 
 // TODO: point to these from arena?
