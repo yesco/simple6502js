@@ -1088,8 +1088,8 @@ void lprintf(char* f, L a) {
 }
 
 void error(char* msg, L a) {
-  printf("%%ERROR: %s - ", msg); prin1(a);
-  if (num(a)>31 && NUM(a)<127) printf(" '%c'", NUM(a)); NL;
+  printf("%%ERROR: %s: ", msg); prin1(a);
+  if (num(a)>31 && NUM(a)<128) printf(" '%c'", NUM(a));  NL;
   // TODO: have arg opt to quit on error?
   if (toploop) longjmp(toploop, 1);
 }
@@ -1746,10 +1746,16 @@ L alvals= 0;
 
 #define TOP
 
+// global vars during interpreation: 30 faster
+L top, *s, *frame, *params;
+char* p;
+
 #ifdef TOP
-L al(char* p) {
+L al(char* la) {
   char n=0, *orig= p;
-  L top= nil, *s= stack-1, *frame= s, *params= s;
+  top= nil; // global 10% faster!
+  orig= p= la; // global 10% faster
+  s= stack-1; frame= s; params= s; // global yet 10% faster!!!
 
   // TODO: remove?
   // pretend we have some local vars (we've no been invoked yet)
@@ -1788,31 +1794,35 @@ L al(char* p) {
   //if (verbose) { printf("al %c : ", p[1]); prin1(*s); NL; }
 
   switch(*++p) {
-  // TOOD: *s-- or ...
-  case 0: return top; // all functions should end with ^ ?
-  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
-
-  // make sure at least safe number, correct if in bounds and all nums
-  #define NUM_MASK 0xfffe
-  case '+': top+= *s; --s; top&=NUM_MASK; NEXT;
-  case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NEXT; 
-  case '-': top= *s-top; --s; top&=NUM_MASK; NEXT;
-  case '/': top= *s/top*2; --s; top&=NUM_MASK; NEXT;
-
-  case '=': s--; return *s==top? T: nil;
-  case '?': if (top==*s) return 0;
-    else if (isatom(*s) && isatom(top)) return strcmp(ATOMSTR(*s), ATOMSTR(top));
-    else return mknum(*s-top); // no care type!
-
-  case 'A': top= car(top); NEXT;
-  case 'D': top= cdr(top); NEXT;
-  case 'C': top= cons(*s, top); --s; NEXT;
+  // inline AD cons-test: 14% faster, 2.96s with isnum,
+  // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
+  case 'A': top= isnum(top)? nil: CAR(top); NEXT;
+  case 'D': top= isnum(top)? nil: CDR(top); NEXT;
 
   case 'U': top= (top==nil)? T: nil; NEXT;    
   case 'K': top= (iscons(top))? T: nil; NEXT;
 
   case '@': top= ATOMVAL(top); NEXT; // same car 'A' lol
   case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NEXT;
+
+  case '=': s--; return *s==top? T: nil;
+
+  // make sure at least safe number, correct if in bounds and all nums
+  #define NUM_MASK 0xfffe
+  case '+': top+= *s; --s; top&=NUM_MASK; NEXT;
+  case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NEXT;
+  case '-': top= *s-top; --s; top&=NUM_MASK; NEXT;
+  case '/': top= *s/top*2; --s; top&=NUM_MASK; NEXT;
+
+
+  case 'C': top= cons(*s, top); --s; NEXT;
+
+  // not so common so move down... linear probe!
+  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
+
+  case '?': if (top==*s) return 0;
+    else if (isatom(*s) && isatom(top)) return strcmp(ATOMSTR(*s), ATOMSTR(top));
+    else return mknum(*s-top); // no care type!
 
   // TODO: need a drop?
 
@@ -1885,6 +1895,8 @@ L al(char* p) {
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
   case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':case'9':
     *++s= top; top= MKNUM(*p-'0'); NEXT;
+
+  case 0: return top; // all functions should end with ^ ?
 
 // 26.82s
 //  default : ++s; *s= MKNUM(*p-'0'); NEXT; 

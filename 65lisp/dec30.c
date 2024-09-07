@@ -150,15 +150,14 @@ L readdec(char c, char base) {
     else if (isdigit(c) || (c>='a' && c<='a'+b-10)) {
       if (d>=0) m= m*b + (c<='9'? c-'0': c-'a'+10);
       else      e= e*b + c-'0';
-    } else if (c!='.') error("Illegal char in dec", NUM(c));
+    } else break;
 
     // overflow, throw away lower digit
     // (rounding w +5 isn't perfect...)
     while(((U)m) >= 0x00100000) { m+= 5; m/= 10; e++; }
 
     c= nextc();
-
-  } while(isdigit(c));
+  }
   unc(c);
   DECDEBUG(printf("dec: m=%ld d=%d e=%d -> %d\n", m, d, e, e-(abs(d)-1)));
   e-= (abs(d)-1);
