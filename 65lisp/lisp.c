@@ -1727,7 +1727,7 @@ L evalTrace(L x, L env) {
 
 // define to test...
 
-#define AL
+//#define AL
 
 #ifndef AL
   #define STACKSIZE 1

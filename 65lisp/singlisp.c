@@ -64,7 +64,7 @@
 #define MAXATOM  1024
 
 // ---------------- lisp Datatype
-typedef unsigned int D;  D nil, LAMBDA, QUOTE, T,PLUS,TIMES,CAR,CDR,CONS,EQ;
+typedef unsigned int D;  D nil, LAMBDA, QUOTE, T;
 
 D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
 
@@ -162,33 +162,39 @@ D eval(D x, D env) {
 
 D apply(D f, D x, D env) {
 //printf("APPLY: '%c'(%d)", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
-#ifndef FISH
-// cons 12.40s plus 600: 9.96s slightly faster, with more ops later...
   switch(num(car(f))) {
+  // ONE arg
+  case 'U': return x==nil? T: nil;
+  case 'K': return iscons(x)? T: nil;
+  case '#': return isnum(x)? T: nil;
+  case '!': return isatom(x)? T: nil;
+
   case 'A': return car(car(x));
   case 'D': return cdr(car(x));
+  case 'P': terpri(); // fallthrough
+  case '.': return princ(car(x));
+  case 'T': return terpri(), nil;
+
+  // TWO args
+  case ':': return car(car(x))= car(cdr(x)); // global set
   case 'C': return cons(car(x), car(cdr(x)));
   case '=': return car(x)==car(cdr(x))? T: nil;
   case '+': return car(x)+car(cdr(x));
   case '*': return car(x)/2*car(cdr(x));
+
+  // N args
   case'\\': return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
+
+  // not a primitive function
   default:  return apply(eval(f, env), x, env);
   }
-#else
-  // FASTER!!! cons 12.05s plus 600: 10.36s
-  if (f==CAR) return car(car(x));
-  if (f==CDR) return cdr(car(x));
-  if (f==CONS) return cons(car(x), car(cdr(x)));
-  if (f==EQ) return car(x)==car(cdr(x))? T: nil;
-  if (f==PLUS) return car(x)+car(cdr(x));
-  if (f==TIMES) return car(x)*car(cdr(x))/2;
-  if (f==LAMBDA) return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
-
-  return apply(eval(f, env), x, env);
-#endif
 }
 
+// tap 6681 bytes -> 6648 bytes lol intead of array of strings
+#define NAMES "\\ lambda\0' quote\0A car\0D cdr\0C cons\0+ +\0- -\0* *\0/ /\0U null\0K consp\0# number\0! atom\0= req\0: set\0P print\0. princ\0W prin1\0\0"
+
 int main(int argc, char** argv) {
+  char *np= NAMES;
   long m= 5000, i;
   D x, r;
   //m= 4921;// 4921 x cons = crash!
@@ -199,19 +205,11 @@ int main(int argc, char** argv) {
 
   C= ((Cons*)callaign(MAXCONS, 3))-1;
   nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
-  A= 1+(Atom*)nil; T= atom("T"); car(T)= T;
+  A= 1+(Atom*)nil; T= atom("T"); car(T)= T; QUOTE= atom("quote"); LAMBDA= atom("lambda");
 
-  LAMBDA= atom("lambda"); car(LAMBDA)= mknum('\\');
-  QUOTE= atom("quote"); car(QUOTE)= mknum('\'');
+  while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
 
-  // TODO: remove, by using dispatch system?
-  CAR= atom("car");   car(CAR)= mknum('A');
-  CDR= atom("cdr");   car(CDR)= mknum('D');
-  CONS= atom("cons"); car(CONS)= mknum('C');
-  EQ= atom("eq");     car(EQ)= mknum('=');
-  PLUS= atom("+");    car(PLUS)= mknum('+');
-  TIMES= atom("*");   car(TIMES)= mknum('*');
-
+  // read-eval loop
   while(!feof(stdin)) { printf("65> "); x= lread();
     for(i=m; i; --i) r= eval(x, nil);
     princ(r); terpri();
