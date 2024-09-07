@@ -161,8 +161,9 @@ D eval(D x, D env) {
 }
 
 D apply(D f, D x, D env) {
-//printf("APPLY: '%c'(%d)", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
-  switch(num(car(f))) {
+ applyagain:
+printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
+  switch(num(car(f))) { // cheap by getting global value, but faster!
   // ONE arg
   case 'U': return x==nil? T: nil;
   case 'K': return iscons(x)? T: nil;
@@ -184,10 +185,15 @@ D apply(D f, D x, D env) {
 
   // N args
   case'\\': return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
-
-  // not a primitive function
-  default:  return apply(eval(f, env), x, env);
   }
+
+  // not primitive
+  // return apply(eval(f, env), x, env);
+  if (iscons(f)) { f= eval(f, env); goto applyagain; }
+
+  // ERROR
+  printf("\n%% No such function: "); princ(f); terpri(); terpri();
+  exit(1);
 }
 
 // tap 6681 bytes -> 6648 bytes lol intead of array of strings
