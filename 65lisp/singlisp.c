@@ -44,10 +44,11 @@
 //    most likely not a legal lisp value)
 
 
-// singlisp.c: 25.52s for 2000 "caaaddddr"
 // singlisp.c: 15.14s for 2000 "caaaddddr" (no more evallist for primtives)
 // (65)lisp.c: 19.38s for 2000 ... EVAL
 // (65)lisp.c:  7.23s for 2000 ... AL/TOP
+
+//(singlisp.c: 25.52s for 2000 "caaaddddr") - OLD, not optimized
 // xxxxx (65)lisp.c:  1.03s for 2000 ... AL/TOP - erh?)) xxxx - BUG?
 
 //
