@@ -161,8 +161,9 @@ D assoc(D a, D env) {
 
 D eval(D x, D env) {
   if (x==nil || isnum(x)) return x;
-  if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(x); }// var
-//  return car(x)==QUOTE? car(cdr(x)): apply(car(x), evallist(cdr(x),env), env);
+  if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(env); }// var
+  // TODO: set?
+  if (car(x)==LAMBDA) return cons(car(car(x)), cdr(x));
   return car(x)==QUOTE? car(cdr(x)): apply(car(x), cdr(x), env);
 }
 
@@ -171,15 +172,22 @@ D apply(D f, D x, D env) {
   D a, b;
 
  applyagain:
-//printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
+//printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri();
+  if (!isnum(f) && car(f)==LAMBDA) {
+    // TODO: progn
+    //return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
+    D e= bindeval(car(cdr(f)), x, env);
+    //printf("LAMBDA: "); princ(f); printf("\nENV= "); princ(e); terpri();
+    return eval( car(cdr(cdr(f))), e);
+  }
   nf= num(car(f));
   if (!nf) { f= eval(car(f), env); goto applyagain; }
   
   // lambda, eval all args
-  if (nf=='\\') return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
 
   // ONE arg
   a= eval(car(x), env);
+  //printf("A= "); princ(a); terpri();
 
   switch(nf) {
   case 'U': return a==nil? T: nil;
@@ -196,6 +204,7 @@ D apply(D f, D x, D env) {
 
   // TWO args
   b= eval(car(cdr(x)), env); // not safe if do "again"
+  //printf("B= "); princ(b); terpri();
 
   switch(nf) {
   case ':': return car(a)= b; // global set
@@ -228,8 +237,9 @@ int main(int argc, char** argv) {
   //m= 4921;// 4921 x cons = crash!
   m= 1000;
   m= 6000; // plus, no longer create long conses...
-  m= 2000;
-//  m= 1;
+  m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s
+  //m= 3000;
+  //m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
@@ -240,7 +250,7 @@ int main(int argc, char** argv) {
   while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
 
   // read-eval loop
-  while(!feof(stdin)) { printf("65> "); x= lread();
+  while(!feof(stdin)) { printf("65> "); x= lread(); terpri();
     for(i=m; i; --i) r= eval(x, nil);
     princ(r); terpri();
   }

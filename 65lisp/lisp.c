@@ -1723,7 +1723,7 @@ L evalTrace(L x, L env) {
 // EXPERIMENTIAL BYTE CODE VM
 
 // AL: 23.728s instead of EVAL: 38.29s => 38% faster
-//   now 27.67s... why?
+//   now 27.67s... why? cons x 5000= 16.61s 
 
 // define to test...
 
@@ -1745,10 +1745,10 @@ L alvals= 0;
 //  24.47s added more oops, switch slower?
 
 // global vars during interpreation: 30 faster
-L top, *s, *frame, *params;
-char* p;
-
 L al(char* la) {
+  static L top, *s, *frame, *params;
+  static char* p;
+
   char n=0, *orig= p;
   top= nil; // global 10% faster!
   orig= p= la; // global 10% faster
