@@ -1727,7 +1727,7 @@ L evalTrace(L x, L env) {
 
 // define to test...
 
-//#define AL
+#define AL
 
 #ifndef AL
   #define STACKSIZE 1
@@ -1744,13 +1744,10 @@ L alvals= 0;
 // ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
 //  24.47s added more oops, switch slower?
 
-#define TOP
-
 // global vars during interpreation: 30 faster
 L top, *s, *frame, *params;
 char* p;
 
-#ifdef TOP
 L al(char* la) {
   char n=0, *orig= p;
   top= nil; // global 10% faster!
@@ -1909,56 +1906,6 @@ L al(char* la) {
   }
 }
 
-#else // AL TOP
-L al(char* p) {
-  if (!p) return ERROR;
-  //printf("\nAL.run: %s\n", p);
-  p--;
-
-  s= stack;
- next:
-  //assert(s<send);
-  //printf("al %c : ", p[1]); print(*s);
-
-  switch(*++p) {
-  case 0  : return *s--;
-  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
-
-  case '+': --s; *s+= s[1]; NEXT; // TODO: fix
-  case '*': --s; *s*= s[1]; *s/=2; NEXT; // TODO: fix
-  case '-': --s; *s= mknum(num(*s)-num(s[1])); NEXT;
-  case '/': --s; *s= mknum(num(*s)/num(s[1])); NEXT;
-
-  case '=': return s[0]==s[1]? T: nil;
-  case '?': if (*s==s[1]) return 0;
-    else if (isatom(*s) && isatom(s[1])) return strcmp(ATOMSTR(*s), ATOMSTR(s[1]));
-    else return mknum(*s-s[1]); // no care type!
-
-  case 'A': *s= car(*s); NEXT;
-  case 'D': *s= cdr(*s); NEXT;
-  case 'C': --s; *s= cons(*s, s[1]); NEXT;
-
-  case 'U': *s= (*s==nil)? T: nil; NEXT;    
-  case 'K': *s= (iscons(*s))? T: nil; NEXT;
-
-  case '@': *s= ATOMVAL(*s); NEXT; // same 'A' lol
-  case ',': ++s; *s= *(L*)++p; p+= sizeof(L)-1; NEXT;
-
-// 27.19s
-  case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': ++s; *s= MKNUM(*p-'0'); NEXT; 
-
-
-// 26.82s
-//  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
-
-// 30.45s
-//  default : if (isdigit(*p)) { ++s; *s= MKNUM(*p-'0'); NEXT; }
-//   printf("%% AL: illegal op '%c'\n", *p); return ERROR;
-  default:
-    printf("%% AL: illegal op '%c'\n", *p); return ERROR;
-  }
-}
-#endif TOP
 
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code

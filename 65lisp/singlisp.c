@@ -45,7 +45,11 @@
 
 
 // singlisp.c: 25.52s for 2000 "caaaddddr"
-// (65)lisp.c:  1.03s for 2000 ...
+// singlisp.c: 15.14s for 2000 "caaaddddr" (no more evallist for primtives)
+// (65)lisp.c: 19.38s for 2000 ... EVAL
+// (65)lisp.c:  7.23s for 2000 ... AL/TOP
+// xxxxx (65)lisp.c:  1.03s for 2000 ... AL/TOP - erh?)) xxxx - BUG?
+
 //
 // The main reason being: evaluation of expressions
 // do evallist that creates "garbage"
@@ -145,9 +149,9 @@ D evallist(D v, D env) {
   return v==nil? nil: cons( eval(car(v),env), evallist(cdr(v),env) );
 }
 
-D bind(D b, D v, D env) {
+D bindeval(D b, D v, D env) {
   return b==nil? nil: cons( cons( car(b), eval(car(v),env) ),
-                            bind(cdr(b), cdr(v), env) );
+                            bindeval(cdr(b), cdr(v), env) );
 }
 
 D assoc(D a, D env) {
@@ -156,43 +160,60 @@ D assoc(D a, D env) {
 
 D eval(D x, D env) {
   if (x==nil || isnum(x)) return x;
-  if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(x); }
-  return car(x)==QUOTE? car(cdr(x)): apply(car(x), evallist(cdr(x),env), env);
+  if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(x); }// var
+//  return car(x)==QUOTE? car(cdr(x)): apply(car(x), evallist(cdr(x),env), env);
+  return car(x)==QUOTE? car(cdr(x)): apply(car(x), cdr(x), env);
 }
 
 D apply(D f, D x, D env) {
+  char nf;
+  D a, b;
+
  applyagain:
-printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
-  switch(num(car(f))) { // cheap by getting global value, but faster!
+//printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); terpri();
+  nf= num(car(f));
+  if (!nf) { f= eval(car(f), env); goto applyagain; }
+  
+  // lambda, eval all args
+  if (nf=='\\') return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
+
   // ONE arg
-  case 'U': return x==nil? T: nil;
-  case 'K': return iscons(x)? T: nil;
-  case '#': return isnum(x)? T: nil;
-  case '!': return isatom(x)? T: nil;
+  a= eval(car(x), env);
 
-  case 'A': return car(car(x));
-  case 'D': return cdr(car(x));
+  switch(nf) {
+  case 'U': return a==nil? T: nil;
+  case 'K': return iscons(a)? T: nil;
+  case '#': return isnum(a)? T: nil;
+  case '!': return isatom(a)? T: nil;
+
+  case 'A': return car(a);
+  case 'D': return cdr(a);
   case 'P': terpri(); // fallthrough
-  case '.': return princ(car(x));
-  case 'T': return terpri(), nil;
-
-  // TWO args
-  case ':': return car(car(x))= car(cdr(x)); // global set
-  case 'C': return cons(car(x), car(cdr(x)));
-  case '=': return car(x)==car(cdr(x))? T: nil;
-  case '+': return car(x)+car(cdr(x));
-  case '*': return car(x)/2*car(cdr(x));
-
-  // N args
-  case'\\': return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
+  case '.': return princ(a);
+  case 'T': return terpri(), nil; // zero arg
   }
 
-  // not primitive
+  // TWO args
+  b= eval(car(cdr(x)), env); // not safe if do "again"
+
+  switch(nf) {
+  case ':': return car(a)= b; // global set
+  case 'C': return cons(a, b);
+  case '=': return a==b? T: nil;
+  case '+': return a+b;
+  case '*': return a/2*b;
+
+  // N args - lambda
+  // see above
+  //  case'\\': return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
+  }
+
+  // not primitive, what could it be?
   // return apply(eval(f, env), x, env);
-  if (iscons(f)) { f= eval(f, env); goto applyagain; }
+  //if (iscons(f)) { f= eval(f, env); goto applyagain; }
 
   // ERROR
-  printf("\n%% No such function: "); princ(f); terpri(); terpri();
+  printf("\n%% No such function: "); princ(f); putchar(' '); princ(x); terpri(); terpri();
   exit(1);
 }
 
@@ -205,7 +226,9 @@ int main(int argc, char** argv) {
   D x, r;
   //m= 4921;// 4921 x cons = crash!
   m= 1000;
-  m= 600; // plus
+  m= 6000; // plus, no longer create long conses...
+  m= 2000;
+//  m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
