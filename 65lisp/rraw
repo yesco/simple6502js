@@ -30,8 +30,8 @@ cl65 -O -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 cl65 -O -t atmos $name.c -o $name.tap || exit 72
 
 echo 
-cl65 -O -t atmos $name.c -o $name.out 2>/dev/null
-cc65 -O -T $name.c -o $name.out 2>/dev/null # generate .s file
+#cl65 -O -t atmos $name.c -o $name.out 2>/dev/null
+#cc65 -O -T $name.c -o $name.out 2>/dev/null # generate .s file
 
 echo
 ls -l $name.o $name.out $name.tap
@@ -57,6 +57,8 @@ grep '^Name' $name.map
 grep '^CODE' $name.map
 grep '^RODATA' $name.map
 grep '^DATA' $name.map
+echo
+echo "`./wcode $name.c ` LOC of LISP  C-code (wc: `wc $name.c`)"
 echo
 echo "`./wcode lisp.c ` LOC of LISP  C-code (wc: `wc lisp.c`)"
 echo "`./wcode dec30.c` LOC of DEC30 C-code (wc: `wc dec30.c`)"
