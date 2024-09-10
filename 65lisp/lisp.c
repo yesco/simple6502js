@@ -1,3 +1,9 @@
+// WARNING: this file is in complete flux,
+// as it's being EXPERIMENTED ON
+//
+// ...
+
+
 // 65LISP02 - an lisp interpeter for 6502 (oric)
 
 // An highly efficent and optimized lisp for the 6502.
@@ -236,7 +242,7 @@ char firstbss;
 #define TRACE(x)
 
 // comment to enable EVAL TRACE
-#define ETRACE(x) ;
+//#define ETRACE(x) ;
 
 
 // ---------------- CONFIG
@@ -529,8 +535,8 @@ L cons(L a, L d) {
 
 // returning nil is faster than 0! (1%)
 L car(L c)         { return iscons(c)? CAR(c): nil; }
-L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L cdr(L c)         { return iscons(c)? CDR(c): nil; }
+L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
 
 // --- Atoms / Symbols / Constants
@@ -550,7 +556,6 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
 //  c) HASH:    need linked list anyway...
 
 typedef struct Atom {
-  // TODO: move val to first pos...
   // - val first saves 40 bytes code
   // - but not faster, 0.01% slower...?
   // echo "foo" | ./run -t ==> 0.01% faster LOL
@@ -573,9 +578,7 @@ char hash(char* s) {
 // Arena - simple for now
 char* arena, *arptr, *arend;
 
-char isatomchar(char c) { //test for non-chars
-  return (char)(int)!strchr(" \t\n\r.;`'\"()[]{}", c);
-}
+char isatomchar(char c) { return (char)(int)!strchr(" \t\n\r.;`'\"()[]{}", c); }
 
 //  57 bytes extra for ptr % 3 ==  01
 // 141 bytes extra for ptr % 7 == 101
@@ -583,7 +586,6 @@ char isatomchar(char c) { //test for non-chars
 // TODO: really should be named issym()
 //   number is an atom, lol
 #define isatom(x) (((x)&3)==1) 
-//#define isatom(x) (((x)&7)==(4+1)) // HEAP align 101
 
 #define ATOMSTR(a) (((Atom*)a)->name)
 #define ATOMVAL(x) (((Atom*)x)->val)
@@ -599,57 +601,6 @@ L setatomval(L x, L v) {
   if (null(x) || !isatom(x)) return nil;
   return ATOMVAL(x)= v;
 }
-
-#define PRINTARENA() ;
-#ifndef PRINTARENA
-  #define PRINTARENA printarena
-
-void printarena() {
-  
-  char* a= arena;
-  printf("ARENA: ");
-  while(a<arptr) {
-    if (*a==HATOM) NL;
-    if (*a==' ') printf("_  ");
-    else if (*a>' ' && *a<127) printf(" %c ", *a);
-    else printf("%X%X ", (*a)>>4, (*a)&0xf);
-    ++a;
-  }
-  putchar('\n');
-}
-
-// search arena, this could save next link...
-// TODO: won't work, as aligned ptr now
-void* searchatom2(char* s) {
-  char* a= arena;
-  a= arena;
-  // TODO: more efficient
-  while(*s && a<arptr) {
-    if (0==strcmp(s, a+4)) return a;
-    a+= 4+1+strlen(a+4); // TODO: should be 1???
-  }
-  return NULL;
-}
-
-// slower, lol!
-// TODO: won't work, as aligned ptr now
-void* searchatom(char* s) {
-  char *a= arena, *p, *aa;
-  while(a<arptr) {
-    aa= a;
-    a+= 4;
-    p= s;
-    //printf("\t%d '%s'\n", aa-arena, a);
-    while(*a && *a==*p) {
-      ++p; ++a;
-    }
-    if (!*a && *a==*p) return aa;
-    while(*a) ++a;
-    ++a;
-  }
-  return NULL;
-}
-#endif // PRINTARENA
 
 // search linked list
 Atom* findatom(Atom* a, char* s, unsigned char typ) {
@@ -678,38 +629,34 @@ L atomstr(char* s, unsigned char typ) {
   Atom *a;
 
   h= hash(s) & (HASH-1);
-  //p= searchatom(s);  // slower 24s for 4x150.words
-  //p= searchatom2(s); // slower 32s for 4x150.words
   a= findatom((Atom*)syms[h], s, typ); // fast 14s for 4x150.words
-  if (!a) {
-    // create atom
-    ++natoms;
+  if (a) return (L)a;
 
-    // WHATIF: heap object x01, point at attr value
-    //    char type;
-    // -> L val;
+  // create atom
+  ++natoms;
 
-    // put type byte "before" pointer
-    do {
-      *arptr++= typ; // HTYP
-      // align as: not cons: == x01
-      //   (filling with extra type info, lol)
-    } while (!isatom((L)arptr));
+  // WHATIF: heap object x01, point at attr value
+  //    char type;
+  // -> L val;
 
-    a= (Atom*)arptr;
-    arptr+= sizeof(Atom)+strlen(s)+1;
-    // TODO: better test? LOL this crashes
-    assert(arptr<=arend);
+  // put type byte "before" pointer, and align
+  do {
+    *arptr++= typ; // HTYP
+  } while (!isatom((L)arptr));
 
-    // CAR len if str!/arra
-    a->val= typ==HSTRING? MKNUM(strlen(s)): 0;
-    // copy name
-    strcpy(a->name, s);
-    // CDR link it up
-    // TODO: add specific cdr? could be the maxsize for array?
-    a->next= (Atom*)(syms[h]);
-    syms[h]= (L)a;
-  }
+  a= (Atom*)arptr;
+  arptr+= sizeof(Atom)+strlen(s)+1;
+  // TODO: better test? LOL this crashes
+  assert(arptr<=arend);
+
+  // CAR len if str!/arra
+  a->val= typ==HSTRING? MKNUM(strlen(s)): 0;
+  // copy name
+  strcpy(a->name, s);
+  // CDR link it up
+  // TODO: add specific cdr? could be the maxsize for array?
+  a->next= (Atom*)(syms[h]);
+  syms[h]= (L)a;
 
   // -- but 120 bytes more storage used
   // 41.47s ret actual pointer FASTER: 5.2%, BYTES; -120b !!
@@ -742,7 +689,7 @@ L mkstr(char* s) { return atomstr(s, HSTRING); }
 // one bit per cell[]
 char* cused;
 
-#define BIT(arr, n) (((arr)[(n)/8])&(1<<((n)&7)))
+#define USED(arr, n) (((arr)[(n)/8])&(1<<((n)&7)))
 
 char gcdeep= 0;
 
@@ -760,6 +707,8 @@ void printmap() {
   printf("\n");
 }
 
+// mark object at a
+// TODO: recursive, can run out of stack... reverse pointer?
 void mark(L a) {
   // TODO: BUG: somehow, 42 doesn't get marked. It's the CDR
   // yeah, it's on a non cons address, but the addition
@@ -771,7 +720,7 @@ void mark(L a) {
   if (isnum(a)) return;
 
   DEBUG(printf("\n=>MARK: %d ", ((L*)a)-cstart); prin1(a); NL);
-
+  
   ++nmark;
   if (iscons(a)) {
     // TODO: measure cost of extra vars?
@@ -781,7 +730,7 @@ void mark(L a) {
 
     // TODO: what's the maxdepth? check w stack option
     //   then, limit it, but link to "next" TODO...
-    //if (BIT(cused, n)) return;
+    //if (USED(cused, n)) return;
 
     ++gcdeep;
     DEBUG(printf(" [%d/MARK: %d]", gcdeep, n); princ(a); putchar(' '));
@@ -872,7 +821,7 @@ void GC(L env, L alvals) {
 // next character, buffer for unc()
 int _nc= 0;
 
-// read from string
+// read from string if set
 char* _rs= 0;
 
 // ungetc
@@ -881,7 +830,6 @@ void unc(char c) {
   _nc= c;
 }
 
-//char nextcx() {
 char nextc() {
   int r;
   if (_nc) { r= _nc; _nc= 0; }
@@ -891,13 +839,8 @@ char nextc() {
   return r>=0? r: 0;
 }
 
-//char nextc() {
-//  char c= nextcx();
-//  printf("NEXTC: '%c' (%d)\n", c, c);
-//  return c;
-//}
-
-char spc() {
+// skip spaces, return next char
+char skipspc() {
   char c= nextc();
   while (c && isspace(c)) c= nextc();
   return c;
@@ -924,7 +867,7 @@ L lread(); // forward
 // read a list of type: '(' '{' '['
 L lreadlist(char t) {
   L r;
-  char c= spc();
+  char c= skipspc();
   if (!c || c==')' || c=='}' || c==']') return nil;
   unc(c);
   r= lread();
@@ -936,14 +879,15 @@ L lreadlist(char t) {
 // TODO: maybe 1,2,3= (1 2 3) ? implicit by comma?
 L lread() {
   // TODO: skip single "," for more insert nil? [1 2,3 ,, 5]
-  char c= spc(), q= 0;
+  char c= skipspc(), q= 0;
   if (!c) return eof;
   if (c=='(' || c=='{' || c=='[') return lreadlist(c);
 
-#ifdef DEC
-  // TODO: base prefixes...
-  if (isdigit(c)) return readdec(c, 10);
-#else
+  #ifdef DEC
+    // TODO: base prefixes...
+    if (isdigit(c)) return readdec(c, 10);
+  #else
+
   if (isdigit(c)) { // number
     // TODO: negative numbers... large numbers? bignum?
     int n= 0;
@@ -963,7 +907,6 @@ L lread() {
     char n= 0, s[MAXSYMLEN+1]= {0};
     if (q) c= nextc();
     do {
-      // TODO: handle \t \n \r \e \007 ???
       if (c=='\\') { char *s;
         c= nextc();
         s= strchr("t\tn\nr\re", c);
@@ -971,8 +914,8 @@ L lread() {
       }
       s[n]= c; ++n;
       c= nextc();
-      // TODO: breaking chars: <spc>'"()
     } while(c && ((q && c!=q) || (!q && isatomchar(c))) && n<MAXSYMLEN);
+    // TODO: if run out of length, will read garbage - fix
     if (!q) unc(c);
     return q=='"'? mkstr(s): atom(s);
   }
@@ -983,16 +926,6 @@ L lread() {
   return ERROR;
 }
 
-#ifdef FOO
-// Read from string, gives *EOF* internally until pointer reset;
-L lreads(char* x) {
-  char* saved= _rs; L r; // could be recursive?
-  _rs= x; r= lread();
-  _rs= saved;
-  return r;
-}
-#endif
-
 // print unquoted value without space before/after
 //   no quotes for strings, except inside list? hmmm
 L princ(L x) {
@@ -1002,23 +935,20 @@ L princ(L x) {
   else if (isnum(x)) printf("%d", num(x));
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) printf("%s", ATOMSTR(x));
-  else if (iscons(x)) { // printlist
+  else if (iscons(x)) {
 
+    // speical case of (num . num) if DEC!
     #ifdef DEC
     if (isdec(x)) { dputf((dec30*)x); return x; }
     #endif // DEC
 
-    putchar('(');
-    do {
-      princ(car(i));
-      i= cdr(i);
-      if (notnull(i)) putchar(' ');
-    } while (notnull(i) && iscons(i));
-    if (notnull(i)) {
-      printf(". ");
-      princ(i);
+    // printlist
+    for(putchar('('); ; putchar(' ')) {
+      princ(car(i)); i= cdr(i); if (!iscons(i)) break;
     }
+    if (notnull(i)) { printf(" . "); princ(i); }
     putchar(')');
+
   } else printf("LISP: Unknown data %04x\n", x);
   return x;
 }
@@ -1026,41 +956,33 @@ L princ(L x) {
 // TODO: supposed to print in readable format:
 //   quote strings, and |atom w spaces|
 L prin1(L x) {
-  L r; char str= ISSTR(x);
-  if (str) putchar('"');
-  r= princ(x);
-  if (str) putchar('"');
-  return r;
+  return !ISSTR(x)? princ(x): (printf("\"%s\"", ATOMSTR(x)), x);
 }
 
 //void prinx(L x) { printf("#%04u", (num)x); } 
 
-// LOL: emacs-lisp does "\n$x\n" !!!
-L print(L x) {
-  NL; // lol,always though it was after..
-  return prin1(x);
-}
+L print(L x) { NL; return prin1(x); }
 
-#define PRINTARRAY(a,b,c,d) ; 
-#ifndef PRINTARRAY
-  #define PRINTARRAY printarray
+#define PRINTARRAY(a,b,c,d) ; // debug
+#ifndef PRINTARRAY // debug
+  #define PRINTARRAY printarray // debug
 
-void printarray(L* arr, int n, char printnil, char ishash) {
-  int i;
-  // just print symbols per slot
-  for(i=0; i<n; ++i) {
-    L a= arr[i];
-    if (!printnil && (a==nil || !a)) continue;
-    printf("\n%2d: ", i);
-    while (a && a!=nil) {
-      princ(a); putchar(' ');
-      if (!ishash) break;
-      a= (L)(((Atom*)a)->next);
-    }
-  }
-  NL;
-}
-#endif // PRINTARRAY
+void printarray(L* arr, int n, char printnil, char ishash) { // debug
+  int i; // debug
+  // just print symbols per slot // debug
+  for(i=0; i<n; ++i) { // debug
+    L a= arr[i]; // debug
+    if (!printnil && (a==nil || !a)) continue; // debug
+    printf("\n%2d: ", i); // debug
+    while (a && a!=nil) { // debug
+      princ(a); putchar(' '); // debug
+      if (!ishash) break; // debug
+      a= (L)(((Atom*)a)->next); // debug
+    } // debug
+  } // debug
+  NL; // debug
+} // debug
+#endif // PRINTARRAY // debug
 
 // TODO: instead of a "format" do my own "printf"
 
@@ -1069,6 +991,7 @@ void printarray(L* arr, int n, char printnil, char ishash) {
 //   %Q - use prin1 for value (quote strings/atoms)
 //   %F - flatten TODO: don't print () of list
 // Returns a list of objects
+// TODO: use? 'F' - Format printF
 void lprintf(char* f, L a) {
   L x;
   do {
@@ -1097,110 +1020,16 @@ void error(char* msg, L a) {
 // ---------------- Variables
 
 L assoc(L x, L l) {
-  L p;
-  while(iscons(l)) {
-    p= CAR(l);
-    if (car(p)==x) return p;
-    l= CDR(l);
-  }
-  return nil;
+  while(iscons(l)) if (car(CAR(l))==x) return CAR(l); else l= CDR(l);  return l;
 }
 
 L setval(L x, L v, L e) {
   L p= e? assoc(x, e): nil;
-  //printf("SETVAL: "); prin1(x); putchar(' '); prin1(v); NL;
   if (notnull(p)) return setcdr(p, v);
   // TODO: optimize? as assoc() call is expensive (e==nil)
   return setatomval(x, v); // GLOBAL
 }
 
-// TODO: get rid of?
-// only should be used in eval?
-//
-// might as well use eval(x, e) !!!
-
-#ifdef notused
-// inlined in eval, just eval atom X instead?
-L getval(L x, L e) {
-//  L p;
-  L p= assoc(x, e);
-  return null(p)? atomval(x): cdr(p);
-
-#ifdef foo
-  // inline assoc (/ 5.29 6.21) => 14.8% faster
-  while(iscons(e)) {
-    p= CAR(e);
-    if (car(p)==x) break;
-    e= CDR(e);
-  }
-
-  return iscons(e)? cdr(p): atomval(x);
-#endif // foo
-}
-#endif // notused
-
-
-// ---------------- ARRAY / VECTOR
-
-#ifdef ARRAY
-
-// unsafe, eval twice, lol
-#define ISARR(x) (isatom(x)&&HTYP(x)==HARRAY)
-
-#define ARROFF 3
-#define ARRSTEP 16
-
-L mkarr(L dim, L val) {
-  size_t n= num(dim);
-  size_t bytes= (n+ARROFF)*sizeof(L), i;
-  char *p= zalloc(bytes+4), *orig= p;
-  L* a;
-  if (n==0) n= ARRSTEP;
-  if (!isnum(dim)) error("Array dimensions", dim);
-
-  do {
-    *p++= HARRAY;
-  } while(!isatom((L)p));
-  a= (L*)p;
-
-  *a++ = MKNUM(0); // 1. CAR = length
-  *a++ = MKNUM(n); // 2. CDR = size
-  *a++ = (L)orig; // 3. save orig mem ptr
-
-  // fill
-  for(i= ARROFF; i<n+ARROFF; ++i) *a++ = val;
-
-  return (L)p;
-}
-
-void arrfree(L arr) {
-  if (!ISARR(arr)) error("Not array", arr);
-  HTYP(arr)= HFREE;
-  free((char*)((L*)arr)[2]);
-}
-
-L arrpush(L arr, L val) {
-  L* a= (L*)arr; int n, z;
-  if (!ISARR(arr)) error("Not array", arr);
-  n= a[0];
-  z= a[1];
-  n+= 2; // LOL inc num:1 !
-  // TODO: groiw
-  if (n>=z) error("Array full", arr);
-  a[0]= n;
-  return *(L*)(ARROFF-2+arr+n)= val;
-}
-
-L arrpop(L arr) {
-  L* a= (L*)arr; int n;
-  if (!ISARR(arr)) error("Not array", arr);
-  n= a[0]-2; // LOL dec. num:1 !
-  if (n<=0) error("Array empty", arr);
-  a[0]= n;
-  return *(L*)(ARROFF+2+arr+n);
-}
-
-#endif // ARRAY
 
 // ---------------- Lisp Functions
 
@@ -1210,6 +1039,7 @@ L arrpop(L arr) {
   #define ETRACERUN
   #define ETRACE(x) do { x; } while(0)
   #define eval(a,b) evalTrace(a,b)
+
 int ind= 0;
 void indent() {
   int i;
@@ -1217,27 +1047,21 @@ void indent() {
 }
 
 L eval(L,L);
+
 #else
+
 L evalX(L,L);
   #define eval(a,b) evalX(a,b)
   #define indent() ;
+
 #endif // ETRACE
 
-//L apply(L f, L a, L e); // forward
+L de(L args) { return args?ERROR:ERROR; } // TODO:
+L df(L args) { return args?ERROR:ERROR; } // TODO:
+L evalappend(L args) { return args?ERROR:ERROR; } // TODO:
 
-L de(L args) {
-  //assert(!"NIY: de");
-  return args?ERROR:ERROR;
-}
 
-L df(L args) {
-  //assert(!"NIY: df");
-  return args?ERROR:ERROR;
-}
-
-// TODO: progn?
-
-// tailrecursion?
+// TODO: tailrecursion?
 L iff(L args, L env) {
   if (null(eval(car(args), env)))
     return eval(car(cdr(cdr(args))),env);
@@ -1249,36 +1073,26 @@ L evallist(L args, L env) {
   return iscons(args)? cons(eval(CAR(args),env), evallist(CDR(args),env)): nil;
 }
 
-L evalappend(L args) {
-  //assert(!"NIY: append");
-  return args?ERROR:ERROR;
-}
-
 L length(L a) {
   int n= 0;
   if (ISSTR(a)) return CAR(a);
-  while(iscons(a)) {
-    ++n;
-    a= CDR(a);
-  }
+  while(iscons(a)) ++n,a= CDR(a);
   return mknum(n);
 }
 
 L member(L x, L l) {
-  while(iscons(l)) if (CAR(x)==x) return l;
-  return l;
+  while(iscons(l)) if (CAR(l)==x) return l; else l= CDR(l);  return l;
 }
 
 L mapcar(L f, L l) {
   return f&&l&&l?ERROR:ERROR;
 // TODO: lol, how to do without apply?
-//  return (null(l) || !iscons(l))? nil:
+  /// create and modify a special allocate cons!
 //    cons(apply(f, CAR(l), nil), mapcar(f, CDR(l)));
 }
   
 // TODO: nthcdr
-L nth(L n, L l) {
-  n= num(n);
+L nth(L n, L l) { n= num(n);
   while(--n >= 0) if (!iscons(l)) return nil; else l= CDR(l);
   return CAR(l);
 }
@@ -1727,7 +1541,7 @@ L evalTrace(L x, L env) {
 
 // define to test...
 
-//#define AL
+#define AL
 
 #ifndef AL
   #define STACKSIZE 1
@@ -1738,6 +1552,7 @@ L evalTrace(L x, L env) {
 L stack[STACKSIZE]= {0}, *s= stack, *send;
 L alvals= 0;
 
+
 #ifdef AL
 #define NEXT goto next
 
@@ -1745,11 +1560,44 @@ L alvals= 0;
 //  24.47s added more oops, switch slower?
 
 // global vars during interpreation: 30 faster
-L al(char* la) {
-  static L top, *s, *frame, *params;
-  static char* p;
+static L top, *frame, *params;
+static char* p;
 
-  char n=0, *orig= p;
+void fcar();
+void fcdr();
+
+// ignore JMP usage, uncomment to activate
+//#define JMP(a) 
+
+static char c;
+
+L al(char* la) {
+#ifndef JMP
+  static void* jmp[127]= {(void*)(int*)42,0};
+#endif
+   char n=0, *orig;
+
+#ifndef JMP
+  #define JMP(a) a:
+  if (*((int*)jmp)==42) {
+    printf("FOURTYTWO\n");
+    memset(jmp, (int)&&gerr, sizeof(jmp));
+    
+    jmp[0]=&&g0;
+
+    jmp['A']=&&gA; jmp['D']=&&gD; jmp['U']=&&gU; jmp['K']=&&gK; jmp['@']=&&gat; jmp[',']=&&gcomma; jmp['C']=&&gC;
+    jmp['+']=&&gadd; jmp['*']=&&gmul; jmp['-']=&&gsub;
+    jmp['/']=&&gdiv; jmp['=']=&&geq;
+    jmp['?']=&&gcmp;
+    jmp['P']=&&gP;
+
+    for(c='0'; c<='9'; ++c) jmp[c]= &&gdigit;
+    for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
+
+    jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
+  }
+#endif // JMP
+
   top= nil; // global 10% faster!
   orig= p= la; // global 10% faster
   s= stack-1; frame= s; params= s; // global yet 10% faster!!!
@@ -1788,42 +1636,53 @@ L al(char* la) {
   if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
  next:
   //assert(s<send);
-  //if (verbose) { printf("al %c : ", p[1]); prin1(*s); NL; }
+  // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
+  //if (verbose) { printf("al %c : ", p[1]); prin1(top); NL; }
+
+  // caaadrr x5K => 17.01s ! faster than function call
+
+// we want to do this to get ultimiate speed... but  it crashes!
+
+#define NNEXT c=*++p;goto *jmp[c]
+
+  // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
+  NNEXT;
 
   switch(*++p) {
-  // inline AD cons-test: 14% faster, 2.96s with isnum,
+
+  // inline AD cons-test: 14% faster, 2.96s with isnum => safe,
   // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
-  case 'A': top= isnum(top)? nil: CAR(top); NEXT;
-  case 'D': top= isnum(top)? nil: CDR(top); NEXT;
+JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); NNEXT;
+JMP(gD)case 'D': top= isnum(top)? nil: CDR(top); NNEXT;
 
-  case 'U': top= (top==nil)? T: nil; NEXT;    
-  case 'K': top= (iscons(top))? T: nil; NEXT;
+JMP(gU)case 'U': top= (top==nil)? T: nil; NNEXT;
+JMP(gK)case 'K': top= (iscons(top))? T: nil; NNEXT;
 
-  case '@': top= ATOMVAL(top); NEXT; // same car 'A' lol
-  case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NEXT;
+JMP(gat)case '@': top= ATOMVAL(top); NNEXT; // same car 'A' lol
+JMP(gcomma)case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NNEXT;
 
-  case '=': s--; return *s==top? T: nil;
+JMP(geq)case '=': s--; return *s==top? T: nil;
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
-  case '+': top+= *s; --s; top&=NUM_MASK; NEXT;
-  case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NEXT;
-  case '-': top= *s-top; --s; top&=NUM_MASK; NEXT;
-  case '/': top= *s/top*2; --s; top&=NUM_MASK; NEXT;
+JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; NNEXT;
+JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NNEXT;
+JMP(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; NNEXT;
+JMP(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; NNEXT;
 
+JMP(gC)case 'C': top= cons(*s, top); --s; NNEXT;
 
-  case 'C': top= cons(*s, top); --s; NEXT;
-
+JMP(gbl)
   // not so common so move down... linear probe!
-  case ' ': case '\t': case '\n': case '\r': case 12: goto next;
+  case ' ': case '\t': case '\n': case '\r': case 12: NNEXT; // TODO: NNEXT loops forever?
 
-  case '?': if (top==*s) return 0;
-    else if (isatom(*s) && isatom(top)) return strcmp(ATOMSTR(*s), ATOMSTR(top));
-    else return mknum(*s-top); // no care type!
+JMP(gcmp)
+  case '?': top= top==*s? MKNUM(0): (isatom(*s)&&isatom(top))?
+      mknum(strcmp(ATOMSTR(*s), ATOMSTR(top))): mknum(*s-top); NNEXT; // no care type!
 
   // TODO: need a drop?
 
-  case 'P': print(top); NEXT;
+JMP(gP)case 'P': print(top); NNEXT;
 
   // calling user compiled AL or normal lisp
 
@@ -1833,18 +1692,18 @@ L al(char* la) {
   //stack  : ... <new a> <new b> <new c> (@new frame) <old frame> <old orig> <old p> ... | call in top
   //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
 
-  case'\\': n=0; frame=s; while(*p=='\\'){p++;n++;frame--;} NEXT; // lambda \\\ = \abc (TODO)
+  case'\\': n=0; frame=s; while(*p=='\\'){p++;n++;frame--;} NNEXT; // lambda \\\ = \abc (TODO)
   case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig+n; goto call;
   case 'X': // "apply" TODO: if X^ make tail-call
     // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
     // or fixed:                     \ a3<I{a^}{a a1= ,PPX  *^}^
     *++s=(L)frame; *++s=(L)orig; *++s=(L)p; *++s=(L)n; // PARAM_OFF
     frame= s; p= orig= ATOMSTR(top); n= 0; goto call;
-  case '^': n=(L)*s--; p=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NEXT;
+  case '^': n=(L)*s--; p=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
     // top contains result! no need copy
   // parameter a-h (warning need others for local let vars!)
   case 'a':case'b':case'c':case'd':case e':case'f':case'g':case'h':
-    *s++= top; top= frame[*p-('a'-PARAM_OFF)]; NEXT;
+    *s++= top; top= frame[*p-('a'-PARAM_OFF)]; NNEXT;
 
 #endif // CALLONE
 
@@ -1860,7 +1719,7 @@ L al(char* la) {
   //          @)=     | call in top
   // return :  
 
-  case'\\': n=0; while(*++p=='\\')++n; --p; NEXT; // lambda \\\ = \abc (TODO)
+  case'\\': n=0; while(*++p=='\\')++n; --p; NNEXT; // lambda \\\ = \abc (TODO)
   case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig; goto call; // TOOD: p= orig+n ???
   case '(': { L* newframe= frame;
       *++s=(L)frame;
@@ -1869,7 +1728,9 @@ L al(char* la) {
       //*++s=(L)n; // TODO: save s ???
       *++s=(L)n; // save stack pointer
 
-      frame= newframe; NEXT; }
+      frame= newframe; NNEXT; } // TODO: NNEXT dumps core?
+
+
   case ')': // "apply" TODO: if X^ make tail-call, top == address
     p= orig= ATOMSTR(top); goto call;
 
@@ -1884,15 +1745,18 @@ L al(char* la) {
     // top contains result! no need copy
 
   // parameter a-h
+JMP(gvar)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= params[*p-'a']; NEXT;
+    *s++= top; top= params[*p-'a']; NNEXT;
 
 #endif // CALLTWO
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
+JMP(gdigit)
   case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':case'9':
-    *++s= top; top= MKNUM(*p-'0'); NEXT;
+    *++s= top; top= MKNUM(*p-'0'); NNEXT;
 
+JMP(g0)
   case 0: return top; // all functions should end with ^ ?
 
 // 26.82s
@@ -1901,7 +1765,7 @@ L al(char* la) {
 // 30.45s
 //  default : if (isdigit(*p)) { ++s; *s= MKNUM(*p-'0'); NEXT; }
 //   printf("%% AL: illegal op '%c'\n", *p); return ERROR;
-  default:
+JMP(gerr)default:
     printf("%% AL: illegal op '%c'\n", *p); return ERROR;
   }
 }
@@ -1913,6 +1777,7 @@ L al(char* la) {
 
 char* alcompile(char* p) {
  char c, extra= 0; int n= 0; L x= 0, f;
+ 
 
  again:
   switch((c=nextc())) {
@@ -1931,7 +1796,7 @@ char* alcompile(char* p) {
   // TODO: function call... of lisp
   case '(': 
     // detmine function, try get a number
-    //spc();
+    //skipspc();
     f= nextc(); unc(f); // peek
     if (f=='(') return NULL; // TODO: ,..X inline lambda?
     x= lread();
@@ -2046,6 +1911,10 @@ char* names[]= {
   "N nth",
 
   "R rec", // recurse on self
+
+  "Y y",
+  "y yy",
+  "Z z", 
   NULL};
 
 void initlisp() {
@@ -2264,8 +2133,7 @@ int mainmain(int argc, char** argv, void* main) {
   if (!quiet && bench==1) clrscr(); // || only if interactive?
 
   if (!quiet) {
-    PRINTARRAY(syms, HASH, 0, 1);
-    PRINTARENA();
+    PRINTARRAY(syms, HASH, 0, 1); // debug
 
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
   }

@@ -1,3 +1,9 @@
+// WARNING: this file is in complete flux,
+// as it's being EXPERIMENTED ON
+//
+// ...
+
+
 // A 6502 lisp from Hackware presentation in Singapore
 // (>) 2024 Jonas S Karlsson
 
@@ -109,12 +115,13 @@ void terpri() { putchar('\n'); }
 D princ(D x) { if (x==nil) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
   else if (isatom(x)) printf("%s", ((Atom*)x)->str);
-  else { putchar('('); while(iscons(x)) {
-      princ(car(x)); x= cdr(x); if (iscons(x)) putchar(' ');
+  else { for (putchar('(');;putchar' ') {
+      princ(car(x)); x= cdr(x); if (!iscons(x)) break;
     }
-    if (!iscons(x) && x!=nil) { printf(" . "); princ(x); }
+    if (notnul(x)) { printf(" . "); princ(x); }
     putchar(')');
   }  
+
   return x;
 }
 
@@ -160,10 +167,12 @@ D assoc(D a, D env) {
 }
 
 D eval(D x, D env) {
+printf("EVAL: "); princ(x); printf(" ENV= "); princ(env); terpri();
   if (x==nil || isnum(x)) return x;
   if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(env); }// var
   // TODO: set?
-  if (car(x)==LAMBDA) return cons(car(car(x)), cdr(x));
+  //if (car(x)==LAMBDA) return cons(car(car(x)), cdr(x));
+  //if (car(x)==LAMBDA) return cons( cons(car(car(x)), cdr(x)), env );
   return car(x)==QUOTE? car(cdr(x)): apply(car(x), cdr(x), env);
 }
 
@@ -172,7 +181,7 @@ D apply(D f, D x, D env) {
   D a, b;
 
  applyagain:
-//printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri();
+printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri();
   if (!isnum(f) && car(f)==LAMBDA) {
     // TODO: progn
     //return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
@@ -237,9 +246,9 @@ int main(int argc, char** argv) {
   //m= 4921;// 4921 x cons = crash!
   m= 1000;
   m= 6000; // plus, no longer create long conses...
-  m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s
+  m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s, but it no closures...
   //m= 3000;
-  //m= 1;
+  m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
