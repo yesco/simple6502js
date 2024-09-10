@@ -17,7 +17,12 @@
 //
 //   Backspace - del previous char
 //   CTRL-D    - del next char
-
+//
+//   CTRL-O    - insert line before cursor (\n CTRL-B)
+//
+//   CTRL-K    - kill (cut till end of line, or on end, cut end)
+//   CTRL-Y    - Yank all cuttings stored
+//   CTRL-G    - clear yank buffer
 //
 // Features:
 // - keep x-position of previous row when go up/down
@@ -38,14 +43,23 @@
 
 // TODO: resize
 void edit(char* e, size_t len) {
-  char *p= e, *cur= e, *sl, *el, k;
-  int x= 0;
+  char *p= e, *cur= e, *sl, *el, *last= e+len-1, k;
+  int x= 0, yank= 0;
+  *last= 0; // end used as yank buffer
   do {
     // update screen
     clrscr();
     if (cur!=e) printf("%.*s", cur-e, e);
     printf("[s"); // save cursor
     if (cur<e+len) printf("%s<<<\n", cur);
+    if (*last) {
+      // show yank buffer if not empty
+      printf("\n\nYANK>>>");
+      p= last; yank= 0;
+      while(*p) putchar(*p--),yank++;
+      printf("<<<\n");
+    }
+    //printf("\n: cur=%d len=%d yank=%d size=%d\n", cur-e, strlen(e), yank, len);
     printf("[u"); // restore
 
     // start of line
@@ -74,10 +88,24 @@ void edit(char* e, size_t len) {
     // exit/other
     case CTRL+'C': case CTRL+'X': return;
 
+    // cut and paste (CTRL-K and CTTRL-Yank)
+    // TODO: erm code ugly...
+    // TODO: CTRL-K on '(' will cut only till matching ')' !
+    case CTRL+'K': if (*cur) do {
+          k= *cur; memmove(cur, cur+1, e+len-cur-1); *last= k;
+        } while(*cur && *cur!='\n' && k!='\n'); break;
+    case CTRL+'Y': if (strlen(e)+2*yank>len-5) break; // safe
+      p= last; while(*p) {
+        k= *p--; memmove(cur+1, cur, strlen(cur)+1); *cur= k;
+      } break;
+    case CTRL+'G': memset(e+strlen(e), 0, len-strlen(e)); break;
+
     // edit
     case CTRL+'H': case 127: if (cur>e) memmove(cur-1, cur, e+len-cur); --cur; break;
-    case CTRL+'D': memmove(cur, cur+1, e+len-cur+1); break;
-    default: memmove(cur+1, cur, e+len-cur); *cur= k; ++cur; break;
+    case CTRL+'D': memmove(cur, cur+1, e+len-cur-1); break;
+    case CTRL+'O': memmove(cur+1, cur, e+len-cur-1); *cur= '\n'; break;
+    default: if ((k>=' ' && k<127) || k=='\n') {
+      memmove(cur+1, cur, e+len-cur-1); *cur= k; ++cur; } break;
     }
 
     // fix cur in bounds
@@ -87,7 +115,7 @@ void edit(char* e, size_t len) {
 }
 
 int main(int argc, char** argv) {
-  char buff[255]= "foobar\nfie\nfum";
+  char buff[200]= "foobar\nfie\nfum";
   edit(buff, sizeof(buff));
   return 0;
 }
