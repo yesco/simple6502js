@@ -136,7 +136,7 @@ L readdec(char c, char base) {
   if (c=='0') {
     c= tolower(nextc());
     if (c=='x') b= 16; else if (c=='b') b= 2; else if (isdigit(c)) b= 8;
-    else error("Unknown base char: ", MKNUM(c));
+    else unc(c); // error("Unknown base char: ", MKNUM(c));
     c= nextc();
   }
 

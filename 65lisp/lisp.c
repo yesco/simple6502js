@@ -242,8 +242,17 @@ char firstbss;
 #define TRACE(x)
 
 // comment to enable EVAL TRACE
-//#define ETRACE(x) ;
+#define ETRACE(x) ;
 
+// counts ops
+#define NOPS
+
+#ifndef NOPS
+  #define NOPS(a)
+#else
+  #undef NOPS
+  #define NOPS(a) a;
+#endif NOPS
 
 // ---------------- CONFIG
 
@@ -272,6 +281,7 @@ char firstbss;
 
 // --- Statisticss
 unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
+long nops= 0;
 
 int debug= 0, verbose= 0;
 
@@ -386,6 +396,7 @@ void error(char* msg, L a);
 #define HATOM   0xA7
 #define HARRAY  0xA6
 #define HSTRING 0x57
+#define HBIN    0xB1
 #define HSLICE  0x51 // do you get it? ;-)
 
 #define HTYP(x) (*((char*)(((L)x)-1)))
@@ -633,14 +644,18 @@ Atom* findatom(Atom* a, char* s, unsigned char typ) {
 // Otherwise create it.
 //
 // TYP: use this type code to match and create
-// (This means an ATOM and "ATOM" could both exist)
-L atomstr(char* s, unsigned char typ) {
+//   (This means an ATOM and "STRING" could both exist)
+// LEN: if len==0 is ATOM or STRING, otherwise mallocced
+L atomstr(char* s, unsigned char typ, size_t len) {
   char h;
   Atom *a;
 
-  h= hash(s) & (HASH-1);
-  a= findatom((Atom*)syms[h], s, typ); // fast 14s for 4x150.words
-  if (a) return (L)a;
+  // TODO: hash gone bad!!! for ARRAY LEN!!!!
+  h= (len?len:hash(s)) & (HASH-1);
+  if (typ==HATOM || typ==HSTRING || !len) {
+    a= findatom((Atom*)syms[h], s, typ); // fast 14s for 4x150.words
+    if (a) return (L)a;
+  }
 
   // create atom
   ++natoms;
@@ -655,14 +670,15 @@ L atomstr(char* s, unsigned char typ) {
   } while (!isatom((L)arptr));
 
   a= (Atom*)arptr;
-  arptr+= sizeof(Atom)+strlen(s)+1;
+  arptr+= sizeof(Atom)+(len?len: strlen(s))+1;
   // TODO: better test? LOL this crashes
   assert(arptr<=arend);
 
-  // CAR len if str!/arra
-  a->val= typ==HSTRING? MKNUM(strlen(s)): 0;
-  // copy name
-  strcpy(a->name, s);
+  // CAR bytes len if !atom
+  a->val= MKNUM(typ==HSTRING? strlen(s): len);
+  // copy name/data, alt, store pointer?
+  a->name[0]= 0; // for safety (HBIN)
+  if (len) memcpy(a->name+1, s, len); else strcpy(a->name, s);
   // CDR link it up
   // TODO: add specific cdr? could be the maxsize for array?
   a->next= (Atom*)(syms[h]);
@@ -675,7 +691,7 @@ L atomstr(char* s, unsigned char typ) {
 }
 
 // TODO: measure code size overhead?L
-L atom(char* s) { return atomstr(s, HATOM); }
+L atom(char* s) { return atomstr(s, HATOM, 0); }
 
 // --- Strings
 
@@ -690,8 +706,15 @@ L atom(char* s) { return atomstr(s, HATOM); }
 #define ISSTR(x) (isatom(x)&&HTYP(x)==HSTRING)
 
 // TODO: measure code size overhead?
-L mkstr(char* s) { return atomstr(s, HSTRING); }
+L mkstr(char* s) { return atomstr(s, HSTRING, 0); }
 
+
+#define ISBIN(x) (isatom(x)&&HTYP(x)==HBIN)
+#define BINSTR(x) (ISBIN(x)? ATOMSTR(x)+1: 0)
+#define BINLEN(x) (ISBIN(x)? NUM(ATOMVAL(x)): 0)
+
+// TODO: provide alternative
+L mkbin(char* s, size_t len) { return atomstr(s, HBIN, len); }
 
 // ---------------- GC Garbage Collector
 // just do a simple mark and sweep
@@ -808,6 +831,9 @@ void GC(L env, L alvals) {
   // -- enumerate all variables in program, like env
   mark(env);
   mark(alvals);
+
+  // -- TODO: mark stack, just not sure what alignment stack is...
+  // (should prev be same as cons for mark etc to work?)
 
   // -- walk through all globals, in symbols table
   for(i=0; i<HASH; ++i) {
@@ -944,8 +970,14 @@ L princ(L x) {
   if (null(x)) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
   //TODO: printatom as |foo bar| isn't written readable...
-  else if (isatom(x)) printf("%s", ATOMSTR(x));
-  else if (iscons(x)) {
+  else if (isatom(x)) {
+    if (HTYP(x)==HBIN) { char* p= BINSTR(x); size_t z= BINLEN(x);
+      printf("#[");
+      while(z-->0) if (*p>=32 && *p<=126 &&* p!=']') putchar(*p++);
+        else { revers(1); printf("%02x", *p++); revers(0); }
+      printf("]");
+    } else printf("%s", ATOMSTR(x));
+  } else if (iscons(x)) {
 
     // speical case of (num . num) if DEC!
     #ifdef DEC
@@ -1551,7 +1583,7 @@ L evalTrace(L x, L env) {
 
 // define to test...
 
-#define AL
+//#define AL
 
 #ifndef AL
   #define STACKSIZE 1
@@ -1559,27 +1591,41 @@ L evalTrace(L x, L env) {
   #define STACKSIZE 255
 #endif // AL
 
-L stack[STACKSIZE]= {0}, *s= stack, *send;
-L alvals= 0;
-
+// TODO: move to ZP
+static L stack[STACKSIZE]= {0};
+static L *s, *send, *frame, *params;
+static L alvals= 0;
 
 #ifdef AL
 #define NEXT goto next
 
 // ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
-//  24.47s added more oops, switch slower?
+//  24.47s added more oops, switch slower? now use goto jmp[] => 13s.. !!! lol
 
-// global vars during interpreation: 30 faster
-static L top, *frame, *params;
-static char* p;
+// global vars during interpretation: 30% faster
 
-void fcar();
-void fcdr();
+
+// +5.0% faster with zero page vars!!!
+// BUT: it overflows it, need config file to allcocate more?
+//#define ZEROPAGE
+
+#ifdef ZEROPAGE
+#pragma bss-name (push,"ZEROPAGE")
+#pragma data-name(push,"ZEROPAGE")
+#endif // ZEROPAGE
+
+static L top;
+static char c, *pc;
+
+#ifdef ZEROPAGE
+#pragma bss-name (pop)
+#pragma data-name(pop)
+#endif // ZEROPAGE
+
 
 // ignore JMP usage, uncomment to activate
 //#define JMP(a) 
 
-static char c;
 
 L al(char* la) {
 #ifndef JMP
@@ -1590,7 +1636,7 @@ L al(char* la) {
 #ifndef JMP
   #define JMP(a) a:
   if (*((int*)jmp)==42) {
-    printf("FOURTYTWO\n");
+    //printf("FOURTYTWO\n");
     memset(jmp, (int)&&gerr, sizeof(jmp));
     
     jmp[0]=&&g0;
@@ -1607,11 +1653,14 @@ L al(char* la) {
     jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
 
     jmp['9']= &&gnil;
+
+    jmp['i']= &&ginc;
+    jmp['j']= &&ginc2;
   }
 #endif // JMP
 
   top= nil; // global 10% faster!
-  orig= p= la; // global 10% faster
+  orig= pc= la; // global 10% faster
   s= stack-1; frame= s; params= s; // global yet 10% faster!!!
 
   // TODO: remove?
@@ -1633,21 +1682,22 @@ L al(char* la) {
   top= *s;
 
   // HHMMMM>?
-  if (!p) return ERROR;
+  if (!pc) return ERROR;
 
   #define PARAM_OFF 4
 
-  //if (verbose) printf("\nAL.run: %s\n", p);
+  if (verbose) printf("\nAL.run: %s\n", pc);
 
  call:
   params= frame+PARAM_OFF;
   if (s<params) s= params; // TODO: hmmm... TODO: assert?
-  p--; // as pre-inc is faster in the loop
+  --pc; // as pre-inc is faster in the loop
 
   if (verbose) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
   if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
 
  next:
+  NOPS(++nops;)
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
   //if (verbose) { printf("al %c : ", p[1]); prin1(top); NL; }
@@ -1655,13 +1705,14 @@ L al(char* la) {
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
 // inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
-#define NNEXT c=*++p;goto *jmp[c]
+
+#define NNEXT NOPS(++nops;)c=*++pc;goto *jmp[c]
   NNEXT;
 //#define NNEXT goto next;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
 
-  switch(*++p) {
+  switch(*++pc) {
 
   // inline AD cons-test: 14% faster, 2.96s with isnum => safe,
   // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
@@ -1688,10 +1739,13 @@ JMP(gU)case 'U': if (null(top)) goto settrue; goto setnil;
 JMP(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
 
 JMP(gat)case '@': top= ATOMVAL(top); NNEXT; // same car 'A' lol
-JMP(gcomma)case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NNEXT;
+JMP(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; NNEXT;
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
+JMP(ginc)case 'i': __AX__= top; asm("jsr incax2"); top= __AX__; goto next;
+JMP(ginc2)case 'j': top+= 2; goto next;
+
 JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; goto next;
 JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; goto next;
 
@@ -1720,18 +1774,18 @@ JMP(gP)case 'P': print(top); NNEXT;
   //stack  : ... <new a> <new b> <new c> (@new frame) <old frame> <old orig> <old p> ... | call in top
   //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
 
-  case'\\': n=0; frame=s; while(*p=='\\'){p++;n++;frame--;} NNEXT; // lambda \\\ = \abc (TODO)
-  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig+n; goto call;
+  case'\\': n=0; frame=s; while(*pc=='\\'){pc++;n++;frame--;} NNEXT; // lambda \\\ = \abc (TODO)
+  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig+n; goto call;
   case 'X': // "apply" TODO: if X^ make tail-call
     // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
     // or fixed:                     \ a3<I{a^}{a a1= ,PPX  *^}^
-    *++s=(L)frame; *++s=(L)orig; *++s=(L)p; *++s=(L)n; // PARAM_OFF
-    frame= s; p= orig= ATOMSTR(top); n= 0; goto call;
-  case '^': n=(L)*s--; p=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
+    *++s=(L)frame; *++s=(L)orig; *++s=(L)pc; *++s=(L)n; // PARAM_OFF
+    frame= s; pc= orig= ATOMSTR(top); n= 0; goto call;
+  case '^': n=(L)*s--; pc=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
     // top contains result! no need copy
   // parameter a-h (warning need others for local let vars!)
-  case 'a':case'b':case'c':case'd':case e':case'f':case'g':case'h':
-    *s++= top; top= frame[*p-('a'-PARAM_OFF)]; NNEXT;
+  case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
+    *s++= top; top= frame[*pc-('a'-PARAM_OFF)]; NNEXT;
 
 #endif // CALLONE
 
@@ -1747,12 +1801,12 @@ JMP(gP)case 'P': print(top); NNEXT;
   //          @)=     | call in top
   // return :  
 
-  case'\\': n=0; while(*++p=='\\')++n; --p; NNEXT; // lambda \\\ = \abc (TODO)
-  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); p= orig; goto call; // TOOD: p= orig+n ???
+  case'\\': n=0; while(*++pc=='\\')++n; --pc; NNEXT; // lambda \\\ = \abc (TODO)
+  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig; goto call; // TOOD: pc= orig+n ???
   case '(': { L* newframe= frame;
       *++s=(L)frame;
       *++s=(L)orig;
-      *++s=(L)p;
+      *++s=(L)pc;
       //*++s=(L)n; // TODO: save s ???
       *++s=(L)n; // save stack pointer
 
@@ -1760,12 +1814,12 @@ JMP(gP)case 'P': print(top); NNEXT;
 
 
   case ')': // "apply" TODO: if X^ make tail-call, top == address
-    p= orig= ATOMSTR(top); goto call;
+    pc= orig= ATOMSTR(top); goto call;
 
   case '^':
     params= (L*)(frame[0]); // tmp
     orig=(char*)(frame[1]);
-    p=(char*)(frame[2]);
+    pc=(char*)(frame[2]);
     //n=(int)(frame[3]); // TODO: n is not needed!
     s=(L*)(frame[3]); // restore stack
 
@@ -1775,7 +1829,7 @@ JMP(gP)case 'P': print(top); NNEXT;
   // parameter a-h
 JMP(gvar)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= params[*p-'a']; NNEXT;
+    *s++= top; top= params[*pc-'a']; NNEXT;
 
 #endif // CALLTWO
 
@@ -1783,7 +1837,7 @@ JMP(gvar)
 JMP(gdigit)
   case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':
 //case'9':
-    *++s= top; top= MKNUM(*p-'0'); NNEXT;
+    *++s= top; top= MKNUM(*pc-'0'); NNEXT;
 
 JMP(g0)
   case 0: return top; // all functions should end with ^ ?
@@ -1792,10 +1846,10 @@ JMP(g0)
 //  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
 
 // 30.45s
-//  default : if (isdigit(*p)) { ++s; *s= MKNUM(*p-'0'); NEXT; }
-//   printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+//  default : if (isdigit(*pc)) { ++s; *s= MKNUM(*pc-'0'); NEXT; }
+//   printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
 JMP(gerr)default:
-    printf("%% AL: illegal op '%c'\n", *p); return ERROR;
+    printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
   }
 }
 
@@ -1805,7 +1859,7 @@ JMP(gerr)default:
 #define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
 
 char* alcompile(char* p) {
- char c, extra= 0; int n= 0; L x= 0, f;
+char c, extra= 0; int n= 0; L x= 0xbeef, f;
  
 
  again:
@@ -1815,7 +1869,8 @@ char* alcompile(char* p) {
 
   case'\'': quote:
     // TODO: make subroutine compile const
-    x= x? x: lread();
+    //printf("QUOTE: %d\n", x);
+    x= x==0xbeef? lread(): x;
 
     // short constants
     if (null(x)) { ALC('9'); return p; }
@@ -1862,7 +1917,7 @@ char* alcompile(char* p) {
     assert(isatom(f)); // TODO: handle lisp/s-exp
     extra= ')';
     unc(c);
-    x= 0;
+    x= 0xbeef;
     goto quote;
 
   default:
@@ -1870,10 +1925,12 @@ char* alcompile(char* p) {
     //printf("\nDFAULT: '%c'\n", c);
 
     if (isdigit(c) || c=='.' || c=='-' || c=='+') {
+      //printf("READNUM: ");
       x= readdec(c, base); // x use by quote if !0
+      //printf("... is %d\n", x);
       // result is single digit, compile as is
       // NOTE: '9' isn't 9 but nil :-D :-D (const 9 not common...?)
-      if (isnum(x) && x>=0 && x<MKNUM(9)) { ALC(NUM(x)+'0'); return p; }
+      if (isnum(x) && x>=0 && NUM(x)<9) { ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
@@ -1882,7 +1939,7 @@ char* alcompile(char* p) {
     assert(isatom(x));
     // local variable a-z
     if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
-    printf("----ATOM---"); prin1(x); NL;
+    //printf("----ATOM---"); prin1(x); NL;
     // compile address on stack and @ to read value at runtime
     extra= '@'; // read atom val TODO: or 'X'/'E'
     goto quote;
@@ -1895,7 +1952,7 @@ L alcompileread() {
   char al[MAXSYMLEN+2]= {0}, *p= al;
   al[MAXSYMLEN]= 255; // end marker
   p= alcompile(p);
-  return (p && *p!=255)? atom(al): ERROR;
+  return p==al? eof: (p && *p!=255)? mkbin(al, p-al+1): ERROR;
 }  
 
 #endif // AL
@@ -1953,6 +2010,10 @@ char* names[]= {
   "Y y",
   "y yy",
   "Z z", 
+
+  "i inc",
+  "j jnc",
+
   NULL};
 
 void initlisp() {
@@ -1983,7 +2044,7 @@ void initlisp() {
   cend= cstart+MAXCELL;
 
   // statistics
-  natoms= ncons= nalloc= 0;
+  nops= natoms= ncons= nalloc= 0;
 
   // special symbols
     nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
@@ -2016,14 +2077,16 @@ closure= atom("closure");
 #endif // PREFTEST
 
 // TODO: maybe smaller as macro?
-void report(char* what, unsigned int now, unsigned int *last) {
-  if ((*last)!=now) printf("%% %s: +%d  ", what, now-*last);
-  *last= now;
+void report(char* what, unsigned long now, unsigned int *last, unsigned long *llast) {
+  unsigned long l= last? *last: llast? *llast: 0;
+  if (l!=now) printf("%% %s: +%ld  ", what, now-l);
+  if (last) *last= (unsigned int)now; if (llast) *last= now;
 }
 
 void statistics(int level) {
   int cused= cnext-cell+1, hslots= 0, i;
-  static unsigned int latoms, lcons, lalloc, leval, lmark; // TODO: arean?
+  static unsigned int latoms, lcons, lalloc, leval, lmark;
+  static unsigned long lops;
 
   for(i=0; i<HASH; ++i) if (syms[i]) ++hslots;
 
@@ -2034,16 +2097,18 @@ void statistics(int level) {
   }
 
   if (level) {
-    report("Eval", neval, &leval);
-    report("Cons", ncons, &lcons);
-    report("Atom", natoms, &latoms);
-    report("Alloc", nalloc, &lalloc);
-    report("Marks", nmark, &lmark);
+    report("Eval", neval, &leval, 0);
+    report("Cons", ncons, &lcons, 0);
+    report("Atom", natoms, &latoms, 0); // TODO: outoput messed up?
+    report("Alloc", nalloc, &lalloc, 0);
+    report("Marks", nmark, &lmark, 0);
+    report("Ops", nops, 0, &lops); // TODO: somehow screws up memory, or is already ./vm-test last 2 tests
     NL;
   }
 }
 
-char echo=0,noeval=0,quiet=0,gc=1,stats=1,test=0;
+// TODO: turn on GC
+char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
 unsigned long bench=1;
 
 L readeval(char *ln, L env, char noprint) {
@@ -2064,6 +2129,7 @@ L readeval(char *ln, L env, char noprint) {
 
   r= ERROR;
   do {
+    //printf("X=%d Y=%d\n", wherex(), wherey());
 
     // read
     if (!ln && !quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
@@ -2074,7 +2140,6 @@ L readeval(char *ln, L env, char noprint) {
       if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
     #endif // AL
 
-    if (isatom(x) && !strlen(ATOMSTR(x))) break;
     if (x==eof || x==bye) break;
     if (echo) { printf("> "); prin1(x); NL; }
 
@@ -2086,7 +2151,7 @@ L readeval(char *ln, L env, char noprint) {
         #ifndef AL
           r= eval(x, env);
         #else
-          r= al(isatom(x)? ATOMSTR(x): NULL);
+          r= al(ISBIN(x)? BINSTR(x): NULL);
         #endif // AL
 
         if (r==ERROR) break;
