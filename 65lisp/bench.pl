@@ -36,7 +36,7 @@ while(<>) {
     if (/^> (.*)/) {
         $expr= $1;
         $res = "";
-        while(($_=<>) && !/\d+ cycles/ && !/ERROR/) {
+        while(($_=<>) && !/\d+ cycles/ && !/ERROR/ && !/Ops:/) {
             $res.= "$_";
             #print "RES: $res\n";
         }
