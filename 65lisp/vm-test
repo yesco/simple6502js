@@ -1,0 +1,14 @@
+RUN="./run"
+RUN="./65lisp"
+RUN="./65vm-nops"
+
+$echo "RUN: $RUN"
+(
+$RUN -t -p "c3a4dr"   -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+$RUN -t -p "c12"      -b $* -e "(cons 1 2)"
+$RUN -t -p "plusnum"  -b $* -e "(* (+ 1 2) (* (+ 1 (+ 1 (+ 1 1))) 2))"
+$RUN -t -p "var"      -b $* -e "one"
+$RUN -t -p "var"      -b $* -e "foo"
+$RUN -t -p "plusvar"  -b $* -e "(+ one two)"
+$RUN -t -p "manyvar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) two))"
+) | tee bench.log | perl bench.pl

@@ -245,7 +245,7 @@ char firstbss;
 #define ETRACE(x) ;
 
 // counts ops
-#define NOPS
+//#define NOPS
 
 #ifndef NOPS
   #define NOPS(a)
@@ -2102,7 +2102,7 @@ void statistics(int level) {
     report("Atom", natoms, &latoms, 0); // TODO: outoput messed up?
     report("Alloc", nalloc, &lalloc, 0);
     report("Marks", nmark, &lmark, 0);
-    report("Ops", nops, 0, &lops); // TODO: somehow screws up memory, or is already ./vm-test last 2 tests
+    report("Ops", nops, 0, &lops);
     NL;
   }
 }
@@ -2170,6 +2170,8 @@ L readeval(char *ln, L env, char noprint) {
 
   _rs= saved;
   
+  NOPS(report("Ops", nops, 0, 0); NL;)
+
   memset(toploop, 0, sizeof(toploop));
   return env;
 }
