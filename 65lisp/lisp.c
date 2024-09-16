@@ -287,6 +287,16 @@ void* zalloc(size_t n) {
 typedef int16_t L;
 typedef uint16_t uint;
 
+// junk
+
+#ifdef TESTCOMPILER
+L inc(L i) { return i+2; }
+
+L fastcall inc2(L i) { asm("jsr incax2");
+  return __AX__; }
+#endif
+
+
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
@@ -972,7 +982,7 @@ void printarray(L* arr, int n, char printnil, char ishash) { // debug
   // just print symbols per slot // debug
   for(i=0; i<n; ++i) { // debug
     L a= arr[i]; // debug
-    if (!printnil && (a==nil || !a)) continue; // debug
+    if (!printnil && (null(a) || !a)) continue; // debug
     printf("\n%2d: ", i); // debug
     while (a && a!=nil) { // debug
       princ(a); putchar(' '); // debug
@@ -1595,6 +1605,8 @@ L al(char* la) {
     for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
 
     jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
+
+    jmp['9']= &&gnil;
   }
 #endif // JMP
 
@@ -1634,39 +1646,55 @@ L al(char* la) {
 
   if (verbose) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
   if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
+
  next:
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
   //if (verbose) { printf("al %c : ", p[1]); prin1(top); NL; }
 
-  // caaadrr x5K => 17.01s ! faster than function call
+  // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
-// we want to do this to get ultimiate speed... but  it crashes!
-
+// inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
 #define NNEXT c=*++p;goto *jmp[c]
+  NNEXT;
+//#define NNEXT goto next;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
-  NNEXT;
 
   switch(*++p) {
 
   // inline AD cons-test: 14% faster, 2.96s with isnum => safe,
   // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
-JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); NNEXT;
-JMP(gD)case 'D': top= isnum(top)? nil: CDR(top); NNEXT;
+//JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); NNEXT; // 13.00s
+//JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); goto next; // 13.10s
+//JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); NNEXT; // 12.98s (/ 13.10 12.98) < 1%
+JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13.06 (/ 13.06 12.98) < 0.7%
+JMP(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
 
-JMP(gU)case 'U': top= (top==nil)? T: nil; NNEXT;
-JMP(gK)case 'K': top= (iscons(top))? T: nil; NNEXT;
+//JMP(geq)case '=': top= (*s-- == top)? T: nil; NNEXT;
+//JMP(geq)case '=': if (*s--== top) goto settrue; else goto setnil; // OLD LABEL
+//JMP(geq)case '=': if (*s--==top) goto setnil; goto settrue; // error if have else!
+//JMP(geq)case 7: if (*s==top) goto droptrue; else goto dropnil; goto droptrue; // error if have else!
+//JMP(geq)case 7: --s; if (s[1]==top) goto settrue; goto setnil; .. not too bad
+JMP(geq)case '=':
+    if (*s==top)
+         { --s; settrue: top= T; }
+    else { --s; setnil:  top= nil; }
+    NNEXT;
+         
+JMP(gnil)case '9': *++s= top; top= nil; goto next; goto setnil;
+
+JMP(gU)case 'U': if (null(top)) goto settrue; goto setnil;
+JMP(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
 
 JMP(gat)case '@': top= ATOMVAL(top); NNEXT; // same car 'A' lol
 JMP(gcomma)case ',': *++s= top; top= *(L*)++p; p+= sizeof(L)-1; NNEXT;
 
-JMP(geq)case '=': s--; return *s==top? T: nil;
-
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
-JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; NNEXT;
-JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; NNEXT;
+JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; goto next;
+JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; goto next;
+
 JMP(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; NNEXT;
 JMP(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; NNEXT;
 
@@ -1753,7 +1781,8 @@ JMP(gvar)
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
 JMP(gdigit)
-  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':case'9':
+  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':
+//case'9':
     *++s= top; top= MKNUM(*p-'0'); NNEXT;
 
 JMP(g0)
@@ -1784,10 +1813,16 @@ char* alcompile(char* p) {
   case 0  : return p;
   case ' ': case '\t': case '\n': case '\r': goto again;
 
-  case'\'': quote: ALC(','); // reads next value and compiles to put it on stack
-    // TODO: make subroutine
-    { L* pi= (L*)p; if (*pi) return NULL; // overflow?
-      *pi= x? x: lread(); p+= sizeof(L);
+  case'\'': quote:
+    // TODO: make subroutine compile const
+    x= x? x: lread();
+
+    // short constants
+    if (null(x)) { ALC('9'); return p; }
+
+    ALC(','); // reads next value and compiles to put it on stack
+    { L* pi= (L*)p; if (*pi) return NULL; // overflow!
+      *pi= x; p+= sizeof(L);
       // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
     }
@@ -1795,18 +1830,20 @@ char* alcompile(char* p) {
 
   // TODO: function call... of lisp
   case '(': 
-    // detmine function, try get a number
+    // determine function, try get a number
     //skipspc();
     f= nextc(); unc(f); // peek
     if (f=='(') return NULL; // TODO: ,..X inline lambda?
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
     // TODO: handle funcall etc - do eval?
-    if (!isatom(x)) return NULL; // TODO: ,..X
+    if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; return NULL; }
+
     f= ATOMVAL(x);
-    f= num(f);
     // is it another compiled AL? or lisp S-EXP?
-    if (!f) { prin1(x); printf(" => %04X ", f); prin1(f); NL; }
+
+    f= num(f);
+    if (!f) { prin1(x); printf(" => ATOMVAL: %04X ", f); prin1(f); NL; return NULL; }
     else if (f=='\'') goto quote;
     else if (f=='L') f= 'C'; // foldr
     else assert(f<255);
@@ -1835,7 +1872,8 @@ char* alcompile(char* p) {
     if (isdigit(c) || c=='.' || c=='-' || c=='+') {
       x= readdec(c, base); // x use by quote if !0
       // result is single digit, compile as is
-      if (isnum(x) && x>=0 && x<MKNUM(10)) { ALC(NUM(x)+'0'); return p; }
+      // NOTE: '9' isn't 9 but nil :-D :-D (const 9 not common...?)
+      if (isnum(x) && x>=0 && x<MKNUM(9)) { ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
