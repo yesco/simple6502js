@@ -902,13 +902,26 @@ L lread(); // forward
 
 // read a list of type: '(' '{' '['
 L lreadlist(char t) {
-  L r;
-  char c= skipspc();
-  if (!c || c==')' || c=='}' || c==']') return nil;
-  unc(c);
-  r= lread();
-  // TODO: how deep/long? make iterative, need setcdr!
-  return cons(r, lreadlist(t));
+  L r= nil, *last= &r;
+  char c= t; // lol
+
+  do {
+    c= skipspc();
+    if (!c || c==')' || c=='}' || c==']') break;
+
+    if (c=='.') {
+      c= nextc();
+      if (c==' ') { *last= lread(); continue; }
+      if (isdigit(c)) { unc(c); *last = cons(readdec('.', 10), nil); continue; }
+      printf("GOT '.' and '%c'\n", c); assert(!"lreadlist"); // .lol symbol?
+      // can't stuff it back... only one char
+    }
+
+    unc(c); *last= cons(lread(), nil);
+    last= &CDR(*last);
+
+  } while (1);
+  return r;
 }
 
 // read anything return sexp ()={}=[] !
@@ -1593,11 +1606,12 @@ L evalTrace(L x, L env) {
 
 // TODO: move to ZP
 static L stack[STACKSIZE]= {0};
-static L *s, *send, *frame, *params;
-static L alvals= 0;
+static L *send, alvals= 0;
 
 #ifdef AL
 #define NEXT goto next
+
+static L *s, *frame, *params;
 
 // ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
 //  24.47s added more oops, switch slower? now use goto jmp[] => 13s.. !!! lol

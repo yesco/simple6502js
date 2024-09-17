@@ -16,10 +16,16 @@ $RUN -t -p "morevar"  -b $* -e "(* (+ one two) (+ one (+ one (+ one one))))"
 $RUN -t -p "morevar"  -b $* -e "(* (+ one two) (+ one (+ one (+ one one))))"
 
 # - ok on normal EVAL
-./run -t -p "morevar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) two))"
+#./run -t -p "morevar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) two))"
 
-# TODO: --- FAIL ON VM? 
-$RUN -t -p "morevar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) two))"
 $RUN -t -p "manyvar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) two))"
+
+# -- TODO: test with (reads "(....)")
+
+$RUN -t -p "manyvar"  -b $* -e "(+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 1)))))))))"
+$RUN -t -p "manyvar"  -b $* -e "(+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 9)))))))))"
+$RUN -t -p "manyvar"  -b $* -e "(+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 77)))))))))"
+$RUN -t -p "manyvar"  -b $* -e "(+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 777)))))))))"
+$RUN -t -p "manyvar"  -b $* -e "(+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 12345)))))))))"
 
 ) | tee bench.log | perl bench.pl

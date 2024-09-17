@@ -10,27 +10,44 @@ nil
 T
 ERROR
 
-'foo
-'bar
-
 "foo"
 "bar"
 
+; --- quote symbol
 
-; simple value
+'foo
+'bar
 
+
+; --- simple number
+
+0
 42
+-42
+
+; --- decimal
+
+1e5
+1d5
++1d+5
+-1d-5
+
+1.23456789012345678d
+1.23456789012345678e
+
+; long int (keep 6 chars)
+123456789012345678e
+123456789012345678d
 
 
-; list
+; --- list of atoms
 
 '(1 2 (3 4) 5) (nil) (()) foo bar foobar foo foobar
 
-
-; --- atoms
-
 '(a ab abc abcd abcde abcdef abcdefg abcdefgh abcdefghi)
 
+'(foo . bar)
+'(1 foo . 3)
 
 ; --- cons
 
@@ -107,3 +124,6 @@ foo
 
 HERE
 
+# - read long list of 1000 numbers
+
+echo "'(`perl -e 'for $i (1...1000) {print "$i "; }'`)"  | ./run | less
