@@ -1,7 +1,7 @@
-RUN="./run"
 RUN="./65lisp"
 RUN="./65vm"
 RUN="./65vm-nops"
+RUN="./run"
 
 $echo "RUN: $RUN"
 (
@@ -22,10 +22,17 @@ $RUN -t -p "manyvar"  -b $* -e "(* (+ one two) (* (+ one (+ one (+ one one))) tw
 
 # -- TODO: test with (reads "(....)")
 
-$RUN -t -p "manyvar"  -b $* -e "(+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 (+ 1 1)))))))))"
-$RUN -t -p "manyvar"  -b $* -e "(+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 (+ 9 9)))))))))"
-$RUN -t -p "manyvar"  -b $* -e "(+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 (+ 77 77)))))))))"
-$RUN -t -p "manyvar"  -b $* -e "(+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 (+ 777 777)))))))))"
-$RUN -t -p "manyvar"  -b $* -e "(+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 (+ 12345 12345)))))))))"
+$RUN -t -p "readnum"  -b $* -e '(read "1")'
+$RUN -t -p "readnum"  -b $* -e '(read "12")'
+$RUN -t -p "readnum"  -b $* -e '(read "123")'
+$RUN -t -p "readnum"  -b $* -e '(read "1234")'
+$RUN -t -p "readnum"  -b $* -e '(read "12345")'
+$RUN -t -p "readnum"  -b $* -e '(read "123456")'
+$RUN -t -p "readnum"  -b $* -e '(read "1234567")'
+$RUN -t -p "readnum"  -b $* -e '(read "12345678")'
+$RUN -t -p "readnum"  -b $* -e '(read "123456789")'
+$RUN -t -p "readnum"  -b $* -e '(read "1234567890")'
+$RUN -t -p "readnum"  -b $* -e '(read "12345678901234567890")'
+$RUN -t -p "readnum"  -b $* -e '(read "123456789012345678901234567890")'
 
 ) | tee bench.log | perl bench.pl

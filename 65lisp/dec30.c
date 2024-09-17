@@ -103,11 +103,11 @@ void dmake(long m, int e, dec30 *r) {
   assert(e>=-254);
 
   // encode
-  bput(m);
+  DECDEBUG(bput(m));
   r->ab= (e<<7)&0xff80; // 9 bits from e stored in ab: 1111 1111 1000 0000
   r->cd= (m<<1)&0xfffe;
   r->b|= (m>>14)&0x7e; // 6 bits from m stored in b:             0111 1110
-  bput(r->uabcd);
+  DECDEBUG(bput(r->uabcd));
 }
 
 #ifdef LISP

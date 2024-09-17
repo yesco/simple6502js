@@ -975,9 +975,17 @@ L lread() {
   return ERROR;
 }
 
-// print unquoted value without space before/after
-//   no quotes for strings, except inside list? hmmm
-L princ(L x) {
+// This will read *one* value/s-exp from S
+L sread(char* s) { L r;
+  char* saved= _rs;
+  _rs= s; r= lread();
+  _rs= saved;
+  return r;
+}
+
+// print XSTRING in readable format unless QUOTED
+// if QUOTED<0 then lists are written without 
+L prinq(L x, signed char quoted) {
   L i= x;
   //printf("%d=%d=%04x\n", num(x), x, x);
   if (null(x)) printf("nil");
@@ -985,11 +993,12 @@ L princ(L x) {
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) {
     if (HTYP(x)==HBIN) { char* p= BINSTR(x); size_t z= BINLEN(x);
-      printf("#%d$[", z);
-      while(z-->0) if (*p>=32 && *p<=126 &&* p!=']') putchar(*p++);
+      (quoted>=0) && printf("#%d$[", z);
+      while(z-->0) if (quoted<0) putchar(*p++);
+        else if (*p>=32 && *p<=126 &&* p!=']') putchar(*p++);
         else { revers(1); printf("%02x", *p++); revers(0); }
-      printf("]");
-    } else printf("%s", ATOMSTR(x));
+      (quoted>=0) && printf("]");
+    } else printf((ISSTR(x) && quoted>0)?"\"%s\"": "%s", ATOMSTR(x));
   } else if (iscons(x)) {
 
     // speical case of (num . num) if DEC!
@@ -998,21 +1007,19 @@ L princ(L x) {
     #endif // DEC
 
     // printlist
-    for(putchar('('); ; putchar(' ')) {
-      princ(car(i)); i= cdr(i); if (!iscons(i)) break;
+    for((quoted>=0) && putchar('('); ; putchar(' ')) {
+      prinq(car(i), quoted); i= cdr(i); if (!iscons(i)) break;
     }
-    if (notnull(i)) { printf(" . "); princ(i); }
-    putchar(')');
+    if (notnull(i)) { (quoted>=0) && printf(" . "); prinq(i, quoted); }
+    (quoted>=0) && putchar(')');
 
   } else printf("LISP: Unknown data %04x\n", x);
   return x;
 }
 
-// TODO: supposed to print in readable format:
-//   quote strings, and |atom w spaces|
-L prin1(L x) {
-  return !ISSTR(x)? princ(x): (printf("\"%s\"", ATOMSTR(x)), x);
-}
+L princ(L x) { return prinq(x, 0); }
+L prin1(L x) { return prinq(x, 1); }
+//L prinflattenL x) { return prinq(x, -1); }
 
 //void prinx(L x) { printf("#%04u", (num)x); } 
 
@@ -1392,10 +1399,12 @@ L evalX(L x, L env) {
     case ';': return df(x);
     case 'I': return iff(x, env);
     //case 'X': return TODO: FUNCALL! eXecute
-    case 'Y': return lread();
       // TODO: non-blocking getchar (0 if none)
     case '\'': return car(x); // quote
     //case '\\':return o;
+
+    case 'Y': x= eval(car(x), env); return sread(ISSTR(x)? ATOMSTR(x): 0);
+
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
     //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
@@ -1436,8 +1445,10 @@ L evalX(L x, L env) {
     case ';': return df(a);
     case 'I': return iff(a, env);
     //case 'X': return TODO: FUNCALL! eXecute
-    case 'Y': return lread();
       // TODO: non-blocking getchar (0 if none)
+
+    case 'Y': x= eval(car(x), env); return sread(ISSTR(x)? ATOMSTR(x): 0);
+
     case '\'':return car(a); // quote
     //case '\\':return o;
     case 'S': return setval(car(a), eval(car(cdr(a)), env), env); // TODO: set local means update 'env' here...
@@ -1660,14 +1671,16 @@ L al(char* la) {
     jmp['/']=&&gdiv; jmp['=']=&&geq;
     jmp['?']=&&gcmp;
     jmp['P']=&&gP;
+    jmp['Y']= &&gY;
 
     for(c='0'; c<='9'; ++c) jmp[c]= &&gdigit;
     for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
 
     jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
 
-    jmp['9']= &&gnil;
+    jmp['9']= &&gnil; // lol
 
+    // play
     jmp['i']= &&ginc;
     jmp['j']= &&ginc2;
   }
@@ -1779,6 +1792,7 @@ JMP(gcmp)
   // TODO: need a drop?
 
 JMP(gP)case 'P': print(top); goto next;
+JMP(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 
   // calling user compiled AL or normal lisp
 
@@ -2220,6 +2234,7 @@ int mainmain(int argc, char** argv, void* main) {
   L env= nil; char interpret= 1;
 
   initlisp();
+
   env= nil; // must be done after initlisp();
 
   // - read args

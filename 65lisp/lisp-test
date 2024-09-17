@@ -119,8 +119,18 @@ foo
 (< 'foo 3)
 (> 'foo 3)
 
-; --- TODO: ?
+; --- I/O
 
+(princ "foo")(princ '(fie "fum"))(princ "fie")
+(prin1 "foo")(prin1 '(fie "fum"))(prin1 "fie")
+(print "foo")(print '(fie "fum"))(print "fie")
+
+(read "foo")
+(read "42")
+(read "(a b b a)")
+(read "'(1 2 3 4)")
+
+; --- TODO: ?
 
 HERE
 
