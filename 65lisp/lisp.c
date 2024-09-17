@@ -262,6 +262,8 @@ char firstbss;
 //   DECREASE if run out of memory. LOL
 //#define MAXCELL 25*1024/2 // ~ 12K cells
 
+// (+ (* 8192 2 2) (* 32 2) (* 2048 1)) = 34880 bytes!
+
 #define MAXCELL 8192*2
 
 // Arena len to store symbols/constants (and global ptr)
@@ -2232,6 +2234,8 @@ L testing(env) {
 
 int mainmain(int argc, char** argv, void* main) {
   L env= nil; char interpret= 1;
+
+  statistics(3);
 
   initlisp();
 

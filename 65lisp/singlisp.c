@@ -115,10 +115,10 @@ void terpri() { putchar('\n'); }
 D princ(D x) { if (x==nil) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
   else if (isatom(x)) printf("%s", ((Atom*)x)->str);
-  else { for (putchar('(');;putchar' ') {
+  else { for (putchar('(');;putchar(' ')) {
       princ(car(x)); x= cdr(x); if (!iscons(x)) break;
     }
-    if (notnul(x)) { printf(" . "); princ(x); }
+    if (x==nil) { printf(" . "); princ(x); }
     putchar(')');
   }  
 
@@ -132,7 +132,7 @@ D readlist() {
   char c= unc? unc: getchar(); unc= 0;
   if (isspace(c)) return readlist();
   if (c==')') return nil;
-  if (c=='.') { D x= lread(); if (!unc) getchar(); unc= 0; return x; }
+  if (c=='.') { D x= lread(); if (!unc) getchar(); unc= 0; return x; } // TODO: .5 lol? check ')'
   unc= c; return cons(lread(), readlist()); // order of eval 1...2
 }
 
@@ -144,6 +144,7 @@ D lread() { int n= 0, c= unc? unc: getchar(); unc= 0;
   }
   if (c=='\'') return cons(QUOTE, cons(lread(), nil));
   if (c=='(') return cons(lread(), readlist());
+  // assume atom
   { char s[32]={0}, *p= s; // overflow?
     do { *p++= c; c= getchar(); }while(c>0 && !isspace(c) && c!='(' && c!=')');
     unc= c; return atom(strdup(s));
