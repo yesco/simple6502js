@@ -6,8 +6,9 @@ sub report {
         print "ERR" if $error;
         chop($res);
         chop($res);
+        $eops= $opos+$eval;
         print sprintf("%*s:%6d# %9dc %7.3fs %7do %4.0fo/s - $expr \t=> $res\n",
-          $error?13:16, $name, $times, $cycles, $secs, $ops, $ops/$secs);
+          $error?13:16, $name, $times, $cycles, $secs, $ops, $secs?($eops/$secs):0);
         print "\t\t  $error" if $error; 
     } else {
         print "--- $name\n";
@@ -19,6 +20,7 @@ sub report {
         print "secs: $secs\n";
         print "resl: $res\n";
         print "ops : $ops\n";
+        print "eval: $eval\n";
     }
 }
 
@@ -42,6 +44,7 @@ while(<>) {
         }
     }
     $ops= $1 if /Ops: \+(\d+)/;
+    $eval= $1 if /Eval: \+(\d+)/;
     $expr= $1 if /^> (.*)/;
     $cycles= $1 if /(\d+) cycles/;
     $exit= $1 if /--- EXIT=(%d+) ---/;

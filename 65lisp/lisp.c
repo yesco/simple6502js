@@ -248,10 +248,10 @@ char firstbss;
 //#define NOPS
 
 #ifndef NOPS
-  #define NOPS(a)
+  #define NOPS(a) ;
 #else
   #undef NOPS
-  #define NOPS(a) a;
+  #define NOPS(a) do {a;} while (0)
 #endif NOPS
 
 // ---------------- CONFIG
@@ -277,7 +277,7 @@ char firstbss;
 //#define HASH 1
 
 // max length of atom and constant strings
-#define MAXSYMLEN 32
+#define MAXSYMLEN 120
 
 // --- Statisticss
 unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
@@ -972,7 +972,7 @@ L princ(L x) {
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) {
     if (HTYP(x)==HBIN) { char* p= BINSTR(x); size_t z= BINLEN(x);
-      printf("#[");
+      printf("#%d$[", z);
       while(z-->0) if (*p>=32 && *p<=126 &&* p!=']') putchar(*p++);
         else { revers(1); printf("%02x", *p++); revers(0); }
       printf("]");
@@ -1697,7 +1697,6 @@ L al(char* la) {
   if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
 
  next:
-  NOPS(++nops;)
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
   //if (verbose) { printf("al %c : ", p[1]); prin1(top); NL; }
@@ -1706,7 +1705,7 @@ L al(char* la) {
 
 // inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
 
-#define NNEXT NOPS(++nops;)c=*++pc;goto *jmp[c]
+#define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
   NNEXT;
 //#define NNEXT goto next;
 
@@ -1950,7 +1949,7 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
 
 L alcompileread() {
   char al[MAXSYMLEN+2]= {0}, *p= al;
-  al[MAXSYMLEN]= 255; // end marker
+  al[sizeof(al)]= 255; // end marker
   p= alcompile(p);
   return p==al? eof: (p && *p!=255)? mkbin(al, p-al+1): ERROR;
 }  
@@ -2079,14 +2078,15 @@ closure= atom("closure");
 // TODO: maybe smaller as macro?
 void report(char* what, unsigned long now, unsigned int *last, unsigned long *llast) {
   unsigned long l= last? *last: llast? *llast: 0;
-  if (l!=now) printf("%% %s: +%ld  ", what, now-l);
-  if (last) *last= (unsigned int)now; if (llast) *last= now;
+  if (l!=now) printf("%% %s: +%lu  ", what, now-l);
+  //if (last) *last= (unsigned int)now; if (llast) *llast= now;
+  if (last) *last= (unsigned int)now; if (llast) *llast= now;
 }
 
 void statistics(int level) {
   int cused= cnext-cell+1, hslots= 0, i;
-  static unsigned int latoms, lcons, lalloc, leval, lmark;
-  static unsigned long lops;
+  static unsigned int latoms=0, lcons=0, lalloc=0, leval=0, lmark=0;
+  static unsigned long lops=0;
 
   for(i=0; i<HASH; ++i) if (syms[i]) ++hslots;
 
@@ -2170,7 +2170,7 @@ L readeval(char *ln, L env, char noprint) {
 
   _rs= saved;
   
-  NOPS(report("Ops", nops, 0, 0); NL;)
+  NOPS(report("Eval", neval, 0, 0); report("Ops", nops, 0, 0); NL);
 
   memset(toploop, 0, sizeof(toploop));
   return env;
