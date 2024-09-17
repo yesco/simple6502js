@@ -103,10 +103,11 @@ D cons(D a, D d) { ++C; C->car= a; C->cdr= d; return (D)C; }
 //   car(atom) == global value
 typedef struct { D val; char* str; } Atom;  Atom *A;
 
-// TODO: assert test out of slots for atom
+// linear search to find if have existing atom
 D atom(char* s) { Atom* x= (Atom*)nil;
   if (0==strcmp(s, "nil")) return nil; // special
   while(s && ++x<=A) if (0==strcmp(x->str, s)) return (D)x;
+  // TODO: assert test out of slots for atom
   ++A; A->val= nil; A->str= s? s: (char*)nil;  return (D)A;
 }
 

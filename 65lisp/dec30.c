@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
+
 
 // HMMM
 typedef   int8_t S;
