@@ -1707,9 +1707,10 @@ L al(char* la) {
 
 #define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
   NNEXT;
-//#define NNEXT goto next;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
+
+  // using goto next instead of NNEXT cost 1% more time but saves 365 bytes!
 
   switch(*++pc) {
 
@@ -1732,13 +1733,13 @@ JMP(geq)case '=':
     else { --s; setnil:  top= nil; }
     NNEXT;
          
-JMP(gnil)case '9': *++s= top; top= nil; goto next; goto setnil;
+JMP(gnil)case '9': *++s= top; goto setnil;
 
 JMP(gU)case 'U': if (null(top)) goto settrue; goto setnil;
 JMP(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
 
-JMP(gat)case '@': top= ATOMVAL(top); NNEXT; // same car 'A' lol
-JMP(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; NNEXT;
+JMP(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
+JMP(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
@@ -1748,22 +1749,22 @@ JMP(ginc2)case 'j': top+= 2; goto next;
 JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; goto next;
 JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; goto next;
 
-JMP(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; NNEXT;
-JMP(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; NNEXT;
+JMP(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; goto next;
+JMP(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; goto next;
 
-JMP(gC)case 'C': top= cons(*s, top); --s; NNEXT;
+JMP(gC)case 'C': top= cons(*s, top); --s; goto next;
 
 JMP(gbl)
   // not so common so move down... linear probe!
-  case ' ': case '\t': case '\n': case '\r': case 12: NNEXT; // TODO: NNEXT loops forever?
+  case ' ': case '\t': case '\n': case '\r': case 12: goto next; // TODO: NNEXT loops forever?
 
 JMP(gcmp)
   case '?': top= top==*s? MKNUM(0): (isatom(*s)&&isatom(top))?
-      mknum(strcmp(ATOMSTR(*s), ATOMSTR(top))): mknum(*s-top); NNEXT; // no care type!
+      mknum(strcmp(ATOMSTR(*s), ATOMSTR(top))): mknum(*s-top); goto next; // no care type!
 
   // TODO: need a drop?
 
-JMP(gP)case 'P': print(top); NNEXT;
+JMP(gP)case 'P': print(top); goto next;
 
   // calling user compiled AL or normal lisp
 
@@ -1773,7 +1774,7 @@ JMP(gP)case 'P': print(top); NNEXT;
   //stack  : ... <new a> <new b> <new c> (@new frame) <old frame> <old orig> <old p> ... | call in top
   //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
 
-  case'\\': n=0; frame=s; while(*pc=='\\'){pc++;n++;frame--;} NNEXT; // lambda \\\ = \abc (TODO)
+  case'\\': n=0; frame=s; while(*pc=='\\'){pc++;n++;frame--;} goto next; // lambda \\\ = \abc (TODO)
   case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig+n; goto call;
   case 'X': // "apply" TODO: if X^ make tail-call
     // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
@@ -1784,7 +1785,7 @@ JMP(gP)case 'P': print(top); NNEXT;
     // top contains result! no need copy
   // parameter a-h (warning need others for local let vars!)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= frame[*pc-('a'-PARAM_OFF)]; NNEXT;
+    *s++= top; top= frame[*pc-('a'-PARAM_OFF)]; goto next;
 
 #endif // CALLONE
 
@@ -1800,7 +1801,7 @@ JMP(gP)case 'P': print(top); NNEXT;
   //          @)=     | call in top
   // return :  
 
-  case'\\': n=0; while(*++pc=='\\')++n; --pc; NNEXT; // lambda \\\ = \abc (TODO)
+  case'\\': n=0; while(*++pc=='\\')++n; --pc; goto next; // lambda \\\ = \abc (TODO)
   case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig; goto call; // TOOD: pc= orig+n ???
   case '(': { L* newframe= frame;
       *++s=(L)frame;
@@ -1809,7 +1810,7 @@ JMP(gP)case 'P': print(top); NNEXT;
       //*++s=(L)n; // TODO: save s ???
       *++s=(L)n; // save stack pointer
 
-      frame= newframe; NNEXT; } // TODO: NNEXT dumps core?
+      frame= newframe; goto next; } // TODO: NNEXT dumps core?
 
 
   case ')': // "apply" TODO: if X^ make tail-call, top == address
@@ -1828,15 +1829,14 @@ JMP(gP)case 'P': print(top); NNEXT;
   // parameter a-h
 JMP(gvar)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= params[*pc-'a']; NNEXT;
+    *s++= top; top= params[*pc-'a']; goto next;
 
 #endif // CALLTWO
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
 JMP(gdigit)
-  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8':
-//case'9':
-    *++s= top; top= MKNUM(*pc-'0'); NNEXT;
+  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8'://case'9':
+    *++s= top; top= MKNUM(*pc-'0'); goto next;
 
 JMP(g0)
   case 0: return top; // all functions should end with ^ ?
