@@ -46,7 +46,7 @@ stty cbreak -echo
 echo
 echo "=== RUN ==="
 #(time sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
-(sim65 -c $name.out "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
+(sim65 -c $name.out "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log ; stty sane
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
 

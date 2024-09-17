@@ -24,6 +24,8 @@
 //   CTRL-Y    - Yank all cuttings stored
 //   CTRL-G    - clear yank buffer
 //
+//   CTRL-X/C  - exit
+
 // Features:
 // - keep x-position of previous row when go up/down
 //
@@ -42,16 +44,17 @@
 #define META 128
 
 // TODO: resize
-void edit(char* e, size_t len) {
-  char *p= e, *cur= e, *sl, *el, *last= e+len-1, k;
-  int x= 0, yank= 0;
+void edit(char* e, size_t size) {
+  char *p= e, *cur= e, *sl, *el, *last= e+size-1, k;
+  int x= 0, yank= 0, elen, curlen;
+
   *last= 0; // end used as yank buffer
   do {
     // update screen
     clrscr();
-    if (cur!=e) printf("%.*s", cur-e, e);
+    if (cur!=e) printf("%.*s", (int)(cur-e), e);
     printf("[s"); // save cursor
-    if (cur<e+len) printf("%s<<<\n", cur);
+    if (cur<e+size) printf("%s<<<\n", cur);
     if (*last) {
       // show yank buffer if not empty
       printf("\n\nYANK>>>");
@@ -59,12 +62,15 @@ void edit(char* e, size_t len) {
       while(*p) putchar(*p--),yank++;
       printf("<<<\n");
     }
-    //printf("\n: cur=%d len=%d yank=%d size=%d\n", cur-e, strlen(e), yank, len);
+    //printf("\n: cur=%d size=%d yank=%d size=%d\n", cur-e, strsize(e), yank, size);
+    revers(1); printf("65EMACS: ESC< ^APNBFOKYEG ESC> ^X\n"); revers(0);
     printf("[u"); // restore
 
     // start of line
     sl= cur; while(sl>e && sl[-1]!='\n') --sl;
     el= cur; while(*el && *el!='\n') ++el;
+    elen= strlen(e);
+    curlen= elen + cur-e;
 
     // adjust for x column ctrl-P and ctrl-N
     if (x) { cur= (sl+x<el)? sl+x: el; x= 0; continue; } // update cursor
@@ -77,7 +83,7 @@ void edit(char* e, size_t len) {
 
     // movement // TODO: simplier, make a search fun?
     case META+'<': case META+'V':cur= e; break;
-    case META+'>': case CTRL+'V':cur= e+strlen(e); break;
+    case META+'>': case CTRL+'V':cur= e+elen; break;
     case CTRL+'P': x= cur-sl; cur= sl-1; break;
     case CTRL+'A': cur= sl; break;
     case CTRL+'B': --cur; break;
@@ -92,30 +98,31 @@ void edit(char* e, size_t len) {
     // TODO: erm code ugly...
     // TODO: CTRL-K on '(' will cut only till matching ')' !
     case CTRL+'K': if (*cur) do {
-          k= *cur; memmove(cur, cur+1, e+len-cur-1); *last= k;
+          k= *cur; memmove(cur, cur+1, e+size-cur-1); *last= k;
         } while(*cur && *cur!='\n' && k!='\n'); break;
-    case CTRL+'Y': if (strlen(e)+2*yank>len-5) break; // safe
+    case CTRL+'Y': if (elen+2*yank>size-5) break; // safe
       p= last; while(*p) {
-        k= *p--; memmove(cur+1, cur, strlen(cur)+1); *cur= k;
+        k= *p--; memmove(cur+1, cur, curlen+1); *cur= k;
       } break;
-    case CTRL+'G': memset(e+strlen(e), 0, len-strlen(e)); break;
+    case CTRL+'G': memset(e+elen, 0, size-elen); break;
 
     // edit
-    case CTRL+'H': case 127: if (cur>e) memmove(cur-1, cur, e+len-cur); --cur; break;
-    case CTRL+'D': memmove(cur, cur+1, e+len-cur-1); break;
-    case CTRL+'O': memmove(cur+1, cur, e+len-cur-1); *cur= '\n'; break;
+    case CTRL+'H': case 127: if (cur>e) memmove(cur-1, cur, elen); --cur; break;
+    case CTRL+'D': memmove(cur, cur+1, elen); break;
+    case CTRL+'O': memmove(cur+1, cur, elen-1); *cur= '\n'; break;
     default: if ((k>=' ' && k<127) || k=='\n') {
-      memmove(cur+1, cur, e+len-cur-1); *cur= k; ++cur; } break;
+      memmove(cur+1, cur, elen); *cur= k; ++cur; } break;
     }
 
     // fix cur in bounds
     if (cur < e) cur= e;
-    if (cur > e+strlen(e)) cur= e+strlen(e);
+    if (cur > e+elen) cur= e+elen;
   } while(1);
 }
 
+char buff[2014]= "foobar\nfie\nfum";
+
 int main(int argc, char** argv) {
-  char buff[200]= "foobar\nfie\nfum";
   edit(buff, sizeof(buff));
   return 0;
 }

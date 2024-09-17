@@ -1,0 +1,1 @@
+(clang emacs.c && stty cbreak -echo && ./a.out) ; stty sane
