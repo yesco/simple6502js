@@ -74,7 +74,7 @@ void edit(char* e, size_t size) {
       revers(1); printf("<<<\n"); revers(0);
     }
     //printf("\n: cur=%d size=%d yank=%d size=%d\n", cur-e, strsize(e), yank, size);
-    revers(1); printf("65EMACS: ESC< ^APNBFOKYEG ESC> ^X\n"); revers(0);
+    revers(1); printf("65EMACS ESC< ^APNBFOE^DHKYG ESC> ^X\n"); revers(0);
 
     printf("[u"); // restore cursor // TODO: only vt100
 
