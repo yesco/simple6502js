@@ -70,6 +70,16 @@
 #include <string.h>
 #include <assert.h>
 
+// it's implicitly optional, only enabled with -DPROGSIZE
+#include "progsize.c" // "first"
+
+#ifndef ETRACE
+  #define ETRACE(a) 
+#else
+  #undef ETRACE
+  #define ETRACE(a) do { a } while(0)
+#endif
+
 // ---------------- CONFIG
 #define MAXCONS  1024*8
 #define MAXATOM  1024
@@ -169,7 +179,7 @@ D assoc(D a, D env) {
 }
 
 D eval(D x, D env) {
-printf("EVAL: "); princ(x); printf(" ENV= "); princ(env); terpri();
+  ETRACE(printf("EVAL: "); princ(x); printf(" ENV= "); princ(env); terpri());
   if (x==nil || isnum(x)) return x;
   if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(env); }// var
   // TODO: set?
@@ -183,7 +193,7 @@ D apply(D f, D x, D env) {
   D a, b;
 
  applyagain:
-printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri();
+  ETRACE(printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri());
   if (!isnum(f) && car(f)==LAMBDA) {
     // TODO: progn
     //return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
@@ -266,6 +276,8 @@ int main(int argc, char** argv) {
     for(i=m; i; --i) r= eval(x, nil);
     princ(r); terpri();
   }
+
+  PROGSIZE;
 
   return argv? argc-1: 0; // BS
 }

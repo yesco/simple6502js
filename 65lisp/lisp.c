@@ -75,7 +75,7 @@
 // - primtive ops
 //
 // They are all listed above in the Functions: section
-// Only + - and list are varargs
+// Only + - and list are varargs (unless VM)
 // 
 // - evaluate function fixpoint
 //
@@ -210,9 +210,8 @@
 // Alread used names by others:
 // - lisp65 lisp/8 lisp02
 
-void startprogram() {}
-char firstvar= 42;
-char firstbss;
+// it's implicitly optional, only enabled with -DPROGSIZE
+#include "progsize.c"
 
 // for included files, enable lisp extensions
 #define LISP
@@ -2121,8 +2120,8 @@ void statistics(int level) {
   for(i=0; i<HASH; ++i) if (syms[i]) ++hslots;
 
   if (level>1) {
-    printf("%% Heap: max=%d mem=%d\n", _heapmaxavail(), _heapmemavail());
-    printf("%% Cons: %d/%d  Hash: %d/%d  Arena: %d/%d  Atoms: %d\n",
+    printf("%% Heap: max=%u mem=%u\n", _heapmaxavail(), _heapmemavail());
+    printf("%% Cons: %u/%u  Hash: %u/%u  Arena: %u/%u  Atoms: %u\n",
       ncons, MAXCELL/2,  hslots, HASH,  arptr-arena, ARENA_LEN, natoms);
   }
 
@@ -2235,7 +2234,7 @@ L testing(env) {
 int mainmain(int argc, char** argv, void* main) {
   L env= nil; char interpret= 1;
 
-  statistics(3);
+  if (!quiet) statistics(3);
 
   initlisp();
 
@@ -2289,7 +2288,7 @@ int mainmain(int argc, char** argv, void* main) {
   PRINTARRAY(syms, HASH, 0, 1);
   if (stats || test) {
     statistics(255);
-    printf("Program size: %u bytes(ish) %04x-%04x %04x %04x\n", ((uint)&firstbss)-((uint)startprogram), (uint)startprogram, (uint)main, (uint)&firstvar, (uint)&firstbss);
+    PROGSIZE;
   }
 
   //{clock_t x= clock(); } // TODO: only on machine?
