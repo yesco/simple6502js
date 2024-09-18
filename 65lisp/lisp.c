@@ -211,7 +211,7 @@
 // - lisp65 lisp/8 lisp02
 
 // it's implicitly optional, only enabled with -DPROGSIZE
-#include "progsize.c"
+#include "progsize.c" // "first"
 
 // for included files, enable lisp extensions
 #define LISP
