@@ -68,10 +68,10 @@ void edit(char* e, size_t size) {
 
     // show yank buffer if not empty
     if (*last) {
-      printf("\n\nYANK>>>");
+      revers(1); printf("\n\nYANK>>>"); revers(0);
       p= last; yank= 0;
       while(*p) putchar(*p--),yank++;
-      printf("<<<\n");
+      revers(1); printf("<<<\n"); revers(0);
     }
     //printf("\n: cur=%d size=%d yank=%d size=%d\n", cur-e, strsize(e), yank, size);
     revers(1); printf("65EMACS: ESC< ^APNBFOKYEG ESC> ^X\n"); revers(0);
@@ -122,7 +122,7 @@ void edit(char* e, size_t size) {
     // edit
     case CTRL+'H': case 127: if (cur>e) memmove(cur-1, cur, elen); --cur; break;
     case CTRL+'D': memmove(cur, cur+1, elen); break;
-    case CTRL+'O': memmove(cur+1, cur, elen-1); *cur= '\n'; break;
+    case CTRL+'O': memmove(cur+1, cur, elen); *cur= '\n'; break;
     default: if ((k>=' ' && k<127) || k=='\n') {
       memmove(cur+1, cur, elen); *cur= k; ++cur; } break;
     }
