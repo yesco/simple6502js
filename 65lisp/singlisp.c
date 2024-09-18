@@ -126,12 +126,12 @@ void terpri() { putchar('\n'); }
 D princ(D x) { if (x==nil) printf("nil");
   else if (isnum(x)) printf("%d", num(x));
   else if (isatom(x)) printf("%s", ((Atom*)x)->str);
-  else { for (putchar('(');;putchar(' ')) {
+  else { for (putchar('(');; putchar(' ')) {
       princ(car(x)); x= cdr(x); if (!iscons(x)) break;
     }
-    if (x==nil) { printf(" . "); princ(x); }
+    if (x!=nil) { printf(" . "); princ(x); }
     putchar(')');
-  }  
+  }
 
   return x;
 }
@@ -139,12 +139,23 @@ D princ(D x) { if (x==nil) printf("nil");
 // poor mans ungetchar...
 char unc= 0;
 
-D readlist() { 
-  char c= unc? unc: getchar(); unc= 0;
-  if (isspace(c)) return readlist();
-  if (c==')') return nil;
-  if (c=='.') { D x= lread(); if (!unc) getchar(); unc= 0; return x; } // TODO: .5 lol? check ')'
-  unc= c; return cons(lread(), readlist()); // order of eval 1...2
+//// Very lispy/simple, but too recursive for long lists...
+//D readlist2() { 
+//  char c= unc? unc: getchar(); unc= 0;
+//  if (isspace(c)) return readlist2();
+//  if (c==')') return nil;
+//  if (c=='.') { D x= lread(); if (!unc) getchar(); unc= 0; return x; }
+//  unc= c; return cons(lread(), readlist2()); // order of eval 1...2
+//}
+
+// TODO: .5 lol? check ')'
+D readlist() { D r= nil, *last= &r; char c;
+  do { c= unc? unc: getchar(); unc= 0;
+    while (isspace(c)) c= getchar();
+    if (c==')') return r;
+    if (c=='.') { *last= lread(); lread(); return r; }
+    unc= c; *last= cons(lread(), nil); last= &(cdr(*last));
+  } while(1);
 }
 
 D lread() { int n= 0, c= unc? unc: getchar(); unc= 0;
@@ -154,7 +165,7 @@ D lread() { int n= 0, c= unc? unc: getchar(); unc= 0;
     unc= c= getchar(); if (!isdigit(c)) return mknum(n);
   }
   if (c=='\'') return cons(QUOTE, cons(lread(), nil));
-  if (c=='(') return cons(lread(), readlist());
+  if (c=='(') return readlist();
   // assume atom
   { char s[32]={0}, *p= s; // overflow?
     do { *p++= c; c= getchar(); }while(c>0 && !isspace(c) && c!='(' && c!=')');
