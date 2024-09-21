@@ -287,8 +287,10 @@ long nops= 0;
 int debug= 0, verbose= 0;
 
 void* zalloc(size_t n) {
+  void* r= calloc(n, 1);
+  assert(r);
   nalloc+= n;
-  return calloc(n, 1);
+  return r;
 }
 
 
@@ -507,6 +509,7 @@ OBJ* newObj(char typ, void* s, size_t z) {
   // If this is considered wasteful: don't use for small!
   char *orig= (char*)malloc(z+sizeof(OBJ)+4), *p= orig;
   OBJ *prev= objList, *o;
+  assert(orig);
 
   // Prepend at least one type byte
   do {
@@ -944,13 +947,23 @@ char skipspc() {
 
 
 // ---------------- DEC30 - floating point decimals!
-// (optional)
+// (optional) 3.8KB extra CODE!
 
-#define DEC
+//#define DEC
 
 #ifdef DEC
 #include <limits.h>
 #include "dec30.c"
+#else
+  L readdec(char c, char base) {
+    int r= 0;
+    while(isdigit(c)) {
+      r= r*10 + c-'0';
+      c= nextc();
+    }
+    unc(c);
+    return r;
+  }
 #endif // DEC
 
 
@@ -1679,6 +1692,8 @@ L evalTrace(L x, L env) {
 static L stack[STACKSIZE]= {0};
 static L *send, alvals= 0;
 
+unsigned long bench=1;
+
 #ifdef AL
 #define NEXT goto next
 
@@ -1707,19 +1722,20 @@ static char c, *pc;
 #pragma data-name(pop)
 #endif // ZEROPAGE
 
-
 // ignore JMP usage, uncomment to activate
 //#define JMP(a) 
 
 
 // just including the cod
-//#define GENASM
+#define GENASM
 
 #ifdef GENASM
 char mc[255]= {0};
 char* mcp= mc;
  
 // compile AL bytecode to simple JSR/asm
+
+// 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x
 char* genasm(char* la) {
   #define B(b) *mcp++= (b)&0xff
   #define W(w) *((L*)mcp)++= (L)(w)
@@ -1753,7 +1769,6 @@ char* genasm(char* la) {
 }
 
 char* asmpile(char* la) {
-  return 0;
   mcp= mc;
   memset(mc, 0, sizeof(mc));
   return genasm(la)? mc: 0;
@@ -1763,7 +1778,27 @@ char* asmpile(char* la) {
   #define asmpile(a) 0
 #endif
 
+// -b -e 10 => 196.76s
+int fib(int n) {
+  if (n<2) return n;
+  else return fib(n-1)+fib(n-2);
+}
+
+int fub(int a) {
+  int b= a+1,
+    c= b+1;
+  {
+    int d= a+b+c;
+    {
+      int e=a+b+c+d;
+      return e+10000;
+    }
+  }
+}
+
 L al(char* la) {
+  char *m= 0, *p= m;
+
 #ifndef JMP
   static void* jmp[127]= {(void*)(int*)42,0};
 #endif
@@ -1828,25 +1863,20 @@ L al(char* la) {
 
   if (verbose) printf("\nAL.run: %s\n", pc);
 
-  #ifdef GENASM
-  { char* m= asmpile(la);
-    char* p= m;
-    printf("MMMM=%d\n", m);
-    if (m) {
-      printf("ASM:\n");
-      NL;
-      do { printf("%02x ", *p); ++p; } while(*p || p[1] || p[2]); // end with 3 BRK!
-      NL;
-      printf("RUN!\n");
-      { int i=10000; L x= top;
-        for(; i; --i) { prin1(x); top= ((FUN1)m)(x); prin1(top); NL; }
-        return top;
-      }
-    } else
-      printf("NO GEN CODE!\n");
-  }
-  #endif
+  m= asmpile(la);
+  if (m) {
+    p= m;
+    printf("CODE: ");
+    do { printf("%02x ", *p); p++; } while (*p || p[1] || p[2]);  NL;
 
+    // Run machine code
+    { int i=10000; L x= top;
+      for(; i; --i) top= ((FUN1)m)(x);
+      return top;
+    }
+  } else
+    printf("\nNO GEN CODE!\n");
+  
  call:
   params= frame+PARAM_OFF;
   if (s<params) s= params; // TODO: hmmm... TODO: assert?
@@ -2284,7 +2314,6 @@ void statistics(int level) {
 
 // TODO: turn on GC
 char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
-unsigned long bench=1;
 
 L readeval(char *ln, L env, char noprint) {
   // TODO: not sure what function env has an toplevel:

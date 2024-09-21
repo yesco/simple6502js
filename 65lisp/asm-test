@@ -1,7 +1,7 @@
 # 46.62s
 ./run -b 10000 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" 
 # 13.56s
-./65vm -b -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65vm -b 1 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"ae
 # car/cdr = 6.41s
 # CAR/CDR = 2.98s == UNSAFE
 # fc3a4dr = 3.09s UNSAFE: 2.83s

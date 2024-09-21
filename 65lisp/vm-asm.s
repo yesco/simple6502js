@@ -36,8 +36,8 @@ _ffcdr:
   beq @nil
   tya
 
-  lda #02
-  jmp ldaxi
+  ldy #$03
+  jmp ldaxidx
 
 @nil:
   lda _nil
