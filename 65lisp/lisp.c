@@ -1702,6 +1702,58 @@ L fc3a4dr(L c) {
   return __AX__;
 }
 
+// HMMM< fc3a4dr gets destroyed and give wrong result if this is enabled, lol 
+// optimizer....
+
+//#define GENASM
+
+#ifdef GENASM
+char mc[255]= {0};
+char* mcp= mc;
+ 
+// compile AL bytecode to simple JSR/asm
+char* genasm(char* la) {
+  #define B(b) *mcp++= (b)&0xff
+  #define W(w) *((L*)mcp)++= (L)(w)
+
+  #define LDAn(n) B(0xA9),B(n)
+  #define LDXn(n) B(0xA2),B(n)
+
+  #define JSR(a) B(0x20),W(a)
+  #define RTS(a) B(0x60)
+  #define BRK(a) B(0x00)
+
+ next:
+  printf("GENASM: '%c'\n", *la);
+  switch(*la++) {
+  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
+  case ' ': case '\t': case '\n': case '\r': goto next;
+  case 'A': JSR(fcar); goto next;
+  case 'D': JSR(fcdr); goto next;
+  case ',': // TODO: pushax first... (doesn't matte yet!)
+    printf(", COMPILE "); prin1(*((L*)la)); NL;
+    LDAn(la[0]); LDXn(la[1]); la+= 2; goto next;
+
+  case '^':
+  case '(':
+  case ')':
+  default:
+    --la;
+    printf("%% genasm.error: unimplemented code '%c' (%d)\n", *la, *la);
+    return 0;
+  }
+}
+
+char* asmpile(char* la) {
+  return 0;
+  mcp= mc;
+  memset(mc, 0, sizeof(mc));
+  return genasm(la)? mc: 0;
+}
+
+#else
+  #define asmpile(a) 0
+#endif
 
 L al(char* la) {
 #ifndef JMP
@@ -1767,6 +1819,25 @@ L al(char* la) {
   #define PARAM_OFF 4
 
   if (verbose) printf("\nAL.run: %s\n", pc);
+
+  #ifdef GENASM
+  { char* m= asmpile(la);
+    if (0 && m) {
+      char* p=m;
+      printf("ASM:\n");
+      NL;
+      do { printf("%02x ", *p); ++p; } while(*p || p[1] || p[2]); // end with 3 BRK!
+      NL;
+      printf("RUN!\n");
+      { int i=10000; L x= top;
+        for(; i; --i) { prin1(x); top= ((FUN1)m)(x); prin1(top); NL; }
+        return top;
+      }
+    } else {
+      printf("NO GEN CODE!\n");
+    }
+  }
+  #endif
 
  call:
   params= frame+PARAM_OFF;
@@ -1969,6 +2040,7 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
 
     ALC(','); // reads next value and compiles to put it on stack
     { L* pi= (L*)p; if (*pi) return NULL; // overflow!
+      printf("GENBYTES: "); prin1(x); NL;
       *pi= x; p+= sizeof(L);
       // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
