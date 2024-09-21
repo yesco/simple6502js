@@ -31,11 +31,11 @@ cl65 -O $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 #cl65 -Oi $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 
 #cl65 --codesize 10 -O -t atmos $name.c -o $name.tap || exit 72
-#( cl65 -O $OPTS -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
-( cl65 -O $OPTS -t atmos $name.c -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
+( cl65 -O $OPTS -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
+#( cl65 -O $OPTS -t atmos $name.c -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
 
-#cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
-cc65 -O $OPTS -T $name.c 2>/dev/null # generate .s file
+cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
+#cc65 -O $OPTS -T $name.c 2>/dev/null # generate .s file
 
 #ls -l $name.o $name.out $name.tap
 
