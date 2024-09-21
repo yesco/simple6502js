@@ -1,7 +1,7 @@
 RUN="./65lisp"
-RUN="./65vm"
 RUN="./65vm-nops"
 RUN="./run"
+RUN="./65vm"
 
 $echo "RUN: $RUN"
 (

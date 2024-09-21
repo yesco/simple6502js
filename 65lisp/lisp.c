@@ -1652,6 +1652,56 @@ static char c, *pc;
 // ignore JMP usage, uncomment to activate
 //#define JMP(a) 
 
+//#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
+
+void fcar() {
+  #ifndef UNSAFE
+    asm("      tay"); 
+    asm("      and #$01"); // TODO: bit?
+    asm("      beq @nil");
+    asm("      tya");
+  #endif
+
+  asm("   jmp ldaxi");
+
+  #ifndef UNSAFE
+    asm("@nil: lda _nil");
+    asm("      ldx _nil+1");
+    asm("rts");
+  #endif
+}
+
+// - https://github.com/cc65/cc65/blob/master/libsrc%2Fruntime%2Fldaxi.s
+
+
+//L fcdr(L c) { return isnum(c)? nil: CDR(c); }
+
+// 11.70521450042724609375 (fcar & fcdr in ASM!)
+
+void fcdr() {
+  #ifndef UNSAFE
+  asm("      tay"); 
+  asm("      and #$01"); // TODO: bit?
+  asm("      beq @nil");
+  asm("      tya");
+  #endif
+
+  // This works... lol
+  asm("   ldy #$03");
+  asm("   jmp ldaxidx"); // 11.54969692230224609375
+
+  #ifndef UNSAFE
+  asm("@nil: lda _nil");
+  asm("      ldx _nil+1");
+  asm("rts");
+  #endif
+}
+
+L fc3a4dr(L c) {
+  __AX__= c;  fcdr();fcdr();fcdr();fcdr();fcar();fcar();fcar();  top= __AX__;
+  return __AX__;
+}
+
 
 L al(char* la) {
 #ifndef JMP
@@ -1684,6 +1734,8 @@ L al(char* la) {
     // play
     jmp['i']= &&ginc;
     jmp['j']= &&ginc2;
+
+    jmp['Z']= &&gZ;
   }
 #endif // JMP
 
@@ -1749,6 +1801,18 @@ L al(char* la) {
 //JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); NNEXT; // 12.98s (/ 13.10 12.98) < 1%
 JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13.06 (/ 13.06 12.98) < 0.7%
 JMP(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
+
+JMP(gZ)case 'Z':
+    { int i=5000; static L x; x= top;
+      for(;i;--i) {
+        //top=CAR(CAR(CAR(CDR(CDR(CDR(cdr(x))))))); // 2.98s
+        //top=car(car(car(cdr(cdr(cdr(cdr(x))))))); // 6.41s
+        //__AX__= x;  fcdr();fcdr();fcdr();fcdr();fcar();fcar();fcar();  top= __AX__; //  NOT: x optimized away lol
+        top= fc3a4dr(x); // 3.09s 22564ops/s !!! (2.83s UNSAFE)
+        //NL;
+      }
+    }
+    goto next; // last can't be CDR lol
 
 //JMP(geq)case '=': top= (*s-- == top)? T: nil; NNEXT;
 //JMP(geq)case '=': if (*s--== top) goto settrue; else goto setnil; // OLD LABEL
