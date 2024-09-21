@@ -304,11 +304,15 @@ typedef uint16_t uint;
 
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
-//extern _fastcall_ L ffcar(L);
-//extern _fastcall_ L ffcdr(L);
-
 extern L ffcar(L);
 extern L ffcdr(L);
+
+extern void retnil();
+
+extern void pushax();
+
+extern void tosaddax();
+extern void tosmulax();
 
 
 #ifdef FFFF
@@ -1752,17 +1756,24 @@ char* genasm(char* la) {
   switch(*la++) {
   case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
   case ' ': case '\t': case '\n': case '\r': goto next;
+
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
   case ',': // TODO: pushax first... (doesn't matte yet!)
-    printf(", COMPILE "); prin1(*((L*)la)); NL;
-    LDAn(la[0]); LDXn(la[1]); la+= 2; goto next;
+    //printf(", COMPILE "); prin1(*((L*)la)); NL;
+    JSR(pushax); LDAn(la[0]); LDXn(la[1]); la+= 2; goto next;
+
+  case '+': JSR(tosaddax); goto next;
+  case '*': JSR(tosmulax); goto next;
+
+  case '9': JSR(retnil); goto next;
 
   case '^':
   case '(':
   case ')':
   default:
     --la;
+    if (*la>='0' && *la<='8') { JSR(pushax); LDAn(*la-'0'); LDXn(0); goto next; }
     printf("%% genasm.error: unimplemented code '%c' (%d)\n", *la, *la);
     return 0;
   }
