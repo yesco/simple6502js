@@ -6,7 +6,15 @@
 .import tosadda0, tosaddax
 .import tosmulax
 
+.import asrax1
+.import shraxy
+.import shlaxy
+
+.import pusha
 .import pushax
+.import pusha0sp
+
+.import addysp
 
 .import ptr1,ptr2,ptr3
 
@@ -16,10 +24,17 @@
 .export _ldaxi, _ldaxidx
 
 .export _pushax
+.export _pusha0sp
+.export _pusha
+
+.export _addysp
 
 .export _tosaddax
 .export _tosmulax
 
+.export _asrax1
+.export _shraxy
+.export _shlaxy
 
 .export _ffcar, _ffcdr
 
@@ -30,8 +45,17 @@
 _ldaxi		= ldaxi
 _ldaxidx	= ldaxidx
 _pushax         = pushax
+_pusha0sp       = pusha0sp
+_pusha          = pusha
+
 _tosaddax       = tosaddax
 _tosmulax       = tosmulax
+
+_asrax1         = asrax1
+_shraxy         = shraxy
+_shlaxy         = shlaxy
+
+_addysp         = addysp
 
 ;;; some routines in assembly, can't put inline in .c as optimized meddles...
 

@@ -263,7 +263,8 @@
 
 // (+ (* 8192 2 2) (* 32 2) (* 2048 1)) = 34880 bytes!
 
-#define MAXCELL 8192*2
+//#define MAXCELL 8192*2
+#define MAXCELL 4096*2
 
 // Arena len to store symbols/constants (and global ptr)
 #define ARENA_LEN 2048
@@ -314,24 +315,8 @@ extern void pushax();
 extern void tosaddax();
 extern void tosmulax();
 
+extern void addysp();
 
-#ifdef FFFF
-void fcar() {
-  #ifndef UNSAFE
-    asm("      tay"); 
-    asm("      and #$01"); // TODO: bit?
-    asm("      beq @nil");
-    asm("      tya");
-  #endif
-
-  asm("   jmp ldaxi");
-
-  #ifndef UNSAFE
-    asm("@nil: lda _nil");
-    asm("      ldx _nil+1");
-    asm("rts");
-  #endif
-}
 // - https://github.com/cc65/cc65/blob/master/libsrc%2Fruntime%2Fldaxi.s
 
 
@@ -339,26 +324,6 @@ void fcar() {
 
 // 11.70521450042724609375 (fcar & fcdr in ASM!)
 
-void fcdr() {
-  #ifndef UNSAFE
-  asm("      tay"); 
-  asm("      and #$01"); // TODO: bit?
-  asm("      beq @nil");
-  asm("      tya");
-  #endif
-
-  // This works... lol
-  asm("   ldy #$03");
-  asm("   jmp ldaxidx"); // 11.54969692230224609375
-
-  #ifndef UNSAFE
-  asm("@nil: lda _nil");
-  asm("      ldx _nil+1");
-  asm("rts");
-  #endif
-}
-
-#endif
 //L fc3a4dr(L c) {
 //  __AX__= c;  fcdr();fcdr();fcdr();fcdr();fcar();fcar();fcar();  //top= __AX__;
 //  return __AX__;
@@ -1726,54 +1691,61 @@ static char c, *pc;
 #pragma data-name(pop)
 #endif // ZEROPAGE
 
-// ignore JMP usage, uncomment to activate
-//#define JMP(a) 
+// ignore JMPARR usage, uncomment to activate
+//#define JMPARR(a) 
 
 
 // just including the cod
 #define GENASM
 
 #ifdef GENASM
-char mc[255]= {0};
+char mc[120]= {0};
 char* mcp= mc;
  
 // compile AL bytecode to simple JSR/asm
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x
 char* genasm(char* la) {
+  char stk= 0;
+
   #define B(b) *mcp++= (b)&0xff
   #define W(w) *((L*)mcp)++= (L)(w)
 
   #define LDAn(n) B(0xA9),B(n)
   #define LDXn(n) B(0xA2),B(n)
+  #define LDYn(n) B(0xA0),B(n)
 
   #define JSR(a) B(0x20),W(a)
   #define RTS(a) B(0x60)
+  #define JMP(a) B(0x4c),W(a)
+  #define JMPi(a) B(0x6c),W(a)
   #define BRK(a) B(0x00)
 
  next:
   printf("GENASM: '%c'\n", *la);
-  switch(*la++) {
-  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
+  switch(*++la) {
+//  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
+  case 0  : LDYn(stk*2); JMP(addysp); BRK(); BRK(); BRK(); return mcp;
   case ' ': case '\t': case '\n': case '\r': goto next;
 
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
   case ',': // TODO: pushax first... (doesn't matte yet!)
     //printf(", COMPILE "); prin1(*((L*)la)); NL;
-    JSR(pushax); LDAn(la[0]); LDXn(la[1]); la+= 2; goto next;
+    JSR(pushax); ++stk;
+    LDAn(la[1]); LDXn(la[2]); la+= 2; goto next;
 
-  case '+': JSR(tosaddax); goto next;
-  case '*': JSR(tosmulax); goto next;
+  case '+': JSR(tosaddax); --stk; goto next;
+  case '*': JSR(tosmulax); --stk; goto next;
 
-  case '9': JSR(retnil); goto next;
+  case '9': JSR(pushax); ++stk; JMP(retnil); goto next;
 
   case '^':
   case '(':
   case ')':
   default:
-    --la;
-    if (*la>='0' && *la<='8') { JSR(pushax); LDAn(*la-'0'); LDXn(0); goto next; }
+    printf("DEFAULT: %d\n", *la);
+    if (*la>='0' && *la<='8') { JSR(pushax); ++stk; LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
     printf("%% genasm.error: unimplemented code '%c' (%d)\n", *la, *la);
     return 0;
   }
@@ -1810,13 +1782,14 @@ int fub(int a) {
 L al(char* la) {
   char *m= 0, *p= m;
 
-#ifndef JMP
+#ifndef JMPARR
   static void* jmp[127]= {(void*)(int*)42,0};
 #endif
-   char n=0, *orig;
 
-#ifndef JMP
-  #define JMP(a) a:
+  char n=0, *orig;
+
+#ifndef JMPARR
+  #define JMPARR(a) a:
   if (*((int*)jmp)==42) {
     //printf("FOURTYTWO\n");
     memset(jmp, (int)&&gerr, sizeof(jmp));
@@ -1843,7 +1816,7 @@ L al(char* la) {
 
     jmp['Z']= &&gZ;
   }
-#endif // JMP
+#endif // JMPARR
 
   top= nil; // global 10% faster!
   orig= pc= la; // global 10% faster
@@ -1883,6 +1856,10 @@ L al(char* la) {
     // Run machine code
     { int i=10000; L x= top;
       for(; i; --i) top= ((FUN1)m)(x);
+      return MKNUM(42);
+      //top= ((FUN1)m)(x);
+      printf("RETURN: "); prin1(top);NL;
+      // TODO: need to balance the stack!
       return top;
     }
   } else
@@ -1906,7 +1883,10 @@ L al(char* la) {
 // inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
 
 #define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
-  NNEXT;
+
+  NOPS(++nops;);
+  c=*++pc;
+  goto *jmp[c];
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
 
@@ -1916,13 +1896,13 @@ L al(char* la) {
 
   // inline AD cons-test: 14% faster, 2.96s with isnum => safe,
   // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
-//JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); NNEXT; // 13.00s
-//JMP(gA)case 'A': top= isnum(top)? nil: CAR(top); goto next; // 13.10s
-//JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); NNEXT; // 12.98s (/ 13.10 12.98) < 1%
-JMP(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13.06 (/ 13.06 12.98) < 0.7%
-JMP(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
+//JMPARR(gA)case 'A': top= isnum(top)? nil: CAR(top); NNEXT; // 13.00s
+//JMPARR(gA)case 'A': top= isnum(top)? nil: CAR(top); goto next; // 13.10s
+//JMPARR(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); NNEXT; // 12.98s (/ 13.10 12.98) < 1%
+JMPARR(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13.06 (/ 13.06 12.98) < 0.7%
+JMPARR(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
 
-JMP(gZ)case 'Z':
+JMPARR(gZ)case 'Z':
     { int i=5000; static L x; x= top;
       // nair fair, EVAL: ./run -b 10000 => 92.38s !!!!    
       for(;i;--i) {
@@ -1936,50 +1916,50 @@ JMP(gZ)case 'Z':
     }
     goto next; // last can't be CDR loll
 
-//JMP(geq)case '=': top= (*s-- == top)? T: nil; NNEXT;
-//JMP(geq)case '=': if (*s--== top) goto settrue; else goto setnil; // OLD LABEL
-//JMP(geq)case '=': if (*s--==top) goto setnil; goto settrue; // error if have else!
-//JMP(geq)case 7: if (*s==top) goto droptrue; else goto dropnil; goto droptrue; // error if have else!
-//JMP(geq)case 7: --s; if (s[1]==top) goto settrue; goto setnil; .. not too bad
-JMP(geq)case '=':
+//JMPARR(geq)case '=': top= (*s-- == top)? T: nil; NNEXT;
+//JMPARR(geq)case '=': if (*s--== top) goto settrue; else goto setnil; // OLD LABEL
+//JMPARR(geq)case '=': if (*s--==top) goto setnil; goto settrue; // error if have else!
+//JMPARR(geq)case 7: if (*s==top) goto droptrue; else goto dropnil; goto droptrue; // error if have else!
+//JMPARR(geq)case 7: --s; if (s[1]==top) goto settrue; goto setnil; .. not too bad
+JMPARR(geq)case '=':
     if (*s==top)
          { --s; settrue: top= T; }
     else { --s; setnil:  top= nil; }
     NNEXT;
          
-JMP(gnil)case '9': *++s= top; goto setnil;
+JMPARR(gnil)case '9': *++s= top; goto setnil;
 
-JMP(gU)case 'U': if (null(top)) goto settrue; goto setnil;
-JMP(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
+JMPARR(gU)case 'U': if (null(top)) goto settrue; goto setnil;
+JMPARR(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
 
-JMP(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
-JMP(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
+JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
+JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
-JMP(ginc)case 'i': __AX__= top; asm("jsr incax2"); top= __AX__; goto next;
-JMP(ginc2)case 'j': top+= 2; goto next;
+JMPARR(ginc)case 'i': __AX__= top; asm("jsr incax2"); top= __AX__; goto next;
+JMPARR(ginc2)case 'j': top+= 2; goto next;
 
-JMP(gadd)case '+': top+= *s; --s; top&=NUM_MASK; goto next;
-JMP(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; goto next;
+JMPARR(gadd)case '+': top+= *s; --s; top&=NUM_MASK; goto next;
+JMPARR(gmul)case '*': top*= *s; --s; top/=2; top&=NUM_MASK; goto next;
 
-JMP(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; goto next;
-JMP(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; goto next;
+JMPARR(gsub)case '-': top= *s-top; --s; top&=NUM_MASK; goto next;
+JMPARR(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; goto next;
 
-JMP(gC)case 'C': top= cons(*s, top); --s; goto next;
+JMPARR(gC)case 'C': top= cons(*s, top); --s; goto next;
 
-JMP(gbl)
+JMPARR(gbl)
   // not so common so move down... linear probe!
   case ' ': case '\t': case '\n': case '\r': case 12: goto next; // TODO: NNEXT loops forever?
 
-JMP(gcmp)
+JMPARR(gcmp)
   case '?': top= top==*s? MKNUM(0): (isatom(*s)&&isatom(top))?
       mknum(strcmp(ATOMSTR(*s), ATOMSTR(top))): mknum(*s-top); goto next; // no care type!
 
   // TODO: need a drop?
 
-JMP(gP)case 'P': print(top); goto next;
-JMP(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
+JMPARR(gP)case 'P': print(top); goto next;
+JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 
   // calling user compiled AL or normal lisp
 
@@ -2042,18 +2022,18 @@ JMP(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
     // top contains result! no need copy
 
   // parameter a-h
-JMP(gvar)
+JMPARR(gvar)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
     *s++= top; top= params[*pc-'a']; goto next;
 
 #endif // CALLTWO
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
-JMP(gdigit)
+JMPARR(gdigit)
   case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8'://case'9':
     *++s= top; top= MKNUM(*pc-'0'); goto next;
 
-JMP(g0)
+JMPARR(g0)
   case 0: return top; // all functions should end with ^ ?
 
 // 26.82s
@@ -2062,7 +2042,7 @@ JMP(g0)
 // 30.45s
 //  default : if (isdigit(*pc)) { ++s; *s= MKNUM(*pc-'0'); NEXT; }
 //   printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
-JMP(gerr)default:
+JMPARR(gerr)default:
     printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
   }
 }
