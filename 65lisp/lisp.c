@@ -302,6 +302,13 @@ typedef uint16_t uint;
 
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
+//extern _fastcall_ L ffcar(L);
+//extern _fastcall_ L ffcdr(L);
+
+extern L ffcar(L);
+extern L ffcdr(L);
+
+
 #ifdef FFFF
 void fcar() {
   #ifndef UNSAFE
@@ -1705,9 +1712,7 @@ static char c, *pc;
 //#define JMP(a) 
 
 
-// HMMM< fc3a4dr gets destroyed and give wrong result if this is enabled, lol 
-// optimizer....
-
+// just including the cod
 //#define GENASM
 
 #ifdef GENASM
@@ -1731,8 +1736,8 @@ char* genasm(char* la) {
   switch(*la++) {
   case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
   case ' ': case '\t': case '\n': case '\r': goto next;
-  case 'A': JSR(fcar); goto next;
-  case 'D': JSR(fcdr); goto next;
+  case 'A': JSR(ffcar); goto next;
+  case 'D': JSR(ffcdr); goto next;
   case ',': // TODO: pushax first... (doesn't matte yet!)
     printf(", COMPILE "); prin1(*((L*)la)); NL;
     LDAn(la[0]); LDXn(la[1]); la+= 2; goto next;
@@ -1878,15 +1883,17 @@ JMP(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
 
 JMP(gZ)case 'Z':
     { int i=5000; static L x; x= top;
+      // nair fair, EVAL: ./run -b 10000 => 92.38s !!!!    
       for(;i;--i) {
         //top=CAR(CAR(CAR(CDR(CDR(CDR(cdr(x))))))); // 2.98s
         //top=car(car(car(cdr(cdr(cdr(cdr(x))))))); // 6.41s
         //__AX__= x;  fcdr();fcdr();fcdr();fcdr();fcar();fcar();fcar();  top= __AX__; //  NOT: x optimized away lol
         //top= fc3a4dr(x); // 3.09s 22564ops/s !!! (2.83s UNSAFE)
         //NL;
+        top= ffcar(ffcar(ffcar( ffcdr(ffcdr(ffcdr(ffcdr( x))))))); // 2.24s => 29537ops/s
       }
     }
-    goto next; // last can't be CDR lol
+    goto next; // last can't be CDR loll
 
 //JMP(geq)case '=': top= (*s-- == top)? T: nil; NNEXT;
 //JMP(geq)case '=': if (*s--== top) goto settrue; else goto setnil; // OLD LABEL
