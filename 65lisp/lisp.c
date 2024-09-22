@@ -1696,7 +1696,9 @@ static char c, *pc;
 
 
 // just including the cod
-#define GENASM
+#ifdef ASM
+  #define GENASM
+#endif
 
 #ifdef GENASM
 char mc[120]= {0};
@@ -1721,8 +1723,9 @@ char* genasm(char* la) {
   #define JMPi(a) B(0x6c),W(a)
   #define BRK(a) B(0x00)
 
+  --la;
  next:
-  printf("GENASM: '%c'\n", *la);
+  printf("GENASM: '%c'\n", la[1]);
   switch(*++la) {
 //  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
   case 0  : LDYn(stk*2); JMP(addysp); BRK(); BRK(); BRK(); return mcp;
@@ -1730,6 +1733,8 @@ char* genasm(char* la) {
 
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
+
+  case 'C': JSR(cons); --stk; goto next;
   case ',': // TODO: pushax first... (doesn't matte yet!)
     //printf(", COMPILE "); prin1(*((L*)la)); NL;
     JSR(pushax); ++stk;
@@ -1746,7 +1751,7 @@ char* genasm(char* la) {
   default:
     printf("DEFAULT: %d\n", *la);
     if (*la>='0' && *la<='8') { JSR(pushax); ++stk; LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
-    printf("%% genasm.error: unimplemented code '%c' (%d)\n", *la, *la);
+    printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;
   }
 }
@@ -2071,7 +2076,7 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
 
     ALC(','); // reads next value and compiles to put it on stack
     { L* pi= (L*)p; if (*pi) return NULL; // overflow!
-      printf("GENBYTES: "); prin1(x); NL;
+      //printf("GENBYTES: "); prin1(x); NL;
       *pi= x; p+= sizeof(L);
       // make sure not GC:ed = link up all constants
       alvals= cons(*pi, alvals);
