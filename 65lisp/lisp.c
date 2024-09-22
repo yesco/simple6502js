@@ -1723,22 +1723,41 @@ char* genasm(char* la) {
   #define JMPi(a) B(0x6c),W(a)
   #define BRK(a) B(0x00)
 
+  // Codegen generates "inline cc65 bytecode".
+  //
+  // In principle the generated code will be almost as fast as cc65's
+  // C-code! cc65 isn't a byte-code interpreter, but the code generated
+  // is heavily depending on an asm sub-routine library that is JSR:ed
+  // into for almost all operations. This saves code, compared to inlining
+  // all. For more compact representation, it could have used byte-code.
+  //
+  // But a byte-code interpreter is about 15x slower!
+  //
+  // So, for lisp, we choose to have:
+  // - EVAL : a simple, but generic, EVAL/APPLY
+  // - AL   : Alphabetical Lisp byte-code interpreter. 2x-3x faster
+  // - ASM  : simplistic inline asm using JSR for most primitives
+  //
+  // Challanges:
+  // - (Real) Closures in compiled code, need copy vars, hmmm, grrr, maybe not?
+  // - generic Tail-recursion optimization (can be done) (move vars, adjust stack, jmp)
+  //   (both cases, need count args)
+  
   --la;
  next:
-  printf("GENASM: '%c'\n", la[1]);
+  printf("GENASM: '%c' (%d %02x)\n", la[1], la[1], la[1]);
   switch(*++la) {
 //  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
   case 0  : LDYn(stk*2); JMP(addysp); BRK(); BRK(); BRK(); return mcp;
   case ' ': case '\t': case '\n': case '\r': goto next;
 
+  // These are safe functions with no stack effect
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
 
-  case 'C': JSR(cons); --stk; goto next;
-  case ',': // TODO: pushax first... (doesn't matte yet!)
-    //printf(", COMPILE "); prin1(*((L*)la)); NL;
-    JSR(pushax); ++stk;
-    LDAn(la[1]); LDXn(la[2]); la+= 2; goto next;
+  // All these routine change the stack
+  case 'C': JSR(cons); --stk; goto next; // WORKS!
+  case ',': JSR(pushax); ++stk; LDAn(la[1]); LDXn(la[2]); la+= 2; goto next;
 
   case '+': JSR(tosaddax); --stk; goto next;
   case '*': JSR(tosmulax); --stk; goto next;
@@ -1749,7 +1768,7 @@ char* genasm(char* la) {
   case '(':
   case ')':
   default:
-    printf("DEFAULT: %d\n", *la);
+    // inline constant 7 bytes, hmmmm... TODO: compare generated code?
     if (*la>='0' && *la<='8') { JSR(pushax); ++stk; LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
     printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;
@@ -1759,7 +1778,12 @@ char* genasm(char* la) {
 char* asmpile(char* la) {
   mcp= mc;
   memset(mc, 0, sizeof(mc));
-  return genasm(la)? mc: 0;
+  if (!genasm(la)) return 0;
+  
+  printf("CODE[%d]: ", mcp-mc);
+  mcp= mc;
+  do { printf("%02x ", *mcp); mcp++; } while (*mcp || mcp[1] || mcp[2]);  NL;
+  return mc;
 }
 
 #else
@@ -1785,7 +1809,7 @@ int fub(int a) {
 }
 
 L al(char* la) {
-  char *m= 0, *p= m;
+  char *m= 0;
 
 #ifndef JMPARR
   static void* jmp[127]= {(void*)(int*)42,0};
@@ -1852,23 +1876,25 @@ L al(char* la) {
 
   if (verbose) printf("\nAL.run: %s\n", pc);
 
+  // TODO: move OUT
   m= asmpile(la);
   if (m) {
-    p= m;
-    printf("CODE: ");
-    do { printf("%02x ", *p); p++; } while (*p || p[1] || p[2]);  NL;
-
     // Run machine code
-    { int i=10000; L x= top;
-      for(; i; --i) top= ((FUN1)m)(x);
-      return MKNUM(42);
+    { L x= top; L check= ERROR, ft= MKNUM(42);
+
+      for(; bench>0; --bench) top= ((FUN1)m)(x);
+
+      if (ft!=MKNUM(42) || check!=ERROR) {
+        // TODO: calculate how much? lol
+        printf("%% ASM: STACK MISALIGNED: %d\n", 0); // get and store SP
+        exit(99);
+      }
       //top= ((FUN1)m)(x);
-      printf("RETURN: "); prin1(top);NL;
+      printf("RETURN: %04x == ", top); prin1(top);NL;
       // TODO: need to balance the stack!
       return top;
     }
-  } else
-    printf("\nNO GEN CODE!\n");
+  }
   
  call:
   params= frame+PARAM_OFF;
@@ -2346,7 +2372,7 @@ L readeval(char *ln, L env, char noprint) {
     // eval
     if (!noeval && x!=ERROR) {
       // option to compare results? slow but equal
-      for(i=bench; i>0; --i) { // run n tests
+      for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
 
         #ifndef AL
           r= eval(x, env);
