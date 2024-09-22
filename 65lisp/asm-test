@@ -1,15 +1,26 @@
 # 46.62s
-./run -b 10000 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" 
+./65lisp -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" 
+
+./65lisp -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
+./65lisp -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
+./65lisp -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
 
 # 13.56s
 ./65vm -b 1000 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65vm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
+./65vm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
+./65vm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+
 
 # car/cdr = 6.41s
 # CAR/CDR = 2.98s == UNSAFE
 # fc3a4dr = 3.09s UNSAFE: 2.83s
-# ./65vm -b 10000 -e "(z '(1 2 3 4 ((5 6) 7) 8))"
+# ./65vm -b $* -e "(z '(1 2 3 4 ((5 6) 7) 8))"
 
 # --- ASM
 # 13.56s
-./65vm-asm -b 10000 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65vm-asm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
+./65vm-asm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
+./65vm-asm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+
 

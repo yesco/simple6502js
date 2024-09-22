@@ -307,6 +307,7 @@ typedef uint16_t uint;
 
 extern L ffcar(L);
 extern L ffcdr(L);
+extern L ldaxi(L);
 
 extern void retnil();
 
@@ -316,6 +317,8 @@ extern void tosaddax();
 extern void tosmulax();
 
 extern void addysp();
+
+extern void staxspidx();
 
 // - https://github.com/cc65/cc65/blob/master/libsrc%2Fruntime%2Fldaxi.s
 
@@ -927,7 +930,7 @@ char skipspc() {
   L readdec(char c, char base) {
     int r= 0;
     while(isdigit(c)) {
-      r= r*10 + c-'0';
+      r= r*base + c-'0';
       c= nextc();
     }
     unc(c);
@@ -1752,6 +1755,7 @@ char* genasm(char* la) {
   case ' ': case '\t': case '\n': case '\r': goto next;
 
   // These are safe functions with no stack effect
+  case '@': JSR(ldaxi); goto next;
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
 
@@ -1764,6 +1768,13 @@ char* genasm(char* la) {
 
   case '9': JSR(pushax); ++stk; JMP(retnil); goto next;
 
+  // setting global variable: value in AX sta
+    
+  case ':': JSR(staxspidx); --stk; goto next;
+  case '!': JSR(staxspidx); --stk; goto next;
+
+
+  // Subroutine caller and misc and 0..8 digit
   case '^':
   case '(':
   case ')':
@@ -1830,7 +1841,8 @@ L al(char* la) {
     jmp['/']=&&gdiv; jmp['=']=&&geq;
     jmp['?']=&&gcmp;
     jmp['P']=&&gP;
-    jmp['Y']= &&gY;
+    jmp['Y']=&&gY;
+    jmp['!']=&&gset;
 
     for(c='0'; c<='9'; ++c) jmp[c]= &&gdigit;
     for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
@@ -1878,6 +1890,7 @@ L al(char* la) {
 
   // TODO: move OUT
   m= asmpile(la);
+
   if (m) {
     // Run machine code
     { L x= top; L check= ERROR, ft= MKNUM(42);
@@ -1959,6 +1972,8 @@ JMPARR(geq)case '=':
     NNEXT;
          
 JMPARR(gnil)case '9': *++s= top; goto setnil;
+
+JMPARR(gset)case '!': setval(*s, top, nil); --s; goto next;
 
 JMPARR(gU)case 'U': if (null(top)) goto settrue; goto setnil;
 JMPARR(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
@@ -2189,8 +2204,10 @@ L alcompileread() {
 char* names[]= {
   // nargs
   ": de",
-  ": setq",
+  ": setq", // TODO: not right for "VM"
+  "! set",
   //"; df",
+
   "I if",
   "Y read",
   "\' quote",
@@ -2203,7 +2220,7 @@ char* names[]= {
   "H append",
   
   // one arg
-  "! atom", // "! symbolp", // or symbol?
+  "! atom", // "! symbolp", // or symbol? // TODO: change... lol
   "# numberp", // "# intp"
   //"$ stringp", 
   "A car",
@@ -2368,6 +2385,8 @@ L readeval(char *ln, L env, char noprint) {
 
     if (x==eof || x==bye) break;
     if (echo) { printf("> "); prin1(x); NL; }
+
+    if (!bench) bench= 1;
 
     // eval
     if (!noeval && x!=ERROR) {

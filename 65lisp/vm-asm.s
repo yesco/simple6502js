@@ -2,6 +2,8 @@
 ;;  -- https://stackoverflow.com/questions/71208847/how-to-access-assembly-language-symbols-without-a-leading-from-c-on-6502-cc65
 
 .import	ldaxi, ldaxidx
+.import staxspidx
+
 
 .import tosadda0, tosaddax
 .import tosmulax
@@ -22,6 +24,8 @@
 
 
 .export _ldaxi, _ldaxidx
+
+.export _staxspidx
 
 .export _pushax
 .export _pusha0sp
@@ -44,6 +48,8 @@
 
 _ldaxi		= ldaxi
 _ldaxidx	= ldaxidx
+_staxspidx      = staxspidx
+
 _pushax         = pushax
 _pusha0sp       = pusha0sp
 _pusha          = pusha
@@ -65,6 +71,7 @@ _ffcar:
   beq _retnil
   tya
 
+_ffat: 
   jmp ldaxi
 
 _retnil:
