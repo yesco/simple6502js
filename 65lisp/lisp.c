@@ -1438,7 +1438,7 @@ L evalX(L x, L env) {
     a= 2;
     switch(f) {
     // - nlambda - no eval
-    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case '!': return setval(car(x), eval(car(cdr(x)), env), env); 
     // TODO: if it allows local defines, how to
     //   extend the env,setq should not, two words?
     case ';': return df(x);
@@ -1713,18 +1713,32 @@ char* mcp= mc;
 char* genasm(char* la) {
   char stk= 0;
 
-  #define B(b) *mcp++= (b)&0xff
-  #define W(w) *((L*)mcp)++= (L)(w)
+  #define B(b) printf("%02x ", b);*mcp++= (b)&0xff
+  #define O(b) printf("\n\t");B(b)
+  #define W(w) *((L*)mcp)++= (L)(w);printf("%04x", w)
 
-  #define LDAn(n) B(0xA9),B(n)
-  #define LDXn(n) B(0xA2),B(n)
-  #define LDYn(n) B(0xA0),B(n)
 
-  #define JSR(a) B(0x20),W(a)
-  #define RTS(a) B(0x60)
-  #define JMP(a) B(0x4c),W(a)
-  #define JMPi(a) B(0x6c),W(a)
-  #define BRK(a) B(0x00)
+  #define LDAn(n) O(0xA9);B(n)
+  #define LDXn(n) O(0xA2);B(n)
+  #define LDYn(n) O(0xA0);B(n)
+
+
+  #define LDA(w)  O(0xAD);W(w)
+  #define LDX(w)  O(0xAE);W(w)
+  #define LDY(w)  O(0xAC);W(w)
+
+  #define STA(w)  O(0x8D);W(w)
+  #define STX(w)  O(0x8E);W(w)
+  #define STY(w)  O(0x8C);W(w)
+
+
+  #define JSR(a)  O(0x20);W(a)
+  #define RTS(a)  O(0x60)
+
+  #define JMP(a)  O(0x4c);W(a)
+  #define JMPi(a) O(0x6c);W(a)
+
+  #define BRK(a)  O(0x00)
 
   // Codegen generates "inline cc65 bytecode".
   //
@@ -1748,30 +1762,36 @@ char* genasm(char* la) {
   
   --la;
  next:
-  printf("GENASM: '%c' (%d %02x)\n", la[1], la[1], la[1]);
+  printf("\nGENASM: '%c' (%d %02x) %04X  ", la[1], la[1], la[1], *(L*)(la+2));
   switch(*++la) {
 //  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
-  case 0  : LDYn(stk*2); JMP(addysp); BRK(); BRK(); BRK(); return mcp;
+  case 0  : if (stk) { LDYn(stk*2); JMP(addysp); } else RTS();  BRK(); BRK(); BRK(); return mcp;
   case ' ': case '\t': case '\n': case '\r': goto next;
 
-  // These are safe functions with no stack effect
-  case '@': JSR(ldaxi); goto next;
+
+  // -- These are safe functions with no stack effect
+  case '@': JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
 
-  // All these routine change the stack
+  // SETQ: ax=val ':' addr => ax still val
+  case ':': ++la; STA(*(L*)la); STX(1+*(L*)la); ++la; goto next; // 6 bytes = write val at addr/var
+
+  // TODO: JSR(pushax); probably not neede, should be it's own token and generated, we might have a drop before!
+  // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
+
+  // -- All these routine change the stack
+  case ',': JSR(pushax); ++stk; ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
+  case ';': JSR(pushax); ++stk; ++la; LDA(*(L*)la); LDX((*(L*)la)+1); ++la; goto next; // 9 bytes = read var
+
   case 'C': JSR(cons); --stk; goto next; // WORKS!
-  case ',': JSR(pushax); ++stk; LDAn(la[1]); LDXn(la[2]); la+= 2; goto next;
 
   case '+': JSR(tosaddax); --stk; goto next;
   case '*': JSR(tosmulax); --stk; goto next;
 
   case '9': JSR(pushax); ++stk; JMP(retnil); goto next;
-
-  // setting global variable: value in AX sta
-    
-  case ':': JSR(staxspidx); --stk; goto next;
-  case '!': JSR(staxspidx); --stk; goto next;
+  // SET: setting global variable: address on stack, value in AX (opposite SETQ
+  case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
 
 
   // Subroutine caller and misc and 0..8 digit
@@ -1791,7 +1811,7 @@ char* asmpile(char* la) {
   memset(mc, 0, sizeof(mc));
   if (!genasm(la)) return 0;
   
-  printf("CODE[%d]: ", mcp-mc);
+  printf("\nCODE[%d]: ", mcp-mc);
   mcp= mc;
   do { printf("%02x ", *mcp); mcp++; } while (*mcp || mcp[1] || mcp[2]);  NL;
   return mc;
@@ -1817,6 +1837,11 @@ int fub(int a) {
       return e+10000;
     }
   }
+}
+
+int varbar= 4711;
+int bar(int a) {
+  return varbar;
 }
 
 L al(char* la) {
@@ -2146,16 +2171,33 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
 
     prin1(x); printf(" => '%c' (%d)\n", f, f);
 
+    // setq very special => VAL : ADDR
+    if (x==atom("setq")) {
+      L n= lread();
+      assert(isatom(n));
+
+      // generate eval of valuie
+      p= alcompile(p);
+      // prefix like ,
+      ALC(':');
+      *((L*)p)++= n;
+
+      skipspc(); // skip ')' lol TODO: cleaner?
+      return p;
+    }
+
     while((c=nextc())!=')') {
       ++n;
       p= alcompile(p);
       // implicit FOLDL of nargs + - L ! LOL
       if (n>2 && f<255 && f!='R') ALC(f);
     }
+
     // push the actual call
     if (f<255) {ALC(f); break;}
     // it's a user defined function/compiled
     assert(isatom(f)); // TODO: handle lisp/s-exp
+
     extra= ')';
     unc(c);
     x= 0xbeef;
@@ -2180,6 +2222,12 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
     assert(isatom(x));
     // local variable a-z
     if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
+
+    // allow for inline read
+    ALC(';');
+    *((L*)p)++= x;
+    return p;
+
     //printf("----ATOM---"); prin1(x); NL;
     // compile address on stack and @ to read value at runtime
     extra= '@'; // read atom val TODO: or 'X'/'E'
