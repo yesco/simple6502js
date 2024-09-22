@@ -931,7 +931,7 @@ char skipspc() {
       c= nextc();
     }
     unc(c);
-    return r;
+    return MKNUM(r);
   }
 #endif // DEC
 
