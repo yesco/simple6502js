@@ -15,7 +15,9 @@
 .import pusha
 .import pushax
 .import pusha0sp
+.import popax
 
+.import incsp2, incsp4, incsp6, incsp8
 .import addysp
 
 .import ptr1,ptr2,ptr3
@@ -30,7 +32,10 @@
 .export _pushax
 .export _pusha0sp
 .export _pusha
+.export _popax
+.export _incsp2
 
+.export _incsp2, _incsp4, _incsp6, _incsp8
 .export _addysp
 
 .export _tosaddax
@@ -53,6 +58,12 @@ _staxspidx      = staxspidx
 _pushax         = pushax
 _pusha0sp       = pusha0sp
 _pusha          = pusha
+_popax          = popax
+
+_incsp2         = incsp2
+_incsp4         = incsp4
+_incsp6         = incsp6
+_incsp8         = incsp8
 
 _tosaddax       = tosaddax
 _tosmulax       = tosmulax

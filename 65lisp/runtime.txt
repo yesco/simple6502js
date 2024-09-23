@@ -463,6 +463,14 @@ laddeqysp       - += operator for longs on the stack
 
 ldeaxysp        - Load a long from somewhere in the stack
 
+pushax          - push ax onto stack
+popax           - pop a value from the stack into ax
+incsp2          - drop one value from stack
+incsp 1-8       - drop one value from stack
+addysp          - base on Y, JSR=drop, JMP=Y..drop RTS
+
+
+
 pusheax         - long push
 pushl0          - long push
 

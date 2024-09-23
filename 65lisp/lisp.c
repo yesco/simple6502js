@@ -311,7 +311,13 @@ extern L ldaxi(L);
 
 extern void retnil();
 
-extern void pushax();
+extern void pushax(); 
+extern void popax(); 
+
+extern void incsp2(); // JSR=drop, JMP=return!
+extern void incsp4();
+extern void incsp6();
+extern void incsp8();
 
 extern void tosaddax();
 extern void tosmulax();
@@ -1709,9 +1715,13 @@ char* mcp= mc;
  
 // compile AL bytecode to simple JSR/asm
 
+// drop 0-4 values from stack, JSR=drop, JMP=return
+void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
+
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x
 char* genasm(char* la) {
-  char stk= 0;
+  char *fixstack[16]= {0}, **fix= fixstack, *tmp;
+  signed char stk= 0;
 
   #define B(b) printf("%02x ", b);*mcp++= (b)&0xff
   #define O(b) printf("\n\t");B(b)
@@ -1730,6 +1740,30 @@ char* genasm(char* la) {
   #define STA(w)  O(0x8D);W(w)
   #define STX(w)  O(0x8E);W(w)
   #define STY(w)  O(0x8C);W(w)
+
+
+  #define CMPn(b) O(0xC9);B(b)
+  #define CPXn(b) O(0xE0);B(b)
+  #define CPYn(b) O(0xC0);B(b)
+
+
+  #define CLC()   O(0x18)
+  #define SEC()   O(0x38)
+
+  #define CLV()   O(0xB8)
+
+
+  #define BMI(b)  O(0x30);B(b)
+  #define BPL(b)  O(0x10);B(b)
+
+  #define BNE(b)  O(0xD0);B(b)
+  #define BEQ(b)  O(0xF0);B(b)
+
+  #define BCC(b)  O(0x90);B(b)
+  #define BCS(b)  O(0xB0);B(b)
+
+  #define BVC(b)  O(0x50);B(b)
+  #define BVS(b)  O(0x70);B(b)
 
 
   #define JSR(a)  O(0x20);W(a)
@@ -1765,8 +1799,9 @@ char* genasm(char* la) {
   printf("\nGENASM: '%c' (%d %02x) %04X  ", la[1], la[1], la[1], *(L*)(la+2));
   switch(*++la) {
 
-  // leave: TODO: Y=2,4,8,... JMP(inc#sp); ...
-  case 0  : if (stk) { LDYn(stk*2); JMP(addysp); } else { RTS(); }  BRK(); BRK(); BRK(); return mcp;
+  // return may be followed by 0 which is return...  ^}\0
+  case '^': case 0: if (stk==0) { RTS(); } else if (stk>4) { LDYn(stk*2); JMP(addysp); }
+  else { JMP(incspARR[stk]); }    if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 
@@ -1790,22 +1825,36 @@ char* genasm(char* la) {
   // TODO: JSR(pushax); probably not neede, should be it's own token and generated, we might have a drop before!
   // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
 
-  // -- All these routine change the stack
-  case ',': JSR(pushax); ++stk; ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
-  case ';': JSR(pushax); ++stk; ++la; LDA(*(L*)la); LDX((*(L*)la)+1); ++la; goto next; // 9 bytes = read var
+  case ',': ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
+  case ';': ++la; LDA(*(L*)la); LDX((*(L*)la)+1); ++la; goto next; // 9 bytes = read var
+  case '9': JMP(retnil); goto next;
+
+ 
+  // -- All these routine (may) change the stack
+  case ']': if (la[1]=='[') ++la; else { JSR(incsp2); --stk; }  goto next; // ][ drop-push cancels!
+  case '[': JSR(pushax); ++stk; goto next;
 
   case 'C': JSR(cons); --stk; goto next; // WORKS!
 
   case '+': JSR(tosaddax); --stk; goto next;
   case '*': JSR(tosmulax); --stk; goto next;
 
-  case '9': JSR(pushax); ++stk; JMP(retnil); goto next;
   // SET: setting global variable: address on stack, value in AX (opposite SETQ
   case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
 
+  // COND I { THEN } { ELSE } ' ' => COND  CMP 0  BNE xx  THEN  SEC  BCS yy  xx:  ELSE  yy:
+  //                                         I        fix     {          fix          }
+  // TODO: AX not just A, lo, and TODO: test nil
+  case 'I': CMPn(0); BEQ(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
+
+  // TODO: stk should be same later with } end of ELSE, otherwise have troble...
+  // 3 bytes relative = slow: 2+3 c, 3 bytes jmp = 3 c TODO: jmp skip ELSE, save yy, fix xx to jump to END
+  case '{': tmp= *fix; SEC(); BCS(0); *fix= mcp-1; *tmp= mcp-tmp-1; goto next;
+
+  case '}': **fix= mcp-*fix-1; --fix; goto next; // END of IF, patch yy to jump here
+    
 
   // Subroutine caller and misc and 0..8 digit
-  case '^':
   case '(':
   case ')':
   default:
@@ -1814,8 +1863,8 @@ char* genasm(char* la) {
     printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;
   }
-}
 
+}
 char* asmpile(char* la) {
   mcp= mc;
   memset(mc, 0, sizeof(mc));
@@ -1934,7 +1983,10 @@ L al(char* la) {
 
       if (ft!=MKNUM(42) || check!=ERROR) {
         // TODO: calculate how much? lol
-        printf("%% ASM: STACK MISALIGNED: %d\n", 0); // get and store SP
+        printf("%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
+        printf("top="); prin1(top);
+        printf(" ft="); prin1(ft);
+        printf(" check="); prin1(check); NL;
         exit(99);
       }
       //top= ((FUN1)m)(x);
@@ -2148,8 +2200,9 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
     x= x==0xbeef? lread(): x;
 
     // short constants
-    if (null(x)) { ALC('9'); return p; }
+    if (null(x)) { ALC('['); ALC('9'); return p; }
 
+    ALC('['); // push
     ALC(','); // reads next value and compiles to put it on stack
     { L* pi= (L*)p; if (*pi) return NULL; // overflow!
       //printf("GENBYTES: "); prin1(x); NL;
@@ -2180,6 +2233,16 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
     else assert(f<255);
 
     prin1(x); printf(" => '%c' (%d)\n", f, f);
+ 
+    // if very special => EXPR I THEN { ELSE } ' '
+    if (x==atom("if")) {
+      p= alcompile(p); ALC('I'); // EXPR I
+      ALC(']'); p= alcompile(p); ALC('{'); // DROP THEN
+      ALC(']'); p= alcompile(p); ALC('}'); // DROP ELSE
+      c= skipspc();
+      if (c!=')') return NULL;
+      return p;
+    }
 
     // setq very special => VAL : ADDR
     if (x==atom("setq")) {
@@ -2192,7 +2255,8 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
       ALC(':');
       *((L*)p)++= n;
 
-      skipspc(); // skip ')' lol TODO: cleaner?
+      c= skipspc();
+      if (c!=')') return NULL;
       return p;
     }
 
@@ -2232,8 +2296,9 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
     assert(isatom(x));
     // local variable a-z
     if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
-
+ 
     // allow for inline read
+    ALC('['); // push
     ALC(';');
     *((L*)p)++= x;
     return p;
@@ -2267,6 +2332,7 @@ char* names[]= {
   //"; df",
 
   "R recurse",
+  "^ return",
 
   "I if",
   "Y read",
