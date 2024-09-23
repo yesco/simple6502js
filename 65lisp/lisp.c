@@ -1718,7 +1718,7 @@ char* mcp= mc;
    ' ' \t \r \n - skip
    !    - store (val, addr) => val
    "	
-   #    - (isnum)
+// #    - (isnum)    = LOL cc65 preprocessor runs inside comments?
    $	- (isstr)
    %    - (mod)
    &    - (bit-and)
