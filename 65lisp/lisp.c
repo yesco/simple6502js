@@ -1457,7 +1457,6 @@ L evalX(L x, L env) {
     case 'Y': x= eval(car(x), env); return sread(ISSTR(x)? ATOMSTR(x): 0);
 
     case 'S': return setval(car(x), eval(car(cdr(x)), env), env); // TODO: set local means update 'env' here...
-    //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
 
     // - nargs - eval many x
@@ -1503,7 +1502,6 @@ L evalX(L x, L env) {
     case '\'':return car(a); // quote
     //case '\\':return o;
     case 'S': return setval(car(a), eval(car(cdr(a)), env), env); // TODO: set local means update 'env' here...
-    //case '@': return TODO: apply J or @
     //case 'J': return TODO: apply J or @
 
     // - nargs - eval many x
@@ -1715,6 +1713,77 @@ char* mcp= mc;
  
 // compile AL bytecode to simple JSR/asm
 
+/* Byte codes that are compiled
+
+   ' ' \t \r \n - skip
+   !    - store (val, addr) => val
+   "	
+   #    - (isnum)
+   $	- (isstr)
+   %    - (mod)
+   &    - (bit-and)
+   '    
+   ()
+   *    - mul
+   +    - add
+   ,    - literal word
+   -    - (sub)
+   .    - princ
+   /    - (div)
+   012345678 - literal single digit number
+   9    - nil
+   :    - setq
+   ;    - ;BEEF read value at BEEF
+   <    - (lt)
+   =    - (eq)
+   >    - (gt)
+   ?    - (cmp)
+   @    - read value at addr from stack (use for array)
+   A    - cAr
+   B    - (memBer)
+   C    - Cons
+   D    - cDr
+   E    - (Eval)
+   F    - (Filter?)
+   G    - (Gassoc)
+   H    - (evalappend?) ???
+   I    - If
+   J    - (Japply)
+   K    - (Kons)
+   L    - (evallist?)
+   M    - (Map)
+   NO   - (Nth)
+   P    - Print
+   Q
+   R    - Recurse
+   S    - (Setq local/closure var)
+   T    - Terpri (newline)
+   U    - (null)
+   V
+   W    - princ
+   X    - prin1
+   Y    - read
+   Z    - loop/tail-recurse
+   [    - pushax, as new value comes
+   \    - (lambda?)
+   ]    - popax? ( "][" will do nothing! )
+   ^    - return
+   _
+   `    - (backquote construct)
+   abcdefgh - (local stack variables)
+   ijklmnop - (local/closure frame variables)
+   qrstuvw
+   x    - AX lol
+   yz
+   {    - forth ELSE (starts THEN part, lol)
+   |    - (bit-or)
+   }    - forth THEN (ends if-else-then)
+   ~    - (bit-not)
+      - ermh?
+
+*/
+
+
 // drop 0-4 values from stack, JSR=drop, JMP=return
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 
@@ -1817,6 +1886,9 @@ char* genasm(char* la) {
 
     // ./65vm-asm -e "(recurse (print (+ x 1)))" -- LOL!
   case 'R': JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
+    // TODO: better adjust stack
+    // TODO: move N parameters!
+  case 'Z': if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
   case 'x': goto next; // LOL, it's just AX!  TOOD: rename to "ax" or "AX" ???
 
   // SETQ: ax=val ':' addr => ax still val
@@ -1831,11 +1903,13 @@ char* genasm(char* la) {
 
  
   // -- All these routine (may) change the stack
-  case ']': if (la[1]=='[') ++la; else { JSR(incsp2); --stk; }  goto next; // ][ drop-push cancels!
+  case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
   case '[': JSR(pushax); ++stk; goto next;
 
   case 'C': JSR(cons); --stk; goto next; // WORKS!
 
+    // TODO: add by constant - inline    
+    // TODO: add by variable - inline: global/local
   case '+': JSR(tosaddax); --stk; goto next;
   case '*': JSR(tosmulax); --stk; goto next;
 
@@ -1853,18 +1927,17 @@ char* genasm(char* la) {
 
   case '}': **fix= mcp-*fix-1; --fix; goto next; // END of IF, patch yy to jump here
     
-
   // Subroutine caller and misc and 0..8 digit
   case '(':
   case ')':
   default:
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
-    if (*la>='0' && *la<='8') { JSR(pushax); ++stk; LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
+    if (*la>='0' && *la<='8') { LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
     printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;
   }
-
 }
+
 char* asmpile(char* la) {
   mcp= mc;
   memset(mc, 0, sizeof(mc));
@@ -1939,7 +2012,7 @@ L al(char* la) {
     jmp['i']= &&ginc;
     jmp['j']= &&ginc2;
 
-    jmp['Z']= &&gZ;
+    jmp['z']= &&gZ;
   }
 #endif // JMPARR
 
@@ -2033,7 +2106,7 @@ L al(char* la) {
 JMPARR(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13.06 (/ 13.06 12.98) < 0.7%
 JMPARR(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
 
-JMPARR(gZ)case 'Z':
+JMPARR(gZ)case 'z':
     { int i=5000; static L x; x= top;
       // nair fair, EVAL: ./run -b 10000 => 92.38s !!!!    
       for(;i;--i) {
@@ -2287,7 +2360,7 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
       //printf("... is %d\n", x);
       // result is single digit, compile as is
       // NOTE: '9' isn't 9 but nil :-D :-D (const 9 not common...?)
-      if (isnum(x) && x>=0 && NUM(x)<9) { ALC(NUM(x)+'0'); return p; }
+      if (isnum(x) && x>=0 && NUM(x)<9) { ALC('['); ALC(NUM(x)+'0'); return p; }
       goto quote;
     }
 
@@ -2378,7 +2451,8 @@ char* names[]= {
 
   "Y y",
   "y yy",
-  "Z z", 
+  "z z", 
+  "Z loop",
 
   "i inc",
   "j jnc",

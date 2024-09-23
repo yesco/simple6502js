@@ -4,6 +4,7 @@
 .import	ldaxi, ldaxidx
 .import staxspidx
 
+.importzp sp
 
 .import tosadda0, tosaddax
 .import tosmulax
@@ -20,9 +21,10 @@
 .import incsp2, incsp4, incsp6, incsp8
 .import addysp
 
-.import ptr1,ptr2,ptr3
+.importzp ptr1,ptr2,ptr3
 
-.import _nil
+.import _nil, _T
+
 
 
 .export _ldaxi, _ldaxidx
@@ -46,8 +48,10 @@
 .export _shlaxy
 
 .export _ffcar, _ffcdr
+.export _ffnull, _ffisnum, _ffiscons, _ffisatom, _fftype
+;;.export _ffisheap ;; TODO: hmmm
 
-.export _retnil
+.export _retnil, _rettrue
 
 ;;; make names visible from C
 
@@ -76,25 +80,108 @@ _addysp         = addysp
 
 ;;; some routines in assembly, can't put inline in .c as optimized meddles...
 
+
+_ffisnum:
+        and #$01
+        bne _retnil
+
+_rettrue:
+        lda _T
+        ldx _T+1
+        rts
+
+
+_ffiscons:
+        and #$03
+        cmp #$03
+        beq _rettrue
+        jmp _retnil
+        
+_ffisatom:
+        and #$03
+        cmp #$01
+        beq _rettrue
+        jmp _retnil
+        
+
+_ffnull:
+        cmp #<_nil
+        bne _retnil
+        cpx #>_nil
+        bne _retnil
+        jmp _rettrue
+
+;;; type 0 = null, K = cons, # = num, A = atom, num = heap type
+_fftype:
+        tay
+
+        and #03
+        cmp #03
+        beq @cons
+
+        and #01
+        beq @num
+
+@atom:  cpx #>_nil
+        bne @atm
+        tya
+        cmp #<_nil
+        beq @nil
+
+@atm:   tya
+        jsr _ffcdrptr
+        jsr ldaxi
+        ;; a smaller ldai
+        ldy #00
+        sta ptr1
+        stx ptr1+1
+        lda (ptr1),y
+        bne @type
+
+@tm:    lda #'A'
+        bne @ret
+
+@cons:  lda #'K'
+        bne @ret
+
+@num:   lda #'#'
+        bne @ret
+
+@nil:   lda #00
+        
+@type:
+
+@ret:   ldx #00
+        rts
+
+
+        
+
+        tya
+
+
 _ffcar:  
-  tay
-  and #$01                      ; use bit?
-  beq _retnil
-  tya
+        tay
+        and #$01
+        beq _retnil
+        tya
 
 _ffat: 
-  jmp ldaxi
+        jmp ldaxi
 
 _retnil:
-  lda _nil
-  lda _nil+1
-  rts
+        lda _nil
+        ldx _nil+1
+        rts
+
+
 
 _ffcdr:
-  tay
-  and #$01                      ; use bit?
-  beq _retnil
-  tya
+        tay
+        and #$01
+        beq _retnil
+        tya
 
-  ldy #$03
-  jmp ldaxidx
+_ffcdrptr:
+        ldy #$03
+        jmp ldaxidx
