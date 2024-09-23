@@ -1764,8 +1764,10 @@ char* genasm(char* la) {
  next:
   printf("\nGENASM: '%c' (%d %02x) %04X  ", la[1], la[1], la[1], *(L*)(la+2));
   switch(*++la) {
-//  case 0  : RTS(); BRK(); BRK(); BRK(); return mcp;
-  case 0  : if (stk) { LDYn(stk*2); JMP(addysp); } else RTS();  BRK(); BRK(); BRK(); return mcp;
+
+  // leave: TODO: Y=2,4,8,... JMP(inc#sp); ...
+  case 0  : if (stk) { LDYn(stk*2); JMP(addysp); } else { RTS(); }  BRK(); BRK(); BRK(); return mcp;
+
   case ' ': case '\t': case '\n': case '\r': goto next;
 
 
@@ -1773,6 +1775,14 @@ char* genasm(char* la) {
   case '@': JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
   case 'A': JSR(ffcar); goto next;
   case 'D': JSR(ffcdr); goto next;
+
+  case '.': JSR(princ); goto next;
+  case 'W': JSR(prin1); goto next;
+  case 'P': JSR(print); goto next;
+
+    // ./65vm-asm -e "(recurse (print (+ x 1)))" -- LOL!
+  case 'R': JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
+  case 'x': goto next; // LOL, it's just AX!  TOOD: rename to "ax" or "AX" ???
 
   // SETQ: ax=val ':' addr => ax still val
   case ':': ++la; STA(*(L*)la); STX(1+*(L*)la); ++la; goto next; // 6 bytes = write val at addr/var
@@ -1840,8 +1850,8 @@ int fub(int a) {
 }
 
 int varbar= 4711;
-int bar(int a) {
-  return varbar;
+int bar(int a) {  
+  return varbar+a;
 }
 
 L al(char* la) {
@@ -2255,6 +2265,8 @@ char* names[]= {
   ": setq", // TODO: not right for "VM"
   "! set",
   //"; df",
+
+  "R recurse",
 
   "I if",
   "Y read",
