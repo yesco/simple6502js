@@ -307,7 +307,11 @@ typedef uint16_t uint;
 
 extern L ffcar(L);
 extern L ffcdr(L);
+
 extern L ldaxi(L);
+extern L ldaxidx(L);
+extern L ldax0sp(L);
+extern L ldaxysp(L);
 
 extern void retnil();
 
@@ -320,7 +324,15 @@ extern void incsp6();
 extern void incsp8();
 
 extern void tosaddax();
+extern void tossubax();
 extern void tosmulax();
+extern void tosdivax();
+extern void asrax1();
+extern void aslax1();
+
+extern void toseq00();
+extern void toseqa0();
+extern void toseqax();
 
 extern void addysp();
 
@@ -1783,15 +1795,6 @@ char* mcp= mc;
 
 */
 
-
-// drop 0-4 values from stack, JSR=drop, JMP=return
-void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
-
-// 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x
-char* genasm(char* la) {
-  char *fixstack[16]= {0}, **fix= fixstack, *tmp;
-  signed char stk= 0;
-
   #define B(b) printf("%02x ", b);*mcp++= (b)&0xff
   #define O(b) printf("\n\t");B(b)
   #define W(w) *((L*)mcp)++= (L)(w);printf("%04x", w)
@@ -1810,6 +1813,8 @@ char* genasm(char* la) {
   #define STX(w)  O(0x8E);W(w)
   #define STY(w)  O(0x8C);W(w)
 
+
+  #define ANDn(b) O(0x29);B(b)
 
   #define CMPn(b) O(0xC9);B(b)
   #define CPXn(b) O(0xE0);B(b)
@@ -1843,25 +1848,35 @@ char* genasm(char* la) {
 
   #define BRK(a)  O(0x00)
 
-  // Codegen generates "inline cc65 bytecode".
-  //
-  // In principle the generated code will be almost as fast as cc65's
-  // C-code! cc65 isn't a byte-code interpreter, but the code generated
-  // is heavily depending on an asm sub-routine library that is JSR:ed
-  // into for almost all operations. This saves code, compared to inlining
-  // all. For more compact representation, it could have used byte-code.
-  //
-  // But a byte-code interpreter is about 15x slower!
-  //
-  // So, for lisp, we choose to have:
-  // - EVAL : a simple, but generic, EVAL/APPLY
-  // - AL   : Alphabetical Lisp byte-code interpreter. 2x-3x faster
-  // - ASM  : simplistic inline asm using JSR for most primitives
-  //
-  // Challanges:
-  // - (Real) Closures in compiled code, need copy vars, hmmm, grrr, maybe not?
-  // - generic Tail-recursion optimization (can be done) (move vars, adjust stack, jmp)
-  //   (both cases, need count args)
+// Codegen generates "inline cc65 bytecode".
+//
+// In principle the generated code will be almost as fast as cc65's
+// C-code! cc65 isn't a byte-code interpreter, but the code generated
+// is heavily depending on an asm sub-routine library that is JSR:ed
+// into for almost all operations. This saves code, compared to inlining
+// all. For more compact representation, it could have used byte-code.
+//
+// But a byte-code interpreter is about 15x slower!
+//
+// So, for lisp, we choose to have:
+// - EVAL : a simple, but generic, EVAL/APPLY
+// - AL   : Alphabetical Lisp byte-code interpreter. 2x-3x faster
+// - ASM  : simplistic inline asm using JSR for most primitives
+//
+// Challanges:
+// - (Real) Closures in compiled code, need copy vars, hmmm, grrr, maybe not?
+// - generic Tail-recursion optimization (can be done) (move vars, adjust stack, jmp)
+//   (both cases, need count args)
+
+
+// drop 0-4 values from stack, JSR=drop, JMP=return
+void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
+
+// 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
+char* genasm(char* la) {
+  char *fixstack[16]= {0}, **fix= fixstack, *tmp;
+  char lastvar= 'a'; // TODO: take arglist...
+  signed char stk= 0;
   
   --la;
  next:
@@ -1900,18 +1915,20 @@ char* genasm(char* la) {
   case ',': ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
   case ';': ++la; LDA(*(L*)la); LDX((*(L*)la)+1); ++la; goto next; // 9 bytes = read var
   case '9': JMP(retnil); goto next;
-
  
   // -- All these routine (may) change the stack
+  case '=': JSR(toseqax); goto next; // TODO: V cmp I => ...
   case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
   case '[': JSR(pushax); ++stk; goto next;
 
   case 'C': JSR(cons); --stk; goto next; // WORKS!
 
-    // TODO: add by constant - inline    
-    // TODO: add by variable - inline: global/local
-  case '+': JSR(tosaddax); --stk; goto next;
-  case '*': JSR(tosmulax); --stk; goto next;
+    // TODO: add/sub/mul by constant - inline/special jsr
+    // TODO: add/sub by variable - inline: global/local?
+  case '+': JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
+  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
+  case '*': JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
+  case '/': JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
 
   // SET: setting global variable: address on stack, value in AX (opposite SETQ
   case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
@@ -1931,8 +1948,15 @@ char* genasm(char* la) {
   case '(':
   case ')':
   default:
+    // local variables on stack
+    // TODO: handle let, even inline let: (let ((a 3) (b 4)) (+ 3 (let ((c 4)(d (+ a b))) (+ a c d))))
+    //                                        probably have to keep track of what where " dc ba" spc is 1stk
+    if (*la>='a' && *la<='h') { LDYn(2*(lastvar-*la+stk)); JSR(ldaxysp); goto next; }
+    // TODO: closure variables ijkl mnop
+
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
     if (*la>='0' && *la<='8') { LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
+
     printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;
   }
@@ -2259,8 +2283,7 @@ JMPARR(gerr)default:
 #define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
 
 char* alcompile(char* p) {
-char c, extra= 0; int n= 0; L x= 0xbeef, f;
- 
+char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
  again:
   switch((c=nextc())) {
@@ -2367,8 +2390,9 @@ char c, extra= 0; int n= 0; L x= 0xbeef, f;
     // atom name
     unc(c); x= lread(); // x use by quote if !0
     assert(isatom(x));
-    // local variable a-z
-    if (1==strlen(ATOMSTR(x)) && islower(*ATOMSTR(x))) { ALC(c); return p; }
+    // local variable a-w (x y z special)
+    nm= ATOMSTR(x);
+    if (!nm[1] && islower(*nm) && *nm<'x') { ALC('['); ALC(c); return p; }
  
     // allow for inline read
     ALC('['); // push

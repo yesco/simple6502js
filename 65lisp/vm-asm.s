@@ -1,15 +1,18 @@
 ;; 6502 asm vm-code and symbols used in asm-code gen during execution/compilation
 ;;  -- https://stackoverflow.com/questions/71208847/how-to-access-assembly-language-symbols-without-a-leading-from-c-on-6502-cc65
 
-.import	ldaxi, ldaxidx
+.import	ldaxi, ldaxidx, ldax0sp, ldaxysp
 .import staxspidx
 
 .importzp sp
 
 .import tosadda0, tosaddax
-.import tosmulax
+.import tossubax    	; , tossuba0
+.import tosmulax, tosdivax
+.import toseq00, toseqa0, toseqax
 
 .import asrax1
+.import aslax1
 .import shraxy
 .import shlaxy
 
@@ -27,7 +30,7 @@
 
 
 
-.export _ldaxi, _ldaxidx
+.export _ldaxi, _ldaxidx, _ldax0sp, _ldaxysp
 
 .export _staxspidx
 
@@ -41,9 +44,12 @@
 .export _addysp
 
 .export _tosaddax
-.export _tosmulax
+.export _tossubax	; , _tossuba0 
+.export _tosmulax, _tosdivax
+.export _toseq00, _toseqa0, _toseqax
 
 .export _asrax1
+.export _aslax1
 .export _shraxy
 .export _shlaxy
 
@@ -57,6 +63,9 @@
 
 _ldaxi		= ldaxi
 _ldaxidx	= ldaxidx
+_ldax0sp        = ldax0sp
+_ldaxysp        = ldaxysp
+
 _staxspidx      = staxspidx
 
 _pushax         = pushax
@@ -70,9 +79,17 @@ _incsp6         = incsp6
 _incsp8         = incsp8
 
 _tosaddax       = tosaddax
+; _tossub0a       = tossuba0
+_tossubax       = tossubax
 _tosmulax       = tosmulax
+_tosdivax       = tosdivax
+
+_toseq00        = toseq00
+_toseqa0        = toseqa0
+_toseqax        = toseqax
 
 _asrax1         = asrax1
+_aslax1         = aslax1
 _shraxy         = shraxy
 _shlaxy         = shlaxy
 
@@ -185,3 +202,66 @@ _ffcdr:
 _ffcdrptr:
         ldy #$03
         jmp ldaxidx
+
+;;; inspired by
+;;; - http://forum.6502.org/viewtopic.php?f=2&t=6136
+ 
+        ;; 16-bit number comparison...
+        ;; TODO: this is unsigned int?
+        ;;
+        ;; Need 3 variants:
+        ;; - ax  CMP const
+        ;; - ax  CMP global var
+        ;; - tos CMP ax
+        ;; (others not worth it? local var, closure var)
+
+        ;;    9 bytes:ish
+        
+        ;; ax CMP m
+        ;; lo compare
+_cmp:   pha
+        cmp #>$1234           ;MSB of 2nd number
+        ;; 
+        bne @ret               ; not eq - done
+
+        ;; hi eq - compare more
+        pla
+        cmp #<$1234           ;LSB of 2nd number
+        ;; 
+@ret:   rts
+
+
+;;; how to use:
+
+;;;     jsr _cmp
+
+;;;     ;; pick one...
+
+;;;     bcc @lt                 ; <
+;;;     bcs @ge                 ; >=
+;;;     bne @gt                 ; >
+;;;     beq @eq                 ; ==
+
+;;;     ;; for <=
+;;;     bcs +2                  ; >=
+;;;     beq @le                 ; = 
+
+;;;     fall through to opposite of test
+
+
+;;; For IF to jump to ELSE ! 
+;;; (last byte will be patched to jump to ELSE)
+
+;;;     ;; one of                      stacknotation
+;;;     bcc @                   ; >=       <! I
+;;;     bcs @                   ; <        <  I
+;;;     bne @                   ; <=       >! I
+;;;     beq @                   ; !=       =! I
+
+;;;     ;; for >
+;;;     bcs +2                  ; <
+;;;     beq @le                 ; !=       >  I 
+
+
+
+
