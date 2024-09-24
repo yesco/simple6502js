@@ -5,9 +5,9 @@ name="lisp"
 xx="$*"
 echo "unix> ./65vm $xx"
 
-rm $name.out $name.tap 2>&1
+rm $name.out $name.tap $name.map $name.s 2>&1
 
-cl65 -O $OPTS -T -t sim6502 $name.c vm-asm.s -o $name.out -m $name.map 2>&1 && (sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time")
+cl65 -O $OPTS -T -t sim6502 $name.c -m $name.map vm-asm.s -o $name.out 2>&1 && (sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time")
 
 # show and format error messages, generate .s too, (makes no out?)
 ( cl65 -S -O $OPTS -T -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72

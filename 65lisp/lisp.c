@@ -1795,30 +1795,38 @@ char* mcp= mc;
 
 */
 
-  #define B(b) printf("%02x ", b);*mcp++= (b)&0xff
-  #define O(b) printf("\n\t");B(b)
-  #define W(w) *((L*)mcp)++= (L)(w);printf("%04x", w)
+// PROGSIZE: 31358 bytes ... => 27552 bytes no macros 
+//  25401 bytes for VM, 19102 bytes for EVAL !!!!! HMMMM
+// byte code compiler... + byte interpreter = 6299
+//                             asm-compiler = 2152 bytes
 
 
-  #define LDAn(n) O(0xA9);B(n)
-  #define LDXn(n) O(0xA2);B(n)
-  #define LDYn(n) O(0xA0);B(n)
+void B(char b) { printf("%02x ", b); *mcp++= (b)&0xff; }
+void O(char op) { printf("\n\t"); B(op); }
+void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
+
+#define O2(op, b) do { O(op);B(b); } while(0)
+#define O3(op, w) do { O(op);W(w); } while(0)
+
+  #define LDAn(n) O2(0xA9,n)
+  #define LDXn(n) O2(0xA2,n)
+  #define LDYn(n) O2(0xA0,n)
 
 
-  #define LDA(w)  O(0xAD);W(w)
-  #define LDX(w)  O(0xAE);W(w)
-  #define LDY(w)  O(0xAC);W(w)
+  #define LDA(w)  O3(0xAD,w)
+  #define LDX(w)  O3(0xAE,w)
+  #define LDY(w)  O3(0xAC,w)
 
-  #define STA(w)  O(0x8D);W(w)
-  #define STX(w)  O(0x8E);W(w)
-  #define STY(w)  O(0x8C);W(w)
+  #define STA(w)  O3(0x8D,w)
+  #define STX(w)  O3(0x8E,w)
+  #define STY(w)  O3(0x8C,w)
 
 
-  #define ANDn(b) O(0x29);B(b)
+  #define ANDn(b) O2(0x29,b)
 
-  #define CMPn(b) O(0xC9);B(b)
-  #define CPXn(b) O(0xE0);B(b)
-  #define CPYn(b) O(0xC0);B(b)
+  #define CMPn(b) O2(0xC9,b)
+  #define CPXn(b) O2(0xE0,b)
+  #define CPYn(b) O2(0xC0,b)
 
 
   #define CLC()   O(0x18)
@@ -1827,24 +1835,24 @@ char* mcp= mc;
   #define CLV()   O(0xB8)
 
 
-  #define BMI(b)  O(0x30);B(b)
-  #define BPL(b)  O(0x10);B(b)
+  #define BMI(b)  O2(0x30, b)
+  #define BPL(b)  O2(0x10, b)
 
-  #define BNE(b)  O(0xD0);B(b)
-  #define BEQ(b)  O(0xF0);B(b)
+  #define BNE(b)  O2(0xD0,b)
+  #define BEQ(b)  O2(0xF0,b)
 
-  #define BCC(b)  O(0x90);B(b)
-  #define BCS(b)  O(0xB0);B(b)
+  #define BCC(b)  O2(0x90,b)
+  #define BCS(b)  O2(0xB0,b)
 
-  #define BVC(b)  O(0x50);B(b)
-  #define BVS(b)  O(0x70);B(b)
+  #define BVC(b)  O2(0x50,b)
+  #define BVS(b)  O2(0x70,b)
 
 
-  #define JSR(a)  O(0x20);W(a)
+  #define JSR(a)  O3(0x20,a)
   #define RTS(a)  O(0x60)
 
-  #define JMP(a)  O(0x4c);W(a)
-  #define JMPi(a) O(0x6c);W(a)
+  #define JMP(a)  O3(0x4c,a)
+  #define JMPi(a) O3(0x6c,a)
 
   #define BRK(a)  O(0x00)
 
@@ -1873,7 +1881,7 @@ char* mcp= mc;
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
-char* genasm(char* la) {
+extern char* genasm(char* la) {
   char *fixstack[16]= {0}, **fix= fixstack, *tmp;
   char lastvar= 'a'; // TODO: take arglist...
   signed char stk= 0;
@@ -1907,13 +1915,13 @@ char* genasm(char* la) {
   case 'x': goto next; // LOL, it's just AX!  TOOD: rename to "ax" or "AX" ???
 
   // SETQ: ax=val ':' addr => ax still val
-  case ':': ++la; STA(*(L*)la); STX(1+*(L*)la); ++la; goto next; // 6 bytes = write val at addr/var
+  case ':': ++la; STA((void*)(*(L*)la)); STX((void*)(1+*(L*)la)); ++la; goto next; // 6 bytes = write val at addr/var
 
   // TODO: JSR(pushax); probably not neede, should be it's own token and generated, we might have a drop before!
   // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
 
   case ',': ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
-  case ';': ++la; LDA(*(L*)la); LDX((*(L*)la)+1); ++la; goto next; // 9 bytes = read var
+  case ';': ++la; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
   case '9': JMP(retnil); goto next;
  
   // -- All these routine (may) change the stack
@@ -2000,7 +2008,7 @@ int bar(int a) {
   return varbar+a;
 }
 
-L al(char* la) {
+extern L al(char* la) {
   char *m= 0;
 
 #ifndef JMPARR
@@ -2282,7 +2290,7 @@ JMPARR(gerr)default:
 // returning atom string containing AL code
 #define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
 
-char* alcompile(char* p) {
+extern char* alcompile(char* p) {
 char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
  again:
