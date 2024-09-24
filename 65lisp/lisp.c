@@ -2042,6 +2042,10 @@ extern L al(char* la) {
     jmp['P']=&&gP;
     jmp['Y']=&&gY;
     jmp['!']=&&gset;
+    //jmp[':']=&&gsetq;
+
+    jmp['[']=&&gbl;
+    jmp[']']=&&gbl;
 
     for(c='0'; c<='9'; ++c) jmp[c]= &&gdigit;
     for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
@@ -2334,21 +2338,22 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
     //skipspc();
     f= nextc(); unc(f); // peek
     if (f=='(') return NULL; // TODO: ,..X inline lambda?
+
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
-    // TODO: handle funcall etc - do eval?
     if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; return NULL; }
 
-    f= ATOMVAL(x);
-    // is it another compiled AL? or lisp S-EXP?
+    if (isatom(x)) f= ATOMVAL(x);
+    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; return NULL; }
 
-    f= num(f);
-    if (!f) { prin1(x); printf(" => ATOMVAL: %04X ", f); prin1(f); NL; return NULL; }
-    else if (f=='\'') goto quote;
+    // get the byte code token
+    f= NUM(f);
+
+    if (f=='\'') goto quote;
     else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
 
-    prin1(x); printf(" => '%c' (%d)\n", f, f);
+    prin1(x); printf("\t=> '%c' (%d)\n", f, f);
  
     // IF special => EXPR I THEN { ELSE } ' '
     if (x==atom("if")) {

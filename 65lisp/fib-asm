@@ -5,26 +5,40 @@
 #./run -b $*000 -e 8       #     30000 =>  447.s
 
 # --- EVAL
-# fib 8 x 30 times => 29.9s LOL
-./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $* -e "(fib 8)"
+# fib 8 x times                     30 =>   29.9s LOL
+#                                  300 =>  (run out of cons!)
+#                                 3000 =>  (run out of cons!)
 
 # --- VM-ASM
-# fib 8 x 30 times =>    4.7s
-#        300       =>   15.41s
-#       3000       =>  122.s
-
-./65vm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
-./65vm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
-./65vm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
-
-# --- VM-ASM
-# fib 8 x 30 times =>    4.7s
-#        300       =>   15.41s
-#       3000       =>  122.s
+# fib 8 x                          30  =>    4.7s          4.9x slower than natve C
+#                                 300  =>   15.41s         3.1x slower
+#                                3000  =>  122.s           2.7x slower
+#                               30000  => 1175.s           2.6x slower
 
 ./65vm-asm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
 ./65vm-asm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
 ./65vm-asm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+./65vm-asm -v -b $*000 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+
+./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $* -e "(fib 8)"
+#./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*0 -e "(fib 8)"
+#./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*00 -e "(fib 8)"
+
+exit 99
+
+
+# --- VM
+# fib 8 x 30 times =>  
+#        300       =>  
+#       3000       =>  
+
+# TODO:  VM can't call functions! lol
+./65vm -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $* -e "(fib 8)"
+#./65vm -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*0 -e "(fib 8)"
+#./65vm -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*00 -e "(fib 8)"
+#./65vm -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*000 -e "(fib 8)"
+
+exit 3
 
 
 #./65vm-asm -v -b $* -e "(if (eq (print (print a)) 0) 0 (if (eq (print a) 1) 1 (+ (recurse (- (print a) 1)) (recurse (- (print a) 2)))))"
