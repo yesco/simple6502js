@@ -1910,8 +1910,24 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //   (both cases, need count args)
 
 
+// ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
+//    
+//    105 B    120.7s     emitRETURN
+//    107 B    123.1s     - start -
+//
+//     30 B      -        --- VM --- effective CODE used to generate ASM!
+//     30 B                [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0  - saved 4x (drop+push)  4x "]["
+//     38 B                [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
+//     2b B                 a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
+
 // drop 0-4 values from stack, JSR=drop, JMP=return
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
+
+void emitRETURN(signed char stk) {
+  if (stk==0) RTS();
+  else if (stk>4) { LDYn(stk*2); JMP(addysp); }
+  else JMP(incspARR[stk]);
+}
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
 extern char* genasm(char* la) {
@@ -1925,8 +1941,7 @@ extern char* genasm(char* la) {
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: if (stk==0) { RTS(); } else if (stk>4) { LDYn(stk*2); JMP(addysp); }
-  else { JMP(incspARR[stk]); }    if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
+  case '^': case 0: emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 

@@ -15,10 +15,10 @@
 #                                3000  =>  122.s           2.7x slower
 #                               30000  => 1175.s           2.6x slower
 
-./65vm-asm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
-./65vm-asm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+#./65vm-asm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+#./65vm-asm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
 ./65vm-asm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
-./65vm-asm -v -b $*000 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+#./65vm-asm -v -b $*000 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
 
 ./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $* -e "(fib 8)"
 #./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $*0 -e "(fib 8)"
