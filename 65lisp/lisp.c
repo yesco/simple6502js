@@ -350,6 +350,37 @@ extern void staxspidx();
 //  return __AX__;
 //}
 
+// -b -e 10 => 196.76s
+
+// FIB         149s
+// 65vm-asm:   386s
+// 
+
+//#define FIB
+
+int fib(int n) {
+  if (n==0) return n;
+  else if (n==1) return n;
+  else return fib(n-1) + fib(n-2);
+}
+
+int fub(int a) {
+  int b= a+1,
+    c= b+1;
+  {
+    int d= a+b+c;
+    {
+      int e=a+b+c+d;
+      return e+10000;
+    }
+  }
+}
+
+int varbar= 4711;
+int bar(int a) {  
+  return varbar+a;
+}
+
 
 #ifdef TESTCOMPILER
 L inc(L i) { return i+2; }
@@ -1056,11 +1087,11 @@ L prinq(L x, signed char quoted) {
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) {
     if (HTYP(x)==HBIN) { char* p= BINSTR(x); size_t z= BINLEN(x);
-      (quoted>=0) && printf("#%d$[", z);
+      (quoted>=0) && printf("#%d$\"", z);
       while(z-->0) if (quoted<0) putchar(*p++);
-        else if (*p>=32 && *p<=126 &&* p!=']') putchar(*p++);
+        else if (*p>=32 && *p<=126 &&* p!='"') putchar(*p++);
         else { revers(1); printf("%02x", *p++); revers(0); }
-      (quoted>=0) && printf("]");
+      (quoted>=0) && printf("\"");
     } else printf((ISSTR(x) && quoted>0)?"\"%s\"": "%s", ATOMSTR(x));
   } else if (iscons(x)) {
 
@@ -1456,7 +1487,8 @@ L evalX(L x, L env) {
     a= 2;
     switch(f) {
     // - nlambda - no eval
-    case '!': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case '!': return setval(eval(car(x),env), eval(car(cdr(x)), env), env); 
     // TODO: if it allows local defines, how to
     //   extend the env,setq should not, two words?
     case ';': return df(x);
@@ -1501,7 +1533,8 @@ L evalX(L x, L env) {
     //            x is still orig
     switch(f) {
     // - nlambda - no eval
-    case ':': return setval(car(a), eval(car(cdr(a)), env), env); 
+    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case '!': return setval(eval(car(x),env), eval(car(cdr(x)), env), env); 
     // TODO: if it allows local defines, how to
     //   extend the env,setq should not, two words?
     case ';': return df(a);
@@ -1888,7 +1921,7 @@ extern char* genasm(char* la) {
   
   --la;
  next:
-  printf("\nGENASM: '%c' (%d %02x) %04X  ", la[1], la[1], la[1], *(L*)(la+2));
+  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ", la[1], la[1], la[1], *(L*)(la+2), stk);
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
@@ -1925,7 +1958,7 @@ extern char* genasm(char* la) {
   case '9': JMP(retnil); goto next;
  
   // -- All these routine (may) change the stack
-  case '=': JSR(toseqax); goto next; // TODO: V cmp I => ...
+  case '=': JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
   case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
   case '[': JSR(pushax); ++stk; goto next;
 
@@ -1959,7 +1992,7 @@ extern char* genasm(char* la) {
     // local variables on stack
     // TODO: handle let, even inline let: (let ((a 3) (b 4)) (+ 3 (let ((c 4)(d (+ a b))) (+ a c d))))
     //                                        probably have to keep track of what where " dc ba" spc is 1stk
-    if (*la>='a' && *la<='h') { LDYn(2*(lastvar-*la+stk)); JSR(ldaxysp); goto next; }
+    if (*la>='a' && *la<='h') { LDYn(2*(lastvar-*la+stk-1)+1); JSR(ldaxysp); goto next; }
     // TODO: closure variables ijkl mnop
 
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
@@ -1984,29 +2017,6 @@ char* asmpile(char* la) {
 #else
   #define asmpile(a) 0
 #endif
-
-// -b -e 10 => 196.76s
-int fib(int n) {
-  if (n<2) return n;
-  else return fib(n-1)+fib(n-2);
-}
-
-int fub(int a) {
-  int b= a+1,
-    c= b+1;
-  {
-    int d= a+b+c;
-    {
-      int e=a+b+c+d;
-      return e+10000;
-    }
-  }
-}
-
-int varbar= 4711;
-int bar(int a) {  
-  return varbar+a;
-}
 
 extern L al(char* la) {
   char *m= 0;
@@ -2066,6 +2076,8 @@ extern L al(char* la) {
   *++s= MKNUM(33); // c
   *++s= MKNUM(44); // d // lol
   *++s= MKNUM(4);  // argc // TODO: maybe useful
+
+  *++s= MKNUM(8);  // for fib
   // can't access 4 as e? hmmm?
 
   top= *s;
@@ -2333,12 +2345,12 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
     f= num(f);
     if (!f) { prin1(x); printf(" => ATOMVAL: %04X ", f); prin1(f); NL; return NULL; }
     else if (f=='\'') goto quote;
-    else if (f=='L') f= 'C'; // foldr
+    else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
 
     prin1(x); printf(" => '%c' (%d)\n", f, f);
  
-    // if very special => EXPR I THEN { ELSE } ' '
+    // IF special => EXPR I THEN { ELSE } ' '
     if (x==atom("if")) {
       p= alcompile(p); ALC('I'); // EXPR I
       ALC(']'); p= alcompile(p); ALC('{'); // DROP THEN
@@ -2348,7 +2360,7 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
       return p;
     }
 
-    // setq very special => VAL : ADDR
+    // SETQ special => VAL : ADDR
     if (x==atom("setq")) {
       L n= lread();
       assert(isatom(n));
@@ -2364,15 +2376,20 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
       return p;
     }
 
+    // GENERIC argument compiler
     while((c=nextc())!=')') {
       ++n;
       p= alcompile(p);
       // implicit FOLDL of nargs + - L ! LOL
-      if (n>2 && f<255 && f!='R') ALC(f);
+      if (f>0 && n>=2 && f<255 && f!='R' && f!='Z') {ALC(f);n-=2;}
     }
+    if (f>0 && f<255 && n) { ALC(f); n-=2; break; }
 
     // push the actual call
-    if (f<255) {ALC(f); break;}
+    // if (f<255) { ALC(f); break; }
+    while(f<0 && n-- > 0) ALC(-f);
+    if (f<255) break; // FOLD R/L
+
     // it's a user defined function/compiled
     assert(isatom(f)); // TODO: handle lisp/s-exp
 
@@ -2626,7 +2643,11 @@ L readeval(char *ln, L env, char noprint) {
       for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
 
         #ifndef AL
-          r= eval(x, env);
+          #ifndef FIB
+            r= eval(x, env);
+          #else
+            r= MKNUM(fib(NUM(x)));
+          #endif
         #else
           r= al(ISBIN(x)? BINSTR(x): NULL);
         #endif // AL

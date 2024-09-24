@@ -1,0 +1,31 @@
+# fib 8... #define FIB
+#./run -b $* -e 8          #        30 =>    0.98s
+#./run -b $*0 -e 8         #       300 =>    5.00s
+#./run -b $*00 -e 8        #      3000 =>   45.2s
+#./run -b $*000 -e 8       #     30000 =>  447.s
+
+# --- EVAL
+# fib 8 x 30 times => 29.9s LOL
+./run -v -e "(setq fib (lambda (n) (if (eq n 0) n (if (eq n 1) n (+ (fib (- n 1)) (fib (- n 2)))))))" -b $* -e "(fib 8)"
+
+# --- VM-ASM
+# fib 8 x 30 times =>    4.7s
+#        300       =>   15.41s
+#       3000       =>  122.s
+
+./65vm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+./65vm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+./65vm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+
+# --- VM-ASM
+# fib 8 x 30 times =>    4.7s
+#        300       =>   15.41s
+#       3000       =>  122.s
+
+./65vm-asm -v -b $* -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+./65vm-asm -v -b $*0 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+./65vm-asm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))"
+
+
+#./65vm-asm -v -b $* -e "(if (eq (print (print a)) 0) 0 (if (eq (print a) 1) 1 (+ (recurse (- (print a) 1)) (recurse (- (print a) 2)))))"
+
