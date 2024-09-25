@@ -323,12 +323,84 @@ extern void incsp4();
 extern void incsp6();
 extern void incsp8();
 
+extern void negax();
+
 extern void tosaddax();
 extern void tossubax();
 extern void tosmulax();
 extern void tosdivax();
+
+extern void tosadda0();
+extern void tossuba0();
+extern void tosmula0();
+extern void tosdiva0();
+
+
+extern void mulax3();
+extern void mulax5();
+extern void mulax6();
+extern void mulax7();
+extern void mulax9();
+extern void mulax10();
+extern void mulaxy();
+
 extern void asrax1();
+extern void asrax2();
+extern void asrax3();
+extern void asrax4();
+//extern void asrax7();
+
+extern void asraxy();
+
+
 extern void aslax1();
+extern void aslax2();
+extern void aslax3();
+extern void aslax4();
+//extern void aslax7();
+
+extern void aslaxy();
+
+
+extern void shrax1();
+extern void shrax2();
+extern void shrax3();
+extern void shrax4();
+//extern void shrax7();
+
+extern void shraxy();
+
+
+extern void shlax1();
+extern void shlax2();
+extern void shlax3();
+extern void shlax4();
+//extern void shlax7();
+
+extern void shlaxy();
+
+
+
+extern void decax1();
+extern void decax2();
+extern void decax3();
+extern void decax4();
+extern void decax5();
+extern void decax6();
+extern void decax7();
+extern void decax8();
+extern void decaxy();
+
+extern void incax1();
+extern void incax2();
+extern void incax3();
+extern void incax4();
+extern void incax5();
+extern void incax6();
+extern void incax7();
+extern void incax8();
+extern void incaxy();
+
 
 extern void toseq00();
 extern void toseqa0();
@@ -371,6 +443,7 @@ int fub(int a) {
     int d= a+b+c;
     {
       int e=a+b+c+d;
+      return e+9;
       return e+10000;
     }
   }
@@ -1911,14 +1984,17 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 
 // ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
+//    ASM      TIME    PROGSIZE  OPT
 //    
-//    105 B    120.7s     emitRETURN
-//    107 B    123.1s     - start -
+//     
+//     91 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
+//    105 B    120.7s   27969 B           emitRETURN    
+//    107 B    123.1s                     - start -
 //
 //     30 B      -        --- VM --- effective CODE used to generate ASM!
 //     30 B                [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0  - saved 4x (drop+push)  4x "]["
 //     38 B                [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
-//     2b B                 a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
+//     24 B                 a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
 
 // drop 0-4 values from stack, JSR=drop, JMP=return
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
@@ -1929,15 +2005,97 @@ void emitRETURN(signed char stk) {
   else JMP(incspARR[stk]);
 }
 
+void* incARR[]= {(void*)0xffff, incax2, incax4, incax6, incax8};
+void* decARR[]= {(void*)0xffff, decax2, decax4, decax6, decax8};
+
+unsigned char emitADD(L w) {
+  if (w==0) return 1;
+  if (w>0 && w<=MKNUM(4)) JSR(incARR[NUM(w)]); // just *deref and add? lol
+  else if (w & 0xff00) return 0;
+  else { LDYn((char)w); JSR(incaxy); }  // 0--255
+  return 1;
+}
+
+unsigned char emitSUB(L w) {
+  if (w==0) return 1;
+  if (w>0 && w<=MKNUM(4)) JSR(decARR[NUM(w)]);
+  else if (w & 0xff00) return 0;
+  else { LDYn((char)w); JSR(decaxy); }
+  return 1;
+}
+
+void* mulARR[]= {(void*)0xffff, (void*)0xffff, aslax1, mulax3, aslax2, mulax5, mulax6, mulax7, aslax3, mulax9, mulax10};
+
+// TODO: code or array?
+//void* aslARR[]= {(void*)0xffff, aslax1, aslax2, aslax3, aslax4, 0, 0, aslax7};
+//void* asrARR[]= {(void*)0xffff, asrax1, asrax2, asrax3, asrax4, 0, 0, asrax7};
+
+// TODO: how many bytes? It's quite a lot of code - is it worth it?
+unsigned char emitMUL(L w, unsigned char shifts) {
+  w= NUM(w);
+  if (w==1) ; // nothing!
+  else if (w==0) { LDAn(0); LDXn(0); } // TODO: replace prev ',' or digit...
+  else if (w==-1) JSR(negax);
+  else if (shifts==4) JSR(aslax4);
+//  else if (shifts==7) JSR(aslax7);
+  else if (shifts>0) { LDYn(shifts); JSR(aslaxy); }
+  else if (w<=10) JSR(mulARR[w]);
+  //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosmula0); }
+  else return 0;
+  // TODO: make it return to compile "normal"
+  //else JSR(tosmulax); // TODO: need push value
+  return 1;
+}
+
+// TODO: how many bytes? It's quite a lot of code - is it worth it?
+unsigned char emitDIV(L w, unsigned char shifts) {
+  w= NUM(w);
+  if (w==1) ; // nothing!
+  else if (w==0) { LDAn(0x7f); LDXn(0); } // TODO: overflow... // TODO: replace prev ',' or digit...
+  else if (w==-1) JSR(negax);
+  else if (shifts==4) JSR(asrax4);
+//  else if (shifts==7) JSR(asrax7);
+  else if (shifts>0) { LDYn(shifts); JSR(asraxy); }
+  //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosdiva0); }
+  else return 0;
+  // TODO: make it return to compile "normal"
+  //else JSR(tosdivax); // TODO: need push value
+  return 1;
+}
+
+char* la= 0;
+
+unsigned char emitMATH(L w, unsigned char d) {
+  unsigned char shifts= 0;
+  unsigned char r= 0;
+  // only one bit set?
+  if ((la[d]=='*' || la[d]=='/') && w>=2 && !(w & (w-1))) while(w) { w>>= 1; ++shifts; }
+
+  switch(la[d]) {
+  case '+': r= emitADD(w); break;
+  case '-': r= emitSUB(w); break;
+  case '*': r= emitMUL(w, shifts); break;
+  case '/': r= emitDIV(w, shifts); break;
+  //default:  return 0; // failed, just continue (probably @ or var or...)
+  }
+  printf("\n\t--emitMATH(%d, %d) '%c' ===> %d '%s'", w, d, la[d], r, la);
+  if (!r) return 0;
+  la+= d; return 1;
+}
+
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
-extern char* genasm(char* la) {
+extern char* genasm(char* tla) {
   char *fixstack[16]= {0}, **fix= fixstack, *tmp;
   char lastvar= 'a'; // TODO: take arglist...
   signed char stk= 0;
-  
+
+
+  la= tla;
   --la;
+
  next:
-  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ", la[1], la[1], la[1], *(L*)(la+2), stk);
+  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d val=", la[1], la[1], la[1], *(L*)(la+2), stk);
+  if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
@@ -1968,20 +2126,37 @@ extern char* genasm(char* la) {
   // TODO: JSR(pushax); probably not neede, should be it's own token and generated, we might have a drop before!
   // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
 
-  case ',': ++la; LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
+  // TODO: handle [1- !!!!
+  case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
+
+  // TODO: can't we collapse this and next 3?
+  case '[': if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto next;
+    printf("--------LA[1]= '%c'\n", la[1]);
+    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto next;
+    JSR(pushax); ++stk; goto next; // no math
+
+  case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
+    if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
+    LDAn(MKNUM(*la-'0')); LDXn(0); goto next;
+
+  case ',': ++la; if (emitMATH(*(L*)la, 2)) goto next;
+    LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
+
+  // read address from var/address
+  // TODO: optimize for MATH?    
   case ';': ++la; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
+
   case '9': JMP(retnil); goto next;
  
   // -- All these routine (may) change the stack
   case '=': JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
-  case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
-  case '[': JSR(pushax); ++stk; goto next;
 
   case 'C': JSR(cons); --stk; goto next; // WORKS!
 
     // TODO: add/sub/mul by constant - inline/special jsr
     // TODO: add/sub by variable - inline: global/local?
   case '+': JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
+//  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
   case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
   case '*': JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
   case '/': JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
@@ -2011,7 +2186,7 @@ extern char* genasm(char* la) {
     // TODO: closure variables ijkl mnop
 
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
-    if (*la>='0' && *la<='8') { LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
+    //if (*la>='0' && *la<='8') { LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
 
     printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
     return 0;

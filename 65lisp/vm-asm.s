@@ -6,15 +6,25 @@
 
 .importzp sp
 
-.import tosadda0, tosaddax
-.import tossubax    	; , tossuba0
-.import tosmulax, tosdivax
-.import toseq00, toseqa0, toseqax
+.import negax
 
-.import asrax1
-.import aslax1
-.import shraxy
-.import shlaxy
+.import tosaddax, tossubax, tosmulax, tosdivax
+.import tosadda0, tossuba0, tosmula0, tosdiva0
+
+.import mulax3, mulax5, mulax6, mulax7, mulax9, mulax10
+
+.import decax1, decax2, decax3, decax4, decax5, decax6, decax7, decax8, decaxy
+.import incax1, incax2, incax3, incax4, incax5, incax6, incax7, incax8, incaxy
+
+;;.import asrax7, aslax7, shrax7, shlax7 ;; can't find!
+
+.import asrax1, asrax2, asrax3, asrax4, asrax7, asraxy
+.import aslax1, aslax2, aslax3, aslax4, aslax7, aslaxy
+
+.import shrax1, shrax2, shrax3, shrax4, shrax7, shraxy
+.import shlax1, shlax2, shlax3, shlax4, shlax7, shlaxy
+
+.import toseq00, toseqa0, toseqax
 
 .import pusha
 .import pushax
@@ -43,15 +53,23 @@
 .export _incsp2, _incsp4, _incsp6, _incsp8
 .export _addysp
 
-.export _tosaddax
-.export _tossubax	; , _tossuba0 
-.export _tosmulax, _tosdivax
+.export _negax
+.export _tosaddax, _tossubax, _tosmulax, _tosdivax
+.export _tosadda0, _tossuba0, _tosmula0, _tosdiva0
+
+.export _decax1, _decax2, _decax3, _decax4, _decax5, _decax6, _decax7, _decax8, _decaxy
+.export _incax1, _incax2, _incax3, _incax4, _incax5, _incax6, _incax7, _incax8, _incaxy
+
 .export _toseq00, _toseqa0, _toseqax
 
-.export _asrax1
-.export _aslax1
-.export _shraxy
-.export _shlaxy
+.export _mulax3, _mulax5, _mulax6, _mulax7, _mulax9, _mulax10
+
+;;.export asrax7, aslax7, shrax7, shlax7 ;; can't find!
+.export _asrax1,_asrax2,_asrax3,_asrax4,_asraxy
+.export _aslax1,_aslax2,_aslax3,_aslax4,_aslaxy
+
+.export _shrax1,_shrax2,_shrax3,_shrax4,_shraxy
+.export _shlax1,_shlax2,_shlax3,_shlax4,_shlaxy
 
 .export _ffcar, _ffcdr
 .export _ffnull, _ffisnum, _ffiscons, _ffisatom, _fftype
@@ -78,20 +96,77 @@ _incsp4         = incsp4
 _incsp6         = incsp6
 _incsp8         = incsp8
 
+_negax          = negax
+
 _tosaddax       = tosaddax
-; _tossub0a       = tossuba0
 _tossubax       = tossubax
 _tosmulax       = tosmulax
 _tosdivax       = tosdivax
+
+_tosadda0       = tosadda0
+_tossuba0       = tossuba0
+_tosmula0       = tosmula0
+_tosdiva0       = tosdiva0
+
+
+_mulax3   = mulax3 
+_mulax5   = mulax5 
+_mulax6   = mulax6 
+_mulax7   = mulax7 
+_mulax9   = mulax9 
+_mulax10  = mulax10
+
+_decax1 	= decax1
+_decax2	        = decax2
+_decax3	        = decax3
+_decax4	        = decax4
+_decax5	        = decax5
+_decax6	        = decax6
+_decax7	        = decax7
+_decax8	        = decax8
+_decaxy	        = decaxy
+
+_incax1	        = incax1
+_incax2	        = incax2
+_incax3	        = incax3
+_incax4	        = incax4
+_incax5	        = incax5
+_incax6	        = incax6
+_incax7	        = incax7
+_incax8	        = incax8
+_incaxy	        = incaxy
 
 _toseq00        = toseq00
 _toseqa0        = toseqa0
 _toseqax        = toseqax
 
-_asrax1         = asrax1
-_aslax1         = aslax1
-_shraxy         = shraxy
-_shlaxy         = shlaxy
+_asrax1		= asrax1
+_asrax2		= asrax2
+_asrax3		= asrax3
+_asrax4		= asrax4
+;;_asrax7		= asrax7
+_asraxy		= asraxy
+
+_aslax1		= aslax1
+_aslax2		= aslax2
+_aslax3		= aslax3
+_aslax4		= aslax4
+;;_aslax7		= aslax7
+_aslaxy		= aslaxy
+
+_shrax1		= shrax1
+_shrax2		= shrax2
+_shrax3		= shrax3
+_shrax4		= shrax4
+;;_shrax7		= shrax7
+_shraxy		= shraxy
+
+_shlax1		= shlax1
+_shlax2		= shlax2
+_shlax3		= shlax3
+_shlax4		= shlax4
+;;_shlax7		= shlax7
+_shlaxy		= shlaxy
 
 _addysp         = addysp
 
