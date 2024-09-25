@@ -1987,6 +1987,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //    ASM      TIME    PROGSIZE  OPT
 //    
 //     
+//     81 B    101.0    29611 B   +35 B   ldax0sp for "a" varible
 //     91 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
 //    105 B    120.7s   27969 B           emitRETURN    
 //    107 B    123.1s                     - start -
@@ -2182,7 +2183,10 @@ extern char* genasm(char* tla) {
     // local variables on stack
     // TODO: handle let, even inline let: (let ((a 3) (b 4)) (+ 3 (let ((c 4)(d (+ a b))) (+ a c d))))
     //                                        probably have to keep track of what where " dc ba" spc is 1stk
-    if (*la>='a' && *la<='h') { LDYn(2*(lastvar-*la+stk-1)+1); JSR(ldaxysp); goto next; }
+    if (*la>='a' && *la<='h') {
+      char i= 2*(lastvar-*la+stk-1)+1;
+      if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more?
+      LDYn(i); JSR(ldaxysp); goto next; }
     // TODO: closure variables ijkl mnop
 
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
