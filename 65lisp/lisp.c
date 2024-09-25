@@ -1985,9 +1985,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 // ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
 //    ASM      TIME    PROGSIZE  OPT
-//    
+//     65+3     45.2s     -               fib.c
 //     
-//     81 B    101.0    29611 B   +35 B   ldax0sp for "a" varible
+//     60 B     38.2s   30106 B           using return
+//     54 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
+//     81 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
 //     91 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
 //    105 B    120.7s   27969 B           emitRETURN    
 //    107 B    123.1s                     - start -
@@ -2064,6 +2066,12 @@ unsigned char emitDIV(L w, unsigned char shifts) {
   return 1;
 }
 
+unsigned char emitEQ(L w) {
+  CMPn(w & 0xff);               BNE(+2);
+  CPXn(((unsigned int)w) >> 8); BNE(00);
+  return 1;
+}
+
 char* la= 0;
 
 unsigned char emitMATH(L w, unsigned char d) {
@@ -2077,49 +2085,51 @@ unsigned char emitMATH(L w, unsigned char d) {
   case '-': r= emitSUB(w); break;
   case '*': r= emitMUL(w, shifts); break;
   case '/': r= emitDIV(w, shifts); break;
+  case '=': r= emitEQ(w); break;
   //default:  return 0; // failed, just continue (probably @ or var or...)
   }
-  printf("\n\t--emitMATH(%d, %d) '%c' ===> %d '%s'", w, d, la[d], r, la);
+  printf("\n\t--emitMATH(%d, %d) '%c' ===> %d '%s'", NUM(w), d, la[d], r, la);
   if (!r) return 0;
   la+= d; return 1;
 }
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
 extern char* genasm(char* tla) {
-  char *fixstack[16]= {0}, **fix= fixstack, *tmp;
-  char lastvar= 'a'; // TODO: take arglist...
+  char *fixstack[16]= {0}, **fix= fixstack, *tmp, lastop= 0;
   signed char stk= 0;
-
+  // TODO: take arglist...
+  char lastvar= 'a', lastarg= lastvar, ax= lastvar, t;
 
   la= tla;
   --la;
 
  next:
-  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d val=", la[1], la[1], la[1], *(L*)(la+2), stk);
+  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), stk, ax);
   if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
+  lastop= *la;
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
+  case '^': case 0: ax= '?'; emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 
 
   // -- These are safe functions with no stack effect
-  case '@': JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
-  case 'A': JSR(ffcar); goto next;
-  case 'D': JSR(ffcdr); goto next;
+  case '@': ax= '?'; JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
+  case 'A': ax= '?'; JSR(ffcar); goto next;
+  case 'D': ax= '?'; JSR(ffcdr); goto next;
 
   case '.': JSR(princ); goto next;
   case 'W': JSR(prin1); goto next;
   case 'P': JSR(print); goto next;
 
     // ./65vm-asm -e "(recurse (print (+ x 1)))" -- LOL!
-  case 'R': JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
+  case 'R': ax= '?'; JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
     // TODO: better adjust stack
     // TODO: move N parameters!
-  case 'Z': if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
-  case 'x': goto next; // LOL, it's just AX!  TOOD: rename to "ax" or "AX" ???
+  case 'Z': ax= '?'; if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
+  case 'x': goto next; // LOL, it's just AX! // TODO: hmmmm, ax verify?
 
   // SETQ: ax=val ':' addr => ax still val
   case ':': ++la; STA((void*)(*(L*)la)); STX((void*)(1+*(L*)la)); ++la; goto next; // 6 bytes = write val at addr/var
@@ -2128,39 +2138,44 @@ extern char* genasm(char* tla) {
   // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
 
   // TODO: handle [1- !!!!
-  case ']': if (la[1]=='[') ++la; else { JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
+  case ']': if (la[1]=='[') ++la; else { ax= '?'; JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
 
   // TODO: can't we collapse this and next 3?
-  case '[': if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto next;
-    printf("--------LA[1]= '%c'\n", la[1]);
-    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto next;
-    JSR(pushax); ++stk; goto next; // no math
+  case '[': t= ax; ax= '?'; if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto mathdone;
+    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto mathdone;
+    ax= t; JSR(pushax); ++stk; goto next; // no math
+  mathdone:
+    if (*la=='=') ax= t;
+    goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
+    ax= *la;
     if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
     LDAn(MKNUM(*la-'0')); LDXn(0); goto next;
 
-  case ',': ++la; if (emitMATH(*(L*)la, 2)) goto next;
+  case ',': ++la; ax= '?'; if (emitMATH(*(L*)la, 2)) goto next;
     LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
 
   // read address from var/address
   // TODO: optimize for MATH?    
-  case ';': ++la; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
+  case ';': ++la; ax='?'; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
 
-  case '9': JMP(retnil); goto next;
+  case '9': ax= '9'; JMP(retnil); goto next;
  
   // -- All these routine (may) change the stack
-  case '=': JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+  //  case '=': ax= '?'; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+  // not correct ...
+  case '=': ax= '?'; JSR(toseqax); CMPn(0); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
 
-  case 'C': JSR(cons); --stk; goto next; // WORKS!
+  case 'C': ax= '?'; JSR(cons); --stk; goto next; // WORKS!
 
     // TODO: add/sub/mul by constant - inline/special jsr
     // TODO: add/sub by variable - inline: global/local?
-  case '+': JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
+  case '+': ax= '?'; JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
 //  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '*': JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
-  case '/': JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
+  case '-': ax= '?'; JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
+  case '*': ax= '?'; JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
+  case '/': ax= '?'; JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
 
   // SET: setting global variable: address on stack, value in AX (opposite SETQ
   case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
@@ -2168,13 +2183,26 @@ extern char* genasm(char* tla) {
   // COND I { THEN } { ELSE } ' ' => COND  CMP 0  BNE xx  THEN  SEC  BCS yy  xx:  ELSE  yy:
   //                                         I        fix     {          fix          }
   // TODO: AX not just A, lo, and TODO: test nil
-  case 'I': CMPn(0); BEQ(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
+//  case 'I': CMPn(0); BEQ(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
+//  case 'I': BNE(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
+  case 'I': *++fix= (void*)ax; *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
 
   // TODO: stk should be same later with } end of ELSE, otherwise have troble...
   // 3 bytes relative = slow: 2+3 c, 3 bytes jmp = 3 c TODO: jmp skip ELSE, save yy, fix xx to jump to END
-  case '{': tmp= *fix; SEC(); BCS(0); *fix= mcp-1; *tmp= mcp-tmp-1; goto next;
+  case '{': --fix; t= ax; ax= (char)(L)*fix; *fix= (void*)t; ++fix; // restore ax from I and save ax from THEN
+    tmp= *fix;
+    //t= !strchr("^RZ", lastop);
+    //if (!t) { SEC(); BCS(0); }
+    { SEC(); BCS(0); }
+    *fix= mcp-1; // patch I to jump yy 
+    //*tmp= t? 0: mcp-tmp-1; // xx no longer needed
+    *tmp= mcp-tmp-1;
+    goto next;
 
-  case '}': **fix= mcp-*fix-1; --fix; goto next; // END of IF, patch yy to jump here
+  case '}': //if (*fix)
+      **fix= mcp-*fix-1; --fix; // only patch xx if neeeded
+    if (ax!=(L)*fix) ax= '?'; --fix;
+    goto next; // END of IF, patch yy to jump here
     
   // Subroutine caller and misc and 0..8 digit
   case '(':
@@ -2185,7 +2213,11 @@ extern char* genasm(char* tla) {
     //                                        probably have to keep track of what where " dc ba" spc is 1stk
     if (*la>='a' && *la<='h') {
       char i= 2*(lastvar-*la+stk-1)+1;
-      if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more?
+      if (ax==*la) goto next; // ax IS *la 'a' !
+      printf("\n\t===== VAR ax '%c => '%c'\n", ax, *la);
+      assert(*la <= lastvar);
+      ax= *la;
+      if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more variants?
       LDYn(i); JSR(ldaxysp); goto next; }
     // TODO: closure variables ijkl mnop
 
@@ -2418,13 +2450,13 @@ JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
   //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
 
   case'\\': n=0; frame=s; while(*pc=='\\'){pc++;n++;frame--;} goto next; // lambda \\\ = \abc (TODO)
-  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig+n; goto call;
+  case 'R': ax= '?'; memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig+n; goto call;
   case 'X': // "apply" TODO: if X^ make tail-call
     // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
     // or fixed:                     \ a3<I{a^}{a a1= ,PPX  *^}^
     *++s=(L)frame; *++s=(L)orig; *++s=(L)pc; *++s=(L)n; // PARAM_OFF
     frame= s; pc= orig= ATOMSTR(top); n= 0; goto call;
-  case '^': n=(L)*s--; pc=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
+  case '^': ax= '?'; n=(L)*s--; pc=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
     // top contains result! no need copy
   // parameter a-h (warning need others for local let vars!)
   case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':

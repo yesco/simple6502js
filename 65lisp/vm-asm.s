@@ -1,7 +1,7 @@
 ;; 6502 asm vm-code and symbols used in asm-code gen during execution/compilation
 ;;  -- https://stackoverflow.com/questions/71208847/how-to-access-assembly-language-symbols-without-a-leading-from-c-on-6502-cc65
 
-.import	ldaxi, ldaxidx, ldax0sp, ldaxysp
+.import	ldaxi, ldaxidx, ldax0sp, ldaxysp, ldaxy
 .import staxspidx
 
 .importzp sp
