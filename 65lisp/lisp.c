@@ -1985,8 +1985,18 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 // ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
 //    ASM      TIME    PROGSIZE  OPT
-//     65+3     45.2s     -               fib.c)
-//     
+//     65+3     45.2s     -               fib.c
+
+// TODO: access var0, var1, var2, var3 just do jump!
+// TODO: access var0 LAST should popax it? instead of 'a' use 'A'...
+//          difficult to generalize, especialy in if branches, return, etc, slices?
+// TODO: write an lisp interpreter in lisp and compile it... what size/performance?
+// TODO: write this compiler in lisp? lol
+
+//     54 B                      loop forever... lol something wrong.... 
+//            +4 bytes extra for 
+//     50 B     31.6s   31845 B .TO.. cleanup ... (/ 45.2 31.6) cc65 43% slower! (/ 65 47.0) cc65 38% more code
+//                      30589 !!!! BAD.... no inline IAX!
 //     54 B     38.1s   30154 B   +       using return and removing jmp to endIF => 21% smaller than fib.c
 //     60 B     38.2s   30106?B           using return
 //     54 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
@@ -1996,10 +2006,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //    107 B    123.1s                     - start -
 //
 //     30 B      -        --- VM --- effective CODE used to generate ASM!
-//     30 B                [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0  - saved 4x (drop+push)  4x "]["
-//     38 B                [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
-//     24 B                 a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
-
+//     30 B                cleaned [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0 - saved 4x (drop+push ][) 
+//     38 B                byte code with push/pop [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
+//  !  24 B                plain byte code:  a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
+//  !  62 B     31 cells         LISP w RETURN
+//  !  56 B     28 cells         LISP if if..
 // drop 0-4 values from stack, JSR=drop, JMP=return
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 
@@ -2099,10 +2110,21 @@ extern char* genasm(char* tla) {
   char *fixstack[16]= {0}, **fix= fixstack, *tmp, lastop= 0;
   signed char stk= 0;
   // TODO: take arglist...
-  char lastvar= 'a', lastarg= lastvar, ax= lastvar, t;
+  char lastvar= 'a', lastarg= lastvar, ax= lastvar, savelast=1, t;
 
   la= tla;
   --la;
+
+  // TODO:
+  //   (+ (if (...) a 7) a) who saves ax?
+
+  // invalidate AX
+  // TODO: don't inline... and can we test/do this not at ever CASE but instead at one place?
+  #define SAVEAX(a) do { if (savelast && a!=lastarg) { assert(ax==lastarg); JSR(pushax); ++stk; savelast= 0; \
+printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
+} } while(0)
+  #define IAX   do { SAVEAX('?'); ax= '?'; } while(0)
+  #define AX(a) do { SAVEAX(a); ax= a; } while(0)
 
  next:
   printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), stk, ax);
@@ -2111,25 +2133,25 @@ extern char* genasm(char* tla) {
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: ax= '?'; emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
+  case '^': case 0: emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 
 
   // -- These are safe functions with no stack effect
-  case '@': ax= '?'; JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
-  case 'A': ax= '?'; JSR(ffcar); goto next;
-  case 'D': ax= '?'; JSR(ffcdr); goto next;
+  case '@': IAX; JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
+  case 'A': IAX; JSR(ffcar); goto next;
+  case 'D': IAX; JSR(ffcdr); goto next;
 
   case '.': JSR(princ); goto next;
   case 'W': JSR(prin1); goto next;
   case 'P': JSR(print); goto next;
 
     // ./65vm-asm -e "(recurse (print (+ x 1)))" -- LOL!
-  case 'R': ax= '?'; JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
+  case 'R': IAX; JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
     // TODO: better adjust stack
     // TODO: move N parameters!
-  case 'Z': ax= '?'; if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
+  case 'Z': IAX; if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
   case 'x': goto next; // LOL, it's just AX! // TODO: hmmmm, ax verify?
 
   // SETQ: ax=val ':' addr => ax still val
@@ -2139,44 +2161,55 @@ extern char* genasm(char* tla) {
   // that'd cancel out having to push..., most likely from prev statement discard result! (in tos/AX)
 
   // TODO: handle [1- !!!!
-  case ']': if (la[1]=='[') ++la; else { ax= '?'; JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
+    // hmmmmm, if ax[] ?
+  case ']': if (la[1]=='[') ++la; else { IAX; JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
 
   // TODO: can't we collapse this and next 3?
-  case '[': t= ax; ax= '?'; if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto mathdone;
-    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto mathdone;
-    ax= t; JSR(pushax); ++stk; goto next; // no math
+  case '[':
+    if ((la[1]==',' && la[4]=='=') || (isdigit(la[1]) && la[2]=='=') || la[1]==lastarg)
+      printf("\n---EQUAL coming!\n")
+;
+ else IAX;
+    if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto next;
+    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto next;
+    // else no math
+ printf("--- NEW: ax='%c'\n", ax);
+ //if (ax==lastarg && !savelast) goto next; // IAX did it already
+    if (ax==lastarg) goto next; // no need do anything
+    JSR(pushax); ++stk; goto next;
+
   mathdone:
-    if (*la=='=') ax= t;
+    if (*la=='=') ax= t; else IAX; // = doesn't change AX!
     goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
-    ax= *la;
     if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
+    else AX(*la);
     LDAn(MKNUM(*la-'0')); LDXn(0); goto next;
 
-  case ',': ++la; ax= '?'; if (emitMATH(*(L*)la, 2)) goto next;
+  case ',': ++la; IAX; if (emitMATH(*(L*)la, 2)) goto next;
     LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
 
   // read address from var/address
   // TODO: optimize for MATH?    
-  case ';': ++la; ax='?'; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
+  case ';': ++la; IAX; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
 
-  case '9': ax= '9'; JMP(retnil); goto next;
+  case '9': AX('9'); JMP(retnil); goto next;
  
   // -- All these routine (may) change the stack
-  //  case '=': ax= '?'; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+  //  case '=': IAX; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
   // not correct ...
-  case '=': ax= '?'; JSR(toseqax); CMPn(0); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+  case '=': IAX; JSR(toseqax); CMPn(0); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
 
-  case 'C': ax= '?'; JSR(cons); --stk; goto next; // WORKS!
+  case 'C': IAX; JSR(cons); --stk; goto next; // WORKS!
 
     // TODO: add/sub/mul by constant - inline/special jsr
     // TODO: add/sub by variable - inline: global/local?
-  case '+': ax= '?'; JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
+  case '+': IAX; JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
 //  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '-': ax= '?'; JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '*': ax= '?'; JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
-  case '/': ax= '?'; JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
+  case '-': IAX; JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
+  case '*': IAX; JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
+  case '/': IAX; JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
 
   // SET: setting global variable: address on stack, value in AX (opposite SETQ
   case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
@@ -2204,9 +2237,10 @@ extern char* genasm(char* tla) {
 
     goto next;
 
-  case '}': if (*fix) **fix= mcp-*fix-1;  --fix; // only patch xx if neeeded
+  case '}': if (*fix) **fix= mcp-*fix-1;  --fix; // only patch THEN if needed to jmp endIF
+    // do the THEN ELSE have same in AX?
     if (ax!=(L)*fix) ax= '?'; --fix;
-    goto next; // END of IF, patch yy to jump here
+    goto next;
     
   // Subroutine caller and misc and 0..8 digit
   case '(':
@@ -2218,7 +2252,7 @@ extern char* genasm(char* tla) {
     if (*la>='a' && *la<='h') {
       char i= 2*(lastvar-*la+stk-1)+1;
       if (ax==*la) goto next; // ax IS *la 'a' !
-      printf("\n\t===== VAR ax '%c => '%c'\n", ax, *la);
+      printf("\n\t===== VAR ax '%c' => '%c'\n", ax, *la);
       assert(*la <= lastvar);
       ax= *la;
       if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more variants?

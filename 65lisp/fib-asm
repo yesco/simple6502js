@@ -1,3 +1,9 @@
+./65vm-asm -v -b $*00 -e "(if (eq a 0) (return a) (if (eq a 1) (return a) (+ (recurse (- a 1)) (recurse (- a 2)))))" -s
+./65vm-asm -v -b $*00 -e "(if (eq a 0) a (if (eq a 1) a (+ (recurse (- a 1)) (recurse (- a 2)))))" -s
+
+
+exit 1
+
 # fib 8... #define FIB
 #./run -b $* -e 8          #        30 =>    0.98s
 #./run -b $*0 -e 8         #       300 =>    5.00s
