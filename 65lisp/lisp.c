@@ -1985,9 +1985,9 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 // ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
 //    ASM      TIME    PROGSIZE  OPT
-//     65+3     45.2s     -               fib.c
+//     65+3     45.2s     -               fib.c)
 //     
-//     54 B     38.1s   30154 B   +         using return and removing jmp to endIF
+//     54 B     38.1s   30154 B   +       using return and removing jmp to endIF => 21% smaller than fib.c
 //     60 B     38.2s   30106?B           using return
 //     54 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
 //     81 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
