@@ -1987,7 +1987,8 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //    ASM      TIME    PROGSIZE  OPT
 //     65+3     45.2s     -               fib.c
 //     
-//     60 B     38.2s   30106 B           using return
+//     54 B     38.1s   30154 B   +         using return and removing jmp to endIF
+//     60 B     38.2s   30106?B           using return
 //     54 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
 //     81 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
 //     91 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
@@ -2189,18 +2190,21 @@ extern char* genasm(char* tla) {
 
   // TODO: stk should be same later with } end of ELSE, otherwise have troble...
   // 3 bytes relative = slow: 2+3 c, 3 bytes jmp = 3 c TODO: jmp skip ELSE, save yy, fix xx to jump to END
-  case '{': --fix; t= ax; ax= (char)(L)*fix; *fix= (void*)t; ++fix; // restore ax from I and save ax from THEN
-    tmp= *fix;
-    //t= !strchr("^RZ", lastop);
-    //if (!t) { SEC(); BCS(0); }
-    { SEC(); BCS(0); }
-    *fix= mcp-1; // patch I to jump yy 
-    //*tmp= t? 0: mcp-tmp-1; // xx no longer needed
-    *tmp= mcp-tmp-1;
+  case '{': // restore ax from I and save ax from THEN
+    --fix; t= ax; ax= (char)(L)*fix; *fix= (void*)t; ++fix;
+
+    tmp= *fix; // place to patch IF jmp yy ELSE, save as we reuses *fix...
+
+    // if last op in THEN was jmp/tail rec/return, no need jmp endIF!
+    if (lastop!='^' && lastop!='Z') {
+      SEC(); BCS(0); *fix= mcp-1; // patch me alter to jump to endIF
+    } else *fix= 0;
+
+    *tmp= mcp-tmp-1; // patch IF to jump yy ELSE
+
     goto next;
 
-  case '}': //if (*fix)
-      **fix= mcp-*fix-1; --fix; // only patch xx if neeeded
+  case '}': if (*fix) **fix= mcp-*fix-1;  --fix; // only patch xx if neeeded
     if (ax!=(L)*fix) ax= '?'; --fix;
     goto next; // END of IF, patch yy to jump here
     
