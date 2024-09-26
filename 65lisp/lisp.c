@@ -1992,9 +1992,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //          difficult to generalize, especialy in if branches, return, etc, slices?
 // TODO: write an lisp interpreter in lisp and compile it... what size/performance?
 // TODO: write this compiler in lisp? lol
-
+// TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
+//
+//
 //     54 B                      loop forever... lol something wrong.... 
-//            +4 bytes extra for 
+//            +4 bytes extra for relative jmp, instead of RTS
 //     50 B     31.6s   31845 B .TO.. cleanup ... (/ 45.2 31.6) cc65 43% slower! (/ 65 47.0) cc65 38% more code
 //                      30589 !!!! BAD.... no inline IAX!
 //     54 B     38.1s   30154 B   +       using return and removing jmp to endIF => 21% smaller than fib.c
@@ -2048,12 +2050,13 @@ void* mulARR[]= {(void*)0xffff, (void*)0xffff, aslax1, mulax3, aslax2, mulax5, m
 // TODO: how many bytes? It's quite a lot of code - is it worth it?
 unsigned char emitMUL(L w, unsigned char shifts) {
   w= NUM(w);
-  if (w==1) ; // nothing!
+
+  if (shifts==4) JSR(aslax4);
+  //  else if (shifts==7) JSR(aslax7);
+  else if (shifts>0) { LDYn(shifts); JSR(aslaxy); }
+  else if (w==1) ; // nothing!
   else if (w==0) { LDAn(0); LDXn(0); } // TODO: replace prev ',' or digit...
   else if (w==-1) JSR(negax);
-  else if (shifts==4) JSR(aslax4);
-//  else if (shifts==7) JSR(aslax7);
-  else if (shifts>0) { LDYn(shifts); JSR(aslaxy); }
   else if (w<=10) JSR(mulARR[w]);
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosmula0); }
   else return 0;
@@ -2065,12 +2068,12 @@ unsigned char emitMUL(L w, unsigned char shifts) {
 // TODO: how many bytes? It's quite a lot of code - is it worth it?
 unsigned char emitDIV(L w, unsigned char shifts) {
   w= NUM(w);
-  if (w==1) ; // nothing!
+  if (shifts==4) JSR(asrax4);
+  //else if (shifts==7) JSR(asrax7);
+  else if (shifts>0) { LDYn(shifts); JSR(asraxy); }
+  else if (w==1) ; // nothing!
   else if (w==0) { LDAn(0x7f); LDXn(0); } // TODO: overflow... // TODO: replace prev ',' or digit...
   else if (w==-1) JSR(negax);
-  else if (shifts==4) JSR(asrax4);
-//  else if (shifts==7) JSR(asrax7);
-  else if (shifts>0) { LDYn(shifts); JSR(asraxy); }
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosdiva0); }
   else return 0;
   // TODO: make it return to compile "normal"
@@ -2089,8 +2092,9 @@ char* la= 0;
 unsigned char emitMATH(L w, unsigned char d) {
   unsigned char shifts= 0;
   unsigned char r= 0;
-  // only one bit set?
-  if ((la[d]=='*' || la[d]=='/') && w>=2 && !(w & (w-1))) while(w) { w>>= 1; ++shifts; }
+
+  // * / use shift if only one bit set
+  if ((la[d]=='*' || la[d]=='/') && !(w & (w-1))) while(w>=4) { w>>= 1; ++shifts; }
 
   switch(la[d]) {
   case '+': r= emitADD(w); break;
@@ -2098,9 +2102,8 @@ unsigned char emitMATH(L w, unsigned char d) {
   case '*': r= emitMUL(w, shifts); break;
   case '/': r= emitDIV(w, shifts); break;
   case '=': r= emitEQ(w); break;
-  //default:  return 0; // failed, just continue (probably @ or var or...)
   }
-  printf("\n\t--emitMATH(%d, %d) '%c' ===> %d '%s'", NUM(w), d, la[d], r, la);
+  printf("\n\t--emitMATH(%d, %d) '%c' shifts=%d ===> %d '%s'", NUM(w), d, la[d], shifts, r, la);
   if (!r) return 0;
   la+= d; return 1;
 }
