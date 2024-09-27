@@ -1902,12 +1902,18 @@ char* mcp= mc;
 */
 
 // PROGSIZE: 31358 bytes ... => 27552 bytes no macros 
-//  25401 bytes for VM, 19102 bytes for EVAL !!!!! HMMMM
+//    19102 bytes for EVAL !!!!! HMMMM
+//    25401 bytes for VM
+//    27969 bytes for ASM
+//    29611 bytes for OPT MATH
+//    30154 bytes for OPT emitEQ, return, ax tracking jmp endif
+//    31945 bytes for OPT DELAY-AX TODO: reduce inline...
+//   
 // byte code compiler... + byte interpreter = 6299
 //                             asm-compiler = 2152 bytes
 
 
-void B(char b) { printf("%02x ", b); *mcp++= (b)&0xff; }
+void B(char b)  { printf("%02x ", b); *mcp++= (b)&0xff; }
 void O(char op) { printf("\n\t"); B(op); }
 void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
@@ -1993,19 +1999,26 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: write an lisp interpreter in lisp and compile it... what size/performance?
 // TODO: write this compiler in lisp? lol
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
+// TODO: ret0, ret1 optimization? retA is implicit JSR+RTS
 //
+//         BUG bug B U G ! -- different branches of IF-THEN-ELSE, differnt stacks! 
+//                                 because delayed-push!!!
 //
-//     54 B                      loop forever... lol something wrong.... 
+//     57 B     39.02s  34034 B incl poor disam
+//        maybenot so good? LOL
+//        better off using (ret xx) => less code, faster
+//
+//     51 B                      loop forever... lol something wrong.... 
 //            +4 bytes extra for relative jmp, instead of RTS
-//     50 B     31.6s   31845 B .TO.. cleanup ... (/ 45.2 31.6) cc65 43% slower! (/ 65 47.0) cc65 38% more code
+//     47 B     31.6s   31845 B .TO.. cleanup ... (/ 45.2 31.6) cc65 43% slower! (/ 65 47.0) cc65 38% more code
 //                      30589 !!!! BAD.... no inline IAX!
-//     54 B     38.1s   30154 B   +       using return and removing jmp to endIF => 21% smaller than fib.c
-//     60 B     38.2s   30106?B           using return
-//     54 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
-//     81 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
-//     91 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
-//    105 B    120.7s   27969 B           emitRETURN    
-//    107 B    123.1s                     - start -
+//     51 B     38.1s   30154 B   +       using return and removing jmp to endIF => 21% smaller than fib.c
+//     57 B     38.2s   30106?B           using return
+//     51 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
+//     78 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
+//     88 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
+//    102 B    120.7s   27969 B           emitRETURN    
+//    105 B    123.1s                     - start -
 //
 //     30 B      -        --- VM --- effective CODE used to generate ASM!
 //     30 B                cleaned [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0 - saved 4x (drop+push ][) 
@@ -2089,6 +2102,24 @@ unsigned char emitEQ(L w) {
 
 char* la= 0;
 
+// TODO: (between a XX XX)
+// - https://www.nesdev.org/wiki/Synthetic_instructions
+//
+// Test whether A is in range [min, max]
+// Test whether A (unsigned), A is destroyed.[4]
+
+// Set carry flag if A is in range, otherwise clear carry:
+//
+// clc
+// adc #$ff-max
+// adc #max-min+1
+
+// Clear carry flag if A is in range, otherwise set carry:
+//
+// sec
+// sbc #min
+// sbc #max-min+1
+
 unsigned char emitMATH(L w, unsigned char d) {
   unsigned char shifts= 0;
   unsigned char r= 0;
@@ -2108,35 +2139,46 @@ unsigned char emitMATH(L w, unsigned char d) {
   la+= d; return 1;
 }
 
+typedef struct AsmState {
+  signed char stk;
+  char ax;
+  char savelast;
+  char *fix;
+} AsmState;
+
+// TODO: asmpile fix these...
+// TODO: take arglist...
+char lastvar, lastarg, lastop;
+
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
-extern char* genasm(char* tla) {
-  char *fixstack[16]= {0}, **fix= fixstack, *tmp, lastop= 0;
-  signed char stk= 0;
-  // TODO: take arglist...
-  char lastvar= 'a', lastarg= lastvar, ax= lastvar, savelast=1, t;
-
-  la= tla;
-  --la;
-
+extern char* genasm(AsmState *s) {
   // TODO:
   //   (+ (if (...) a 7) a) who saves ax?
 
   // invalidate AX
   // TODO: don't inline... and can we test/do this not at ever CASE but instead at one place?
-  #define SAVEAX(a) do { if (savelast && a!=lastarg) { assert(ax==lastarg); JSR(pushax); ++stk; savelast= 0; \
+  #define SAVEAX(a) do { if (s->savelast && a!=lastarg) { assert(s->ax==lastarg); JSR(pushax); ++(s->stk); s->savelast= 0; \
 printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
 } } while(0)
-  #define IAX   do { SAVEAX('?'); ax= '?'; } while(0)
-  #define AX(a) do { SAVEAX(a); ax= a; } while(0)
+  #define IAX   do { SAVEAX('?'); s->ax= '?'; } while(0)
+  #define AX(a) do { SAVEAX(a); s->ax= a; } while(0)
 
  next:
-  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), stk, ax);
-  if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
   lastop= *la;
+
+  // TailCall? JSR xxxx RTS  -> JMP xxxx
+  if (mcp>mc+3 && *(mcp-1)==0x60 && *(mcp-4)==0x20) {
+    *(mcp-4)= 0x4c; *--mcp= 0;
+  }
+
+  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
+  if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
+
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: emitRETURN(stk); if (*la) goto next;   BRK(); BRK(); BRK(); return mcp;
+  case '^': case 0: emitRETURN(s->stk); s->stk=100;s->ax='?'; if (*la) goto next;
+    return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 
@@ -2152,9 +2194,10 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
 
     // ./65vm-asm -e "(recurse (print (+ x 1)))" -- LOL!
   case 'R': IAX; JSR(mc); goto next; // Recurse - TODO: 0x0000 and patch later!
-    // TODO: better adjust stack
-    // TODO: move N parameters!
-  case 'Z': IAX; if (stk) { LDYn(stk*2); JSR(addysp); }  JMP(mc); goto next; // TailRecurse - LOOP lol
+
+  // Tail-recurse: move up lastarg-'a' parameters, JMP beginning
+  // TODO: move N parameters! now only works for one/AX !
+  case 'Z': if (s->stk<64) { LDYn((s->stk-(lastarg-'a'))*2); JSR(addysp); }  s->stk=100;s->ax='?'; JMP(mc); goto next;
   case 'x': goto next; // LOL, it's just AX! // TODO: hmmmm, ax verify?
 
   // SETQ: ax=val ':' addr => ax still val
@@ -2165,25 +2208,21 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
 
   // TODO: handle [1- !!!!
     // hmmmmm, if ax[] ?
-  case ']': if (la[1]=='[') ++la; else { IAX; JSR(popax); --stk; }  goto next; // ][ drop-push cancels!
+  case ']': if (la[1]=='[') ++la; else { IAX; JSR(popax); --(s->stk); }  goto next; // ][ drop-push cancels!
 
   // TODO: can't we collapse this and next 3?
   case '[':
     if ((la[1]==',' && la[4]=='=') || (isdigit(la[1]) && la[2]=='=') || la[1]==lastarg)
-      printf("\n---EQUAL coming!\n")
+      printf("\n---MATH OP/\'a\' coming! - no need pushax!\n")
 ;
  else IAX;
     if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto next;
     if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto next;
     // else no math
- printf("--- NEW: ax='%c'\n", ax);
+    printf("--- NEW: ax='%c'\n", s->ax);
  //if (ax==lastarg && !savelast) goto next; // IAX did it already
-    if (ax==lastarg) goto next; // no need do anything
-    JSR(pushax); ++stk; goto next;
-
-  mathdone:
-    if (*la=='=') ax= t; else IAX; // = doesn't change AX!
-    goto next;
+    if (s->ax==lastarg) goto next; // no need do anything
+    JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
     if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
@@ -2202,49 +2241,109 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
   // -- All these routine (may) change the stack
   //  case '=': IAX; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
   // not correct ...
-  case '=': IAX; JSR(toseqax); CMPn(0); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+  case '=': IAX; JSR(toseqax); CMPn(0); --(s->stk); goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
 
-  case 'C': IAX; JSR(cons); --stk; goto next; // WORKS!
+  case 'C': IAX; JSR(cons); --(s->stk); goto next; // WORKS!
 
     // TODO: add/sub/mul by constant - inline/special jsr
     // TODO: add/sub by variable - inline: global/local?
-  case '+': IAX; JSR(tosaddax); --stk; goto next; // prove not need ANDn for neg?
-//  case '-': JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '-': IAX; JSR(tossubax); --stk; goto next; // prove not need ANDn for neg?
-  case '*': IAX; JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --stk; goto next; // prove not need ANDn for neg?
-  case '/': IAX; JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --stk; goto next; // need ANDn for neg, yes!
+  case '+': IAX; JSR(tosaddax); --(s->stk); goto next; // prove not need ANDn for neg?
+  case '-': IAX; JSR(tossubax); --(s->stk); goto next; // prove not need ANDn for neg?
+  case '*': IAX; JSR(asrax1); JSR(tosmulax); ANDn(0xfe); --(s->stk); goto next; // prove not need ANDn for neg?
+  case '/': IAX; JSR(tosdivax); JSR(aslax1); ANDn(0xfe); --(s->stk); goto next; // need ANDn for neg, yes!
 
   // SET: setting global variable: address on stack, value in AX (opposite SETQ
-  case '!': JSR(staxspidx); --stk; goto next; // total 23 bytes...
+  case '!': JSR(staxspidx); --(s->stk); goto next; // total 23 bytes...
 
   // COND I { THEN } { ELSE } ' ' => COND  CMP 0  BNE xx  THEN  SEC  BCS yy  xx:  ELSE  yy:
   //                                         I        fix     {          fix          }
   // TODO: AX not just A, lo, and TODO: test nil
 //  case 'I': CMPn(0); BEQ(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
 //  case 'I': BNE(0); *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
-  case 'I': *++fix= (void*)ax; *++fix= mcp-1; goto next; // save relative xx to fix of 'I', THEN follows
+  case '{': case '}': return mcp;
+  case 'I':
+    {
+      AsmState thn, els;
+      char *xx= mcp-1, *yy= 0;
+      char* insertHere= 0;
+      thn= *s; els= *s;
 
-  // TODO: stk should be same later with } end of ELSE, otherwise have troble...
-  // 3 bytes relative = slow: 2+3 c, 3 bytes jmp = 3 c TODO: jmp skip ELSE, save yy, fix xx to jump to END
-  case '{': // restore ax from I and save ax from THEN
-    --fix; t= ax; ax= (char)(L)*fix; *fix= (void*)t; ++fix;
+      genasm(&thn);
+      printf("\n======> THEN.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
 
-    tmp= *fix; // place to patch IF jmp yy ELSE, save as we reuses *fix...
+      // '{'
+      assert(*la=='{');
+      ++la;
 
-    // if last op in THEN was jmp/tail rec/return, no need jmp endIF!
-    if (lastop!='^' && lastop!='Z') {
-      SEC(); BCS(0); *fix= mcp-1; // patch me alter to jump to endIF
-    } else *fix= 0;
+      // if last op in THEN was jmp/tail rec/return, no need jmp endIF!
+      if (thn.stk < 64) { // ^ or Z
+        if (thn.savelast && thn.ax=='a')
+          insertHere= mcp; // where to insert pushax, lol
+        SEC(); BCS(0); yy= mcp-1; // addr of rel Bxx to endIF
+      }
 
-    *tmp= mcp-tmp-1; // patch IF to jump yy ELSE
+      *xx= mcp-xx-1; // patch IF to jump yy ELSE
 
-    goto next;
+      genasm(&els);
+      printf("\n======> ELSE.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
 
-  case '}': if (*fix) **fix= mcp-*fix-1;  --fix; // only patch THEN if needed to jmp endIF
-    // do the THEN ELSE have same in AX?
-    if (ax!=(L)*fix) ax= '?'; --fix;
-    goto next;
-    
+      // '}'
+      assert(*la=='}');
+
+      // TODO? just because savelast ....
+      s->stk= thn.stk;
+      if (s->stk>=64) s->stk= els.stk;
+
+      // do the THEN ELSE have same in AX?
+      s->ax= thn.ax;
+      if (s->ax != els.ax) s->ax= '?';
+
+      // correctness
+      if (thn.stk < 64 && els.stk < 64) {
+        int err= 0;
+
+        // same stacks
+        if (thn.stk != els.stk) {
+          printf("\n%% Stack mismatch: IF THEN (%d) ELSE (%d)\n", thn.stk, els.stk);
+          err= 50+els.stk-thn.stk;
+        }
+
+        // same "saved" - it's same thing? lol
+        if (thn.savelast != els.savelast) {
+          printf("\n%% SaveLast mismatch: IF THEN (%d) ELSE (%d)\n", thn.savelast, els.savelast);
+          err+= 1000*thn.savelast + 100*els.savelast;
+          // THEN 1 ELSE 0
+          // we don't know if need "a" later
+          // -- we could force-push before IF :-(
+          //    but that defaults space and time saving...
+          // -- can't drop stack because AX may be needed
+          //    if return, it's already noted/optimized
+          // -- "insert pushax" BEFORE "{" LOL
+          //    only feasable? LOL
+        }
+
+        if (err==1051) {
+          printf("\nTRYING TO FIX MISMATCH... INSERTING...\n");
+          // insert "puashax" before "{"
+          if (!insertHere) printf("\nINSERTHERE: can't!\n");
+          else {
+            char* tmp= mcp;
+            memmove(insertHere+3, insertHere, mcp-insertHere);
+            mcp= insertHere; JSR(pushax);
+            assert(mcp-insertHere==3);
+            mcp= tmp+3; *xx+= 3; yy+= 3; *yy+= 3; // adjust jmps LOL
+            s->ax= '?'; s->savelast= 0; s->stk= els.stk;
+            err= 0;
+          }
+        }
+        if (err) printf("\n\nERR=%d\n", err);
+        assert(!err);
+      }
+        
+      if (yy) *yy= mcp-yy-1; // patch THEN if needed to jmp endIF
+
+    } goto next; 
+
   // Subroutine caller and misc and 0..8 digit
   case '(':
   case ')':
@@ -2253,11 +2352,11 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
     // TODO: handle let, even inline let: (let ((a 3) (b 4)) (+ 3 (let ((c 4)(d (+ a b))) (+ a c d))))
     //                                        probably have to keep track of what where " dc ba" spc is 1stk
     if (*la>='a' && *la<='h') {
-      char i= 2*(lastvar-*la+stk-1)+1;
-      if (ax==*la) goto next; // ax IS *la 'a' !
-      printf("\n\t===== VAR ax '%c' => '%c'\n", ax, *la);
+      char i= 2*(lastvar-*la+s->stk-1)+1;
+      if (s->ax==*la) goto next; // ax IS *la 'a' !
+      printf("\n\t===== VAR ax '%c' => '%c'\n", s->ax, *la);
       assert(*la <= lastvar);
-      ax= *la;
+      s->ax= *la;
       if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more variants?
       LDYn(i); JSR(ldaxysp); goto next; }
     // TODO: closure variables ijkl mnop
@@ -2270,17 +2369,56 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
   }
 }
 
-char* asmpile(char* la) {
+char* asmpile(char* pla) {
+  unsigned char *p;
+  AsmState s= {};
+  s.ax= 'a'; s.savelast= 1;
+
   mcp= mc;
   memset(mc, 0, sizeof(mc));
-  if (!genasm(la)) return 0;
-  
-  printf("\nCODE[%d]: ", mcp-mc);
-  mcp= mc;
-  do { printf("%02x ", *mcp); mcp++; } while (*mcp || mcp[1] || mcp[2]);  NL;
+  lastvar= 'a'; lastarg= lastvar; lastop= 0;
+  la= pla-1; // using pre-inc
+  if (!genasm(&s)) return 0;
+
+  // poor man disasm (- 34621 33339) 1282 bytes!
+#ifndef DISASM
+  #define BRANCH "BPLBMIBVCBVSBCCBCSBNEBEQ"
+  #define X8     "PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED"
+  #define XA     "00a01a02a03a04a05a06a07aTXATXSTAXTSXDEX0daNOP0fa"
+  #define CCIII  "???BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC"
+  printf("\nCODE[%d]:\n",mcp-mc);p=mc;
+  while(p<mcp) {
+    unsigned char i= *p++, m= (i>>2)&7;
+    printf("%04X:\t%02x  ",p,i);
+    if (i==0x20) { printf("JSR %04x\n",*((L*)p)++); continue; }
+    else if (i==0x4c) { printf("JMP %04x\n",*((L*)p)++); continue; }
+    else if (i==0x6c) { printf("JSI %02x",*p++); continue; }
+    else if (i==0x60) { printf("RTS"); continue; }
+    else if ((i&0x1f)==0x10) {
+      printf("%.3s %+d\t=> %04X\n", BRANCH+3*(i>>5), *p, p+2+(signed char)*p++); continue; }
+    else if ((i&0xf)==0x8) { printf("%.3s\n",X8+3*(*p>>4)); continue; }
+    else if ((i&0xf)==0xA) { printf("%.3s\n",XA+3*(*p>>4)); continue; }
+    else {
+      unsigned char cciii= (i>>5)+((i&3)<<3);
+      if (cciii<0b11000) printf("%.3s", CCIII+3*cciii);
+      else printf("%02x",p,*p++);
+    }
+    switch(m) {
+    case 0b000: printf(i&1?" (%02x,X)":" #%02x", *p++); break;
+    case 0b001: printf(" %02x ZP", *p++); break;
+    case 0b010: printf(i&1?" #%02x":" A", *p++); break;
+    case 0b011: printf(i&1?" %04x":" A", *((L*)p)++); break;
+    case 0b100: printf(" (%02x),Y", *p++); break;
+    case 0b101: printf(" %02x,X", *p++); break;
+    case 0b110: printf(" %04x,Y", *((L*)p)++); break;
+    case 0b111: printf(" %04x,X", *((L*)p)++); break;
+    }
+    NL;
+  } NL;
+#endif // DISASM
+
   return mc;
 }
-
 #else
   #define asmpile(a) 0
 #endif
@@ -2371,7 +2509,7 @@ extern L al(char* la) {
 
       if (ft!=MKNUM(42) || check!=ERROR) {
         // TODO: calculate how much? lol
-        printf("%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
+        printf("\n%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
         printf("top="); prin1(top);
         printf(" ft="); prin1(ft);
         printf(" check="); prin1(check); NL;
