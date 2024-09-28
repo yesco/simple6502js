@@ -281,8 +281,15 @@
 // max length of atom and constant strings
 #define MAXSYMLEN 120
 
+// ---------------- Lisp Datatypes
+
+//typedef int16_t L;
+typedef int16_t L;
+typedef uint16_t uint;
+typedef unsigned uchar;
+
 // --- Statisticss
-unsigned int natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
+uint natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 long nops= 0;
 
 int debug= 0, verbose= 0;
@@ -294,12 +301,6 @@ void* zalloc(size_t n) {
   return r;
 }
 
-
-// ---------------- Lisp Datatypes
-
-//typedef int16_t L;
-typedef int16_t L;
-typedef uint16_t uint;
 
 // junk
 
@@ -545,7 +546,7 @@ L nil, T, FREE, ERROR, eof, lambda, closure, bye, quote= 0;
 //
 // -- Cons
 
-unsigned int ncell= 0;
+uint ncell= 0;
 L *cell, *cnext, *cstart, *cend;
 
 L prin1(L); // forward TODO: remove
@@ -797,7 +798,7 @@ L setatomval(L x, L v) {
 }
 
 // search linked list
-Atom* findatom(Atom* a, char* s, unsigned char typ) {
+Atom* findatom(Atom* a, char* s, uchar typ) {
   while(a) { // lol not nil...
     if (HTYP(a)==typ && 0==strcmp(s, a->name)) return a;
     a= a->next;
@@ -819,7 +820,7 @@ Atom* findatom(Atom* a, char* s, unsigned char typ) {
 // TYP: use this type code to match and create
 //   (This means an ATOM and "STRING" could both exist)
 // LEN: if len==0 is ATOM or STRING, otherwise mallocced
-L atomstr(char* s, unsigned char typ, size_t len) {
+L atomstr(char* s, uchar typ, size_t len) {
   char h;
   Atom *a;
 
@@ -930,7 +931,7 @@ void mark(L a) {
   ++nmark;
   if (iscons(a)) {
     // TODO: measure cost of extra vars?
-    unsigned int n= ((L*)a)-cstart, i= n/8;
+    uint n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
     if (cused[i] & b) { DEBUG(printf(" [used %d %d] ", i, b)); return; }
 
@@ -952,7 +953,7 @@ void mark(L a) {
   // <= cnext is important! lol (for CDR)
   if (((L*)a)>=cstart && ((L*)a) <= cnext) {
     // TODO: measure cost of extra vars?
-    unsigned int n= ((L*)a)-cstart, i= n/8;
+    uint n= ((L*)a)-cstart, i= n/8;
     char b= 1<<(n&7);
     if (cused[i] & b) { printf(" [used %d %d] ", i, b); return; }
     DEBUG(printf(" [%d/mark: %d]", gcdeep, n); princ(a); putchar(' '))
@@ -963,7 +964,7 @@ void mark(L a) {
 }
 
 void sweep() {
-  unsigned int n, i;
+  uint n, i;
   char b;
   L *a= cstart-1, *cend= cstart+MAXCELL;
   DEBUG(printf("\n-->sweep\n"));
@@ -1956,6 +1957,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
   #define CPXn(b) O2(0xE0,b)
   #define CPYn(b) O2(0xC0,b)
 
+  #define SBCn(b) O2(0xE9, b)
 
   #define PHP()   O(0x08)
   #define CLC()   O(0x18)
@@ -1977,6 +1979,8 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
   #define INX()   O(0xE8)
   #define SED()   O(0xF8)
 
+  #define TXA()   O(0x8A)
+  #define TAX()   O(0xAA)
 
   #define BMI(b)  O2(0x30, b)
   #define BPL(b)  O2(0x10, b)
@@ -2060,6 +2064,8 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // drop 0-4 values from stack, JSR=drop, JMP=return
 void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 
+// TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
+
 void emitRETURN(signed char stk) {
   if (stk==0) RTS();
   else if (stk>4) { LDYn(stk*2); JMP(addysp); }
@@ -2069,7 +2075,7 @@ void emitRETURN(signed char stk) {
 void* incARR[]= {(void*)0xffff, incax2, incax4, incax6, incax8};
 void* decARR[]= {(void*)0xffff, decax2, decax4, decax6, decax8};
 
-unsigned char emitADD(L w) {
+uchar emitADD(L w) {
   if (w==0) return 1;
   if (w>0 && w<=MKNUM(4)) JSR(incARR[NUM(w)]); // just *deref and add? lol
   else if (w & 0xff00) return 0;
@@ -2077,7 +2083,7 @@ unsigned char emitADD(L w) {
   return 1;
 }
 
-unsigned char emitSUB(L w) {
+uchar emitSUB(L w) {
   if (w==0) return 1;
   if (w>0 && w<=MKNUM(4)) JSR(decARR[NUM(w)]);
   else if (w & 0xff00) return 0;
@@ -2092,7 +2098,7 @@ void* mulARR[]= {(void*)0xffff, (void*)0xffff, aslax1, mulax3, aslax2, mulax5, m
 //void* asrARR[]= {(void*)0xffff, asrax1, asrax2, asrax3, asrax4, 0, 0, asrax7};
 
 // TODO: how many bytes? It's quite a lot of code - is it worth it?
-unsigned char emitMUL(L w, unsigned char shifts) {
+uchar emitMUL(L w, uchar shifts) {
   w= NUM(w);
 
   if (shifts==4) JSR(aslax4);
@@ -2110,7 +2116,7 @@ unsigned char emitMUL(L w, unsigned char shifts) {
 }
 
 // TODO: how many bytes? It's quite a lot of code - is it worth it?
-unsigned char emitDIV(L w, unsigned char shifts) {
+uchar emitDIV(L w, uchar shifts) {
   w= NUM(w);
   if (shifts==4) JSR(asrax4);
   //else if (shifts==7) JSR(asrax7);
@@ -2125,9 +2131,19 @@ unsigned char emitDIV(L w, unsigned char shifts) {
   return 1;
 }
 
-unsigned char emitEQ(L w) {
-  CMPn(w & 0xff);               BNE(+2);
-  CPXn(((unsigned int)w) >> 8); BNE(00);
+// eq w constant: 8 bytes inlined, cc65: 9 bytes
+uchar emitEQ(L w) {
+  CMPn(w & 0xff);       BNE(+2);
+  CPXn(((uint)w) >> 8); BNE(0);
+  return 1;
+}
+
+// 11B 17c cc65: 
+uchar emitULT(L w) {
+  TAY(); CMPn(w & 0xff);
+  TXA(); SBCn(((uint)w) >> 8);
+  PHP(); TYA(); PLP();
+  BCS(0);
   return 1;
 }
 
@@ -2151,9 +2167,9 @@ char* la= 0;
 // sbc #min
 // sbc #max-min+1
 
-unsigned char emitMATH(L w, unsigned char d) {
-  unsigned char shifts= 0;
-  unsigned char r= 0;
+uchar emitMATH(L w, uchar d) {
+  uchar shifts= 0;
+  uchar r= 0;
 
   // * / use shift if only one bit set
   if ((la[d]=='*' || la[d]=='/') && !(w & (w-1))) while(w>=4) { w>>= 1; ++shifts; }
@@ -2163,7 +2179,11 @@ unsigned char emitMATH(L w, unsigned char d) {
   case '-': r= emitSUB(w); break;
   case '*': r= emitMUL(w, shifts); break;
   case '/': r= emitDIV(w, shifts); break;
+
   case '=': r= emitEQ(w); break;
+  case '<': r= emitULT(w); break; // TODO: not correct, U?
+    // TODO:   ax >! w     ax <= w    ===    ax < w+1
+    // TODO:   ax <! w     ax >= w    ===    ax > w-1
   }
   printf("\n\t--emitMATH(%d, %d) '%c' shifts=%d ===> %d '%s'", NUM(w), d, la[d], shifts, r, la);
   if (!r) return 0;
@@ -2189,7 +2209,7 @@ extern char* genasm(AsmState *s) {
   // invalidate AX
   // TODO: don't inline... and can we test/do this not at ever CASE but instead at one place?
   #define SAVEAX(a) do { if (s->savelast && a!=lastarg) { assert(s->ax==lastarg); JSR(pushax); ++(s->stk); s->savelast= 0; \
-printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
+printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
 } } while(0)
   #define IAX   do { SAVEAX('?'); s->ax= '?'; } while(0)
   #define AX(a) do { SAVEAX(a); s->ax= a; } while(0)
@@ -2201,6 +2221,8 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
   if (mcp>mc+3 && *(mcp-1)==0x60 && *(mcp-4)==0x20) {
     *(mcp-4)= 0x4c; *--mcp= 0;
   }
+  // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
+
 
   printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
   if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
@@ -2243,7 +2265,7 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
 
   // TODO: can't we collapse this and next 3?
   case '[':
-    if ((la[1]==',' && la[4]=='=') || (isdigit(la[1]) && la[2]=='=') || la[1]==lastarg)
+    if ((la[1]==',' && strchr("<=>!", la[4])) || (isdigit(la[1]) && strchr("<=>!", la[2])) || la[1]==lastarg)
       printf("\n---MATH OP/\'a\' coming! - no need pushax!\n")
 ;
  else IAX;
@@ -2253,7 +2275,7 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
     printf("--- NEW: ax='%c'\n", s->ax);
  //if (ax==lastarg && !savelast) goto next; // IAX did it already
     if (s->ax==lastarg) goto next; // no need do anything
-    JSR(pushax); ++(s->stk); goto next;
+    //JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
     if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
@@ -2273,6 +2295,8 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
   //  case '=': IAX; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
   // not correct ...
   case '=': IAX; JSR(toseqax); CMPn(0); --(s->stk); goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
+
+ //case '<': IAX; JSR(toseqax); CMPn(0); --(s->stk); goto next;
 
   case 'C': IAX; JSR(cons); --(s->stk); goto next; // WORKS!
 
@@ -2306,9 +2330,9 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
       assert(*la=='{');
       ++la;
 
-      // if last op in THEN was jmp/tail rec/return, no need jmp endIF!
+      // if last op in THEN was jmp/tail rec/return, no need jmp endIF!/
       if (thn.stk < 64) { // ^ or Z
-        if (thn.savelast && thn.ax=='a')
+        if (thn.savelast && thn.ax=='a')//
           insertHere= mcp; // where to insert pushax, lol
 // TDOO: assembler thinks this becoms CLV ???? WTF patching?
         SEC(); BCS(0); yy= mcp-1; // addr of rel Bxx to endIF
@@ -2337,13 +2361,13 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
         // same stacks
         if (thn.stk != els.stk) {
           printf("\n%% Stack mismatch: IF THEN (%d) ELSE (%d)\n", thn.stk, els.stk);
-          err= 50+els.stk-thn.stk;
+          err= 5+els.stk-thn.stk;
         }
 
         // same "saved" - it's same thing? lol
         if (thn.savelast != els.savelast) {
           printf("\n%% SaveLast mismatch: IF THEN (%d) ELSE (%d)\n", thn.savelast, els.savelast);
-          err+= 1000*thn.savelast + 100*els.savelast;
+          err+= 2000 + 100*thn.savelast + 10*els.savelast;
           // THEN 1 ELSE 0
           // we don't know if need "a" later
           // -- we could force-push before IF :-(
@@ -2354,7 +2378,14 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
           //    only feasable? LOL
         }
 
-        if (err==1051) {
+        if (err==2014) {
+          printf("\nTRYING TO FIX MISMATCH... INSERTING...\n");
+          // insert "puashax" before "{"
+          JSR(pushax); ++els.stk; els.savelast= 0; els.ax= 'a';
+          assert(thn.stk==els.stk);
+          s->savelast= 0; s->stk= thn.stk; s->ax= (thn.ax==els.ax)? thn.ax: '?';
+          err= 0;
+        } else if (err==2106) {
           printf("\nTRYING TO FIX MISMATCH... INSERTING...\n");
           // insert "puashax" before "{"
           if (!insertHere) printf("\nINSERTHERE: can't!\n");
@@ -2402,7 +2433,7 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
 }
 
 char* asmpile(char* pla) {
-  unsigned char *p;
+  char *p;
   AsmState s= {};
   s.ax= 'a'; s.savelast= 1;
 
@@ -2423,9 +2454,9 @@ char* asmpile(char* pla) {
   #define CCIII  "-??BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC" // ASL...
   #define JMPS   "BRKJSRRTIRTS"
 
-  printf("\nCODE[%d]:\n",mcp-mc);p=mc;
+  printf("\nCODE[%d]:\n",mcp-mc); p= mc;
   while(p<mcp) {
-    unsigned char i= *p++, m= (i>>2)&7;
+    uchar i= *p++, m= (i>>2)&7;
     printf("%04X:\t", p);
 
     if      (i==0x20) { printf("JSR %04x\n",*((L*)p)++); continue; }
@@ -2436,7 +2467,7 @@ char* asmpile(char* pla) {
     else if ((i&0xf)==0x8 || (i&0xf)==0xA) { printf("%.3s\n",(i&2?XA:X8)+3*(*p>>4)); continue; }
     else if (!(i&0x9f)) { printf("%.3s\n", JMPS+3*(i>>5)); continue; }
     else {
-      unsigned char cciii= (i>>5)+((i&3)<<3);
+      uchar cciii= (i>>5)+((i&3)<<3);
       if (cciii<0b11000) printf("%.3s", CCIII+3*cciii);
       else printf("%02x ??? ", i);
     }
@@ -3015,16 +3046,16 @@ closure= atom("closure");
 #endif // PREFTEST
 
 // TODO: maybe smaller as macro?
-void report(char* what, unsigned long now, unsigned int *last, unsigned long *llast) {
+void report(char* what, unsigned long now, uint *last, unsigned long *llast) {
   unsigned long l= last? *last: llast? *llast: 0;
   if (l!=now) printf("%% %s: +%lu  ", what, now-l);
-  //if (last) *last= (unsigned int)now; if (llast) *llast= now;
-  if (last) *last= (unsigned int)now; if (llast) *llast= now;
+  //if (last) *last= (uint)now; if (llast) *llast= now;
+  if (last) *last= (uint)now; if (llast) *llast= now;
 }
 
 void statistics(int level) {
   int cused= cnext-cell+1, hslots= 0, i;
-  static unsigned int latoms=0, lcons=0, lalloc=0, leval=0, lmark=0;
+  static uint latoms=0, lcons=0, lalloc=0, leval=0, lmark=0;
   static unsigned long lops=0;
 
   for(i=0; i<HASH; ++i) if (syms[i]) ++hslots;

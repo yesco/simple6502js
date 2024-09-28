@@ -1,4 +1,4 @@
-OPTS=" -DPROGSIZE -DAL -DASM "
+OPTS=" -DPROGSIZE -DAL -DASM -DDISASM "
 name="lisp"
 
 # why doesn't this quote every arg in the resulting string

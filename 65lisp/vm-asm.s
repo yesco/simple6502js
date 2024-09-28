@@ -341,7 +341,7 @@ _cmp:   pha
 
 .export _asmfib
 
-;;; 16 bit optimal uint fib
+;;; 16 bit optimal uint fib - 41B in 29.16s
 
 _asmfib:
         ;; if (ax <= 1)
@@ -352,7 +352,7 @@ _asmfib:
         bcs @gt                 ; 8B 11c
 
         tya
-        ;; return n
+         ;; return n
         rts
 
 @gt:
