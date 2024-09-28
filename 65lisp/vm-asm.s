@@ -349,15 +349,13 @@ _asmfib:
         cmp #2
         txa
         sbc #0
+        tya
         bcs @gt                 ; 8B 11c
 
-        tya
-         ;; return n
+        ;; return n
         rts
 
 @gt:
-        tya
-
         jsr pushax
 
         ;; return fib(n-1) + fib(n-2)

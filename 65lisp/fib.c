@@ -41,10 +41,10 @@ int main() {//int argc, char** argv) {
   long z= 0;
   int r= 42;
   while(--i) {
-    //r= fib(n); // 43.31
-    //r= ufib(n); // 43.31
-    //r= ltfib(n); // 41.53
-    r= asmfib(n); // 21.16
+    r= fib(n);		// 63 B   43.31s
+    //r= ufib(n);	//        43.31s
+    //r= ltfib(n);	// 54 B - 41.53s "best of cc65"
+    //r= asmfib(n);	// 39 B   29.17s handwritten
     z+= r;
   }
   printf("fib %d => %d z=%ld calls=%ld   %ld c/bench\n", n, r, z, calls, calls/bench);

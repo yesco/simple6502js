@@ -2023,11 +2023,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // - generic Tail-recursion optimization (can be done) (move vars, adjust stack, jmp)
 //   (both cases, need count args)
 
-
-// ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
-//    ASM      TIME    PROGSIZE  OPT
-//     65+3     45.2s     -               fib.c
-
+// ---- OPT -------- OPT -------- OPT -------- OPT -------- OPT ----
 // TODO: access var0, var1, var2, var3 just do jump!
 // TODO: access var0 LAST should popax it? instead of 'a' use 'A'...
 //          difficult to generalize, especialy in if branches, return, etc, slices?
@@ -2036,9 +2032,21 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
 // TODO: ret0, ret1 optimization? retA is implicit JSR+RTS
 //
-//         BUG bug B U G ! -- different branches of IF-THEN-ELSE, differnt stacks! 
-//                                 because delayed-push!!!
+
+
+// ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
+//    ASM      TIME    PROGSIZE  OPT
+//     65      45.2s     -               fib.c
+// CC  54 B    41.53           ltfib.c (unsigned LT<2 etc)
+//                 --- 38% B  42% slower ---
 //
+
+//     39 B     30.95s  35359 B after ret, no gen jmp at end!
+//                              to restore A, just TYA no PHP/PLA
+//           (/ 39 24.0) asm is 62.5% more bytes than BYTECODE
+//           (/ 39.0 50) LISP uses 28% more byte than asm
+//
+//     41 B     32.33s  35370 B lol... <2 ... return...
 //     57 B     39.02s  34034 B incl poor disam
 //        maybenot so good? LOL
 //        better off using (ret xx) => less code, faster
@@ -2059,6 +2067,8 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //     30 B                cleaned [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0 - saved 4x (drop+push ][) 
 //     38 B                byte code with push/pop [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
 //  !  24 B                plain byte code:  a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
+//
+//  !  50 B     25 cells         LISP w RETURN and <2 ...
 //  !  62 B     31 cells         LISP w RETURN
 //  !  56 B     28 cells         LISP if if..
 // drop 0-4 values from stack, JSR=drop, JMP=return
@@ -2067,6 +2077,7 @@ void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
 
 void emitRETURN(signed char stk) {
+  if (stk>64) return; // can't get here!
   if (stk==0) RTS();
   else if (stk>4) { LDYn(stk*2); JMP(addysp); }
   else JMP(incspARR[stk]);
@@ -2142,8 +2153,7 @@ uchar emitEQ(L w) {
 uchar emitULT(L w) {
   TAY(); CMPn(w & 0xff);
   TXA(); SBCn(((uint)w) >> 8);
-  PHP(); TYA(); PLP();
-  BCS(0);
+  TYA(); BCS(0); // TYA not effect Carry!
   return 1;
 }
 
@@ -2219,10 +2229,13 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
 
   // TailCall? JSR xxxx RTS  -> JMP xxxx
   if (mcp>mc+3 && *(mcp-1)==0x60 && *(mcp-4)==0x20) {
-    *(mcp-4)= 0x4c; *--mcp= 0;
+    *(mcp-4)= 0x4c; *--mcp= 255;
+    printf("\n\n====== TAIL CALL %04X", mcp);
   }
   // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
 
+  // TODO: skip gen?
+  if (s->stk>64) printf("\n===== NO CODE GENERATE (after return)\n");
 
   printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
   if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
@@ -2234,7 +2247,6 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
-
 
   // -- These are safe functions with no stack effect
   case '@': IAX; JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
@@ -2275,7 +2287,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     printf("--- NEW: ax='%c'\n", s->ax);
  //if (ax==lastarg && !savelast) goto next; // IAX did it already
     if (s->ax==lastarg) goto next; // no need do anything
-    //JSR(pushax); ++(s->stk); goto next;
+    JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
     if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
@@ -2447,7 +2459,7 @@ char* asmpile(char* pla) {
   //       and verify length...
 
   // poor man disasm (- 34634 33339) 1295 bytes! (one is asm is 970 B?)
-#ifndef DISASM
+#ifdef DISASM
   #define BRANCH "PLMIVCVSCCCSNEEQ"
   #define X8     "PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED" // verified
   #define XA     "ASL-1aROL-3aLSL-5aROR-7aTXATXSTAXTSXDEX-daNOP-fa" // verified duplicaet ASL...
