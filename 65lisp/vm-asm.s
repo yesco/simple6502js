@@ -1,10 +1,13 @@
 ;; 6502 asm vm-code and symbols used in asm-code gen during execution/compilation
 ;;  -- https://stackoverflow.com/questions/71208847/how-to-access-assembly-language-symbols-without-a-leading-from-c-on-6502-cc65
 
+.macpack        generic
+
+
 .import	ldaxi, ldaxidx, ldax0sp, ldaxysp, ldaxy
 .import staxspidx
 
-.importzp sp
+.importzp sp,tmp1
 
 .import negax
 
@@ -339,6 +342,7 @@ _cmp:   pha
 
 .import _print
 
+
 .export _asmfib
 
 ;;; 16 bit optimal uint fib - 41B in 29.16s
@@ -373,3 +377,110 @@ _asmfib:
         jsr tosaddax
 
         jmp incsp2
+
+
+;;; about 114 B - 21.45s !!!!!
+
+.export _fibinline
+
+;;; 16 bit optimal uint fib - 41B in 29.16s
+
+_fibinline:
+        ;; if (ax <= 1)
+        tay
+        cmp #2
+        txa
+        sbc #0
+        tya
+        bcs @gt                 ; 8B 11c
+
+        ;; return n
+        rts
+
+@gt:
+        ;; jsr pushax  (/ 29.18 27.88) 4.7%
+        pha        
+        lda     sp 
+        sec        
+        sbc     #2 
+        sta     sp 
+        bcs     @L1
+        dec     sp+1    
+@L1:    ldy     #1      
+        txa             
+        sta     (sp),y  
+        pla             
+        dey             
+        sta     (sp),y  
+
+        ;; return fib(n-1) + fib(n-2)
+
+        ;; jsr decax1 - 24.3s
+        sub     #1
+        bcs     @Ldecax1
+        dex
+@Ldecax1:
+        jsr _fibinline
+
+        ;; jsr pushax 26.7s
+        pha        
+        lda     sp 
+        sec        
+        sbc     #2 
+        sta     sp 
+        bcs     @L2
+        dec     sp+1    
+@L2:    ldy     #1      
+        txa             
+        sta     (sp),y  
+        pla             
+        dey             
+        sta     (sp),y  
+
+        ;;ldy #3         
+        ;;jsr ldaxysp - 21.75
+
+        ldy     #3
+        lda     (sp),y          ; get high byte
+        tax                     ; and save it
+        dey                     ; point to lo byte
+        lda     (sp),y          ; load low byte
+
+
+
+        ;; jsr decax2             
+        sub     #2
+        bcs     @Ldecax2
+        dex
+@Ldecax2:
+        jsr _fibinline
+
+
+        ;; jsr tosaddax -- 22.94s
+        ldy     #0       
+        adc     (sp),y   
+        iny              
+        sta     tmp1     
+        txa              
+        adc     (sp),y   
+        tax              
+        clc              
+        lda     sp       
+        adc     #2       
+        sta     sp       
+        bcc     Ladd
+        inc     sp+1     
+Ladd:   lda     tmp1     
+
+
+        ;;jmp incsp2 - 21.45s
+
+        inc     sp   
+        beq     @Lsp1  
+        inc     sp   
+        beq     @Lsp2 
+        rts
+
+@Lsp1:  inc     sp         
+@Lsp2:  inc     sp+1       
+        rts
