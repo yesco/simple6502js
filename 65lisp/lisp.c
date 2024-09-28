@@ -436,6 +436,22 @@ int fib(int n) {
   else return fib(n-1) + fib(n-2);
 }
 
+int fibb(int n) {
+  return n==0?
+    n:
+    n==1?
+    n:
+    fib(n-1)+fib(n-2);
+}
+
+int fibbb(int n) {
+  return !n?
+    0:
+    !--n?
+    1:
+    fib(n)+fib(--n);
+}
+
 int fub(int a) {
   int b= a+1,
     c= b+1;
@@ -1941,10 +1957,25 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
   #define CPYn(b) O2(0xC0,b)
 
 
+  #define PHP()   O(0x08)
   #define CLC()   O(0x18)
+  #define PLP()   O(0x28)
   #define SEC()   O(0x38)
 
+  #define PHA()   O(0x48)
+  #define CLI()   O(0x58)
+  #define PLA()   O(0x68)
+  #define SEI()   O(0x78)
+
+  #define DEY()   O(0x88)
+  #define TYA()   O(0x98)
+  #define TAY()   O(0xA8)
   #define CLV()   O(0xB8)
+
+  #define INY()   O(0xC8)
+  #define CLD()   O(0xD8)
+  #define INX()   O(0xE8)
+  #define SED()   O(0xF8)
 
 
   #define BMI(b)  O2(0x30, b)
@@ -2279,6 +2310,7 @@ printf("\n----- PUSHED initial AX to %c------\n", lastarg); \
       if (thn.stk < 64) { // ^ or Z
         if (thn.savelast && thn.ax=='a')
           insertHere= mcp; // where to insert pushax, lol
+// TDOO: assembler thinks this becoms CLV ???? WTF patching?
         SEC(); BCS(0); yy= mcp-1; // addr of rel Bxx to endIF
       }
 
@@ -2380,28 +2412,33 @@ char* asmpile(char* pla) {
   la= pla-1; // using pre-inc
   if (!genasm(&s)) return 0;
 
-  // poor man disasm (- 34621 33339) 1282 bytes!
+  // TODO: a test with 00..FF codes andn params 11 22 33 to verify all.... 
+  //       and verify length...
+
+  // poor man disasm (- 34634 33339) 1295 bytes! (one is asm is 970 B?)
 #ifndef DISASM
-  #define BRANCH "BPLBMIBVCBVSBCCBCSBNEBEQ"
-  #define X8     "PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED"
-  #define XA     "00a01a02a03a04a05a06a07aTXATXSTAXTSXDEX0daNOP0fa"
-  #define CCIII  "???BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC"
+  #define BRANCH "PLMIVCVSCCCSNEEQ"
+  #define X8     "PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED" // verified
+  #define XA     "ASL-1aROL-3aLSL-5aROR-7aTXATXSTAXTSXDEX-daNOP-fa" // verified duplicaet ASL...
+  #define CCIII  "-??BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC" // ASL...
+  #define JMPS   "BRKJSRRTIRTS"
+
   printf("\nCODE[%d]:\n",mcp-mc);p=mc;
   while(p<mcp) {
     unsigned char i= *p++, m= (i>>2)&7;
-    printf("%04X:\t%02x  ",p,i);
-    if (i==0x20) { printf("JSR %04x\n",*((L*)p)++); continue; }
+    printf("%04X:\t", p);
+
+    if      (i==0x20) { printf("JSR %04x\n",*((L*)p)++); continue; }
     else if (i==0x4c) { printf("JMP %04x\n",*((L*)p)++); continue; }
-    else if (i==0x6c) { printf("JSI %02x",*p++); continue; }
-    else if (i==0x60) { printf("RTS"); continue; }
+    else if (i==0x6c) { printf("JSI %02x\n",*p++); continue; } // ? TODO: JMI JSI
     else if ((i&0x1f)==0x10) {
-      printf("%.3s %+d\t=> %04X\n", BRANCH+3*(i>>5), *p, p+2+(signed char)*p++); continue; }
-    else if ((i&0xf)==0x8) { printf("%.3s\n",X8+3*(*p>>4)); continue; }
-    else if ((i&0xf)==0xA) { printf("%.3s\n",XA+3*(*p>>4)); continue; }
+      printf("B%.2s %+d\t=> %04X\n", BRANCH-1+(i>>4), *p, p+2+(signed char)*p++); continue; }
+    else if ((i&0xf)==0x8 || (i&0xf)==0xA) { printf("%.3s\n",(i&2?XA:X8)+3*(*p>>4)); continue; }
+    else if (!(i&0x9f)) { printf("%.3s\n", JMPS+3*(i>>5)); continue; }
     else {
       unsigned char cciii= (i>>5)+((i&3)<<3);
       if (cciii<0b11000) printf("%.3s", CCIII+3*cciii);
-      else printf("%02x",p,*p++);
+      else printf("%02x ??? ", i);
     }
     switch(m) {
     case 0b000: printf(i&1?" (%02x,X)":" #%02x", *p++); break;
@@ -2410,8 +2447,7 @@ char* asmpile(char* pla) {
     case 0b011: printf(i&1?" %04x":" A", *((L*)p)++); break;
     case 0b100: printf(" (%02x),Y", *p++); break;
     case 0b101: printf(" %02x,X", *p++); break;
-    case 0b110: printf(" %04x,Y", *((L*)p)++); break;
-    case 0b111: printf(" %04x,X", *((L*)p)++); break;
+    case 0b110: printf(" %04x,%c", m&1?'Y':'X', *((L*)p)++); break;
     }
     NL;
   } NL;
