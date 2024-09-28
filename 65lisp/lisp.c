@@ -2023,7 +2023,33 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // - generic Tail-recursion optimization (can be done) (move vars, adjust stack, jmp)
 //   (both cases, need count args)
 
-// ---- OPT -------- OPT -------- OPT -------- OPT -------- OPT ----
+// =================================================
+// O P T I M I Z A T I O N S   I M P L E M E N T E D
+//
+// - tail-call JSR+RTS => JMP
+// - using RTS/JMP insp2/4/6/8
+//
+// - getting last variable of parameters if not down
+//
+// - use that AX is preserved by many ops in cc65 runtime
+//   - DELAY-pushAX
+//   - (return EXP) - much more efficient
+//   - (IF ... (return THE) (return ELSE)) - no JMP ENDIF!
+//
+// - AX  + -  CONST 2,4,6,8
+// - AX  + -  0
+// - AX  + -  y
+// - AX  * /  1,2,3,4,5,6,7,8,9,10
+// - AX  * /  0
+// - AX  * /  -1
+// - AX  * /  2,4,8,16,32,64,128,256,512,1K,2K,4K,8K,16K...
+//
+// - AX == CONST 8 bytes test incl IF cc65: 9 bytes
+// - AX <  CONst *unsigned* => 9 bytes incl IF
+// - 
+
+// --TODO----TODO----TODO----TODO----TODO----TODO----TODO--
+// ------ OPT -------- OPT -------- OPT -------- OPT ------
 // TODO: access var0, var1, var2, var3 just do jump!
 // TODO: access var0 LAST should popax it? instead of 'a' use 'A'...
 //          difficult to generalize, especialy in if branches, return, etc, slices?
@@ -2031,6 +2057,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: write this compiler in lisp? lol
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
 // TODO: ret0, ret1 optimization? retA is implicit JSR+RTS
+//
 //
 
 
@@ -2114,11 +2141,13 @@ uchar emitMUL(L w, uchar shifts) {
 
   if (shifts==4) JSR(aslax4);
   //  else if (shifts==7) JSR(aslax7);
+  // TODO: not using 2,4,8 as mulArray is later...
   else if (shifts>0) { LDYn(shifts); JSR(aslaxy); }
   else if (w==1) ; // nothing!
   else if (w==0) { LDAn(0); LDXn(0); } // TODO: replace prev ',' or digit...
   else if (w==-1) JSR(negax);
-  else if (w<=10) JSR(mulARR[w]);
+// TODO: this doesn't work... as we've shifted w!!!
+  else if (w> 0 && w<=10) JSR(mulARR[w]);
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosmula0); }
   else return 0;
   // TODO: make it return to compile "normal"
@@ -2133,7 +2162,8 @@ uchar emitDIV(L w, uchar shifts) {
   //else if (shifts==7) JSR(asrax7);
   else if (shifts>0) { LDYn(shifts); JSR(asraxy); }
   else if (w==1) ; // nothing!
-  else if (w==0) { LDAn(0x7f); LDXn(0); } // TODO: overflow... // TODO: replace prev ',' or digit...
+// TODO: this doesn't work... as we've shifted w!!!
+  else if (w==0) { LDAn(0xff); LDXn(0x7f); } // TODO: overflow... // TODO: replace prev ',' or digit...
   else if (w==-1) JSR(negax);
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosdiva0); }
   else return 0;
