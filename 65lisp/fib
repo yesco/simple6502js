@@ -1,1 +1,2 @@
-rm fib.out ; cl65  -t sim6502 fib.c vm-asm.s -o fib.out && sim65 -c fib.out
+rm fib.out ; cl65 -O -t sim6502 fib.c vm-asm.s -o fib.out && sim65 -c fib.out
+

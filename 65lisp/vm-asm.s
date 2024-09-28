@@ -337,6 +337,41 @@ _cmp:   pha
 ;;;     bcs +2                  ; <
 ;;;     beq @le                 ; !=       >  I 
 
+.import _print
 
+.export _asmfib
 
+;;; 16 bit optimal uint fib
 
+_asmfib:
+        ;; if (ax <= 1)
+        tay
+        cmp #2
+        txa
+        sbc #0
+        bcs @gt                 ; 8B 11c
+
+        tya
+        ;; return n
+        rts
+
+@gt:
+        tya
+
+        jsr pushax
+
+        ;; return fib(n-1) + fib(n-2)
+        jsr decax1
+        jsr _asmfib
+
+        jsr pushax
+
+        ldy #3
+        jsr ldaxysp
+
+        jsr decax2
+        jsr _asmfib
+
+        jsr tosaddax
+
+        jmp incsp2
