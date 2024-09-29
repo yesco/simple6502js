@@ -306,15 +306,25 @@ void* zalloc(size_t n) {
 
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
+extern L retnil(L);
+extern L rettrue(L);
+
+extern L istrue(L);
+extern L isfalse(L);
+extern L iscarry(L);
+
 extern L ffcar(L);
 extern L ffcdr(L);
+extern L ffnull(L);
+extern L ffisnum(L);
+extern L ffiscons(L);
+extern L ffisatom(L);
+extern L fftype(L);
 
 extern L ldaxi(L);
 extern L ldaxidx(L);
 extern L ldax0sp(L);
 extern L ldaxysp(L);
-
-extern void retnil();
 
 extern void pushax(); 
 extern void popax(); 
@@ -1952,7 +1962,10 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 
   #define ANDn(b) O2(0x29,b)
+  #define ORAn(b) O2(0x09,b)
+  #define EORn(b) O2(0x49,b)
 
+  #define ASL()   O(0x0A)
   #define CMPn(b) O2(0xC9,b)
   #define CPXn(b) O2(0xE0,b)
   #define CPYn(b) O2(0xC0,b)
@@ -2057,6 +2070,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: write this compiler in lisp? lol
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
 // TODO: ret0, ret1 optimization? retA is implicit JSR+RTS
+// TODO: RTS can reuse! remember last... save one byte, lol
 //
 //
 
@@ -2067,7 +2081,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // CC  54 B    41.53           ltfib.c (unsigned LT<2 etc)
 //                 --- 38% B  42% slower ---
 //
-
+//     43 B     31.8    36004 B <2 SIGNED (no cheating)
+//                              emitCONST '0' - 3 bytes
+//                                if ax already '0'..'8'
+//                              emitEQ: 0 -> 7B, 8 other
+//
 //     39 B     30.95s  35359 B after ret, no gen jmp at end!
 //                              to restore A, just TYA no PHP/PLA
 //           (/ 39 24.0) asm is 62.5% more bytes than BYTECODE
@@ -2087,7 +2105,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //     51 B     38.5s   30161 B  +550 B   emitEQ and "ax tracking"! WTF! I'm better!
 //     78 B    101.0s   29611 B   +35 B   ldax0sp for "a" varible
 //     88 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
-//    102 B    120.7s   27969 B           emitRETURN    
+//    102 B    120.7s   27969 B           emitEXIT
 //    105 B    123.1s                     - start -
 //
 //     30 B      -        --- VM --- effective CODE used to generate ASM!
@@ -2103,12 +2121,25 @@ void* incspARR[]= {(void*)0xffff, incsp2, incsp4, incsp6, incsp8};
 
 // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
 
-void emitRETURN(signed char stk) {
+void emitEXIT(signed char stk) {
   if (stk>64) return; // can't get here!
   if (stk==0) RTS();
   else if (stk>4) { LDYn(stk*2); JMP(addysp); }
   else JMP(incspARR[stk]);
 }
+
+void emitCONST(L w, char ax) {
+  // TODO: track value of ax? axv
+  // cc65 as clever and knows all A X Y values!
+  // it'll reuse A is 0 and transfer to X, or from Y to A
+  // after test it knows axv and if load same can use
+
+  if (ax-'0'==w) return; // 0B !
+
+  if (w==0) { LDAn(0); TAX(); } // 3B
+  else { LDAn(w & 0xff); LDXn(((uint)w) >> 8); }
+}
+
 
 void* incARR[]= {(void*)0xffff, incax2, incax4, incax6, incax8};
 void* decARR[]= {(void*)0xffff, decax2, decax4, decax6, decax8};
@@ -2172,18 +2203,46 @@ uchar emitDIV(L w, uchar shifts) {
   return 1;
 }
 
-// eq w constant: 8 bytes inlined, cc65: 9 bytes
+// ==0 -> 7B, otherwise 8B
+// cc65: ==0 -> 9B  ==1 -> 11B
 uchar emitEQ(L w) {
+  if (w==0) { // 7B !!!
+    TAY();   BNE(+2);
+    CPXn(0); BNE(0);
+    return 1;
+  }
+
   CMPn(w & 0xff);       BNE(+2);
   CPXn(((uint)w) >> 8); BNE(0);
   return 1;
 }
 
-// 11B 17c cc65: 
+// 9B 13c cc65: 15 B !!!
 uchar emitULT(L w) {
   TAY(); CMPn(w & 0xff);
   TXA(); SBCn(((uint)w) >> 8);
-  TYA(); BCS(0); // TYA not effect Carry!
+  TYA(); BCS(0); // restore A
+  return 1;
+}
+
+// 13B 17c
+// signed => unsigned by add $80 !
+uchar emitSLT(L w) {
+  // TODO: can we do better for 0 <= w <= 255 => 10B
+    
+  TAY(); EORn(0x80); CMPn((w & 0xff)^0x80);
+  TXA(); EORn(0x80); SBCn((((uint)w) >> 8)^0x80);
+  TYA(); BCS(0); // restore A
+  return 1;
+}
+
+// 14B 20c 
+// TODO: merge w ULT? use if...
+uchar emitXLT(L w) {
+  TAY(); CMPn(w & 0xff);
+  TXA(); SBCn(((uint)w) >> 8);
+  BVS(+2); EORn(0x80); ASL(); // unsigned fix...
+  TYA(); BCS(0); // restore A
   return 1;
 }
 
@@ -2207,7 +2266,14 @@ char* la= 0;
 // sbc #min
 // sbc #max-min+1
 
-uchar emitMATH(L w, uchar d) {
+typedef struct AsmState {
+  signed char stk;
+  char ax;
+  char savelast;
+  char *fix;
+} AsmState;
+
+uchar emitMATH(L w, uchar d, AsmState *s) {
   uchar shifts= 0;
   uchar r= 0;
 
@@ -2221,21 +2287,37 @@ uchar emitMATH(L w, uchar d) {
   case '/': r= emitDIV(w, shifts); break;
 
   case '=': r= emitEQ(w); break;
-  case '<': r= emitULT(w); break; // TODO: not correct, U?
+  // 10B slow/generic: JSR pushax, LDA+LDX, JSR icmp
+//  case '<': r= emitULT(w); break; //  9B C N unsigned
+  case '<': r= emitSLT(w); break; // 13B C N (I think)
+//case '<': r= emitXLT(w); break; // 14B C N
     // TODO:   ax >! w     ax <= w    ===    ax < w+1
     // TODO:   ax <! w     ax >= w    ===    ax > w-1
+
+  case '^': emitCONST(w, s->ax); emitEXIT(s->stk);
+    s->stk= 100; s->ax= '?';
+    r= 1; break;
   }
   printf("\n\t--emitMATH(%d, %d) '%c' shifts=%d ===> %d '%s'", NUM(w), d, la[d], shifts, r, la);
+
+  // -- sorry, no match
   if (!r) return 0;
+
+  // -- ok, we did it!
+
+  // <=>! code gen is optimized for IF !
+  if (strchr("<=>!", la[d]) && la[d+1]!='I') {
+    // convert to T/NIL
+    mcp-= 2; // remove test
+    switch (la[d]) {
+    case '=': JSR(istrue); break;
+    case '<': JSR(iscarry); break;
+    }
+    // TODO: much more, and ! inv...
+  }
+
   la+= d; return 1;
 }
-
-typedef struct AsmState {
-  signed char stk;
-  char ax;
-  char savelast;
-  char *fix;
-} AsmState;
 
 // TODO: asmpile fix these...
 // TODO: take arglist...
@@ -2273,7 +2355,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: emitRETURN(s->stk); s->stk=100;s->ax='?'; if (*la) goto next;
+  case '^': case 0: emitEXIT(s->stk); s->stk=100;s->ax='?'; if (*la) goto next;
     return mcp;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
@@ -2311,8 +2393,8 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
       printf("\n---MATH OP/\'a\' coming! - no need pushax!\n")
 ;
  else IAX;
-    if (la[1]==',' && emitMATH(*(L*)(la+2), 4)) goto next;
-    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2)) goto next;
+    if (la[1]==',' && emitMATH(*(L*)(la+2), 4, s)) goto next;
+    if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2, s)) goto next;
     // else no math
     printf("--- NEW: ax='%c'\n", s->ax);
  //if (ax==lastarg && !savelast) goto next; // IAX did it already
@@ -2320,12 +2402,14 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
-    if (emitMATH(MKNUM(*la-'0'), 1)) goto next;
+    // TODO: we come, here? always [ before? no?
+    // TODO: IAX; needed for emitMATH?
+    if (emitMATH(MKNUM(*la-'0'), 1, s)) goto next;
     else AX(*la);
-    LDAn(MKNUM(*la-'0')); LDXn(0); goto next;
+    emitCONST(*la-'0', s->ax); goto next;
 
-  case ',': ++la; IAX; if (emitMATH(*(L*)la, 2)) goto next;
-    LDAn(*la); ++la; LDXn(*la); goto next; // 9 bytes + 3 read var
+  case ',': ++la; IAX; if (emitMATH(*(L*)la, 2, s)) goto next;
+    emitCONST((int*)la, s->ax); ++la; goto next;
 
   // read address from var/address
   // TODO: optimize for MATH?    

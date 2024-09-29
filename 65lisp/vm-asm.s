@@ -76,6 +76,8 @@
 
 .export _ffcar, _ffcdr
 .export _ffnull, _ffisnum, _ffiscons, _ffisatom, _fftype
+.export _istrue, _iscarry
+
 ;;.export _ffisheap ;; TODO: hmmm
 
 .export _retnil, _rettrue
@@ -178,13 +180,17 @@ _addysp         = addysp
 
 _ffisnum:
         and #$01
+  _istrue:
         bne _retnil
 
-_rettrue:
+  _rettrue:
         lda _T
         ldx _T+1
         rts
 
+_isfalse:
+        beq _retnil
+        jmp _rettrue
 
 _ffiscons:
         and #$03
@@ -203,8 +209,39 @@ _ffnull:
         cmp #<_nil
         bne _retnil
         cpx #>_nil
-        bne _retnil
+        beq _rettrue
+
+  _retnil:
+        lda _nil
+        ldx _nil+1
+        rts
+
+
+_iscarry:
+        bcs _retnil
         jmp _rettrue
+
+
+_ffcar:  
+        tay
+        and #$01
+        beq _retnil
+        tya
+
+_ffat: 
+        jmp ldaxi
+
+
+_ffcdr:
+        tay
+        and #$01
+        beq _retnil
+        tya
+
+_ffcdrptr:
+        ldy #$03
+        jmp ldaxidx
+
 
 ;;; type 0 = null, K = cons, # = num, A = atom, num = heap type
 _fftype:
@@ -249,37 +286,6 @@ _fftype:
 @ret:   ldx #00
         rts
 
-
-        
-
-        tya
-
-
-_ffcar:  
-        tay
-        and #$01
-        beq _retnil
-        tya
-
-_ffat: 
-        jmp ldaxi
-
-_retnil:
-        lda _nil
-        ldx _nil+1
-        rts
-
-
-
-_ffcdr:
-        tay
-        and #$01
-        beq _retnil
-        tya
-
-_ffcdrptr:
-        ldy #$03
-        jmp ldaxidx
 
 ;;; inspired by
 ;;; - http://forum.6502.org/viewtopic.php?f=2&t=6136
@@ -453,6 +459,8 @@ _fibinline:
         bcs     @Ldecax2
         dex
 @Ldecax2:
+
+
         jsr _fibinline
 
 
@@ -473,7 +481,7 @@ _fibinline:
 Ladd:   lda     tmp1     
 
 
-        ;;jmp incsp2 - 21.45s
+        ;;jmp incsp2 - 21.45sg
 
         inc     sp   
         beq     @Lsp1  

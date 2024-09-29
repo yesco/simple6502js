@@ -17,12 +17,26 @@ int fib(int n) {
   else return fib(n-1) + fib(n-2);
 }
 
+int fibn(int n) {
+  // ++calls; // this doubles time...
+  //if (n==0) return 0;
+//  else if (n==1) return 1;
+  if (n==0) return 1;
+  else if (n==1) return 01;
+  else return fib(n-1) + fib(n-2);
+}
+
 extern unsigned int asmfib(unsigned int n);
 extern unsigned int fibinline(unsigned int n);
 
 //extern unsigned int asmltfib(unsigned int n);
 
-unsigned int ltfib(unsigned int n) {
+unsigned int ultfib(unsigned int n) {
+  if (n<2) return n;
+  return ultfib(n-1) + ultfib(n-2);
+}
+
+int ltfib(signed int n) {
   if (n<2) return n;
   return ltfib(n-1) + ltfib(n-2);
 }
