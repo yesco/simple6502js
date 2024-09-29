@@ -1,3 +1,7 @@
+./65vm-asm -v -e "(+ a 8)"
+
+# still pushesax, lol...
+
 // WARNING: this file is in complete flux,
 // as it's being EXPERIMENTED ON
 //

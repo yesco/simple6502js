@@ -5,7 +5,8 @@ echo "unix> ./r $*"
 name=$1
 shift
 
-rm $name.tap  2>/dev/nullrm $name.out  2>/dev/null
+rm $name.tap  2>/dev/null
+rm $name.out  2>/dev/null
 rm $name.o    2>/dev/null
 rm $name.s    2>/dev/null
 
