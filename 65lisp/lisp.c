@@ -1,6 +1,6 @@
-./65vm-asm -v -e "(+ a 8)"
-
-# still pushesax, lol...
+//./65vm-asm -v -e "(+ a 8)"
+//
+//# still pushesax, lol...
 
 // WARNING: this file is in complete flux,
 // as it's being EXPERIMENTED ON
@@ -1054,11 +1054,15 @@ void unc(char c) {
   _nc= c;
 }
 
+char echo;
+
 char nextc() {
   int r;
   if (_nc) { r= _nc; _nc= 0; }
-  else if (_rs) { r= *_rs; if (r) ++_rs; }
-  else r= getchar();
+  else {
+    if (_rs) { r= *_rs; if (r) ++_rs; } else r= getchar();
+    if (echo) putchar(r);
+  }
 
   return r>=0? r: 0;
 }
@@ -1850,7 +1854,6 @@ static char c, *pc;
 // ignore JMPARR usage, uncomment to activate
 //#define JMPARR(a) 
 
-
 // just including the cod
 #ifdef ASM
   #define GENASM
@@ -2631,8 +2634,9 @@ extern L al(char* la) {
 
 #ifndef JMPARR
   #define JMPARR(a) a:
+
   if (*((int*)jmp)==42) {
-    //printf("FOURTYTWO\n");
+    if (verbose) printf("JMPARR inited\n");
     memset(jmp, (int)&&gerr, sizeof(jmp));
     
     jmp[0]=&&g0;
@@ -2645,6 +2649,9 @@ extern L al(char* la) {
     jmp['Y']=&&gY;
     jmp['!']=&&gset;
     //jmp[':']=&&gsetq;
+    jmp[';']=&&gsemis;
+    
+    //printf("FISH\n");
 
     jmp['[']=&&gbl;
     jmp[']']=&&gbl;
@@ -2724,13 +2731,14 @@ extern L al(char* la) {
   if (s<params) s= params; // TODO: hmmm... TODO: assert?
   --pc; // as pre-inc is faster in the loop
 
-  if (verbose) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
-  if (verbose) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
+  if (verbose>2) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
+  if (verbose>2) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
 
  next:
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
-  //if (verbose) { printf("al %c : ", p[1]); prin1(top); NL; }
+
+  if (verbose>1) { printf("al %c : ", pc[1]); prin1(top); NL; }
 
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
@@ -2789,7 +2797,9 @@ JMPARR(gU)case 'U': if (null(top)) goto settrue; goto setnil;
 JMPARR(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
 
 JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
+
 JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
+JMPARR(gsemis)case ';': *++s= top; top= *(L*)++pc; top= ATOMVAL(top); pc+= sizeof(L)-1; goto next;
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
@@ -2890,7 +2900,9 @@ JMPARR(gdigit)
     *++s= top; top= MKNUM(*pc-'0'); goto next;
 
 JMPARR(g0)
-  case 0: return top; // all functions should end with ^ ?
+  case 0:
+    if (verbose) printf("\n\nRETURN="); prin1(top); NL;
+    return top; // all functions should end with ^ ?
 
 // 26.82s
 //  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
@@ -2955,7 +2967,7 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
     else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
 
-    prin1(x); printf("\t=> '%c' (%d)\n", f, f);
+    if (verbose) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n", f, f); }
  
     // IF special => EXPR I THEN { ELSE } ' '
     if (x==atom("if")) {
