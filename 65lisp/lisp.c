@@ -2065,7 +2065,8 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 //
 // - AX == CONST 8 bytes test incl IF cc65: 9 bytes
 // - AX <  CONst *unsigned* => 9 bytes incl IF
-// - 
+// - return optimzied: 0, nil, T   also at end \0
+
 
 // --TODO----TODO----TODO----TODO----TODO----TODO----TODO--
 // ------ OPT -------- OPT -------- OPT -------- OPT ------
@@ -2075,9 +2076,12 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: write an lisp interpreter in lisp and compile it... what size/performance?
 // TODO: write this compiler in lisp? lol
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
-// TODO: ret1 optimization? retA is implicit JSR+RTS
-// TODO: RTS can reuse! remember last... save one byte, lol
+// TODO: ret2 optimization? retA is implicit JSR+RTS
+// TODO: RTS can reuse! remember last, reverse Bxx... save one byte, lol
 // TODO: avoid pushax if last use of lastarg and didnt push before!
+// TODO: match all end of "THENs{" and insert ^ before { if "}...\0"
+//       and if that location is }...} do again... lol
+//       i.e. don't require user to insert RETURN!
 //
 //
 
@@ -2088,6 +2092,7 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // CC  54 B    41.53           ltfib.c (unsigned LT<2 etc)
 //                 --- 38% B  42% slower ---
 //
+
 //     43 B     31.8    36004 B <2 SIGNED (no cheating)
 //                              emitCONST '0' - 3 bytes
 //                                if ax already '0'..'8'
@@ -2280,13 +2285,18 @@ typedef struct AsmState {
   char *fix;
 } AsmState;
 
+// These ops don't change AX
+uchar axsameop(char c) { return c==0 || strchr("<=>~^", c); }
+
 // optimize pattern: CONST OP
 uchar emitMATH(L w, uchar d, AsmState *s) {
+  L x= w;
   uchar shifts= 0;
   uchar r= 0;
 
   // * / use shift if only one bit set
-  if ((la[d]=='*' || la[d]=='/') && !(w & (w-1))) while(w>=4) { w>>= 1; ++shifts; }
+  // TODO: optimize % mod
+  if ((la[d]=='*' || la[d]=='/') && !(x & (x-1))) while(x>=4) { x>>= 1; ++shifts; }
 
   switch(la[d]) {
   case '+': r= emitADD(w); break;
@@ -2302,9 +2312,16 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
     // TODO:   ax >! w     ax <= w    ===    ax < w+1
     // TODO:   ax <! w     ax >= w    ===    ax > w-1
 
-  case '^':
-    if (s->stk==0 && w==0) JMP(return0);
-    else { emitCONST(w, s->ax); emitEXIT(s->stk); }
+  case '^': case 0: x= 1;
+    printf("\n----emitRETURN: "); prin1(w); NL;
+    if (s->stk==0) {
+      if      (w==0)   JMP(return0);
+      else if (w==nil) JMP(retnil);
+      else if (w==T)   JMP(rettrue);
+      else x= 0;
+    } else x= 0;
+    if (!x) { emitCONST(w, s->ax); emitEXIT(s->stk); }
+
     s->stk= 100; s->ax= '?';
     r= 1; break;
   }
@@ -2340,7 +2357,7 @@ extern char* genasm(AsmState *s) {
 
   // invalidate AX
   // TODO: don't inline... and can we test/do this not at ever CASE but instead at one place?
-  #define SAVEAX(a) do { if (s->savelast && a!=lastarg) { assert(s->ax==lastarg); JSR(pushax); ++(s->stk); s->savelast= 0; \
+  #define SAVEAX(a) do { if (s->savelast && (a)!=lastarg) { assert(s->ax==lastarg); JSR(pushax); ++(s->stk); s->savelast= 0; \
 printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
 } } while(0)
   #define IAX   do { SAVEAX('?'); s->ax= '?'; } while(0)
@@ -2365,8 +2382,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   switch(*++la) {
 
   // return may be followed by 0 which is return...  ^}\0
-  case '^': case 0: emitEXIT(s->stk); s->stk=100;s->ax='?'; if (*la) goto next;
-    return mcp;
+  case '^': case 0: emitEXIT(s->stk); s->stk=100;s->ax='?'; if (!*la) return mcp; else goto next;
 
   case ' ': case '\t': case '\n': case '\r': goto next;
 
@@ -2400,18 +2416,28 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   // TODO: un-duplicate with +-*/ ...
   case '[':
     if (s->savelast) {
-      if ( (la[1]==',' && strchr("<=>~", la[4])) ||
-           (isdigit(la[1]) && strchr("<=>~", la[2])) ||
-           (la[1]==lastarg && la[2]=='[' && isdigit(la[3]) && strchr("<=>~", la[4])) )
-        printf("\n---MATH OP/\'a\' coming! - no need pushax! \"%s\"\n", la);
-      else AX(islower(la[1])? la[1]: '?');
+      if ( (la[1]==',' && axsameop(la[4])) ) printf("\n-------11111: \"%s\"\n", la);
+      else if ( (isdigit(la[1]) && axsameop(la[2])) ) printf("\n-------222222\n");
+      else if ( (la[1]==lastarg && lastarg==s->ax && la[2]=='[' && isdigit(la[3]) && axsameop(la[4])) ) printf("\n-------333 \"%s\"\n", la);
+      //else if (la[1]!=s->ax || s->ax!=lastarg) IAX;
+      //else AX(la[1]);
+      // TODO: this is all wrong with 'b' ???
+      else IAX;
     }
     if (la[1]==',' && emitMATH(*(L*)(la+2), 4, s)) goto next;
+    // TODO: too much...
     if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2, s)) goto next;
-    // else no math
- //if (ax==lastarg && !savelast) goto next; // IAX did it already
-    if (s->ax==lastarg) { la+= 2; goto next; } // no need do anything
-    printf("--- NEW: want '%c' ax='%c' \n", la[1], s->ax);
+    if (la[1]=='9' && (la[2]=='^' || !la[2]) && emitMATH(nil, 2, s)) goto next;
+    // FAILE => else no math
+    //if (ax==lastarg && !savelast) goto next; // IAX did it already
+//    if (s->ax==lastarg) { la+= 2; goto next; } // no need do anything
+//    if (s->ax==lastarg && la[1]==lastarg) { goto next; } // no need do anything
+
+// TODO: this is all wrong with 'b' ???
+    if (la[1]==lastarg && s->ax==lastarg) { la+= 2; goto next; } // no need do anything
+
+    printf("\n--- NEW: want '%c' ax='%c' \n", la[1], s->ax);
+    //goto next;
     JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
@@ -3045,8 +3071,12 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
     nm= ATOMSTR(x);
     if (!nm[1] && islower(*nm) && *nm<'x') { ALC('['); ALC(c); return p; }
  
+    // x==self lol?
+    if (x==nil || x==T || x==ERROR) goto quote;
+
     // allow for inline read
     ALC('['); // push
+
     ALC(';');
     *((L*)p)++= x;
     return p;
