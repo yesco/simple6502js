@@ -1,0 +1,4 @@
+cat bench5.lisp | ./65vm -v -v -E -i -s
+
+
+

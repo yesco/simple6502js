@@ -1,0 +1,1 @@
+perl -e 'for  (32..127) { print chr(); }'

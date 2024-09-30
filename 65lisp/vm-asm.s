@@ -4,6 +4,8 @@
 .macpack        generic
 
 
+.import return0
+
 .import	ldaxi, ldaxidx, ldax0sp, ldaxysp, ldaxy
 .import staxspidx
 
@@ -43,6 +45,7 @@
 
 
 
+.export _return0
 .export _ldaxi, _ldaxidx, _ldax0sp, _ldaxysp
 
 .export _staxspidx
@@ -83,6 +86,8 @@
 .export _retnil, _rettrue
 
 ;;; make names visible from C
+
+_return0        = return0
 
 _ldaxi		= ldaxi
 _ldaxidx	= ldaxidx

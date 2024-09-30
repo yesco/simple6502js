@@ -1,7 +1,3 @@
-//./65vm-asm -v -e "(+ a 8)"
-//
-//# still pushesax, lol...
-
 // WARNING: this file is in complete flux,
 // as it's being EXPERIMENTED ON
 //
@@ -310,6 +306,7 @@ void* zalloc(size_t n) {
 
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
+extern L return0(L);
 extern L retnil(L);
 extern L rettrue(L);
 
@@ -1953,10 +1950,12 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 
 #define O2(op, b) do { O(op);B(b); } while(0)
 #define O3(op, w) do { O(op);W(w); } while(0)
+#define N3(opn, op, w) do { O(op);W(w); printf("\t\t%-4s %s", opn, #w); } while(0) 
+#define N2(opn, op, b) do { O(op);B(b); printf("\t\t%-4s %02x", opn, b); } while(0) 
 
-  #define LDAn(n) O2(0xA9,n)
-  #define LDXn(n) O2(0xA2,n)
-  #define LDYn(n) O2(0xA0,n)
+  #define LDAn(n) N2("LDAn",0xA9,n)
+  #define LDXn(n) N2("LDXn",0xA2,n)
+  #define LDYn(n) N2("LDYn",0xA0,n)
 
 
   #define LDA(w)  O3(0xAD,w)
@@ -1973,11 +1972,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
   #define EORn(b) O2(0x49,b)
 
   #define ASL()   O(0x0A)
-  #define CMPn(b) O2(0xC9,b)
-  #define CPXn(b) O2(0xE0,b)
-  #define CPYn(b) O2(0xC0,b)
+  #define CMPn(b) N2("CMPn",0xC9,b)
+  #define CPXn(b) N2("CPXn",0xE0,b)
+  #define CPYn(b) N2("CPYn",0xC0,b)
 
-  #define SBCn(b) O2(0xE9, b)
+  #define SBCn(b) N2("SBC",0xE9, b)
 
   #define PHP()   O(0x08)
   #define CLC()   O(0x18)
@@ -2015,11 +2014,11 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
   #define BVS(b)  O2(0x70,b)
 
 
-  #define JSR(a)  O3(0x20,a)
+  #define JSR(a)  N3("JSR",0x20,a)
   #define RTS(a)  O(0x60)
 
-  #define JMP(a)  O3(0x4c,a)
-  #define JMPi(a) O3(0x6c,a)
+  #define JMP(a)  N3("JMP", 0x4c,a)
+  #define JMPi(a) N3("JPI", 0x6c,a)
 
   #define BRK(a)  O(0x00)
 
@@ -2076,8 +2075,9 @@ void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
 // TODO: write an lisp interpreter in lisp and compile it... what size/performance?
 // TODO: write this compiler in lisp? lol
 // TODO: 38 b0 XX == ELSE 5 cycles, change to JMP 3 cycles!
-// TODO: ret0, ret1 optimization? retA is implicit JSR+RTS
+// TODO: ret1 optimization? retA is implicit JSR+RTS
 // TODO: RTS can reuse! remember last... save one byte, lol
+// TODO: avoid pushax if last use of lastarg and didnt push before!
 //
 //
 
@@ -2280,6 +2280,7 @@ typedef struct AsmState {
   char *fix;
 } AsmState;
 
+// optimize pattern: CONST OP
 uchar emitMATH(L w, uchar d, AsmState *s) {
   uchar shifts= 0;
   uchar r= 0;
@@ -2301,7 +2302,9 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
     // TODO:   ax >! w     ax <= w    ===    ax < w+1
     // TODO:   ax <! w     ax >= w    ===    ax > w-1
 
-  case '^': emitCONST(w, s->ax); emitEXIT(s->stk);
+  case '^':
+    if (s->stk==0 && w==0) JMP(return0);
+    else { emitCONST(w, s->ax); emitEXIT(s->stk); }
     s->stk= 100; s->ax= '?';
     r= 1; break;
   }
@@ -2356,7 +2359,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   // TODO: skip gen?
   if (s->stk>64) printf("\n===== NO CODE GENERATE (after return)\n");
 
-  printf("\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
+  printf("\n\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
   if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
 
   switch(*++la) {
@@ -2394,18 +2397,21 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     // hmmmmm, if ax[] ?
   case ']': if (la[1]=='[') ++la; else { IAX; JSR(popax); --(s->stk); }  goto next; // ][ drop-push cancels!
 
-  // TODO: can't we collapse this and next 3?
+  // TODO: un-duplicate with +-*/ ...
   case '[':
-    if ((la[1]==',' && strchr("<=>!", la[4])) || (isdigit(la[1]) && strchr("<=>!", la[2])) || la[1]==lastarg)
-      printf("\n---MATH OP/\'a\' coming! - no need pushax!\n")
-;
- else IAX;
+    if (s->savelast) {
+      if ( (la[1]==',' && strchr("<=>~", la[4])) ||
+           (isdigit(la[1]) && strchr("<=>~", la[2])) ||
+           (la[1]==lastarg && la[2]=='[' && isdigit(la[3]) && strchr("<=>~", la[4])) )
+        printf("\n---MATH OP/\'a\' coming! - no need pushax! \"%s\"\n", la);
+      else AX(islower(la[1])? la[1]: '?');
+    }
     if (la[1]==',' && emitMATH(*(L*)(la+2), 4, s)) goto next;
     if (isdigit(la[1]) && la[1]!='9' && emitMATH(MKNUM(la[1]-'0'), 2, s)) goto next;
     // else no math
-    printf("--- NEW: ax='%c'\n", s->ax);
  //if (ax==lastarg && !savelast) goto next; // IAX did it already
-    if (s->ax==lastarg) goto next; // no need do anything
+    if (s->ax==lastarg) { la+= 2; goto next; } // no need do anything
+    printf("--- NEW: want '%c' ax='%c' \n", la[1], s->ax);
     JSR(pushax); ++(s->stk); goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
@@ -2416,7 +2422,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     emitCONST(*la-'0', s->ax); goto next;
 
   case ',': ++la; IAX; if (emitMATH(*(L*)la, 2, s)) goto next;
-    emitCONST((int*)la, s->ax); ++la; goto next;
+    emitCONST(*(L*)la, s->ax); ++la; goto next;
 
   // read address from var/address
   // TODO: optimize for MATH?    
@@ -2457,7 +2463,6 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
       thn= *s; els= *s;
 
       genasm(&thn);
-      printf("\n======> THEN.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
 
       // '{'
       assert(*la=='{');
@@ -2470,6 +2475,8 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
 // TDOO: assembler thinks this becoms CLV ???? WTF patching?
         SEC(); BCS(0); yy= mcp-1; // addr of rel Bxx to endIF
       }
+
+      printf("\n======> THEN.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
 
       *xx= mcp-xx-1; // patch IF to jump yy ELSE
 
@@ -2587,31 +2594,31 @@ char* asmpile(char* pla) {
   #define CCIII  "-??BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC" // ASL...
   #define JMPS   "BRKJSRRTIRTS"
 
-  printf("\nCODE[%d]:\n",mcp-mc); p= mc;
+  printf("\n---CODE[%d]:\n",mcp-mc); p= mc;
   while(p<mcp) {
     uchar i= *p++, m= (i>>2)&7;
     printf("%04X:\t", p);
 
-    if      (i==0x20) { printf("JSR %04x\n",*((L*)p)++); continue; }
-    else if (i==0x4c) { printf("JMP %04x\n",*((L*)p)++); continue; }
-    else if (i==0x6c) { printf("JSI %02x\n",*p++); continue; } // ? TODO: JMI JSI
-    else if ((i&0x1f)==0x10) {
-      printf("B%.2s %+d\t=> %04X\n", BRANCH-1+(i>>4), *p, p+2+(signed char)*p++); continue; }
-    else if ((i&0xf)==0x8 || (i&0xf)==0xA) { printf("%.3s\n",(i&2?XA:X8)+3*(*p>>4)); continue; }
-    else if (!(i&0x9f)) { printf("%.3s\n", JMPS+3*(i>>5)); continue; }
+    if      (i==0x20) printf("JSR %04x",*((L*)p)++);
+    else if (i==0x4c) printf("JMP %04x",*((L*)p)++);
+    else if (i==0x6c) printf("JPI (%04x)",*((L*)p)++);
+    else if ((i&0x1f)==0x10) 
+      printf("B%.2s %+d\t=> %04X", BRANCH-1+(i>>4), *p, p+2+(signed char)*p++);
+    else if ((i&0xf)==0x8 || (i&0xf)==0xA) printf("%.3s",(i&2?XA:X8)+3*(i>>4));
+    else if (!(i&0x9f)) printf("%.3s", JMPS+3*(i>>5));
     else {
       uchar cciii= (i>>5)+((i&3)<<3);
       if (cciii<0b11000) printf("%.3s", CCIII+3*cciii);
       else printf("%02x ??? ", i);
-    }
-    switch(m) {
-    case 0b000: printf(i&1?" (%02x,X)":" #%02x", *p++); break;
-    case 0b001: printf(" %02x ZP", *p++); break;
-    case 0b010: printf(i&1?" #%02x":" A", *p++); break;
-    case 0b011: printf(i&1?" %04x":" A", *((L*)p)++); break;
-    case 0b100: printf(" (%02x),Y", *p++); break;
-    case 0b101: printf(" %02x,X", *p++); break;
-    case 0b110: printf(" %04x,%c", m&1?'Y':'X', *((L*)p)++); break;
+      switch(m) {
+      case 0b000: printf(i&1?" (%02x,X)":" #%02x", *p++); break;
+      case 0b001: printf(" %02x ZP", *p++); break;
+      case 0b010: printf(i&1?" #%02x":" A", *p++); break;
+      case 0b011: printf(i&1?" %04x":" A", *((L*)p)++); break;
+      case 0b100: printf(" (%02x),Y", *p++); break;
+      case 0b101: printf(" %02x,X", *p++); break;
+      case 0b110: printf(" %04x,%c", m&1?'Y':'X', *((L*)p)++); break;
+      }
     }
     NL;
   } NL;
@@ -2967,7 +2974,7 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
     else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
 
-    if (verbose) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n", f, f); }
+    if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", f, f); }
  
     // IF special => EXPR I THEN { ELSE } ' '
     if (x==atom("if")) {
