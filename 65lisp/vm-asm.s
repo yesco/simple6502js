@@ -354,6 +354,111 @@ _cmp:   pha
 .import _print
 
 
+
+;;; ---- CLOSUREDATA:
+
+;;; user code, calling closure
+
+usercode:
+        jsr closure
+        ;; ...
+
+closure:
+        ;;  yes we call data to install itself as new self while saving old
+        jsr pusholdself         ; save prev self on stack to be restored ( U - U O )
+        jsr data                ; install new self ( - )
+        ;;  stack is now (- U O)
+
+main:   ;; ... generated code for function closure
+        rts                     ; calls install old self! the that will return to usercode!
+
+;;; This is the actual data object, starts with code
+        ;; closure enter: (U O C - U O C) sideeffect: stores itself in self
+
+self=0000
+
+;;; DATA OBJECT:
+;;; 
+;;; a data object is basically an array defined as follows:
+;;; 
+;;; (de [xy x y] self)
+;;; 
+;;; (de (xy'len) (sqrt (sqr .x) (sqr .y)))
+;;; 
+;;; Usage: (setq coord [xy 3 4])
+;;;        (xy.x coord) == (aref 1 coord) == (aref 'x coord) == (coord 'x) ==  (.x coord)
+;;;        (xy'len coord) == ((coord 'len)) == ((.len coord))
+;;;        (prinf "Length of coordinate %O is %d\n" coord (xy'len coord))
+
+
+;;; LAYOUT OF OBJECT
+;;; DATA:  JMP ODATA
+;;;        typenum nargs
+;;;        display...name 00
+;;; 
+;;; ODATA: JSR NEWSELF      - first byte 0x20 means "closure env"
+;;;        JMP DATA
+;;; 
+;;; ODATA+2+3: DESC         - pointer to array of [TYPENAME FARG1 FARG2 ... FARGN]
+;;; +7         NSIZE        - allow for growth
+;;; +9       [ NFIXED       - current fixed by DESC ie. N of FARGN plus 1?
+;;; +11        NUSED        - current used
+;;; +13        S0 S1 ...    - TODO: JS S0 needs to be __PROTO__ ?
+;;;            SNFIXED ...  - fixed correspond to FARG by position
+;;;            KEY VAL ...  - overflow values, OR... just keep an ASSOC-list with pointer... lol
+;;;            ...          - NIL/0 filling till NSIZE
+;;;          ]
+
+data:
+        jsr newself             ; trick to get current address, store in self, return to caller of data
+        ;; this is the addres stored (-1) so when main code returns, it comes here! reinstalls old returns
+        jmp data                ; lol, so when reinstalling we come here
+        ;; doesn't come here
+
+        ;; stack on entry:       we want before RTS       (U C N - U O C) (1 2 3 - 1 o 2)
+        ;; 105  usercaller            usercaller               
+        ;; 103  closure               olddata
+        ;; 101  newdata               closure
+
+pusholdself:                   ; 46c
+        tay
+
+        ;; save caller
+        pla
+        sta tmp1+1
+        pla
+        sta tmp1
+
+        ;; push self
+        lda self+1
+        pha
+        lda self
+        pha
+        
+        ;; restore caller
+        lda tmp1+1
+        pha
+        lda tmp1
+        pha
+
+        tya
+        rts
+        
+
+        ;; ( U C D - U C )
+newself:                        ; 18c
+        ;; todo, low byte pulled first? what order it gets pushed?
+        pla
+        sta self
+        pla
+        sta self+1
+
+        rts                     ; returns to caller of data!
+
+
+
+
+
 .export _asmfib
 
 ;;; 16 bit optimal uint fib - 41B in 29.16s

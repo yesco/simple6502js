@@ -1,12 +1,12 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
+//#include <stdio.h>
+//#include <unistd.h>
+//#include <stdlib.h>
 
-#include <conio.h>
+//#include <conio.h>
 
-extern int print(int n) { printf("\n%d", n); return n; }
+//extern int print(int n) { printf("\n%d", n); return n; }
 
-extern int nil=0, T=0;
+//extern int nil=0, T=0;
 
 long calls= 0;
 
@@ -26,8 +26,8 @@ int fibn(int n) {
   else return fib(n-1) + fib(n-2);
 }
 
-extern unsigned int asmfib(unsigned int n);
-extern unsigned int fibinline(unsigned int n);
+//extern unsigned int asmfib(unsigned int n);
+//extern unsigned int fibinline(unsigned int n);
 
 //extern unsigned int asmltfib(unsigned int n);
 
@@ -56,13 +56,11 @@ int main() {//int argc, char** argv) {
   long z= 0;
   int r= 42;
   while(--i) {
-    //r= fib(n);	// 63 B    43.31s
+    r= fib(n);	// 63 B    43.31s
     //r= ufib(n);	//         43.31s
     //r= ltfib(n);	//  54 B - 41.53s "best of cc65"
-    //r= asmfib(n);	//  39 B   29.17s handwritten
-    r= fibinline(n);	// 114 B   21.45s inlined "all" (63 lines)
     z+= r;
   }
-  printf("fib %d => %d z=%ld calls=%ld   %ld c/bench\n", n, r, z, calls, calls/bench);
+//  printf("fib %d => %d z=%ld calls=%ld   %ld c/bench\n", n, r, z, calls, calls/bench);
   return 0;
 }

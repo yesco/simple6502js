@@ -3,6 +3,17 @@
 //
 // ...
 
+// Current Performance:
+
+// ==== C3A4DR-test 2024-10-04
+//
+// VARIANT SIZE    FREE    SECONDS
+// ------- ----    ----    -------
+// 65lisp   20K     24K     48.20s
+// 65vm     27K     17K     17.13s
+// singl..   6K       ?     40.19s
+// 65asm    39K      4K      6.73s
+
 
 // 65LISP02 - an lisp interpeter for 6502 (oric)
 
@@ -2333,7 +2344,7 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
   // -- ok, we did it!
 
   // <=>! code gen is optimized for IF !
-  if (strchr("<=>!", la[d]) && la[d+1]!='I') {
+  if (strchr("<=>~", la[d]) && la[d+1]!='I') {
     // convert to T/NIL
     mcp-= 2; // remove test
     switch (la[d]) {
@@ -2346,9 +2357,57 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
   la+= d; return 1;
 }
 
+// Closure is dynamically generated code with data storage
+//
+//                                        init: JSR enterclosure   ;; 53c
+// CLOSURE/ARRAY:                               <on stack point to CLOSURE-1!>
+//   	nparams	0x20	CLOS1                   JMP init
+//   	nslots	0 1 2 3 4 5 ... nslots-1	nslots	0 1 2 3 4 5 ... nslots-1
+//
+//    CLOS1:
+//      ;; enter closure - 14B                enterclosure:        ;; 48c
+//      TAY				        TAY   STX tmp1   TSX
+//      LDA self	PHA		        LDA 102,X   STA self+1
+//      LDA self+1      PHA                     LDA 101,X   STA self
+//      LDA #<CLOSURE  	STA frame		LDA 104,X   STA 102,X
+//      LDA #>CLOSURE   STA frame+1	        LDA 103,X   STA 101,X
+//      TYA				        LDX tmp1    TYA
+//      ;;				        RTS ; return to caller of init!
+//      JSR machinecode				(remain on stack is reinit itself)
+//      ;; exit closure - 9B			
+//      TAY                                   exitclosure:         ;; 39c
+//      PLA	STA frame+1                     TAY   STX tmp1   TSX
+//      PLA	STA frame                       LDA 102,X   STA 104,X
+//      TYA                                     LDA 101,X   STA 103,X
+//      RTS                                     DEX DEX          TXS
+//                                              TYA   LDX tmp1 
+//                                              RTS ; prev closure reinstall!
+//
+// The second solution has the frame re-install itself by
+
+L makeClosure(char* code, char* clos) {
+  
+}
+
+void emitMakeClosure() {
+}
+
 // TODO: asmpile fix these...
 // TODO: take arglist...
 char lastvar, lastarg, lastop;
+
+
+// Operator stackeffect:
+// +1  [ 
+// -1  ] =< C +-*/% !
+// N   ^RZ
+
+// - These use one vale and give one back (only AX)
+// 0   @AD.WPx : I {}
+
+// - These sets AX overwriting previous, thus are prefixed w [
+//   This allows preceeding ] to null out [!
+// 0   AD.WPx , 012345678 9 ;
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
 extern char* genasm(AsmState *s) {
@@ -2753,7 +2812,7 @@ extern L al(char* la) {
         exit(99);
       }
       //top= ((FUN1)m)(x);
-      printf("RETURN: %04x == ", top); prin1(top);NL;
+      if (verbose) printf("RETURN: %04x == ", top); prin1(top);NL;
       // TODO: need to balance the stack!
       return top;
     }
@@ -2934,7 +2993,7 @@ JMPARR(gdigit)
 
 JMPARR(g0)
   case 0:
-    if (verbose) printf("\n\nRETURN="); prin1(top); NL;
+    if (verbose) { printf("\n\nRETURN="); prin1(top); NL; }
     return top; // all functions should end with ^ ?
 
 // 26.82s
@@ -3033,13 +3092,12 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
       ++n;
       p= alcompile(p);
       // implicit FOLDL of nargs + - L ! LOL
-      if (f>0 && n>=2 && f<255 && f!='R' && f!='Z') {ALC(f);n-=2;}
+      if (f>0 && n>2 && f<255 && f!='R' && f!='Z') {ALC(f);--n;}
     }
-    if (f>0 && f<255 && n) { ALC(f); n-=2; break; }
+    if (f>0 && f<255 && n>0) { ALC(f); n-=2; break; }
 
-    // push the actual call
-    // if (f<255) { ALC(f); break; }
-    while(f<0 && n-- > 0) ALC(-f);
+    // foldr?
+    while(f<0 && --n > 0) ALC(-f); 
     if (f<255) break; // FOLD R/L
 
     // it's a user defined function/compiled
