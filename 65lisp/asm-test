@@ -19,8 +19,8 @@
 
 # --- ASM
 # 13.56s
-./65vm-asm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
-./65vm-asm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
-./65vm-asm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65asm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
+./65asm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
+./65asm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
 
 

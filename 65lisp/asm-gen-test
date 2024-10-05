@@ -1,32 +1,32 @@
 echo "--- RETURNS ---"
-./65vm-asm -v -e "1"
-./65vm-asm -v -e "(return 1)"
+./65asm -v -e "1"
+./65asm -v -e "(return 1)"
 
-./65vm-asm -v -e "42"
-./65vm-asm -v -e "(return 42)"
+./65asm -v -e "42"
+./65asm -v -e "(return 42)"
 
-./65vm-asm -v -e "'foo"
-./65vm-asm -v -e "(return 'foo)"
+./65asm -v -e "'foo"
+./65asm -v -e "(return 'foo)"
 
 
 echo "--- RETURNS OPTIMIZED ----"
-./65vm-asm -v -e "0"
-./65vm-asm -v -e "(return 0)"
+./65asm -v -e "0"
+./65asm -v -e "(return 0)"
 
-./65vm-asm -v -e "nil"
-./65vm-asm -v -e "(return nil)"
+./65asm -v -e "nil"
+./65asm -v -e "(return nil)"
 
-./65vm-asm -v -e "T"
-./65vm-asm -v -e "(return T)"
+./65asm -v -e "T"
+./65asm -v -e "(return T)"
 
-./65vm-asm -v -e "a"
-./65vm-asm -v -e "(return a)"
+./65asm -v -e "a"
+./65asm -v -e "(return a)"
 
-./65vm-asm -v -e "b"
-./65vm-asm -v -e "(return b)"
+./65asm -v -e "b"
+./65asm -v -e "(return b)"
 
 echo "--- PUSHING AX ---"
-./65vm-asm -v -e "(+ a 8)"
+./65asm -v -e "(+ a 8)"
 
 
 
