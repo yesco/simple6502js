@@ -70,6 +70,12 @@
 #include <string.h>
 #include <assert.h>
 
+//#define EMACS // adds 4552 bytes to PROGSIZE
+
+#ifdef EMACS 
+  #include "emacs.c"
+#endif // EMACS
+
 // it's implicitly optional, only enabled with -DPROGSIZE
 #include "progsize.c" // "first"
 

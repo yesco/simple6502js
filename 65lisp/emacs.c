@@ -3,6 +3,10 @@
 //
 // Edits a multiline string inside a given buffer.
 //
+// Adds 4552 bytes to PROGSIZE
+//
+// TODO: how big in lisp and in bytecode?
+//
 //
 // MOVEMENT
 //
@@ -133,9 +137,13 @@ void edit(char* e, size_t size) {
   } while(1);
 }
 
+
+#ifndef EMACS 
 char buff[2014]= "foobar\nfie\nfum";
 
 int main(int argc, char** argv) {
   edit(buff, sizeof(buff));
   return 0;
 }
+#endif // EMACS
+
