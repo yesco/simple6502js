@@ -532,9 +532,8 @@ _asmfibpha:
         pha
         tya
         pha
-        jsr pushax
 
-        ;; load "a"
+        ;; load "a" - 6B
         tsx
         lda $104,x
         tax
