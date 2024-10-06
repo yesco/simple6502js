@@ -60,7 +60,7 @@ echo
 #grep '^RODATA' $name.map
 #grep '^DATA' $name.map
 #echo
-echo "`./wcode $name.c ` LOC of LISP  C-code (wc: `wc $name.c`)"
+echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`)"
 echo
 echo "`./wcode singlisp.c ` LOC of LISP  C-code (wc: `wc singlisp.c`)"
 echo "`./wcode lisp.c ` LOC of LISP  C-code (wc: `wc lisp.c`)"

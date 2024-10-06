@@ -2,11 +2,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 
-#include <conio.h>
+//#include <conio.h>
 
 extern int print(int n) { printf("\n%d", n); return n; }
 
-extern int nil=0, T=0;
+//extern int nil=0, T=0;
 
 long calls= 0;
 
@@ -26,10 +26,10 @@ int fibn(int n) {
   else return fib(n-1) + fib(n-2);
 }
 
-extern unsigned int asmfib(unsigned int n);
-extern unsigned int fibinline(unsigned int n);
+//extern unsigned int asmfib(unsigned int n);
+//extern unsigned int fibinline(unsigned int n);
 
-extern unsigned int asmltfib(unsigned int n);
+//extern unsigned int asmltfib(unsigned int n);
 
 unsigned int ultfib(unsigned int n) {
   if (n<2) return n;
@@ -49,7 +49,8 @@ unsigned int ufib(unsigned int n) {
 }
 
 int main() {//int argc, char** argv) {
-  long bench= 3000;
+  // tablet is (/ 42000 1.37) 30700x faster!
+  long bench= 3000*42000/1.37; // 43.31s 
   long i= bench;
   //long bench= 30000; // 432s
   int n= 8;
