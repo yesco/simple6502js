@@ -48,9 +48,17 @@ static char c, *pc;
 #endif
 
 
+// 2883 Bytes for the bytecode interpreter!
 #ifndef GENASM
 
+//#if 0
+
+#ifdef GENASM
+extern L runal(char* la) {
+#else
 extern L al(char* la) {
+#endif
+
   char n=0, *orig;
 
 #ifndef JMPARR
@@ -319,10 +327,18 @@ JMPARR(gerr)default:
 
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code
-#define ALC(c) do { if (!p || *p) return NULL; *p++= (c); } while(0)
+
+void alc(char** p, char c) {
+  // run out of size?
+  // TODO: better?
+  if (!p || !*p || **p) error("ALC: oo compile space", 0);
+  *(*p)++= (c);
+}
+
+#define ALC(c) alc(&p, c)
 
 extern char* alcompile(char* p) {
-char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
+  char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
  again:
   switch((c=nextc())) {
@@ -443,8 +459,7 @@ char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
     // allow for inline read
     ALC('['); // push
-
-    ALC(';');
+    ALC(';'); // 55 bytes about! => 13 bytes without macro
     *((L*)p)++= x;
     return p;
 

@@ -3,6 +3,7 @@
 //
 // ...
 
+// ------------------------------------------------------------
 // Current Performance:
 
 // ==== C3A4DR-test 2024-10-04 (1MHz not 1024*1024 lol)
@@ -11,10 +12,25 @@
 // ------- ----    ----    -------
 // 65lisp   20K     24K     50.29s  1x
 // 65vm     26K     17K     17.06s  2.95x
-// singl..   6K       ?     42.14s  1.19x
-// 65asm    30K     14K      5.74s  8.76x faster! (sz w/o DISASM)
+// 65asm    29K     14K      5.74s  8.76x faster! (sz w/o DISASM)
+// singl..   6K       ?     42.14s  1.19x faster!
+//
+// PROGSIZE
+// --------
+// emacs      -  4552 bytes TODO: rewrite inlisp! run bytecode!
+// 65lisp     - 19542 bytes TODO: eval/apply too big cmp singlisp.c
+// 65vm       - 25735 bytes TODO: separate out the case/jmp?
+// 65asm      - 28982 bytes TODO: template code gen?
+// singl..    -  6252 bytes
+
+// (outdated)
+// vmcompiler -  3989 bytes
+// vm         -  2883 bytes (al function)
+// asmcompiler-  6330 bytes 
+// asm-runtime-   ??? bytes
 
 
+// ============================================================
 // 65LISP02 - an lisp interpeter for 6502 (oric)
 
 // An highly efficent and optimized lisp for the 6502.
