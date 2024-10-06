@@ -19,8 +19,8 @@
 // --------
 // emacs      -  4552 bytes TODO: rewrite inlisp! run bytecode!
 // 65lisp     - 19542 bytes TODO: eval/apply too big cmp singlisp.c
-// 65vm       - 25735 bytes TODO: separate out the case/jmp?
-// 65asm      - 28982 bytes TODO: template code gen?
+// 65vm       - 25541 bytes TODO: separate out the case/jmp?
+// 65asm      - 28788 bytes TODO: template code gen?
 // singl..    -  6252 bytes
 
 // (outdated)
@@ -1299,8 +1299,10 @@ void lprintf(char* f, L a) {
 }
 
 void error(char* msg, L a) {
-  printf("%%ERROR: %s: ", msg); prin1(a);
-  if (num(a)>31 && NUM(a)<128) printf(" '%c'", NUM(a));  NL;
+  printf("%%ERROR: %s: ", msg);
+  if (num(a)>31 && NUM(a)<128) printf(" '%c' %d", NUM(a), NUM(a));
+  else prin1(a);
+  NL;
   // TODO: have arg opt to quit on error?
   if (toploop) longjmp(toploop, 1);
 }

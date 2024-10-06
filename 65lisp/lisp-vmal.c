@@ -325,24 +325,23 @@ JMPARR(gerr)default:
 
 #endif // GENASM
 
+// using generic fixed buffer of fixed size and char index
+// generates 8 bytes instead of ... ... Saved 194 bytes
+// TODO: use in more places...
+unsigned char b;
+char buff[250];
+
+#define ALC(c) do { buff[b]=(c); ++b; } while(0)
+#define ALW(n) do { ALC((n)&0xff); ALC(((unsigned int)n) >> 8); } while(0)
+
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code
-
-void alc(char** p, char c) {
-  // run out of size?
-  // TODO: better?
-  if (!p || !*p || **p) error("ALC: oo compile space", 0);
-  *(*p)++= (c);
-}
-
-#define ALC(c) alc(&p, c)
-
-extern char* alcompile(char* p) {
+void alcompile() {
   char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
  again:
   switch((c=nextc())) {
-  case 0  : return p;
+  case 0  : return;
   case ' ': case '\t': case '\n': case '\r': goto again;
 
   case'\'': quote:
@@ -351,31 +350,29 @@ extern char* alcompile(char* p) {
     x= x==0xbeef? lread(): x;
 
     // short constants
-    if (null(x)) { ALC('['); ALC('9'); return p; }
+    if (null(x)) { ALC('['); ALC('9'); return; }
 
     ALC('['); // push
     ALC(','); // reads next value and compiles to put it on stack
-    { L* pi= (L*)p; if (*pi) return NULL; // overflow!
-      //printf("GENBYTES: "); prin1(x); NL;
-      *pi= x; p+= sizeof(L);
-      // make sure not GC:ed = link up all constants
-      alvals= cons(*pi, alvals);
-    }
-    if (extra) ALC(extra);  return p;
+    ALW(x);
+    alvals= cons(x, alvals);
+    if (extra) ALC(extra);
+    return;
 
   // TODO: function call... of lisp
   case '(': 
     // determine function, try get a number
     //skipspc();
     f= nextc(); unc(f); // peek
-    if (f=='(') return NULL; // TODO: ,..X inline lambda?
+    // TODO: ,..X inline lambda? or evaluate function to call
+    if (f=='(') error("ALC: TODO: computed function", 0);
 
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
-    if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; return NULL; }
+    if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; error("ALC: Need to do eval", 0); }
 
     if (isatom(x)) f= ATOMVAL(x);
-    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; return NULL; }
+    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; error("ALC: Need funcall", 0); }
 
     // get the byte code token
     f= NUM(f);
@@ -388,12 +385,12 @@ extern char* alcompile(char* p) {
  
     // IF special => EXPR I THEN { ELSE } ' '
     if (x==atom("if")) {
-      p= alcompile(p); ALC('I'); // EXPR I
-      ALC(']'); p= alcompile(p); ALC('{'); // DROP THEN
-      ALC(']'); p= alcompile(p); ALC('}'); // DROP ELSE
+      alcompile(); ALC('I'); // EXPR I
+      ALC(']'); alcompile(); ALC('{'); // DROP THEN
+      ALC(']'); alcompile(); ALC('}'); // DROP ELSE
       c= skipspc();
-      if (c!=')') return NULL;
-      return p;
+      if (c!=')') goto expected;
+      return;
     }
 
     // SETQ special => VAL : ADDR
@@ -402,20 +399,20 @@ extern char* alcompile(char* p) {
       assert(isatom(n));
 
       // generate eval of valuie
-      p= alcompile(p);
-      // prefix like ,
+      alcompile();
+      // prefix as ,
       ALC(':');
-      *((L*)p)++= n;
+      ALW(n);
 
       c= skipspc();
-      if (c!=')') return NULL;
-      return p;
+      if (c!=')') goto expected;
+      return;
     }
 
     // GENERIC argument compiler
     while((c=nextc())!=')') {
       ++n;
-      p= alcompile(p);
+      alcompile();
       // implicit FOLDL of nargs + - L ! LOL
       if (f>0 && n>2 && f<255 && f!='R' && f!='Z') {ALC(f);--n;}
     }
@@ -443,7 +440,7 @@ extern char* alcompile(char* p) {
       //printf("... is %d\n", x);
       // result is single digit, compile as is
       // NOTE: '9' isn't 9 but nil :-D :-D (const 9 not common...?)
-      if (isnum(x) && x>=0 && NUM(x)<9) { ALC('['); ALC(NUM(x)+'0'); return p; }
+      if (isnum(x) && x>=0 && NUM(x)<9) { ALC('['); ALC(NUM(x)+'0'); return; }
       goto quote;
     }
 
@@ -452,7 +449,7 @@ extern char* alcompile(char* p) {
     assert(isatom(x));
     // local variable a-w (x y z special)
     nm= ATOMSTR(x);
-    if (!nm[1] && islower(*nm) && *nm<'x') { ALC('['); ALC(c); return p; }
+    if (!nm[1] && islower(*nm) && *nm<'x') { ALC('['); ALC(c); return; }
  
     // x==self lol?
     if (x==nil || x==T || x==ERROR) goto quote;
@@ -460,21 +457,22 @@ extern char* alcompile(char* p) {
     // allow for inline read
     ALC('['); // push
     ALC(';'); // 55 bytes about! => 13 bytes without macro
-    *((L*)p)++= x;
-    return p;
-
-    //printf("----ATOM---"); prin1(x); NL;
-    // compile address on stack and @ to read value at runtime
-    extra= '@'; // read atom val TODO: or 'X'/'E'
-    goto quote;
-
+    ALW(x);
+    return;
   }
-  return p;
+  return;
+
+ expected: // used twice
+  error("ALC.expected ) got", c);
 }
 
 L alcompileread() {
-  char al[MAXSYMLEN+2]= {0}, *p= al;
-  al[sizeof(al)]= 255; // end marker
-  p= alcompile(p);
-  return p==al? eof: (p && *p!=255)? mkbin(al, p-al+1): ERROR;
+  // use global buffer, and index b -- much less code and faster!
+  memset(buff, 0, sizeof(buff));
+  buff[sizeof(buff)-1]= 255; // end marker
+  b= 0;
+  alcompile();
+  if (!b) return eof;
+  if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
+  return mkbin(buff, b+1);
 }  
