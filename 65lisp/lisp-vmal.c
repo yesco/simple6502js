@@ -384,7 +384,7 @@ void alcompile() {
     if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", f, f); }
  
     // IF special => EXPR I THEN { ELSE } ' '
-    if (x==atom("if")) {
+    if (x==IF) {
       alcompile(); ALC('I'); // EXPR I
       ALC(']'); alcompile(); ALC('{'); // DROP THEN
       ALC(']'); alcompile(); ALC('}'); // DROP ELSE
@@ -394,7 +394,7 @@ void alcompile() {
     }
 
     // SETQ special => VAL : ADDR
-    if (x==atom("setq")) {
+    if (x==SETQ) {
       L n= lread();
       assert(isatom(n));
 

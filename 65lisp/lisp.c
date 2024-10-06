@@ -11,8 +11,8 @@
 // VARIANT SIZE    FREE    SECONDS
 // ------- ----    ----    -------
 // 65lisp   20K     24K     50.29s  1x
-// 65vm     26K     17K     17.06s  2.95x
-// 65asm    29K     14K      5.74s  8.76x faster! (sz w/o DISASM)
+// 65vm     26K     17K     17.03s  2.95x
+// 65asm    29K     14K      5.70s  8.82x faster! (sz w/o DISASM)
 // singl..   6K       ?     42.14s  1.19x faster!
 //
 // PROGSIZE
@@ -521,7 +521,7 @@ L fastcall inc2(L i) { asm("jsr incax2");
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, closure, bye, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, quote= 0;
 
 #define notnull(x) (x!=nil) // faster than !null
 #define null(x) (x==nil)    // crazy but this is 81s instead of 91s!
@@ -1953,6 +1953,8 @@ closure= atom("closure");
   ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
     bye= atom("bye");   setval(bye, bye, nil);
+   SETQ= atom("setq");
+     IF= atom("if");
 
   // register function names
   while(*s) { setatomval(atom(2+*s), MKNUM(**s)); ++s; }
