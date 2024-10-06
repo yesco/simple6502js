@@ -3,6 +3,7 @@
 //
 // ...
 
+
 // ------------------------------------------------------------
 // Current Performance:
 
@@ -600,7 +601,9 @@ L prin1(L); // forward TODO: remove
 
 jmp_buf toploop= {0};
 
-void error(char* msg, L a);
+void error(char* msg);
+void error1(char* msg, L a);
+
 
 // Type number to identify Heap OBJ
 #define HFREE   0xFE
@@ -763,7 +766,7 @@ L cons(L a, L d) {
     return r;
   }
 
-  error("Run out of conses", nil);
+  error("Run out of conses");
 }
 
 // returning nil is faster than 0! (1%)
@@ -1298,15 +1301,17 @@ void lprintf(char* f, L a) {
   } while (1);
 }
 
-void error(char* msg, L a) {
+void error1(char* msg, L a) {
   printf("%%ERROR: %s: ", msg);
-  if (num(a)>31 && NUM(a)<128) printf(" '%c' %d", NUM(a), NUM(a));
+  if (num(a)>31 && NUM(a)<128) printf(" '%c' (%d) ptr=%04x", NUM(a), NUM(a), a);
   else prin1(a);
   NL;
   // TODO: have arg opt to quit on error?
   if (toploop) longjmp(toploop, 1);
 }
   
+void error(char *msg) { error1(msg, 0); }
+
 // ---------------- Variables
 
 L assoc(L x, L l) {
@@ -1489,9 +1494,9 @@ L evalX(L x, L env) {
         a= f; // avoid self loop nil/T etc
         f= ATOMVAL(f);
         if (isnum(f)) break;
-        if (f==a) error("eval.loop", a);
+        if (f==a) error1("eval.loop", a);
       }
-      if (null(f)) error("nofunc", a);
+      if (null(f)) error1("nofunc", a);
 
       // evaluate any cons until it's not...
       // lambda 66s => 37s by reordering tests!
@@ -1500,9 +1505,9 @@ L evalX(L x, L env) {
         a= f; // avoid self loop
         f= eval(f, env);
         if (isnum(f)) break;
-        if (f==a) error("eval.loop", a); // can happen?
+        if (f==a) error1("eval.loop", a); // can happen?
       }
-      if (null(f)) error("nofunc", a);
+      if (null(f)) error1("nofunc", a);
 
       // TODO: really needed? or put limit on it?
       if (isatom(f)) continue;
@@ -1775,7 +1780,7 @@ L evalX(L x, L env) {
     case 'M': return mapcar(a, b);
     case 'N': return nth(a, b);
 
-    default: error("NO such FUN, or too many args", x);
+    default: error1("NO such FUN, or too many args", x);
     }
 
     // If three args need to use narg !

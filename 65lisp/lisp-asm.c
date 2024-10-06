@@ -800,13 +800,11 @@ extern char* genasm(AsmState *s) {
     // inline constant 7 bytes, hmmmm... TODO: compare generated code?
     //if (*la>='0' && *la<='8') { LDAn(MKNUM(*la-'0')); LDXn(0); goto next; }
 
-    printf("%% genasm.error: unimplemented code '%c' (%d %02x)\n", *la, *la, *la);
-    return 0;
+    error1("%% genasm.error: unimplemented code", *la);
   }
 }
 
 char* asmpile(char* pla) {
-  char *p;
   AsmState s= {};
   s.ax= 'a'; s.savelast= 1;
 

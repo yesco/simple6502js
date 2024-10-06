@@ -60,7 +60,6 @@ extern L al(char* la) {
 #endif
 
   char n=0, *orig;
-
 #ifndef JMPARR
   static void* jmp[127]= {(void*)(int*)42,0};
 #endif
@@ -332,7 +331,7 @@ unsigned char b;
 char buff[250];
 
 #define ALC(c) do { buff[b]=(c); ++b; } while(0)
-#define ALW(n) do { ALC((n)&0xff); ALC(((unsigned int)n) >> 8); } while(0)
+#define ALW(n) do { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); } while(0)
 
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code
@@ -365,14 +364,14 @@ void alcompile() {
     //skipspc();
     f= nextc(); unc(f); // peek
     // TODO: ,..X inline lambda? or evaluate function to call
-    if (f=='(') error("ALC: TODO: computed function", 0);
+    if (f=='(') error("ALC: TODO: computed function");
 
     x= lread();
     //printf("ALC.read fun: "); prin1(x);
-    if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; error("ALC: Need to do eval", 0); }
+    if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; error("ALC: Need to do eval"); }
 
     if (isatom(x)) f= ATOMVAL(x);
-    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; error("ALC: Need funcall", 0); }
+    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; error("ALC: Need funcall"); }
 
     // get the byte code token
     f= NUM(f);
@@ -463,7 +462,7 @@ void alcompile() {
   return;
 
  expected: // used twice
-  error("ALC.expected ) got", c);
+  error1("ALC.expected ) got", c);
 }
 
 L alcompileread() {
