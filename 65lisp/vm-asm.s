@@ -351,7 +351,7 @@ _cmp:   pha
 ;;;     bcs +2                  ; <
 ;;;     beq @le                 ; !=       >  I 
 
-.import _print
+.import _print, _prin1
 
 
 
@@ -504,6 +504,7 @@ _asmfib:
 
 _asmfibpha:
         ;; if (ax <= 1)
+;;; jsr "cmpyax" 9B -> 7B
         tay
         cmp #2
         txa
@@ -515,7 +516,7 @@ _asmfibpha:
         rts
 
 @gt:
-        ;; push ax, keep ax
+        ;; push ax, keep ax - 5B
         tay
         txa
         pha
@@ -526,23 +527,27 @@ _asmfibpha:
         jsr decax1
         jsr _asmfibpha
 
-        ;; save result - push ax, no need keep ax
+        ;; save result - push ax, no need keep ax (still is!) - 5B !
         tay
         txa
         pha
         tya
         pha
 
-        ;; load "a" - 6B
+        ;; load "a" - 10B
+;;; jsr "STKloadaxidx" 
         tsx
+        lda $103,x              ; lo
+        tay
         lda $104,x
         tax
-        lda $103,x
+        tya
 
         jsr decax2
         jsr _asmfibpha
 
         ; jsr tosaddax
+;;;  jsr "STKaddax" 15B -> 3B 
         stx tmp1
 
         tsx
@@ -558,6 +563,7 @@ _asmfibpha:
 
         ;; drop tmp, "a"
         tay
+;;; make jump table, at each pos -> 1+3 B
           pla
           pla
 
@@ -566,6 +572,66 @@ _asmfibpha:
         tya
 
         rts
+
+
+.export _byteasmfib
+
+_byteasmfib:
+        ;; if (ax <= 1)
+;;; jsr "cmpyax" 9B -> 7B
+        cmp #2
+        bcs @gt                 ; 8B 11c
+
+        ;; return n
+        rts
+
+@gt:
+        ;; push a keep a
+        pha
+
+        ;; return fib(n-1) + fib(n-2)
+        sec
+        sbc #1
+
+        jsr _byteasmfib
+
+        ;; save result - push ax, no need keep ax (still is!) - 5B !
+        pha
+
+        ;; load "a" - 10B
+;;; jsr "STKloadaxidx" 
+        tsx
+        lda $102,x
+
+;;;     jsr decax2
+        sec
+        sbc #2
+
+        jsr _byteasmfib
+
+        ; jsr tosaddax
+;;;  jsr "STKaddax" 15B -> 3B 
+        tsx
+        clc
+        adc $101,x
+
+        ;; drop tmp, "a"
+        tay
+;;; make jump table, at each pos -> 1+3 B
+          pla
+          pla
+        tya
+
+        rts
+;;; 32 B
+
+
+
+
+;;; 16 bit optimal uint fib - 41B in 29.16s
+
+;;; TODO: not correct! lol
+;;; toadd... hmmm
 
 
 ;;; about 114 B - 21.45s !!!!!
