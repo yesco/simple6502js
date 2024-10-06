@@ -495,6 +495,80 @@ _asmfib:
         jmp incsp2
 
 
+.export _asmfibpha
+
+;;; 16 bit optimal uint fib - 41B in 29.16s
+
+;;; TODO: not correct! lol
+;;; toadd... hmmm
+
+_asmfibpha:
+        ;; if (ax <= 1)
+        tay
+        cmp #2
+        txa
+        sbc #0
+        tya
+        bcs @gt                 ; 8B 11c
+
+        ;; return n
+        rts
+
+@gt:
+        ;; push ax, keep ax
+        tay
+        txa
+        pha
+        tya
+        pha
+
+        ;; return fib(n-1) + fib(n-2)
+        jsr decax1
+        jsr _asmfibpha
+
+        ;; save result - push ax, no need keep ax
+        tay
+        txa
+        pha
+        tya
+        pha
+        jsr pushax
+
+        ;; load "a"
+        tsx
+        lda $104,x
+        tax
+        lda $103,x
+
+        jsr decax2
+        jsr _asmfibpha
+
+        ; jsr tosaddax
+        stx tmp1
+
+        tsx
+        clc
+        adc $101,x
+        tay
+
+        lda tmp1
+        adc $102,x
+        tax
+
+        tya
+
+        ;; drop tmp, "a"
+        tay
+          pla
+          pla
+
+          pla
+          pla
+        tya
+
+        rts
+
+
 ;;; about 114 B - 21.45s !!!!!
 
 .export _fibinline
