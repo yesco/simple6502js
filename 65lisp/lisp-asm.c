@@ -516,7 +516,7 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
 // The second solution has the frame re-install itself by
 
 L makeClosure(char* code, char* clos) {
-  
+  return code || clos ? ERROR : ERROR;
 }
 
 void emitMakeClosure() {
@@ -842,3 +842,41 @@ char* asmpile(char* pla) {
   return mc;
 }
 
+// takes compiled bytecode and compiles to asm,
+// then runs bench times
+L al(char* la) {
+  char *m= 0;
+
+  top= MKNUM(8);
+
+  // TODO: implement real function call...
+
+  if (verbose) printf("\nVMAL.run: %s\n", pc);
+
+  // TODO: move OUT
+  m= asmpile(la);
+
+  if (m) {
+    // Run machine code
+    { L x= top; L check= ERROR, ft= MKNUM(42);
+
+      // Bench cut all overhead, run form there...
+      // TODO: not fair to VM... lol
+      for(; bench>0; --bench) top= ((FUN1)m)(x);
+
+      if (ft!=MKNUM(42) || check!=ERROR) {
+        // TODO: calculate how much? lol
+        printf("\n%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
+        printf("top="); prin1(top);
+        printf(" ft="); prin1(ft);
+        printf(" check="); prin1(check); NL;
+        exit(99);
+      }
+      //top= ((FUN1)m)(x);
+      if (verbose) printf("RETURN: %04x == ", top); prin1(top);NL;
+      // TODO: need to balance the stack!
+      return top;
+    }
+  }
+  return ERROR;
+}

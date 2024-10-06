@@ -48,14 +48,14 @@ static char c, *pc;
 #endif
 
 
+#ifndef GENASM
+
 extern L al(char* la) {
-  char *m= 0;
+  char n=0, *orig;
 
 #ifndef JMPARR
   static void* jmp[127]= {(void*)(int*)42,0};
 #endif
-
-  char n=0, *orig;
 
 #ifndef JMPARR
   #define JMPARR(a) a:
@@ -125,32 +125,7 @@ extern L al(char* la) {
 
   #define PARAM_OFF 4
 
-  if (verbose) printf("\nAL.run: %s\n", pc);
-
-  // TODO: move OUT
-  m= asmpile(la);
-
-  if (m) {
-    // Run machine code
-    { L x= top; L check= ERROR, ft= MKNUM(42);
-
-      for(; bench>0; --bench) top= ((FUN1)m)(x);
-
-      if (ft!=MKNUM(42) || check!=ERROR) {
-        // TODO: calculate how much? lol
-        printf("\n%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
-        printf("top="); prin1(top);
-        printf(" ft="); prin1(ft);
-        printf(" check="); prin1(check); NL;
-        exit(99);
-      }
-      //top= ((FUN1)m)(x);
-      if (verbose) printf("RETURN: %04x == ", top); prin1(top);NL;
-      // TODO: need to balance the stack!
-      return top;
-    }
-  }
-  
+ 
  call:
   params= frame+PARAM_OFF;
   if (s<params) s= params; // TODO: hmmm... TODO: assert?
@@ -340,6 +315,7 @@ JMPARR(gerr)default:
   }
 }
 
+#endif // GENASM
 
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code

@@ -10,9 +10,9 @@
 // VARIANT SIZE    FREE    SECONDS
 // ------- ----    ----    -------
 // 65lisp   20K     24K     50.29s  1x
-// 65vm     27K     17K     17.69s  2.8x
+// 65vm     26K     17K     17.06s  2.95x
 // singl..   6K       ?     42.14s  1.19x
-// 65asm    39K      4K      6.80s  7.40x faster!
+// 65asm    35K      7K      6.93s  7.26x faster! (sz w/o DISASM)
 
 
 // 65LISP02 - an lisp interpeter for 6502 (oric)
