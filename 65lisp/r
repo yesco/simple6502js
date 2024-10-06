@@ -50,7 +50,7 @@ cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
 #(time sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
 (sim65 -c $name.out "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
 echo
-(echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1024/1024" | bc -l ; echo "seconds simulated time");
+(echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time");
 
 #ls -l $name.o $name.out $name.tap
 
