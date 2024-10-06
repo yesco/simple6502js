@@ -1,3 +1,12 @@
+// Define DASM on compilation to DebugASM !!!!
+#ifdef DASM
+  #undef DASM
+  #define DASM(a) do { a; } while(0)
+#else
+  #undef DASM
+  #define DASM(a)
+#endif
+
 char mc[120]= {0};
 char* mcp= mc;
  
@@ -85,14 +94,14 @@ char* mcp= mc;
 //                             asm-compiler = 2152 bytes
 
 
-void B(char b)  { printf("%02x ", b); *mcp++= (b)&0xff; }
-void O(char op) { printf("\n\t"); B(op); }
-void W(void* w) { *((L*)mcp)++= (L)(w); printf("%04x", w); }
+void B(char b)  { DASM(printf("%02x ", b)); *mcp++= (b)&0xff; }
+void O(char op) { DASM(printf("\n\t")); B(op); }
+void W(void* w) { *((L*)mcp)++= (L)(w); DASM(printf("%04x", w)); }
 
 #define O2(op, b) do { O(op);B(b); } while(0)
 #define O3(op, w) do { O(op);W(w); } while(0)
-#define N3(opn, op, w) do { O(op);W(w); printf("\t\t%-4s %s", opn, #w); } while(0) 
-#define N2(opn, op, b) do { O(op);B(b); printf("\t\t%-4s %02x", opn, b); } while(0) 
+#define N3(opn, op, w) do { O(op);W(w); DASM(printf("\t\t%-4s %s", opn, #w)); } while(0) 
+#define N2(opn, op, b) do { O(op);B(b); DASM(printf("\t\t%-4s %02x", opn, b)); } while(0) 
 
   #define LDAn(n) N2("LDAn",0xA9,n)
   #define LDXn(n) N2("LDXn",0xA2,n)
@@ -454,7 +463,7 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
     // TODO:   ax <! w     ax >= w    ===    ax > w-1
 
   case '^': case 0: x= 1;
-    printf("\n----emitRETURN: "); prin1(w); NL;
+    DASM(printf("\n----emitRETURN: "); prin1(w); NL);
     if (s->stk==0) {
       if      (w==0)   JMP(return0);
       else if (w==nil) JMP(retnil);
@@ -466,7 +475,7 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
     s->stk= 100; s->ax= '?';
     r= 1; break;
   }
-  printf("\n\t--emitMATH(%d, %d) '%c' shifts=%d ===> %d '%s'", NUM(w), d, la[d], shifts, r, la);
+  DASM(printf("\n\t--emitMATH(%d, %d) '%c' shifts=%d ===> %d '%s'", NUM(w), d, la[d], shifts, r, la));
 
   // -- sorry, no match
   if (!r) return 0;
@@ -540,17 +549,26 @@ char lastvar, lastarg, lastop;
 // 0   AD.WPx , 012345678 9 ;
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
-extern char* genasm(AsmState *s) {
-  // TODO:
-  //   (+ (if (...) a 7) a) who saves ax?
+
+void iax(AsmState *s, char a) {
+  if (s->savelast && (a)!=lastarg) {
+    assert(s->ax==lastarg);
+    JSR(pushax); ++(s->stk);
+    s->savelast= 0;
+    DASM(printf("\n\t----- PUSHED initial AX to %c------\n", lastarg));
+  }
+  s->ax= a;
+}
+
+#define IAX iax(s, '?')
+#define AX(a) iax(s, a)
 
   // invalidate AX
   // TODO: don't inline... and can we test/do this not at ever CASE but instead at one place?
-  #define SAVEAX(a) do { if (s->savelast && (a)!=lastarg) { assert(s->ax==lastarg); JSR(pushax); ++(s->stk); s->savelast= 0; \
-printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
-} } while(0)
-  #define IAX   do { SAVEAX('?'); s->ax= '?'; } while(0)
-  #define AX(a) do { SAVEAX(a); s->ax= a; } while(0)
+
+extern char* genasm(AsmState *s) {
+  // TODO:
+  //   (+ (if (...) a 7) a) who saves ax?
 
  next:
   lastop= *la;
@@ -558,14 +576,14 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   // TailCall? JSR xxxx RTS  -> JMP xxxx
   if (mcp>mc+3 && *(mcp-1)==0x60 && *(mcp-4)==0x20) {
     *(mcp-4)= 0x4c; *--mcp= 255;
-    printf("\n\n====== TAIL CALL %04X", mcp);
+    DASM(printf("\n\n====== TAIL CALL %04X", mcp));
   }
   // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
 
   // TODO: skip gen?
-  if (s->stk>64) printf("\n===== NO CODE GENERATE (after return)\n");
+  if (s->stk>64) DASM(printf("\n===== NO CODE GENERATE (after return)\n"));
 
-  printf("\n\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax);
+  DASM(printf("\n\nGENASM: '%c' (%d %02x) %04X stk=%d ax='%c' val=", la[1], la[1], la[1], *(L*)(la+2), s->stk, s->ax));
   if (strchr(",:;X", la[1])) prin1(*(L*)(la+2));
 
   switch(*++la) {
@@ -605,9 +623,9 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
   // TODO: un-duplicate with +-*/ ...
   case '[':
     if (s->savelast) {
-      if ( (la[1]==',' && axsameop(la[4])) ) printf("\n-------11111: \"%s\"\n", la);
-      else if ( (isdigit(la[1]) && axsameop(la[2])) ) printf("\n-------222222\n");
-      else if ( (la[1]==lastarg && lastarg==s->ax && la[2]=='[' && isdigit(la[3]) && axsameop(la[4])) ) printf("\n-------333 \"%s\"\n", la);
+      if ( (la[1]==',' && axsameop(la[4])) ) DASM(printf("\n-------11111: \"%s\"\n", la));
+      else if ( (isdigit(la[1]) && axsameop(la[2])) ) DASM(printf("\n-------222222\n"));
+      else if ( (la[1]==lastarg && lastarg==s->ax && la[2]=='[' && isdigit(la[3]) && axsameop(la[4])) ) DASM(printf("\n-------333 \"%s\"\n", la));
       //else if (la[1]!=s->ax || s->ax!=lastarg) IAX;
       //else AX(la[1]);
       // TODO: this is all wrong with 'b' ???
@@ -625,7 +643,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
 // TODO: this is all wrong with 'b' ???
     if (la[1]==lastarg && s->ax==lastarg) { la+= 2; goto next; } // no need do anything
 
-    printf("\n--- NEW: want '%c' ax='%c' \n", la[1], s->ax);
+    DASM(printf("\n--- NEW: want '%c' ax='%c' \n", la[1], s->ax));
     //goto next;
     JSR(pushax); ++(s->stk); goto next;
 
@@ -691,12 +709,12 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
         SEC(); BCS(0); yy= mcp-1; // addr of rel Bxx to endIF
       }
 
-      printf("\n======> THEN.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
+      DASM(printf("\n======> THEN.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax));
 
       *xx= mcp-xx-1; // patch IF to jump yy ELSE
 
       genasm(&els);
-      printf("\n======> ELSE.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax);
+      DASM(printf("\n======> ELSE.stk: T %d ax=%c / E %d ax=%c\n", thn.stk, thn.ax, els.stk, els.ax));
 
       // '}'
       assert(*la=='}');
@@ -772,7 +790,7 @@ printf("\n\t----- PUSHED initial AX to %c------\n", lastarg); \
     if (*la>='a' && *la<='h') {
       char i= 2*(lastvar-*la+s->stk-1)+1;
       if (s->ax==*la) goto next; // ax IS *la 'a' !
-      printf("\n\t===== VAR ax '%c' => '%c'\n", s->ax, *la);
+      DASM(printf("\n\t===== VAR ax '%c' => '%c'\n", s->ax, *la));
       assert(*la <= lastvar);
       s->ax= *la;
       if (i==1) { JSR(ldax0sp); goto next; } // TODO: add more variants?

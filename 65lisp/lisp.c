@@ -12,7 +12,7 @@
 // 65lisp   20K     24K     50.29s  1x
 // 65vm     26K     17K     17.06s  2.95x
 // singl..   6K       ?     42.14s  1.19x
-// 65asm    35K      7K      6.93s  7.26x faster! (sz w/o DISASM)
+// 65asm    30K     14K      5.74s  8.76x faster! (sz w/o DISASM)
 
 
 // 65LISP02 - an lisp interpeter for 6502 (oric)
@@ -1813,7 +1813,11 @@ L evalTrace(L x, L env) {
 #ifndef AL
   #define STACKSIZE 1
 #else
-  #define STACKSIZE 255
+  #ifndef ASM
+    #define STACKSIZE 255
+  #else
+    #define STACKSIZE 1
+  #endif
 #endif // AL
 
 // TODO: move to ZP
@@ -2012,6 +2016,7 @@ L readeval(char *ln, L env, char noprint) {
       x= lread();
     #else
       x= alcompileread();
+      NL;
       if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
     #endif // AL
 
