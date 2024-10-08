@@ -14,7 +14,7 @@ extern int nil=0, T=0;
 typedef unsigned char uchar;
 typedef unsigned int uint;
 
-// a bit for every 4 bytes (cons cells)
+// a bit for every 4 bytes (cons cells) - 2KB
 #define BITS (65536/4/8)
 
 // byte is slightly faster 36.7s for scan whole memory, 38.48 for uint
@@ -39,6 +39,11 @@ uint v;
 // - cons cells
 // - atoms as they are globals
 
+// this os kindof a misnomer,
+// it just checks and marks any 4 byte memory region if its pointed to
+
+// a real gc only follows live data!
+// there is no easy way to null out pointers when not used
 void markwholemem() {
   // we check any alignment
   i= 0xffff;
