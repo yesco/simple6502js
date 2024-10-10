@@ -84,16 +84,23 @@ char bi=0, buff[255];
 typedef unsigned char uchar;
 typedef unsigned int uint;
 
-#define ASM(x, a,b) asm6502(x, sizeof(x)-1, a,b)
+#define ASM(x, ...) addasm((x), sizeof(x)-1,__VA_ARGS__)
 
-void asm6502(char* x, uchar len, uint a, uint b) {
-  uchar c, n= 0;
+void __cdecl__ addasm(char* x, uchar len, ...) {
+  uchar c, n= 1;
+  //va_list ap;
+  //va_start(ap, fmt);
+#define ARG(n) (*((uint*)(&len-2*n)))
+  for(c=1; c<15; ++c)
+    printf("%04X\t", ARG(c));
+  putchar('\n');
+
   printf("ASM[%d]:  \"%s\"\n", len, x);
   for(bi=0 ;bi<len; ) {
     c= x[bi];
 
-    if (c=='#') { buff[bi]= *(&a+ n); ++n; }
-    else if (c=='?') { buff[bi++]= *(&a- n); buff[bi]= *(&a- n) >> 8; ++n; }
+    if (c=='#') { buff[bi]= ARG(n); ++n; }
+    else if (c=='?') { buff[bi++]= ARG(n); buff[bi]= ARG(n) >> 8; ++n; }
     else buff[bi]= c;
 
     buff[++bi]= 0; // BRK, haha
@@ -101,9 +108,17 @@ void asm6502(char* x, uchar len, uint a, uint b) {
   printf("ASM[%d]=> \"%s\"\n", len, buff);
 }
 
+// CC65 can't do this...
+#define MAKE_WORD(x,y) x,y
+#define MAKE_STR(...) ((char[]){__VA_ARGS__, 0})
+
 int main(int argc, char** argv) {
   printf("Hello " "\n\"22:\x22 \n#23:x23 \n27:\x27 \n+2B:\x2B \n/2F:\x2F \n32:\x32 \n33:\x33 \n34:\x34 \n37:\x37 \n:3a:\x3a \n;3b:\x3b \n<3c:\x3c \n?3f:\x3f World!\n");
+  ASM(TYA() TXA() LDAn(41), 0);
   ASM(TYA() TXA() LDAn(41), 65, 0);
   ASM(TYA() TXA() LDAn(41) LDA(99), 65, 256*65+66);
+  ASM(TYA() TXA() LDAn(41) LDA(99), 1,2,3,4,5,6,7,0xabcd,0xdeadbeef);
+
+  //printf("foo: %s\n", MAKE_STR(65, 66, 67, 68));
   return 0;
 }
