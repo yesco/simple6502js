@@ -15,7 +15,21 @@
 // 65vm     26K     17K     17.03s  2.95x
 // 65asm    29K     14K      5.70s  8.82x faster! (sz w/o DISASM)
 // singl..   6K       ?     42.14s  1.19x faster!
+
+// ==== fib8-test 
+// VARIANT SIZE    FREE    SECONDS
+// ------- ----    ----    -------
+// cc65 i    63B            43.31s
+// cc65 lt   54B            41.53s
+// cc65 ult  39B            29.17s (asmfib)
+// cc65 pha  39B            18.00s (pha)
 //
+// 65lisp   20K     24K       
+// 65vm     26K     17K    
+// 65asm    29K     14K     40.08s
+// singl..   6K       ?    
+
+
 // PROGSIZE
 // --------
 // emacs      -  4552 bytes TODO: rewrite inlisp! run bytecode!

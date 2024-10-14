@@ -575,7 +575,7 @@ extern char* genasm(AsmState *s) {
 
   // TailCall? JSR xxxx RTS  -> JMP xxxx
   if (mcp>mc+3 && *(mcp-1)==0x60 && *(mcp-4)==0x20) {
-    *(mcp-4)= 0x4c; *--mcp= 255;
+    *(mcp-4)= 0x4c; *--mcp= 0;
     DASM(printf("\n\n====== TAIL CALL %04X", mcp));
   }
   // TODO: jsr ldax0sp, jsr incsp2 == jmp ldax0sp !
