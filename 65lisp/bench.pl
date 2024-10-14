@@ -8,7 +8,7 @@ sub report {
         chop($res);
         $eops= $ops+$eval;
         print sprintf("%*s:%6d# %9dc %7.3fs %7do %4.0fo/s - $expr \t=> $res\n",
-          $error?13:16, $name, $times, $cycles, $secs, $ops, $secs?($eops/$secs):0);
+          $error?13:16, $name, $times, $cycles, $secs, $eops, $secs?($eops/$secs):0);
         print "\t\t  $error" if $error; 
     } else {
         print "--- $name\n";
@@ -32,6 +32,8 @@ while(<>) {
         $unix= $1;
         $times= (/-b (\d+)/)? $1: 5000;
         $name= <>;
+        while($name =~ /(^%|Warning)/i || $name =~ /^\s*$/) { $name= <>; };
+        #print "NAME=$name";
         chop($name);
     }
     # what if 2?

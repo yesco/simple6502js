@@ -1,15 +1,16 @@
+(
 # 46.62s
-./65lisp -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" 
+./65lisp -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" -s
 
 ./65lisp -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
 ./65lisp -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
-./65lisp -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65lisp -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" -s
 
 # 13.56s
-./65vm -b 1000 -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65vm -b -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
 ./65vm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
 ./65vm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
-./65vm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65vm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" -s
 
 
 # car/cdr = 6.41s
@@ -21,6 +22,6 @@
 # 13.56s
 ./65asm -t -p "* + const"     -b $* -e "(* (+ 1 2) (+ 1 1 1 1) 2)"
 ./65asm -t -p "* + var"       -b $* -e "(* (+ one two) (+ one one one one) two)"
-./65asm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))"
+./65asm -t -p "caaaddddr"     -b $* -e "(car (car (car (cdr (cdr (cdr (cdr '(1 2 3 4 ((5 6) 7) 8))))))))" -s
 
-
+) | tee bench.log | perl bench.pl

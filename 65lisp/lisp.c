@@ -2127,7 +2127,7 @@ L testing(env) {
   return env;
 }
 
-int mainmain(int argc, char** argv, void* main) {
+int main(int argc, char** argv) {
   L env= nil; char interpret= 1;
 
   if (!quiet) statistics(3);
@@ -2179,7 +2179,6 @@ int mainmain(int argc, char** argv, void* main) {
 
   NL;
 
-
   // Info
   PRINTARRAY(syms, HASH, 0, 1);
   if (stats || test) {
@@ -2189,8 +2188,4 @@ int mainmain(int argc, char** argv, void* main) {
 
   //{clock_t x= clock(); } // TODO: only on machine?
   return 0;
-}
-
-int main(int argc, char** argv) {
-  return mainmain(argc, argv, main);
 }
