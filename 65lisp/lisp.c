@@ -805,6 +805,8 @@ L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; }
 //  b) INDEX:   array of ptrs to mallocs + array of vals
 //  c) HASH:    need linked list anyway...
 
+// TODO: go towards using singlisp style atoms!
+// array then heap allocated? no hash? hmmm...
 typedef struct Atom {
   // - val first saves 40 bytes code
   // - but not faster, 0.01% slower...?
@@ -813,6 +815,8 @@ typedef struct Atom {
   struct Atom* next;
   char name[];
 } Atom;
+
+
 
 L* syms;
 
@@ -921,6 +925,12 @@ L atomstr(char* s, uchar typ, size_t len) {
 
 // TODO: measure code size overhead?L
 L atom(char* s) { return atomstr(s, HATOM, 0); }
+
+// snn= '+2plus" for functions
+L funatom(char* snn, char* code, int len) {
+  // TODO:
+  return atomstr(s, HATOM, 0);
+}
 
 // --- Strings
 
@@ -1872,63 +1882,59 @@ unsigned long bench=1;
 // TODO: point to these from arena?
 char* names[]= {
   // nargs
-  ": de",
-  ": setq", // TODO: not right for "VM"
-  "! set",
+  ":2de",
+  ":2setq", // TODO: not right for "VM"
+  "!2set",
   //"; df",
 
-  "R recurse",
-  "^ return",
+  "R-recurse",
+  "^1return",
 
-  "I if",
-  "Y read",
-  "\' quote",
-  "\\ lambda",
+  "I1if",
+  "Y1read",
+  "\'1quote",
+  "\\-lambda",
 
-  "* *",
-  "+ +",
-
-  "L list",
-  "H append",
+  "Lnlist",
+  "H2append",
   
   // one arg
-  "! atom", // "! symbolp", // or symbol? // TODO: change... lol
-  "# numberp", // "# intp"
+  "!1atom", // "! symbolp", // or symbol? // TODO: change... lol
+  "#1numberp", // "# intp"
   //"$ stringp", 
-  "A car",
-  "D cdr",
-  "K consp", // listP
-  "O length",
-  "T terpri",
-  "U null",
-  "P print", "W prin1", ". princ",
+  "A1car",
+  "D1cdr",
+  "K1consp", // listP
+  "O1length",
+  "T0terpri",
+  "U1null",
+  "P1print", "W1prin1", ".1princ",
+  "~1~", // bit neg
 
   // two args
-  "% %",
-  "& &",
-  "- -",
-  "/ /",
-  "| |",
-  "~ ~",
-  "= eq", "= =",
-  "? cmp",
-  "< <",
-  "> >",
-  "C cons",
-  "B member",
-  "G assoc",
-  "M mapcar",
-  "N nth",
+  "%2%",
+  "&2&",
+  "-2-", // vararg?
+  "+2+", // vararg?
+  "*2*", // vargarg?
+  "/2/", // vararg?
+  "|2|", // bitor vararg
+  "=2eq", "=2=",
+  "?2cmp",
+  "<2<",
+  ">2>",
+  "C2cons",
+  "B2member",
+  "G2assoc",
+  "M2mapcar",
+  "N2nth",
 
-  "R rec", // recurse on self
+  "R-rec", // recurse on self
 
-  "Y y",
-  "y yy",
-  "z z", 
-  "Z loop",
+  "Z-loop",
 
-  "i inc",
-  "j jnc",
+  "i1inc",
+  "j1jnc",
 
   NULL};
 
@@ -1976,7 +1982,7 @@ closure= atom("closure");
      IF= atom("if");
 
   // register function names
-  while(*s) { setatomval(atom(2+*s), MKNUM(**s)); ++s; }
+  while(*s) { setatomval(funatom(2+*s), MKNUM(**s)); ++s; }
 
   // direct code pointers
   // nearly 10% faster... but little dangerous

@@ -79,7 +79,7 @@ extern L runal(char* la) {
     memset(jmp, (int)&&gerr, sizeof(jmp));
     
     //jmp['R']=&&grec;
-    //jmp['L']=&&gloop;
+    //jmp['Z']=&&gloop;
 
     jmp[0]=&&g0;
     jmp['^']=&&gret;
@@ -251,7 +251,7 @@ JMPARR(grec)case'R': if (pc[1]!='^') {
 
     // Tail Recursion
     if (n>1) memmove(frame, s+1-n, n-1); // fall through
-JMPARR(gloop)case'L': pc= orig; goto call;
+JMPARR(gloop)case'Z': pc= orig; goto call;
 
   // parameter a-h (warning need others for local let vars!)
 JMPARR(gvar)case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':

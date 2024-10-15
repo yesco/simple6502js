@@ -114,9 +114,11 @@ D cons(D a, D d) { ++C; C->car= a; C->cdr= d; return (D)C; }
 #define car(c) (((Cons*)c)->car)
 #define cdr(c) (((Cons*)c)->cdr)
 
-// Atoms stored as: (D global  value, char*)
+// Atoms stored as: (D globalval, char*)
 //   (Note: nil, car(nil)= nil, cdr(nil)= nil
-//   car(atom) == global value
+//    car(atom) == global value
+
+// DO NOT ADD ANYTHING TO THIS! *A is an aligned array...
 typedef struct { D val; char* str; } Atom;  Atom *A;
 
 // linear search to find if have existing atom
