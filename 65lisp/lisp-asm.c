@@ -552,7 +552,7 @@ char lastvar, lastarg, lastop;
 
 void iax(AsmState *s, char a) {
   if (s->savelast && (a)!=lastarg) {
-    assert(s->ax==lastarg);
+    //assert(s->ax==lastarg);
     JSR(pushax); ++(s->stk);
     s->savelast= 0;
     DASM(printf("\n\t----- PUSHED initial AX to %c------\n", lastarg));
@@ -622,6 +622,7 @@ extern char* genasm(AsmState *s) {
 
   // TODO: un-duplicate with +-*/ ...
   case '[':
+    // make this mean save any value/register as it's a cache! some would write it back
     if (s->savelast) {
       if ( (la[1]==',' && axsameop(la[4])) ) DASM(printf("\n-------11111: \"%s\"\n", la));
       else if ( (isdigit(la[1]) && axsameop(la[2])) ) DASM(printf("\n-------222222\n"));
@@ -643,16 +644,24 @@ extern char* genasm(AsmState *s) {
 // TODO: this is all wrong with 'b' ???
     if (la[1]==lastarg && s->ax==lastarg) { la+= 2; goto next; } // no need do anything
 
+    // TODO: if want same, maybe need dup?
+    // TODO: distinguish between "have right value" but need to save,
+    //       or have right value, but is waste?
     DASM(printf("\n--- NEW: want '%c' ax='%c' \n", la[1], s->ax));
     //goto next;
-    JSR(pushax); ++(s->stk); goto next;
+    //assert(!s->savelast);
+    if (s->savelast) {AX('?'); s->savelast= 0;}
+    // JSR(pushax); ++(s->stk);
+
+    s->savelast= 1;
+    goto next;
 
   case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': 
     // TODO: we come, here? always [ before? no?
     // TODO: IAX; needed for emitMATH?
-    if (emitMATH(MKNUM(*la-'0'), 1, s)) goto next;
-    else AX(*la);
-    emitCONST(*la-'0', s->ax); goto next;
+    AX('?');
+    if (!emitMATH(MKNUM(*la-'0'), 1, s)) { emitCONST(MKNUM(*la-'0'), s->ax); AX(*la); }
+    goto next;
 
   case ',': ++la; IAX; if (emitMATH(*(L*)la, 2, s)) goto next;
     emitCONST(*(L*)la, s->ax); ++la; goto next;
