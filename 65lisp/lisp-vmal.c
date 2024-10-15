@@ -8,7 +8,7 @@
 
 #define NEXT goto next
 
-static L *s, *frame, *params;
+static L *s, *frame;
 
 // ./cons-test AL: 23.74s EVAL: 43.38s (/ 23.74 43.38) => 43% faster!
 //  24.47s added more oops, switch slower? now use goto jmp[] => 13s.. !!! lol
@@ -53,16 +53,23 @@ static char c, *pc;
 
 //#if 0
 
+// For each user/machine code function call we recurse
+// The function need to know how many parameters from the
+// stack it uses, and it needs to clear that up!
+
 #ifdef GENASM
 extern L runal(char* la) {
 #else
-extern L al(char* la) {
+extern L runal(char* la) {
 #endif
 
-  char n=0, *orig;
+  char n=0;
 #ifndef JMPARR
   static void* jmp[127]= {(void*)(int*)42,0};
 #endif
+
+  char* orig= la; // global 10% faster
+  pc= la;
 
 #ifndef JMPARR
   #define JMPARR(a) a:
@@ -71,11 +78,15 @@ extern L al(char* la) {
     if (verbose) printf("JMPARR inited\n");
     memset(jmp, (int)&&gerr, sizeof(jmp));
     
+    //jmp['R']=&&grec;
+    //jmp['L']=&&gloop;
+
     jmp[0]=&&g0;
+    jmp['^']=&&gret;
 
     jmp['A']=&&gA; jmp['D']=&&gD; jmp['U']=&&gU; jmp['K']=&&gK; jmp['@']=&&gat; jmp[',']=&&gcomma; jmp['C']=&&gC;
     jmp['+']=&&gadd; jmp['*']=&&gmul; jmp['-']=&&gsub;
-    jmp['/']=&&gdiv; jmp['=']=&&geq;
+    jmp['/']=&&gdiv; jmp['=']=&&geq; jmp['<']=&&glt;
     jmp['?']=&&gcmp;
     jmp['P']=&&gP;
     jmp['Y']=&&gY;
@@ -83,6 +94,8 @@ extern L al(char* la) {
     //jmp[':']=&&gsetq;
     jmp[';']=&&gsemis;
     
+    jmp['I']=&&gif; jmp['{']==&&gelse; jmp['}']==&&gendif;
+
     //printf("FISH\n");
 
     jmp['[']=&&gbl;
@@ -103,49 +116,18 @@ extern L al(char* la) {
   }
 #endif // JMPARR
 
-  top= nil; // global 10% faster!
-  orig= pc= la; // global 10% faster
-  s= stack-1; frame= s; params= s; // global yet 10% faster!!!
+  // cut from here 
 
-  // TODO: remove?
-  // pretend we have some local vars (we've no been invoked yet)
-  *++s= (L)NULL;   // top frame
-  frame= s;
-  *++s= (L)NULL;   // orig
-  *++s= (L)NULL;   // p
-  *++s= (L)NULL;   // no prev stack
-  // args for testing
-  *++s= MKNUM(11); // a
-  params= s;
-  *++s= MKNUM(22); // b
-  *++s= MKNUM(33); // c
-  *++s= MKNUM(44); // d // lol
-  *++s= MKNUM(4);  // argc // TODO: maybe useful
-
-  *++s= MKNUM(8);  // for fib
-  // can't access 4 as e? hmmm?
-
-  top= *s;
-
-  // HHMMMM>?
-  if (!pc) return ERROR;
-
-  #define PARAM_OFF 4
-
- 
  call:
-  params= frame+PARAM_OFF;
-  if (s<params) s= params; // TODO: hmmm... TODO: assert?
   --pc; // as pre-inc is faster in the loop
 
-  if (verbose>2) printf("FRAME =%04X PARAMS=%04X d=%d\n", frame, params, params-frame);
-  if (verbose>2) printf("PARAMS=%04X STACK =%04X d=%d\n", params, s, s-params);
+  if (verbose>2) printf("FRAME =%04X\n", frame);
 
  next:
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
 
-  if (verbose>1) { printf("al %c : ", pc[1]); prin1(top); NL; }
+  if (verbose>1) { printf("%02d:al %c : ", pc-orig+1, pc[1]); prin1(top); NL; }
 
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
@@ -153,9 +135,11 @@ extern L al(char* la) {
 
 #define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
 
-  NOPS(++nops;);
-  c=*++pc;
-  goto *jmp[c];
+//#undef NNEXT
+//#define NNEXT goto next
+
+  //NOPS(++nops;);c=*++pc;goto *jmp[c];
+  NNEXT;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
 
@@ -190,18 +174,19 @@ JMPARR(gZ)case 'z':
 //JMPARR(geq)case '=': if (*s--==top) goto setnil; goto settrue; // error if have else!
 //JMPARR(geq)case 7: if (*s==top) goto droptrue; else goto dropnil; goto droptrue; // error if have else!
 //JMPARR(geq)case 7: --s; if (s[1]==top) goto settrue; goto setnil; .. not too bad
+JMPARR(glt)case '<': if (*s<top) goto settrue; goto setnil;
 JMPARR(geq)case '=':
     if (*s==top)
          { --s; settrue: top= T; }
     else { --s; setnil:  top= nil; }
-    NNEXT;
+    goto next;
+    //NNEXT; // TODO: some problem?
          
 JMPARR(gnil)case '9': *++s= top; goto setnil;
-
-JMPARR(gset)case '!': setval(*s, top, nil); --s; goto next;
-
 JMPARR(gU)case 'U': if (null(top)) goto settrue; goto setnil;
 JMPARR(gK)case 'K': if (iscons(top)) goto settrue; goto setnil;
+
+JMPARR(gset)case '!': setval(*s, top, nil); --s; goto next;
 
 JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
 
@@ -234,82 +219,43 @@ JMPARR(gcmp)
 JMPARR(gP)case 'P': print(top); goto next;
 JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 
-  // calling user compiled AL or normal lisp
-
-#ifdef CALLONE // a b c ,FF@X
-  // stack layout at call (top separate)
-  
-  //stack  : ... <new a> <new b> <new c> (@new frame) <old frame> <old orig> <old p> ... | call in top
-  //return : ... <new a> <new b> <new c> <old frame> <old orig> <old p> ... | ret in top
-
-  case'\\': n=0; frame=s; while(*pc=='\\'){pc++;n++;frame--;} goto next; // lambda \\\ = \abc (TODO)
-  case 'R': ax= '?'; memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig+n; goto call;
-  case 'X': // "apply" TODO: if X^ make tail-call
-    // late binding: (fac 42) == 42  \ a3<I{a^}{a a1- ,FF@X *^}^
-    // or fixed:                     \ a3<I{a^}{a a1= ,PPX  *^}^
-    *++s=(L)frame; *++s=(L)orig; *++s=(L)pc; *++s=(L)n; // PARAM_OFF
-    frame= s; pc= orig= ATOMSTR(top); n= 0; goto call;
-  case '^': ax= '?'; n=(L)*s--; pc=(char*)*s--; orig=(char*)*s--; frame=(L*)*s--; s=frame+PARAM_OFF; NNEXT;
-    // top contains result! no need copy
-  // parameter a-h (warning need others for local let vars!)
-  case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= frame[*pc-('a'-PARAM_OFF)]; goto next;
-
-#endif // CALLONE
-
-#define CALLTWO
-#ifdef CALLTWO 
-  // stack layout at call (top separate)
-
-  // require extra variable: keep track of current params
-  // late binding: (fac 42) == 42  \ a3<I{a}{ a ( a1- ,FF ) *}^
-  
-  // stack  : @frame= <prev frame> <prev orig> <prev p> <prev n> a b c ...
-  //          @(=     <old frame>  <old orig>  <old p>  <n>      <new a> <new b> <new c> ...
-  //          @)=     | call in top
-  // return :  
-
-  case'\\': n=0; while(*++pc=='\\')++n; --pc; goto next; // lambda \\\ = \abc (TODO)
-  case 'R': memmove(frame+PARAM_OFF, s-n+1, n-1); pc= orig; goto call; // TOOD: pc= orig+n ???
-  case '(': { L* newframe= frame;
-      *++s=(L)frame;
-      *++s=(L)orig;
-      *++s=(L)pc;
-      //*++s=(L)n; // TODO: save s ???
-      *++s=(L)n; // save stack pointer
-
-      frame= newframe; goto next; } // TODO: NNEXT dumps core?
-
-
-  case ')': // "apply" TODO: if X^ make tail-call, top == address
-    pc= orig= ATOMSTR(top); goto call;
-
-  case '^':
-    params= (L*)(frame[0]); // tmp
-    orig=(char*)(frame[1]);
-    pc=(char*)(frame[2]);
-    //n=(int)(frame[3]); // TODO: n is not needed!
-    s=(L*)(frame[3]); // restore stack
-
-    frame= params; goto call; // lol, return is call
-    // top contains result! no need copy
-
-  // parameter a-h
-JMPARR(gvar)
-  case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= params[*pc-'a']; goto next;
-
-#endif // CALLTWO
+// TODO: replace by jmps? This doesn't nest, lol
+JMPARR(gif)   case 'I': if (null(top)) while(*pc!='{') ++pc;  goto next;
+JMPARR(gelse) case '{': while(*pc!='}') ++pc; goto next;
+JMPARR(gendif)case '}': goto next;
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
-JMPARR(gdigit)
-  case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8'://case'9':
+JMPARR(gdigit)case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8'://case'9':
     *++s= top; top= MKNUM(*pc-'0'); goto next;
 
-JMPARR(g0)
-  case 0:
+// TODO: does this stay the same?
+JMPARR(gret)case'^': return top;
+JMPARR(g0)case 0:
     if (verbose) { printf("\n\nRETURN="); prin1(top); NL; }
     return top; // all functions should end with ^ ?
+
+
+// --- Recursion, TailCall, Iterate, Function Call
+JMPARR(grec)case'R': if (pc[1]!='^') {
+      // Self recursion
+      // (parameters already on stack)
+      { L *saveframe= frame, *savestk= s; char* savepc= pc;
+        frame= s-n+1;
+
+        runal(orig); // TODO: pass in the BINOBJECT!
+
+        frame= saveframe; s= savestk-n+1; pc= savepc;
+      }
+      goto next;
+    }
+
+    // Tail Recursion
+    if (n>1) memmove(frame, s+1-n, n-1); // fall through
+JMPARR(gloop)case'L': pc= orig; goto call;
+
+  // parameter a-h (warning need others for local let vars!)
+JMPARR(gvar)case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
+    *s++= top; top= frame[*pc-'a']; goto next;
 
 // 26.82s
 //  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
@@ -320,9 +266,30 @@ JMPARR(g0)
 JMPARR(gerr)default:
     printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
   }
+
+}
+
+L al(char* la) {
+  top= nil;
+  s= stack-1;
+  frame= s;
+
+  // TODO: remove?
+  // pretend we have some local vars (we've no been invoked yet)
+  frame= s;
+  top= MKNUM(8); // a (last parameter)
+
+  top= *s;
+
+  // HHMMMM>?
+  if (!pc) return ERROR;
+
+  return runal(la);
 }
 
 #endif // GENASM
+
+
 
 // using generic fixed buffer of fixed size and char index
 // generates 8 bytes instead of ... ... Saved 194 bytes
