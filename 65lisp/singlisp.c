@@ -268,12 +268,14 @@ D apply(D f, D x, D env) {
 }
 
 // tap 6681 bytes -> 6648 bytes lol intead of array of strings
-#define NAMES "\\ lambda\0' quote\0A car\0D cdr\0C cons\0+ +\0- -\0* *\0/ /\0U null\0K consp\0# number\0! atom\0= req\0: set\0P print\0. princ\0W prin1\0\0"
+// TOOD: leading \0 to be used to indicate type of storage for name/atom/machinecode! see atom.c
+#define NAMES "\0\\-lambda\0'1quote\0A1car\0D1cdr\0C2cons\0+2+\0-2-\0*2*\0/2/\0U1null\0K1consp\0#1number\0!1atom\0=2eq\0:2set\0P1print\0.1princ\0W1prin1\0\0"
 
 int main(int argc, char** argv) {
   char *np= NAMES;
   long m= 5000, i;
   D x, r;
+
   //m= 4921;// 4921 x cons = crash!
   m= 1000;
   m= 6000; // plus, no longer create long conses...
@@ -284,11 +286,13 @@ int main(int argc, char** argv) {
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
+  // allocate memory, init special atoms
   C= ((Cons*)callaign(MAXCONS, 3))-1;
   nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
   A= 1+(Atom*)nil; T= atom("T"); car(T)= T; QUOTE= atom("quote"); LAMBDA= atom("lambda");
 
-  while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
+  // register primitives
+  ++np; while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
 
   // read-eval loop
   while(!feof(stdin)) { printf("65> "); x= lread(); terpri();
