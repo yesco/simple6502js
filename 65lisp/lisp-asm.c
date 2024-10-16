@@ -332,32 +332,30 @@ void* mulARR[]= {(void*)0xffff, (void*)0xffff, aslax1, mulax3, aslax2, mulax5, m
 uchar emitMUL(L w, uchar shifts) {
   w= NUM(w);
 
-  if (shifts==4) JSR(aslax4);
-  //  else if (shifts==7) JSR(aslax7);
-  // TODO: not using 2,4,8 as mulArray is later...
+  if (w>1 && w<=10) JSR(mulARR[w]);
+  //  else if (shifts==4) JSR(aslax4); // 1111: 28765 bytes, remove 1111: 28586 == (- 28765 28586) == 179B!
+  //else if (shifts==7) JSR(aslax7); // doesn't exist?
   else if (shifts>0) { LDYn(shifts); JSR(aslaxy); }
-  else if (w==1) ; // nothing!
-  else if (w==0) { LDAn(0); LDXn(0); } // TODO: replace prev ',' or digit...
-  else if (w==-1) JSR(negax);
-// TODO: this doesn't work... as we've shifted w!!!
-  else if (w> 0 && w<=10) JSR(mulARR[w]);
+  //  else if (w==1) ; // nothing! // 1111
+  // else if (w==0) { LDAn(0); LDXn(0); } // TODO: replace prev ',' or digit... // 1111
+  // else if (w==-1) JSR(negax); // 1111
+  // TODO: stk cannot be accessed
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosmula0); }
-  else return 0;
-  // TODO: make it return to compile "normal"
-  //else JSR(tosmulax); // TODO: need push value
+  else return 0; // failed: use the generic
+
   return 1;
 }
 
 // TODO: how many bytes? It's quite a lot of code - is it worth it?
 uchar emitDIV(L w, uchar shifts) {
   w= NUM(w);
-  if (shifts==4) JSR(asrax4);
-  //else if (shifts==7) JSR(asrax7);
-  else if (shifts>0) { LDYn(shifts); JSR(asraxy); }
-  else if (w==1) ; // nothing!
-// TODO: this doesn't work... as we've shifted w!!!
+  // if (shifts==4) JSR(asrax4); // 1111
+  //else if (shifts==7) JSR(asrax7); // doesn't exist?
+  //else
+  if (shifts>0) { LDYn(shifts); JSR(asraxy); }
+  // else if (w==1) ; // nothing! // 1111
   else if (w==0) { LDAn(0xff); LDXn(0x7f); } // TODO: overflow... // TODO: replace prev ',' or digit...
-  else if (w==-1) JSR(negax);
+  // else if (w==-1) JSR(negax); // 1111
   //else if (!(w >> 8)) { JSR(pushax); ++stk; LDAn((char)w); JSR(tosdiva0); }
   else return 0;
   // TODO: make it return to compile "normal"
@@ -368,14 +366,8 @@ uchar emitDIV(L w, uchar shifts) {
 // ==0 -> 7B, otherwise 8B
 // cc65: ==0 -> 9B  ==1 -> 11B
 uchar emitEQ(L w) {
-  if (w==0) { // 7B !!!
-    TAY();   BNE(+2);
-    CPXn(0); BNE(0);
-    return 1;
-  }
-
-  CMPn(w & 0xff);       BNE(+2);
-  CPXn(((uint)w) >> 8); BNE(0);
+  if(w) CMPn(w&0xff); else TAY();   BNE(+2);
+        CPXn(((uint)w) >> 8);       BNE(0);
   return 1;
 }
 
@@ -401,10 +393,10 @@ uchar emitSLT(L w) {
 // 14B 20c 
 // TODO: merge w ULT? use if...
 uchar emitXLT(L w) {
-  TAY(); CMPn(w & 0xff);
-  TXA(); SBCn(((uint)w) >> 8);
+  TAY();   CMPn(w & 0xff);
+  TXA();   SBCn(((uint)w) >> 8);
   BVS(+2); EORn(0x80); ASL(); // unsigned fix...
-  TYA(); BCS(0); // restore A
+  TYA();   BCS(0); // restore A
   return 1;
 }
 
@@ -482,7 +474,7 @@ uchar emitMATH(L w, uchar d, AsmState *s) {
 
   // -- ok, we did it!
 
-  // <=>! code gen is optimized for IF !
+  // Make "boolean" (<=>! code gen is optimized for IF !)
   if (strchr("<=>~", la[d]) && la[d+1]!='I') {
     // convert to T/NIL
     mcp-= 2; // remove test
@@ -545,7 +537,7 @@ char lastvar, lastarg, lastop;
 // 0   @AD.WPx : I {}
 
 // - These sets AX overwriting previous, thus are prefixed w [
-//   This allows preceeding ] to null out [!
+//   This allows a preceeding ] to null out [!
 // 0   AD.WPx , 012345678 9 ;
 
 // 93.24s ./run | 6.69 "c3a4d,"  (/ 98.24 6.69) = 14.7x 
@@ -677,7 +669,7 @@ extern char* genasm(AsmState *s) {
   // not correct ...
   case '=': IAX; JSR(toseqax); CMPn(0); --(s->stk); goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
 
- //case '<': IAX; JSR(toseqax); CMPn(0); --(s->stk); goto next;
+ //case '<': IAX; JSR(tosltax); CMPn(0); --(s->stk); goto next;
 
   case 'C': IAX; JSR(cons); --(s->stk); goto next; // WORKS!
 
