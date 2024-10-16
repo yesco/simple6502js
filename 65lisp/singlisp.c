@@ -79,11 +79,13 @@
 // it's implicitly optional, only enabled with -DPROGSIZE
 #include "progsize.c" // "first"
 
+//#define ETRACE
+
 #ifndef ETRACE
   #define ETRACE(a) 
 #else
   #undef ETRACE
-  #define ETRACE(a) do { a } while(0)
+  #define ETRACE(a) do { a; } while(0)
 #endif
 
 // ---------------- CONFIG
@@ -202,29 +204,44 @@ D eval(D x, D env) {
   if (x==nil || isnum(x)) return x;
   if (isatom(x)) { env= assoc(x, env); return env==nil? car(x): cdr(env); }// var
   // TODO: set?
-  //if (car(x)==LAMBDA) return cons(car(car(x)), cdr(x));
   //if (car(x)==LAMBDA) return cons( cons(car(car(x)), cdr(x)), env );
+  //return car(x)==QUOTE? car(cdr(x)): apply(eval(car(x), env), cdr(x), env);
+  if (car(x)==LAMBDA) return x;
   return car(x)==QUOTE? car(cdr(x)): apply(car(x), cdr(x), env);
 }
 
 D apply(D f, D x, D env) {
-  char nf;
+  char nf= 0;
   D a, b;
 
  applyagain:
-  ETRACE(printf("APPLY: '%c'(%d): ", num(car(f)), num(car(f))); princ(f); printf(" ARGS= "); princ(x); printf(" ENV= "); princ(env); terpri());
-  if (!isnum(f) && car(f)==LAMBDA) {
-    // TODO: progn
-    //return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
-    D e= bindeval(car(cdr(f)), x, env);
-    //printf("LAMBDA: "); princ(f); printf("\nENV= "); princ(e); terpri();
-    return eval( car(cdr(cdr(f))), e);
-  }
-  nf= num(car(f));
-  if (!nf) { f= eval(car(f), env); goto applyagain; }
-  
-  // lambda, eval all args
+  ETRACE(printf("APPLY: "); princ(f); printf("\t ('%c' %d)\tARGS= ", num(car(f)), num(car(f))); princ(x); printf("   ENV= "); princ(env); terpri());
 
+  if (!isnum(f)) {
+    if (f==nil) goto error;
+    if (isatom(f)) { f= car(f); goto applyagain; }
+
+    // LAMBDA
+    if (car(f)==LAMBDA) {
+      // TODO: progn
+      //return eval( car(cdr(cdr(f))), bindeval(car(cdr(f)), x, env));
+      D e= bindeval(car(cdr(f)), x, env), r= nil;
+      ETRACE(printf("LAMBDA: "); princ(f); printf("\nENV= "); princ(e); terpri());
+      x= cdr(cdr(f)); // body
+      while(iscons(x)) {
+        r= eval(car(x), e); // TODO: tail opt?
+        x= cdr(x);
+      }
+      return r;
+    }
+
+    // wtf now?
+    assert(!"Shouldn't happen?");
+  }
+  
+  nf= num(f);
+  ETRACE(printf("NF='%c' %d\n", nf, nf));
+  
   // ONE arg
   a= eval(car(x), env);
   //printf("A= "); princ(a); terpri();
@@ -240,6 +257,8 @@ D apply(D f, D x, D env) {
   case 'P': terpri(); // fallthrough
   case '.': return princ(a);
   case 'T': return terpri(), nil; // zero arg
+
+  case 'I': return a==nil? eval(car(cdr(cdr(x))), env): eval(car(cdr(x)), env); // if
   }
 
   // TWO args
@@ -250,12 +269,11 @@ D apply(D f, D x, D env) {
   case ':': return car(a)= b; // global set
   case 'C': return cons(a, b);
   case '=': return a==b? T: nil;
+  case '<': return a<b? T: nil;
   case '+': return a+b;
+  case '-': return a-b;
   case '*': return a/2*b;
-
-  // N args - lambda
-  // see above
-  //  case'\\': return eval( car(cdr(cdr(f))), bind(car(cdr(f)), x, env));
+  case '/': return a/b*2;
   }
 
   // not primitive, what could it be?
@@ -263,13 +281,15 @@ D apply(D f, D x, D env) {
   //if (iscons(f)) { f= eval(f, env); goto applyagain; }
 
   // ERROR
-  printf("\n%% No such function: "); princ(f); putchar(' '); princ(x); terpri(); terpri();
+ error:
+  printf("\n%% No such function: "); princ(f); printf("    ARGS: "); princ(x); terpri(); terpri();
   exit(1);
 }
 
 // tap 6681 bytes -> 6648 bytes lol intead of array of strings
 // TOOD: leading \0 to be used to indicate type of storage for name/atom/machinecode! see atom.c
-#define NAMES "\0\\-lambda\0'1quote\0A1car\0D1cdr\0C2cons\0+2+\0-2-\0*2*\0/2/\0U1null\0K1consp\0#1number\0!1atom\0=2eq\0:2set\0P1print\0.1princ\0W1prin1\0\0"
+//#define NAMES "\0\0\\lambda\0'1quote\0A1car\0D1cdr\0C2cons\0+2+\0-2-\0*2*\0/2/\0U1null\0K1consp\0#1number\0!1atom\0=2eq\0<2<\0:2set\0P1print\0.1princ\0W1prin1\0I-if\0\0"
+#define NAMES "\0'1quote\0A1car\0D1cdr\0C2cons\0+2+\0-2-\0*2*\0/2/\0U1null\0K1consp\0#1number\0!1atom\0=2eq\0<2<\0:2set\0P1print\0.1princ\0W1prin1\0I-if\0\0"
 
 int main(int argc, char** argv) {
   char *np= NAMES;
@@ -281,8 +301,8 @@ int main(int argc, char** argv) {
   m= 6000; // plus, no longer create long conses...
   m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s, but it no closures...
   //m= 3000;
-  m= 1;
   m= 5000; // standard test
+  m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
