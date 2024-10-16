@@ -97,7 +97,7 @@ typedef unsigned int D;  D nil, LAMBDA, QUOTE, T;
 
 D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
 
-typedef struct { D car, cdr; } Cons;  Cons *C;
+typedef struct { D car, cdr; } Cons;  Cons *C, *CS, *CE;
 
 // return N multiple of 4 bytes, aligned bits (bPPP..PPP01) if bits==01
 void* callaign(size_t n, char bits) { char* p= calloc(n+1, sizeof(Cons)); 
@@ -112,7 +112,7 @@ void* callaign(size_t n, char bits) { char* p= calloc(n+1, sizeof(Cons));
 #define iscons(n) (((n)&3)==3) // ppp11
 
 // TODO: assert test out of cons
-D cons(D a, D d) { ++C; C->car= a; C->cdr= d; return (D)C; }
+D cons(D a, D d) { ++C; assert(C<CE); C->car= a; C->cdr= d; return (D)C; }
 #define car(c) (((Cons*)c)->car)
 #define cdr(c) (((Cons*)c)->cdr)
 
@@ -302,12 +302,13 @@ int main(int argc, char** argv) {
   m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s, but it no closures...
   //m= 3000;
   m= 5000; // standard test
+  m= 100;
   m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
   // allocate memory, init special atoms
-  C= ((Cons*)callaign(MAXCONS, 3))-1;
+  CS= C= ((Cons*)callaign(MAXCONS, 3))-1; CE= CS+MAXCONS;
   nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
   A= 1+(Atom*)nil; T= atom("T"); car(T)= T; QUOTE= atom("quote"); LAMBDA= atom("lambda");
 
