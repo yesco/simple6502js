@@ -1,0 +1,5 @@
+./65lisp -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
+./65vm   -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
+./65asm  -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
+(echo "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" ; "(fib 8)") | ./r singlisp
+
