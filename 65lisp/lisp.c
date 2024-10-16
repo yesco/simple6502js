@@ -929,7 +929,7 @@ L atom(char* s) { return atomstr(s, HATOM, 0); }
 // snn= '+2plus" for functions
 L funatom(char* snn, char* code, int len) {
   // TODO:
-  return atomstr(s, HATOM, 0);
+  return atomstr(snn, HATOM, 0);
 }
 
 // --- Strings
@@ -1982,7 +1982,8 @@ closure= atom("closure");
      IF= atom("if");
 
   // register function names
-  while(*s) { setatomval(funatom(2+*s), MKNUM(**s)); ++s; }
+  // TODO: funatom()
+  while(*s) { setatomval(atom(2+*s), MKNUM(**s)); ++s; }
 
   // direct code pointers
   // nearly 10% faster... but little dangerous
