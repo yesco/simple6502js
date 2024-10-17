@@ -662,7 +662,7 @@ extern char* genasm(AsmState *s) {
   // TODO: optimize for MATH?    
   case ';': ++la; IAX; LDA((void*)(*(L*)la)); LDX((void*)((*(L*)la)+1)); ++la; goto next; // 9 bytes = read var
 
-  case '9': AX('9'); JMP(retnil); goto next;
+  case '9': AX('9'); JSR(retnil); goto next;
  
   // -- All these routine (may) change the stack
   //  case '=': IAX; JSR(toseqax); --stk; goto next; // TODO: V cmp I => ... TODO: toseqax => 1 or 0, not T or nil...
