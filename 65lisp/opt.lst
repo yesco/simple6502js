@@ -53,7 +53,7 @@
 ^%d^ ldyn [stk*2]  jmp addysp
 
 0^ ldan 0  tay
-T^ jsr retnil ; TODO: not 'T' hmmm...
+T^ jsr rettrue ; TODO: not 'T' hmmm...
 9^ jmp retnil
 9 jsr retnil
 
@@ -78,7 +78,7 @@ R jsr 0000
 Z [adjust stack] jmp 0000
 
 :%2d sta [%d]  stx [%d+1]
-;%2d lda [%d0xff]  ldx [%d>>8]
+;%2d lda [%d]  ldx [%d+1]
 
 ][
 ] jsr popax

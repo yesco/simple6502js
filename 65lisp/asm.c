@@ -1,67 +1,23 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 //#include <conio.h>
 
 #include <assert.h>
 
+#define PROGSIZE
 #include "progsize.c"
 
+#include <stdint.h> // cc65 uses 29K extra memory???
 
-extern void tosaddax();
-extern void tossubax();
-extern void tosmulax();
-extern void tosdivax();
+typedef int16_t L;
+typedef uint16_t uint;
+typedef unsigned uchar;
 
-extern void tosadda0();
-extern void tossuba0();
-extern void tosmula0();
-extern void tosdiva0();
-
-
-extern void mulax3();
-extern void mulax5();
-extern void mulax6();
-extern void mulax7();
-extern void mulax9();
-extern void mulax10();
-extern void mulaxy();
-
-extern void asrax1();
-extern void asrax2();
-extern void asrax3();
-extern void asrax4();
-//extern void asrax7();
-
-extern void asraxy();
-
-
-extern void aslax1();
-extern void aslax2();
-extern void aslax3();
-extern void aslax4();
-//extern void aslax7();
-
-extern void aslaxy();
-
-
-extern void shrax1();
-extern void shrax2();
-extern void shrax3();
-extern void shrax4();
-//extern void shrax7();
-
-extern void shraxy();
-
-
-extern void shlax1();
-extern void shlax2();
-extern void shlax3();
-extern void shlax4();
-//extern void shlax7();
-
-extern void shlaxy();
+#include "extern-vm.c"
 
 extern unsigned int T=42;
 extern unsigned int nil=0;
@@ -144,9 +100,6 @@ extern unsigned int nil=0;
 
 unsigned char bi=0, bz=0, buff[255];
 
-typedef unsigned char uchar;
-typedef unsigned int uint;
-
 #define ASM(x, ...) addasm((x), sizeof(x)-1,__VA_ARGS__)
 
 // poor mans argv, LOL
@@ -179,6 +132,7 @@ void __cdecl__ addasm(char* x, uchar len, ...) {
 char mc[120]= {0};
 char* mcp= mc;
 
+/*
 
 #define DASM(x)
 
@@ -190,106 +144,166 @@ void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
 #define O3(op, w) do { O(op);W(w); } while(0)
 #define N3(opn, op, w) do { O(op);W(w); DASM(printf("\t\t%-4s %s", opn, #w)); } while(0) 
 #define N2(opn, op, b) do { O(op);B(b); DASM(printf("\t\t%-4s %02x", opn, b)); } while(0) 
+*/
 
-  #define LDAn(n) N2("LDAn",0xA9,n)
-  #define LDXn(n) N2("LDXn",0xA2,n)
-  #define LDYn(n) N2("LDYn",0xA0,n)
+// cc65 can't do this:
+//#define MAKE_WORD(x,y) x,y
+//#define MAKE_STR(...) ((char[]){__VA_ARGS__, 0})
 
+#define U (void*)
 
-  #define LDA(w)  O3(0xAD,w)
-  #define LDX(w)  O3(0xAE,w)
-  #define LDY(w)  O3(0xAC,w)
+// TODO: we don't need end 0 on each line
+#define REND 0, // cost 100 bytes, only for consistency
+//#define REND
 
-  #define STA(w)  O3(0x8D,w)
-  #define STX(w)  O3(0x8E,w)
-  #define STY(w)  O3(0x8C,w)
+#define RULES
+#define MATCHER
 
-
-  #define ANDn(b) O2(0x29,b)
-  #define ORAn(b) O2(0x09,b)
-  #define EORn(b) O2(0x49,b)
-
-  #define ASL()   O(0x0A)
-  #define CMPn(b) N2("CMPn",0xC9,b)
-  #define CPXn(b) N2("CPXn",0xE0,b)
-  #define CPYn(b) N2("CPYn",0xC0,b)
-
-  #define SBCn(b) N2("SBC",0xE9, b)
-
-  #define PHP()   O(0x08)
-  #define CLC()   O(0x18)
-  #define PLP()   O(0x28)
-  #define SEC()   O(0x38)
-
-  #define PHA()   O(0x48)
-  #define CLI()   O(0x58)
-  #define PLA()   O(0x68)
-  #define SEI()   O(0x78)
-
-  #define DEY()   O(0x88)
-  #define TYA()   O(0x98)
-  #define TAY()   O(0xA8)
-  #define CLV()   O(0xB8)
-
-  #define INY()   O(0xC8)
-  #define CLD()   O(0xD8)
-  #define INX()   O(0xE8)
-  #define SED()   O(0xF8)
-
-  #define TXA()   O(0x8A)
-  #define TAX()   O(0xAA)
-
-  #define BMI(b)  O2(0x30, b)
-  #define BPL(b)  O2(0x10, b)
-
-  #define BNE(b)  O2(0xD0,b)
-  #define BEQ(b)  O2(0xF0,b)
-
-  #define BCC(b)  O2(0x90,b)
-  #define BCS(b)  O2(0xB0,b)
-
-  #define BVC(b)  O2(0x50,b)
-  #define BVS(b)  O2(0x70,b)
-
-
-  #define JSR(a)  N3("JSR",0x20,a)
-  #define RTS(a)  O(0x60)
-
-  #define JMP(a)  N3("JMP", 0x4c,a)
-  #define JMPi(a) N3("JPI", 0x6c,a)
-
-  #define BRK(a)  O(0x00)
-
-
-
-
-
-
-// CC65 can't do this...
-#define MAKE_WORD(x,y) x,y
-#define MAKE_STR(...) ((char[]){__VA_ARGS__, 0})
-
-typedef void* U;
-
-#define X(a) (void*)(int*)a
-
-char* xx[]= {"foo", (U)42, (U)printf, 0};
+#ifdef RULES
 
 char* rules[]= {
-  "0+", "", 0, 0,
-  "+", mJSR("??"), (U)3, (U)tosaddax, 0,
-  "-", mJSR("??"), (U)3, (U)tossubax, 0,
-  "*", mJSR("??") mJSR("??") mANDn("#"), (U)8, (U)asrax1, (U)tosmulax, (U)0xfe, 0,
-  "*", mJSR("??") mJSR("??") mANDn("\xfe"), (U)8, (U)asrax1, (U)tosmulax, 0,
+  "[0+", "", 0, 0,
+  "[1+", mJSR("??"), U 3, U incax2, REND
+  "[2+", mJSR("??"), U 3, U incax4, REND
+  "[3+", mJSR("??"), U 3, U incax6, REND
+  "[4+", mJSR("??"), U 3, U incax8, REND
+  // TODO: only <255
+  //"[%b+", mLDYn("#") mJSR("??"), U 5, U incaxy, 0,
+
+  "+", mJSR("??"), U 3, U tosaddax, REND
+
+
+  "[0-", "", 0, REND
+  "[1-", mJSR("??"), U 3, U decax2, REND
+  "[2-", mJSR("??"), U 3, U decax4, REND
+  "[3-", mJSR("??"), U 3, U decax6, REND
+  "[4-", mJSR("??"), U 3, U decax8, REND
+  // TODO: only <255
+  //"[%b-", mLDYn("#") mJSR("??"), U 5, U decaxy, REND
+
+  "-", mJSR("??"), U 3, U tossubax, REND
+
+
+  "[0*", mLDAn("\0") mTAX(), U 3, REND
+  "[1*", "", 0, 0,
+  "[2*", mJSR("??"), U 3, U aslax1, REND
+  "[3*", mJSR("??"), U 3, U mulax3, REND
+  "[4*", mJSR("??"), U 3, U aslax2, REND
+  "[5*", mJSR("??"), U 3, U mulax5, REND
+  "[6*", mJSR("??"), U 3, U mulax6, REND
+  "[7*", mJSR("??"), U 3, U mulax7, REND
+  "[8*", mJSR("??"), U 3, U aslax3, REND
+  // TODO: how to match? \0 lol Z match \0?
+  "[,Z\x09*", mJSR("??"), U 3, U mulax9, REND
+  // TODO: how to match?
+  "[,Z\x0a*", mJSR("??"), U 3, U mulax10, REND
+  // TODO: only <255
+  //"[%b*", mLDA("#") mJSR("??"), U 5, U tosmula0, REND
+
+  "*", mJSR("??") mJSR("??") mANDn("\xfe"), U 8, U asrax1, U tosmulax, REND
+
+
+  "[2/", mJSR("??"), U 3, U asrax1, REND
+  "[4/", mJSR("??"), U 3, U asrax2, REND
+  "[8/", mJSR("??"), U 3, U asrax3, REND
+
+  "[,Z\x10/", mJSR("??"), U 3, U asrax4, REND
+  //",Z\x80/", mJSR("??"), U 3, U asrax7, REND  // doesn't exist?
+  // TODO: only <255
+  //"%b/", mLDAn("#") mJSR("??"), U 5, U pushax, U tosdiva0, REND
+
+  "/", mJSR("??") mJSR("??") mANDn("\xfe"), U 8, U tosdivax, U aslax1, REND
+
+
+  "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
+  "[%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
+
+  "=", mJSR("??"), U 3, U toseqax, REND
+
+  // Unsigned Int
+  "[%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
+
+  "<", mJSR("??"), U 3, U toseqax, REND
+  // TODO: signed int - maybe use "function argument"
+  //"%d<", mTAY() mEORn("\x80") mCMPn("_") mTXA() mEORn("\x80") mSBCn("\"") mBCS("\0") mTYA() mBCS("\0"), U 12, REND
+
+  "A", mJSR("??"), U 3, U ffcar, REND
+  "D", mJSR("??"), U 3, U ffcdr, REND
+//"C", mJSR("??"), U 3, U cons, REND
+
+  "!", mJSR("??"), U 3, U staxspidx, REND
+  "@", mJSR("??"), U 3, U ldaxi, REND
+//".", mJSR("??"), U 3, U princ, REND
+//"W", mJSR("??"), U 3, U prin1, REND
+//"P", mJSR("??"), U 3, U print, REND
+//"P", mJSR("??"), U 3, U print, REND
+
+  // TODO: more than 4 ...
+  //"^^^^^^",  TODO: ERROR!
+  "^^^^^", mJMP("??"), U 3, U incsp8, REND
+  "^^^^",  mJMP("??"), U 3, U incsp6, REND
+  "^^^",   mJMP("??"), U 3, U incsp4, REND
+  "^^",    mJMP("??"), U 3, U incsp2, REND
+  "^",     mRTS(), U 1, 0,
+
+  ",", mLDAn("#") mLDXn("#"), U 4, REND
+  ":", mSTA("ww") mSTX("w+"), U 6, REND
+  ";", mLDA("ww") mLDX("w+"), U 6, REND
+
+  "][", 0, U 0, REND
+  "]", mJSR("??"), U 3, U popax, REND
+
+  // TODO: [%d +-*/
+  "[", mJSR("??"), U 3, U pushax, REND
+
+  "0", mLDAn("\0") mTAY(), U 3, REND
+  "9^", mJMP("??"), U 3, U retnil, REND // redundant? auto opt...
+  "9",  mJSR("??"), U 3, U retnil, REND
+  "%d", mLDAn("_") mLDXn("\""), U 4, REND
+
+  "END", 0, 0, REND
   0};
+#endif // RULES
 
 // No OP:
-//   ^B^C^D ^G ^K^L ^O   ^R^S^T ^W ^Z^[^\ ^_   ""
+//   ^B^C^D ^G ^K^L ^O   ^R^S^T ^W ^Z^[^\ ^_   
 //  "# ' + / : ; < ?     234 7 : Z[\ _  rst w z{| 
-// #   = inline byte    '  = hi byte
-// ??  = inline word    
-int main(int argc, char** argv) {
-  printf("Hello " "\n\"22:\x22 \n#23:x23 \n27:\x27 \n+2B:\x2B \n/2F:\x2F \n32:\x32 \n33:\x33 \n34:\x34 \n37:\x37 \n:3a:\x3a \n;3b:\x3b \n<3c:\x3c \n?3f:\x3f World!\n");
+// #   = inline (lo) byte from code 
+// ??  = inline word from param
+// ww  = word from code
+// w+  = same word from code + 1
+// _   = %d match (limit to 255?) (== lo byte)
+// "   = hi byte from %d
+// '   = 0x80 for signed... hmmm... _'  hmmmm: TODO: EOR last byte gen!
+
+#ifdef MATCHER
+uint  ww;  // _ ww
+uchar whi; // " // TODO: redundant? we have ww?
+char  charmatch; 
+
+char matching(char* bc, char* r) {
+  charmatch= ww= whi= 0;
+  while(*r) {
+    if (*r=='Z') { if (*bc) break; } // match \0
+    // TODO: %b match only 0 <= x <= 255
+    else if (*r=='%' && r[1]=='d') {
+      ++r;
+      if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
+      else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
+      else return 0;
+    } else if (*bc != *r) return 0;
+    ++charmatch;
+    ++bc; ++r;
+  }
+  // got to end of rule == match!
+  return !*r;
+}
+#endif // MATCHER
+
+//int main(int argc, char** argv) {
+int main(void) {
+
+/*
   bz=0; ASM(mTYA() mTXA() mLDAn("#"), 0);
   bz=0; ASM(mTYA() mTXA() mLDAn("#"), 65, 0);
   bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66);
@@ -323,32 +337,73 @@ int main(int argc, char** argv) {
 
 //  printf("%s", HEX(printf) "\n");
 
+*/
+
+  #ifdef MATCHER // (- 6292 4965) == 1327 BYTES optimizer code!!!
+  // (- 4863 4214) === 649 bytes rules!
   {
-    char** p= rules; char i, *pc, z, c;
+
+  char* bc= "[3[3+";
+  while(*bc) {
+    // Search all rules for first match
+    // TODO: move out
+    char **p= rules, *r= 0;
+    char i, *pc, c; int z;
+    char match= 0;
+
+    char* bco= bc;
+
+    printf("\n\n---CODE: bc='%s'\n", bc);
+
     while(*p) {
-      printf("Rule: '%s'", *p++);
-      printf("\n\t");
-      pc= *p++; z= (unsigned int)*p++;
-      while(*pc) {
+      bc = bco;
+      if (matching(bc, *p)) {
+        printf("---MATCH: rule='%s'\n", *p);
+        match= 1;
+      }
+      r= *p++;
+      printf("  %s\t", r);
+      pc= *p++; z= (uint)*p++;
+      printf(" [%d] ", z);
+      while(z-- > 0) { // *pc) {
         c= *pc;
         if (c==0x20) printf(" JSR ");
         else if (c==0x4c) printf(" JMP ");
         else if (c==0x6c) printf(" JPI ");
         else if (c==0x60) printf(" RTS ");
-        else if (c=='#') printf("#$%02x ", *p++);
-        else if (c=='?' && *++pc=='?') printf("$%04X ", *p++);
-        else printf(" %02x ", *pc);
+        // TODO: These are "arguments", the have no matching OP-codes, BUTT
+        //       they aren't safe substitutions... lol, "WORKS FOR NOW".
+        // WARNING: may give totally random bugs, depending on memory locs of data!
+        else if (c=='#') z--,printf("#$%02x ", ww & 0xff);
+        else if (c=='"') z--,printf("#$%02x ", ww>>8);
+        else if (c=='?' && pc[1]=='?') z--,++pc,printf("$%04X ", *p++);
+        else if (c=='w' && pc[1]=='w') z--,++pc,printf("$%04X ", ww);
+        else if (c=='w' && pc[1]=='+') z--,++pc,printf("$%04X ", ww+1);
+        //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
+        else printf(" %02x ", *pc); // we don't know, for now
         ++pc;
       }
-      while(*p) printf("\n\t: %04x", *p++);
+      //while(*p) printf("\n\t: %04x", *p++);
       //assert(!*p);
       printf("\n");
       p++;
+      if (match) break;
     }
+
+    // TODO: move bc forward almost length of rule, but %d... %a...
+    if (!match) {
+      printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
+      exit(3);
+    }
+
+    bc+= charmatch;
+    printf(">>> bc='%s' r='%s' bc='%s'\n", bco, r, bc);
+    // TODO: %d %a???
   }
 
+  }
+  #endif // MATCHER
+
   PROGSIZE;
-
-
   return 0;
 }
