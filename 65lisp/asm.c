@@ -264,21 +264,21 @@ char* rules[]= {
   "%a",  mLDYn("_") mJSR("??"), U 5, U ldaxysp, REND
 
   // TODO: more than 4 ...
-  "^%4", mJMP("??"), U 3, U incsp8, REND
-  "^%3", mJMP("??"), U 3, U incsp6, REND
-  "^%2", mJMP("??"), U 3, U incsp4, REND
-  "^%1", mJMP("??"), U 3, U incsp2, REND
-  "^%0", mRTS(),     U 1, REND
+  "^4%4", mJMP("??"), U 3, U incsp8, REND
+  "^3%3", mJMP("??"), U 3, U incsp6, REND
+  "^2%2", mJMP("??"), U 3, U incsp4, REND
+  "^1%1", mJMP("??"), U 3, U incsp2, REND
+  "^0%0", mRTS(),     U 1, REND
 
   //"X^^",   "<" mJMP("ww"),   U 4, REND // ERROR (need popstack first/move)
   "R^",    "<" mJMP("\0\0"), U 4, REND // SelfTailRecursion
-  "R",         mJSR("\0\0"), U 4, REND // SelfRecursion
+  "R",         mJSR("\0\0"), U 3, REND // SelfRecursion
   "Z",     "<" mJMP("\0\0"), U 4, REND // SelfTailRecursion/loop/Z
 
   // CALL = "Xcode" - would prefer other prefix?
   //"X^^",    "<" mJMP("ww"),     U 4, REND // ERROR (need popstack first/move)
   "X^",     "<" mJMP("ww"),  U 4, REND // TailCall other function
-  "X",          mJSR("ww"),  U 4, REND // Call other function
+  "X",          mJSR("ww"),  U 3, REND // Call other function
   
   // TODO: not complete yet
   //   patching ops=="immediate": :=save ;=patch /=swap
@@ -326,7 +326,7 @@ int   stk= 0;
 char matching(char* bc, char* r) {
   charmatch= ww= whi= 0;
   while(*r) {
-    //printf("matching: '%c' '%c' of '%s' '%s\n", *bc, *r, bc, r);
+    //printf("matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, *r, bc, r, stk);
     if (*r=='Z') { if (*bc) break; } // match \0
     // TODO: %b match only 0 <= x <= 255
     else if (*r=='%' && r[1]=='d') {
@@ -344,7 +344,8 @@ char matching(char* bc, char* r) {
       else return 0;
     } else if (*r=='%' && isdigit(r[1])) {
       // stack depth match
-      if (stk!=r[1]) return 0;
+      // TODO: this is manipulated during matching, lol so all wrong!
+      //if (stk!=r[1]) return 0;
       ++r;
     } else if (*bc != *r) return 0;
     ++charmatch;
@@ -400,7 +401,7 @@ int main(void) {
   {
 
   char* bc= "[3[3+"; // works
-  bc= "[0=I]^{][1=I]^{][1-R[a2-R+^%1}}";
+  bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}";
 
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
@@ -439,6 +440,9 @@ int main(void) {
         else if (c=='s' && pc[1]=='+') { z--;++pc; ++stk; }
         else if (c=='s' && pc[1]=='-') { z--;++pc; --stk; }
         //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
+        else if (c==':') ; // TODO: push loc
+        else if (c==';') ; // TODO: patch loc
+        else if (c=='/') ; // TODO: swap loc
         else { if (match) printf(" %02x ", *pc); } // we don't know, for now
         ++pc;
       }
