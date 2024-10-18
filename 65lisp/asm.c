@@ -162,66 +162,67 @@ void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
 #ifdef RULES
 
 char* rules[]= {
-  "[0+", "", 0, 0,
-  "[1+", mJSR("??"), U 3, U incax2, REND
-  "[2+", mJSR("??"), U 3, U incax4, REND
-  "[3+", mJSR("??"), U 3, U incax6, REND
-  "[4+", mJSR("??"), U 3, U incax8, REND
+  "0+", "", 0, 0,
+  "1+", mJSR("??"), U 3, U incax2, REND
+  "2+", mJSR("??"), U 3, U incax4, REND
+  "3+", mJSR("??"), U 3, U incax6, REND
+  "4+", mJSR("??"), U 3, U incax8, REND
   // TODO: only <255
   //"[%b+", mLDYn("#") mJSR("??"), U 5, U incaxy, 0,
 
-  "+", mJSR("??"), U 3, U tosaddax, REND
+  "+", mJSR("??") "s-", U 5, U tosaddax, REND
 
 
-  "[0-", "", 0, REND
-  "[1-", mJSR("??"), U 3, U decax2, REND
-  "[2-", mJSR("??"), U 3, U decax4, REND
-  "[3-", mJSR("??"), U 3, U decax6, REND
-  "[4-", mJSR("??"), U 3, U decax8, REND
+  "0-", "", 0, REND
+  "1-", mJSR("??"), U 3, U decax2, REND
+  "2-", mJSR("??"), U 3, U decax4, REND
+  "3-", mJSR("??"), U 3, U decax6, REND
+  "4-", mJSR("??"), U 3, U decax8, REND
   // TODO: only <255
   //"[%b-", mLDYn("#") mJSR("??"), U 5, U decaxy, REND
 
-  "-", mJSR("??"), U 3, U tossubax, REND
+  "-", mJSR("??") "s-", U 5, U tossubax, REND
 
+  // ][ conflicts with this
 
-  "[0*", mLDAn("\0") mTAX(), U 3, REND
-  "[1*", "", 0, 0,
-  "[2*", mJSR("??"), U 3, U aslax1, REND
-  "[3*", mJSR("??"), U 3, U mulax3, REND
-  "[4*", mJSR("??"), U 3, U aslax2, REND
-  "[5*", mJSR("??"), U 3, U mulax5, REND
-  "[6*", mJSR("??"), U 3, U mulax6, REND
-  "[7*", mJSR("??"), U 3, U mulax7, REND
-  "[8*", mJSR("??"), U 3, U aslax3, REND
+  "0*", mLDAn("\0") mTAX(), U 3, REND
+  "1*", "", 0, 0,
+  "2*", mJSR("??"), U 3, U aslax1, REND
+  "3*", mJSR("??"), U 3, U mulax3, REND
+  "4*", mJSR("??"), U 3, U aslax2, REND
+  "5*", mJSR("??"), U 3, U mulax5, REND
+  "6*", mJSR("??"), U 3, U mulax6, REND
+  "7*", mJSR("??"), U 3, U mulax7, REND
+  "8*", mJSR("??"), U 3, U aslax3, REND
   // TODO: how to match? \0 lol Z match \0?
-  "[,Z\x09*", mJSR("??"), U 3, U mulax9, REND
+  ",Z\x09*", mJSR("??"), U 3, U mulax9, REND
   // TODO: how to match?
-  "[,Z\x0a*", mJSR("??"), U 3, U mulax10, REND
+  ",Z\x0a*", mJSR("??"), U 3, U mulax10, REND
   // TODO: only <255
   //"[%b*", mLDA("#") mJSR("??"), U 5, U tosmula0, REND
 
-  "*", mJSR("??") mJSR("??") mANDn("\xfe"), U 8, U asrax1, U tosmulax, REND
+  "*", mJSR("??") mJSR("??") mANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
 
-  "[2/", mJSR("??"), U 3, U asrax1, REND
-  "[4/", mJSR("??"), U 3, U asrax2, REND
-  "[8/", mJSR("??"), U 3, U asrax3, REND
+  "2/", mJSR("??"), U 3, U asrax1, REND
+  "4/", mJSR("??"), U 3, U asrax2, REND
+  "8/", mJSR("??"), U 3, U asrax3, REND
 
-  "[,Z\x10/", mJSR("??"), U 3, U asrax4, REND
+  ",Z\x10/", mJSR("??"), U 3, U asrax4, REND
   //",Z\x80/", mJSR("??"), U 3, U asrax7, REND  // doesn't exist?
   // TODO: only <255
   //"%b/", mLDAn("#") mJSR("??"), U 5, U pushax, U tosdiva0, REND
 
-  "/", mJSR("??") mJSR("??") mANDn("\xfe"), U 8, U tosdivax, U aslax1, REND
+  "/", mJSR("??") mJSR("??") mANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
 
-  "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
-  "[%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
+  "0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
+  "%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
 
-  "=", mJSR("??"), U 3, U toseqax, REND
+  "=", mJSR("??") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
-  "[%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
+  "%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
 
   "<", mJSR("??"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
@@ -229,61 +230,103 @@ char* rules[]= {
 
   "A", mJSR("??"), U 3, U ffcar, REND
   "D", mJSR("??"), U 3, U ffcdr, REND
-//"C", mJSR("??"), U 3, U cons, REND
+//"C", mJSR("??") "s-", U 5, U cons, REND
 
-  "!", mJSR("??"), U 3, U staxspidx, REND
+  "!", mJSR("??") "s-", U 5, U staxspidx, REND
   "@", mJSR("??"), U 3, U ldaxi, REND
 //".", mJSR("??"), U 3, U princ, REND
 //"W", mJSR("??"), U 3, U prin1, REND
 //"P", mJSR("??"), U 3, U print, REND
-//"P", mJSR("??"), U 3, U print, REND
-
-  // TODO: more than 4 ...
-  //"^^^^^^",  TODO: ERROR!
-  "^^^^^", mJMP("??"), U 3, U incsp8, REND
-  "^^^^",  mJMP("??"), U 3, U incsp6, REND
-  "^^^",   mJMP("??"), U 3, U incsp4, REND
-  "^^",    mJMP("??"), U 3, U incsp2, REND
-  "^",     mRTS(), U 1, 0,
 
   ",", mLDAn("#") mLDXn("#"), U 4, REND
   ":", mSTA("ww") mSTX("w+"), U 6, REND
   ";", mLDA("ww") mLDX("w+"), U 6, REND
 
   "][", 0, U 0, REND
-  "]", mJSR("??"), U 3, U popax, REND
+  "]", "s-" mJSR("??"), U 5, U popax, REND // TODO: useful?
 
-  // TODO: [%d +-*/
-  "[", mJSR("??"), U 3, U pushax, REND
+  "[", "s+" mJSR("??"), U 5, U pushax, REND
 
+  //"0[", mJSR("??"), U3, U pushzero, REND // TODO: need for local var? keep ax?
+  //"9[", mJSR("??"), U3, U pushnil, REND // TODO: need for local var? keep ax?
   "0", mLDAn("\0") mTAY(), U 3, REND
-  "9^", mJMP("??"), U 3, U retnil, REND // redundant? auto opt...
+  "9^%0", mJMP("??"), U 3, U retnil, REND // redundant? auto opt...
   "9",  mJSR("??"), U 3, U retnil, REND
+
   "%d", mLDAn("_") mLDXn("\""), U 4, REND
 
-  "END", 0, 0, REND
+  // TODO: %a relateive stack...
+  // TODO: keep track of stack! [] enough?
+  // TODO: if request ax?
+  // TODO: if request => w==1 then JSR(ldax0sp)
+  // TODO: use %1357 to indicate depth on stack?
+  "%a%1", mJSR("??"), U 3, U ldax0sp, REND
+  "%a",  mLDYn("_") mJSR("??"), U 5, U ldaxysp, REND
+
+  // TODO: more than 4 ...
+  "^%4", mJMP("??"), U 3, U incsp8, REND
+  "^%3", mJMP("??"), U 3, U incsp6, REND
+  "^%2", mJMP("??"), U 3, U incsp4, REND
+  "^%1", mJMP("??"), U 3, U incsp2, REND
+  "^%0", mRTS(),     U 1, REND
+
+  //"X^^",   "<" mJMP("ww"),   U 4, REND // ERROR (need popstack first/move)
+  "R^",    "<" mJMP("\0\0"), U 4, REND // SelfTailRecursion
+  "R",         mJSR("\0\0"), U 4, REND // SelfRecursion
+  "Z",     "<" mJMP("\0\0"), U 4, REND // SelfTailRecursion/loop/Z
+
+  // CALL = "Xcode" - would prefer other prefix?
+  //"X^^",    "<" mJMP("ww"),     U 4, REND // ERROR (need popstack first/move)
+  "X^",     "<" mJMP("ww"),  U 4, REND // TailCall other function
+  "X",          mJSR("ww"),  U 4, REND // Call other function
+  
+  // TODO: not complete yet
+  //   patching ops=="immediate": :=save ;=patch /=swap
+  // TODO: how aobut balancing stack, recurse on compiler?
+  //   pop to same level?
+  //   if return stack ... 64 lol
+  "I", ":", U 1, REND
+  "{", mSEC() mBCS("\0") ":" "/" ";", U 6, REND
+  "}", ";", U 1, REND
   0};
 #endif // RULES
 
 // No OP:
 //   ^B^C^D ^G ^K^L ^O   ^R^S^T ^W ^Z^[^\ ^_   
 //  "# ' + / : ; < ?     234 7 : Z[\ _  rst w z{| 
-// #   = inline (lo) byte from code 
-// ??  = inline word from param
-// ww  = word from code
-// w+  = same word from code + 1
-// _   = %d match (limit to 255?) (== lo byte)
+//
 // "   = hi byte from %d
+// #   = inline (lo) byte from code 
 // '   = 0x80 for signed... hmmm... _'  hmmmm: TODO: EOR last byte gen!
+// w+  = same word from code + 1
+// /   = swap
+// :   = push loc
+// ;   = patch loc to here
+// <   = move n params of function for tailrec
+// ??  = inline word from param
+// 234 7
+// Z
+// [n  = stack == n
+// \\
+// _   = %d match (limit to 255?) (== lo byte)
+// r
+// s
+// t 
+// ww  = word from code
+// z
+// {
+// |
 
 #ifdef MATCHER
 uint  ww;  // _ ww
 uchar whi; // " // TODO: redundant? we have ww?
 char  charmatch; 
+int   stk= 0;
 
 char matching(char* bc, char* r) {
   charmatch= ww= whi= 0;
   while(*r) {
+    //printf("matching: '%c' '%c' of '%s' '%s\n", *bc, *r, bc, r);
     if (*r=='Z') { if (*bc) break; } // match \0
     // TODO: %b match only 0 <= x <= 255
     else if (*r=='%' && r[1]=='d') {
@@ -291,6 +334,18 @@ char matching(char* bc, char* r) {
       if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
       else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
       else return 0;
+    } else if (*r=='%' && r[1]=='a') {
+      // TODO: if request ax?
+      char lastvar= 'a'; // TODO: fix, lol
+      if (!islower(*bc)) return 0;
+      assert(*bc==lastvar); // TODO: fix, lol
+      ++r;
+      if (islower(*bc)) { ww= 2*(lastvar-*bc+stk)+1; }
+      else return 0;
+    } else if (*r=='%' && isdigit(r[1])) {
+      // stack depth match
+      if (stk!=r[1]) return 0;
+      ++r;
     } else if (*bc != *r) return 0;
     ++charmatch;
     ++bc; ++r;
@@ -339,11 +394,16 @@ int main(void) {
 
 */
 
+  // 7131 bytes... TOTAL 3K?
   #ifdef MATCHER // (- 6292 4965) == 1327 BYTES optimizer code!!!
   // (- 4863 4214) === 649 bytes rules!
   {
 
-  char* bc= "[3[3+";
+  char* bc= "[3[3+"; // works
+  bc= "[0=I]^{][1=I]^{][1-R[a2-R+^%1}}";
+
+  // TODO: ax and saved and lastvar tracking... [-delay
+  // TODO: can't this be done before here, in byte code gen?
   while(*bc) {
     // Search all rules for first match
     // TODO: move out
@@ -351,41 +411,39 @@ int main(void) {
     char i, *pc, c; int z;
     char match= 0;
 
-    char* bco= bc;
-
-    printf("\n\n---CODE: bc='%s'\n", bc);
+    printf("\n\n- %s\n", bc);
 
     while(*p) {
-      bc = bco;
       if (matching(bc, *p)) {
-        printf("---MATCH: rule='%s'\n", *p);
+        //printf("---MATCH: '%s'\ton '%s'\n", *p, bc);
         match= 1;
       }
       r= *p++;
-      printf("  %s\t", r);
+      if (match) printf("  %s\t", r);
       pc= *p++; z= (uint)*p++;
-      printf(" [%d] ", z);
+      if (match) printf(" [%d] ", z);
       while(z-- > 0) { // *pc) {
         c= *pc;
-        if (c==0x20) printf(" JSR ");
-        else if (c==0x4c) printf(" JMP ");
-        else if (c==0x6c) printf(" JPI ");
-        else if (c==0x60) printf(" RTS ");
+        if (c==0x20) { if (match) printf(" JSR "); }
+        else if (c==0x4c) { if (match) printf(" JMP "); }
+        else if (c==0x6c) { if (match) printf(" JPI "); }
+        else if (c==0x60) { if (match) printf(" RTS "); }
         // TODO: These are "arguments", the have no matching OP-codes, BUTT
         //       they aren't safe substitutions... lol, "WORKS FOR NOW".
         // WARNING: may give totally random bugs, depending on memory locs of data!
-        else if (c=='#') z--,printf("#$%02x ", ww & 0xff);
-        else if (c=='"') z--,printf("#$%02x ", ww>>8);
-        else if (c=='?' && pc[1]=='?') z--,++pc,printf("$%04X ", *p++);
-        else if (c=='w' && pc[1]=='w') z--,++pc,printf("$%04X ", ww);
-        else if (c=='w' && pc[1]=='+') z--,++pc,printf("$%04X ", ww+1);
+        else if (c=='#') { z--; if (match) printf("#$%02x ", ww & 0xff); }
+        else if (c=='"') { z--; if (match) printf("#$%02x ", ww>>8); }
+        else if (c=='?' && pc[1]=='?') { z--;++pc; if (match) printf("$%04X ", *p); ++p; }
+        else if (c=='w' && pc[1]=='w') { z--;++pc; if (match) printf("$%04X ", ww); }
+        else if (c=='w' && pc[1]=='+') { z--;++pc; if (match) printf("$%04X ", ww+1); }
+        else if (c=='s' && pc[1]=='+') { z--;++pc; ++stk; }
+        else if (c=='s' && pc[1]=='-') { z--;++pc; --stk; }
         //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
-        else printf(" %02x ", *pc); // we don't know, for now
+        else { if (match) printf(" %02x ", *pc); } // we don't know, for now
         ++pc;
       }
       //while(*p) printf("\n\t: %04x", *p++);
       //assert(!*p);
-      printf("\n");
       p++;
       if (match) break;
     }
@@ -397,7 +455,7 @@ int main(void) {
     }
 
     bc+= charmatch;
-    printf(">>> bc='%s' r='%s' bc='%s'\n", bco, r, bc);
+    //printf(">>> bc='%s' r='%s' bc='%s'\n", bc, r, bc);
     // TODO: %d %a???
   }
 

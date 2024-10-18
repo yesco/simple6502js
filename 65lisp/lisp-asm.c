@@ -15,7 +15,7 @@ char* mcp= mc;
 /* Byte codes that are compiled
 
    ' ' \t \r \n - skip
-   !    - store (val, addr) => val
+   !    - store (val, addr) => val (TODO: redundant? uses : ??)
    "	
 // #    - (isnum)    = LOL cc65 preprocessor runs inside comments?
    $	- (isstr)
@@ -25,55 +25,59 @@ char* mcp= mc;
    ()
    *    - mul
    +    - add
-   ,    - literal word
+   ,nn  - literal word (== quote ' !)
    -    - (sub)
    .    - princ
    /    - (div)
    012345678 - literal single digit number
    9    - nil
-   :    - setq
-   ;    - ;BEEF read value at BEEF
+   :    - setq (TODO: is just set?)
+   ;nn  - ;BEEF read value at BEEF
    <    - (lt)
    =    - (eq)
    >    - (gt)
    ?    - (cmp)
-   @    - read value at addr from stack (use for array)
+   @    - read value at addr from stack (use for array) (TODO: redundant w N? see @ too)
    A    - cAr
    B    - (memBer)
    C    - Cons
    D    - cDr
-   E    - (Eval)
+   E    - (Eval) - call lisp
    F    - (Filter?)
    G    - (Gassoc)
    H    - (evalappend?) ???
    I    - If
-   J    - (Japply)
+   J    - (Japply) - funcall?
    K    - (Kons)
-   L    - (evallist?)
+   L    - (evallist?)/nList
    M    - (Map)
-   NO   - (Nth)
+   N    - (Nth)
+   O    - (Ord/length)
    P    - Print
-   Q
+   Q    - (eQual)
    R    - Recurse
-   S    - (Setq local/closure var)
+   S    - (Setq local/closure named var: Sa S+a etc..)
    T    - Terpri (newline)
-   U    - (null)
-   V
+   U    - nUll
+   V    - (reduce?)
    W    - princ
-   X    - prin1
+   X    - (eXecute addr on stack? JSR? see z)
    Y    - read
-   Z    - loop/tail-recurse
+   Z    - loop/tail-recurse (jmp)
    [    - pushax, as new value comes
    \    - (lambda?)
    ]    - popax? ( "][" will do nothing! )
    ^    - return
-   _
+   _    - nil, but that's 9, hmmm, swap 9 to T?, OR _ jmp?
    `    - (backquote construct)
    abcdefgh - (local stack variables)
    ijklmnop - (local/closure frame variables)
-   qrstuvw
-   x    - AX lol
-   yz
+   qrst
+   uv
+   w    - (ax Word)
+   x    - (x lol)
+   y    - (y lol)
+   znn  - jsr nn, how to jmp?
    {    - forth ELSE (starts THEN part, lol)
    |    - (bit-or)
    }    - forth THEN (ends if-else-then)
