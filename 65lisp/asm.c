@@ -4,13 +4,74 @@
 
 //#include <conio.h>
 
+#include <assert.h>
+
 #include "progsize.c"
 
-#define mO(op) op
-#define mO2(op, b) op "#"
-#define mN2(name, op, b) mO2(op, b)
 
-#define mO3(op, w) op "??"
+extern void tosaddax();
+extern void tossubax();
+extern void tosmulax();
+extern void tosdivax();
+
+extern void tosadda0();
+extern void tossuba0();
+extern void tosmula0();
+extern void tosdiva0();
+
+
+extern void mulax3();
+extern void mulax5();
+extern void mulax6();
+extern void mulax7();
+extern void mulax9();
+extern void mulax10();
+extern void mulaxy();
+
+extern void asrax1();
+extern void asrax2();
+extern void asrax3();
+extern void asrax4();
+//extern void asrax7();
+
+extern void asraxy();
+
+
+extern void aslax1();
+extern void aslax2();
+extern void aslax3();
+extern void aslax4();
+//extern void aslax7();
+
+extern void aslaxy();
+
+
+extern void shrax1();
+extern void shrax2();
+extern void shrax3();
+extern void shrax4();
+//extern void shrax7();
+
+extern void shraxy();
+
+
+extern void shlax1();
+extern void shlax2();
+extern void shlax3();
+extern void shlax4();
+//extern void shlax7();
+
+extern void shlaxy();
+
+extern unsigned int T=42;
+extern unsigned int nil=0;
+
+#define mO(op) op
+#define mO2(op, b) op b
+#define mN2(name, op, b) mO2(op,b)
+
+#define mO3(op, w) op w
+#define mN3(name, op, w) mO3(op,w)
 
 #define mLDAn(n) mN2("LDAn","\xA9",n)
 #define mLDXn(n) mN2("LDXn","\xA2",n)
@@ -208,17 +269,86 @@ void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
 #define MAKE_WORD(x,y) x,y
 #define MAKE_STR(...) ((char[]){__VA_ARGS__, 0})
 
+typedef void* U;
+
+#define X(a) (void*)(int*)a
+
+char* xx[]= {"foo", (U)42, (U)printf, 0};
+
+char* rules[]= {
+  "0+", "", 0, 0,
+  "+", mJSR("??"), (U)3, (U)tosaddax, 0,
+  "-", mJSR("??"), (U)3, (U)tossubax, 0,
+  "*", mJSR("??") mJSR("??") mANDn("#"), (U)8, (U)asrax1, (U)tosmulax, (U)0xfe, 0,
+  "*", mJSR("??") mJSR("??") mANDn("\xfe"), (U)8, (U)asrax1, (U)tosmulax, 0,
+  0};
+
+// No OP:
+//   ^B^C^D ^G ^K^L ^O   ^R^S^T ^W ^Z^[^\ ^_   ""
+//  "# ' + / : ; < ?     234 7 : Z[\ _  rst w z{| 
+// #   = inline byte    '  = hi byte
+// ??  = inline word    
 int main(int argc, char** argv) {
   printf("Hello " "\n\"22:\x22 \n#23:x23 \n27:\x27 \n+2B:\x2B \n/2F:\x2F \n32:\x32 \n33:\x33 \n34:\x34 \n37:\x37 \n:3a:\x3a \n;3b:\x3b \n<3c:\x3c \n?3f:\x3f World!\n");
-  bz=0; ASM(mTYA() mTXA() mLDAn(41), 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn(41), 65, 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn(41) mLDA(??), 65, 256*65+66);
-  bz=0; ASM(mTYA() mTXA() mLDAn(41) mLDA(??), 65, 256*65+66); // 28 bytes...
-  TYA(); TXA(); LDAn(65); LDA(256*65+66); // (- 3365 3333) 32 bytes...
+  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 0);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 65, 0);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66); // 28 bytes...
+  //TYA(); TXA(); LDAn(65); LDA(256*65+66); // (- 3365 3333) 32 bytes...
 
   //printf("foo: %s\n", MAKE_STR(65, 66, 67, 68));
 
+#define ABCD ((unsigned int)printf)
+#define HXS(a,s) ("0123456789abcdef"[(((unsigned int)a)>>s) & 0x0f])
+
+#define STR(a) #a
+#define FOO(a) STR(a)
+#define BAR(a) FOO((a>>0))
+
+#define HEX(a) STR(HXS(a,12)) STR(HXS(a,8)) STR(HXS(a,4) HXS(a,0))
+  printf("%04x<FISH\n", printf);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>12) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>8) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>4) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>0) & 0x0f]);
+
+  printf("%c<ABBA\n", HXS(printf,12));
+  printf("%c<ABBA\n", HXS(printf,8));
+  printf("%c<ABBA\n", HXS(printf,4));
+  printf("%c<ABBA\n", HXS(printf,0));
+  printf("\n%s<STR\n", STR(ABCD));
+  printf("\n%s<FOO\n", FOO(ABCD));
+  printf("\n%s<FOO\n", BAR(ABCD));
+//  printf("%s<ABBA\n", HXS(printf,12) HXS(printf,8) "\0");
+
+//  printf("%s", HEX(printf) "\n");
+
+  {
+    char** p= rules; char i, *pc, z, c;
+    while(*p) {
+      printf("Rule: '%s'", *p++);
+      printf("\n\t");
+      pc= *p++; z= (unsigned int)*p++;
+      while(*pc) {
+        c= *pc;
+        if (c==0x20) printf(" JSR ");
+        else if (c==0x4c) printf(" JMP ");
+        else if (c==0x6c) printf(" JPI ");
+        else if (c==0x60) printf(" RTS ");
+        else if (c=='#') printf("#$%02x ", *p++);
+        else if (c=='?' && *++pc=='?') printf("$%04X ", *p++);
+        else printf(" %02x ", *pc);
+        ++pc;
+      }
+      while(*p) printf("\n\t: %04x", *p++);
+      //assert(!*p);
+      printf("\n");
+      p++;
+    }
+  }
+
   PROGSIZE;
+
 
   return 0;
 }
