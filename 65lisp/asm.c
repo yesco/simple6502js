@@ -1,3 +1,20 @@
+// ./run-asm to compile and run this...
+
+//  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
+//
+// 59 bytes first GEN no opt Not working?
+//
+// NOT OPTIMIZED:
+// - ax reuse
+// - ax is a, doesn't know
+// - ax push delay
+// - I ..^{ ..^} doesn't know stack depth from before, recurse?
+// - JMP/JSR 0 0 needs to post substitute to actual address
+// - actually call it!
+
+#define DEBASM(a)
+//#define DEBASM(a) do { a; } while (0)
+
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -11,7 +28,7 @@
 #define PROGSIZE
 #include "progsize.c"
 
-#include <stdint.h> // cc65 uses 29K extra memory???
+#include <stdint.h>
 
 typedef int16_t L;
 typedef uint16_t uint;
@@ -264,11 +281,11 @@ char* rules[]= {
   "%a",  mLDYn("_") mJSR("??"), U 5, U ldaxysp, REND
 
   // TODO: more than 4 ...
-  "^4%4", mJMP("??"), U 3, U incsp8, REND
-  "^3%3", mJMP("??"), U 3, U incsp6, REND
-  "^2%2", mJMP("??"), U 3, U incsp4, REND
-  "^1%1", mJMP("??"), U 3, U incsp2, REND
-  "^0%0", mRTS(),     U 1, REND
+  "^%4", mJMP("??"), U 3, U incsp8, REND
+  "^%3", mJMP("??"), U 3, U incsp6, REND
+  "^%2", mJMP("??"), U 3, U incsp4, REND
+  "^%1", mJMP("??"), U 3, U incsp2, REND
+  "^%0", mRTS(),     U 1, REND
 
   //"X^^",   "<" mJMP("ww"),   U 4, REND // ERROR (need popstack first/move)
   "R^",    "<" mJMP("\0\0"), U 4, REND // SelfTailRecursion
@@ -325,8 +342,9 @@ int   stk= 0;
 
 char matching(char* bc, char* r) {
   charmatch= ww= whi= 0;
+  DEBASM(printf("\tRULE: '%s' STK=%d\n", r, stk));
   while(*r) {
-    //printf("matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, *r, bc, r, stk);
+    DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, *r, bc, r, stk));
     if (*r=='Z') { if (*bc) break; } // match \0
     // TODO: %b match only 0 <= x <= 255
     else if (*r=='%' && r[1]=='d') {
@@ -334,19 +352,19 @@ char matching(char* bc, char* r) {
       if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
       else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
       else return 0;
-    } else if (*r=='%' && r[1]=='a') {
+    } else if (*r=='%' && islower(r[1])) { // TODO:
       // TODO: if request ax?
       char lastvar= 'a'; // TODO: fix, lol
       if (!islower(*bc)) return 0;
       assert(*bc==lastvar); // TODO: fix, lol
       ++r;
-      if (islower(*bc)) { ww= 2*(lastvar-*bc+stk)+1; }
-      else return 0;
+      ww= 2*(lastvar-*bc+stk)+1;
     } else if (*r=='%' && isdigit(r[1])) {
       // stack depth match
       // TODO: this is manipulated during matching, lol so all wrong!
-      //if (stk!=r[1]) return 0;
+      if (stk!=r[1]-'0') return 0;
       ++r;
+      --charmatch;
     } else if (*bc != *r) return 0;
     ++charmatch;
     ++bc; ++r;
@@ -396,12 +414,18 @@ int main(void) {
 */
 
   // 7131 bytes... TOTAL 3K?
-  #ifdef MATCHER // (- 6292 4965) == 1327 BYTES optimizer code!!!
-  // (- 4863 4214) === 649 bytes rules!
+  #ifdef MATCHER // (- 6737 4214) == 2523 BYTES optimizer code!!!
+  // (- 5092 4214) === 878 bytes rules! (-100B REND)
   {
 
   char* bc= "[3[3+"; // works
-  bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}";
+  //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
+
+  // ./65vm -v -e "(if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2))))"
+  bc= "[a[2<I][a{][a[1-R[a[2-R+}";
+
+  // ./65vm -v -e "(if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2)))))"
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
 
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
@@ -412,7 +436,7 @@ int main(void) {
     char i, *pc, c; int z;
     char match= 0;
 
-    printf("\n\n- %s\n", bc);
+    printf("\n\n- %s\tSTK=%d\n", bc, stk);
 
     while(*p) {
       if (matching(bc, *p)) {
@@ -420,30 +444,32 @@ int main(void) {
         match= 1;
       }
       r= *p++;
-      if (match) printf("  %s\t", r);
+#define APRINT(...) do{ if (match) printf(__VA_ARGS__); } while(0)
+//#define APRINT(...) 
+      APRINT("  %s\t", r);
       pc= *p++; z= (uint)*p++;
-      if (match) printf(" [%d] ", z);
+      APRINT(" [%d] ", z);
       while(z-- > 0) { // *pc) {
         c= *pc;
-        if (c==0x20) { if (match) printf(" JSR "); }
-        else if (c==0x4c) { if (match) printf(" JMP "); }
-        else if (c==0x6c) { if (match) printf(" JPI "); }
-        else if (c==0x60) { if (match) printf(" RTS "); }
+        if (c==0x20) { APRINT(" JSR "); }
+        else if (c==0x4c) { APRINT(" JMP "); }
+        else if (c==0x6c) { APRINT(" JPI "); }
+        else if (c==0x60) { APRINT(" RTS "); }
         // TODO: These are "arguments", the have no matching OP-codes, BUTT
         //       they aren't safe substitutions... lol, "WORKS FOR NOW".
         // WARNING: may give totally random bugs, depending on memory locs of data!
-        else if (c=='#') { z--; if (match) printf("#$%02x ", ww & 0xff); }
-        else if (c=='"') { z--; if (match) printf("#$%02x ", ww>>8); }
-        else if (c=='?' && pc[1]=='?') { z--;++pc; if (match) printf("$%04X ", *p); ++p; }
-        else if (c=='w' && pc[1]=='w') { z--;++pc; if (match) printf("$%04X ", ww); }
-        else if (c=='w' && pc[1]=='+') { z--;++pc; if (match) printf("$%04X ", ww+1); }
-        else if (c=='s' && pc[1]=='+') { z--;++pc; ++stk; }
-        else if (c=='s' && pc[1]=='-') { z--;++pc; --stk; }
+        else if (c=='#') { z--; APRINT("#$%02x ", ww & 0xff); }
+        else if (c=='"') { z--; APRINT("#$%02x ", ww>>8); }
+        else if (c=='?' && pc[1]=='?') { z--;++pc; APRINT("$%04X ", *p); ++p; }
+        else if (c=='w' && pc[1]=='w') { z--;++pc; APRINT("$%04X ", ww); }
+        else if (c=='w' && pc[1]=='+') { z--;++pc; APRINT("$%04X ", ww+1); }
+        else if (c=='s' && pc[1]=='+') { z--;++pc; if (match) ++stk; }
+        else if (c=='s' && pc[1]=='-') { z--;++pc; if (match) --stk; }
         //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
         else if (c==':') ; // TODO: push loc
         else if (c==';') ; // TODO: patch loc
         else if (c=='/') ; // TODO: swap loc
-        else { if (match) printf(" %02x ", *pc); } // we don't know, for now
+        else { if (match) APRINT(" %02x ", *pc); } // we don't know, for now
         ++pc;
       }
       //while(*p) printf("\n\t: %04x", *p++);
