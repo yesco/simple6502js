@@ -3,16 +3,20 @@
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
 //
 
+// 43 bytes
+// - don't load a var if already in AX
+// - count bytes
+// - 7577 bytes program...
+
 // 50 bytes
 // - track ax, no clever reuse
 // - [1+ etc... no need pushax
 
 // 59 bytes first GEN no opt Not working?
-//
+// - just generate first non-optimized
 
 // NOT OPTIMIZED:
-// - ax reuse
-// - ax is a, doesn't know
+// - IF after return no need JMP end...
 // - ax push delay
 // - I ..^{ ..^} doesn't know stack depth from before, recurse?
 // - JMP/JSR 0 0 needs to post substitute to actual address
@@ -425,6 +429,8 @@ int main(void) {
   // (- 5092 4214) === 878 bytes rules! (-100B REND)
   {
 
+  int bytes= 0;
+
   char* bc= "[3[3+"; // works
   //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
 
@@ -445,8 +451,7 @@ int main(void) {
     char **p= rules, *r= 0;
     char i, *pc, c; int z;
     char match= 0;
-
-    printf("\n\n- %-30s\tSTK=%d AX=%c\n", bc, stk, ax);
+    printf("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
 
     while(*p) {
       if (matching(bc, *p)) {
@@ -458,29 +463,37 @@ int main(void) {
 //#define APRINT(...) 
       APRINT("  %s\t", r);
       pc= *p++; z= (uint)*p++;
+      if (match && islower(*bc) && *bc==ax) {
+        APRINT("  parameter requested is already in AX!\n");
+        break;
+      }
       APRINT(" [%d] ", z);
       // Parse ASM and ACTION
       while(z-- > 0) { // *pc) {
         c= *pc;
-        if (c==0x20) { APRINT(" JSR "); }
-        else if (c==0x4c) { APRINT(" JMP "); }
-        else if (c==0x6c) { APRINT(" JPI "); }
-        else if (c==0x60) { APRINT(" RTS "); }
+        if (c==0x20) { APRINT(" JSR "); if (match) ++bytes; }
+        else if (c==0x4c) { APRINT(" JMP "); if (match) ++bytes; }
+        else if (c==0x6c) { APRINT(" JPI "); if (match) ++bytes; }
+        else if (c==0x60) { APRINT(" RTS "); if (match) ++bytes; }
         // TODO: These are "arguments", the have no matching OP-codes, BUTT
         //       they aren't safe substitutions... lol, "WORKS FOR NOW".
         // WARNING: may give totally random bugs, depending on memory locs of data!
-        else if (c=='#') { z--; APRINT("#$%02x ", ww & 0xff); }
-        else if (c=='"') { z--; APRINT("#$%02x ", ww>>8); }
-        else if (c=='?' && pc[1]=='?') { z--;++pc; APRINT("$%04X ", *p); ++p; }
-        else if (c=='w' && pc[1]=='w') { z--;++pc; APRINT("$%04X ", ww); }
-        else if (c=='w' && pc[1]=='+') { z--;++pc; APRINT("$%04X ", ww+1); }
-        else if (c=='s' && pc[1]=='+') { z--;++pc; if (match) ++stk; }
-        else if (c=='s' && pc[1]=='-') { z--;++pc; if (match) --stk; }
+        else if (c=='#') { --z; APRINT("#$%02x ", ww & 0xff); if (match) ++bytes; }
+        else if (c=='"') { --z; APRINT("#$%02x ", ww>>8); if (match) ++bytes; }
+        else if (c=='?' && pc[1]=='?') { --z;++pc; APRINT("$%04X ", *p); ++p; if (match) bytes+=2; }
+        else if (c=='w' && pc[1]=='w') { --z;++pc; APRINT("$%04X ", ww); if (match) bytes+=2; }
+        else if (c=='w' && pc[1]=='+') { --z;++pc; APRINT("$%04X ", ww+1); if (match) bytes+=2; }
+
+        // preconditions
+        else if (c=='s' && pc[1]=='+') { --z;++pc; if (match) ++stk; }
+        else if (c=='s' && pc[1]=='-') { --z;++pc; if (match) --stk; }
+        // actions
         //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
-        else if (c==':') ; // TODO: push loc
-        else if (c==';') ; // TODO: patch loc
-        else if (c=='/') ; // TODO: swap loc
-        else { if (match) APRINT(" %02x ", *pc); } // we don't know, for now
+        else if (c==':') { } // TODO: push loc
+        else if (c==';') { } // TODO: patch loc
+        else if (c=='/') { } // TODO: swap loc
+        else { APRINT(" %02x ", *pc); if (match) ++bytes; } // we don't know, for now
+
         ++pc;
       }
       //while(*p) printf("\n\t: %04x", *p++);
@@ -508,7 +521,9 @@ int main(void) {
     // TODO: %d %a???
   }
 
+  printf("...bytes: %d\n", bytes);
   }
+
   #endif // MATCHER
 
   PROGSIZE;

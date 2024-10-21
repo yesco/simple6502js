@@ -13,7 +13,7 @@
 // ------- ----    ----    -------
 // 65lisp   20K     24K     50.29s  1x
 // 65vm     26K     17K     17.03s  2.95x
-// 65asm    29K     14K      5.70s  8.82x faster! (sz w/o DISASM)
+// 65asm    29K     14K      5.70s  8.82x faster!x (sz w/o DISASM)
 // singl..   6K       ?     42.14s  1.19x faster!
 
 // ==== fib8-test 
