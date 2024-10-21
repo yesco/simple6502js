@@ -56,6 +56,18 @@
 // - actually call it!
 // - last usage of lastvar, can do popax instead, cheaper/less stack adjustment? (unless have locals)
 // - cc65 is clever about tracking Y register value, not sure if really doable, lol
+// - track RETURNS generated, (value and how, JMP there!)
+//   RETURN 0, RETURN 1, esp because of JMP INCSP7...
+// - ++c very efficient INC c
+// 
+// ; ++r;                                  // 9 bytes!
+// ; 
+// L0207:  ldy     #$03
+//         ldx     #$00
+//         lda     #$01
+//         jsr     addeqysp
+// VERY COMMON? why not LDY 3   jsr WINCYSP // 5 bytes
+
 
 #include <stdio.h>
 #include <unistd.h>
@@ -274,6 +286,8 @@ char* rules[]= {
   "/", mJSR("w?") mJSR("w?") mANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
 
+  // "[0=", mSTXzp(tmp1) mORAzp(tmp1) mBNE("\0"), U 6, REND // TODO: destructive...
+  // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
   "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
   "[%d=", mCMPn("#") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
 
@@ -423,7 +437,7 @@ char matching(char* bc, char* r) {
         // TODO: this is manipulated during matching, lol so all wrong!
         if (stk!=nc-'0') return 0;
         --charmatch;
-      } else if (c=='%' && nc=='^') {
+      } else if (nc=='^') {
         printf("HERE %^ stk=%d\n", stk);
         if (stk<60) return 0;
         --charmatch;
@@ -488,7 +502,7 @@ int main(void) {
   #ifdef MATCHER
   {
 
-  int bytes= 0;
+    int bytes= 0;
 
   char* bc= "[3[3+"; // works
   //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
