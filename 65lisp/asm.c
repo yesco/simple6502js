@@ -1,24 +1,44 @@
 // ./run-asm to compile and run this...
 
+// 7275 bytes... TOTAL 3K? (no DEBASM no APRINT
+// (- 7275 4214) == 3061 BYTES optimizer code!!! (incl rules)
+// (- 4628 4214) === 414 bytes rules! (-100B REND)
+
+#define RULES
+#define MATCHER
+
+#define DEBASM(a)
+//#define DEBASM(a) do { a; } while (0)
+
+#define APRINT(...) printf(__VA_ARGS__)
+//#define APRINT(...) 
+
+
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
 //
 
 // TODO: make variant that pushes params on R stack with PHA, return becomes PLA
 //   potentially less code! and 30% faster!
 
+// 42 bytes
+// - corrected gen etc, counted -z wrongly at '#' and '"'
+
 // 37 bytes (!) I think it's wrong as it ends with RTS, lol STK wrong after IF...
 // - simplify skip rule
 // - "^{" ELSE no generate skip ELSE part if ended with RETURN ^
 // - should be 39 bytes I think end with JMP INCSP2
+// - PROG: 7275 bytes, RULES: 414 bytes, +ASM: 3061 bytes !!!
+//   (so much less; maybe it's reduced by no "if (match)" etc...)
 
 // 43 bytes
 // - don't load a var if already in AX
 // - count bytes
-// - 7577 bytes program...
+// - PROG: 7577 bytes, RULES: 926 bytes, +ASM: 3896 (lisp-asm: 6330 bytes) ???
 
 // 50 bytes
 // - track ax, no clever reuse
 // - [1+ etc... no need pushax
+// - 7131 bytes... TOTAL 3K?
 
 // 59 bytes first GEN no opt Not working?
 // - just generate first non-optimized
@@ -29,9 +49,7 @@
 // - I ..^{ ..^} doesn't know stack depth from before, recurse?
 // - JMP/JSR 0 0 needs to post substitute to actual address
 // - actually call it!
-
-#define DEBASM(a)
-//#define DEBASM(a) do { a; } while (0)
+// - PROG: 6737 bytes, RULES: 878 bytes, +ASM: 2523 bytes
 
 #include <stdio.h>
 #include <unistd.h>
@@ -131,7 +149,7 @@ extern unsigned int nil=0;
 #define mJMP(a)  mN3("JMP", "\x4c",a)
 #define mJMPi(a) mN3("JPI", "\x6c",a)
 
-#define mBRK(a)  mO("\x00")
+#define mBRK(a)  mO("\0")
 
 unsigned char bi=0, bz=0, buff[255];
 
@@ -140,6 +158,7 @@ unsigned char bi=0, bz=0, buff[255];
 // poor mans argv, LOL
 #define ARG(n) (*((uint*)(&len-2*n)))
 
+#ifdef BAR
 void __cdecl__ addasm(char* x, uchar len, ...) {
   uchar c, n= 1;
   uint* p= (uint*)&len;
@@ -163,6 +182,7 @@ void __cdecl__ addasm(char* x, uchar len, ...) {
   printf("ASM[%d]=> \"%s\"\n", len, buff);
 }
 
+#endif // BAR
 
 char mc[120]= {0};
 char* mcp= mc;
@@ -190,9 +210,6 @@ void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
 // TODO: we don't need end 0 on each line
 #define REND 0, // cost 100 bytes, only for consistency
 //#define REND
-
-#define RULES
-#define MATCHER
 
 #ifdef RULES
 
@@ -252,16 +269,16 @@ char* rules[]= {
 
 
   "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
-  "[%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
+  "[%d=", mCMPn("#") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
 
   "=", mJSR("w?") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
-  "[%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
+  "[%d<", mTAY() mCMPn("#") mTXA() mSBCn("\"") mTYA() mBCS("\x00"), U 9, REND
 
   "<", mJSR("w?"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
-  //"%d<", mTAY() mEORn("\x80") mCMPn("_") mTXA() mEORn("\x80") mSBCn("\"") mBCS("\0") mTYA() mBCS("\0"), U 12, REND
+  //"%d<", mTAY() mEORn("\x80") mCMPn("#") mTXA() mEORn("\x80") mSBCn("\"") mBCS("\0") mTYA() mBCS("\0"), U 12, REND
 
   "A", mJSR("w?"), U 3, U ffcar, REND
   "D", mJSR("w?"), U 3, U ffcdr, REND
@@ -277,7 +294,7 @@ char* rules[]= {
   ":", mSTA("ww") mSTX("w+"), U 6, REND
   ";", mLDA("ww") mLDX("w+"), U 6, REND
 
-  "][", 0, U 0, REND
+  "][", 0, U 0, REND // 3 zeroes! lol
   "]", "s-" mJSR("w?"), U 5, U popax, REND // TODO: useful?
 
   "[", "s+" mJSR("w?"), U 5, U pushax, REND
@@ -288,15 +305,16 @@ char* rules[]= {
   "9^%0", mJMP("w?"), U 3, U retnil, REND // redundant? auto opt...
   "9",  mJSR("w?"), U 3, U retnil, REND
 
-  "%d", mLDAn("_") mLDXn("\""), U 4, REND
+  "%d", mLDAn("#") mLDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
   // TODO: keep track of stack! [] enough?
   // TODO: if request ax?
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
-  "%a%1", mJSR("w?"), U 3, U ldax0sp, REND
-  "%a",  mLDYn("_") mJSR("w?"), U 5, U ldaxysp, REND
+  //"[a", mJSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  "%a%1", mJSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  "%a",  mLDYn("#") mJSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
 
   // TODO: more than 4 ...
   "^%4", "s^" mJMP("w?"), U 5, U incsp8, REND
@@ -331,24 +349,24 @@ char* rules[]= {
 //   ^B^C^D ^G ^K^L ^O   ^R^S^T ^W ^Z^[^\ ^_   
 //  "# ' + / : ; < ?     234 7 : Z[\ _  rst w z{| 
 //
+// _   = %d match (limit to 255?) (== lo byte)
 // "   = hi byte from %d
 // #   = inline (lo) byte from code 
 // '   = 0x80 for signed... hmmm... _'  hmmmm: TODO: EOR last byte gen!
+// ww  = word from code
 // w+  = same word from code + 1
 // w?  = inline word from param
-// /   = swap
-// :   = push loc
-// ;   = patch loc to here
+// /   = IF swap
+// :   = IF push loc
+// ;   = IF patch loc to here
 // <   = move n params of function for tailrec
 // 234 7
 // Z
-// [n  = stack == n
+// [
 // \\
-// _   = %d match (limit to 255?) (== lo byte)
 // r
 // s
 // t 
-// ww  = word from code
 // z
 // {
 // |
@@ -405,6 +423,13 @@ char matching(char* bc, char* r) {
 }
 #endif // MATCHER
 
+unsigned char changesAX(char* rule) {
+    if (0==strcmp(rule, "%d<") || 0==strcmp(rule, "%d=") || 0==strcmp(rule, "%d>")) return 0;
+    if (strchr("I[]{}^", *rule)) return 0;
+    // all other ops changes AX
+    return 1;
+}
+
 //int main(int argc, char** argv) {
 int main(void) {
 
@@ -444,9 +469,7 @@ int main(void) {
 
 */
 
-  // 7131 bytes... TOTAL 3K?
-  #ifdef MATCHER // (- 6737 4214) == 2523 BYTES optimizer code!!!
-  // (- 5092 4214) === 878 bytes rules! (-100B REND)
+  #ifdef MATCHER
   {
 
   int bytes= 0;
@@ -460,63 +483,76 @@ int main(void) {
   // ./65vm -v -e "(if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2)))))"
   bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
 
+  //bc= "b";
+
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
 
   ax= 'a';
 
+  // process byte code
   while(*bc) {
     // Search all rules for first match
     // TODO: move out
     char **p= rules, *r= 0;
     char i, *pc, c; int z;
     char match= 0;
-    printf("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
-
-#define APRINT(...) printf(__VA_ARGS__)
-//#define APRINT(...) 
+    APRINT("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
 
     // for each rule
     while(*p) {
       r= *p++;
 
+      // find matching prefix ("peep-hole code-gen/optimizer")
       if (matching(bc, r)) {
-        APRINT("---MATCH: '%s'\ton '%s'\n", *p, bc);
+        //APRINT("---MATCH: '%s'\ton '%s'\n", *p, bc);
         match= 1;
       }
-      if (match) APRINT("  %s\t", r);
       // get action/asm of rule, and length in bytes
       pc= *p++; z= (uint)*p++;
 
-      // if variable and ax alread contains, done!
-      if (match && islower(*bc) && *bc==ax) {
-        if (match) APRINT("  parameter requested is already in AX!\n");
-        break;
-      }
-
-      if (match) APRINT(" [%d] ", z);
-
       if (match) {
-        if (*bc=='{' && stk>60) stk= 0; // TODO: reset to whatever before IF
+        APRINT("  %s\t", r);
+
+        // if variable and ax alread contains, done!
+        if (islower(*bc) && *bc==ax) {
+          APRINT("  parameter requested is already in AX!\n");
+          break;
+        }
+
+        APRINT(" [%d] ", z);
+
+        if (*r=='I') *--patch= stk;
+        if (*r=='{' && stk>60) stk= patch[1]; // TODO: who pops it?
+
+        // LOL, need to find next matching rule to decide if pushax! GRRRRR
 
         // Parse ASM and ACTION of single rule
         // (also consumes parameters from p)
         // (we need z as \0 might occur inside string!)
         while(z-- > 0) { // *pc) {
+          //APRINT(" --%d--", z);
           gen[bytes]= c= *pc;
 
+          // LOL, wtf, turning into a mini disasm... lol
           if (c==0x20) { APRINT(" JSR "); }
           else if (c==0x4c) { APRINT(" JMP "); }
           else if (c==0x6c) { APRINT(" JPI "); }
           else if (c==0x60) { APRINT(" RTS "); }
+          else if (c==0xa9 || c==0xad) { APRINT(" LDA "); }
+          else if (c==0xa2 || c==0xae) { APRINT(" LDX "); }
+          else if (c==0xa0 || c==0xac) { APRINT(" LDY "); }
+          else if (c==0xa8) { APRINT(" TAY "); }
+          else if (c==0x98) { APRINT(" TYA "); }
+          else if (c==0x8a) { APRINT(" TXA "); }
+          else if (c==0xaa) { APRINT(" TAX "); }
           // TODO: These are "arguments", the have no matching OP-codes, BUTT
           //       they aren't safe substitutions... lol, "WORKS FOR NOW".
           // WARNING: may give totally random bugs, depending on memory locs of data!
           // -- use last %d matched valuie
           // (take low/high)
-          // TODO: --z == is this correct? no extra byte consumed...!?!?!
-          else if (c=='#') { --z; APRINT("#$%02x ", ww & 0xff); gen[bytes]= ww & 0xff; }
-          else if (c=='"') { --z; APRINT("#$%02x ", ww>>8); gen[bytes]= ww>8; }
+          else if (c=='#') { APRINT("#$%02x ", ww & 0xff); gen[bytes]= ww & 0xff; }
+          else if (c=='"') { APRINT("#$%02x ", ww>>8); gen[bytes]= ww>8; }
           // (take word)
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
           else if (c=='w' && pc[1]=='w') { --z;++pc; APRINT("$%04X ", ww);   *(uint*)(gen+bytes)= ww;     }
@@ -540,6 +576,7 @@ int main(void) {
           if (c=='w') ++bytes;
           ++pc;
         } // end while action/asm
+
         //printf("Done rule\n");
         //if (*pc) printf("\nNOT ZERO: '%c' (%02x) *PC\n", *pc, *pc);
         //assert(!*pc); // if no action then error here because ++pc?
@@ -560,12 +597,15 @@ int main(void) {
       exit(3);
     }
 
+    // restore stk to THEN.stk after ELSE if ELSE returned...
+    // TODO:
+    //if (*r=='}' && stk>60) assert(!"TODO: THEN.stk");
+
     // -- MATCH!
     
     // update ax
     if (islower(*bc)) ax= *bc;
-    else if (0==strcmp(r, "%d<") || 0==strcmp(r, "%d=") || 0==strcmp(r, "%d>")) /* unchanged */;
-    else if (0==strchr("I[]{}^", *bc)) ax= '?'; // all other ops "destroy it"
+    else if (changesAX(r)) ax= '?';
     // TODO: pushax?
 
 
@@ -574,7 +614,7 @@ int main(void) {
     // TODO: %d %a???
   }
 
-  printf("...bytes: %d\n", bytes);
+  printf("\n...bytes: %d\n", bytes);
   }
 
   #endif // MATCHER
