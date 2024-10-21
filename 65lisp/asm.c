@@ -2,8 +2,14 @@
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
 //
+
+// 50 bytes
+// - track ax, no clever reuse
+// - [1+ etc... no need pushax
+
 // 59 bytes first GEN no opt Not working?
 //
+
 // NOT OPTIMIZED:
 // - ax reuse
 // - ax is a, doesn't know
@@ -179,22 +185,22 @@ void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
 #ifdef RULES
 
 char* rules[]= {
-  "0+", "", 0, 0,
-  "1+", mJSR("??"), U 3, U incax2, REND
-  "2+", mJSR("??"), U 3, U incax4, REND
-  "3+", mJSR("??"), U 3, U incax6, REND
-  "4+", mJSR("??"), U 3, U incax8, REND
+  "[0+", "", 0, 0,
+  "[1+", mJSR("??"), U 3, U incax2, REND
+  "[2+", mJSR("??"), U 3, U incax4, REND
+  "[3+", mJSR("??"), U 3, U incax6, REND
+  "[4+", mJSR("??"), U 3, U incax8, REND
   // TODO: only <255
   //"[%b+", mLDYn("#") mJSR("??"), U 5, U incaxy, 0,
 
   "+", mJSR("??") "s-", U 5, U tosaddax, REND
 
 
-  "0-", "", 0, REND
-  "1-", mJSR("??"), U 3, U decax2, REND
-  "2-", mJSR("??"), U 3, U decax4, REND
-  "3-", mJSR("??"), U 3, U decax6, REND
-  "4-", mJSR("??"), U 3, U decax8, REND
+  "[0-", "", 0, REND
+  "[1-", mJSR("??"), U 3, U decax2, REND
+  "[2-", mJSR("??"), U 3, U decax4, REND
+  "[3-", mJSR("??"), U 3, U decax6, REND
+  "[4-", mJSR("??"), U 3, U decax8, REND
   // TODO: only <255
   //"[%b-", mLDYn("#") mJSR("??"), U 5, U decaxy, REND
 
@@ -202,30 +208,30 @@ char* rules[]= {
 
   // ][ conflicts with this
 
-  "0*", mLDAn("\0") mTAX(), U 3, REND
-  "1*", "", 0, 0,
-  "2*", mJSR("??"), U 3, U aslax1, REND
-  "3*", mJSR("??"), U 3, U mulax3, REND
-  "4*", mJSR("??"), U 3, U aslax2, REND
-  "5*", mJSR("??"), U 3, U mulax5, REND
-  "6*", mJSR("??"), U 3, U mulax6, REND
-  "7*", mJSR("??"), U 3, U mulax7, REND
-  "8*", mJSR("??"), U 3, U aslax3, REND
+  "[0*", mLDAn("\0") mTAX(), U 3, REND
+  "[1*", "", 0, 0,
+  "[2*", mJSR("??"), U 3, U aslax1, REND
+  "[3*", mJSR("??"), U 3, U mulax3, REND
+  "[4*", mJSR("??"), U 3, U aslax2, REND
+  "[5*", mJSR("??"), U 3, U mulax5, REND
+  "[6*", mJSR("??"), U 3, U mulax6, REND
+  "[7*", mJSR("??"), U 3, U mulax7, REND
+  "[8*", mJSR("??"), U 3, U aslax3, REND
   // TODO: how to match? \0 lol Z match \0?
-  ",Z\x09*", mJSR("??"), U 3, U mulax9, REND
+  "[,Z\x09*", mJSR("??"), U 3, U mulax9, REND
   // TODO: how to match?
-  ",Z\x0a*", mJSR("??"), U 3, U mulax10, REND
+  "[,Z\x0a*", mJSR("??"), U 3, U mulax10, REND
   // TODO: only <255
   //"[%b*", mLDA("#") mJSR("??"), U 5, U tosmula0, REND
 
   "*", mJSR("??") mJSR("??") mANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
 
-  "2/", mJSR("??"), U 3, U asrax1, REND
-  "4/", mJSR("??"), U 3, U asrax2, REND
-  "8/", mJSR("??"), U 3, U asrax3, REND
+  "[2/", mJSR("??"), U 3, U asrax1, REND
+  "[4/", mJSR("??"), U 3, U asrax2, REND
+  "[8/", mJSR("??"), U 3, U asrax3, REND
 
-  ",Z\x10/", mJSR("??"), U 3, U asrax4, REND
+  "[,Z\x10/", mJSR("??"), U 3, U asrax4, REND
   //",Z\x80/", mJSR("??"), U 3, U asrax7, REND  // doesn't exist?
   // TODO: only <255
   //"%b/", mLDAn("#") mJSR("??"), U 5, U pushax, U tosdiva0, REND
@@ -233,13 +239,13 @@ char* rules[]= {
   "/", mJSR("??") mJSR("??") mANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
 
-  "0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
-  "%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
+  "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
+  "[%d=", mCMPn("_") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
 
   "=", mJSR("??") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
-  "%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
+  "[%d<", mTAY() mCMPn("_") mTXA() mSBCn("\"") mTYA() mBCS("\0"), U 9, REND
 
   "<", mJSR("??"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
@@ -339,6 +345,7 @@ uint  ww;  // _ ww
 uchar whi; // " // TODO: redundant? we have ww?
 char  charmatch; 
 int   stk= 0;
+char  ax= 0;
 
 char matching(char* bc, char* r) {
   charmatch= ww= whi= 0;
@@ -429,6 +436,9 @@ int main(void) {
 
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
+
+  ax= 'a';
+
   while(*bc) {
     // Search all rules for first match
     // TODO: move out
@@ -436,7 +446,7 @@ int main(void) {
     char i, *pc, c; int z;
     char match= 0;
 
-    printf("\n\n- %s\tSTK=%d\n", bc, stk);
+    printf("\n\n- %-30s\tSTK=%d AX=%c\n", bc, stk, ax);
 
     while(*p) {
       if (matching(bc, *p)) {
@@ -449,6 +459,7 @@ int main(void) {
       APRINT("  %s\t", r);
       pc= *p++; z= (uint)*p++;
       APRINT(" [%d] ", z);
+      // Parse ASM and ACTION
       while(z-- > 0) { // *pc) {
         c= *pc;
         if (c==0x20) { APRINT(" JSR "); }
@@ -483,6 +494,14 @@ int main(void) {
       printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
       exit(3);
     }
+
+    // -- MATCH!
+    
+    // update ax
+    if (islower(*bc)) ax= *bc;
+    else if (0==strcmp(r, "%d<") || 0==strcmp(r, "%d=") || 0==strcmp(r, "%d>")) /* unchanged */;
+    else if (0==strchr("I[]{}^", *bc)) ax= '?'; // all other ops "destroy it"
+    // TODO: pushax?
 
     bc+= charmatch;
     //printf(">>> bc='%s' r='%s' bc='%s'\n", bc, r, bc);
