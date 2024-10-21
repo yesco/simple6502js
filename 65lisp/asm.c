@@ -1,7 +1,7 @@
 // ./run-asm to compile and run this...
 
-// 7184 bytes... (no DEBASM no APRINT)
-// (- 7184 3905) == 3279 BYTES optimizer code!!! (incl rules)
+// 7076 bytes... (no DEBASM no APRINT)
+// (- 7076 3905) == 3171 3279 BYTES optimizer code!!! (incl rules)
 // (- 4823 3905) === 918 bytes rules! (-100B REND)
 
 #define RULES
@@ -10,8 +10,8 @@
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-#define APRINT(...) printf(__VA_ARGS__)
-//#define APRINT(...) 
+//#define APRINT(...) printf(__VA_ARGS__)
+#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -386,45 +386,54 @@ char  ax= 0;
 char  patchstk[MAXIF], *patch= patchstk+MAXIF;
 char  gen[255]; // generate asm bytes
 
+// Rule maching understands following "tests":
+//   c     == match literal char (if none of the following:)
+//   Z     == 0 byte
+//   %d    == match ",xxxx" or "3" (digit) sets "ww"
+//            used by ww, w+, w? and #, and "
+//   %a    == match 'a'-'z'
+//   %0 -9 == match only if STK is 0-9
+//   %^    == match if STK is 60+ == after RETURN
 char matching(char* bc, char* r) {
+  char c, nc;
   charmatch= ww= whi= 0;
   DEBASM(printf("\tRULE: '%s' STK=%d\n", r, stk));
-  while(*r) {
-    DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, *r, bc, r, stk));
-    if (*r=='Z') { if (*bc) break; } // match \0
+  c= *r;
+  while(c) {
+    nc= r[1];
 
-    // TODO: one test of *r=='%'
-
-    // TODO: %b match only 0 <= x <= 255
-    else if (*r=='%' && r[1]=='d') {
+    DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, c, bc, r, stk));
+    if (c=='Z') { if (*bc) break; } // match \0
+    else if (c=='%') {
+      if (nc=='d') {
+        // TODO: actually, do we care if it's number? Hmmm... (, case)
+        if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
+        else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
+        else return 0;
+      } else if (islower(nc)) { // TODO:
+        // TODO: if request ax?
+        char lastvar= 'a'; // TODO: fix, lol
+        if (!islower(*bc)) return 0;
+        assert(*bc==lastvar); // TODO: fix, lol
+        ww= 2*(lastvar-*bc+stk)+1;
+      } else if (isdigit(nc)) {
+        // stack depth match
+        // TODO: this is manipulated during matching, lol so all wrong!
+        if (stk!=nc-'0') return 0;
+        --charmatch;
+      } else if (c=='%' && nc=='^') {
+        printf("HERE %^ stk=%d\n", stk);
+        if (stk<60) return 0;
+        --charmatch;
+      }
       ++r;
-      if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
-      else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
-      else return 0;
-    } else if (*r=='%' && islower(r[1])) { // TODO:
-      // TODO: if request ax?
-      char lastvar= 'a'; // TODO: fix, lol
-      if (!islower(*bc)) return 0;
-      assert(*bc==lastvar); // TODO: fix, lol
-      ++r;
-      ww= 2*(lastvar-*bc+stk)+1;
-    } else if (*r=='%' && isdigit(r[1])) {
-      // stack depth match
-      // TODO: this is manipulated during matching, lol so all wrong!
-      if (stk!=r[1]-'0') return 0;
-      ++r;
-      --charmatch;
-    } else if (*r=='%' && r[1]=='^') {
-      printf("HERE %^ stk=%d\n", stk);
-      if (stk<60) return 0;
-      ++r;
-      --charmatch;
-    } else if (*bc != *r) return 0;
+    } else if (*bc != c) return 0; // simple char exact match
     ++charmatch;
-    ++bc; ++r;
+    ++bc;
+    c= *++r;
   }
   // got to end of rule == match!
-  return !*r;
+  return !c;
 }
 #endif // MATCHER
 
