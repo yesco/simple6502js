@@ -5,13 +5,13 @@
 // (- 4823 3905) === 918 bytes rules! (-100B REND)
 
 #define RULES
-//#define MATCHER
+#define MATCHER
 
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-//#define APRINT(...) printf(__VA_ARGS__)
-#define APRINT(...) 
+#define APRINT(...) printf(__VA_ARGS__)
+//#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -27,7 +27,6 @@
 // 42 bytes, LOL
 // - corrected gen etc, counted -z wrongly at '#' and '"'
 // - PROG: 8180 bytes, RULES: 414 bytes, +ASM: 4K
-
 // 37 bytes (!) I think it's wrong as it ends with RTS, lol STK wrong after IF...
 // - simplify skip rule
 // - "^{" ELSE no generate skip ELSE part if ended with RETURN ^
@@ -47,14 +46,15 @@
 
 // 59 bytes first GEN no opt Not working?
 // - just generate first non-optimized
+// - PROG: 6737 bytes, RULES: 878 bytes, +ASM: 2523 bytes
+
 
 // NOT OPTIMIZED:
-// - IF after return no need JMP end...
 // - ax push delay
 // - I ..^{ ..^} doesn't know stack depth from before, recurse?
 // - JMP/JSR 0 0 needs to post substitute to actual address
 // - actually call it!
-// - PROG: 6737 bytes, RULES: 878 bytes, +ASM: 2523 bytes
+// - last usage of lastvar, can do popax instead, cheaper/less stack adjustment? (unless have locals)
 
 #include <stdio.h>
 #include <unistd.h>
