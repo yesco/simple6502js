@@ -10,8 +10,8 @@
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-//#define APRINT(...) printf(__VA_ARGS__)
-#define APRINT(...) 
+#define APRINT(...) printf(__VA_ARGS__)
+//#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -67,7 +67,9 @@
 //         lda     #$01
 //         jsr     addeqysp
 // VERY COMMON? why not LDY 3   jsr WINCYSP // 5 bytes
-
+//
+// - possile, read bytecode from fixed array buffer -> more simple code on "bc"
+// - look at gen[bytes]= ... is it optimal code gen? 
 
 #include <stdio.h>
 #include <unistd.h>
@@ -454,10 +456,11 @@ char matching(char* bc, char* r) {
 #endif // MATCHER
 
 unsigned char changesAX(char* rule) {
-    if (0==strcmp(rule, "%d<") || 0==strcmp(rule, "%d=") || 0==strcmp(rule, "%d>")) return 0;
-    if (strchr("I[]{}^", *rule)) return 0;
-    // all other ops changes AX
-    return 1;
+  // TODO: get first char?
+  if (0==strcmp(rule, "[%d<") || 0==strcmp(rule, "[%d=") || 0==strcmp(rule, "[%d>")) return 0;
+  if (strchr("I]{}^", *rule)) return 0;
+  // all other ops changes AX
+  return 1;
 }
 
 //int main(int argc, char** argv) {
