@@ -1,7 +1,7 @@
 // ./run-asm to compile and run this...
 
-// 7076 bytes... (no DEBASM no APRINT)
-// (- 7076 3905) == 3171 3279 BYTES optimizer code!!! (incl rules)
+// 7009 bytes... (no DEBASM no APRINT)
+// (- 7009 3905) == 3104 BYTES optimizer code!!! (incl rules)
 // (- 4823 3905) === 918 bytes rules! (-100B REND)
 
 #define RULES
@@ -55,6 +55,7 @@
 // - JMP/JSR 0 0 needs to post substitute to actual address
 // - actually call it!
 // - last usage of lastvar, can do popax instead, cheaper/less stack adjustment? (unless have locals)
+// - cc65 is clever about tracking Y register value, not sure if really doable, lol
 
 #include <stdio.h>
 #include <unistd.h>
@@ -395,27 +396,28 @@ char  gen[255]; // generate asm bytes
 //   %0 -9 == match only if STK is 0-9
 //   %^    == match if STK is 60+ == after RETURN
 char matching(char* bc, char* r) {
-  char c, nc;
+  char c, nc, b;
   charmatch= ww= whi= 0;
   DEBASM(printf("\tRULE: '%s' STK=%d\n", r, stk));
   c= *r;
   while(c) {
     nc= r[1];
+    b= *bc;
 
-    DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", *bc, c, bc, r, stk));
-    if (c=='Z') { if (*bc) break; } // match \0
+    DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", b, c, bc, r, stk));
+    if (c=='Z') { if (b) break; } // match \0
     else if (c=='%') {
       if (nc=='d') {
         // TODO: actually, do we care if it's number? Hmmm... (, case)
-        if (*bc==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
-        else if (isdigit(*bc) && *bc<='8') { ww= *bc-'0'; whi= 0; }
+        if (b==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
+        else if (isdigit(b) && b<='8') { ww= b-'0'; whi= 0; }
         else return 0;
       } else if (islower(nc)) { // TODO:
         // TODO: if request ax?
         char lastvar= 'a'; // TODO: fix, lol
-        if (!islower(*bc)) return 0;
-        assert(*bc==lastvar); // TODO: fix, lol
-        ww= 2*(lastvar-*bc+stk)+1;
+        if (!islower(b)) return 0;
+        assert(b==lastvar); // TODO: fix, lol
+        ww= 2*(lastvar-b+stk)+1;
       } else if (isdigit(nc)) {
         // stack depth match
         // TODO: this is manipulated during matching, lol so all wrong!
@@ -427,7 +429,7 @@ char matching(char* bc, char* r) {
         --charmatch;
       }
       ++r;
-    } else if (*bc != c) return 0; // simple char exact match
+    } else if (b != c) return 0; // simple char exact match
     ++charmatch;
     ++bc;
     c= *++r;
