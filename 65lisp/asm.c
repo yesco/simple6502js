@@ -20,7 +20,7 @@
 // TODO: make variant that pushes params on R stack with PHA, return becomes PLA
 //   potentially less code! and 30% faster!
 
-// 42 bytes
+// 42 bytes, LOL
 // - corrected gen etc, counted -z wrongly at '#' and '"'
 
 // 37 bytes (!) I think it's wrong as it ends with RTS, lol STK wrong after IF...
@@ -495,13 +495,13 @@ int main(void) {
     // Search all rules for first match
     // TODO: move out
     char **p= rules, *r= 0;
-    char i, *pc, c; int z;
+    char i, *pc, c, nc; int z;
     char match= 0;
     APRINT("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
 
     // for each rule
     while(*p) {
-      r= *p++;
+      r= *p; ++p;
 
       // find matching prefix ("peep-hole code-gen/optimizer")
       if (matching(bc, r)) {
@@ -509,7 +509,7 @@ int main(void) {
         match= 1;
       }
       // get action/asm of rule, and length in bytes
-      pc= *p++; z= (uint)*p++;
+      pc= *p; z= (uint)*++p; ++p;
 
       if (match) {
         APRINT("  %s\t", r);
@@ -530,9 +530,10 @@ int main(void) {
         // Parse ASM and ACTION of single rule
         // (also consumes parameters from p)
         // (we need z as \0 might occur inside string!)
-        while(z-- > 0) { // *pc) {
+        while(z) {
           //APRINT(" --%d--", z);
-          gen[bytes]= c= *pc;
+          gen[bytes]= c= *pc; ++pc;
+          nc= *pc;
 
           // LOL, wtf, turning into a mini disasm... lol
           if (c==0x20) { APRINT(" JSR "); }
@@ -555,26 +556,34 @@ int main(void) {
           else if (c=='"') { APRINT("#$%02x ", ww>>8); gen[bytes]= ww>8; }
           // (take word)
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
-          else if (c=='w' && pc[1]=='w') { --z;++pc; APRINT("$%04X ", ww);   *(uint*)(gen+bytes)= ww;     }
-          else if (c=='w' && pc[1]=='+') { --z;++pc; APRINT("$%04X ", ww+1); *(uint*)&gen[bytes]= ww+1; }
-          // take extra word parameter from rules
-          else if (c=='w' && pc[1]=='?') { --z;++pc; APRINT("$%04X ", *p);   *(uint*)(gen+bytes)= (uint)*p; ++p;}
-
+          else if (c=='w') {
+            uint* pi= (uint*)(gen+bytes);
+            if (nc=='w')      { APRINT("$%04X ", ww);   *pi= ww;   }
+            else if (nc=='+') { APRINT("$%04X ", ww+1); *pi= ww+1; }
+            // take extra word parameter from rules
+            else if (nc=='?') { APRINT("$%04X ", *p);   *pi= (uint)*p; ++p; }
+            //else assert(!"BAD nc!");
+            --z;++pc;
+            ++bytes;
+          }
           // -- actions to track stack changes
-          else if (c=='s' && pc[1]=='+') { --z;++pc; ++stk; }
-          else if (c=='s' && pc[1]=='-') { --z;++pc; --stk; }
-          else if (c=='s' && pc[1]=='^') { --z;++pc; stk=64; }
+          else if (c=='s') {
+            if      (nc=='+') ++stk;
+            else if (nc=='-') --stk;
+            else if (nc=='^') stk=64;
+            --z;++pc;
+          }
           // -- actions for IF
           //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
 
-          else if (c==':') { *--patch= bytes; }
-          else if (c==';') { gen[bytes]= *patch++; }
-          else if (c=='/') { c= *patch; *patch= patch[1]; patch[1]= c; }
-          else { APRINT(" %02x ", *pc); } // we don't know, for now
+          else if (c==':') { *--patch= bytes; }                          // label=push
+          else if (c==';') { gen[bytes]= *patch; ++patch; }              // patch=pop
+          else if (c=='/') { c= *patch; *patch= patch[1]; patch[1]= c; } // swap
+          else { APRINT(" %02x ", c); } // we don't know, for now
 
-          if (c!='s' & c!=':' && c!=';' && c!='/') ++bytes;
-          if (c=='w') ++bytes;
-          ++pc;
+          // TODO: more efficient?
+          if (c!='s' && c!=':' && c!=';' && c!='/') ++bytes;
+          --z;
         } // end while action/asm
 
         //printf("Done rule\n");
@@ -587,7 +596,7 @@ int main(void) {
       DEBASM(printf("\n\n"));
 
       assert(!*p);
-      p++;
+      ++p;
       if (match) break;
     }
 
