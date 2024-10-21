@@ -1,17 +1,17 @@
 // ./run-asm to compile and run this...
 
-// 7275 bytes... TOTAL 3K? (no DEBASM no APRINT
-// (- 7275 4214) == 3061 BYTES optimizer code!!! (incl rules)
-// (- 4628 4214) === 414 bytes rules! (-100B REND)
+// 7184 bytes... (no DEBASM no APRINT)
+// (- 7184 3905) == 3279 BYTES optimizer code!!! (incl rules)
+// (- 4823 3905) === 918 bytes rules! (-100B REND)
 
 #define RULES
-#define MATCHER
+//#define MATCHER
 
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-#define APRINT(...) printf(__VA_ARGS__)
-//#define APRINT(...) 
+//#define APRINT(...) printf(__VA_ARGS__)
+#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -20,8 +20,13 @@
 // TODO: make variant that pushes params on R stack with PHA, return becomes PLA
 //   potentially less code! and 30% faster!
 
+// 42 bytes, but optimized code...
+// - PROG: 7702 bytes, RULES: 918 bytes, +ASM: 3279 bytes
+//   (why did RULES increase?)
+
 // 42 bytes, LOL
 // - corrected gen etc, counted -z wrongly at '#' and '"'
+// - PROG: 8180 bytes, RULES: 414 bytes, +ASM: 4K
 
 // 37 bytes (!) I think it's wrong as it ends with RTS, lol STK wrong after IF...
 // - simplify skip rule
