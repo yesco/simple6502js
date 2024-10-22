@@ -10,8 +10,8 @@
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-#define APRINT(...) printf(__VA_ARGS__)
-//#define APRINT(...) 
+//#define APRINT(...) printf(__VA_ARGS__)
+#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -19,6 +19,10 @@
 
 // TODO: make variant that pushes params on R stack with PHA, return becomes PLA
 //   potentially less code! and 30% faster!
+
+// 45 bytes, lol
+// - (/ 1137712 674346.0) 69% slower if not use register
+//   also removed match var, z is now byte, moved vars out of scope...
 
 // 42 bytes, but optimized code...
 // - PROG: 7702 bytes, RULES: 918 bytes, +ASM: 3279 bytes
@@ -463,88 +467,40 @@ unsigned char changesAX(char* rule) {
   return 1;
 }
 
-//int main(int argc, char** argv) {
-int main(void) {
+//void compile(register char* bc) {
+void compile(char* bc) {
+  int bytes= 0;
 
-/*
-  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 65, 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66); // 28 bytes...
-  //TYA(); TXA(); LDAn(65); LDA(256*65+66); // (- 3365 3333) 32 bytes...
+  // register: (/ 1137712 766349.0) 49% slower without register
+  // (however, no function below here can use it, as it'll trash/copy too much!)
 
-  //printf("foo: %s\n", MAKE_STR(65, 66, 67, 68));
-
-#define ABCD ((unsigned int)printf)
-#define HXS(a,s) ("0123456789abcdef"[(((unsigned int)a)>>s) & 0x0f])
-
-#define STR(a) #a
-#define FOO(a) STR(a)
-#define BAR(a) FOO((a>>0))
-
-#define HEX(a) STR(HXS(a,12)) STR(HXS(a,8)) STR(HXS(a,4) HXS(a,0))
-  printf("%04x<FISH\n", printf);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>12) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>8) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>4) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>0) & 0x0f]);
-
-  printf("%c<ABBA\n", HXS(printf,12));
-  printf("%c<ABBA\n", HXS(printf,8));
-  printf("%c<ABBA\n", HXS(printf,4));
-  printf("%c<ABBA\n", HXS(printf,0));
-  printf("\n%s<STR\n", STR(ABCD));
-  printf("\n%s<FOO\n", FOO(ABCD));
-  printf("\n%s<FOO\n", BAR(ABCD));
-//  printf("%s<ABBA\n", HXS(printf,12) HXS(printf,8) "\0");
-
-//  printf("%s", HEX(printf) "\n");
-
-*/
-
-  #ifdef MATCHER
-  {
-
-    int bytes= 0;
-
-  char* bc= "[3[3+"; // works
-  //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
-
-  // ./65vm -v -e "(if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2))))"
-  bc= "[a[2<I][a{][a[1-R[a[2-R+}";
-
-  // ./65vm -v -e "(if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2)))))"
-  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
-
-  //bc= "b";
+  register char **p, *r;
 
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
+
+  char i, *pc, c, nc, z;
 
   ax= 'a';
 
   // process byte code
   while(*bc) {
-    // Search all rules for first match
-    // TODO: move out
-    char **p= rules, *r= 0;
-    char i, *pc, c, nc; int z;
-    char match= 0;
     APRINT("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
 
+    // Search all rules for first match
+    // TODO: move out
+
     // for each rule
+    p= rules;
     while(*p) {
       r= *p; ++p;
+
+      // get action/asm of rule, and length in bytes
+      pc= *p; z= (uint)*++p; ++p;
 
       // find matching prefix ("peep-hole code-gen/optimizer")
       if (matching(bc, r)) {
         //APRINT("---MATCH: '%s'\ton '%s'\n", *p, bc);
-        match= 1;
-      }
-      // get action/asm of rule, and length in bytes
-      pc= *p; z= (uint)*++p; ++p;
-
-      if (match) {
         APRINT("  %s\t", r);
 
         // if variable and ax alread contains, done!
@@ -619,22 +575,18 @@ int main(void) {
           --z;
         } // end while action/asm
 
-        //printf("Done rule\n");
-        //if (*pc) printf("\nNOT ZERO: '%c' (%02x) *PC\n", *pc, *pc);
-        //assert(!*pc); // if no action then error here because ++pc?
+        break;
       } // if match
 
-      // skip remaining parameters (lol)
+      // skip remaining parameters (assuming none zero)
       while(*p) { DEBASM(printf("\n\t: CONSUME PARAM %04x", *p)); ++p; }
       DEBASM(printf("\n\n"));
 
-      assert(!*p);
+      // go to next rule
       ++p;
-      if (match) break;
-    }
+    } // while do next rule
 
-    // TODO: move bc forward almost length of rule, but %d... %a...
-    if (!match) {
+    if (!*r) { // no more rules
       printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
       exit(3);
     }
@@ -643,23 +595,71 @@ int main(void) {
     // TODO:
     //if (*r=='}' && stk>60) assert(!"TODO: THEN.stk");
 
-    // -- MATCH!
-    
-    // update ax
+    // -- update ax
     if (islower(*bc)) ax= *bc;
     else if (changesAX(r)) ax= '?';
     // TODO: pushax?
 
-
     bc+= charmatch;
-    //printf(">>> bc='%s' r='%s' bc='%s'\n", bc, r, bc);
-    // TODO: %d %a???
   }
 
-  printf("\n...bytes: %d\n", bytes);
-  }
+  printf("\n\nASM...bytes: %d\n", bytes);
+}
 
-  #endif // MATCHER
+
+int main(void) {
+
+/*
+  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 0);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 65, 0);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66);
+  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66); // 28 bytes...
+  //TYA(); TXA(); LDAn(65); LDA(256*65+66); // (- 3365 3333) 32 bytes...
+
+  //printf("foo: %s\n", MAKE_STR(65, 66, 67, 68));
+
+#define ABCD ((unsigned int)printf)
+#define HXS(a,s) ("0123456789abcdef"[(((unsigned int)a)>>s) & 0x0f])
+
+#define STR(a) #a
+#define FOO(a) STR(a)
+#define BAR(a) FOO((a>>0))
+
+#define HEX(a) STR(HXS(a,12)) STR(HXS(a,8)) STR(HXS(a,4) HXS(a,0))
+  printf("%04x<FISH\n", printf);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>12) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>8) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>4) & 0x0f]);
+  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>0) & 0x0f]);
+
+  printf("%c<ABBA\n", HXS(printf,12));
+  printf("%c<ABBA\n", HXS(printf,8));
+  printf("%c<ABBA\n", HXS(printf,4));
+  printf("%c<ABBA\n", HXS(printf,0));
+  printf("\n%s<STR\n", STR(ABCD));
+  printf("\n%s<FOO\n", FOO(ABCD));
+  printf("\n%s<FOO\n", BAR(ABCD));
+//  printf("%s<ABBA\n", HXS(printf,12) HXS(printf,8) "\0");
+
+//  printf("%s", HEX(printf) "\n");
+
+*/
+
+#ifdef MATCHER
+  char* bc= "[3[3+"; // works
+  //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
+
+  // ./65vm -v -e "(if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2))))"
+  bc= "[a[2<I][a{][a[1-R[a[2-R+}";
+
+  // ./65vm -v -e "(if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2)))))"
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
+
+  //bc= "b";
+
+  compile(bc);
+
+#endif // MATCHER
 
   PROGSIZE;
   return 0;

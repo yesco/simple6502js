@@ -1,2 +1,2 @@
-rm out; (cl65 -O -T -t sim6502 asm.c vm-asm.s -o out  2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72 && sim65 out 
-(cl65 -S -T -O -t sim6502 asm.c vm-asm.s 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' )
+rm out; (cl65 -Or -O -T -t sim6502 asm.c vm-asm.s -o out  2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72 && sim65 -c out 
+(cl65 -S -T -Or -O -t sim6502 asm.c vm-asm.s 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' )
