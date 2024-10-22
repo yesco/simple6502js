@@ -1,8 +1,28 @@
 // ./run-asm to compile and run this...
 
-// 7009 bytes... (no DEBASM no APRINT)
-// (- 7009 3905) == 3104 BYTES optimizer code!!! (incl rules)
-// (- 4823 3905) === 918 bytes rules! (-100B REND)
+// This is a prototype of a "PEEP-HOLE CODE GENERATOR/OPTIMIZER"
+//
+// It works by looking at successive prefixes of AL byte-code
+// by ./65vm and then taking that as input.
+//
+// Rules are tested in order, so longest match needs to be first.
+// When a rule matches, it's "action" is run. This generates 
+// an assembly string, taking static parameters such as addresses,
+// and runs inline actions, such as keeping track of stack depth.
+//
+// A rule may also have pre/post-conditions, or special matchers.
+// These relates to conditions of stackdepths (%0 %3 %^),
+// and matching and extracting numbers on any form (,xxxx or '3').
+//
+// The code is about 50% of what the ./65asm hard-coded rules were,
+// which frankly was a code-mess.
+//
+// Speed is somewhat slower, but coming closer...
+
+
+// 6808 bytes... (no DEBASM no APRINT)
+// (- 6808 3905) == 2903 BYTES optimizer code!!! (incl rules)
+// (- 4823 3905) === 918 bytes, 70ish rules! (-100B REND)
 
 #define RULES
 #define MATCHER
@@ -23,6 +43,7 @@
 // 45 bytes, lol
 // - (/ 1137712 674346.0) 69% slower if not use register
 //   also removed match var, z is now byte, moved vars out of scope...
+// - PROG: 6808 bytes, RULES: 918 bytes, +ASM: 2903 bytes
 
 // 42 bytes, but optimized code...
 // - PROG: 7702 bytes, RULES: 918 bytes, +ASM: 3279 bytes
@@ -175,65 +196,14 @@ extern unsigned int nil=0;
 
 #define mBRK(a)  mO("\0")
 
-unsigned char bi=0, bz=0, buff[255];
 
 #define ASM(x, ...) addasm((x), sizeof(x)-1,__VA_ARGS__)
 
-// poor mans argv, LOL
-#define ARG(n) (*((uint*)(&len-2*n)))
-
-#ifdef BAR
-void __cdecl__ addasm(char* x, uchar len, ...) {
-  uchar c, n= 1;
-  uint* p= (uint*)&len;
-  //va_list ap;
-  //va_start(ap, fmt);
-  //for(c=1; c<15; ++c) printf("%04X = %04x\t", ARG(c), *--p);   putchar('\n');
-
-  printf("ASM[%d]:  \"%s\"\n", len, x);
-  for(bi=0 ;bi<len; ) {
-    c= x[bi];
-
-    if (c=='#') { buff[bz]= *--p; ++n; }
-    else if (c=='?') { buff[bz]= *--p; ++bz; ++bi; buff[bz]= *p >> 8; ++n; }
-    else buff[bz]= c;
- 
-    ++bz;
-    buff[bz]= 0; // BRK, haha
-
-    ++bi;
-  }
-  printf("ASM[%d]=> \"%s\"\n", len, buff);
-}
-
-#endif // BAR
-
-char mc[120]= {0};
-char* mcp= mc;
-
-/*
-
-#define DASM(x)
-
-void B(char b)  { DASM(printf("%02x ", b)); *mcp++= (b)&0xff; }
-void O(char op) { DASM(printf("\n\t")); B(op); }
-void W(void* w) { *((uint*)mcp)++= (uint)(w); DASM(printf("%04x", w)); }
-
-#define O2(op, b) do { O(op);B(b); } while(0)
-#define O3(op, w) do { O(op);W(w); } while(0)
-#define N3(opn, op, w) do { O(op);W(w); DASM(printf("\t\t%-4s %s", opn, #w)); } while(0) 
-#define N2(opn, op, b) do { O(op);B(b); DASM(printf("\t\t%-4s %02x", opn, b)); } while(0) 
-*/
-
-// cc65 can't do this:
-//#define MAKE_WORD(x,y) x,y
-//#define MAKE_STR(...) ((char[]){__VA_ARGS__, 0})
-
 #define U (void*)
 
-// TODO: we don't need end 0 on each line
+// TODO: instead of 2 bytes here, could have length inside hibyte of Z, but difficult to get right?
+//        macro?
 #define REND 0, // cost 100 bytes, only for consistency
-//#define REND
 
 #ifdef RULES
 
@@ -608,42 +578,6 @@ void compile(char* bc) {
 
 
 int main(void) {
-
-/*
-  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#"), 65, 0);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66);
-  bz=0; ASM(mTYA() mTXA() mLDAn("#") mLDA("??"), 65, 256*65+66); // 28 bytes...
-  //TYA(); TXA(); LDAn(65); LDA(256*65+66); // (- 3365 3333) 32 bytes...
-
-  //printf("foo: %s\n", MAKE_STR(65, 66, 67, 68));
-
-#define ABCD ((unsigned int)printf)
-#define HXS(a,s) ("0123456789abcdef"[(((unsigned int)a)>>s) & 0x0f])
-
-#define STR(a) #a
-#define FOO(a) STR(a)
-#define BAR(a) FOO((a>>0))
-
-#define HEX(a) STR(HXS(a,12)) STR(HXS(a,8)) STR(HXS(a,4) HXS(a,0))
-  printf("%04x<FISH\n", printf);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>12) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>8) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>4) & 0x0f]);
-  printf("%c<FISH\n", "0123456789abcdef"[(ABCD>>0) & 0x0f]);
-
-  printf("%c<ABBA\n", HXS(printf,12));
-  printf("%c<ABBA\n", HXS(printf,8));
-  printf("%c<ABBA\n", HXS(printf,4));
-  printf("%c<ABBA\n", HXS(printf,0));
-  printf("\n%s<STR\n", STR(ABCD));
-  printf("\n%s<FOO\n", FOO(ABCD));
-  printf("\n%s<FOO\n", BAR(ABCD));
-//  printf("%s<ABBA\n", HXS(printf,12) HXS(printf,8) "\0");
-
-//  printf("%s", HEX(printf) "\n");
-
-*/
 
 #ifdef MATCHER
   char* bc= "[3[3+"; // works
