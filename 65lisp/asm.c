@@ -202,7 +202,7 @@ extern unsigned int nil=0;
 
 // TODO: instead of 2 bytes here, could have length inside hibyte of Z, but difficult to get right?
 //        macro?
-#define REND 0, // cost 100 bytes, only for consistency
+#define REND 0, // cost 70rules x 2 bytes= 140 bytes, needed unless have count inside bytelen...
 
 #ifdef RULES
 
