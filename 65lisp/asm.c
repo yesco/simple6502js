@@ -120,84 +120,83 @@ typedef unsigned uchar;
 extern unsigned int T=42;
 extern unsigned int nil=0;
 
-#define mO(op) op
-#define mO2(op, b) op b
-#define mN2(name, op, b) mO2(op,b)
+#define O(op) op
+#define O2(op, b) op b
+#define N2(name, op, b) O2(op,b)
 
-#define mO3(op, w) op w
-#define mN3(name, op, w) mO3(op,w)
+#define O3(op, w) op w
+#define N3(name, op, w) O3(op,w)
 
-#define mLDAn(n) mN2("LDAn","\xA9",n)
-#define mLDXn(n) mN2("LDXn","\xA2",n)
-#define mLDYn(n) mN2("LDYn","\xA0",n)
-
-
-#define mLDA(w)  mO3("\xAD",w)
-#define mLDX(w)  mO3("\xAE",w)
-#define mLDY(w)  mO3("\xAC",w)
-
-#define mSTA(w)  mO3("\x8D",w)
-#define mSTX(w)  mO3("\x8E",w)
-#define mSTY(w)  mO3("\x8C",w)
+#define LDAn(n) N2("LDAn","\xA9",n)
+#define LDXn(n) N2("LDXn","\xA2",n)
+#define LDYn(n) N2("LDYn","\xA0",n)
 
 
-#define mANDn(b) mO2("\x29",b)
-#define mORAn(b) mO2("\x09",b)
-#define mEORn(b) mO2("\x49",b)
+#define LDA(w)  O3("\xAD",w)
+#define LDX(w)  O3("\xAE",w)
+#define LDY(w)  O3("\xAC",w)
 
-#define mASL()   mO("\x0A")
-#define mCMPn(b) mN2("CMPn","\xC9",b)
-#define mCPXn(b) mN2("CPXn","\xE0",b)
-#define mCPYn(b) mN2("CPYn","\xC0",b)
-
-#define mSBCn(b) mN2("SBC","\xE9", b)
-
-#define mPHP()   mO("\x08")
-#define mCLC()   mO("\x18")
-#define mPLP()   mO("\x28")
-#define mSEC()   mO("\x38")
-
-#define mPHA()   mO("\x48")
-#define mCLI()   mO("\x58")
-#define mPLA()   mO("\x68")
-#define mSEI()   mO("\x78")
-
-#define mDEY()   mO("\x88")
-#define mTYA()   mO("\x98")
-#define mTAY()   mO("\xA8")
-#define mCLV()   mO("\xB8")
-
-#define mINY()   mO("\xC8")
-#define mCLD()   mO("\xD8")
-#define mINX()   mO("\xE8")
-#define mSED()   mO("\xF8")
-
-#define mTXA()   mO("\x8A")
-#define mTAX()   mO("\xAA")
-
-#define mBMI(b)  mO2("\x30", b)
-#define mBPL(b)  mO2("\x10", b)
-
-#define mBNE(b)  mO2("\xD0",b)
-#define mBEQ(b)  mO2("\xF0",b)
-
-#define mBCC(b)  mO2("\x90",b)
-#define mBCS(b)  mO2("\xB0",b)
-
-#define mBVC(b)  mO2("\x50",b)
-#define mBVS(b)  mO2("\x70",b)
+#define STA(w)  O3("\x8D",w)
+#define STX(w)  O3("\x8E",w)
+#define STY(w)  O3("\x8C",w)
 
 
-#define mJSR(a)  mN3("JSR","\x20",a)
-#define mRTS(a)  mO("\x60")
+#define ANDn(b) O2("\x29",b)
+#define ORAn(b) O2("\x09",b)
+#define EORn(b) O2("\x49",b)
 
-#define mJMP(a)  mN3("JMP", "\x4c",a)
-#define mJMPi(a) mN3("JPI", "\x6c",a)
+#define ASL()   O("\x0A")
+#define CMPn(b) N2("CMPn","\xC9",b)
+#define CPXn(b) N2("CPXn","\xE0",b)
+#define CPYn(b) N2("CPYn","\xC0",b)
 
-#define mBRK(a)  mO("\0")
+#define SBCn(b) N2("SBC","\xE9", b)
+
+#define PHP()   O("\x08")
+#define CLC()   O("\x18")
+#define PLP()   O("\x28")
+#define SEC()   O("\x38")
+
+#define PHA()   O("\x48")
+#define CLI()   O("\x58")
+#define PLA()   O("\x68")
+#define SEI()   O("\x78")
+
+#define DEY()   O("\x88")
+#define TYA()   O("\x98")
+#define TAY()   O("\xA8")
+#define CLV()   O("\xB8")
+
+#define INY()   O("\xC8")
+#define CLD()   O("\xD8")
+#define INX()   O("\xE8")
+#define SED()   O("\xF8")
+
+#define TXA()   O("\x8A")
+#define TAX()   O("\xAA")
+
+#define BMI(b)  O2("\x30", b)
+#define BPL(b)  O2("\x10", b)
+
+#define BNE(b)  O2("\xD0",b)
+#define BEQ(b)  O2("\xF0",b)
+
+#define BCC(b)  O2("\x90",b)
+#define BCS(b)  O2("\xB0",b)
+
+#define BVC(b)  O2("\x50",b)
+#define BVS(b)  O2("\x70",b)
 
 
-#define ASM(x, ...) addasm((x), sizeof(x)-1,__VA_ARGS__)
+#define JSR(a)  N3("JSR","\x20",a)
+#define RTS(a)  O("\x60")
+
+#define JMP(a)  N3("JMP", "\x4c",a)
+#define JMPi(a) N3("JPI", "\x6c",a)
+
+#define BRK(a)  O("\0")
+
+#define ASM(x,...) (x),U (sizeof(x)-1),__VA_ARGS__,REND
 
 #define U (void*)
 
@@ -209,125 +208,125 @@ extern unsigned int nil=0;
 
 char* rules[]= {
   "[0+", "", 0, 0,
-  "[1+", mJSR("w?"), U 3, U incax2, REND
-  "[2+", mJSR("w?"), U 3, U incax4, REND
-  "[3+", mJSR("w?"), U 3, U incax6, REND
-  "[4+", mJSR("w?"), U 3, U incax8, REND
+  "[1+", JSR("w?"), U 3, U incax2, REND
+  "[2+", JSR("w?"), U 3, U incax4, REND
+  "[3+", JSR("w?"), U 3, U incax6, REND
+  "[4+", JSR("w?"), U 3, U incax8, REND
   // TODO: only <255
-  //"[%b+", mLDYn("#") mJSR("w?"), U 5, U incaxy, 0,
+  //"[%b+", LDYn("#") JSR("w?"), U 5, U incaxy, 0,
 
-  "+", mJSR("w?") "s-", U 5, U tosaddax, REND
+  "+", JSR("w?") "s-", U 5, U tosaddax, REND
 
 
   "[0-", "", 0, REND
-  "[1-", mJSR("w?"), U 3, U decax2, REND
-  "[2-", mJSR("w?"), U 3, U decax4, REND
-  "[3-", mJSR("w?"), U 3, U decax6, REND
-  "[4-", mJSR("w?"), U 3, U decax8, REND
+  "[1-", JSR("w?"), U 3, U decax2, REND
+  "[2-", JSR("w?"), U 3, U decax4, REND
+  "[3-", JSR("w?"), U 3, U decax6, REND
+  "[4-", JSR("w?"), U 3, U decax8, REND
   // TODO: only <255
-  //"[%b-", mLDYn("#") mJSR("w?"), U 5, U decaxy, REND
+  //"[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND
 
-  "-", mJSR("w?") "s-", U 5, U tossubax, REND
+  "-", JSR("w?") "s-", U 5, U tossubax, REND
 
   // ][ conflicts with this
 
-  "[0*", mLDAn("\0") mTAX(), U 3, REND
+  "[0*", LDAn("\0") TAX(), U 3, REND
   "[1*", "", 0, 0,
-  "[2*", mJSR("w?"), U 3, U aslax1, REND
-  "[3*", mJSR("w?"), U 3, U mulax3, REND
-  "[4*", mJSR("w?"), U 3, U aslax2, REND
-  "[5*", mJSR("w?"), U 3, U mulax5, REND
-  "[6*", mJSR("w?"), U 3, U mulax6, REND
-  "[7*", mJSR("w?"), U 3, U mulax7, REND
-  "[8*", mJSR("w?"), U 3, U aslax3, REND
+  "[2*", JSR("w?"), U 3, U aslax1, REND
+  "[3*", JSR("w?"), U 3, U mulax3, REND
+  "[4*", JSR("w?"), U 3, U aslax2, REND
+  "[5*", JSR("w?"), U 3, U mulax5, REND
+  "[6*", JSR("w?"), U 3, U mulax6, REND
+  "[7*", JSR("w?"), U 3, U mulax7, REND
+  "[8*", JSR("w?"), U 3, U aslax3, REND
   // TODO: how to match? \0 lol Z match \0?
-  "[,Z\x09*", mJSR("w?"), U 3, U mulax9, REND
+  "[,Z\x09*", JSR("w?"), U 3, U mulax9, REND
   // TODO: how to match?
-  "[,Z\x0a*", mJSR("w?"), U 3, U mulax10, REND
+  "[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND
   // TODO: only <255
-  //"[%b*", mLDA("#") mJSR("w?"), U 5, U tosmula0, REND
+  //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND
 
-  "*", mJSR("w?") mJSR("w?") mANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
+  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
 
-  "[2/", mJSR("w?"), U 3, U asrax1, REND
-  "[4/", mJSR("w?"), U 3, U asrax2, REND
-  "[8/", mJSR("w?"), U 3, U asrax3, REND
+  "[2/", JSR("w?"), U 3, U asrax1, REND
+  "[4/", JSR("w?"), U 3, U asrax2, REND
+  "[8/", JSR("w?"), U 3, U asrax3, REND
 
-  "[,Z\x10/", mJSR("w?"), U 3, U asrax4, REND
-  //",Z\x80/", mJSR("w?"), U 3, U asrax7, REND  // doesn't exist?
+  "[,Z\x10/", JSR("w?"), U 3, U asrax4, REND
+  //",Z\x80/", JSR("w?"), U 3, U asrax7, REND  // doesn't exist?
   // TODO: only <255
-  //"%b/", mLDAn("#") mJSR("w?"), U 5, U pushax, U tosdiva0, REND
+  //"%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND
 
-  "/", mJSR("w?") mJSR("w?") mANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
+  "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
 
-  // "[0=", mSTXzp(tmp1) mORAzp(tmp1) mBNE("\0"), U 6, REND // TODO: destructive...
+  // "[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
-  "[0=", mTAY() mBNE("\x02") mCPXn("\0") mBNE("\0"), U 7, REND
-  "[%d=", mCMPn("#") mBNE("\x02") mCPXn("\"") mBNE("\0"), U 8, REND
+  "[0=", TAY() BNE("\x02") CPXn("\0") BNE("\0"), U 7, REND
+  "[%d=", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0"), U 8, REND
 
-  "=", mJSR("w?") "s-", U 5, U toseqax, REND
+  "=", JSR("w?") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
-  "[%d<", mTAY() mCMPn("#") mTXA() mSBCn("\"") mTYA() mBCS("\x00"), U 9, REND
+  "[%d<", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00"), U 9, REND
 
-  "<", mJSR("w?"), U 3, U toseqax, REND
+  "<", JSR("w?"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
   //"%d<", mTAY() mEORn("\x80") mCMPn("#") mTXA() mEORn("\x80") mSBCn("\"") mBCS("\0") mTYA() mBCS("\0"), U 12, REND
 
-  "A", mJSR("w?"), U 3, U ffcar, REND
-  "D", mJSR("w?"), U 3, U ffcdr, REND
-//"C", mJSR("w?") "s-", U 5, U cons, REND
+  "A", JSR("w?"), U 3, U ffcar, REND
+  "D", JSR("w?"), U 3, U ffcdr, REND
+//"C", JSR("w?") "s-", U 5, U cons, REND
 
-  "!", mJSR("w?") "s-", U 5, U staxspidx, REND
-  "@", mJSR("w?"), U 3, U ldaxi, REND
-//".", mJSR("w?"), U 3, U princ, REND
-//"W", mJSR("w?"), U 3, U prin1, REND
-//"P", mJSR("w?"), U 3, U print, REND
+  "!", JSR("w?") "s-", U 5, U staxspidx, REND
+  "@", JSR("w?"), U 3, U ldaxi, REND
+//".", JSR("w?"), U 3, U princ, REND
+//"W", JSR("w?"), U 3, U prin1, REND
+//"P", JSR("w?"), U 3, U print, REND
 
-  ",", mLDAn("#") mLDXn("#"), U 4, REND
-  ":", mSTA("ww") mSTX("w+"), U 6, REND
-  ";", mLDA("ww") mLDX("w+"), U 6, REND
+  ",", LDAn("#") LDXn("#"), U 4, REND
+  ":", STA("ww") STX("w+"), U 6, REND
+  ";", LDA("ww") LDX("w+"), U 6, REND
 
   "][", 0, U 0, REND // 3 zeroes! lol
-  "]", "s-" mJSR("w?"), U 5, U popax, REND // TODO: useful?
+  "]", "s-" JSR("w?"), U 5, U popax, REND // TODO: useful?
 
-  "[", "s+" mJSR("w?"), U 5, U pushax, REND
+  "[", "s+" JSR("w?"), U 5, U pushax, REND
 
-  //"0[", mJSR("w?"), U3, U pushzero, REND // TODO: need for local var? keep ax?
-  //"9[", mJSR("w?"), U3, U pushnil, REND // TODO: need for local var? keep ax?
-  "0", mLDAn("\0") mTAY(), U 3, REND
-  "9^%0", mJMP("w?"), U 3, U retnil, REND // redundant? auto opt...
-  "9",  mJSR("w?"), U 3, U retnil, REND
+  //"0[", JSR("w?"), U3, U pushzero, REND // TODO: need for local var? keep ax?
+  //"9[", JSR("w?"), U3, U pushnil, REND // TODO: need for local var? keep ax?
+  "0", LDAn("\0") TAY(), U 3, REND
+  "9^%0", JMP("w?"), U 3, U retnil, REND // redundant? auto opt...
+  "9",  JSR("w?"), U 3, U retnil, REND
 
-  "%d", mLDAn("#") mLDXn("\""), U 4, REND
+  "%d", LDAn("#") LDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
   // TODO: keep track of stack! [] enough?
   // TODO: if request ax?
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
-  //"[a", mJSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
-  "%a%1", mJSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
-  "%a",  mLDYn("#") mJSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
+  //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  "%a%1", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  "%a",  LDYn("#") JSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
 
   // TODO: more than 4 ...
-  "^%4", "s^" mJMP("w?"), U 5, U incsp8, REND
-  "^%3", "s^" mJMP("w?"), U 5, U incsp6, REND
-  "^%2", "s^" mJMP("w?"), U 5, U incsp4, REND
-  "^%1", "s^" mJMP("w?"), U 5, U incsp2, REND
-  "^%0", "s^" mRTS(),     U 3, REND
+  "^%4", "s^" JMP("w?"), U 5, U incsp8, REND
+  "^%3", "s^" JMP("w?"), U 5, U incsp6, REND
+  "^%2", "s^" JMP("w?"), U 5, U incsp4, REND
+  "^%1", "s^" JMP("w?"), U 5, U incsp2, REND
+  "^%0", "s^" RTS(),     U 3, REND
 
-  //"X^^",   "<" mJMP("ww"),   U 4, REND // ERROR (need popstack first/move)
-  "R^", "<" mJMP("\0\0") "s^", U 6, REND // SelfTailRecursion
-  "R",      mJSR("\0\0"),      U 3, REND // SelfRecursion // TODO: param count/STK?
-  "Z",  "<" mJMP("\0\0") "s^", U 6, REND // SelfTailRecursion/loop/Z
+  //"X^^",   "<" JMP("ww"),   U 4, REND // ERROR (need popstack first/move)
+  "R^", "<" JMP("\0\0") "s^", U 6, REND // SelfTailRecursion
+  "R",      JSR("\0\0"),      U 3, REND // SelfRecursion // TODO: param count/STK?
+  "Z",  "<" JMP("\0\0") "s^", U 6, REND // SelfTailRecursion/loop/Z
 
   // CALL = "Xcode" - would prefer other prefix?
-  //"X^^",    "<" mJMP("ww"),     U 4, REND // ERROR (need popstack first/move)
-  "X^", "<" mJMP("ww") "s^",  U 4, REND // TailCall other function
-  "X",      mJSR("ww"),       U 3, REND // Call other function // TODO: param/STK?
+  //"X^^",    "<" JMP("ww"),     U 4, REND // ERROR (need popstack first/move)
+  "X^", "<" JMP("ww") "s^",  U 4, REND // TailCall other function
+  "X",      JSR("ww"),       U 3, REND // Call other function // TODO: param/STK?
   
   // TODO: not complete yet
   //   patching ops=="immediate": :=save ;=patch /=swap
@@ -336,7 +335,7 @@ char* rules[]= {
   //   if return stack ... 64 lol
   "I", ":", U 1, REND
   "{%^", ":" "/" ";", U 3, REND // after return no need jmp endif!
-  "{", mSEC() mBCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
+  "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
   "}", ";", U 1, REND
   0};
 #endif // RULES
