@@ -36,6 +36,8 @@ unsigned int ultfib(unsigned int n) {
   return ultfib(n-1) + ultfib(n-2);
 }
 
+// VBCC: 153 bytes!!! better be fast, lol
+// cc65: Inline fib best 41 bytes => 114 bytes
 int ltfib(signed int n) {
   if (n<2) return n;
   return ltfib(n-1) + ltfib(n-2);

@@ -1,3 +1,64 @@
+
+jsr abc
+jsr def
+jsr ghi
+
+;;; interpreted
+        ;; ENTER
+code:   tya
+        pha
+        ldy #04                 ; newip+4 == bytes!
+        ;; stack: <caller> Y
+        jsr reinst              ; returns to caller of code. hmmm
+
+reinst: jsr install
+        jsr interpret
+        jmp reinst
+        ;;  calls other interpreted words
+bytes:  x
+        y
+        z
+        ^ -> we want it to return to
+        
+install:  
+        sta aa
+
+        ;; install new main ip
+        pla
+        sta ip+1
+        pla
+        sta ip
+
+        lda aa
+        rts
+        
+
+
+@each code
+        ;; 13B 18c
+selfinstall:                    
+        lda 
+        sta ip
+        lda
+        sta ip+1
+        pla
+        tay
+        jmp next
+
+enter:  
+        ptr1= destination address
+        phy
+        lda
+        pha selfinstallhi
+        lda
+        pha selfinstalllo
+        jmp (ptr1)
+
+ptr1:   user stuff
+        rts 
+        ;;  jumps back to selfinstall
+
+
 ;;; fast dispatch NEXT=18c DOCOL=30c EXIT=15c save AX in docol=10c   (sub +45c+10c save)
 ;;; fast dispatch NEXT=18c DOCOL=28c EXIT=15c save AX in docol=10c   (sub +43c+10c save)
 ;;;(fast dispatch NEXT=15c DOCOL=38c EXIT=14c ) NO SAVE AX index w Y TRASHES A Y ....

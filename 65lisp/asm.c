@@ -21,8 +21,8 @@
 
 
 // 6808 bytes... (no DEBASM no APRINT)
-// (- 6808 3905) == 2903 BYTES optimizer code!!! (incl rules)
-// (- 4823 3905) === 918 bytes, 70ish rules! (-100B REND)
+// (- 6803 3578) == 3225 BYTES optimizer code!!! (incl rules)
+// (- 4499 3578) === 921 bytes, 70ish rules! (-100B REND) (/ 921 70.0) = 13.16B/R
 
 #define RULES
 #define MATCHER
@@ -120,6 +120,31 @@ typedef unsigned uchar;
 extern unsigned int T=42;
 extern unsigned int nil=0;
 
+// Poor Mans Assembler
+// 
+// Generates strings from MNOMICS and arguments,
+// see how it's used. Inline constants need to be
+// proper C strings. Like "\041" (== "A", lol)
+//
+// Since these are expanded next to eachaother they form
+// a single string. Parameters are passed either as:
+// - "\xbe\xef" - inline string constant, 1 bytes, or 2 bytes
+// - "#" - take low byte from last matching "%d" in rule
+// - "\"" - take high byte from last matching "%d" in rule
+// - "w?" - take argument from after rule length in array
+// - "ww" - take word argument from last %d match
+// - "w+" - word argument + 1 from last %d match
+//
+//
+// The string may contain 0:oes, thus, after the string comes a length word.
+//
+// The string contains a mix of instructions for codegen and tracking of
+// side-effects, such as:
+// - "s-" "s+" stack depths changes (data stack)
+// - instructions for labelleing in IF-THEN-ELSE and patching
+// - and a "<" move stack instructions.
+
+
 #define O(op) op
 #define O2(op, b) op b
 #define N2(name, op, b) O2(op,b)
@@ -206,6 +231,14 @@ extern unsigned int nil=0;
 
 #ifdef RULES
 
+// Rules
+//
+// Format:
+//   
+//    MATCH, ASM...ASM, U byteasm, REND
+//
+// There are about 70 rules, these takes maybe (* 70 20)
+
 char* rules[]= {
   "[0+", "", 0, 0,
   "[1+", JSR("w?"), U 3, U incax2, REND
@@ -232,7 +265,7 @@ char* rules[]= {
 
   "[0*", LDAn("\0") TAX(), U 3, REND
   "[1*", "", 0, 0,
-  "[2*", JSR("w?"), U 3, U aslax1, REND
+  "[2*", JSR("w?"), U 3, U aslax1, REND // 18B
   "[3*", JSR("w?"), U 3, U mulax3, REND
   "[4*", JSR("w?"), U 3, U aslax2, REND
   "[5*", JSR("w?"), U 3, U mulax5, REND
@@ -285,7 +318,7 @@ char* rules[]= {
 //"W", JSR("w?"), U 3, U prin1, REND
 //"P", JSR("w?"), U 3, U print, REND
 
-  ",", LDAn("#") LDXn("#"), U 4, REND
+  ",", LDAn("#") LDXn("\""), U 4, REND
   ":", STA("ww") STX("w+"), U 6, REND
   ";", LDA("ww") LDX("w+"), U 6, REND
 
@@ -426,7 +459,6 @@ char matching(char* bc, char* r) {
   // got to end of rule == match!
   return !c;
 }
-#endif // MATCHER
 
 unsigned char changesAX(char* rule) {
   // TODO: get first char?
@@ -574,6 +606,7 @@ void compile(char* bc) {
 
   printf("\n\nASM...bytes: %d\n", bytes);
 }
+#endif // MATCHER
 
 
 int main(void) {

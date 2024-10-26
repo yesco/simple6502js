@@ -3,11 +3,12 @@ export PATH=$VBCC/bin:"$PATH"
 #vbcc6502 "$@"
 
 #vbcc6502 -ic1 -ic2 "$@"
-#vbcc6502 -speed -ic1 -ic2 "$@"
-vbcc6502 -size -ic1 -ic2 "$@"
-#vbcc6502 -ic1 -ic2 "$@"
+#vbcc6502 -speed -ic1 -ic2 "$@.c"
+vbcc6502 -size -ic1 -ic2 "$@.c"
+#vbcc6502 -ic1 -ic2 "$@.c"
 
 #vbcc6502 "$@"
 #vc +Atmos -ic1 -ic2 $@
-ls -l fib-vbcc*.*
+ls -l $1.*
+
 
