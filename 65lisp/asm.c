@@ -23,6 +23,9 @@
 // 6808 bytes... (no DEBASM no APRINT)
 // (- 6803 3578) == 3225 BYTES optimizer code!!! (incl rules)
 // (- 4499 3578) === 921 bytes, 70ish rules! (-100B REND) (/ 921 70.0) = 13.16B/R
+//
+// nothing: 3578, rules NO-OPT: 4002 bytes, OPT: 4499 bytes (rule no-opt: +424, opt: + 497)
+// NO-OPT fac => 87 bytes, OPT: 45 bytes, with delay-pushax it would be 40 bytes...
 
 #define RULES
 #define MATCHER
@@ -30,8 +33,8 @@
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
-//#define APRINT(...) printf(__VA_ARGS__)
-#define APRINT(...) 
+#define APRINT(...) printf(__VA_ARGS__)
+//#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -239,70 +242,100 @@ extern unsigned int nil=0;
 //
 // There are about 70 rules, these takes maybe (* 70 20)
 
+// TODO: how to make different rules char, integer, byte, word?
+//   -- simplify
+//   -- how to indicate a varaible's type?
+//
+// (+ a:B
+
+// One letter atom names, bytes
+// (* (* 26 2) (+ 11)) = 572 bytes (only few will use JSR stuff)
+
+//IDEA:
+//  - ATOM: (val, ptr)
+//  -   ptr = 0x00?? => one letter inline, or offset into array
+//        avg names 5 chars? (/ 256 5) = 51 names...
+
+// Maybe: 
+// - (de foo - normal lisp function (lambda)...
+// - (df foo - nlambda...
+// - (db foo - byte code compiled...
+// - (dc foo - code compiled to asm...
+
+#define OPT
+
+#ifdef OPT 
+  #undef OPT
+  #define OPT(...) __VA_ARGS__
+#else
+  #undef OPT
+  #define OPT(...)
+#endif
+
 char* rules[]= {
-  "[0+", "", 0, 0,
-  "[1+", JSR("w?"), U 3, U incax2, REND
-  "[2+", JSR("w?"), U 3, U incax4, REND
-  "[3+", JSR("w?"), U 3, U incax6, REND
-  "[4+", JSR("w?"), U 3, U incax8, REND
+  OPT("[0+", "", 0, 0,)
+  OPT("[1+", JSR("w?"), U 3, U incax2, REND)
+  OPT("[2+", JSR("w?"), U 3, U incax4, REND)
+  OPT("[3+", JSR("w?"), U 3, U incax6, REND)
+  OPT("[4+", JSR("w?"), U 3, U incax8, REND)
   // TODO: only <255
   //"[%b+", LDYn("#") JSR("w?"), U 5, U incaxy, 0,
 
   "+", JSR("w?") "s-", U 5, U tosaddax, REND
 
 
-  "[0-", "", 0, REND
-  "[1-", JSR("w?"), U 3, U decax2, REND
-  "[2-", JSR("w?"), U 3, U decax4, REND
-  "[3-", JSR("w?"), U 3, U decax6, REND
-  "[4-", JSR("w?"), U 3, U decax8, REND
+  OPT("[0-", "", 0, REND)
+  OPT("[1-", JSR("w?"), U 3, U decax2, REND)
+  OPT("[2-", JSR("w?"), U 3, U decax4, REND)
+  OPT("[3-", JSR("w?"), U 3, U decax6, REND)
+  OPT("[4-", JSR("w?"), U 3, U decax8, REND)
   // TODO: only <255
-  //"[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND
+  // OPT("[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND)
 
   "-", JSR("w?") "s-", U 5, U tossubax, REND
 
   // ][ conflicts with this
 
-  "[0*", LDAn("\0") TAX(), U 3, REND
-  "[1*", "", 0, 0,
-  "[2*", JSR("w?"), U 3, U aslax1, REND // 18B
-  "[3*", JSR("w?"), U 3, U mulax3, REND
-  "[4*", JSR("w?"), U 3, U aslax2, REND
-  "[5*", JSR("w?"), U 3, U mulax5, REND
-  "[6*", JSR("w?"), U 3, U mulax6, REND
-  "[7*", JSR("w?"), U 3, U mulax7, REND
-  "[8*", JSR("w?"), U 3, U aslax3, REND
+  OPT("[0*", LDAn("\0") TAX(), U 3, REND)
+  OPT("[1*", "", 0, 0,)
+  OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
+  OPT("[3*", JSR("w?"), U 3, U mulax3, REND)
+  OPT("[4*", JSR("w?"), U 3, U aslax2, REND)
+  OPT("[5*", JSR("w?"), U 3, U mulax5, REND)
+  OPT("[6*", JSR("w?"), U 3, U mulax6, REND)
+  OPT("[7*", JSR("w?"), U 3, U mulax7, REND)
+  OPT("[8*", JSR("w?"), U 3, U aslax3, REND)
   // TODO: how to match? \0 lol Z match \0?
-  "[,Z\x09*", JSR("w?"), U 3, U mulax9, REND
+  OPT("[,Z\x09*", JSR("w?"), U 3, U mulax9, REND)
   // TODO: how to match?
-  "[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND
+  OPT("[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND)
   // TODO: only <255
   //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND
 
   "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
 
-  "[2/", JSR("w?"), U 3, U asrax1, REND
-  "[4/", JSR("w?"), U 3, U asrax2, REND
-  "[8/", JSR("w?"), U 3, U asrax3, REND
+  OPT("[2/", JSR("w?"), U 3, U asrax1, REND)
+  OPT("[4/", JSR("w?"), U 3, U asrax2, REND)
+  OPT("[8/", JSR("w?"), U 3, U asrax3, REND)
 
-  "[,Z\x10/", JSR("w?"), U 3, U asrax4, REND
-  //",Z\x80/", JSR("w?"), U 3, U asrax7, REND  // doesn't exist?
+  OPT("[,Z\x10/", JSR("w?"), U 3, U asrax4, REND)
+  // OPT(",Z\x80/", JSR("w?"), U 3, U asrax7, REND)  // doesn't exist?
   // TODO: only <255
-  //"%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND
+  // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND)
 
   "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
 
-  // "[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND // TODO: destructive...
+  // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
-  "[0=", TAY() BNE("\x02") CPXn("\0") BNE("\0"), U 7, REND
-  "[%d=", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0"), U 8, REND
+  OPT("[0=", TAY() BNE("\x02") CPXn("\0") BNE("\0"), U 7, REND)
+  OPT("[%d=", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0"), U 8, REND)
 
   "=", JSR("w?") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
-  "[%d<", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00"), U 9, REND
+  OPT("[%d<", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00"), U 9, REND)
 
   "<", JSR("w?"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
@@ -322,15 +355,15 @@ char* rules[]= {
   ":", STA("ww") STX("w+"), U 6, REND
   ";", LDA("ww") LDX("w+"), U 6, REND
 
-  "][", 0, U 0, REND // 3 zeroes! lol
+  OPT("][", 0, U 0, REND) // 3 zeroes! lol
   "]", "s-" JSR("w?"), U 5, U popax, REND // TODO: useful?
 
   "[", "s+" JSR("w?"), U 5, U pushax, REND
 
   //"0[", JSR("w?"), U3, U pushzero, REND // TODO: need for local var? keep ax?
   //"9[", JSR("w?"), U3, U pushnil, REND // TODO: need for local var? keep ax?
-  "0", LDAn("\0") TAY(), U 3, REND
-  "9^%0", JMP("w?"), U 3, U retnil, REND // redundant? auto opt...
+  OPT("0", LDAn("\0") TAY(), U 3, REND)
+  OPT("9^%0", JMP("w?"), U 3, U retnil, REND) // redundant? auto opt...
   "9",  JSR("w?"), U 3, U retnil, REND
 
   "%d", LDAn("#") LDXn("\""), U 4, REND
@@ -341,7 +374,7 @@ char* rules[]= {
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
   //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
-  "%a%1", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  OPT("%a%1", JSR("w?"), U 3, U ldax0sp, REND) // TODO: ?? parameters/locals
   "%a",  LDYn("#") JSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
 
   // TODO: more than 4 ...
@@ -352,13 +385,13 @@ char* rules[]= {
   "^%0", "s^" RTS(),     U 3, REND
 
   //"X^^",   "<" JMP("ww"),   U 4, REND // ERROR (need popstack first/move)
-  "R^", "<" JMP("\0\0") "s^", U 6, REND // SelfTailRecursion
+  OPT("R^", "<" JMP("\0\0") "s^", U 6, REND) // SelfTailRecursion
   "R",      JSR("\0\0"),      U 3, REND // SelfRecursion // TODO: param count/STK?
   "Z",  "<" JMP("\0\0") "s^", U 6, REND // SelfTailRecursion/loop/Z
 
   // CALL = "Xcode" - would prefer other prefix?
   //"X^^",    "<" JMP("ww"),     U 4, REND // ERROR (need popstack first/move)
-  "X^", "<" JMP("ww") "s^",  U 4, REND // TailCall other function
+  OPT("X^", "<" JMP("ww") "s^",  U 4, REND) // TailCall other function
   "X",      JSR("ww"),       U 3, REND // Call other function // TODO: param/STK?
   
   // TODO: not complete yet
@@ -367,9 +400,10 @@ char* rules[]= {
   //   pop to same level?
   //   if return stack ... 64 lol
   "I", ":", U 1, REND
-  "{%^", ":" "/" ";", U 3, REND // after return no need jmp endif!
+  OPT("{%^", ":" "/" ";", U 3, REND) // after return no need jmp endif!
   "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
   "}", ";", U 1, REND
+
   0};
 #endif // RULES
 
