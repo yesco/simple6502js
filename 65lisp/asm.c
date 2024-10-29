@@ -20,6 +20,11 @@
 // Speed is somewhat slower, but coming closer...
 
 
+// OPT
+// TODO: compare to vbcc - https://forums.nesdev.org/viewtopic.php?t=20226&p=251509
+//   (their example is a byte sized memcopy that takes 3 parameters in "registers" (zp)
+
+
 // 6808 bytes... (no DEBASM no APRINT)
 // (- 6803 3578) == 3225 BYTES optimizer code!!! (incl rules)
 // (- 4499 3578) === 921 bytes, 70ish rules! (-100B REND) (/ 921 70.0) = 13.16B/R
