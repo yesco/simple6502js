@@ -30,6 +30,9 @@
 #define RULES
 #define MATCHER
 
+#include "disasm.c"
+
+
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
@@ -400,8 +403,11 @@ char* rules[]= {
   //   pop to same level?
   //   if return stack ... 64 lol
   "I", ":", U 1, REND
-  OPT("{%^", ":" "/" ";", U 3, REND) // after return no need jmp endif!
+  // last patching not needed at }, how to suppress?
+  OPT("{%^", "z" "/" ";", U 3, REND) // after return no need jmp endif!
   "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
+
+  // TODO: if "{%^" before, then no patch!
   "}", ";", U 1, REND
 
   0};
@@ -429,7 +435,7 @@ char* rules[]= {
 // r
 // s
 // t 
-// z
+// z   = IF push 0 (no need to patch)
 // {
 // |
 
@@ -502,8 +508,11 @@ unsigned char changesAX(char* rule) {
   return 1;
 }
 
-//void compile(register char* bc) {
-void compile(char* bc) {
+// Compiles ByteCode to asm in gen[]
+//
+// Returns bytes (length)
+
+int compile(char* bc) {
   int bytes= 0;
 
   // register: (/ 1137712 766349.0) 49% slower without register
@@ -597,16 +606,17 @@ void compile(char* bc) {
             else if (nc=='^') stk=64;
             --z;++pc;
           }
-          // -- actions for IF
           //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
 
-          else if (c==':') { *--patch= bytes; }                          // label=push
-          else if (c==';') { gen[bytes]= *patch; ++patch; }              // patch=pop
-          else if (c=='/') { c= *patch; *patch= patch[1]; patch[1]= c; } // swap
+          // -- actions for IF : = push label, z = push 0=notpatch, ; = patch (if !0), / = swap
+          else if (c=='z') { *--patch= 0; }
+          else if (c==':') { *--patch= bytes-1; }
+          else if (c==';') { if (*patch) gen[*patch]= bytes-*patch-1;  ++patch; }
+          else if (c=='/') { char t= *patch; *patch= patch[1]; patch[1]= t; }
           else { APRINT(" %02x ", c); } // we don't know, for now
 
           // TODO: more efficient?
-          if (c!='s' && c!=':' && c!=';' && c!='/') ++bytes;
+          if (c!='s' && c!=':' && c!=';' && c!='/' && c!='z') ++bytes;
           --z;
         } // end while action/asm
 
@@ -639,11 +649,29 @@ void compile(char* bc) {
   }
 
   printf("\n\nASM...bytes: %d\n", bytes);
+
+  // implicit return in lisp
+  // TODO: if both IF branches return, then suppress... (check \0%^)
+  gen[bytes++]= 0x60; // RTS
+  return bytes;
 }
 #endif // MATCHER
 
+void relocate(int n, char* to) {
+  unsigned char i= 0, c;
+  ++n;
+  while (--n) {
+    c= gen[i]; ++i;
+    if (c==0x20 || c==0x4c || c==0x6c) {
+      int* p= (int*)(gen+i);
+      if (*p==0) *p= to;
+      i+= 2;
+    }
+  }
+}
 
 int main(void) {
+  int n;
 
 #ifdef MATCHER
   char* bc= "[3[3+"; // works
@@ -657,7 +685,14 @@ int main(void) {
 
   //bc= "b";
 
-  compile(bc);
+  n= compile(bc);
+  DISASM(gen, gen+n);
+
+  relocate(n, (char*)0xABBA);
+  DISASM(gen, gen+n);
+
+  // TODO: allocate, copy ...
+
 
 #endif // MATCHER
 
