@@ -1,4 +1,7 @@
 // Define DASM on compilation to DebugASM !!!!
+
+#define DASM
+
 #ifdef DASM
   #undef DASM
   #define DASM(a) do { a; } while(0)
@@ -6,6 +9,17 @@
   #undef DASM
   #define DASM(a)
 #endif
+
+// uncomment to get DISASM
+#define DISASM
+
+#ifdef DISASM
+  #undef DISASM
+  #include "disasm.c"
+#else
+  #undef DISASM
+  #define DISASM(a,b) 
+#endif // DISASM
 
 char mc[120]= {0};
 char* mcp= mc;
@@ -819,48 +833,7 @@ char* asmpile(char* pla) {
   la= pla-1; // using pre-inc
   if (!genasm(&s)) return 0;
 
-  // TODO: a test with 00..FF codes andn params 11 22 33 to verify all.... 
-  //       and verify length...
-
-  // poor man disasm (- 34634 33339) 1295 bytes! (one is asm is 970 B?)
-#ifdef DISASM
-  #define BRANCH "PLMIVCVSCCCSNEEQ"
-  #define X8     "PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED" // verified
-  #define XA     "ASL-1aROL-3aLSL-5aROR-7aTXATXSTAXTSXDEX-daNOP-fa" // verified duplicaet ASL...
-  #define CCIII  "-??BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC" // ASL...
-  #define JMPS   "BRKJSRRTIRTS"
-
-  { char* p= mc;
-    printf("\n---CODE[%d]:\n",mcp-mc); p= mc;
-    while(p<mcp) {
-      uchar i= *p++, m= (i>>2)&7;
-      printf("%04X:\t", p);
-
-      if      (i==0x20) printf("JSR %04x",*((L*)p)++);
-      else if (i==0x4c) printf("JMP %04x",*((L*)p)++);
-      else if (i==0x6c) printf("JPI (%04x)",*((L*)p)++);
-      else if ((i&0x1f)==0x10) 
-        printf("B%.2s %+d\t=> %04X", BRANCH-1+(i>>4), *p, p+2+(signed char)*p++);
-      else if ((i&0xf)==0x8 || (i&0xf)==0xA) printf("%.3s",(i&2?XA:X8)+3*(i>>4));
-      else if (!(i&0x9f)) printf("%.3s", JMPS+3*(i>>5));
-      else {
-        uchar cciii= (i>>5)+((i&3)<<3);
-        if (cciii<0b11000) printf("%.3s", CCIII+3*cciii);
-        else printf("%02x ??? ", i);
-        switch(m) {
-        case 0b000: printf(i&1?" (%02x,X)":" #%02x", *p++); break;
-        case 0b001: printf(" %02x ZP", *p++); break;
-        case 0b010: printf(i&1?" #%02x":" A", *p++); break;
-        case 0b011: printf(i&1?" %04x":" A", *((L*)p)++); break;
-        case 0b100: printf(" (%02x),Y", *p++); break;
-        case 0b101: printf(" %02x,X", *p++); break;
-        case 0b110: printf(" %04x,%c", m&1?'Y':'X', *((L*)p)++); break;
-        }
-      }
-      NL;
-    } NL;
-  }
-#endif // DISASM
+  DISASM(mc, mcp);
 
   return mc;
 }
