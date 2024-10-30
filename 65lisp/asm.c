@@ -280,6 +280,16 @@ extern unsigned int nil=0;
   #define OPT(...)
 #endif
 
+int print(int a) {
+  printf("\n%d ", a/2);
+  return a;
+}
+
+int princ(int a) {
+  printf("%d ", a/2);
+  return a;
+}
+
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)
@@ -355,9 +365,9 @@ char* rules[]= {
 
   "!", JSR("w?") "s-", U 5, U staxspidx, REND
   "@", JSR("w?"), U 3, U ldaxi, REND
-//".", JSR("w?"), U 3, U princ, REND
-//"W", JSR("w?"), U 3, U prin1, REND
-//"P", JSR("w?"), U 3, U print, REND
+  ".", JSR("w?"), U 3, U princ, REND
+//  "W", JSR("w?"), U 3, U prin1, REND
+  "P", JSR("w?"), U 3, U print, REND
 
   ",", LDAn("#") LDXn("\""), U 4, REND
   ":", STA("ww") STX("w+"), U 6, REND
@@ -382,7 +392,7 @@ char* rules[]= {
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
   //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
-  OPT("%a%1", JSR("w?"), U 3, U ldax0sp, REND) // TODO: ?? parameters/locals
+  //OPT("%a%1", JSR("w?"), U 3, U ldax0sp, REND) // TODO: ?? parameters/locals
   "%a",  LDYn("#") JSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
 
   // TODO: more than 4 ...
@@ -477,14 +487,14 @@ char matching(char* bc, char* r) {
       if (nc=='d') {
         // TODO: actually, do we care if it's number? Hmmm... (, case)
         if (b==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
-        else if (isdigit(b) && b<='8') { ww= b-'0'; whi= 0; }
+        else if (isdigit(b) && b<='8') { ww= 2*(b-'0'); whi= 0; }
         else return 0;
       } else if (islower(nc)) { // TODO:
         // TODO: if request ax?
         char lastvar= 'a'; // TODO: fix, lol
         if (!islower(b)) return 0;
         assert(b==lastvar); // TODO: fix, lol
-        ww= 2*(lastvar-b+stk)+1;
+        ww= 2*(lastvar-b+stk)-1;
       } else if (isdigit(nc)) {
         // stack depth match
         // TODO: this is manipulated during matching, lol so all wrong!
@@ -529,6 +539,11 @@ int compile(char* bc) {
   // TODO: can't this be done before here, in byte code gen?
 
   char i, *pc, c, nc, z;
+
+  // print ax arg first thing
+  //gen[bytes++]= 0x20;
+  //gen[bytes++]= ((int)print) & 0xff;
+  //gen[bytes++]= ((int)print) >> 8;
 
   ax= 'a';
 
@@ -675,8 +690,11 @@ void relocate(int n, char* to) {
   }
 }
 
+typedef int (*F1)(int);
+typedef (*F)();
+
 int main(void) {
-  int n;
+  int n, r;
 
 #ifdef MATCHER
   char* bc= "[3[3+"; // works
@@ -690,15 +708,46 @@ int main(void) {
 
   //bc= "b";
 
+  // debug
+  //bc= "[a[a+[a+^";
+  //bc= "[a[a+[a+^";
+  //bc= "[a[a+[a+[a+^";
+
+
   n= compile(bc);
   DISASM(gen, gen+n);
 
   relocate(n, gen);
-  relocate(n, (char*)0xABBA);
+  relocate(n, (char*)0xABBA); // testing, lol
   printf("GEN= %04X\n", gen);
   DISASM(gen, gen+n);
 
-  // TODO: allocate, copy ...
+  printf("incsp8= %04x\n", incsp8);
+  printf("incsp6= %04x\n", incsp6);
+  printf("incsp4= %04x\n", incsp4);
+  printf("incsp2= %04x\n", incsp2);
+  printf("\nprint= %04x\n\n", print);
+  r= 0; // ok
+  r= 1; // ok
+  r= 2; // recurse already - ok
+  r= 8; // ok
+  printf("F(%d)=", r);
+
+  r*= 2;
+  if (1) {
+    DISASM(gen, gen+n);
+    r= ((F1)gen)(r);
+  } else {
+    // TODO: why doesn't it work - loops forever!
+    __AX__= r;
+    ((F)gen)();
+    r= __AX__;
+  }
+  r/= 2;
+
+  printf(" ==>%d\n", r);
+
+    // TODO: allocate, copy ...
 
 
 #endif // MATCHER
