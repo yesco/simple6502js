@@ -693,7 +693,9 @@ int main(void) {
   n= compile(bc);
   DISASM(gen, gen+n);
 
+  relocate(n, gen);
   relocate(n, (char*)0xABBA);
+  printf("GEN= %04X\n", gen);
   DISASM(gen, gen+n);
 
   // TODO: allocate, copy ...

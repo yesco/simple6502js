@@ -21,8 +21,9 @@ void disasm(char* mc, char* end) {
   char* p= (char*)mc;
   printf("\n---CODE[%d]:\n", end-mc); p= mc;
   while(p<end) {
-    unsigned char i= *p++, m= (i>>2)&7;
+    unsigned char i= *p, m= (i>>2)&7;
     printf("%04X:\t", p);
+    ++p;
 
     // exception modes
     if      (i==0x20) printf("JSR %04x",*((int*)p)++);
@@ -30,7 +31,7 @@ void disasm(char* mc, char* end) {
     else if (i==0x6c) printf("JPI (%04x)",*((int*)p)++);
     // branches
     else if ((i&0x1f)==0x10) 
-      printf("B%.2s %+d\t=> %04X", DA_BRANCH-1+(i>>4), *(signed char*)p, p+2+*(signed char*)p++);
+      printf("B%.2s %+d\t=> %04X", DA_BRANCH-1+(i>>4), *(signed char*)p, p+1+*(signed char*)p++);
     // single byte instructions
     else if ((i&0xf)==0x8 || (i&0xf)==0xA) printf("%.3s",(i&2?DA_XA:DA_X8)+3*(i>>4));
     else if (!(i&0x9f)) printf("%.3s", DA_JMPS+3*(i>>5));
