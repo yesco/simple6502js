@@ -507,8 +507,8 @@ char matching(char* bc, char* r) {
 
 unsigned char changesAX(char* rule) {
   // TODO: get first char?
-  if (0==strcmp(rule, "[%d<") || 0==strcmp(rule, "[%d=") || 0==strcmp(rule, "[%d>")) return 0;
-  if (strchr("I]{}^", *rule)) return 0;
+  if (0==strcmp(rule, "[%d<") || 0==strcmp(rule, "[%d=") || 0==strcmp(rule, "[%d>") || 0==strcmp(rule, "][")) return 0;
+  if (strchr("I[{}^", *rule)) return 0;
   // all other ops changes AX
   return 1;
 }
