@@ -694,7 +694,9 @@ typedef int (*F1)(int);
 typedef (*F)();
 
 int main(void) {
-  int n, r;
+  unsigned int bench= 3000;
+//  unsigned int bench= 100; // for fib21
+  int n, r, i;
 
 #ifdef MATCHER
   char* bc= "[3[3+"; // works
@@ -727,25 +729,27 @@ int main(void) {
   printf("incsp4= %04x\n", incsp4);
   printf("incsp2= %04x\n", incsp2);
   printf("\nprint= %04x\n\n", print);
-  r= 0; // ok
-  r= 1; // ok
-  r= 2; // recurse already - ok
-  r= 8; // ok
-  printf("F(%d)=", r);
+  i= 0; // ok
+  i= 1; // ok
+  i= 2; // recurse already - ok
+  i= 21; // largest we can do, lol
+  i= 8; // ok
 
-  r*= 2;
+  // 3000x fib8 ... 38.5s
+  // 100x  fib21 ... 617s
+  i*= 2;
+while(--bench) {
   if (1) {
-    DISASM(gen, gen+n);
-    r= ((F1)gen)(r);
+    r= ((F1)gen)(i);
   } else {
     // TODO: why doesn't it work - loops forever!
-    __AX__= r;
+    __AX__= i;
     ((F)gen)();
     r= __AX__;
   }
-  r/= 2;
+}
 
-  printf(" ==>%d\n", r);
+ printf("FIB(%d)=%d\n", i/2, r/2);
 
     // TODO: allocate, copy ...
 

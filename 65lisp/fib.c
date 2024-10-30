@@ -63,10 +63,10 @@ int main() {//int argc, char** argv) {
   while(--i) {
     //r= fib(n);	// 63 B    43.31s
     //r= ufib(n);	//         43.31s
-    //r= ltfib(n);	//  54 B - 41.53s "best of cc65"
+    r= ltfib(n);	//  54 B - 41.53s "best of cc65"
     //r= asmfib(n);	//  39 B   29.17s handwritten (I can generate this!)
     //r= asmfibpha(n);	//  64 B   18.00s handwritten (using pha!) can save 17B (- 64 17) 47... only 42 recursions!
-    r= byteasmfib(n);	//  32 B    8.20s handwritten byte (using pha!)
+    //r= byteasmfib(n);	//  32 B    8.20s handwritten byte (using pha!)
     //r= fibinline(n);	// 114 B   21.45s inlined "all" (63 lines)
     //printf("result(%d)=%d\n", n, r);
     z+= r;
