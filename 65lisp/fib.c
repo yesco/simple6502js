@@ -44,6 +44,14 @@ int ltfib(signed int n) {
   return ltfib(n-1) + ltfib(n-2);
 }
 
+
+unsigned int two= 2;
+
+int twoltfib(unsigned  int n) {
+  if (n<two) return n;
+  return twoltfib(n-1) + twoltfib(n-2);
+}
+
 unsigned int ufib(unsigned int n) {
   // ++calls; // this doubles time...
   if (n==0) return n;

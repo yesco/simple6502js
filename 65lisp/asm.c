@@ -290,6 +290,15 @@ int princ(int a) {
   return a;
 }
 
+// Consider only positive integers, anything else is boxed!
+// (gives 0--32767, almost good, now only - 16383)
+
+// General rule (for LISP), try to make most operators (< = prinX pushax ...)
+// work on value in AX and "another value", while retaining the value in AX.
+//
+// Example:
+//   Typical pattern (if (eq a 3) a) ... (if (< a 3) (return a) ...)
+
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)
@@ -353,6 +362,8 @@ char* rules[]= {
   "=", JSR("w?") "s-", U 5, U toseqax, REND
 
   // Unsigned Int
+  // OPT("[%a<", ... - local
+  // OPT("[%g<", ... - global
   OPT("[%d<", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00"), U 9, REND)
 
   "<", JSR("w?"), U 3, U toseqax, REND
@@ -417,7 +428,9 @@ char* rules[]= {
   // TODO: how aobut balancing stack, recurse on compiler?
   //   pop to same level?
   //   if return stack ... 64 lol
-  "I", ":", U 1, REND
+  OPT("I", ":", U 1, REND)
+  "I", BCS("\0") ":", U 1, REND // TODO: not correct, what does the generic <, or = do?
+
   // last patching not needed at }, how to suppress?
   OPT("{%^", "z" "/" ";", U 3, REND) // after return no need jmp endif!
   "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
