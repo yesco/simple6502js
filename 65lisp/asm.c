@@ -299,6 +299,14 @@ int princ(int a) {
 // Example:
 //   Typical pattern (if (eq a 3) a) ... (if (< a 3) (return a) ...)
 
+// TODO: add rewrites of AL, use negative length? (not U 3, lol)
+
+// "{(.*)}^" (or zero) => "^{\1^}" this solves the implicit PROGN issue!
+// "^^*" -> "^" or just ignore anything after "^" till "{"...
+// DELAY-pushax A: "[...I...{...}" if no return inside if, stk may be unbalanced:
+// - previous fix, insert pushax just before '{', or '}'...
+// - too late to resolve at ENDIF ... as ';' as patch action already been performed, needs to be done before rule actions... (but doesn't it have access to value? no... DAMN...
+
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)
@@ -540,9 +548,10 @@ unsigned char changesAX(char* rule) {
 //
 // Returns bytes (length)
 
-int compile(char* bc) {
-  int bytes= 0;
+int bytes= 0;
+char* bc;
 
+int compile() {
   // register: (/ 1137712 766349.0) 49% slower without register
   // (however, no function below here can use it, as it'll trash/copy too much!)
 
@@ -551,7 +560,7 @@ int compile(char* bc) {
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
 
-  char i, *pc, c, nc, z;
+  char *pc, c, nc, z;
 
   // print ax arg first thing
   //gen[bytes++]= 0x20;
@@ -559,6 +568,8 @@ int compile(char* bc) {
   //gen[bytes++]= ((int)print) >> 8;
 
   ax= 'a';
+
+  printf(">>>>>COMPILED called: %s\n", bc);
 
   // process byte code
   while(*bc) {
@@ -570,6 +581,7 @@ int compile(char* bc) {
     // for each rule
     p= rules;
     while(*p) {
+
       r= *p; ++p;
 
       // get action/asm of rule, and length in bytes
@@ -582,14 +594,15 @@ int compile(char* bc) {
 
         // if variable and ax alread contains, done!
         if (islower(*bc) && *bc==ax) {
-          APRINT("  parameter requested is already in AX!\n");
+          APRINT(" parameter requested is already in AX!\n");
           break;
         }
 
         APRINT(" [%d] ", z);
 
-        if (*r=='I') *--patch= stk;
-        if (*r=='{' && stk>60) stk= patch[1]; // TODO: who pops it?
+        // TODO: keep or remove?
+//    if (*r=='I') *--patch= stk;
+//    if (*r=='{' && stk>60) stk= patch[1]; // TODO: who pops it?
 
         // LOL, need to find next matching rule to decide if pushax! GRRRRR
 
@@ -644,8 +657,16 @@ int compile(char* bc) {
           // -- actions for IF : = push label, z = push 0=notpatch, ; = patch (if !0), / = swap
           else if (c=='z') { *--patch= 0; }
           else if (c==':') { *--patch= bytes-1; }
-          else if (c==';') { if (*patch) gen[*patch]= bytes-*patch-1;  ++patch; }
-          else if (c=='/') { char t= *patch; *patch= patch[1]; patch[1]= t; }
+          else if (c==';') {
+            if (*patch) {
+              int rel= bytes-*patch-1;
+              if (rel < -126 || rel > 127) {
+                printf("%%Compile: relative jump too far! %d\n", rel);
+              }
+              gen[*patch]= rel;
+            }
+            ++patch;
+          } else if (c=='/') { char t= *patch; *patch= patch[1]; patch[1]= t; }
           else { APRINT(" %02x ", c); } // we don't know, for now
 
           // TODO: more efficient?
@@ -669,23 +690,51 @@ int compile(char* bc) {
       exit(3);
     }
 
-    // restore stk to THEN.stk after ELSE if ELSE returned...
-    // TODO:
-    //if (*r=='}' && stk>60) assert(!"TODO: THEN.stk");
-
     // -- update ax
     if (islower(*bc)) ax= *bc;
     else if (changesAX(r)) ax= '?';
     // TODO: pushax?
+
+
+    // handle IF by recursion
+    if (*bc=='I') {
+      // TODO: if have more, is it better to do struct?
+      int i_stk= stk; char i_ax= ax;
+      ++bc;
+      printf("-------------IF--------------\n");
+
+      // THEN
+      compile();
+      assert(*bc=='{');
+      ++bc;
+      {
+        int t_stk= stk; char t_ax= ax;
+        stk= i_stk; ax= i_ax;
+
+        // ELSE
+        compile();
+        assert(*bc=='}');
+        // no inc, as '}' wil be eaten later
+
+        // ENDIF: resolve THEN and ELSE branch states
+        if (t_ax != ax) ax= '?';
+
+        if (stk>60) stk= t_stk;
+        else if (stk<60 && stk != t_stk) {
+          printf("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
+          assert(0);
+        }
+      }
+    }
+
+    // TODO: worth storing *bc in char var?
+    if (*bc=='{' || *bc=='}') break;
 
     bc+= charmatch;
   }
 
   printf("\n\nASM...bytes: %d\n", bytes);
 
-  // implicit return in lisp
-  // TODO: if both IF branches return, then suppress... (check \0%^)
-  gen[bytes++]= 0x60; // RTS
   return bytes;
 }
 #endif // MATCHER
@@ -697,14 +746,14 @@ void relocate(int n, char* to) {
     c= gen[i]; ++i;
     if (c==0x20 || c==0x4c || c==0x6c) {
       int* p= (int*)(gen+i);
-      if (*p==0) *p= to;
+      if (*p==0) *p= (int)to;
       i+= 2;
     }
   }
 }
 
 typedef int (*F1)(int);
-typedef (*F)();
+typedef void (*F)();
 
 int main(void) {
   unsigned int bench= 3000;
@@ -712,7 +761,7 @@ int main(void) {
   int n, r, i;
 
 #ifdef MATCHER
-  char* bc= "[3[3+"; // works
+  bc= "[3[3+"; // works
   //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
 
   // ./65vm -v -e "(if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2))))"
@@ -729,8 +778,18 @@ int main(void) {
   //bc= "[a[a+[a+[a+^";
 
 
-  n= compile(bc);
-  DISASM(gen, gen+n);
+  bytes= 0;
+  // implicit return, only takes one expression
+  // TODO: PROGN... (how about lambda)
+  compile(); // etc bc... lol
+
+  // need add the implicit return?
+  if (stk<60) {
+    // IF doesn't have RETURN in both branches...
+    gen[bytes++]= 0x60; // RTS
+  }
+
+  DISASM(gen, gen+bytes);
 
   relocate(n, gen);
   relocate(n, (char*)0xABBA); // testing, lol
