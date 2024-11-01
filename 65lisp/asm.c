@@ -307,6 +307,22 @@ int princ(int a) {
 // - previous fix, insert pushax just before '{', or '}'...
 // - too late to resolve at ENDIF ... as ';' as patch action already been performed, needs to be done before rule actions... (but doesn't it have access to value? no... DAMN...
 
+// TODO: how to integrate BigNum without, or keep as separate type and ops?
+//       + - * / needs efficient tests, without overhead
+//       "[1+" = ... BMI overflow 
+//       "[1-" = ... BMI means underflow!
+//       "[,xx+/-" = same, if %I otherwise already go generic routine
+//       + * / = go generic routine? can waste tests before...
+
+// TODO: have generic filter/reduce operator, can be specialized on operator +=sum, *=prod can upgrade ->long->BigNum !
+
+// TODO: track constant types? and also value in "ax" from constants?
+// TODO: track variable AX types, can do after Kons,nUll,etc.
+//       generate specific code without type checks, especially after/inside IFs!
+//       match ax: %I=inlinenum %N=number %D=digit %U=nil %A=atom %K=Kons good for car/cdr opt
+
+// TOOD: track constant value of Y, cc65 is good at reusing it (iny/dey)
+
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)
@@ -360,7 +376,6 @@ char* rules[]= {
   // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND)
 
   "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
-
 
   // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
@@ -756,9 +771,9 @@ typedef int (*F1)(int);
 typedef void (*F)();
 
 int main(void) {
-  unsigned int bench= 3000;
+  unsigned int bench= 3000, n= bench;
 //  unsigned int bench= 100; // for fib21
-  int n, r, i;
+  int r, i;
 
 #ifdef MATCHER
   bc= "[3[3+"; // works
@@ -777,7 +792,6 @@ int main(void) {
   //bc= "[a[a+[a+^";
   //bc= "[a[a+[a+[a+^";
 
-
   bytes= 0;
   // implicit return, only takes one expression
   // TODO: PROGN... (how about lambda)
@@ -794,7 +808,7 @@ int main(void) {
   relocate(n, gen);
   relocate(n, (char*)0xABBA); // testing, lol
   printf("GEN= %04X\n", gen);
-  DISASM(gen, gen+n);
+  DISASM(gen, gen+bytes);
 
   printf("incsp8= %04x\n", incsp8);
   printf("incsp6= %04x\n", incsp6);
@@ -807,10 +821,11 @@ int main(void) {
   i= 21; // largest we can do, lol
   i= 8; // ok
 
-  // 3000x fib8 ... 38.5s
+  // 3000x fib8 ... 38.5s - (- 39.3 3.9) 35.4s RUNNING (not incl compile, and printing overhead)
+  // 3000x emtpy loop overhead: with print and compile overhead 3.9s! (removed gen() call...
   // 100x  fib21 ... 617s
   i*= 2;
-while(--bench) {
+while(--n) {
   if (1) {
     r= ((F1)gen)(i);
   } else {
@@ -821,7 +836,7 @@ while(--bench) {
   }
 }
 
- printf("FIB(%d)=%d\n", i/2, r/2);
+ printf("bench: %d times - FIB(%d)=%d\n", bench, i/2, r/2);
 
     // TODO: allocate, copy ...
 

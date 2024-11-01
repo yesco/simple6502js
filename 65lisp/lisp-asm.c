@@ -36,7 +36,7 @@ char* mcp= mc;
    %    - (mod)
    &    - (bit-and)
    '    
-   ()
+   ()   - (incf/decf? lol rather use SIa SDa)
    *    - mul
    +    - add
    ,nn  - literal word (== quote ' !)
@@ -50,7 +50,7 @@ char* mcp= mc;
    <    - (lt)
    =    - (eq)
    >    - (gt)
-   ?    - (cmp)
+   ?    - (cmp anything)
    @    - read value at addr from stack (use for array) (TODO: redundant w N? see @ too)
    A    - cAr
    B    - (memBer)
@@ -70,12 +70,12 @@ char* mcp= mc;
    P    - Print
    Q    - (eQual)
    R    - Recurse
-   S    - (Setq local/closure named var: Sa S+a etc..)
+   S    - (Setq local/closure named var: Sa S+a, SIa,SDa=incf,decf? etc..)
    T    - Terpri (newline)
    U    - nUll
    V    - (reduce?)
    W    - princ
-   X    - (eXecute addr on stack? JSR? see z)
+   X    - (eXecute addr on stack? JSR? == callax in asm, also see z)
    Y    - read
    Z    - loop/tail-recurse (jmp)
    [    - pushax, as new value comes
