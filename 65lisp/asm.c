@@ -323,6 +323,12 @@ int princ(int a) {
 
 // TOOD: track constant value of Y, cc65 is good at reusing it (iny/dey)
 
+// TODO: for func >1 params, NOT calling other UDF just primitives, meaning it's a bottom function,
+//       it could compile using "registers", slightly more efficient as no pushax before call
+//       also, no cleanup at exit, 
+//
+//       - also see - https://www.cc65.org/doc/cc65-8.html (probably can't use them, as need saving)
+
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)

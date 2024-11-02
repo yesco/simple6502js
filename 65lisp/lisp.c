@@ -1766,6 +1766,19 @@ unsigned long bench=1;
 // ---------------- Register Functions
 
 // TODO: point to these from arena?
+
+// FORMAT:
+//   1st char: ';' symbol for dispatch, single AL alphabetical byte-code
+//   2nd char: '0' - no args
+//             '1' - takes one arg
+//             '2' - 2...
+//             '-' - context known, variable, hmmm, or if funcall, as in delayed?
+//             'n' - counted as in vararg?
+//   ...rest   "name" of function
+//
+// NOTE: all primitives are either 0 1 2 - n ...
+//       user funcs may be more, up to 9 (?)
+
 char* names[]= {
   // nargs
   ":2de",
@@ -1794,7 +1807,7 @@ char* names[]= {
   "O1length",
   "T0terpri",
   "U1null",
-  "P1print", "W1prin1", ".1princ",
+  "P1print", "W1prin1", ".1princ", // swap 'W' and '.'??? '.' should be "pretty"
   "~1~", // bit neg
 
   // two args
@@ -1819,8 +1832,8 @@ char* names[]= {
 
   "Z-loop",
 
-  "i1inc",
-  "j1jnc",
+  //"i1inc", // TODO: remove, only used for testing
+  //"j1jnc", // TODO: remove, only used for testing
 
   NULL};
 

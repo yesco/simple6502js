@@ -346,6 +346,8 @@ void alcompile() {
     if (f=='\'') goto quote;
     else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
+    // TODO: how to handle non-foldable arguemnts
+    //   TODO: look at number of arguments the function expects? if n>2
 
     if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", f, f); }
  
