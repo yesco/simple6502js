@@ -1935,6 +1935,8 @@ void statistics(int level) {
 // TODO: turn on GC
 char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
 
+#define DOPRINT 0
+
 L readeval(char *ln, L env, char noprint) {
   // TODO: not sure what function env has an toplevel:
   //   we're setting/modifying globals, right?
@@ -2047,33 +2049,35 @@ int main(int argc, char** argv) {
     ++argv;
     if (verbose) printf("--ARGC: %d *ARGV: \"%s\" %d\n", argc, *argv, *argv);
 
-    if (0==strcmp("-b", *argv)) { // BENCH 5000 times
-      bench= atol(argv[1]);
-      if (bench) --argc,++argv; else bench= 5000;
-      echo= 1; quiet= 1; } else
-    if (0==strcmp("-q", *argv)) quiet=1,echo=stats=0; else
-    if (0==strcmp("-p", *argv)) printf("%s\n", *++argv),--argc; else
-    if (0==strcmp("-E", *argv)) echo=1; else
-    if (0==strcmp("-i", *argv)) interpret=0,echo=quiet=0,env= readeval(NULL, env, 0); else
-    if (0==strcmp("-x", *argv) || 0==strcmp("-e", *argv)) {
-      env=readeval(argv[1],env,argv[0][1]=='x');
-      interpret= 0; --argc; ++argv; } else
-    if (0==strcmp("-N", *argv)) noeval=1; else
-    if (0==strcmp("--nogc", *argv)) gc=0; else
-    if (0==strcmp("-d", *argv)) debug=1; else
-    if (0==strcmp("-v", *argv)) ++verbose,++stats; else
-    if (0==strcmp("-s", *argv)) ++stats,statistics(stats); else
-    if (0==strcmp("-t", *argv)) test=1,quiet=1,echo=0,env=testing(env);
-    else printf("%% ERROR.args: %s\n", *argv),exit(1);
-  }
+    if (0==strcmp("--nogc", *argv)) gc=0;
+    else switch((*argv)[1]) {
+      // simple flags
+      case 'E': echo=1; break;
+      case 'N': noeval=1;  break;
+      case 'd': debug=1;  break;
+      case 'v': ++verbose,++stats;  break;
+      case 'q': quiet=1,echo=stats=0;  break;
+      case 's': ++stats,statistics(stats);  break;
+      case 't': test=1,quiet=1,echo=0,env=testing(env);  break;
+        
+      // actions
+      case 'b': bench= atol(argv[1]); if (bench) --argc,++argv; else bench= 5000;
+        echo= 1; quiet= 1;  break;
+      case 'p': printf("%s\n", *++argv),--argc;  break;
+      case 'i': interpret=0,echo=quiet=0,env= readeval(NULL, env, DOPRINT);  break;
+      case 'x': case 'e': env=readeval(argv[1], env, argv[0][1]=='x');
+        interpret= 0; --argc; ++argv;  break;
+
+      default: printf("%% ERROR.args: %s\n", *argv); exit(1);
+      }
+    
+  } // while more args
+  
 
   if (!interpret) return 0;
-
-  if (!quiet && bench==1) clrscr(); // || only if interactive?
-
   if (!quiet) {
+    if (bench==1) clrscr(); // || only if interactive?
     PRINTARRAY(syms, HASH, 0, 1); // debug
-
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
   }
 

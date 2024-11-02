@@ -127,7 +127,7 @@ extern L runal(char* la) {
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
 
-  if (verbose>1) { printf("%02d:al %c : ", pc-orig+1, pc[1]); prin1(top); NL; }
+  if (verbose>1) { printf("%02d:al %c stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
 
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
@@ -272,17 +272,14 @@ JMPARR(gerr)default:
 L al(char* la) {
   top= nil;
   s= stack-1;
-  frame= s;
 
   // TODO: remove?
   // pretend we have some local vars (we've no been invoked yet)
   frame= s;
   top= MKNUM(8); // a (last parameter)
 
-  top= *s;
-
-  // HHMMMM>?
-  if (!pc) return ERROR;
+  // TODO: hmmm....
+  //top= *s;
 
   return runal(la);
 }
