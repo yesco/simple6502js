@@ -139,6 +139,8 @@ extern L runal(char* la) {
 //#define NNEXT goto next
 
   //NOPS(++nops;);c=*++pc;goto *jmp[c];
+  //printf("\t\tTOP="); prin1(top); NL;
+
   NNEXT;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
@@ -216,19 +218,24 @@ JMPARR(gcmp)
 
   // TODO: need a drop?
 
-JMPARR(gP)case 'P': print(top); goto next;
+JMPARR(gP)case 'P': print(top);  goto next;
 JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 
 // TODO: replace by jmps? This doesn't nest, lol
 JMPARR(gif)   case 'I': if (null(top)) while(*pc!='{') ++pc;  goto next;
-JMPARR(gelse) case '{': while(*pc!='}') ++pc; goto next;
+// TODO: it goes very badly wrong here, onlyi works if THEN==(return ....) !!!!
+JMPARR(gelse) case '{': printf("----%s\n", pc); while(*pc!='}') {
+printf("SKIP: %c\n", *pc); // TODO: remove and stack get wonky??!??!?!?! wtf
+++pc;
+}
+  goto next; // TODO: somehow the stack is messed up here!
 JMPARR(gendif)case '}': goto next;
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
 JMPARR(gdigit)case '0':case'1':case'2':case'3':case'4':case'5':case'6':case'7':case'8'://case'9':
     *++s= top; top= MKNUM(*pc-'0'); goto next;
 
-// TODO: does this stay the same?
+// TODO: these are the same... always?
 JMPARR(gret)case'^': return top;
 JMPARR(g0)case 0:
     if (verbose) { printf("\n\nRETURN="); prin1(top); NL; }
@@ -348,13 +355,52 @@ void alcompile() {
 
     if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", f, f); }
  
-    // IF special => EXPR I THEN { ELSE } ' '
+    // IF special (if EXPR THEN ELSE) => EXPR I ] THEN { ] ELSE }
     if (x==IF) {
       alcompile(); ALC('I'); // EXPR I
       ALC(']'); alcompile(); ALC('{'); // DROP THEN
-      ALC(']'); alcompile(); ALC('}'); // DROP ELSE
+      // THEN, optional
+      c= skipspc(); unc(c);
+      ALC(']'); // DROP
+      if (c!=')') alcompile(); // ELSE
+      ALC('}');
+      if (skipspc()!=')') goto expectedparen;
+      return;
+    }
+
+    // (and A B) == (if A B nil)
+    // (or A B)  == (if A T B) --- or should return A, hmmm, let?
+
+    // (or A B) == (if (null A) B)
+    if (x==OR) {
+      int d= 0;
+      printf("--------------OR---------------\n");
       c= skipspc();
-      if (c!=')') goto expected;
+      while(c != ')') {
+        if (d) ALC(']');
+        unc(c); alcompile(); ALC('U'); ALC('I');
+        ++d;
+        c= skipspc();
+      }
+      unc(c);
+      while(--d>=0) { ALC('{'); ALC('}'); }
+      return;
+    }
+
+    // (and A B) == (if (null A) nil B)
+    if (x==AND) {
+      int d= 0;
+      printf("--------------AND---------------\n");
+      c= skipspc();
+      while(c != ')') {
+        unc(c);
+        alcompile(); ALC('U'); ALC('I');
+        ALC('{'); ALC(']');
+        c= skipspc();
+        ++d;
+      }
+      unc(c);
+      while(--d>=0) { ALC('}'); }
       return;
     }
 
@@ -370,7 +416,7 @@ void alcompile() {
       ALW(n);
 
       c= skipspc();
-      if (c!=')') goto expected;
+      if (c!=')') goto expectedparen;
       return;
     }
 
@@ -427,7 +473,7 @@ void alcompile() {
   }
   return;
 
- expected: // used twice
+ expectedparen: // used twice
   error1("ALC.expected ) got", c);
 }
 

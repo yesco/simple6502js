@@ -422,7 +422,7 @@ L fastcall inc2(L i) { asm("jsr incax2");
 // special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, quote= 0;
 
 #define notnull(x) (x!=nil) // faster than !null
 #define null(x) (x==nil)    // crazy but this is 81s instead of 91s!
@@ -1789,7 +1789,9 @@ char* names[]= {
   "R-recurse",
   "^1return",
 
-  "I1if",
+  "I-if",
+  "I-and", // TODO: dummy
+  "I-1or",  // TODO: dummy
   "Y1read",
   "\'1quote",
   "\\-lambda",
@@ -1879,6 +1881,8 @@ closure= atom("closure");
     bye= atom("bye");   setval(bye, bye, nil);
    SETQ= atom("setq");
      IF= atom("if");
+    AND= atom("and");
+     OR= atom("or");
 
   // register function names
   // TODO: funatom()
@@ -1972,6 +1976,7 @@ L readeval(char *ln, L env, char noprint) {
 
     if (!bench) bench= 1;
 
+    printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
     // eval
     if (!noeval && x!=ERROR) {
       // option to compare results? slow but equal
@@ -1992,7 +1997,10 @@ L readeval(char *ln, L env, char noprint) {
     }
 
     // print
-    if (!noprint && (echo || !quiet || bench)) { prin1(r); NL; }
+    { printf("RES= "); prin1(r); NL; }
+    printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
+    if (!noprint && (echo || !quiet || bench)) { printf("RES= "); prin1(r); NL; }
+
 
     // info
     if (gc) GC(env, alvals); // TODO: only if needed?
@@ -2045,8 +2053,10 @@ int main(int argc, char** argv) {
   env= nil; // must be done after initlisp();
 
   // - read args
-  while (--argc) {
+  while (--argc>1) {
     ++argv;
+    if (!*argv) break;
+
     if (verbose) printf("--ARGC: %d *ARGV: \"%s\" %d\n", argc, *argv, *argv);
 
     if (0==strcmp("--nogc", *argv)) gc=0;
@@ -2065,7 +2075,9 @@ int main(int argc, char** argv) {
         echo= 1; quiet= 1;  break;
       case 'p': printf("%s\n", *++argv),--argc;  break;
       case 'i': interpret=0,echo=quiet=0,env= readeval(NULL, env, DOPRINT);  break;
-      case 'x': case 'e': env=readeval(argv[1], env, argv[0][1]=='x');
+      case 'e': case 'x':
+        printf("ARGV= '%s' %d\n", *argv, (*argv)[1]=='x');
+        env=readeval(argv[1], env, (*argv)[1]=='x');
         interpret= 0; --argc; ++argv;  break;
 
       default: printf("%% ERROR.args: %s\n", *argv); exit(1);

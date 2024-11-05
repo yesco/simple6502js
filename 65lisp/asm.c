@@ -128,8 +128,15 @@ typedef unsigned uchar;
 
 #include "extern-vm.c"
 
-extern unsigned int T=42;
-extern unsigned int nil=0;
+// These needs to be constants during AMS code-gen
+extern unsigned int T=42; // TODO: constant
+
+// this isn't recognized if used in another constant by cc65
+//extern const unsigned int nil=1; 
+const unsigned int nil=1;
+
+#define NIL (1)
+
 
 // Poor Mans Assembler
 // 
@@ -163,6 +170,7 @@ extern unsigned int nil=0;
 #define O3(op, w) op w
 #define N3(name, op, w) O3(op,w)
 
+
 #define LDAn(n) N2("LDAn","\xA9",n)
 #define LDXn(n) N2("LDXn","\xA2",n)
 #define LDYn(n) N2("LDYn","\xA0",n)
@@ -182,11 +190,17 @@ extern unsigned int nil=0;
 #define EORn(b) O2("\x49",b)
 
 #define ASL()   O("\x0A")
+
 #define CMPn(b) N2("CMPn","\xC9",b)
 #define CPXn(b) N2("CPXn","\xE0",b)
 #define CPYn(b) N2("CPYn","\xC0",b)
 
 #define SBCn(b) N2("SBC","\xE9", b)
+
+#define CMP(w)  N3("CMP","\xCD", w)
+#define CPX(w)  N3("CPX","\xEC", w)
+#define CPY(w)  N3("CPY","\xCC", w)
+
 
 #define PHP()   O("\x08")
 #define CLC()   O("\x18")
@@ -211,6 +225,7 @@ extern unsigned int nil=0;
 #define TXA()   O("\x8A")
 #define TAX()   O("\xAA")
 
+
 #define BMI(b)  O2("\x30", b)
 #define BPL(b)  O2("\x10", b)
 
@@ -231,6 +246,8 @@ extern unsigned int nil=0;
 #define JMPi(a) N3("JPI", "\x6c",a)
 
 #define BRK(a)  O("\0")
+
+// END ASSEMBLY DEF
 
 #define ASM(x,...) (x),U (sizeof(x)-1),__VA_ARGS__,REND
 
@@ -385,15 +402,16 @@ char* rules[]= {
 
   // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
-  OPT("[0=", TAY() BNE("\x02") CPXn("\0") BNE("\0"), U 7, REND)
-  OPT("[%d=", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0"), U 8, REND)
+  OPT("[0=I", TAY() BNE("\x02") CPXn("\0") BNE("\0") ":", U 8, REND) // save once instruction using TAY
+  OPT("[9=I", CMPn("\x01") BNE("\0x02") CPXn("\x00") BNE("\0") ":", U 9, REND)
+  OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U 9, REND)
 
-  "=", JSR("w?") "s-", U 5, U toseqax, REND
+  "=", JSR("w?") "s-", U 5, U toseqax, REND // TODO: make it a number? TODO: make my own generic CMP
 
   // Unsigned Int
   // OPT("[%a<", ... - local
   // OPT("[%g<", ... - global
-  OPT("[%d<", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00"), U 9, REND)
+  OPT("[%d<I", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00") ":", U 10, REND)
 
   "<", JSR("w?"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
@@ -457,11 +475,11 @@ char* rules[]= {
   // TODO: how aobut balancing stack, recurse on compiler?
   //   pop to same level?
   //   if return stack ... 64 lol
-  OPT("I", ":", U 1, REND)
-  "I", BCS("\0") ":", U 1, REND // TODO: not correct, what does the generic <, or = do?
+  //OPT("I", ":", U 1, REND)
+  //"I", BCS("\0") ":", U 1, REND // TODO: not correct, what does the generic <, or = do?
 
-  // last patching not needed at }, how to suppress?
-  OPT("{%^", "z" "/" ";", U 3, REND) // after return no need jmp endif!
+  OPT("{}", ";", U 1, REND) // Typically output by (and ...) or (if EXP THEN)
+  OPT("{%^", "z" "/" ";", U 3, REND) // push z, no need to resolve/patch! after return no need jmp endif!
   "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
 
   // TODO: if "{%^" before, then no patch!
@@ -545,6 +563,7 @@ char matching(char* bc, char* r) {
       } else if (nc=='^') {
         printf("HERE %^ stk=%d\n", stk);
         if (stk<60) return 0;
+        printf("--HERE passed\n");
         --charmatch;
       }
       ++r;
@@ -713,16 +732,16 @@ int compile() {
 
     // -- update ax
     if (islower(*bc)) ax= *bc;
-    else if (changesAX(r)) ax= '?';
+    else if (changesAX(r)) ax= '?';  
     // TODO: pushax?
 
 
     // handle IF by recursion
-    if (*bc=='I') {
+    if ('I'==bc[charmatch-1]) { // TODO: hmmm?
       // TODO: if have more, is it better to do struct?
       int i_stk= stk; char i_ax= ax;
-      ++bc;
-      printf("-------------IF--------------\n");
+      bc+= charmatch;
+      printf("\n-------------IF--------------\n");
 
       // THEN
       compile();
@@ -741,7 +760,7 @@ int compile() {
         if (t_ax != ax) ax= '?';
 
         if (stk>60) stk= t_stk;
-        else if (stk<60 && stk != t_stk) {
+        else if (stk<60 && t_stk<60 && stk != t_stk) {
           printf("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
           assert(0);
         }
@@ -777,8 +796,10 @@ typedef int (*F1)(int);
 typedef void (*F)();
 
 int main(void) {
-  unsigned int bench= 3000, n= bench;
-//  unsigned int bench= 100; // for fib21
+//  unsigned int bench= 3000, n= bench;
+//  unsigned int bench= 3000, n= bench;
+//  unsigned int bench= 100, n= bench; // for fib21
+  unsigned int bench= 1, n= bench;
   int r, i;
 
 #ifdef MATCHER
@@ -797,6 +818,16 @@ int main(void) {
   //bc= "[a[a+[a+^";
   //bc= "[a[a+[a+^";
   //bc= "[a[a+[a+[a+^";
+
+  // AND
+  bc= "[1UI{][2UI{][3UI{]}}}";
+
+  //nil= 1; // address 1 (0-5 used for "SPECIAL: NIL") car(nil)=nil, cdr(nil)=nil
+  bc= "[9P";
+  bc= "[8[9=P"; // works! -1, lol should crash?
+  bc= "[8[9=P";
+
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
 
   bytes= 0;
   // implicit return, only takes one expression
@@ -830,19 +861,27 @@ int main(void) {
   // 3000x fib8 ... 38.5s - (- 39.3 3.9) 35.4s RUNNING (not incl compile, and printing overhead)
   // 3000x emtpy loop overhead: with print and compile overhead 3.9s! (removed gen() call...
   // 100x  fib21 ... 617s
-  i*= 2;
+
+  i*= 2; // TODO: this generates code knowing what i is!!! (so if small may do INX!!!!?)
+
 while(--n) {
   if (1) {
+    // 39.32s
     r= ((F1)gen)(i);
   } else {
-    // TODO: why doesn't it work - loops forever!
+    // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
     __AX__= i;
-    ((F)gen)();
+    asm(" jsr %v", gen);
     r= __AX__;
+
+    // TODO: why doesn't it work - loops forever!
+    //__AX__= i;
+    //((F)gen)();
+    //r= __AX__;
   }
 }
 
- printf("bench: %d times - FIB(%d)=%d\n", bench, i/2, r/2);
+printf("bench: %d times - FIB(%d)=%d (%04X)\n", bench, i/2, r/2, r);
 
     // TODO: allocate, copy ...
 

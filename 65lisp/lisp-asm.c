@@ -30,12 +30,12 @@ char* mcp= mc;
 
    ' ' \t \r \n - skip
    !    - store (val, addr) => val (TODO: redundant? uses : ??)
-   "	
+   "	- (extended ops?)
 // #    - (isnum)    = LOL cc65 preprocessor runs inside comments?
    $	- (isstr)
    %    - (mod)
    &    - (bit-and)
-   '    
+   '    - (isatom?/issymbol?)
    ()   - (incf/decf? lol rather use SIa SDa)
    *    - mul
    +    - add
@@ -44,8 +44,8 @@ char* mcp= mc;
    .    - princ
    /    - (div)
    012345678 - literal single digit number
-   9    - nil
-   :    - setq (TODO: is just set?)
+   9    - nil (or T and swap with _ for nil?)
+   :aa  - setq at AAdress
    ;nn  - ;BEEF read value at BEEF
    <    - (lt)
    =    - (eq)
@@ -57,14 +57,14 @@ char* mcp= mc;
    C    - Cons
    D    - cDr
    E    - (Eval) - call lisp
-   F    - (Filter?)
+   F    - (Filter+Reduce?)
    G    - (Gassoc)
    H    - (evalappend?) ???
    I    - If
    J    - (Japply) - funcall?
-   K    - (Kons)
-   L    - (evallist?)/nList
-   M    - (Map)
+   K    - (Kons?)
+   L    - (evallist? / nList?)
+   M    - (Map, use generic all?)
    N    - (Nth)
    O    - (Ord/length)
    P    - Print
@@ -73,7 +73,7 @@ char* mcp= mc;
    S    - (Setq local/closure named var: Sa S+a, SIa,SDa=incf,decf? etc..)
    T    - Terpri (newline)
    U    - nUll
-   V    - (reduce?)
+   V    - (reduce? or see F)
    W    - princ
    X    - (eXecute addr on stack? JSR? == callax in asm, also see z)
    Y    - read
@@ -82,21 +82,41 @@ char* mcp= mc;
    \    - (lambda?)
    ]    - popax? ( "][" will do nothing! )
    ^    - return
-   _    - nil, but that's 9, hmmm, swap 9 to T?, OR _ jmp?
+   _    - (nil, but that's 9, hmmm, swap 9 to T?, OR _ jmp?)
    `    - (backquote construct)
-   abcdefgh - (local stack variables)
-   ijklmnop - (local/closure frame variables)
+   abcdefgh - (local stack variables, only 8)
+   ijklmnop - (local/closure frame variables, only 8)
    qrst
-   uv
-   w    - (ax Word)
-   x    - (x lol)
-   y    - (y lol)
-   znn  - jsr nn, how to jmp?
+   uv   - (more ops dispatch? u=byte v=word? lol)
+   w    - (ax Word?)
+   x    - (x lol?)
+   y    - (y lol?)
+   znn  - (jsr nn), but how to jmp?
    {    - forth ELSE (starts THEN part, lol)
    |    - (bit-or)
    }    - forth THEN (ends if-else-then)
    ~    - (bit-not)
       - ermh?
+
+   CTRL-CHARS:
+   \0     - end, implicit RTSish (if at expected ALop location)
+   ^A     - 
+   ^B-^F  - 
+   ^G     - BELL/Error?
+   ^H     - backspace
+   ^I \t  - formatting char
+   ^J \r? - formatting char
+   ^K     -
+   ^L     - formatting char (new page)
+   ^M \n  - formatting char
+   ^N-^Z  - 
+   ^[     - ESC (?) 
+   ^\     -
+   ^]     - 
+   ^DEL   - ?
+
+HIBIT set?
+          - could be relative JMP forward... i.e. compiled {}
 
 */
 
@@ -107,7 +127,8 @@ char* mcp= mc;
 //    29611 bytes for OPT MATH
 //    30154 bytes for OPT emitEQ, return, ax tracking jmp endif
 //    31945 bytes for OPT DELAY-AX TODO: reduce inline...
-//   
+//    32717 bytes for ASM OPT ... all 
+
 // byte code compiler... + byte interpreter = 6299
 //                             asm-compiler = 2152 bytes
 
@@ -254,13 +275,16 @@ void W(void* w) { *((L*)mcp)++= (L)(w); DASM(printf("%04x", w)); }
 //
 
 
-// ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
-//    ASM      TIME    PROGSIZE  OPT
-//     65      45.2s     -               fib.c
+// -- COMPARED TO PLAIN C
+//    SIZE      TIME    PROGSIZE  OPT
+// CC  65 B    45.2s     -               fib.c
 // CC  54 B    41.53           ltfib.c (unsigned LT<2 etc)
 //                 --- 38% B  42% slower ---
-//
 
+
+// -- ASM OPTIMIZATION, fib 8 x 3000 (top post!)    ./fib-asm 30
+//    SIZE      TIME    PROGSIZE  OPT
+//                      32767 B optimized for space
 //     43 B     31.8    36004 B <2 SIGNED (no cheating)
 //                              emitCONST '0' - 3 bytes
 //                                if ax already '0'..'8'
@@ -287,12 +311,20 @@ void W(void* w) { *((L*)mcp)++= (L)(w); DASM(printf("%04x", w)); }
 //     88 B    101.1s   29576 B  +607 B   emitMATH (sub)      LOTS OF CODE to OPT 
 //    102 B    120.7s   27969 B           emitEXIT
 //    105 B    123.1s                     - start -
-//
+
+
+// -- VM
+//    SIZE      TIME    PROGSIZE  OPT
+
 //     30 B      -        --- VM --- effective CODE used to generate ASM!
 //     30 B                cleaned [a[0=I  a{  a[1=I  a{  a[1-R[a[2-R+ } } \0 - saved 4x (drop+push ][) 
 //     38 B                byte code with push/pop [a[0=I][a{][a[1=I][a{][a[1-R[a[2-R+ } } \0 
 //  !  24 B                plain byte code:  a 0=I  a{  a 1=I  a{  a 1-R a 2-R+ } } \0
-//
+
+
+// -- CONS LISP
+//    SIZE      TIME    PROGSIZE  OPT
+
 //  !  50 B     25 cells         LISP w RETURN and <2 ...
 //  !  62 B     31 cells         LISP w RETURN
 //  !  56 B     28 cells         LISP if if..
