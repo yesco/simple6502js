@@ -412,6 +412,9 @@ char* rules[]= {
   // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
   //  TODO: rewrite "[9=I" => "UI" ???
+  // TODO: 8 instructions is a lot because AX?
+  // TODO: how about from var? (but don't we typically return exactly same value?)
+  // TODO: JSR() & BNE => 5 bytes... slow...
   OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
   OPT("[9=I", CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
 
@@ -674,7 +677,7 @@ int compile() {
 
           // -- use a byte from last %d matched valuie (low/high)
                if (c=='#') { APRINT(" # => $%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
-          else if (c=='"') { APRINT(" \" => $%02x  ", ww>>8); gen[bytes]= ww>8; }
+          else if (c=='"') { APRINT(" \" => $%02x  ", ww>>8); gen[bytes]= ww>>8; }
           // -- use a word from matched data/parameters
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
           else if (c=='w') {
@@ -817,11 +820,13 @@ typedef int (*F1)(int);
 typedef void (*F)();
 
 int main(void) {
-//  unsigned int bench= 3000, n= bench;
-//  unsigned int bench= 3000, n= bench;
-//  unsigned int bench= 100, n= bench; // for fib21
-  unsigned int bench= 1, n= bench;
+//  unsigned int bench= 3000, n= bench+1;
+//  unsigned int bench= 3000, n= bench+1;
+//  unsigned int bench= 100, n= bench+1; // for fib21
+  unsigned int bench= 1, n= bench+1;
   int r, i;
+
+  if (i==1) return i;
 
 #ifdef MATCHER
   bc= "[3[3+"; // works
@@ -847,12 +852,14 @@ int main(void) {
 
   bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
 
-  // AND
-  bc= "[1UI{][2UI{][3UI{]}}}";
-
-  // OR
+  // OR - works!
   //  //doesn't resolve all OR! {}{}{}...
-  bc= "[1UI][2UI][3UI{}{}{}^";
+  bc= "[9UI][9UI][3UI{}{}{}^";
+
+  // AND - works!
+  bc= "][1UI{][9UI{][3UI{}}}^";
+
+  //bc= "[9^";
 
   bytes= 0;
   // implicit return, only takes one expression
