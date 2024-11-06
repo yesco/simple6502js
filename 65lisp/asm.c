@@ -35,6 +35,18 @@
 #define RULES
 #define MATCHER
 
+
+// uncomment to get DISASM
+#define DISASM
+
+#ifdef DISASM
+  #undef DISASM
+  #include "disasm.c"
+#else
+  #undef DISASM
+  #define DISASM(a,b) 
+#endif // DISASM
+
 #include "disasm.c"
 
 
@@ -133,6 +145,7 @@ extern unsigned int T=42; // TODO: constant
 
 // this isn't recognized if used in another constant by cc65
 //extern const unsigned int nil=1; 
+// TODO: if this is ever changed, need to change codegen "[9=I" and "UI"
 const unsigned int nil=1;
 
 #define NIL (1)
@@ -163,17 +176,13 @@ const unsigned int nil=1;
 // - and a "<" move stack instructions.
 
 
-#define O(op) op
+#define  O(op)    op
 #define O2(op, b) op b
-#define N2(name, op, b) O2(op,b)
-
 #define O3(op, w) op w
-#define N3(name, op, w) O3(op,w)
 
-
-#define LDAn(n) N2("LDAn","\xA9",n)
-#define LDXn(n) N2("LDXn","\xA2",n)
-#define LDYn(n) N2("LDYn","\xA0",n)
+#define LDAn(n) O2("\xA9",n)
+#define LDXn(n) O2("\xA2",n)
+#define LDYn(n) O2("\xA0",n)
 
 
 #define LDA(w)  O3("\xAD",w)
@@ -191,15 +200,15 @@ const unsigned int nil=1;
 
 #define ASL()   O("\x0A")
 
-#define CMPn(b) N2("CMPn","\xC9",b)
-#define CPXn(b) N2("CPXn","\xE0",b)
-#define CPYn(b) N2("CPYn","\xC0",b)
+#define CMPn(b) O2("\xC9",b)
+#define CPXn(b) O2("\xE0",b)
+#define CPYn(b) O2("\xC0",b)
 
-#define SBCn(b) N2("SBC","\xE9", b)
+#define SBCn(b) O2("\xE9", b)
 
-#define CMP(w)  N3("CMP","\xCD", w)
-#define CPX(w)  N3("CPX","\xEC", w)
-#define CPY(w)  N3("CPY","\xCC", w)
+#define CMP(w)  O3("\xCD", w)
+#define CPX(w)  O3("\xEC", w)
+#define CPY(w)  O3("\xCC", w)
 
 
 #define PHP()   O("\x08")
@@ -239,11 +248,11 @@ const unsigned int nil=1;
 #define BVS(b)  O2("\x70",b)
 
 
-#define JSR(a)  N3("JSR","\x20",a)
+#define JSR(a)  O3("\x20",a)
 #define RTS(a)  O("\x60")
 
-#define JMP(a)  N3("JMP", "\x4c",a)
-#define JMPi(a) N3("JPI", "\x6c",a)
+#define JMP(a)  O3("\x4c",a)
+#define JMPi(a) O3("\x6c",a)
 
 #define BRK(a)  O("\0")
 
@@ -402,8 +411,11 @@ char* rules[]= {
 
   // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
   // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
+  //  TODO: rewrite "[9=I" => "UI" ???
+  OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
+  OPT("[9=I", CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
+
   OPT("[0=I", TAY() BNE("\x02") CPXn("\0") BNE("\0") ":", U 8, REND) // save once instruction using TAY
-  OPT("[9=I", CMPn("\x01") BNE("\0x02") CPXn("\x00") BNE("\0") ":", U 9, REND)
   OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U 9, REND)
 
   "=", JSR("w?") "s-", U 5, U toseqax, REND // TODO: make it a number? TODO: make my own generic CMP
@@ -629,6 +641,8 @@ int compile() {
 
       // find matching prefix ("peep-hole code-gen/optimizer")
       if (matching(bc, r)) {
+        int start= bytes;
+
         //APRINT("---MATCH: '%s'\ton '%s'\n", *p, bc);
         APRINT("  %s\t", r);
 
@@ -638,7 +652,7 @@ int compile() {
           break;
         }
 
-        APRINT(" [%d] ", z);
+        APRINT(" [%d] -- ", z);
 
         // TODO: keep or remove?
 //    if (*r=='I') *--patch= stk;
@@ -654,65 +668,63 @@ int compile() {
           gen[bytes]= c= *pc; ++pc;
           nc= *pc;
 
-          // LOL, wtf, turning into a mini disasm... lol
-          if (c==0x20) { APRINT(" JSR "); }
-          else if (c==0x4c) { APRINT(" JMP "); }
-          else if (c==0x6c) { APRINT(" JPI "); }
-          else if (c==0x60) { APRINT(" RTS "); }
-          else if (c==0xa9 || c==0xad) { APRINT(" LDA "); }
-          else if (c==0xa2 || c==0xae) { APRINT(" LDX "); }
-          else if (c==0xa0 || c==0xac) { APRINT(" LDY "); }
-          else if (c==0xa8) { APRINT(" TAY "); }
-          else if (c==0x98) { APRINT(" TYA "); }
-          else if (c==0x8a) { APRINT(" TXA "); }
-          else if (c==0xaa) { APRINT(" TAX "); }
           // TODO: These are "arguments", the have no matching OP-codes, BUTT
-          //       they aren't safe substitutions... lol, "WORKS FOR NOW".
+          //       they aren't safe substitutions(?)... lol, "WORKS FOR NOW".
           // WARNING: may give totally random bugs, depending on memory locs of data!
-          // -- use last %d matched valuie
-          // (take low/high)
-          else if (c=='#') { APRINT("#$%02x ", ww & 0xff); gen[bytes]= ww & 0xff; }
-          else if (c=='"') { APRINT("#$%02x ", ww>>8); gen[bytes]= ww>8; }
-          // (take word)
+
+          // -- use a byte from last %d matched valuie (low/high)
+               if (c=='#') { APRINT(" # => $%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
+          else if (c=='"') { APRINT(" \" => $%02x  ", ww>>8); gen[bytes]= ww>8; }
+          // -- use a word from matched data/parameters
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
           else if (c=='w') {
             uint* pi= (uint*)(gen+bytes);
-            if (nc=='w')      { APRINT("$%04X ", ww);   *pi= ww;   }
-            else if (nc=='+') { APRINT("$%04X ", ww+1); *pi= ww+1; }
+
+            // from last %d matched
+            if (nc=='w')      { APRINT("  ww => $%04X  ", ww);   *pi= ww;  }
+            else if (nc=='+') { APRINT("  w+ => $%04X  ", ww+1); *pi= ww+1; }
+
             // take extra word parameter from rules
-            else if (nc=='?') { APRINT("$%04X ", *p);   *pi= (uint)*p; ++p; }
+            else if (nc=='?') { APRINT("  w? => $%04X  ", *p);   *pi= (uint)*p; ++p; }
             //else assert(!"BAD nc!");
+
             --z;++pc;
             ++bytes;
           }
           // -- actions to track stack changes
           else if (c=='s') {
-            if      (nc=='+') ++stk;
-            else if (nc=='-') --stk;
-            else if (nc=='^') stk=64;
+            if      (nc=='+') { APRINT("(stack+) "); ++stk; }
+            else if (nc=='-') { APRINT("(stack-) "); --stk; }
+            else if (nc=='^') { APRINT("(stack^) "); stk=64; }
+
             --z;++pc;
           }
+          // TODO: unsigned...
           //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
 
           // -- actions for IF : = push label, z = push 0=notpatch, ; = patch (if !0), / = swap
-          else if (c=='z') { *--patch= 0; }
-          else if (c==':') { *--patch= bytes-1; }
+          else if (c=='z') { APRINT("(push:zero) "); *--patch= 0; }
+          else if (c==':') { APRINT("(push:label) "); *--patch= bytes-1; }
           else if (c==';') {
             if (*patch) {
               int rel= bytes-*patch-1;
+              APRINT("(patch[%d]=%+d) ", *patch, rel);
               if (rel < -126 || rel > 127) {
                 printf("%%Compile: relative jump too far! %d\n", rel);
               }
               gen[*patch]= rel;
-            }
+            } else APRINT("(patch:zero) ");
+
             ++patch;
-          } else if (c=='/') { char t= *patch; *patch= patch[1]; patch[1]= t; }
-          else { APRINT(" %02x ", c); } // we don't know, for now
+          } else if (c=='/') { char t= *patch; APRINT("(swap labels) "); *patch= patch[1]; patch[1]= t; }
+          else APRINT("$%02x ", c); // we don't know, for now
 
           // TODO: more efficient?
           if (c!='s' && c!=':' && c!=';' && c!='/' && c!='z') ++bytes;
           --z;
         } // end while action/asm
+
+        disasm_indent= 9; DISASM(gen+start, gen+bytes); disasm_indent= 0;
 
         break;
       } // if match
@@ -746,19 +758,23 @@ int compile() {
       // THEN
       compile();
       assert(*bc=='{');
-      ++bc;
+      bc+= charmatch;
+      //if (bc[1]!='}') {
       {
         int t_stk= stk; char t_ax= ax;
         stk= i_stk; ax= i_ax;
 
+        printf("BC=%s\n", bc);
+
         // ELSE
         compile();
-        assert(*bc=='}');
+        //assert(*bc=='}');
         // no inc, as '}' wil be eaten later
 
         // ENDIF: resolve THEN and ELSE branch states
         if (t_ax != ax) ax= '?';
 
+        printf("BEFORE %IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
         if (stk>60) stk= t_stk;
         else if (stk<60 && t_stk<60 && stk != t_stk) {
           printf("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
@@ -768,8 +784,13 @@ int compile() {
     }
 
     // TODO: worth storing *bc in char var?
-    if (*bc=='{' || *bc=='}') break;
+    if (!*bc) break; // hmmm... 
 
+    if (*bc=='{' || *bc=='}') break;
+    if (bc[charmatch-1]=='}' || bc[charmatch-1]=='{') {
+      bc+= charmatch;
+      break;
+    }
     bc+= charmatch;
   }
 
@@ -819,15 +840,19 @@ int main(void) {
   //bc= "[a[a+[a+^";
   //bc= "[a[a+[a+[a+^";
 
-  // AND
-  bc= "[1UI{][2UI{][3UI{]}}}";
-
   //nil= 1; // address 1 (0-5 used for "SPECIAL: NIL") car(nil)=nil, cdr(nil)=nil
   bc= "[9P";
   bc= "[8[9=P"; // works! -1, lol should crash?
   bc= "[8[9=P";
 
   bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
+
+  // AND
+  bc= "[1UI{][2UI{][3UI{]}}}";
+
+  // OR
+  //  //doesn't resolve all OR! {}{}{}...
+  bc= "[1UI][2UI][3UI{}{}{}^";
 
   bytes= 0;
   // implicit return, only takes one expression
@@ -837,6 +862,7 @@ int main(void) {
   // need add the implicit return?
   if (stk<60) {
     // IF doesn't have RETURN in both branches...
+    // TODO: this isn't right.... add ^ at end?
     gen[bytes++]= 0x60; // RTS
   }
 

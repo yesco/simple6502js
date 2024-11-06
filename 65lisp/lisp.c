@@ -1791,7 +1791,7 @@ char* names[]= {
 
   "I-if",
   "I-and", // TODO: dummy
-  "I-1or",  // TODO: dummy
+  "I-or",  // TODO: dummy
   "Y1read",
   "\'1quote",
   "\\-lambda",
