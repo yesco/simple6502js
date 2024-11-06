@@ -637,8 +637,12 @@ extern char* genasm(AsmState *s) {
 
   // -- These are safe functions with no stack effect
   case '@': IAX; JSR(ldaxi); goto next; // read var at addr/global var 3+4+3 = push,lda+ldx,ldaxi = 13 bytes!
+
   case 'A': IAX; JSR(ffcar); goto next;
   case 'D': IAX; JSR(ffcdr); goto next;
+
+//  case 'A': IAX; JSR(ffffcar); goto next;
+//  case 'D': IAX; JSR(ffffcdr); goto next;
 
   case '.': JSR(princ); goto next;
   case 'W': JSR(prin1); goto next;

@@ -31,6 +31,8 @@
 
 .import toseq00, toseqa0, toseqax
 
+.import callax
+
 .import pusha
 .import pushax
 .import pusha0sp
@@ -49,6 +51,8 @@
 .export _ldaxi, _ldaxidx, _ldax0sp, _ldaxysp
 
 .export _staxspidx
+
+.export _callax
 
 .export _pushax
 .export _pusha0sp
@@ -78,6 +82,8 @@
 .export _shlax1,_shlax2,_shlax3,_shlax4,_shlaxy
 
 .export _ffcar, _ffcdr
+.export _fffcar, _fffcdr
+.export _ffffcar, _ffffcdr
 .export _ffnull, _ffisnum, _ffiscons, _ffisatom, _fftype
 .export _istrue, _iscarry
 
@@ -95,6 +101,8 @@ _ldax0sp        = ldax0sp
 _ldaxysp        = ldaxysp
 
 _staxspidx      = staxspidx
+
+_callax          = callax
 
 _pushax         = pushax
 _pusha0sp       = pusha0sp
@@ -227,6 +235,45 @@ _iscarry:
         jmp _rettrue
 
 
+;;; faster car/cdr
+
+;;; -b ffffcar: 6.792635
+;;; -b ffcar:   6.862458
+;;; -b 1:       1.986396
+;;; (- 6.792635 1.986396) = 4.806239
+;;; (- 6.862458 1.986396) = 4.876062
+;;; (/ 4.877072 4.806239) = 1.014377 = 1.4% lol
+
+
+;;; Need to store 01 at address 01, lol which is/will be NIL lo-byte==01!
+;;; 4B 5c slightly better (?)
+_fffffcar:      
+        ;; very cheap isnum
+        bit $01
+        beq _retnil
+
+        ;; consider inlining, 3c save
+        jmp ldaxi
+
+;;; TODO: 4B 6c is better!
+_ffffcar:   
+        ;; isnum
+        lsr
+        bcc _retnil
+        rol
+
+        jmp ldaxi
+
+;;; TOOD: 5B 8c
+_fffcar:   
+        tay
+        ror
+        bcc _retnil
+        tya
+
+        jmp ldaxi
+
+;;; 6B 8c
 _ffcar:  
         tay
         and #$01
@@ -237,6 +284,28 @@ _ffat:
         jmp ldaxi
 
 
+;;; TOOD: 4B is better!
+_ffffcdr:   
+        ;; isnum
+        lsr
+        bcc _retnil
+        rol
+
+        ldy #$03
+        jmp ldaxidx
+
+;;; TOOD: 5B
+_fffcdr:   
+        tay
+        ror
+        bcc _retnil
+        tya
+
+        ldy #$03
+        jmp ldaxidx
+
+
+;;; TODO: use better
 _ffcdr:
         tay
         and #$01

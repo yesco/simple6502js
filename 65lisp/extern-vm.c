@@ -6,8 +6,17 @@ extern L istrue(L);
 extern L isfalse(L);
 extern L iscarry(L);
 
+extern L callax(L);
+
+extern L ffffcar(L);
+extern L ffffcdr(L);
+
+extern L fffcar(L);
+extern L fffcdr(L);
+
 extern L ffcar(L);
 extern L ffcdr(L);
+
 extern L ffnull(L);
 extern L ffisnum(L);
 extern L ffiscons(L);

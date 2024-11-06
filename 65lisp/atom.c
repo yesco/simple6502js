@@ -1,5 +1,48 @@
 // Proposed new atom to store bytecode and assembly too
 
+typedef struct Atom { // 8 Bytes, aligned x..x01
+  D val;
+  D ptr;
+  char jmp[3]; (JMP|JSR|JMPi|RTS) 0xCODE
+  char n; // number parameters
+}
+
+// Types:
+//   symbol only  - CAR: val   CDR: name  RUN: jsr lisp            N: args   (ax= argumentslist, env?)
+//   prim op      - CAR: o     CDR: name  RUN: jsr OP/jsr DO-OP    N: args   (ax= tos)
+//   string       - CAR: self  CDR: self  RUN: jsr prinf(?)        N: args   (ax= arglist..)
+//   bytecode     - CAR: self  CDR: name  RUN: run bytecode        N: args   (ax= tos)
+//   compiled     - CAR: self  CDR: name  RUN: jmp asm             N: args   (ax= tos)
+//     trace      - CAR: self  CDR: name  RUN: jsr trace           N: args   (ax= tos)
+//   longnum      - CAR: 15b   CDR: 15b   RUN: RTS [2B: 16b]       N: exp?   (ax= tos?)
+
+//EVAL:
+//  - local var --> RUN (how to know? a-z?, A-Z is outer?, using "frame")
+//  - not cons  --> CAR
+//  - ELSE      --> JMP addr+4   == APPLY!
+
+//CDR: name => string
+//  00000000 xxxxxxx0 == one char == char*2
+//  xxxxxxxx xxxxxxx0 == aligned char*
+//  xxxxxxxx xxxxxx01 == atom?
+//  xxxxxxxx xxxxxx11 == cons?
+
+// complicated. lol
+
+// (/ 21 (log 10)) = 9 digits
+
+//LONGNUM:
+//  30b decimal number + 16b = 46b ... (/ 46 (log 10)) = 19.98
+//   8b exponent (10**exp)   =  8b
+
+//BIGNUM:
+//  0-200: n*2  => 0-100: 7B =14 digits, or 12 digits, 2 exp
+//  RTS need to keep... lol
+
+
+
+
+
 typedef struct AtomBin {
   char jmp[3]; // JMP CO DE
   char op; // (may be optional)

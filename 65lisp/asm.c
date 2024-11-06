@@ -377,8 +377,9 @@ char* rules[]= {
 
   "-", JSR("w?") "s-", U 5, U tossubax, REND
 
-  // ][ conflicts with this
+  // ][ conflicts with this, hmmmm, TODO: check IF
 
+  // TODO: make safe value?
   OPT("[0*", LDAn("\0") TAX(), U 3, REND)
   OPT("[1*", "", 0, 0,)
   OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
@@ -397,7 +398,7 @@ char* rules[]= {
 
   "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
-
+  // TODO: make safe value?
   OPT("[2/", JSR("w?"), U 3, U asrax1, REND)
   OPT("[4/", JSR("w?"), U 3, U asrax2, REND)
   OPT("[8/", JSR("w?"), U 3, U asrax3, REND)
@@ -482,8 +483,10 @@ char* rules[]= {
 
   // CALL = "Xcode" - would prefer other prefix?
   //"X^^",    "<" JMP("ww"),     U 4, REND // ERROR (need popstack first/move)
-  OPT("X^", "<" JMP("ww") "s^",  U 4, REND) // TailCall other function
-  "X",      JSR("ww"),       U 3, REND // Call other function // TODO: param/STK?
+  OPT("%dX^", "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
+  OPT("%dX",  "<" JSR("ww"),       U 4, REND) // Call other function // TODO: param/STK?
+  OPT("X^",   "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
+  "X",            JSR("w?"),       U 3, U callax, REND // Call other function // TODO: param/STK?
   
   // TODO: not complete yet
   //   patching ops=="immediate": :=save ;=patch /=swap
@@ -603,7 +606,7 @@ unsigned char changesAX(char* rule) {
 //
 // Returns bytes (length)
 
-int bytes= 0;
+unsigned int bytes= 0; // char would save 50 bytes, but very limited
 char* bc;
 
 int compile() {
@@ -718,6 +721,8 @@ int compile() {
               gen[*patch]= rel;
             } else APRINT("(patch:zero) ");
 
+            // TODO: look back, see if have Bxx *patch-1, if so, patch it to same, if same Bxx?
+            // (hmmm rather complicated, maybe easier to forward patch?)
             ++patch;
           } else if (c=='/') { char t= *patch; APRINT("(swap labels) "); *patch= patch[1]; patch[1]= t; }
           else APRINT("$%02x ", c); // we don't know, for now
@@ -825,8 +830,6 @@ int main(void) {
 //  unsigned int bench= 100, n= bench+1; // for fib21
   unsigned int bench= 1, n= bench+1;
   int r, i;
-
-  if (i==1) return i;
 
 #ifdef MATCHER
   bc= "[3[3+"; // works
