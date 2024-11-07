@@ -394,8 +394,9 @@ void alcompile() {
       c= skipspc();
       while(c != ')') {
         unc(c);
+        if (d) ALC(']');
         alcompile(); ALC('U'); ALC('I');
-        ALC('{'); ALC(']');
+        ALC('{');
         c= skipspc();
         ++d;
       }

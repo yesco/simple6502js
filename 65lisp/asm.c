@@ -857,10 +857,12 @@ int main(void) {
 
   // OR - works!
   //  //doesn't resolve all OR! {}{}{}...
+  bc= "[1UI][2UI][9UI{}{}{}^";
   bc= "[9UI][9UI][3UI{}{}{}^";
 
   // AND - works!
-  bc= "][1UI{][9UI{][3UI{}}}^";
+  bc= "[1UI{][2UI{][9UI{}}}^";
+  bc= "][1UI{][2UI{][3UI{}}}^";  // crash without leading ']'
 
   //bc= "[9^";
 

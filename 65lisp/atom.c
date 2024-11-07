@@ -7,18 +7,32 @@ typedef struct Atom { // 8 Bytes, aligned x..x01
   char n; // number parameters
 }
 
+// TODO: how do we know the TYPE? lol, high 2 bits of N?
+//       Do we need to know type???
+
+//   00 = normal symbol/value
+//   01 = prim op
+//   10 = bytecode
+//   11 = asm
+
+// or by function:
+//   0 = 
+
 // Types:
 //   symbol only  - CAR: val   CDR: name  RUN: jsr lisp            N: args   (ax= argumentslist, env?)
-//   prim op      - CAR: o     CDR: name  RUN: jsr OP/jsr DO-OP    N: args   (ax= tos)
+//   prim op      - CAR: o     CDR: name  RUN: jmp OP/jmp DO-OP    N: args   (ax= tos) (calling next)
 //   string       - CAR: self  CDR: self  RUN: jsr prinf(?)        N: args   (ax= arglist..)
-//   bytecode     - CAR: self  CDR: name  RUN: run bytecode        N: args   (ax= tos)
+//   bytecode     - CAR: self  CDR: name  RUN: jsr runbytecode     N: args   (ax= tos)
 //   compiled     - CAR: self  CDR: name  RUN: jmp asm             N: args   (ax= tos)
 //     trace      - CAR: self  CDR: name  RUN: jsr trace           N: args   (ax= tos)
+
+//   array        - CAR: self  CDR: nelem RUN: RTS [2B: addr]      N: capacity/8 (max nelem)
+
 //   longnum      - CAR: 15b   CDR: 15b   RUN: RTS [2B: 16b]       N: exp?   (ax= tos?)
 
-//EVAL:
+//EVAL (a args...):
 //  - local var --> RUN (how to know? a-z?, A-Z is outer?, using "frame")
-//  - not cons  --> CAR
+//  - not cons  --> CAR (global var, prim, string, bytecode... etc.... give self!)
 //  - ELSE      --> JMP addr+4   == APPLY!
 
 //CDR: name => string
