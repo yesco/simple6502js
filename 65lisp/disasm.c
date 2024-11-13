@@ -6,7 +6,7 @@
 #ifndef DISASM
 
 #undef DISASM
-#define DISASM(a,b) disasm(a,b)
+#define DISASM(a,b,i) disasm(a,b,i)
 
 #include <stdio.h>
 
@@ -17,14 +17,12 @@
 #define DA_CCIII  "-??BITJMPJPISTYLDYCPYCPXORAANDEORADCSTALDACMPSBCASLROLLSRRORSTXLDXDECINC" // ASL...
 #define DA_JMPS   "BRKJSRRTIRTS"
 
-char disasm_indent= 0;
-
-void disasm(char* mc, char* end) {
+void disasm(char* mc, char* end, char indent) {
   char* p= (char*)mc;
-  printf("\n%*c---CODE[%d]:\n", disasm_indent, ' ', end-mc); p= mc;
+  printf("\n%*c---CODE[%d]:\n", indent, ' ', end-mc); p= mc;
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
-    printf("%*c%04X:\t", disasm_indent, ' ', p);
+    printf("%*c%04X:\t", indent, ' ', p);
     ++p;
 
     // exception modes

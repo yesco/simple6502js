@@ -1976,7 +1976,7 @@ L readeval(char *ln, L env, char noprint) {
 
     if (!bench) bench= 1;
 
-    printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
+    //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
     // eval
     if (!noeval && x!=ERROR) {
       // option to compare results? slow but equal
@@ -1997,9 +1997,9 @@ L readeval(char *ln, L env, char noprint) {
     }
 
     // print
-    { printf("RES= "); prin1(r); NL; }
-    printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
-    if (!noprint && (echo || !quiet || bench)) { printf("RES= "); prin1(r); NL; }
+    //{ printf("RES= "); prin1(r); NL; }
+    //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
+    if (!noprint && (echo || !quiet || bench)) { prin1(r); NL; }
 
 
     // info

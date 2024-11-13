@@ -28,6 +28,9 @@ extern L ldaxidx(L);
 extern L ldax0sp(L);
 extern L ldaxysp(L);
 
+extern void push0();
+extern void push2();
+extern void push4();
 extern void pushax(); 
 extern void popax(); 
 

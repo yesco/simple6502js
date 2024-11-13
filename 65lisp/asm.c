@@ -25,6 +25,21 @@
 //   (their example is a byte sized memcopy that takes 3 parameters in "registers" (zp)
 
 
+// lisp.c:    19394 bytes
+// lisp-vmal: 25535 bytes => (- 25535 19394)            = +6141 bytes
+// lisp-asm:  33254 bytes
+//            30407 bytes, no DASM
+//            29036 bytes, no DISASM => (- 29036 25535) = +3501 bytes
+
+// 9789 bytes w all: DISASM,APRINT,MATCHER,RULES
+// 9192 bytes w/o DISASM
+// 8468 OPT
+// 7892 NO OPT  OPT= (- 8468 7892)        =  576 bytes OPT
+// 8437 bytes w/o APRINT  (- 8437 4712)   = 3725 bytes MATCHER = code-gen+OPT
+// 4712 bytes w/o MATCHER (- 4712 3654)   = 1058 bytes RULES
+// 3654 bytes w/o RULES                   == empty program
+
+
 // 6808 bytes... (no DEBASM no APRINT)
 // (- 6803 3578) == 3225 BYTES optimizer code!!! (incl rules)
 // (- 4499 3578) === 921 bytes, 70ish rules! (-100B REND) (/ 921 70.0) = 13.16B/R
@@ -44,15 +59,17 @@
   #include "disasm.c"
 #else
   #undef DISASM
-  #define DISASM(a,b) 
+  #define DISASM(a,b,i)
 #endif // DISASM
 
 #include "disasm.c"
 
 
+// very high details of try matching each rule
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
+// into about the matched rule and code-gen
 #define APRINT(...) printf(__VA_ARGS__)
 //#define APRINT(...) 
 
@@ -361,9 +378,7 @@ char* rules[]= {
   OPT("[2+", JSR("w?"), U 3, U incax4, REND)
   OPT("[3+", JSR("w?"), U 3, U incax6, REND)
   OPT("[4+", JSR("w?"), U 3, U incax8, REND)
-  // TODO: only <255
-  //"[%b+", LDYn("#") JSR("w?"), U 5, U incaxy, 0,
-
+  //"[%b+", LDYn("#") JSR("w?"), U 5, U incaxy, 0, REND // TODO: add byte
   "+", JSR("w?") "s-", U 5, U tosaddax, REND
 
 
@@ -372,9 +387,7 @@ char* rules[]= {
   OPT("[2-", JSR("w?"), U 3, U decax4, REND)
   OPT("[3-", JSR("w?"), U 3, U decax6, REND)
   OPT("[4-", JSR("w?"), U 3, U decax8, REND)
-  // TODO: only <255
-  // OPT("[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND)
-
+  // OPT("[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND) // TODO: subtract byte
   "-", JSR("w?") "s-", U 5, U tossubax, REND
 
   // ][ conflicts with this, hmmmm, TODO: check IF
@@ -389,38 +402,29 @@ char* rules[]= {
   OPT("[6*", JSR("w?"), U 3, U mulax6, REND)
   OPT("[7*", JSR("w?"), U 3, U mulax7, REND)
   OPT("[8*", JSR("w?"), U 3, U aslax3, REND)
-  // TODO: how to match? \0 lol Z match \0?
   OPT("[,Z\x09*", JSR("w?"), U 3, U mulax9, REND)
-  // TODO: how to match?
   OPT("[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND)
-  // TODO: only <255
-  //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND
-
+  //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND // TODO: multiply by byte
   "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
 
   // TODO: make safe value?
   OPT("[2/", JSR("w?"), U 3, U asrax1, REND)
   OPT("[4/", JSR("w?"), U 3, U asrax2, REND)
   OPT("[8/", JSR("w?"), U 3, U asrax3, REND)
-
   OPT("[,Z\x10/", JSR("w?"), U 3, U asrax4, REND)
   // OPT(",Z\x80/", JSR("w?"), U 3, U asrax7, REND)  // doesn't exist?
-  // TODO: only <255
-  // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND)
-
+  // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND) // TODO: load byte
   "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
-  // OPT("[0=", STXzp(tmp1) ORAzp(tmp1) BNE("\0"), U 6, REND) // TODO: destructive...
-  // often followed by TAX then JSR incspN to RETURN 0, but if not destructive, then SAME bytes!
-  //  TODO: rewrite "[9=I" => "UI" ???
-  // TODO: 8 instructions is a lot because AX?
-  // TODO: how about from var? (but don't we typically return exactly same value?)
-  // TODO: JSR() & BNE => 5 bytes... slow...
+  // OPT("%aI", ...                         REND) // TODO: if (boolvar) ...
+  // TODO: if minsize: JSR() & BNE => 5 bytes... slow...
   OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
   OPT("[9=I", CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
+  // TODO: "U" generate "bool" -1/0
 
-  OPT("[0=I", TAY() BNE("\x02") CPXn("\0") BNE("\0") ":", U 8, REND) // save once instruction using TAY
-  OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U 9, REND)
+  OPT("[0=I",  TAY()     BNE("\x02") CPXn("\0") BNE("\0") ":", U 8, REND) // v==0, less code
+  OPT("I",     TAY()     BNE("\x02") CPXn("\0") BEQ("\0") ":", U 8, REND) // v!=0 kindof... // TODO: should !U?
+  OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U 9, REND) // generic == test
 
   "=", JSR("w?") "s-", U 5, U toseqax, REND // TODO: make it a number? TODO: make my own generic CMP
 
@@ -443,22 +447,22 @@ char* rules[]= {
 //  "W", JSR("w?"), U 3, U prin1, REND
   "P", JSR("w?"), U 3, U print, REND
 
-  ",", LDAn("#") LDXn("\""), U 4, REND
-  ":", STA("ww") STX("w+"), U 6, REND
-  ";", LDA("ww") LDX("w+"), U 6, REND
+  ",", LDAn("#") LDXn("\""), U 4, REND // load immedate
+  ";", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
+  ":", STA("ww") STX("w+"),  U 6, REND // store variable at address
 
   OPT("][", 0, U 0, REND) // 3 zeroes! lol
-  "]", "s-" JSR("w?"), U 5, U popax, REND // TODO: useful?
-
+  "]", "s-" JSR("w?"), U 5, U popax,  REND // TODO: useful to actually pop value?
   "[", "s+" JSR("w?"), U 5, U pushax, REND
 
-  //"0[", JSR("w?"), U3, U pushzero, REND // TODO: need for local var? keep ax?
-  //"9[", JSR("w?"), U3, U pushnil, REND // TODO: need for local var? keep ax?
-  OPT("0", LDAn("\0") TAY(), U 3, REND)
-  OPT("9^%0", JMP("w?"), U 3, U retnil, REND) // redundant? auto opt...
-  "9",  JSR("w?"), U 3, U retnil, REND
-
-  "%d", LDAn("#") LDXn("\""), U 4, REND
+//OPT("0^%0", JMP("w?"), U 3, U push0, REND)   // return 0 (if no need clean stack) // 1 byte savings, slower
+//OPT("1^%0", JMP("w?"), U 3, U push2, REND)   // return 1 (if no need clean stack) // 2 byte savings
+//OPT("2^%0", JMP("w?"), U 3, U push4, REND)   // return 2 (if no need clean stack) // 2 
+//OPT("9^%0", JMP("w?"), U 3, U retnil, REND)  // return nil (if no need clean stack) // 
+//"9",        JSR("w?"), U 3, U retnil, REND   // load nil
+  "9",        LDAn("\x01") LDXn("\x00"), U 4, REND // load nil
+  OPT("0",    LDAn("\0") TAX(), U 3, REND)     // load 0
+  "%d",       LDAn("#") LDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
   // TODO: keep track of stack! [] enough?
@@ -679,19 +683,19 @@ int compile() {
           // WARNING: may give totally random bugs, depending on memory locs of data!
 
           // -- use a byte from last %d matched valuie (low/high)
-               if (c=='#') { APRINT(" # => $%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
-          else if (c=='"') { APRINT(" \" => $%02x  ", ww>>8); gen[bytes]= ww>>8; }
+               if (c=='#') { APRINT(" # =>$%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
+          else if (c=='"') { APRINT(" \" =>$%02x  ", ww>>8); gen[bytes]= ww>>8; }
           // -- use a word from matched data/parameters
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
           else if (c=='w') {
             uint* pi= (uint*)(gen+bytes);
 
             // from last %d matched
-            if (nc=='w')      { APRINT("  ww => $%04X  ", ww);   *pi= ww;  }
-            else if (nc=='+') { APRINT("  w+ => $%04X  ", ww+1); *pi= ww+1; }
+            if (nc=='w')      { APRINT("  ww =>$%04X  ", ww);   *pi= ww;  }
+            else if (nc=='+') { APRINT("  w+ =>$%04X  ", ww+1); *pi= ww+1; }
 
             // take extra word parameter from rules
-            else if (nc=='?') { APRINT("  w? => $%04X  ", *p);   *pi= (uint)*p; ++p; }
+            else if (nc=='?') { APRINT("  w? =>$%04X  ", *p);   *pi= (uint)*p; ++p; }
             //else assert(!"BAD nc!");
 
             --z;++pc;
@@ -732,7 +736,7 @@ int compile() {
           --z;
         } // end while action/asm
 
-        disasm_indent= 9; DISASM(gen+start, gen+bytes); disasm_indent= 0;
+        DISASM(gen+start, gen+bytes, 9);
 
         break;
       } // if match
@@ -782,10 +786,10 @@ int compile() {
         // ENDIF: resolve THEN and ELSE branch states
         if (t_ax != ax) ax= '?';
 
-        printf("BEFORE %IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
+        APRINT("BEFORE %IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
         if (stk>60) stk= t_stk;
         else if (stk<60 && t_stk<60 && stk != t_stk) {
-          printf("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
+          APRINT("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
           assert(0);
         }
       }
@@ -806,7 +810,6 @@ int compile() {
 
   return bytes;
 }
-#endif // MATCHER
 
 void relocate(int n, char* to) {
   unsigned char i= 0, c;
@@ -820,6 +823,7 @@ void relocate(int n, char* to) {
     }
   }
 }
+#endif // MATCHER
 
 typedef int (*F1)(int);
 typedef void (*F)();
@@ -836,7 +840,7 @@ int main(void) {
   //bc= "a[0=I]^0{][a[1=I]^0{][a[1-R[a[2-R+^1}}"; // from memory
 
   // ./65vm -v -e "(if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2))))"
-  bc= "[a[2<I][a{][a[1-R[a[2-R+}";
+  //bc= "[a[2<I][a{][a[1-R[a[2-R+}";
 
   // ./65vm -v -e "(if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2)))))"
   bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
@@ -853,18 +857,22 @@ int main(void) {
   bc= "[8[9=P"; // works! -1, lol should crash?
   bc= "[8[9=P";
 
+  // fib - crash?
   bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
+
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - crash
 
   // OR - works!
   //  //doesn't resolve all OR! {}{}{}...
-  bc= "[1UI][2UI][9UI{}{}{}^";
-  bc= "[9UI][9UI][3UI{}{}{}^";
+  //bc= "[1UI][2UI][9UI{}{}{}^";
+  //bc= "[9UI][9UI][3UI{}{}{}^";
 
   // AND - works!
-  bc= "[1UI{][2UI{][9UI{}}}^";
-  bc= "][1UI{][2UI{][3UI{}}}^";  // crash without leading ']'
+  //bc= "[1UI{][2UI{][9UI{}}}^";
+  //bc= "][1UI{][2UI{][3UI{}}}^";  // crash without leading ']' TODO: figure out...
 
   //bc= "[9^";
+  //bc= "P[PaP[PaP+PPPPPPPP7P^";
 
   bytes= 0;
   // implicit return, only takes one expression
@@ -878,12 +886,12 @@ int main(void) {
     gen[bytes++]= 0x60; // RTS
   }
 
-  DISASM(gen, gen+bytes);
+  DISASM(gen, gen+bytes, 0);
 
-  relocate(n, gen);
-  relocate(n, (char*)0xABBA); // testing, lol
+  relocate(bytes, gen);
+//  relocate(bytes, (char*)0xABBA); // testing, lol
   printf("GEN= %04X\n", gen);
-  DISASM(gen, gen+bytes);
+  DISASM(gen, gen+bytes, 0);
 
   printf("incsp8= %04x\n", incsp8);
   printf("incsp6= %04x\n", incsp6);

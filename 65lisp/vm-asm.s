@@ -33,6 +33,7 @@
 
 .import callax
 
+.import push0, push2, push4
 .import pusha
 .import pushax
 .import pusha0sp
@@ -54,9 +55,10 @@
 
 .export _callax
 
+.export _push0, _push2, _push4
+.export _pusha
 .export _pushax
 .export _pusha0sp
-.export _pusha
 .export _popax
 .export _incsp2
 
@@ -104,6 +106,9 @@ _staxspidx      = staxspidx
 
 _callax          = callax
 
+_push0          = push0
+_push2          = push2
+_push4          = push4
 _pushax         = pushax
 _pusha0sp       = pusha0sp
 _pusha          = pusha

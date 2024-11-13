@@ -1,6 +1,6 @@
 // Define DASM on compilation to DebugASM !!!!
 
-#define DASM
+//#define DASM
 
 #ifdef DASM
   #undef DASM
@@ -11,14 +11,14 @@
 #endif
 
 // uncomment to get DISASM
-#define DISASM
+//#define DISASM
 
 #ifdef DISASM
   #undef DISASM
   #include "disasm.c"
 #else
   #undef DISASM
-  #define DISASM(a,b) 
+  #define DISASM(a,b,c) 
 #endif // DISASM
 
 char mc[120]= {0};
@@ -869,7 +869,7 @@ char* asmpile(char* pla) {
   la= pla-1; // using pre-inc
   if (!genasm(&s)) return 0;
 
-  DISASM(mc, mcp);
+  DISASM(mc, mcp, 0);
 
   return mc;
 }
