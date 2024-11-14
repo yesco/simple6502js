@@ -858,9 +858,9 @@ int main(void) {
   bc= "[8[9=P";
 
   // fib - crash?
-  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 59 bytes
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - 0k
 
-  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - crash
+  bc= "a[2<Ia^{a[[1-R[a[2-R+^}"; // 39 bytes - ok, by hand: DELAY-PUSHAX
 
   // OR - works!
   //  //doesn't resolve all OR! {}{}{}...
