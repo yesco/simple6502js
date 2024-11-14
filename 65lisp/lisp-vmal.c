@@ -307,6 +307,7 @@ char buff[250];
 // reads lisp program s-exp from stdin
 // returning atom string containing AL code
 void alcompile() {
+  static char depth;
   char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
 
  again:
@@ -331,6 +332,7 @@ void alcompile() {
 
   // TODO: function call... of lisp
   case '(': 
+    ++depth;
     // determine function, try get a number
     //skipspc();
     f= nextc(); unc(f); // peek
@@ -347,7 +349,7 @@ void alcompile() {
     // get the byte code token
     f= NUM(f);
 
-    if (f=='\'') goto quote;
+    if (f=='\'') { --depth; goto quote; }
     else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
     else assert(f<255);
     // TODO: how to handle non-foldable arguemnts
@@ -357,14 +359,30 @@ void alcompile() {
  
     // IF special (if EXPR THEN ELSE) => EXPR I ] THEN { ] ELSE }
     if (x==IF) {
+      // inserts spaces at end of THEN and ELSE to promote implicit RETURN
+      // TODO: handle explicit return with flag: in-return
+      // TODO: this only works one level...
+      unsigned char bThen, bElse;
       alcompile(); ALC('I'); // EXPR I
-      ALC(']'); alcompile(); ALC('{'); // DROP THEN
+      ALC(']'); alcompile(); bThen= b; ALC(' '); ALC('{'); // DROP THEN
       // THEN, optional
       c= skipspc(); unc(c);
       ALC(']'); // DROP
       if (c!=')') alcompile(); // ELSE
-      ALC('}');
+      bElse= b; ALC(' '); ALC('}');
       if (skipspc()!=')') goto expectedparen;
+      --depth;
+
+      // It's last expr in lambda/progn
+      c= skipspc();
+      if (depth==1 && (!c || c==')')) {
+        printf("DEPTH==1 => RETURN!\n");
+        buff[bThen]= '^';
+        buff[bElse]= '^';
+      }
+      unc(c);
+
+      --depth;
       return;
     }
 
@@ -384,6 +402,8 @@ void alcompile() {
       }
       unc(c);
       while(--d>=0) { ALC('{'); ALC('}'); }
+
+      --depth;
       return;
     }
 
@@ -402,6 +422,8 @@ void alcompile() {
       }
       unc(c);
       while(--d>=0) { ALC('}'); }
+
+      --depth;
       return;
     }
 
@@ -418,6 +440,8 @@ void alcompile() {
 
       c= skipspc();
       if (c!=')') goto expectedparen;
+
+      --depth;
       return;
     }
 
@@ -440,6 +464,8 @@ void alcompile() {
     extra= ')';
     unc(c);
     x= 0xbeef;
+
+    --depth;
     goto quote;
 
   default:

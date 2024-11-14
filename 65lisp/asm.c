@@ -537,6 +537,8 @@ char* rules[]= {
 // |
 
 #ifdef MATCHER
+unsigned char lastvar= 'a'; // TODO: update to actual last parameter at fundef // TODO: nested fundef?
+
 uint  ww;  // _ ww
 uchar whi; // " // TODO: redundant? we have ww?
 char  charmatch; 
@@ -564,6 +566,8 @@ char matching(char* bc, char* r) {
     b= *bc;
 
     DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", b, c, bc, r, stk));
+
+    // -- Test matching rules
     if (c=='Z') { if (b) break; } // match \0
     else if (c=='%') {
       if (nc=='d') {
@@ -573,7 +577,6 @@ char matching(char* bc, char* r) {
         else return 0;
       } else if (islower(nc)) { // TODO:
         // TODO: if request ax?
-        char lastvar= 'a'; // TODO: fix, lol
         if (!islower(b)) return 0;
         assert(b==lastvar); // TODO: fix, lol
         ww= 2*(lastvar-b+stk)-1;
@@ -598,10 +601,16 @@ char matching(char* bc, char* r) {
   return !c;
 }
 
+unsigned int bytes= 0; // char would save 50 bytes, but very limited
+char* bc, saveax;
+
 unsigned char changesAX(char* rule) {
   // TODO: get first char?
-  if (0==strcmp(rule, "[%d<") || 0==strcmp(rule, "[%d=") || 0==strcmp(rule, "[%d>") || 0==strcmp(rule, "][")) return 0;
-  if (strchr("I[{}^", *rule)) return 0;
+  if (0==strcmp(rule, "[%d<I") || 0==strcmp(rule, "[%d=I") || 0==strcmp(rule, "[%d>I") || 0==strcmp(rule, "][")) return 0;
+  if (*bc == lastvar) return 0;
+  // Hmmmm... not very good?
+  if (strchr("I[{}^", *rule) && !strchr("+-/*", rule[strlen(rule)-1])) return 0;
+
   // all other ops changes AX
   return 1;
 }
@@ -609,9 +618,6 @@ unsigned char changesAX(char* rule) {
 // Compiles ByteCode to asm in gen[]
 //
 // Returns bytes (length)
-
-unsigned int bytes= 0; // char would save 50 bytes, but very limited
-char* bc;
 
 int compile() {
   // register: (/ 1137712 766349.0) 49% slower without register
@@ -660,6 +666,19 @@ int compile() {
         if (islower(*bc) && *bc==ax) {
           APRINT(" parameter requested is already in AX!\n");
           break;
+        }
+
+        // -- need to save AX?
+        if (saveax) {
+          APRINT("SAVEAX?");
+          if (changesAX(r)) {// && 0) {
+            APRINT(" SAVE AX\n");
+            gen[bytes++]= 0x20;
+            *(int*)(gen+bytes)= U pushax;
+            bytes+= 2;
+            ++stk;
+            saveax= 0;
+          }
         }
 
         APRINT(" [%d] -- ", z);
@@ -754,31 +773,33 @@ int compile() {
       exit(3);
     }
 
+
+    // --- AFTER APPLYING RULES
+
     // -- update ax
     if (islower(*bc)) ax= *bc;
-    else if (changesAX(r)) ax= '?';  
-    // TODO: pushax?
+    else if (changesAX(r)) ax= '?';
 
 
-    // handle IF by recursion
+    // -- handle IF by recursion
     if ('I'==bc[charmatch-1]) { // TODO: hmmm?
       // TODO: if have more, is it better to do struct?
-      int i_stk= stk; char i_ax= ax;
+      int i_stk= stk; char i_ax= ax, i_sax= saveax;
       bc+= charmatch;
       printf("\n-------------IF--------------\n");
 
-      // THEN
+      // -- THEN
       compile();
       assert(*bc=='{');
       bc+= charmatch;
       //if (bc[1]!='}') {
       {
-        int t_stk= stk; char t_ax= ax;
+        int t_stk= stk; char t_ax= ax, t_sax= saveax;
         stk= i_stk; ax= i_ax;
 
         printf("BC=%s\n", bc);
 
-        // ELSE
+        // -- ELSE
         compile();
         //assert(*bc=='}');
         // no inc, as '}' wil be eaten later
@@ -790,7 +811,11 @@ int compile() {
         if (stk>60) stk= t_stk;
         else if (stk<60 && t_stk<60 && stk != t_stk) {
           APRINT("%%IF i_stk=%d, t_stk=%d, e_stk=%d\n", i_stk, t_stk, stk);
-          assert(0);
+          APRINT("%%IF i_sax=%d, t_sax=%d, e_sax=%d\n", i_sax, t_sax, saveax);
+          // TODO: inject pushax in THEN or ELSE
+          //   OR: make preprocessing to pushax... "]"
+          assert(t_sax==saveax);
+          assert(t_stk==stk);
         }
       }
     }
@@ -823,6 +848,20 @@ void relocate(int n, char* to) {
     }
   }
 }
+
+void promoteReturn(char* bc) {
+  char* r= strstr(bc, " }^");
+  while(r) {
+    *r= '^';
+    r[2]= ' ';
+    while(r!='{' && r>=bc) --r;
+    --r;
+    *r= '^';
+    r= strstr(bc, " }^");
+  }
+}
+
+
 #endif // MATCHER
 
 typedef int (*F1)(int);
@@ -858,9 +897,17 @@ int main(void) {
   bc= "[8[9=P";
 
   // fib - crash?
-  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - 0k
+  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - 0k 44 now
+  bc= "a[2<I][a^{][a[1-R[a[2-R+^}"; // 41 bytes - 0k 39 now
 
-  bc= "a[2<Ia^{a[[1-R[a[2-R+^}"; // 39 bytes - ok, by hand: DELAY-PUSHAX
+  bc= "a[2<I][a{][a[1-R[a[2-R+}^"; // 41 bytes - 0k 39 now - FAIL, THEN/ELSE different stack...
+
+  bc= "a[2<I][a {][a[1-R[a[2-R+ }^"; // 41 bytes - 0k 39 now - FAIL, THEN/ELSE different stack...
+  promoteReturn(bc);
+
+  //bc= "a[2<Ia^{a[[1-R[a[2-R+^}"; // 39/42 bytes - ok, by hand: DELAY-PUSHAX (42 if automatic is done)
+
+  //bc= "a[2<Ia^{a[1-R[a[2-R+^}"; // 39 bytes - ok, automatic!
 
   // OR - works!
   //  //doesn't resolve all OR! {}{}{}...
@@ -877,6 +924,8 @@ int main(void) {
   bytes= 0;
   // implicit return, only takes one expression
   // TODO: PROGN... (how about lambda)
+
+  saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
   compile(); // etc bc... lol
 
   // need add the implicit return?
