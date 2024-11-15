@@ -849,15 +849,30 @@ void relocate(int n, char* to) {
   }
 }
 
+// "I... {... }^"  =>  "I...^{...^} "
+#define FIND " }^"
 void promoteReturn(char* bc) {
-  char* r= strstr(bc, " }^");
+  char *r= strstr(bc, FIND);
   while(r) {
+    char d= 1;
+    printf("PR: '%s'\n", bc);
+    printf(" R:   '%s'\n", r);
+    // ELSE^
     *r= '^';
+    // remove ^ at }^
     r[2]= ' ';
-    while(r!='{' && r>=bc) --r;
-    --r;
-    *r= '^';
-    r= strstr(bc, " }^");
+    while(d && r>bc) {
+      printf("%dR:   '%s'\n", d, r);
+      if (*r=='}') ++d;
+      if (*r=='{') --d;
+      --r;
+    }
+    if (r!=bc) {
+      // THEN^
+      //--r;
+      *r= '^';
+    } else assert(0);
+    r= strstr(bc, FIND);
   }
 }
 
@@ -902,7 +917,12 @@ int main(void) {
 
   bc= "a[2<I][a{][a[1-R[a[2-R+}^"; // 41 bytes - 0k 39 now - FAIL, THEN/ELSE different stack...
 
-  bc= "a[2<I][a {][a[1-R[a[2-R+ }^"; // 41 bytes - 0k 39 now - FAIL, THEN/ELSE different stack...
+  bc= "a[2<I][a {][a[1-R[a[2-R+ }^"; // 39 - promoteReturn avoids unbalanced THEN/ELSE!
+
+  //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
+
+  // copy because we modify! (if not copy strstr finds matches after change!)
+  bc= strdup(bc);
   promoteReturn(bc);
 
   //bc= "a[2<Ia^{a[[1-R[a[2-R+^}"; // 39/42 bytes - ok, by hand: DELAY-PUSHAX (42 if automatic is done)

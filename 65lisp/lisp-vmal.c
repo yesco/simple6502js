@@ -359,28 +359,26 @@ void alcompile() {
  
     // IF special (if EXPR THEN ELSE) => EXPR I ] THEN { ] ELSE }
     if (x==IF) {
-      // inserts spaces at end of THEN and ELSE to promote implicit RETURN
-      // TODO: handle explicit return with flag: in-return
-      // TODO: this only works one level...
-      unsigned char bThen, bElse;
+      // inserts spaces at end of THEN and ELSE to allow promote implicit RETURN
+      // we don't know if it's return until come to end of LAMBDA sequence or PROGN
       alcompile(); ALC('I'); // EXPR I
-      ALC(']'); alcompile(); bThen= b; ALC(' '); ALC('{'); // DROP THEN
+      ALC(']'); alcompile(); ALC(' '); ALC('{'); // DROP THEN
       // THEN, optional
       c= skipspc(); unc(c);
       ALC(']'); // DROP
       if (c!=')') alcompile(); // ELSE
-      bElse= b; ALC(' '); ALC('}');
+      ALC(' '); ALC('}');
       if (skipspc()!=')') goto expectedparen;
       --depth;
 
-      // It's last expr in lambda/progn
-      c= skipspc();
-      if (depth==1 && (!c || c==')')) {
-        printf("DEPTH==1 => RETURN!\n");
-        buff[bThen]= '^';
-        buff[bElse]= '^';
-      }
-      unc(c);
+      //// It's last expr in lambda/progn
+      //c= skipspc();
+      //if (depth==1 && (!c || c==')')) {
+      //printf("DEPTH==1 => RETURN!\n");
+      //buff[bThen]= '^';
+      //buff[bElse]= '^';
+      //}
+      //unc(c);
 
       --depth;
       return;
