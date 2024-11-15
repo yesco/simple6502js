@@ -258,7 +258,7 @@ D apply(D f, D x, D env) {
   case '.': return princ(a);
   case 'T': return terpri(), nil; // zero arg
 
-  case 'I': return a==nil? eval(car(cdr(cdr(x))), env): eval(car(cdr(x)), env); // if
+  case 'I': return eval(a==nil? car(cdr(cdr(x))): car(cdr(x)), env); // if
   }
 
   // TWO args
