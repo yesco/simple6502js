@@ -301,9 +301,9 @@ int main(int argc, char** argv) {
   m= 6000; // plus, no longer create long conses...
   m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s, but it no closures...
   //m= 3000;
-  m= 5000; // standard test
   m= 100;
   m= 1;
+  m= 50000; // standard test
 
   //assert(sizeof(Atom)==sizeof(Cons));
 

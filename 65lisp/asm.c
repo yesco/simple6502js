@@ -216,11 +216,16 @@ const unsigned int nil=1;
 #define EORn(b) O2("\x49",b)
 
 #define ASL()   O("\x0A")
+#define ROL()   O("\x2A")
+
+#define LSR()   O("\x4A")
+#define ROR()   O("\x6A")
 
 #define CMPn(b) O2("\xC9",b)
 #define CPXn(b) O2("\xE0",b)
 #define CPYn(b) O2("\xC0",b)
 
+#define ADCn(b) O2("\x69", b)
 #define SBCn(b) O2("\xE9", b)
 
 #define CMP(w)  O3("\xCD", w)
@@ -374,7 +379,9 @@ int princ(int a) {
 
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
-  OPT("[1+", JSR("w?"), U 3, U incax2, REND)
+//  OPT("[1+", CLC() ADCn("\x02") TAY() TXA() ADCn("\0") TAX() TYA(), U 9, REND) // 9 bytes // SLOWER THAN JSR!
+  OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
+  OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
   OPT("[2+", JSR("w?"), U 3, U incax4, REND)
   OPT("[3+", JSR("w?"), U 3, U incax6, REND)
   OPT("[4+", JSR("w?"), U 3, U incax8, REND)
@@ -395,6 +402,7 @@ char* rules[]= {
   // TODO: make safe value?
   OPT("[0*", LDAn("\0") TAX(), U 3, REND)
   OPT("[1*", "", 0, 0,)
+  OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) 
   OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
   OPT("[3*", JSR("w?"), U 3, U mulax3, REND)
   OPT("[4*", JSR("w?"), U 3, U aslax2, REND)
@@ -405,7 +413,10 @@ char* rules[]= {
   OPT("[,Z\x09*", JSR("w?"), U 3, U mulax9, REND)
   OPT("[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND)
   //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND // TODO: multiply by byte
-  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND
+  "*", JSR("w?") "s-", U 5, U ffmul, REND // 3 bytes, TODO: too unsafe?
+  "*", TAY() TXA() LSR() TAX() TYA() ROR() JSR("w?") "s-", U 11, U tosmulax, REND // 9 bytes, TODO: too unsafe?
+  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND    // 6 bytes slow
+
 
   // TODO: make safe value?
   OPT("[2/", JSR("w?"), U 3, U asrax1, REND)
@@ -550,9 +561,10 @@ char  gen[255]; // generate asm bytes
 
 // Rule maching understands following "tests":
 //   c     == match literal char (if none of the following:)
-//   Z     == 0 byte
+//   Z     == 0 byte match (hmm, clash if used as byte code?) TODO: fix
 //   %d    == match ",xxxx" or "3" (digit) sets "ww"
 //            used by ww, w+, w? and #, and "
+//   %b    == TODO: match "byte value" (< 256)
 //   %a    == match 'a'-'z'
 //   %0 -9 == match only if STK is 0-9
 //   %^    == match if STK is 60+ == after RETURN
@@ -883,10 +895,12 @@ typedef int (*F1)(int);
 typedef void (*F)();
 
 int main(void) {
+//  unsigned int bench= 5000, n= bench+1;
+  unsigned int bench= 50000, n= bench+1;
 //  unsigned int bench= 3000, n= bench+1;
 //  unsigned int bench= 3000, n= bench+1;
 //  unsigned int bench= 100, n= bench+1; // for fib21
-  unsigned int bench= 1, n= bench+1;
+//  unsigned int bench= 1, n= bench+1;
   int r, i;
 
 #ifdef MATCHER
@@ -919,8 +933,13 @@ int main(void) {
 
   bc= "a[2<I][a {][a[1-R[a[2-R+ }^"; // 39 - promoteReturn avoids unbalanced THEN/ELSE!
 
-  //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
+  // For simulating function call with 1 parameter
+  saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
 
+  bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
+  bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+
+  //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
   // copy because we modify! (if not copy strstr finds matches after change!)
   bc= strdup(bc);
   promoteReturn(bc);
@@ -945,7 +964,6 @@ int main(void) {
   // implicit return, only takes one expression
   // TODO: PROGN... (how about lambda)
 
-  saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
   compile(); // etc bc... lol
 
   // need add the implicit return?

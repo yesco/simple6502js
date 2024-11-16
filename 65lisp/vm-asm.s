@@ -83,6 +83,7 @@
 .export _shrax1,_shrax2,_shrax3,_shrax4,_shraxy
 .export _shlax1,_shlax2,_shlax3,_shlax4,_shlaxy
 
+.export _ffmul
 .export _ffcar, _ffcdr
 .export _fffcar, _fffcdr
 .export _ffffcar, _ffffcdr
@@ -238,6 +239,17 @@ _ffnull:
 _iscarry:
         bcs _retnil
         jmp _rettrue
+
+
+;;; divide ax by 2 first (as both values are 2* representation)
+_ffmul:
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        jmp tosmulax
 
 
 ;;; faster car/cdr

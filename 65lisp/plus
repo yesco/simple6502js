@@ -1,0 +1,27 @@
+#         65lisp: 50000# 431298731c 431.299s
+#           65vm: 50000# 260818744c 260.819s    
+#          65asm: 50000#  58256954c  58.257s    
+#       singlisp: 50000# 562865968c 562.866s     # number of evals increase because +* not fold
+#      ./run-asm: 50000#  47604127c  47.6s       # no overhead calling it, probably same asm FOLDR # 43 bytes
+#      ./run-asm:         42752692c  42.7s       # 1+1+1+ if used FOLDL                            # 43 bytes
+#      ./run-asm:         43320284c  43.3s       #                                                 #
+#      ./run-asm:         41204373c  41.2s       # inline                                          # 53 bytes
+#      ./run-asm:         34584816c  34.6s       # no pushax, inline 1+                            # 47 bytes
+#      ./run-asm:         34262432c  34.3s       # inline *2                                       # 50 bytes
+#      ./run-asm:         33635007c  33.6s       # inline /2 for multiply removed safety           # 51 bytes
+#      ./run-asm:         33255025c  33.3s       # ffmul, save code, little faster!                # 45 bytes!
+#
+# FOR PLUS: (/ 431.3 33.3) = 13.0x faster than interpret
+#           (/ 260.8 33.3) =  7.8x faster than bytecode
+#           (/ 58.257 33.3)=  1.7x faster machine code than old 65asm (maybe most call overhead?)
+#           (/ 47.6 33.3)  =  1.4x faster generated machine code asm.c by inlining 1+ 2*
+(
+echo "(* (+ 1 2) (+ 1 1 1 1) 2)"             | ./65lisp     -p 65lisp   -q -b $*
+echo "(* (+ 1 2) (+ 1 1 1 1) 2)"             | ./65vm       -p 65vm     -q -b $*
+echo "(* (+ 1 2) (+ 1 1 1 1) 2)"             | ./65asm      -p 65asm    -q -b $*
+echo "(* (+ 1 2) (* (+ 1 (+ 1 (+ 1 1))) 2))" | ./r singlisp -p singlisp -q -b $* # doesn't take args...
+./run-asm
+) | tee bench.log | perl bench.pl | grep "=>"
+
+
+

@@ -444,13 +444,14 @@ void alcompile() {
     }
 
     // GENERIC argument compiler
+    printf("F='%c' (%d)\n", f, f);
     while((c=nextc())!=')') {
       ++n;
       alcompile();
       // implicit FOLDL of nargs + - L ! LOL
-      if (f>0 && n>2 && f<255 && f!='R' && f!='Z') {ALC(f);--n;}
+      if (f>0 && n>=2 && f<255 && f!='R' && f!='Z') {ALC(f);--n;/*printf("---FOLDL--- '%s'\n", buff);*/}
     }
-    if (f>0 && f<255 && n>0) { ALC(f); n-=2; break; }
+    if (f>0 && f<255 && n>1) { ALC(f); n-=2; break; }
 
     // foldr?
     while(f<0 && --n > 0) ALC(-f); 

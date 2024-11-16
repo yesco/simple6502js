@@ -8,6 +8,8 @@ extern L iscarry(L);
 
 extern L callax(L);
 
+extern void ffmul();
+
 extern L ffffcar(L);
 extern L ffffcdr(L);
 
