@@ -248,10 +248,14 @@ const unsigned int nil=1;
 #define TAY()   O("\xA8")
 #define CLV()   O("\xB8")
 
-#define INY()   O("\xC8")
 #define CLD()   O("\xD8")
-#define INX()   O("\xE8")
 #define SED()   O("\xF8")
+
+#define INY()   O("\xC8")
+#define INX()   O("\xE8")
+
+#define DEY()   O("\x88")
+#define DEX()   O("\xCA")
 
 #define TXA()   O("\x8A")
 #define TAX()   O("\xAA")
@@ -381,7 +385,7 @@ char* rules[]= {
   OPT("[0+", "", 0, 0,)
 //  OPT("[1+", CLC() ADCn("\x02") TAY() TXA() ADCn("\0") TAX() TYA(), U 9, REND) // 9 bytes // SLOWER THAN JSR!
   OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
-  OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
+//  OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
   OPT("[2+", JSR("w?"), U 3, U incax4, REND)
   OPT("[3+", JSR("w?"), U 3, U incax6, REND)
   OPT("[4+", JSR("w?"), U 3, U incax8, REND)
@@ -390,8 +394,10 @@ char* rules[]= {
 
 
   OPT("[0-", "", 0, REND)
-  OPT("[1-", JSR("w?"), U 3, U decax2, REND)
-  OPT("[2-", JSR("w?"), U 3, U decax4, REND)
+  OPT("[1-", SEC() SBCn("\x02") BCS("\x01") DEX(), U 6, REND) // 6 bytes // fib 9% faster
+//  OPT("[1-", JSR("w?"), U 3, U decax2, REND)
+  OPT("[2-", SEC() SBCn("\x04") BCS("\x01") DEX(), U 6, REND) // 6 bytes // fib 9% faster
+//  OPT("[2-", JSR("w?"), U 3, U decax4, REND)
   OPT("[3-", JSR("w?"), U 3, U decax6, REND)
   OPT("[4-", JSR("w?"), U 3, U decax8, REND)
   // OPT("[%b-", LDYn("#") JSR("w?"), U 5, U decaxy, REND) // TODO: subtract byte
@@ -936,8 +942,8 @@ int main(void) {
   // For simulating function call with 1 parameter
   saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
 
-  bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
-  bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+  //bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
+  //bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
 
   //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
   // copy because we modify! (if not copy strstr finds matches after change!)
