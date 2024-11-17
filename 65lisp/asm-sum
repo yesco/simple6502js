@@ -1,0 +1,1 @@
+./run-asm | grep '^  \S'
