@@ -384,8 +384,8 @@ int princ(int a) {
 char* rules[]= {
   OPT("[0+", "", 0, 0,)
 //  OPT("[1+", CLC() ADCn("\x02") TAY() TXA() ADCn("\0") TAX() TYA(), U 9, REND) // 9 bytes // SLOWER THAN JSR!
-  OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
-//  OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
+//  OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
+  OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
   OPT("[2+", JSR("w?"), U 3, U incax4, REND)
   OPT("[3+", JSR("w?"), U 3, U incax6, REND)
   OPT("[4+", JSR("w?"), U 3, U incax8, REND)
@@ -408,7 +408,7 @@ char* rules[]= {
   // TODO: make safe value?
   OPT("[0*", LDAn("\0") TAX(), U 3, REND)
   OPT("[1*", "", 0, 0,)
-  OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) 
+//  OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) 
   OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
   OPT("[3*", JSR("w?"), U 3, U mulax3, REND)
   OPT("[4*", JSR("w?"), U 3, U aslax2, REND)
@@ -420,15 +420,16 @@ char* rules[]= {
   OPT("[,Z\x0a*", JSR("w?"), U 3, U mulax10, REND)
   //"[%b*", LDA("#") JSR("w?"), U 5, U tosmula0, REND // TODO: multiply by byte
   "*", JSR("w?") "s-", U 5, U ffmul, REND // 3 bytes, TODO: too unsafe?
-  "*", TAY() TXA() LSR() TAX() TYA() ROR() JSR("w?") "s-", U 11, U tosmulax, REND // 9 bytes, TODO: too unsafe?
-  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND    // 6 bytes slow
+//  "*", TAY() TXA() LSR() TAX() TYA() ROR() JSR("w?") "s-", U 11, U tosmulax, REND // 9 bytes, TODO: too unsafe?
+//  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND    // 6 bytes slow
 
 
   // TODO: make safe value?
-  OPT("[2/", JSR("w?"), U 3, U asrax1, REND)
-  OPT("[4/", JSR("w?"), U 3, U asrax2, REND)
-  OPT("[8/", JSR("w?"), U 3, U asrax3, REND)
-  OPT("[,Z\x10/", JSR("w?"), U 3, U asrax4, REND)
+  //OPT("[2/", TAY() TXA() LSR() TAX() TYA() ROR() ANDn("\xfe"), U 8, REND) // 8 bytes
+  OPT("[2/", JSR("w?") ANDn("\xfe"), U 5, U asrax1, REND) // 5 bytes // TODO: make safe ANDn("\xfe")
+  OPT("[4/", JSR("w?") ANDn("\xfe"), U 5, U asrax2, REND)
+  OPT("[8/", JSR("w?") ANDn("\xfe"), U 5, U asrax3, REND)
+  OPT("[,Z\x10/", JSR("w?") ANDn("\xfe"), U 5, U asrax4, REND)
   // OPT(",Z\x80/", JSR("w?"), U 3, U asrax7, REND)  // doesn't exist?
   // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND) // TODO: load byte
   "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
@@ -943,7 +944,7 @@ int main(void) {
   saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
 
   //bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
-  //bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+  bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
 
   //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
   // copy because we modify! (if not copy strstr finds matches after change!)
@@ -965,6 +966,8 @@ int main(void) {
 
   //bc= "[9^";
   //bc= "P[PaP[PaP+PPPPPPPP7P^";
+
+  //bc= "7[2/^";
 
   bytes= 0;
   // implicit return, only takes one expression

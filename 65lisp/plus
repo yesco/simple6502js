@@ -15,6 +15,11 @@
 #           (/ 260.8 33.3) =  7.8x faster than bytecode
 #           (/ 58.257 33.3)=  1.7x faster machine code than old 65asm (maybe most call overhead?)
 #           (/ 47.6 33.3)  =  1.4x faster generated machine code asm.c by inlining 1+ 2*
+
+# lisp: 19 cells a 38 bytes
+# vm  :            22 bytes
+# asm :            30 bytes (compact jsr) - 34.87s
+# asm :            45 bytes (inlined opt) - 33.23s - is it worth it?
 (
 echo "(* (+ 1 2) (+ 1 1 1 1) 2)"             | ./65lisp     -p 65lisp   -q -b $*
 echo "(* (+ 1 2) (+ 1 1 1 1) 2)"             | ./65vm       -p 65vm     -q -b $*
