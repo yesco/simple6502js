@@ -236,7 +236,7 @@
 
 .import tosicmp, tosicmp0
 
-import tosint
+.import tosint
 
 .import toslcmp
 .import tosle00, toslea0, tosleax

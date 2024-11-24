@@ -52,7 +52,7 @@
 
 
 // uncomment to get DISASM
-#define DISASM
+//#define DISASM
 
 #ifdef DISASM
   #undef DISASM
@@ -62,16 +62,13 @@
   #define DISASM(a,b,i)
 #endif // DISASM
 
-#include "disasm.c"
-
-
 // very high details of try matching each rule
 #define DEBASM(a)
 //#define DEBASM(a) do { a; } while (0)
 
 // into about the matched rule and code-gen
-#define APRINT(...) printf(__VA_ARGS__)
-//#define APRINT(...) 
+//#define APRINT(...) printf(__VA_ARGS__)
+#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -196,6 +193,9 @@ const unsigned int nil=1;
 #define  O(op)    op
 #define O2(op, b) op b
 #define O3(op, w) op w
+
+
+#define NOP()    O("\xEA")
 
 #define LDAn(n) O2("\xA9",n)
 #define LDXn(n) O2("\xA2",n)
@@ -381,10 +381,20 @@ int princ(int a) {
 //
 //       - also see - https://www.cc65.org/doc/cc65-8.html (probably can't use them, as need saving)
 
+//   "  % '()                   >?
+//   B EFGH J LMNO Q S  VX    \  _
+// `          lmnopqrstuvwxyz    
+
 char* rules[]= {
+//  "&", JSR("w?"), U 3, U tosandax, REND
+//  "|", JSR("w?"), U 3, U tosorax, REND
+//  "~", JSR("w?"), U 3, U tosnot, REND
+//  "%", JSR("w?"), U 3, U tosmodax, REND
+
   OPT("[0+", "", 0, 0,)
 //  OPT("[1+", CLC() ADCn("\x02") TAY() TXA() ADCn("\0") TAX() TYA(), U 9, REND) // 9 bytes // SLOWER THAN JSR!
-//  OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
+//OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
+//OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND)
   OPT("[1+", JSR("w?"), U 3, U incax2, REND)                             // 3 bytes
   OPT("[2+", JSR("w?"), U 3, U incax4, REND)
   OPT("[3+", JSR("w?"), U 3, U incax6, REND)
@@ -408,7 +418,8 @@ char* rules[]= {
   // TODO: make safe value?
   OPT("[0*", LDAn("\0") TAX(), U 3, REND)
   OPT("[1*", "", 0, 0,)
-//  OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) 
+//OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) // slower than JSR?
+//OPT("[2*", STXz("\x00") ASL() ROLz("\x00") LDXz("\x00"), U 7, REND) // inline aslax1/shlax1
   OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
   OPT("[3*", JSR("w?"), U 3, U mulax3, REND)
   OPT("[4*", JSR("w?"), U 3, U aslax2, REND)
@@ -432,8 +443,14 @@ char* rules[]= {
   OPT("[,Z\x10/", JSR("w?") ANDn("\xfe"), U 5, U asrax4, REND)
   // OPT(",Z\x80/", JSR("w?"), U 3, U asrax7, REND)  // doesn't exist?
   // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND) // TODO: load byte
-  "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
+//  "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
+  "#I", TAY() LSR() TYA() BCS("\x00") ":", U 6, REND // Number?
+  "KI", TAY() LSR() BCC("\x01") LSR() TYA() BCC("\x00") ":", U 9, REND // Kons?
+  "KI", TAY() LSR() ANDn("\x01") ADCn("\xfe") TYA() BCC("\x00") ":", U 10, REND // ok alt?
+  "$I", TAY() LSR() ANDn("\x01") SBCn("\x00") TYA() BCC("\x00") ":", U 10, REND // ?? ok alt????
+//  "$I", TAY() LSR() BCC("\x03") XORn("\x01") LSR() TYA() BCC("\x00") ":", U 11, REND // Atom?/String? // TODO: smaller?
+//  "$I", TAY() ANDn("\x03") CMPn("\x01") BNE("\x00") ":", U 8, REND // Atom/String?
   // OPT("%aI", ...                         REND) // TODO: if (boolvar) ...
   // TODO: if minsize: JSR() & BNE => 5 bytes... slow...
   OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
@@ -464,6 +481,8 @@ char* rules[]= {
   ".", JSR("w?"), U 3, U princ, REND
 //  "W", JSR("w?"), U 3, U prin1, REND
   "P", JSR("w?"), U 3, U print, REND
+//  "T", JSR("w?"), U 3, U terpri, REND
+//  "Y", JSR("w?"), U 3, U lread, REND
 
   ",", LDAn("#") LDXn("\""), U 4, REND // load immedate
   ";", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
@@ -902,13 +921,18 @@ typedef int (*F1)(int);
 typedef void (*F)();
 
 int main(void) {
-//  unsigned int bench= 5000, n= bench+1;
-  unsigned int bench= 50000, n= bench+1;
+  static unsigned int bench= 50000, n;
+//  unsigned int bench= 50000, n;
+//  static unsigned long bench= 50000, n; // 11 130 491 counting RTS using long    11 630 463 static!
+//    static unsigned int bench= 50000, n;  //  7 629 927 counting RTS using int        387 260 static!
 //  unsigned int bench= 3000, n= bench+1;
 //  unsigned int bench= 3000, n= bench+1;
 //  unsigned int bench= 100, n= bench+1; // for fib21
 //  unsigned int bench= 1, n= bench+1;
+//  unsigned int bench= 100, n= bench+1;
   int r, i;
+
+  n= bench+1;
 
 #ifdef MATCHER
   bc= "[3[3+"; // works
@@ -943,8 +967,47 @@ int main(void) {
   // For simulating function call with 1 parameter
   saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
 
-  //bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
-  bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+  bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
+
+  // * -> 31s ... 4 035 340  using static int counter! INLINE MAX 2 620 576
+  //bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+  // (/ (- 21600535 1539248) 50000.0) = 401c without overhead (no print, 0.3s compile
+  // (/ (* 14 50000) 21.600535) 32Kops/s (w overhaad)
+  // (* 14 (/ 1000000 401.0)) = 34.912Kops/s
+
+  // (/ (- 18617878 1567789) 50000.0) = 341c
+  // (* 14 (/ 1000000 341.0)) = 41.055Kops/s
+
+  // 50k inline    - (/ (- 22202029 5207599) 50000.0) = 339c only (/ 445 339.0) 31% overhead of JSR?
+  // 50k jsrjsrjsr - (/ (- 23832181 1579794) 50000.0) = 445c
+
+  // (/ (- 26291286 1641196) 50000.0) = 493c non-ops no overhead mult
+  // (* 14 (/ 1000000 493.0)) = 28.397 kops
+  // (/ (- 12638985 1538897) 50000.0) = 222c non-ops no overhead plus
+  // (* 14 (/ 1000000 222.0)) = 63.063 kops
+
+
+  // === plus instead...
+  // (/ (- 9655717 1555627) 50000.0) = 162c
+  // (* 14 (/ 1000000 162.0)) = 86.419 kops
+
+  //bc= "][2[1+[1[1+[1+[1++[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (+ (+ 2 1) ...
+  // got rid of multiplication, still 1 push and 1 add jsr
+  // (/ (- 13241255 5210158) 50000.0) = 160c (45B) (/ (- 160 (* 2 12)) 29) = 4c/B (29i)
+  // (/ (- 15259565 7230009) 50000.0) = 160c but NON-STATIC ovhread 2s! (/ 7230009 5210158.0) 39% overhead
+  // (/ (- 7230009 5210158) 50000.0) = 40c overhead of local var! (12c call, +indirect)
+  // DEUBUG INFO OFF: (/ (- 9606087 1555944) 50000.0) = 161c
+  // (/ (- 12639388 1539248) 50000.0) = 222c (+ 161 (* 5 12)) = 221c !!!
+  // compiling cost: (- 1539248 1263750) = 275 498us, 0.3s
+  // (/ 1263750 50000.0) 25c loop overhead
+
+  // + -> 22s ... 4 010 564 -> 4s using static int counter!
+  //  bc= "][2[1+[1[1+[1+[1++[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
+
+  // 50k X => 11 130 491  using long
+  //bc= "[2*[2*^"; // 11 cycles extra? lol
+  //bc= "[2*^"; // 11 cycles extra? lol
+  //bc= "^";
 
   //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
   // copy because we modify! (if not copy strstr finds matches after change!)
@@ -989,11 +1052,6 @@ int main(void) {
   printf("GEN= %04X\n", gen);
   DISASM(gen, gen+bytes, 0);
 
-  printf("incsp8= %04x\n", incsp8);
-  printf("incsp6= %04x\n", incsp6);
-  printf("incsp4= %04x\n", incsp4);
-  printf("incsp2= %04x\n", incsp2);
-  printf("\nprint= %04x\n\n", print);
   i= 0; // ok
   i= 1; // ok
   i= 2; // recurse already - ok
@@ -1006,15 +1064,17 @@ int main(void) {
 
   i*= 2; // TODO: this generates code knowing what i is!!! (so if small may do INX!!!!?)
 
-while(--n) {
-  if (1) {
+while(--n>0) { // (--n) doesn't work! it jumps out early!
+  if (1) { // 50k noopt- 1579794, opt: 5207599
+    3;
+  } else if (0) { // 25% overhead cmp next...
     // 39.32s
     r= ((F1)gen)(i);
-  } else {
+  } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
     // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
-    __AX__= i;
+    //__AX__= i;
     asm(" jsr %v", gen);
-    r= __AX__;
+    //r= __AX__;
 
     // TODO: why doesn't it work - loops forever!
     //__AX__= i;
@@ -1023,7 +1083,7 @@ while(--n) {
   }
 }
 
-printf("bench: %d times - FIB(%d)=%d (%04X)\n", bench, i/2, r/2, r);
+printf("bench: %u times - FIB(%d)=%d (%04X)\n", bench, i/2, r/2, r);
 
     // TODO: allocate, copy ...
 
