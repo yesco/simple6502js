@@ -34,7 +34,7 @@ static char c, *pc;
 #endif // ZEROPAGE
 
 // ignore JMPARR usage, uncomment to activate
-//#define JMPARR(a) 
+#define JMPARR(a) 
 
 // just including the cod
 #ifdef ASM
@@ -72,6 +72,7 @@ extern L runal(char* la) {
   pc= la;
 
 #ifndef JMPARR
+  // TODO: static allocation, less code!
   #define JMPARR(a) a:
 
   if (*((int*)jmp)==42) {
@@ -127,13 +128,14 @@ extern L runal(char* la) {
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
 
-  if (verbose>1) { printf("%02d:al %c stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
+  if (verbose>1) { printf("%02d:al>%c< stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
 
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
 // inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
 
-#define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
+//#define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
+#define NNEXT goto next;
 
 //#undef NNEXT
 //#define NNEXT goto next
@@ -141,7 +143,8 @@ extern L runal(char* la) {
   //NOPS(++nops;);c=*++pc;goto *jmp[c];
   //printf("\t\tTOP="); prin1(top); NL;
 
-  NNEXT;
+// TODO: hmm, needed for VM with JMP?
+//  NNEXT;
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
 
@@ -194,6 +197,32 @@ JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
 
 JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 JMPARR(gsemis)case ';': *++s= top; top= *(L*)++pc; top= ATOMVAL(top); pc+= sizeof(L)-1; goto next;
+JMPARR(gsetq)case ':': setval(*(L*)++pc, top, nil); pc+= sizeof(L)-1; goto next;
+JMPARR(gcall)case '_': {
+      L f= *(L*)++pc; pc+= sizeof(L)-1;
+      printf("EVAL: "); prin1(top); NL;
+
+      // --- APPLY
+      if (iscons(f)) {
+        // pop enough elements from stack
+        L args= nil, *p= &args;
+        char n= 1;
+        while(n-->0) {
+          *p= cons(top, nil); top= *s; s--;
+          p= CDR(*p);
+        }
+        top= eval(cons(f, args), nil);
+      } else if (ISBIN(f)) {
+        // TODO: can we "pretend" s is our stack in machine code?
+        // (need to grow down...)
+        error("eval.bin: ");
+      // } else if (isasm(f)) {
+      //}
+      } else error("AL.run: how to run?\n");
+
+      printf("==> "); prin1(top); NL;
+    }
+    goto next; // TODO: handle VM
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
@@ -209,6 +238,7 @@ JMPARR(gdiv)case '/': top= *s/top*2; --s; top&=NUM_MASK; goto next;
 JMPARR(gC)case 'C': top= cons(*s, top); --s; goto next;
 
 JMPARR(gbl)
+  case '[': case ']': // TODO: hmmm, simiulate the opt ax of asm?
   // not so common so move down... linear probe!
   case ' ': case '\t': case '\n': case '\r': case 12: goto next; // TODO: NNEXT loops forever?
 
@@ -302,13 +332,16 @@ unsigned char b;
 char buff[250];
 
 #define ALC(c) do { buff[b]=(c); ++b; } while(0)
-#define ALW(n) do { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); } while(0)
 
-// reads lisp program s-exp from stdin
-// returning atom string containing AL code
+// 25857 -> 25793 (- 25793 25857) = 64 bytes saved
+//#define ALW(n) do { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); } while(0)
+void ALW(int n) { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); }
+
+// reads a single lisp function s-exp from stdin
+// LIMITATIONS: can only compile one "function" at a time
 void alcompile() {
   static char depth;
-  char c, extra= 0, *nm; int n= 0; L x= 0xbeef, f;
+  char c, extra= 0, *nm, bf; int n= 0; L x= 0xbeef, f;
 
  again:
   switch((c=nextc())) {
@@ -344,18 +377,24 @@ void alcompile() {
     if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; error("ALC: Need to do eval"); }
 
     if (isatom(x)) f= ATOMVAL(x);
-    if (!f || !isnum(f)) { prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL; error("ALC: Need funcall"); }
+    if (!f || !isnum(f)) { // 0== not primtive?
+      prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL;
+      if (iscons(f) && car(f)==lambda) {
+        printf("LAMBDA!...\n");
+      } else error("ALC: Need funcall");
+      bf= 0;
+    } else {
+      // get the byte code token
+      bf= NUM(f);
+      if (bf=='\'') { --depth; goto quote; }
+      else if (bf=='L') bf= -'C'; // foldr // TODO: who gives a?
+      else assert(bf<255);
+    }
 
-    // get the byte code token
-    f= NUM(f);
-
-    if (f=='\'') { --depth; goto quote; }
-    else if (f=='L') f= -'C'; // foldr // TODO: who gives a?
-    else assert(f<255);
     // TODO: how to handle non-foldable arguemnts
     //   TODO: look at number of arguments the function expects? if n>2
 
-    if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", f, f); }
+    if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", bf, bf); }
  
     // IF special (if EXPR THEN ELSE) => EXPR I ] THEN { ] ELSE }
     if (x==IF) {
@@ -444,14 +483,22 @@ void alcompile() {
     }
 
     // GENERIC argument compiler
-    printf("F='%c' (%d)\n", f, f);
+    printf("F='%c' (%d)\n", bf, bf);
     while((c=nextc())!=')') {
       ++n;
       alcompile();
       // implicit FOLDL of nargs + - L ! LOL
-      if (f>0 && n>=2 && f<255 && f!='R' && f!='Z') {ALC(f);--n;/*printf("---FOLDL--- '%s'\n", buff);*/}
+      // TODO: handle non isnum
+      if (bf>0 && n>=2 && bf<255 && bf!='R' && bf!='Z') {ALC(bf);--n;/*printf("---FOLDL--- '%s'\n", buff);*/}
     }
-    if (f>0 && f<255 && n>1) { ALC(f); n-=2; break; }
+    if (bf>0 && bf<255 && n>1) { ALC(bf); n-=2; break; }
+
+    // TODO: merge with quote?
+    if (!isnum(f)) {
+      printf("Compile: call lambda: "); prin1(f); NL;
+      ALC('_'); ALW(f);
+      return; 
+    }
 
     // foldr?
     while(f<0 && --n > 0) ALC(-f); 

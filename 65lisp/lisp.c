@@ -2076,7 +2076,7 @@ int main(int argc, char** argv) {
       case 'p': printf("%s\n", *++argv),--argc;  break;
       case 'i': interpret=0,echo=quiet=0,env= readeval(NULL, env, DOPRINT);  break;
       case 'e': case 'x':
-        printf("ARGV= '%s' %d\n", *argv, (*argv)[1]=='x');
+        //printf("ARGV= '%s' %d\n", *argv, (*argv)[1]=='x');
         env=readeval(argv[1], env, (*argv)[1]=='x');
         interpret= 0; --argc; ++argv;  break;
 
