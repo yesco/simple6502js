@@ -1,0 +1,6 @@
+PROG=./65vm
+
+#$PROG $* -E -e "(+ 3 4)"
+
+$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(double 21)"
+#$PROG $* -E -e "(setq fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2)))))" -e "(fib 8)"
