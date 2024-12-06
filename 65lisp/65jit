@@ -1,0 +1,23 @@
+#OPTS=" -DPROGSIZE -DAL -DASM -DDASM -DDISASM " # 1340 bytes more!
+OPTS=" -DPROGSIZE -DAL -DASM -DJIT "
+
+name="lisp"
+
+# why doesn't this quote every arg in the resulting string
+xx="$*"
+echo "unix> ./65jit $xx"
+
+rm $name.out $name.tap $name.map $name.s 2>/dev/null
+
+cl65 -O $OPTS -T -t sim6502 $name.c -m $name.map vm-asm.s -o $name.out 2>&1 && (sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep -a ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time")
+
+# show and format error messages, generate .s too, (makes no out?)
+( cl65 -S -O $OPTS -T -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
+
+echo "DONE< ./65vm $xx"
+echo
+echo
+
+
+
+

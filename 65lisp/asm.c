@@ -52,7 +52,7 @@
 
 
 // uncomment to get DISASM
-//#define DISASM
+#define DISASM
 
 #ifdef DISASM
   #undef DISASM
@@ -143,26 +143,35 @@
 
 #include <assert.h>
 
-#define PROGSIZE
-#include "progsize.c"
+#ifdef TEST
+  #define PROGSIZE
+  #include "progsize.c"
+#endif
 
 #include <stdint.h>
 
-typedef int16_t L;
-typedef uint16_t uint;
-typedef unsigned uchar;
+#ifdef TEST
+  typedef int16_t L;
+  typedef uint16_t uint;
+  typedef unsigned uchar;
 
-#include "extern-vm.c"
+  typedef int (*F1)(int);
+  typedef void (*F)();
 
-// These needs to be constants during AMS code-gen
-extern unsigned int T=42; // TODO: constant
 
-// this isn't recognized if used in another constant by cc65
-//extern const unsigned int nil=1; 
-// TODO: if this is ever changed, need to change codegen "[9=I" and "UI"
-const unsigned int nil=1;
+  #include "extern-vm.c"
 
-#define NIL (1)
+  // These needs to be constants during AMS code-gen
+  extern unsigned int T=42; // TODO: constant
+
+  // this isn't recognized if used in another constant by cc65
+  //extern const unsigned int nil=1; 
+ // TODO: if this is ever changed, need to change codegen "[9=I" and "UI"
+ const unsigned int nil=1;
+
+  #define NIL (1)
+
+#endif
 
 
 // Poor Mans Assembler
@@ -170,6 +179,9 @@ const unsigned int nil=1;
 // Generates strings from MNOMICS and arguments,
 // see how it's used. Inline constants need to be
 // proper C strings. Like "\041" (== "A", lol)
+//
+// We use this for runtime codegen, so cannot use the
+// built-in cc65 asm.
 //
 // Since these are expanded next to eachaother they form
 // a single string. Parameters are passed either as:
@@ -181,14 +193,17 @@ const unsigned int nil=1;
 // - "w+" - word argument + 1 from last %d match
 //
 //
-// The string may contain 0:oes, thus, after the string comes a length word.
+// The string generated may contain 0:oes, thus, after
+// the string comes a length word.
 //
-// The string contains a mix of instructions for codegen and tracking of
-// side-effects, such as:
-// - "s-" "s+" stack depths changes (data stack)
-// - instructions for labelleing in IF-THEN-ELSE and patching
+// The string contains a mix of assembly 6502 macro instructions
+// for codegen and tracking of side-effects, such as:
+// - "s-" "s+" - stack depths changes (data stack)
+// - ":" ";" "/" - instructions for labelleing in IF-THEN-ELSE and patching
+// - "w?" "w'" .... - picking parameters from constants (typically for JSR), or bytecode
 // - and a "<" move stack instructions.
-
+//
+// See below for details
 
 #define  O(op)    op
 #define O2(op, b) op b
@@ -284,12 +299,13 @@ const unsigned int nil=1;
 
 // END ASSEMBLY DEF
 
-#define ASM(x,...) (x),U (sizeof(x)-1),__VA_ARGS__,REND
+// TODO: not used
+//#define ASM(x,...) (x),U (sizeof(x)-1),__VA_ARGS__,REND
 
+// Typecast constants to this
 #define U (void*)
 
 // TODO: instead of 2 bytes here, could have length inside hibyte of Z, but difficult to get right?
-//        macro?
 #define REND 0, // cost 70rules x 2 bytes= 140 bytes, needed unless have count inside bytelen...
 
 #ifdef RULES
@@ -332,15 +348,22 @@ const unsigned int nil=1;
   #define OPT(...)
 #endif
 
-int print(int a) {
-  printf("\n%d ", a/2);
-  return a;
-}
+#ifdef TEST
+  int print(int a) {
+    printf("\n%d ", a/2);
+    return a;
+  }
 
-int princ(int a) {
-  printf("%d ", a/2);
-  return a;
-}
+  int princ(int a) {
+    printf("%d ", a/2);
+    return a;
+  }
+#endif // TEST
+
+
+
+// OPTIMIZATION IDEAS
+// ==================
 
 // Consider only positive integers, anything else is boxed!
 // (gives 0--32767, almost good, now only - 16383)
@@ -381,9 +404,16 @@ int princ(int a) {
 //
 //       - also see - https://www.cc65.org/doc/cc65-8.html (probably can't use them, as need saving)
 
+// ASCII that isn't 6502 instructions!
+// -----------------------------------
 //   "  % '()                   >?
 //   B EFGH J LMNO Q S  VX    \  _
 // `          lmnopqrstuvwxyz    
+//
+// Used:
+//   ww w+ w' w? - from constants (typically global var/ c/asm-function)
+//   # " - from byte code
+
 
 char* rules[]= {
 //  "&", JSR("w?"), U 3, U tosandax, REND
@@ -914,14 +944,71 @@ void promoteReturn(char* bc) {
   }
 }
 
+static unsigned int bench= 50000L;
 
 #endif // MATCHER
 
-typedef int (*F1)(int);
-typedef void (*F)();
+
+// takes compiled bytecode and compiles to asm,
+// then runs bench times
+
+// TODO: redo to make everything JSR/JMP asm, even lisp,
+// similar to FORTH threading.
+L al(char* la) {
+  L r= nil;
+  L i= 8*2; // TODO: remove, is input for hardcoded tests
+  static unsigned int n;
+  n= bench+1;
+
+  bc= strdup(la);
+  promoteReturn(bc);
+
+  bytes= 0;
+
+  // TODO: only for compiling "function"
+  saveax= 1;
+
+  compile();
+  
+  if (stk<60) {
+    // IF doesn't have RETURN in both branches...
+    // TODO: this isn't right.... add ^ at end?
+    gen[bytes++]= 0x60; // RTS
+  }
+
+  DISASM(gen, gen+bytes, 0);
+
+  relocate(bytes, gen);
+  DISASM(gen, gen+bytes, 0);
+
+  // Actually call, bench times (n)
+  while(--n>0) { // (--n) doesn't work! it jumps out early!
+    if (0) { // 50k noopt- 1579794, opt: 5207599
+      3;
+    } else if (0) { // 25% overhead cmp next...
+      // 39.32s
+      r= ((F1)gen)(i);
+    } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
+      // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
+      __AX__= i;
+      asm(" jsr %v", gen);
+      r= __AX__;
+      
+      // TODO: why doesn't it work - loops forever!
+      //__AX__= i;
+      //((F)gen)();
+    }
+  }
+
+  return r;
+}
+
+
+
+#ifdef TEST
 
 int main(void) {
-  static unsigned int bench= 50000, n;
+  static unsigned int n;
 //  unsigned int bench= 50000, n;
 //  static unsigned long bench= 50000, n; // 11 130 491 counting RTS using long    11 630 463 static!
 //    static unsigned int bench= 50000, n;  //  7 629 927 counting RTS using int        387 260 static!
@@ -967,7 +1054,7 @@ int main(void) {
   // For simulating function call with 1 parameter
   saveax= 1; // TODO: now assume compile: fun(a), generlize to lastvar
 
-  bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
+//  bc= "][1[2+[1[1[1+[1++[2**^"; saveax= 0; ax= '?'; // oh, default is foldr  - 47.6s
 
   // * -> 31s ... 4 035 340  using static int counter! INLINE MAX 2 620 576
   //bc= "][2[1+[1[1+[1+[1+*[2*^"; saveax= 0; ax= '?'; // if it was foldl...    - 42.7s (and (* (+ 2 1) ...
@@ -1011,85 +1098,17 @@ int main(void) {
 
   //bc= "[a[2<I][a[3<I][5 {][6 } {][4 }^"; // just test of promoteReturn two levels
   // copy because we modify! (if not copy strstr finds matches after change!)
-  bc= strdup(bc);
-  promoteReturn(bc);
 
-  //bc= "a[2<Ia^{a[[1-R[a[2-R+^}"; // 39/42 bytes - ok, by hand: DELAY-PUSHAX (42 if automatic is done)
+  // TODO: just call al for all during test...
 
-  //bc= "a[2<Ia^{a[1-R[a[2-R+^}"; // 39 bytes - ok, automatic!
+  r= al(bc);
 
-  // OR - works!
-  //  //doesn't resolve all OR! {}{}{}...
-  //bc= "[1UI][2UI][9UI{}{}{}^";
-  //bc= "[9UI][9UI][3UI{}{}{}^";
-
-  // AND - works!
-  //bc= "[1UI{][2UI{][9UI{}}}^";
-  //bc= "][1UI{][2UI{][3UI{}}}^";  // crash without leading ']' TODO: figure out...
-
-  //bc= "[9^";
-  //bc= "P[PaP[PaP+PPPPPPPP7P^";
-
-  //bc= "7[2/^";
-
-  bytes= 0;
-  // implicit return, only takes one expression
-  // TODO: PROGN... (how about lambda)
-
-  compile(); // etc bc... lol
-
-  // need add the implicit return?
-  if (stk<60) {
-    // IF doesn't have RETURN in both branches...
-    // TODO: this isn't right.... add ^ at end?
-    gen[bytes++]= 0x60; // RTS
-  }
-
-  DISASM(gen, gen+bytes, 0);
-
-  relocate(bytes, gen);
-//  relocate(bytes, (char*)0xABBA); // testing, lol
-  printf("GEN= %04X\n", gen);
-  DISASM(gen, gen+bytes, 0);
-
-  i= 0; // ok
-  i= 1; // ok
-  i= 2; // recurse already - ok
-  i= 21; // largest we can do, lol
-  i= 8; // ok
-
-  // 3000x fib8 ... 38.5s - (- 39.3 3.9) 35.4s RUNNING (not incl compile, and printing overhead)
-  // 3000x emtpy loop overhead: with print and compile overhead 3.9s! (removed gen() call...
-  // 100x  fib21 ... 617s
-
-  i*= 2; // TODO: this generates code knowing what i is!!! (so if small may do INX!!!!?)
-
-while(--n>0) { // (--n) doesn't work! it jumps out early!
-  if (1) { // 50k noopt- 1579794, opt: 5207599
-    3;
-  } else if (0) { // 25% overhead cmp next...
-    // 39.32s
-    r= ((F1)gen)(i);
-  } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
-    // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
-    //__AX__= i;
-    asm(" jsr %v", gen);
-    //r= __AX__;
-
-    // TODO: why doesn't it work - loops forever!
-    //__AX__= i;
-    //((F)gen)();
-    //r= __AX__;
-  }
-}
-
-printf("bench: %u times - FIB(%d)=%d (%04X)\n", bench, i/2, r/2, r);
-
-    // TODO: allocate, copy ...
-
+  printf("bench: %u times - FIB(%d)=%d (%04X)\n", bench, i/2, r/2, r);
 
 #endif // MATCHER
 
   PROGSIZE;
   return 0;
 }
+
+#endif

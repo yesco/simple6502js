@@ -36,13 +36,17 @@ static char c, *pc;
 // ignore JMPARR usage, uncomment to activate
 #define JMPARR(a) 
 
-// just including the cod
+// just including the code
 #ifdef ASM
   #define GENASM
 #endif
 
 #ifdef GENASM
-  #include "lisp-asm.c"
+  #ifdef JIT
+    #include "asm.c"
+  #else
+    #include "lisp-asm.c"
+  #endif
 #else
   #define asmpile(a) 0
 #endif
@@ -212,6 +216,7 @@ JMPARR(gcall)case '_': {
           p= CDR(*p);
         }
         top= eval(cons(f, args), nil);
+        // TODO: reclaim, at least last cons, the others...? might be stored...! &rest
       } else if (ISBIN(f)) {
         // TODO: can we "pretend" s is our stack in machine code?
         // (need to grow down...)
@@ -305,6 +310,8 @@ JMPARR(gerr)default:
   }
 
 }
+
+// TODO: do we recurse over differnt LA?
 
 L al(char* la) {
   top= nil;
