@@ -37,7 +37,7 @@ void disasm(char* mc, char* end, char indent) {
     else if (!(i&0x9f)) printf("%.3s", DA_JMPS+3*(i>>5));
     // regular instructions with various addressing modes
     else {
-      unsigned char cciii= (i>>5)+((i&3)<<3);
+      unsigned char cciii= (i>>5)+((i&3)<<3); // "ccc_ __ii" encoding change to "cciii"
       if (cciii<0b11000) printf("%.3s", DA_CCIII+3*cciii);
       else printf("$%02x ??? ", i);
 
@@ -45,7 +45,8 @@ void disasm(char* mc, char* end, char indent) {
       case 0b000: printf(i&1?" ($%02x,X)":" #$%02x", *p++); break;
       case 0b001: printf(" $%02x ZP", *p++); break;
       case 0b010: printf(i&1?" #$%02x":" A", *p++); break;
-      case 0b011: printf(i&1?" $%04x":" A", *((int*)p)++); break;
+    //case 0b011: printf(i&1?" $%04x":" A", *((int*)p)++); break; // wrong for STX ?
+      case 0b011: printf(i&3?" $%04x":" A", *((int*)p)++); break; // hmmm, seems to work, lol
       case 0b100: printf(" ($%02x),Y", *p++); break;
       case 0b101: printf(" $%02x,X", *p++); break;
       case 0b110: printf(" $%04x,%c", m&1?'Y':'X', *((int*)p)++); break;

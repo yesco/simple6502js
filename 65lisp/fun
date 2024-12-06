@@ -1,6 +1,17 @@
-PROG=./65vm
+#PROG=./65vm
+#PROG=./65lisp
+#PROG=./65asm
+PROG=./65jit
 
-#$PROG $* -E -e "(+ 3 4)"
+# ERRORNIOUS ON 65jit - why? codegen counting matching chars wrong?
+#$PROG $* -E -e "(cons 'a 'b)"
 
-$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(double 21)"
+##$PROG $* -E -e "(+ 3 4)"
+
+$PROG $* -E -e "(cons 3 (setq double '(lambda (a) (+ a a))))"
+
+#$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))"
+
+#$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(double 21)"
+
 #$PROG $* -E -e "(setq fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2)))))" -e "(fib 8)"

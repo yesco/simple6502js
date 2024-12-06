@@ -67,8 +67,8 @@
 //#define DEBASM(a) do { a; } while (0)
 
 // into about the matched rule and code-gen
-//#define APRINT(...) printf(__VA_ARGS__)
-#define APRINT(...) 
+#define APRINT(...) do { if (verbose) printf(__VA_ARGS__); } while(0)
+//#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -221,12 +221,11 @@
 #define LDA(w)  O3("\xAD",w)
 #define LDX(w)  O3("\xAE",w)
 #define LDY(w)  O3("\xAC",w)
-
-#define STA(w)  O3("\x8D",w)
-#define STX(w)  O3("\x8E",w)
-#define STY(w)  O3("\x8C",w)
-
-
+                             //    m mm
+#define STA(w)  O3("\x8D",w) // 1000 1101
+#define STX(w)  O3("\x8E",w) // 1000 1110
+#define STY(w)  O3("\x8C",w) // 1000 1100
+                             // ccc    ii
 #define ANDn(b) O2("\x29",b)
 #define ORAn(b) O2("\x09",b)
 #define EORn(b) O2("\x49",b)
@@ -466,7 +465,6 @@ char* rules[]= {
 //  "*", TAY() TXA() LSR() TAX() TYA() ROR() JSR("w?") "s-", U 11, U tosmulax, REND // 9 bytes, TODO: too unsafe?
 //  "*", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U asrax1, U tosmulax, REND    // 6 bytes slow
 
-
   // TODO: make safe value?
   //OPT("[2/", TAY() TXA() LSR() TAX() TYA() ROR() ANDn("\xfe"), U 8, REND) // 8 bytes
   OPT("[2/", JSR("w?") ANDn("\xfe"), U 5, U asrax1, REND) // 5 bytes // TODO: make safe ANDn("\xfe")
@@ -506,36 +504,38 @@ char* rules[]= {
 
   "A", JSR("w?"), U 3, U ffcar, REND
   "D", JSR("w?"), U 3, U ffcdr, REND
-//"C", JSR("w?") "s-", U 5, U cons, REND
+  "C", JSR("w?") "s-", U 5, U cons, REND // TODO: make more efficient one?
 
   "!", JSR("w?") "s-", U 5, U staxspidx, REND
   "@", JSR("w?"), U 3, U ldaxi, REND
   ".", JSR("w?"), U 3, U princ, REND
-//  "W", JSR("w?"), U 3, U prin1, REND
+//"W", JSR("w?"), U 3, U prin1, REND
   "P", JSR("w?"), U 3, U print, REND
-//  "T", JSR("w?"), U 3, U terpri, REND
-//  "Y", JSR("w?"), U 3, U lread, REND
+//"T", JSR("w?"), U 3, U terpri, REND
+//"Y", JSR("w?"), U 3, U lread, REND
 
-  ",", LDAn("#") LDXn("\""), U 4, REND // load immedate
-  ";", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
-  ":", STA("ww") STX("w+"),  U 6, REND // store variable at address
+  ":%d", STA("ww") STX("w+"),  U 6, REND // store variable at address
+  ";%d", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
+  "_%d", JSR("ww"),            U 3, REND // call address (eval?)
 
   OPT("][", 0, U 0, REND) // 3 zeroes! lol
   "]", "s-" JSR("w?"), U 5, U popax,  REND // TODO: useful to actually pop value?
+  // TODO: if ax is 0 then dont? (no specific value worth saving, or just prefix with ']'
   "[", "s+" JSR("w?"), U 5, U pushax, REND
 
 //OPT("0^%0", JMP("w?"), U 3, U push0, REND)   // return 0 (if no need clean stack) // 1 byte savings, slower
 //OPT("1^%0", JMP("w?"), U 3, U push2, REND)   // return 1 (if no need clean stack) // 2 byte savings
 //OPT("2^%0", JMP("w?"), U 3, U push4, REND)   // return 2 (if no need clean stack) // 2 
 //OPT("9^%0", JMP("w?"), U 3, U retnil, REND)  // return nil (if no need clean stack) // 
-//"9",        JSR("w?"), U 3, U retnil, REND   // load nil
+// TODO: optimize return nil? very common...
+//"9",        JSR("w?"), U 3, U retnil, REND   // load nil 
   "9",        LDAn("\x01") LDXn("\x00"), U 4, REND // load nil
   OPT("0",    LDAn("\0") TAX(), U 3, REND)     // load 0
   "%d",       LDAn("#") LDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
   // TODO: keep track of stack! [] enough?
-  // TODO: if request ax?
+  // TODO: if request ax_
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
   //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
@@ -577,6 +577,7 @@ char* rules[]= {
   "}", ";", U 1, REND
 
   0};
+
 #endif // RULES
 
 // No OP:
@@ -627,12 +628,14 @@ char  gen[255]; // generate asm bytes
 //   %0 -9 == match only if STK is 0-9
 //   %^    == match if STK is 60+ == after RETURN
 char matching(char* bc, char* r) {
-  char c, nc, b;
+  char c, nc, b, pb= 0;
   charmatch= ww= whi= 0;
   DEBASM(printf("\tRULE: '%s' STK=%d\n", r, stk));
   c= *r;
   while(c) {
+    charmatch= 0;
     nc= r[1];
+    pb= b;
     b= *bc;
 
     DEBASM(printf("\t  matching: '%c' '%c' of '%s' '%s' STK=%d\n", b, c, bc, r, stk));
@@ -641,8 +644,7 @@ char matching(char* bc, char* r) {
     if (c=='Z') { if (b) break; } // match \0
     else if (c=='%') {
       if (nc=='d') {
-        // TODO: actually, do we care if it's number? Hmmm... (, case)
-        if (b==',') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
+        if (b==',' || pb==';' || pb==':' || pb=='_') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
         else if (isdigit(b) && b<='8') { ww= 2*(b-'0'); whi= 0; }
         else return 0;
       } else if (islower(nc)) { // TODO:
@@ -663,7 +665,8 @@ char matching(char* bc, char* r) {
       }
       ++r;
     } else if (b != c) return 0; // simple char exact match
-    ++charmatch;
+
+    ++charmatch; // initial byte
     ++bc;
     c= *++r;
   }
@@ -705,7 +708,7 @@ int compile() {
   //gen[bytes++]= ((int)print) & 0xff;
   //gen[bytes++]= ((int)print) >> 8;
 
-  ax= 'a';
+  //ax= 'a';
 
   if (verbose) printf(">>>>>COMPILED called: %s\n", bc);
 
@@ -827,6 +830,7 @@ int compile() {
 
         if (verbose) DISASM(gen+start, gen+bytes, 9);
 
+        ++p;
         break;
       } // if match
 
@@ -838,13 +842,15 @@ int compile() {
       ++p;
     } // while do next rule
 
-    if (!*r) { // no more rules
+
+    // --- AFTER APPLYING RULES
+
+    // TODO: somehow 'C' isn't found if this code is here? hmmmm?
+    // TODO: if this code not here, then loop forever if no match... lol
+    if (0 && !*p) { // no more rules
       printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
       exit(3);
     }
-
-
-    // --- AFTER APPLYING RULES
 
     // -- update ax
     if (islower(*bc)) ax= *bc;
@@ -894,6 +900,8 @@ int compile() {
     if (!*bc) break; // hmmm... 
 
     if (*bc=='{' || *bc=='}') break;
+
+    // TODO: seems unsafe? (can match ,XX ;XX ;XX _XX ???)
     if (bc[charmatch-1]=='}' || bc[charmatch-1]=='{') {
       bc+= charmatch;
       break;
@@ -966,7 +974,9 @@ L al(char* la) {
   bytes= 0;
 
   // TODO: only for compiling "function"
-  saveax= 1;
+  //saveax= 1;
+  ax= 0;
+  saveax= 0;
 
   compile();
   

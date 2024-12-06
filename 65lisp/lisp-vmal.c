@@ -565,5 +565,5 @@ L alcompileread() {
   alcompile();
   if (!b) return eof;
   if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
-  return mkbin(buff, b+1);
+  return mkbin(buff, b+1); // add one to additionally zero-terminate?
 }  
