@@ -158,6 +158,7 @@
   typedef int (*F1)(int);
   typedef void (*F)();
 
+  static unsigned int bench= 50000L;
 
   #include "extern-vm.c"
 
@@ -358,6 +359,7 @@
     printf("%d ", a/2);
     return a;
   }
+
 #endif // TEST
 
 
@@ -944,8 +946,6 @@ void promoteReturn(char* bc) {
   }
 }
 
-static unsigned int bench= 50000L;
-
 #endif // MATCHER
 
 
@@ -987,7 +987,7 @@ L al(char* la) {
       3;
     } else if (0) { // 25% overhead cmp next...
       // 39.32s
-      r= ((F1)gen)(i);
+//      r= ((F1)gen)(i);
     } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
       // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
       __AX__= i;
@@ -999,6 +999,9 @@ L al(char* la) {
       //((F)gen)();
     }
   }
+
+  // TODO: bad hack, lisp.c epxects bench to be counted
+  bench= 0;
 
   return r;
 }
