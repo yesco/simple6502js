@@ -707,7 +707,7 @@ int compile() {
 
   ax= 'a';
 
-  printf(">>>>>COMPILED called: %s\n", bc);
+  if (verbose) printf(">>>>>COMPILED called: %s\n", bc);
 
   // process byte code
   while(*bc) {
@@ -825,7 +825,7 @@ int compile() {
           --z;
         } // end while action/asm
 
-        DISASM(gen+start, gen+bytes, 9);
+        if (verbose) DISASM(gen+start, gen+bytes, 9);
 
         break;
       } // if match
@@ -901,7 +901,7 @@ int compile() {
     bc+= charmatch;
   }
 
-  printf("\n\nASM...bytes: %d\n", bytes);
+  if (verbose) printf("\n\nASM...bytes: %d\n", bytes);
 
   return bytes;
 }
@@ -976,10 +976,10 @@ L al(char* la) {
     gen[bytes++]= 0x60; // RTS
   }
 
-  DISASM(gen, gen+bytes, 0);
+  //if (verbose) DISASM(gen, gen+bytes, 0);
 
   relocate(bytes, gen);
-  DISASM(gen, gen+bytes, 0);
+  if (verbose) DISASM(gen, gen+bytes, 0);
 
   // Actually call, bench times (n)
   while(--n>0) { // (--n) doesn't work! it jumps out early!
@@ -1002,6 +1002,8 @@ L al(char* la) {
 
   // TODO: bad hack, lisp.c epxects bench to be counted
   bench= 0;
+
+  //print(r);
 
   return r;
 }
