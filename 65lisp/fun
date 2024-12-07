@@ -8,10 +8,13 @@ PROG=./65jit
 
 ##$PROG $* -E -e "(+ 3 4)"
 
-$PROG $* -E -e "(cons 3 (setq double '(lambda (a) (+ a a))))"
+#$PROG $* -E -e "(cons 3 (setq double '(lambda (a) (+ a a))))"
 
 #$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))"
 
-#$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(double 21)"
+#(echo "(setq double '(lambda (a) (+ a a)))"; echo "(+ 3 4)"; echo "(double 21)") | $PROG $* -E -e
+(echo "(setq double '(lambda (a) (+ a a)))"; echo "(+ 3 4)"; echo "(+ 2 5)"; echo "(double 21)") | $PROG $* 
+
+#$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(+ 3 4)" -e "(double 21)"
 
 #$PROG $* -E -e "(setq fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2)))))" -e "(fib 8)"

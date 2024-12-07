@@ -562,8 +562,13 @@ L alcompileread() {
   memset(buff, 0, sizeof(buff));
   buff[sizeof(buff)-1]= 255; // end marker
   b= 0;
+
+  // if not function
+  ALC(']'); // TODO: is this the right way to say ax contains nothing of value?
+
   alcompile();
   if (!b) return eof;
   if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
+  ALC('^'); // all need to return & cleanup
   return mkbin(buff, b+1); // add one to additionally zero-terminate?
 }  

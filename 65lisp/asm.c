@@ -150,13 +150,18 @@
 
 #include <stdint.h>
 
+
+
+typedef int (*F1)(int);
+typedef int (*F0)();
+typedef void (*F)();
+
+
+
 #ifdef TEST
   typedef int16_t L;
   typedef uint16_t uint;
   typedef unsigned uchar;
-
-  typedef int (*F1)(int);
-  typedef void (*F)();
 
   static unsigned int bench= 50000L;
 
@@ -633,7 +638,6 @@ char matching(char* bc, char* r) {
   DEBASM(printf("\tRULE: '%s' STK=%d\n", r, stk));
   c= *r;
   while(c) {
-    charmatch= 0;
     nc= r[1];
     pb= b;
     b= *bc;
@@ -645,6 +649,8 @@ char matching(char* bc, char* r) {
     else if (c=='%') {
       if (nc=='d') {
         if (b==',' || pb==';' || pb==':' || pb=='_') { ww= *(L*)(bc+1); whi= ww>>8; charmatch+= 2; }
+        //if (b==',') { ww= *(L*)(++bc); whi= ww>>8; charmatch+= 2; }
+        //else if (pb==';' || pb==':' || pb=='_') { ww= *(L*)(++bc); whi= ww>>8; charmatch+= 2; }
         else if (isdigit(b) && b<='8') { ww= 2*(b-'0'); whi= 0; }
         else return 0;
       } else if (islower(nc)) { // TODO:
@@ -847,9 +853,16 @@ int compile() {
 
     // TODO: somehow 'C' isn't found if this code is here? hmmmm?
     // TODO: if this code not here, then loop forever if no match... lol
-    if (0 && !*p) { // no more rules
-      printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
-      exit(3);
+    if (1 && !*p) { // no more rules
+      if (stk>=64) {
+        printf("SKPPING: bc: %s\n", bc);
+        ++bc;
+//        if (b==',' || b==':' || b==';' || b=='_') bc+= 2;
+//        continue;
+      } else {
+        printf("%% NO MATCH! Can't compile: bc='%s'\n", bc);
+        exit(3);
+      }
     }
 
     // -- update ax
@@ -963,6 +976,7 @@ void promoteReturn(char* bc) {
 // TODO: redo to make everything JSR/JMP asm, even lisp,
 // similar to FORTH threading.
 L al(char* la) {
+  int xx= 4711;
   L r= nil;
   L i= 8*2; // TODO: remove, is input for hardcoded tests
   static unsigned int n;
@@ -974,7 +988,8 @@ L al(char* la) {
   bytes= 0;
 
   // TODO: only for compiling "function"
-  //saveax= 1;
+  //saveax= 1; ax= 'a'; stk= ?
+  stk= 0;
   ax= 0;
   saveax= 0;
 
@@ -997,7 +1012,8 @@ L al(char* la) {
       3;
     } else if (0) { // 25% overhead cmp next...
       // 39.32s
-//      r= ((F1)gen)(i);
+      //r= ((F1)gen)(i); // one argument, one result
+      r= ((F0)gen)(); // no argument, one result, hmmmm works?
     } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
       // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
       __AX__= i;
@@ -1008,6 +1024,16 @@ L al(char* la) {
       //__AX__= i;
       //((F)gen)();
     }
+    
+    // DEBUG
+    if (0 && xx!=4711) {
+      // TODO:doesn't work
+      //   ERROR: ./65jit -E -v -e "(+ 3 4)" -e "(+ 2 5)"
+      //   FINE:  (echo "(+ 3 4)"; echo "(+ 2 5)") | ./65jit -v
+      printf("STACK MESSED UP: xx!=4711 x==%d\n", xx);
+      exit(1);
+    }
+
   }
 
   // TODO: bad hack, lisp.c epxects bench to be counted

@@ -1955,7 +1955,7 @@ L readeval(char *ln, L env, char noprint) {
   _rs= ln;
 
   // TODO wanted result, abort rest?
-  if (setjmp(toploop)) printf("%% Recovering...\n");
+  if (setjmp(toploop)) printf("\n%% Recovering...\n");
 
   r= ERROR;
   do {
@@ -2001,7 +2001,6 @@ L readeval(char *ln, L env, char noprint) {
     //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
     if (!noprint && (echo || !quiet || bench)) { prin1(r); NL; }
 
-
     // info
     if (gc) GC(env, alvals); // TODO: only if needed?
     if (!quiet & stats) {NL; statistics(stats); }
@@ -2040,6 +2039,7 @@ L testing(env) {
   setval(atom("two"), mknum(2), nil);
 
   //env= readeval("(de clos (lambda (n) (+ n n)))", env, quiet);
+
   return env;
 }
 
@@ -2084,6 +2084,8 @@ int main(int argc, char** argv) {
       }
     
   } // while more args
+
+  printf("FUFUF %d\n", argc);
   
 
   if (!interpret) return 0;
