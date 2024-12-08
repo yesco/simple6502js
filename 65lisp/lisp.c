@@ -1777,7 +1777,7 @@ unsigned long bench=1;
 //   ...rest   "name" of function
 //
 // NOTE: all primitives are either 0 1 2 - n ...
-//       user funcs may be more, up to 9 (?)
+//       user funcs may be more, up to 8 (?)
 
 char* names[]= {
   // nargs

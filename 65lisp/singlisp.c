@@ -123,12 +123,16 @@ D cons(D a, D d) { ++C; assert(C<CE); C->car= a; C->cdr= d; return (D)C; }
 // DO NOT ADD ANYTHING TO THIS! *A is an aligned array...
 typedef struct { D val; char* str; } Atom;  Atom *A;
 
+// marker used to know when to strdup new atoms
+char initialized= 0;
+
 // linear search to find if have existing atom
+// 
 D atom(char* s) { Atom* x= (Atom*)nil;
   if (0==strcmp(s, "nil")) return nil; // special
   while(s && ++x<=A) if (0==strcmp(x->str, s)) return (D)x;
   // TODO: assert test out of slots for atom
-  ++A; A->val= nil; A->str= s? s: (char*)nil;  return (D)A;
+  ++A; A->val= nil; A->str= s?(initialized?strdup(s):s):(char*)nil; return (D)A;
 }
 
 void terpri() { putchar('\n'); }
@@ -179,7 +183,7 @@ D lread() { int n= 0, c= unc? unc: getchar(); unc= 0;
   // assume atom
   { char s[32]={0}, *p= s; // overflow?
     do { *p++= c; c= getchar(); }while(c>0 && !isspace(c) && c!='(' && c!=')');
-    unc= c; return atom(strdup(s));
+    unc= c; return atom(s);
   }
 }
 
@@ -314,6 +318,7 @@ int main(int argc, char** argv) {
 
   // register primitives
   ++np; while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
+  initalized= 1;
 
   // read-eval loop
   while(!feof(stdin)) { printf("65> "); x= lread(); terpri();

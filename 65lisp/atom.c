@@ -1,11 +1,20 @@
 // Proposed new atom to store bytecode and assembly too
 
-typedef struct Atom { // 8 Bytes, aligned x..x01
-  D val;
-  D ptr;
-  char jmp[3]; (JMP|JSR|JMPi|RTS) 0xCODE
-  char n; // number parameters
+typedef struct Atom { // 12 Bytes=3x4, aligned x..x01
+  D val;  // car - global value
+  D next; // cdr - next symbol in hash, or SIZE if array
+  D xxx;
+  void* ptr; // binary data possibly (maybe malloced?)
+  char jmp[3]; // (JMP|JSR|JMPi|RTS) 0xCODE
+  char n;    // type/number parameters
 }
+
+// TYPE:
+//   '0' '1' '2' '3' '4' '5' '6' '7' '8' - number of evalled arguemnts, normal function
+//   'n' - counted as in vararg? uNlimited, not evalled
+//   '-' - doesn't apply, special rule on symbol name
+//
+// if have op
 
 // TODO: how do we know the TYPE? lol, high 2 bits of N?
 //       Do we need to know type???
