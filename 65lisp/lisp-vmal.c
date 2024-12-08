@@ -61,6 +61,8 @@ static char c, *pc;
 // The function need to know how many parameters from the
 // stack it uses, and it needs to clear that up!
 
+void alcall(char nparams, char* la);
+
 #ifdef GENASM
 extern L runal(char* la) {
 #else
@@ -126,13 +128,16 @@ extern L runal(char* la) {
  call:
   --pc; // as pre-inc is faster in the loop
 
-  if (verbose>2) printf("FRAME =%04X\n", frame);
+  //if (verbose>2) printf("FRAME =%04X\n", frame);
 
  next:
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
 
-  if (verbose>1) { printf("%02d:al>%c< stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
+  //if (verbose>1) { printf("%02d:al %c stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
+  if (verbose>1) { L* x= stack;
+    printf("%02d:al %c    STK[%d]: ", pc-orig+1, pc[1], s-(stack-2));
+    while(x<=s) { prin1(*x++); putchar(' '); }  prin1(top); NL; }
 
   // caaadrr x5K => 17.01s ! GOTO*jmp[] is faster than function call and switch
 
@@ -203,19 +208,21 @@ JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
 JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 JMPARR(gsemis)case ';': *++s= top; top= *(L*)++pc; top= ATOMVAL(top); pc+= sizeof(L)-1; goto next;
 JMPARR(gsetq)case ':': setval(*(L*)++pc, top, nil); pc+= sizeof(L)-1; goto next;
-JMPARR(gcall)case '_': { void* f= *(L*)++pc; pc+= sizeof(L)-1;
+JMPARR(gcall)case '_': {
+      L a, b;
       char n= 1; // TODO: extract number of arguments from function
-      D a, b;
+      void* f= (void*)*(L*)++pc; pc+= sizeof(L)-1;
       // move elements to C call stack:
       if (n==0) { top= ((F0)f)();          goto next; }
       if (n==1) { top= ((F1)f)(top);       goto next; } else a= *s; --s;
       if (n==2) { top= ((F2)f)(a, top);    goto next; } else b= *s; --s;
-      if (n==3) { top= ((F2)f)(b, a, top); goto next; }
+      if (n==3) { top= ((F3)f)(b, a, top); goto next; }
       // TODO: ... n==8 ??? lots of code, lol
       error1("AL.gexec too many args", mknum(n));
-      
+    }
 JMPARR(gexec)case'X': {
-    L f= top; --s;
+    L f= top; top= *s; --s;
+    if (verbose) { printf("al.GEXEC ptr=%04x %s ", f, ISBIN(f)?"ISBIN":""); prin1(f); NL; }
       
     if (iscons(f)) { // LAMBDA
       // pop enough elements from stack
@@ -223,27 +230,22 @@ JMPARR(gexec)case'X': {
       char n= 1; // number of arguments
       while(n-->0) {
         *p= cons(top, nil); top= *s; s--;
-        p= CDR(*p);
+        p= (void*)CDR(*p);
       }
       top= eval(cons(f, args), nil);
       goto next;
 
     } else if (ISBIN(f)) {
-      void* f= BINSTR(f);
+      char* fp= BINSTR(f);
       char n= 1; // TODO: extract number of arguments from function
-      alrun();
-      // TODO: like cc65 move to exit of function? esp for tail recursion?
-      // remove params from stack
-      s-= n;
-      top= s[1];
-
-      return;
+      alcall(n, fp); // TOOD: tailrecursion?
+      goto next;
 
     } else error1("AL.gcall: how to run", f);
     }
 
-  // make sure at least safe number, correct if in bounds and all nums
-  #define NUM_MASK 0xfffe
+// make sure at least safe number, correct if in bounds and all nums
+#define NUM_MASK 0xfffe
 JMPARR(ginc)case 'i': __AX__= top; asm("jsr incax2"); top= __AX__; goto next;
 JMPARR(ginc2)case 'j': top+= 2; goto next;
 
@@ -310,7 +312,7 @@ JMPARR(gloop)case'Z': pc= orig; goto call;
 
   // parameter a-h (warning need others for local let vars!)
 JMPARR(gvar)case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
-    *s++= top; top= frame[*pc-'a']; goto next;
+    *++s= top; top= frame[*pc-'a']; goto next;
 
 // 26.82s
 //  default : ++s; *s= MKNUM(*p-'0'); NEXT; 
@@ -321,8 +323,26 @@ JMPARR(gvar)case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
 JMPARR(gerr)default:
     printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
   }
-
 }
+
+// function to recursively call an alfunction, storing state
+// and restoring after call, and cleaning stack
+void alcall(char nparams, char* la) {
+  L *new_s= s-nparams+1, *old_frame= frame;
+  char old_c= c, *old_pc= pc;
+
+  if (verbose) printf("\n>>>> CALLING AL top $%04X = ", top); prin1(top); NL;
+  frame= new_s+1;
+  runal(la); // lol, it returns top, 
+  if (verbose) printf("<<<< RETURNED FROM AL top $%04X = ", top); prin1(top); NL; NL;
+
+  frame= old_frame;
+  c= old_c;
+  pc= old_pc;
+  s= new_s;
+}
+
+
 
 // TODO: do we recurse over differnt LA?
 
@@ -400,17 +420,32 @@ void alcompile() {
 
     if (isatom(x)) f= ATOMVAL(x);
     if (!f || !isnum(f)) { // 0== not primtive?
-      printf("\n%%TODO: funcall: "); prin1(x); printf(" => ATOMVAL $%04X = ", f); prin1(f); NL;
+      if (verbose) { printf("\n%%TODO: funcall: "); prin1(x); printf(" => ATOMVAL $%04X = ", f); prin1(f); NL; }
       if (iscons(f) && car(f)==lambda) {
         printf("LAMBDA!...\n");
       } else {
         if (ISBIN(f)) { // AL bytecode
+
+          n= 0;
+          while((c=nextc())!=')') {
+            alcompile();
+            ++n;
+          }
+
+          // one more...
+          // TODO: ?
+          //c= skipspc();
+          //if (c!=')') goto expectedparen;
+
+          // TODO: very check arguments
+          //printf("NNNN arguments=%d\n", n);
+          assert(n==1);
+
           // TODO: for now assume bytecode, otherwise asm...
           extra= 'X';
-          x= BINSTR(f);
+          x= f; // TODO: should be atom? no?
           goto quote;
           // TODO: hmmm...
-          if (skipspc()!='(') goto expectedparen;
         //} else if (isasm(x)) {
           //ALC('_');
           //ALW(asmaddress(x));
@@ -649,7 +684,7 @@ L alcompileread() {
 
   compileDC= 0;
   alcompile();
-  if (!b) return eof;
+  if (!b || b==1) return eof; // TODO: b==1 for ']' above
   if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
   ALC('^'); // all need to return & cleanup
   return mkbin(buff, b+1); // add one to additionally zero-terminate?

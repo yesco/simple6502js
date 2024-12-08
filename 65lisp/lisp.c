@@ -324,11 +324,17 @@
 #define MAXSYMLEN 120
 
 // ---------------- Lisp Datatypes
-
-//typedef int16_t L;
 typedef int16_t L;
 typedef uint16_t uint;
 typedef unsigned uchar;
+
+typedef L (*F0)();
+typedef L (*F1)(L a);
+typedef L (*F2)(L a, L b);
+typedef L (*F3)(L a, L b, L c);
+typedef L (*FN)(void* fp, L f, L args, L env);
+
+
 
 // --- Statisticss
 uint natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
@@ -1066,9 +1072,9 @@ void lprintf(char* f, L a) {
 }
 
 void error1(char* msg, L a) {
-  printf("%%ERROR: %s: ", msg);
+  printf("\n%%ERROR: %s: ", msg);
   if (num(a)>31 && NUM(a)<128) printf(" '%c' (%d) ptr=%04x", NUM(a), NUM(a), a);
-  else prin1(a);
+  else { printf(" ptr=%04x %s ", a, ISBIN(a)?"ISBIN":""); prin1(a); }
   NL;
   // TODO: have arg opt to quit on error?
   if (toploop) longjmp(toploop, 1);

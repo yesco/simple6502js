@@ -1,8 +1,13 @@
-#PROG=./65vm
+PROG=./65vm
 #PROG=./65lisp
 #PROG=./65asm
-PROG=./65jit
+#PROG=./65jit
 
+$PROG $* -E -e "(dc double (a) (+ a a)))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(double 2121)" -e "(+ 1 6)"
+echo "------------------------------------"
+(echo $* "(dc double (a) (+ a a)))"; echo "(+ 3 4)"; echo "(+ 2 5)"; echo "(double 3)"; echo "(+ 1 6)") | $PROG $* -E
+
+exit
 # ERRORNIOUS ON 65jit - why? codegen counting matching chars wrong?
 #$PROG $* -E -e "(cons 'a 'b)"
 
@@ -13,7 +18,6 @@ PROG=./65jit
 #$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))"
 
 #(echo "(setq double '(lambda (a) (+ a a)))"; echo "(+ 3 4)"; echo "(double 21)") | $PROG $* -E -e
-(echo "(setq double '(lambda (a) (+ a a)))"; echo "(+ 3 4)"; echo "(+ 2 5)"; echo "(double 21)") | $PROG $* 
 
 #$PROG $* -E -e "(setq double '(lambda (a) (+ a a)))" -e "(+ 3 4)" -e "(double 21)"
 
