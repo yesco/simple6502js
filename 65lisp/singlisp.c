@@ -121,19 +121,21 @@ D cons(D a, D d) { ++C; assert(C<CE); C->car= a; C->cdr= d; return (D)C; }
 //    car(atom) == global value
 
 // DO NOT ADD ANYTHING TO THIS! *A is an aligned array...
-typedef struct { D val; char* str; } Atom;  Atom *A;
+typedef struct { D val; char* str; } Atom;  Atom *A, *AE;
 
 // marker used to know when to strdup new atoms
 char initialized= 0;
 
 // linear search to find if have existing atom
-// 
-D atom(char* s) { Atom* x= (Atom*)nil;
+// (hashing is faster when having >~ 50 elements?)
+D atom(char* s) { Atom* x= (Atom*)nil; char c= *s;
   if (0==strcmp(s, "nil")) return nil; // special
-  while(s && ++x<=A) if (0==strcmp(x->str, s)) return (D)x;
-  // TODO: assert test out of slots for atom
-  ++A; A->val= nil; A->str= s?(initialized?strdup(s):s):(char*)nil; return (D)A;
+  // 12% faster, test first char first
+  while(s && ++x<=A) if (c==x->str[0] && 0==strcmp(x->str, s)) return (D)x;
+  ++A; assert(A<AE);
+  A->val= nil; A->str= s?(initialized?strdup(s):s):(char*)nil; return (D)A;
 }
+
 
 void terpri() { putchar('\n'); }
 
@@ -314,14 +316,15 @@ int main(int argc, char** argv) {
   // allocate memory, init special atoms
   CS= C= ((Cons*)callaign(MAXCONS, 3))-1; CE= CS+MAXCONS;
   nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
-  A= 1+(Atom*)nil; T= atom("T"); car(T)= T; QUOTE= atom("quote"); LAMBDA= atom("lambda");
+  A= 1+(Atom*)nil; AE= A+MAXATOM;
+  T= atom("T"); car(T)= T;  QUOTE= atom("quote"); LAMBDA= atom("lambda");
 
   // register primitives
   ++np; while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
   initialized= 1;
 
   // read-eval loop
-  while(!feof(stdin)) { printf("65> "); x= lread(); terpri();
+  while(!feof(stdin)) { printf("65> "); x= lread(); terpri(); 
     for(i=m; i; --i) r= eval(x, nil);
     princ(r); terpri();
   }
