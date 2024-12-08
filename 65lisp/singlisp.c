@@ -306,8 +306,8 @@ int main(int argc, char** argv) {
   m= 2000; // ((lambda (n) (+ n n)3)) x 2000 => 11.9s, 65EVAL: 26.83s, but it no closures...
   //m= 3000;
   m= 100;
-  m= 1;
   m= 50000; // standard test
+  m= 1;
 
   //assert(sizeof(Atom)==sizeof(Cons));
 
@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
 
   // register primitives
   ++np; while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
-  initalized= 1;
+  initialized= 1;
 
   // read-eval loop
   while(!feof(stdin)) { printf("65> "); x= lread(); terpri();
