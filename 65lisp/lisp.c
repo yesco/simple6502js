@@ -504,7 +504,6 @@ jmp_buf toploop= {0};
 void error(char* msg);
 void error1(char* msg, L a);
 
-
 // Type number to identify Heap OBJ
 #define HFREE   0xFE
 #define HATOM   0xA7
