@@ -344,85 +344,15 @@ void* zalloc(size_t n) {
 }
 
 
-// junk
-
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
 #include "extern-vm.c"
 
-// - https://github.com/cc65/cc65/blob/master/libsrc%2Fruntime%2Fldaxi.s
 
-
-//L fcdr(L c) { return isnum(c)? nil: CDR(c); }
-
-// 11.70521450042724609375 (fcar & fcdr in ASM!)
-
-//L fc3a4dr(L c) {
-//  __AX__= c;  fcdr();fcdr();fcdr();fcdr();fcar();fcar();fcar();  //top= __AX__;
-//  return __AX__;
-//}
-
-// -b -e 10 => 196.76s
-
-// FIB         149s
-// 65vm-asm:   386s
-// 
-
-//#define FIB
-
-int fib(int n) {
-  if (n==0) return n;
-  else if (n==1) return n;
-  else return fib(n-1) + fib(n-2);
-}
-
-int fibb(int n) {
-  return n==0?
-    n:
-    n==1?
-    n:
-    fib(n-1)+fib(n-2);
-}
-
-int fibbb(int n) {
-  return !n?
-    0:
-    !--n?
-    1:
-    fib(n)+fib(--n);
-}
-
-int fub(int a) {
-  int b= a+1,
-    c= b+1;
-  {
-    int d= a+b+c;
-    {
-      int e=a+b+c+d;
-      return e+9;
-      return e+10000;
-    }
-  }
-}
-
-int varbar= 4711;
-int bar(int a) {  
-  return varbar+a;
-}
-
-
-#ifdef TESTCOMPILER
-L inc(L i) { return i+2; }
-
-L fastcall inc2(L i) { asm("jsr incax2");
-  return __AX__; }
-#endif
-
-
-// special atoms
+// --- special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, DC, quote= 0;
 
 #define notnull(x) (x!=nil) // faster than !null
 #define null(x) (x==nil)    // crazy but this is 81s instead of 91s!
@@ -488,23 +418,25 @@ L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, quote= 0;
 uint ncell= 0;
 L *cell, *cnext, *cstart, *cend;
 
+
+
 L prin1(L); // forward TODO: remove
 
-// smaller!
+// --- MACROS - smaller!
 #define terpri() putchar('\n')
 #define NL terpri()
 
-// TODO: not happy, too much code add 550 bytes!?
 
 
 // --- ERROR
-
 jmp_buf toploop= {0};
 
 void error(char* msg);
 void error1(char* msg, L a);
 
-// Type number to identify Heap OBJ
+
+
+// --- Type number to identify Heap OBJ
 #define HFREE   0xFE
 #define HATOM   0xA7
 #define HARRAY  0xA6
@@ -513,92 +445,6 @@ void error1(char* msg, L a);
 #define HSLICE  0x51 // do you get it? ;-)
 
 #define HTYP(x) (*((char*)(((L)x)-1)))
-
-
-//#define HEAP
-#ifdef HEAP
-// ---------------- HEAP
-// TODO: Too much code === 550 bytes!!!!
-//
-// Heap of various variable size data for lisp types.
-
-// The OBJ are linked for use by mark() during GC.
-// Code needs to be added per type to the
-// mark() and sweep().
-//
-// Use 
-
-#define isobj(x) (((x)&0x03)==1)
-
-typedef struct OBJ {
-  // We put twolisp values first, this makes it
-  // safe to use CAR/CDR on the pointer
-  L info; // CAR: a link to used other lisp val
-  struct OBJ* next; // CDR: enumeration of all OBJ for GC marking
-  struct OBJ* prev; // to be able to unlink it from list :-(
-  void* origptr; // for free! :-(
-  char data[];
-} OBJ;
-
-OBJ* objList= NULL;
-
-// similar to isatom, actually atom is "subtype"
-// but little special.
-
-// Test if x lisp value is a OBJ of TYP.
-// 
-// If TYP is 0, then test not HFREE
-// This function is expensive, so last test?
-// if typ==0 return 
-char isTyp(L x, char typ) {
-  if (!isobj(x)) return 0;
-  return typ? HTYP(x)==typ: HTYP(x)!= HFREE;
-}
-
-OBJ* newObj(char typ, void* s, size_t z) {
-  // We add 4 bytes, one extra for type, and 3 to align
-  // If this is considered wasteful: don't use for small!
-  char *orig= (char*)malloc(z+sizeof(OBJ)+4), *p= orig;
-  OBJ *prev= objList, *o;
-  assert(orig);
-
-  // Prepend at least one type byte
-  do {
-    *p++= typ;
-    // align to 0x01
-  } while(!isobj((L)p));
-
-  o= (OBJ*)p;
-  o->origptr= orig;
-  o->info= nil;
-
-  // Hook it up
-  o->prev= NULL;
-  o->next= objList;
-  if (objList) {
-    assert(objList->prev);
-    objList->prev= o;
-  }
-  
-  memcpy(o->data, s, z);
-  
-  return o;
-}
-
-void forgetObj(L x) {
-  // TODO: verify valid obj?
-
-  // Unlink
-  OBJ *o= (OBJ*)x;
-  if (o->prev) o->prev->next= o->next;
-  if (o->next) o->next->prev= o->prev;
-  o->next= NULL;
-  o->prev= NULL;
-
-  HTYP(x)= HFREE;
-}
-
-#endif // HEAP
 
 // --- Numbers
 
@@ -632,6 +478,7 @@ L mknum(int n) {
 
   return MKNUM(n);
 }
+
 
 
 // ---------------- CONS
@@ -673,6 +520,8 @@ L car(L c)         { return iscons(c)? CAR(c): nil; }
 L cdr(L c)         { return iscons(c)? CDR(c): nil; }
 L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
+
+
 
 // --- Atoms / Symbols / Constants
 // 
@@ -750,12 +599,7 @@ Atom* findatom(Atom* a, char* s, uchar typ) {
   return NULL;
 }
 
-// TODO: optimize for program constants!
-//   (just store \0 + pointer!)
-// TODO: should use nil() test everywhere?
-//   and make "nil" first atom==offset 0!
-//   (however, I think increase codesize lots!)
-//
+
 // Looks up an atom of NAME and returns it
 // 
 // If already exists, return that
@@ -764,6 +608,17 @@ Atom* findatom(Atom* a, char* s, uchar typ) {
 // TYP: use this type code to match and create
 //   (This means an ATOM and "STRING" could both exist)
 // LEN: if len==0 is ATOM or STRING, otherwise mallocced
+//
+// Also used for binary arrays/alcode/asmcode
+// see atom(), funatom(), mkstr(), mkbin()
+
+
+// TODO: optimize for program constants!
+//   (just store \0 + pointer!)
+// TODO: should use nil() test everywhere?
+//   and make "nil" first atom==offset 0!
+//   (however, I think increase codesize lots!)
+//
 L atomstr(char* s, uchar typ, size_t len) {
   char h;
   Atom *a;
@@ -1782,6 +1637,7 @@ char* names[]= {
   // nargs
   ":2de",
   ":2setq", // TODO: not right for "VM"
+  ":3dc",
   "!2set",
   //"; df",
 
@@ -1882,6 +1738,7 @@ closure= atom("closure");
      IF= atom("if");
     AND= atom("and");
      OR= atom("or");
+     DC= atom("dc");
 
   // register function names
   // TODO: funatom()

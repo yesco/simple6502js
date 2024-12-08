@@ -1,5 +1,8 @@
 %currently not used by lisp.c, therefore moved out here...
 
+// TODO: not happy, too much code add 550 bytes!?
+
+
 //#define HEAP
 #ifdef HEAP
 // ---------------- HEAP

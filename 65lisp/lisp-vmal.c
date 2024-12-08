@@ -154,7 +154,8 @@ extern L runal(char* la) {
 
   // using goto next instead of NNEXT cost 1% more time but saves 365 bytes!
 
-  switch(*++pc) {
+  c= *++pc;
+  switch(c) {
 
   // inline AD cons-test: 14% faster, 2.96s with isnum => safe,
   // otherwise 2.92s (/ 2.96 2.92)=1.5% overhead
@@ -202,32 +203,44 @@ JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
 JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 JMPARR(gsemis)case ';': *++s= top; top= *(L*)++pc; top= ATOMVAL(top); pc+= sizeof(L)-1; goto next;
 JMPARR(gsetq)case ':': setval(*(L*)++pc, top, nil); pc+= sizeof(L)-1; goto next;
-JMPARR(gcall)case '_': {
-      L f= *(L*)++pc; pc+= sizeof(L)-1;
-      printf("EVAL: "); prin1(top); NL;
+JMPARR(gcall)case '_': { void* f= *(L*)++pc; pc+= sizeof(L)-1;
+      char n= 1; // TODO: extract number of arguments from function
+      D a, b;
+      // move elements to C call stack:
+      if (n==0) { top= ((F0)f)();          goto next; }
+      if (n==1) { top= ((F1)f)(top);       goto next; } else a= *s; --s;
+      if (n==2) { top= ((F2)f)(a, top);    goto next; } else b= *s; --s;
+      if (n==3) { top= ((F2)f)(b, a, top); goto next; }
+      // TODO: ... n==8 ??? lots of code, lol
+      error1("AL.gexec too many args", mknum(n));
+      
+JMPARR(gexec)case'X': {
+    L f= top; --s;
+      
+    if (iscons(f)) { // LAMBDA
+      // pop enough elements from stack
+      L args= nil, *p= &args;
+      char n= 1; // number of arguments
+      while(n-->0) {
+        *p= cons(top, nil); top= *s; s--;
+        p= CDR(*p);
+      }
+      top= eval(cons(f, args), nil);
+      goto next;
 
-      // --- APPLY
-      if (iscons(f)) {
-        // pop enough elements from stack
-        L args= nil, *p= &args;
-        char n= 1;
-        while(n-->0) {
-          *p= cons(top, nil); top= *s; s--;
-          p= CDR(*p);
-        }
-        top= eval(cons(f, args), nil);
-        // TODO: reclaim, at least last cons, the others...? might be stored...! &rest
-      } else if (ISBIN(f)) {
-        // TODO: can we "pretend" s is our stack in machine code?
-        // (need to grow down...)
-        error("eval.bin: ");
-      // } else if (isasm(f)) {
-      //}
-      } else error("AL.run: how to run?\n");
+    } else if (ISBIN(f)) {
+      void* f= BINSTR(f);
+      char n= 1; // TODO: extract number of arguments from function
+      alrun();
+      // TODO: like cc65 move to exit of function? esp for tail recursion?
+      // remove params from stack
+      s-= n;
+      top= s[1];
 
-      printf("==> "); prin1(top); NL;
+      return;
+
+    } else error1("AL.gcall: how to run", f);
     }
-    goto next; // TODO: handle VM
 
   // make sure at least safe number, correct if in bounds and all nums
   #define NUM_MASK 0xfffe
@@ -344,6 +357,8 @@ char buff[250];
 //#define ALW(n) do { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); } while(0)
 void ALW(int n) { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); }
 
+char compileDC= 0;
+
 // reads a single lisp function s-exp from stdin
 // LIMITATIONS: can only compile one "function" at a time
 void alcompile() {
@@ -385,10 +400,23 @@ void alcompile() {
 
     if (isatom(x)) f= ATOMVAL(x);
     if (!f || !isnum(f)) { // 0== not primtive?
-      prin1(x); printf("\t=> TODO: funcall.... X ?? ATOMVAL: %04X ", f); prin1(f); NL;
+      printf("\n%%TODO: funcall: "); prin1(x); printf(" => ATOMVAL $%04X = ", f); prin1(f); NL;
       if (iscons(f) && car(f)==lambda) {
         printf("LAMBDA!...\n");
-      } else error("ALC: Need funcall");
+      } else {
+        if (ISBIN(f)) { // AL bytecode
+          // TODO: for now assume bytecode, otherwise asm...
+          extra= 'X';
+          x= BINSTR(f);
+          goto quote;
+          // TODO: hmmm...
+          if (skipspc()!='(') goto expectedparen;
+        //} else if (isasm(x)) {
+          //ALC('_');
+          //ALW(asmaddress(x));
+          //if (skipspc()!='(') goto expectedparen;
+        } else error1("HOW TO FUNCALL - non bin", f);
+      }
       bf= 0;
     } else {
       // get the byte code token
@@ -403,6 +431,58 @@ void alcompile() {
 
     if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", bf, bf); }
  
+    // DefineCompile to al bytecode
+    if (x==DC) {
+      L name;
+
+      assert(!compileDC);
+      
+      // - read name
+      name= lread();
+      assert(isatom(name));
+      printf("DEFINING: "); prin1(name); NL;
+      
+      // - parse (count) parameters
+      compileDC= 1;
+
+      // TODO: handle catchall?
+      if (skipspc()!='(') goto expectedparen;
+      do {
+        x= lread();
+        assert(isatom(x));
+        printf("  PARAM %d: >", n); prin1(x); putchar('<'); NL;
+        { char* p= ATOMSTR(x);
+          assert(strlen(p)==1);
+          assert(*p=='a'+compileDC-1);
+        }
+        ++compileDC;
+      } while(skipspc()!=')'); // TODO: eof?
+      assert(compileDC<=1+8); // max 8 params (?)
+
+      // - parse body
+      // (remove ], why is it there?) TODO:
+      b= 0;
+      buff[0]= 0;
+
+      // TODO: should this just be a funciton of parsing a (n expliecit) lambda?
+      // TOOD: this is duplicated from alcompileread
+      alcompile();
+      assert(b);
+      ALC('^');
+      x= mkbin(buff, b+1);
+
+      printf("  BODY= "); prin1(x); NL;
+      b= 0;
+
+      // end DC
+      c= skipspc();
+      if (c!=')') goto expectedparen;
+      
+      // - define and store function
+      setval(name, x, nil);
+      return;
+    }
+
     // IF special (if EXPR THEN ELSE) => EXPR I ] THEN { ] ELSE }
     if (x==IF) {
       // inserts spaces at end of THEN and ELSE to allow promote implicit RETURN
@@ -490,7 +570,7 @@ void alcompile() {
     }
 
     // GENERIC argument compiler
-    printf("F='%c' (%d)\n", bf, bf);
+    if (verbose) printf("F='%c' (%d)\n", bf, bf);
     while((c=nextc())!=')') {
       ++n;
       alcompile();
@@ -514,6 +594,7 @@ void alcompile() {
     // it's a user defined function/compiled
     assert(isatom(f)); // TODO: handle lisp/s-exp
 
+    // ??? ')'
     extra= ')';
     unc(c);
     x= 0xbeef;
@@ -554,7 +635,7 @@ void alcompile() {
   return;
 
  expectedparen: // used twice
-  error1("ALC.expected ) got", c);
+  error1("ALC.expected ')' got lisp", c);
 }
 
 L alcompileread() {
@@ -566,6 +647,7 @@ L alcompileread() {
   // if not function
   ALC(']'); // TODO: is this the right way to say ax contains nothing of value?
 
+  compileDC= 0;
   alcompile();
   if (!b) return eof;
   if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
