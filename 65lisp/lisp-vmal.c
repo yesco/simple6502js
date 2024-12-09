@@ -34,7 +34,7 @@ static char c, *pc;
 #endif // ZEROPAGE
 
 // ignore JMPARR usage, uncomment to activate
-#define JMPARR(a) 
+//#define JMPARR(a) 
 
 // just including the code
 #ifdef ASM
@@ -71,7 +71,54 @@ extern L runal(char* la) {
 
   char n=0;
 #ifndef JMPARR
-  static void* jmp[127]= {(void*)(int*)42,0};
+  //static void* jmp[127]= {(void*)(int*)42,0};
+  static void* jmp[127]= {
+/*
+    // 00-07
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 08-0F
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 10-07
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 18-1F
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 20-27: > !"#$%&'<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    //&&gbl,&&gft,
+    // 28-2F: >()*+,-./<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 30-37: >01234567<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 38-3F: >89:;<=>?<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 40-47: >@ABCDEFG< 
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 48-4F: >HIJKLMNO<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    
+    // 50-57: >PQRSTUVW<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 58-5F: >XYZ[\]^_<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 60-67: >`abcdefg<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 68-6F: >hijklmno<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+
+    // 70-77: >pqrstuvw<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,&&gbl,
+    // 78-7F: >xyz{|}~/<
+    &&gbl,&&gbl,&&gbl,&&gbl, &&gbl,&&gbl,&&gbl,//&&gbl, // MAX: 127!
+*/
+    (void*)(int)42,
+//    &&gA,&&gD,0,
+    //&&gbl,
+  };
 #endif
 
   char* orig= la; // global 10% faster
@@ -98,22 +145,27 @@ extern L runal(char* la) {
     jmp['P']=&&gP;
     jmp['Y']=&&gY;
     jmp['!']=&&gset;
-    //jmp[':']=&&gsetq;
+    jmp[':']=&&gsetq;
     jmp[';']=&&gsemis;
     
-    jmp['I']=&&gif; jmp['{']==&&gelse; jmp['}']==&&gendif;
+    jmp['I']=&&gif;
+// TOOD: compiler failure!
+    jmp['{']=&&gelse;
+// TOOD: compiler failure!
+//    jmp['}']=&&gendif;
+    jmp['}']=&&next;
 
-    //printf("FISH\n");
-
-    jmp['[']=&&gbl;
-    jmp[']']=&&gbl;
+    jmp['[']=&&next;
+    jmp[']']=&&next;
 
     for(c='0'; c<='9'; ++c) jmp[c]= &&gdigit;
     for(c='a'; c<='h'; ++c) jmp[c]= &&gvar;
 
-    jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
+// TOOD: compiler failure! - Can't handle label/call that is optimimized away cc65 bug!
+//    jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&gbl;
+    jmp[' ']=jmp['\t']=jmp['\n']=jmp['\r']=&&next;
 
-    jmp['9']= &&gnil; // lol
+    jmp['9']=&&gnil; // lol
 
     // play
     jmp['i']= &&ginc;
@@ -143,8 +195,8 @@ extern L runal(char* la) {
 
 // inline this and it costs 33 byters extra per time... 50 ops= 1650 bytes... 
 
-//#define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
-#define NNEXT goto next;
+#define NNEXT NOPS(++nops;);c=*++pc;goto *jmp[c]
+//#define NNEXT goto next;
 
 //#undef NNEXT
 //#define NNEXT goto next
@@ -274,7 +326,10 @@ JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 // TODO: replace by jmps? This doesn't nest, lol
 JMPARR(gif)   case 'I': if (null(top)) while(*pc!='{') ++pc;  goto next;
 // TODO: it goes very badly wrong here, onlyi works if THEN==(return ....) !!!!
-JMPARR(gelse) case '{': while(*pc!='}') ++pc;  goto next; // TODO: doesn't work for NESTED!!!!???
+JMPARR(gelse) case '{':
+    pc+= 0; // LOL, without this line, cc65 optimizes away this bracnh and gives error for gelse!!! cc65 bug!
+    while(*pc!='}') ++pc;  goto next; // TODO: doesn't work for NESTED!!!!???
+
 JMPARR(gendif)case '}': goto next;
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
