@@ -666,20 +666,27 @@ void alcompile() {
 
     // GENERIC argument compiler
     if (verbose) printf("F='%c' (%d)\n", bf, bf);
-    while((c=nextc())!=')') {
-      ++n;
-      //printf("--->COMPILE %c\n", bf);
-      alcompile();
-      //printf("<---COMPILE %c\n", bf);
-      // implicit FOLDL of nargs + - L ! LOL
-      // TODO: handle non isnum
-      if (bf>0 && n>=2 && bf<255 && bf!='R' && bf!='Z') {ALC(bf);--n;/*printf("---FOLDL--- '%s'\n", buff);*/}
+    {
+      char calledF= 0;
+      while((c=nextc())!=')') {
+        ++n;
+        //printf("--->COMPILE %c\n", bf);
+        alcompile();
+        //printf("<---COMPILE %c\n", bf);
+        // implicit FOLDL of nargs + - L ! LOL
+        // TODO: handle non isnum
+        if (bf=='+' || bf=='-' || bf=='*' || bf=='/' || bf=='C')
+          if (bf>0 && n>=2 && bf<255 && bf!='R' && bf!='Z') {
+            ALC(bf);--n;
+            calledF=1;
+          }
+      }
+
+      // TODO: Fix this mess, lol because we don't know nparam... yet!
+      if (!calledF && bf>0) ALC(bf);
+      else if (bf>0 && bf<255 && n>1) { ALC(bf); n-=2; break; }
+
     }
-
-    // TODO: Fix this mess, lol because we don't know nparam... yet!
-    if (bf>0 && bf<255 && n>1) { ALC(bf); n-=2; break; }
-    if (bf=='R' || bf=='Z') ALC(bf);
-
     // TODO: merge with quote?
     if (!isnum(f)) {
       printf("Compile: call lambda: "); prin1(f); NL;

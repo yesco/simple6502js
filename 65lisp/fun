@@ -3,16 +3,16 @@ PROG=./65vm
 #PROG=./65asm
 #PROG=./65jit
 
-#$PROG $* -E -e "(dc down (a) (if (= a 0) 42 (recurse (- a 1))))" -e "(down 10)"
-#exit 1
+$PROG $* -E -e "(dc down (a) (if (= a 0) 42 (recurse (- a 1))))" -e "(down 10)"
+exit 1
 
 
-$PROG $* -E -e "(dc double (a) (+ a a)))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(double 2121)" -e "(+ 1 6)"
-echo "------------------------------------"
+#$PROG $* -E -e "(dc double (a) (+ a a)))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(double 2121)"
+#echo "------------------------------------"
 #$PROG $* -E -e "(dc fib (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2)))))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(fib 8)" -e "(+ 1 6)"
-$PROG $* -E -e "(dc fib (a) (if (< a 2) (return a) (+ (recurse (- a 1)) (recurse (- a 2)))))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(fib 4)" -e "(+ 1 6)"
-$PROG $* -E -e "(dc fib (a) (if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2))))))" -e "(+ 3 4)" -e "(cons (fib 0) (cons (fib 1) (cons (fib 2) (cons (fib 3) (cons (fib 4) (cons (fib 5) (cons (fib 6) (cons (fib 7) (cons (fib 8) nil)))))))))" -e "(cons 2 3)"
-echo "------------------------------------"
+#$PROG $* -E -e "(dc fib (a) (if (< a 2) (return a) (+ (recurse (- a 1)) (recurse (- a 2)))))" -e "(+ 3 4)" -e "(+ 2 5)" -e "(fib 4)" -e "(+ 1 6)"
+#$PROG $* -E -e "(dc fib (a) (if (< a 2) (return a) (return (+ (recurse (- a 1)) (recurse (- a 2))))))" -e "(+ 3 4)" -e "(cons (fib 0) (cons (fib 1) (cons (fib 2) (cons (fib 3) (cons (fib 4) (cons (fib 5) (cons (fib 6) (cons (fib 7) (cons (fib 8) nil)))))))))" -e "(cons 2 3)"
+#echo "------------------------------------"
 #(echo $* "(dc double (a) (+ a a)))"; echo "(+ 3 4)"; echo "(+ 2 5)"; echo "(double 3)"; echo "(+ 1 6)") | $PROG $* -E
 
 exit
