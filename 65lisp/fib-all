@@ -1,5 +1,9 @@
 ./65lisp -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
-./65vm   -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
+./65vm   -e "(dc fib (a) (if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2)))))" -e "(fib 8)"
+# TODO: ASM
 ./65asm  -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -e "(fib 8)"
-(echo "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" ; "(fib 8)") | ./r singlisp
+(echo "(set 'fib (lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" ; echo "(fib 8)") | ./r singlisp
 
+echo "--------------BENCH--------------------"
+./65lisp -e "(set 'fib '(lambda (a) (if (< a 2) a (+ (fib (- a 1)) (fib (- a 2))))))" -b -e "(fib 8)"
+./65vm   -e "(dc fib (a) (if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2)))))" -b -e "(fib 8)"

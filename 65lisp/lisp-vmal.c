@@ -274,11 +274,7 @@ JMPARR(gY)case 'Y': top= sread(ISSTR(top)? ATOMSTR(top): 0);
 // TODO: replace by jmps? This doesn't nest, lol
 JMPARR(gif)   case 'I': if (null(top)) while(*pc!='{') ++pc;  goto next;
 // TODO: it goes very badly wrong here, onlyi works if THEN==(return ....) !!!!
-JMPARR(gelse) case '{': printf("----%s\n", pc); while(*pc!='}') {
-printf("SKIP: %c\n", *pc); // TODO: remove and stack get wonky??!??!?!?! wtf
-++pc;
-}
-  goto next; // TODO: somehow the stack is messed up here!
+JMPARR(gelse) case '{': while(*pc!='}') ++pc;  goto next; // TODO: doesn't work for NESTED!!!!???
 JMPARR(gendif)case '}': goto next;
 
   // single digit, small number, very compact (27.19s, is faster than isdigit in default)
@@ -293,7 +289,12 @@ JMPARR(g0)case 0:
 
 
 // --- Recursion, TailCall, Iterate, Function Call
-JMPARR(grec)case'R': if (pc[1]!='^') {
+JMPARR(grec)case'R':
+    alcall(1, orig);
+    goto next;
+    
+// not working correctly...
+ if (pc[1]!='^') {
       // Self recursion
       // (parameters already on stack)
       { L *saveframe= frame, *savestk= s; char* savepc= pc;
@@ -331,11 +332,14 @@ void alcall(char nparams, char* la) {
   L *new_s= s-nparams+1, *old_frame= frame;
   char old_c= c, *old_pc= pc;
 
-  if (verbose) printf("\n>>>> CALLING AL top $%04X = ", top); prin1(top); NL;
+  //L old= top;
+
+  //if (verbose) printf("\n>>>> CALLING AL top $%04X = ", top); prin1(top); NL;
   frame= new_s+1;
   runal(la); // lol, it returns top, 
-  if (verbose) printf("<<<< RETURNED FROM AL top $%04X = ", top); prin1(top); NL; NL;
+  //if (verbose) printf("<<<< RETURNED FROM AL top $%04X = ", top); prin1(top); NL; NL;
 
+  //printf("!!!!! FIB("); prin1(old); printf(") => "); prin1(top); NL;
   frame= old_frame;
   c= old_c;
   pc= old_pc;
@@ -371,6 +375,7 @@ L al(char* la) {
 unsigned char b;
 char buff[250];
 
+//#define ALC(c) do { buff[b]=(c); ++b; printf("\n>>>> %c\n", (c)); } while(0)
 #define ALC(c) do { buff[b]=(c); ++b; } while(0)
 
 // 25857 -> 25793 (- 25793 25857) = 64 bytes saved
@@ -608,12 +613,17 @@ void alcompile() {
     if (verbose) printf("F='%c' (%d)\n", bf, bf);
     while((c=nextc())!=')') {
       ++n;
+      //printf("--->COMPILE %c\n", bf);
       alcompile();
+      //printf("<---COMPILE %c\n", bf);
       // implicit FOLDL of nargs + - L ! LOL
       // TODO: handle non isnum
       if (bf>0 && n>=2 && bf<255 && bf!='R' && bf!='Z') {ALC(bf);--n;/*printf("---FOLDL--- '%s'\n", buff);*/}
     }
+
+    // TODO: Fix this mess, lol because we don't know nparam... yet!
     if (bf>0 && bf<255 && n>1) { ALC(bf); n-=2; break; }
+    if (bf=='R' || bf=='Z') ALC(bf);
 
     // TODO: merge with quote?
     if (!isnum(f)) {
