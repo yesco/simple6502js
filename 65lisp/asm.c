@@ -152,13 +152,11 @@
 
 
 
-typedef int (*F1)(int);
-typedef int (*F0)();
-typedef void (*F)();
-
-
-
 #ifdef TEST
+  typedef int (*F1)(int);
+  typedef int (*F0)();
+  typedef void (*F)();
+
   typedef int16_t L;
   typedef uint16_t uint;
   typedef unsigned uchar;
@@ -975,6 +973,8 @@ void promoteReturn(char* bc) {
 
 // TODO: redo to make everything JSR/JMP asm, even lisp,
 // similar to FORTH threading.
+long sum= 0;
+
 L al(char* la) {
   int xx= 4711;
   L r= nil;
@@ -1025,6 +1025,9 @@ L al(char* la) {
       //((F)gen)();
     }
     
+    //printf("one %d => %d %ld \n", n, NUM(r), sum);
+    sum+= NUM(r);
+
     // DEBUG
     if (0 && xx!=4711) {
       // TODO:doesn't work
@@ -1035,6 +1038,8 @@ L al(char* la) {
     }
 
   }
+
+  printf("SUM=%ld\n", sum);
 
   // TODO: bad hack, lisp.c epxects bench to be counted
   bench= 0;

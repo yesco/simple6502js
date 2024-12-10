@@ -205,7 +205,10 @@ extern L runal(char* la) {
   //printf("\t\tTOP="); prin1(top); NL;
 
 // TODO: hmm, needed for VM with JMP?
-//  NNEXT;
+// TODO: bug, crash when run/defined function...
+//
+  NNEXT;
+//
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
 
@@ -430,8 +433,16 @@ L al(char* la) {
 unsigned char b;
 char buff[250];
 
-//#define ALC(c) do { buff[b]=(c); ++b; printf("\n>>>> %c\n", (c)); } while(0)
-#define ALC(c) do { buff[b]=(c); ++b; } while(0)
+#if 1
+  //#define ALC(c) do { buff[b]=(c); ++b; printf("\n>>>> %c\n", (c)); } while(0)
+  #define ALC(c) do { buff[b]=(c); ++b; } while(0)
+#else
+  #define ALC(c) do { \
+    if ((c)!='[' && (c)!=']') { \
+      buff[b]=(c); ++b; \
+    } \
+  } while(0)
+#endif
 
 // 25857 -> 25793 (- 25793 25857) = 64 bytes saved
 //#define ALW(n) do { c= (n)&0xff; ALC(c); c= ((unsigned int)n) >> 8; ALC(c); } while(0)

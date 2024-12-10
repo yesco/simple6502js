@@ -1072,7 +1072,7 @@ void lprintf(char* f, L a) {
 }
 
 void error1(char* msg, L a) {
-  printf("%%ERROR: %s: ", msg);
+  printf("\n%%ERROR: %s: ", msg);
   if (num(a)>31 && NUM(a)<128) printf(" '%c' (%d) ptr=%04x", NUM(a), NUM(a), a);
   else { printf(" ptr=%04x %s ", a, ISBIN(a)?"ISBIN":""); prin1(a); }
   NL;
