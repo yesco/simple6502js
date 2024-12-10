@@ -2,15 +2,15 @@ Best viewed using ./presentation hack...
 (basically >> less -c -r -R -p page "$@" )
 
 [H[2J[3J
-page 1   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 1   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 Jonas S Karlsson, Swede in exile (28 years)
 
 Lived	: Sweden, Linkoping, Stockholm, Berlin, Amsterdam, Silicon Valley, San Francisco, Sydney, Hong Kong, Shanghai/Beijing/China, Bangkok
 
-Worked	: ISO-software startup, Technical University of Linkoping (MSc/Lic), CWI Mathematical Research Institute (PhD), IBM (DB2 Everyplace), Google ("Google Megastore")
+Worked	: ISO-software startup, Technical University of Linkoping (MSc/Lic), CWI Mathematical Research Institute (PhD), IBM (DB2 Everyplace), Google (ADS, "Google Megastore")
 
-Likes	: (HK) Milktea, Lasagna, Programming, Kaya Sandwhiches, Cider, Sex, Mah Lai Goh, Tai Chi, Motorcycle - WROOM, Porn, Gong Fu Cha, Cheese, Computers, ESP-32, !Arduino, Embedded Systems, Electronics, C Programming, Lisp, Forth, Make You Own (Programming) Languages, Minimalism
+Likes	: (HK) Milktea, Lasagna, Programming, Kaya Sandwhiches, Cider, Database Kernels, Sex, Mah Lai Goh, Tai Chi, Writing Interpreters, Motorcycle - WROOM, Porn, Gong Fu Cha, Cheese, Computers, ESP-32, !Arduino, Embedded Systems, Electronics, C Programming, Lisp, Forth, Make You Own (Programming) Languages, Minimalism
 
 
 
@@ -68,7 +68,7 @@ Likes	: (HK) Milktea, Lasagna, Programming, Kaya Sandwhiches, Cider, Sex, Mah La
 
 
 [H[2J[3J
-page 2   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 2   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 CPU 6502 - A Home Computer Revolution!
 
@@ -126,7 +126,184 @@ CPU 6502 - A Home Computer Revolution!
 
 
 [H[2J[3J
-page 3   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 3   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+Programming
+- BASIC (16K ROM)
+- assembly (by hand)
+
+ORIC ATMOS
+- 48K (64K RAM)
+- 16K BASIC ROM
+- 28x40 "teletext" attribute screen
+- 200x240 graphics
+
+NEW!
+- C compilers, 10-100x faster code
+- crosscompilation on PC/linux -> "tape-file", disk-image
+- run/test in emulator
+- transfer to actual machine, USB-device/flash etc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 4   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+
+
+                 _____ ____   ___   ___   ___   ___  
+                |___  | ___| / _ \ / _ \ / _ \ / _ \ 
+                   / /|___ \| | | | | | | | | | | | |
+                  / /  ___) | |_| | |_| | |_| | |_| |
+                 /_/  |____/ \___( )___/ \___/ \___/ 
+                                 |/                  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 5   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+W H Y   L I S P ?
+
+- oldest
+
+- small
+
+- powerful
+
+- symbolic
+
+- 3 data types!
+
+- interactive
+
+- functional
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 6   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 LISP
 
@@ -136,7 +313,7 @@ LISP
 65> (+ 2 (* 2 2 2) 7)
 17
 
-65> (de (double n) (+ n n))
+65> (define (double n) (+ n n))
 65> (double 3)
 6
 
@@ -148,10 +325,12 @@ double
 65> (cdr (cons 'double 'trouble))
 trouble
 
+65> (list 'double 3)
+(double 3)
 65> (eval (list 'double 3))
 6
 
-65> (de (iota a b)
+65> (define (iota a b)
       (if (> a b) nil
         (cons a (iota (+ a 1) b))
 
@@ -206,7 +385,7 @@ trouble
 
 
 [H[2J[3J
-page 4   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 7   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 "The Maxwell Equations for Software" - Alan Kay
 
@@ -217,26 +396,25 @@ page 4   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
         ((eq 'cons fn) (cons (car x) (cadr x)))
         ((eq 'atom fn) (atom (car x)))
         ((eq 'eq fn) (eq (car x) (cadr x)))
-        ((eq 'lambda (car fn)) (eval (caddr fn) (pairlis (cadr fn) x env)))
+        ((eq 'lambda (car fn)) (eval (caddr fn) (evlist (cadr fn) x env)))
         (T (apply (eval fn env) x env)))
 
 (de (eval e env)
   (cond ((atom e) (assoc e env))
         ((eq 'quote (car e)) (cadr e))
-        ((eq 'cond (car e))  (evcon (cdr e) env))
+        ((eq 'cond (car e))  (envcon (cdr e) env))
         (T (apply (car e) (evlis (cdr e) env) env))))
 
 (de (envcon c env)
   (cond ((eval (caar c) env) (eval (cadar c) env))
         (T (evcon (cdr c) env))))
 
-(de (evlis m a)
+(de (evlist m env)
   (cond ((null m) nil)
         (T (cons (eval (car m) env) (evlis (cdr m) env)))))
 
 * www.righto.com/2008/07/maxwells-equations-of-software-examined.html
-* from original - Lisp 1.5 manual McCarthy
-* in python - http://norvig.com/lispy.html
+* from original - Lisp 1.5 manual McCarthy * in python - http://norvig.com/lispy.html
 
 
 
@@ -290,7 +468,7 @@ page 4   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
 
 
 [H[2J[3J
-page 5   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 9   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 How to write a LISP for 6502?
 
@@ -300,12 +478,19 @@ How to write a LISP for 6502?
   - difficult to write
 
 * CC65 it's pretty complete C compiler
+  - standard compliant
+  - good libarires
+  - many platforms
+  - relative small code (jsr jsr jsr)
   - slow code (10x?)
   - 10x faster than BASIC, lol
   - how to squeeze out the most?
 
-
-
+( gcc-6502 - halfbaked - often really good
+  LLVM-MOS - clang "retrofitted" - somewhat active
+  vbcc     - seems ok, generates large fast code,
+  kickc    - fast but sometimes wrong?
+  Oscar 64 - VIC 64 etc, latest kid on the block )
 
 
 
@@ -353,19 +538,19 @@ How to write a LISP for 6502?
 
 
 [H[2J[3J
-page 6   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 10   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 L eval(L x, L env) {
-  if (x==nil) return nil;
-  if (isatom(x)) return cdr(assoc(x, env));
-  if (isnum(x)) return x;
-  return apply(car(x), cdr(x), env);
+  if (x==nil) return nil;                         
+  if (isnum(x)) return x;                                      isnum
+  if (isatom(x)) return cdr(assoc(x, env));         isatom,cdr,assoc
+  return apply(car(x), cdr(x), env);                             car
 }
 
 L apply(L f, L x, L env) {
-  if (f==CAR) return car(cdr(a));
-  if (f==CDR) return cdr(cdr(a));
-  if (f==CONS) return cons(car(x), car(cdr(x)));
+  if (f==CAR) return car(cdr(x));                               atom
+  if (f==CDR) return cdr(cdr(x));
+  if (f==CONS) return cons(car(x), car(cdr(x)));                cons
   if (f==EQ) return car(x)==car(cdr(x))? T: nil;
   if (f==PLUS) return car(x)+car(cdr(x));
   if (f==LAMBDA) return eval(
@@ -427,16 +612,161 @@ L assoc(L a, L env) {
 
 
 [H[2J[3J
-page 7   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 11   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+GOALS
+
+- minimal overhead integer math (add/plus, lol)
+
+- minimal memory usage
+
+- as fast as possible
+
+
+MEANS
+
+- no allocation of integers (store in pointer!)
+
+- type-tagged pointers
+
+- "compilation" (bytecode... asm?)
+
+
+USUALLY
+
+- 16 bytes ALIGNED malloc:ed pointers
+  x   x   x   x   - - -   x   x   x   x      0   0   0   0  cons
+  i   i   i   i   - - -   i   i   i   i      0   0   0   1  integer
+  i   i   i   i   - - -   i   i   i   i      0   0   0   1  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 12   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+
+- 15 bit integers ALIGNED                         i % 2 = 0
+
+---------------------------------   ---------------------------------
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | 0 |
+---------------------------------   ---------------------------------
+
+
+- 16 bit pointer to symbols MIS-ALIGNED           p % 4 = 1
+
+---------------------------------   ---------------------------------
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | 0 | 1 |
+---------------------------------   ---------------------------------
+
+
+- 16 bit pointer to cons-pair MIS-ALIGNED         p % 4 = 3
+
+---------------------------------   ---------------------------------
+|   |   |   |   |   |   |   |   |   |   |   |   |   |   |   | 1 | 1 |
+---------------------------------   ---------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 13   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 // Nitty gritty C memory stuff, cheat
 
 typedef uint16_t L;
 
-L cell[MAXCELLS]= {0};
-L *C= (L*)(((char*)cell)+3); // "misalign"
+#define mknum(n) ((n)<<1)      // xxxx 0
+#define isnum(n) (((n)&1)==0)  // xxxx 0
 
-#define iscons(n) (((n)&3)==3) // xxxx11
+#define isatom(n) (((n)&3)==1) // xxx 01
+#define iscons(n) (((n)&3)==3) // xxx 11
+
+
+L cell[MAXCELLS+2]= {0}, *CEND=cell+MAXCELLS;
+L *C= (L*)(((char*)cell)+3); // "misalign" x11
 
 // Every cons on 4 increments!
 L cons(L a, L d) {
@@ -447,20 +777,16 @@ L cons(L a, L d) {
 #define car(c) (*(c))
 #define cdr(c) (c[1])
 
-#define mknum(n) ((n)<<1)      // xxxx0
-#define isnum(n) (((n)&1)==0)  // xxxx0
 
-#define isatom(n) (((n)&3)==1) // xxx01
-
-char *atoms[MAXATOM]= {0};
-char **A= (char**)(((char*)atoms)+1); // misalign
+char** A= (L*)(((char*)CEND)+1); // "misalign" x01
 
 L atom(char* s) {
   char** x;
-  for(x= atoms; x<atoms; ++x)
-    if (0==strcmp(*x, s)) return x;
-  *atoms++= s; // or strdup(s); ?
-  return atoms-1;
+  for(x= A; x<CEND; x+=2)
+    if (0==strcmp(*x, s)) return (L)x;
+  --A= nil; // global value of atom
+  *--A= strdup(s); // hmm?
+  return (L)A;
 }
 
 
@@ -513,23 +839,28 @@ L atom(char* s) {
 
 
 [H[2J[3J
-page 8   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 14   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
-Performance on 6502?
+LISP Results
 
 * Slow, but workable
-* Need a GC (I have)
-* Experiment with a compiler and byte-code VM?
 
-65> (car (car (car (cdr (cdr (cdr (cdr (quote (1 2 3 4 ((5 6) 7) 8)))))))))
+* lisp       - GC runs hot during function calls
+* byte-code  - function calls - NO GC
+* asm        -                  NO GC
+* JIT        -                  NO GC
 
- EVAL  -   856 ops/s        0% faster
-   VM  -  1626 ops/s       90% faster 
+Performance:
+
+   LISP   ~    700 ops/s
 
 
-FUTURE, potential:
 
-6502   - 18000 ops/s assembly
+
+
+
+
+
 
 
 
@@ -581,7 +912,253 @@ FUTURE, potential:
 
 
 [H[2J[3J
-page 9   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 15   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+                P E R F O R M A T   T E S T I N G   1/2
+
+C3A4DR:
+  (car (car (car (cdr (cdr (cdr (cdr (quote (1 2 3 4 ((5 6) 7) 8)))))))))
+
+PLUS:
+  (+ 1 1 1 1 1 1 1 1 1 1)
+
+
+
+$name     ops/s    x       B       ops/s    x      B
+
+Variant  C3A4DR  FASTER  BYTES     PLUS   FASTER  BYTES
+=======  ======  ======  ======   ======  ======= =====
+ EVAL  -   698    1x       30      1404            44
+   VM  -  1587    2.2x     14                      
+   VM2 -  2380    3.4x             1615    :-(     20
+  asm  -  6493    9.3x     26      10989   7.8x    32
+  jit  -  8333   11.9x     26      16393  11.7x    32
+  jit2 -                   26      19607  14.0x    59 (84% more)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 16   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+            C O M P A R I N G  T O  C - C O M P I L E R
+
+
+
+FIB:
+  ( (lambda (a) (if (< a 2) a (+ (recurse (- a 1)) (recurse (- a 2)))))
+    8)
+
+                                          calls/s       x        B
+   
+                                   $name    FIB       FASTER   BYTES
+                                   =====    =====     =======  =====
+L i s p - I n t e r p r e t e r     lisp      79      -61x     108 (27C)
+  b y t e c o d e                    vm2     155      -31x      29
+
+  C - C o m p i l e r s             CC65     4840      1.0      54
+                                    vbcc      -                186
++-----------------------------------------------------------------------
+| 6 5 R e t r o J I T                asm     6891      1.4x     39
++-----------------------------------------------------------------------
+
+e(/ 41.53 21.45)
+  C C 6 5   I n l i n e d        cc65/inl              1.9x    114
+  H A N D - C O D E D             asm/pha   11167      2.3x     64     
+                                    +byte   24512      5.1x     32
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 17   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
+
+
+             C O N C L U S I O N S
+
+   SPEED                                            SIZE
+ 
+      1x  INTERPRETING lisp/python is slow          100%
+     ~3x  BYTECODE is faster but...                  27%
+  12-87x  JIT ASM ~ 0.3s compile time                36%
+  14-       inline more (-Ospeed)                    59%
+    310x  ASM - byte code with PHA (native stack)    30%
+   
+40% faster JIT vs CC65 is possible on 65021 - 38% smaller
+
+
+                      T R I C K S
+
+              1. small integers in the pointer
+              2. MIS-aligned pointers
+              3. compilation saves runtime overhead
+              4. byte-code -> asm relative easy
+              5. you can beat the C-compiler!
+
+
+    H A C K I N G   I S   F U N ! 
+
+(more fun than crosswords or sudoko)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[H[2J[3J
+page 18   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 65> (car (car (car (cdr (cdr (cdr (cdr (quote (1 2 3 4 ((5 6) 7) 8)))))))))
 
@@ -658,7 +1235,7 @@ L vm(char* p) {
 
 
 [H[2J[3J
-page 10   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 19   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 // Minimal VM, only AD' using TOP
 
@@ -732,7 +1309,7 @@ VMtop  -  1900 ops/s      121% faster  (+ 17% faster!)
 
 
 [H[2J[3J
-page 11   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 20   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 
 
@@ -785,7 +1362,7 @@ page 11   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
 
 
 [H[2J[3J
-page 12   [30;42m- 6502 lisp in C - Hackware Singapore 20240905
+page 22   [30;42m- RetroJIT 6502 - Codeaholics, Hong Kong, 20241211
 
 
 

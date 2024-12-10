@@ -207,7 +207,7 @@ extern L runal(char* la) {
 // TODO: hmm, needed for VM with JMP?
 // TODO: bug, crash when run/defined function...
 //
-  NNEXT;
+//  NNEXT;
 //
 
   // 16.61s => 13.00s 27% faster, 23.49s => 21.72s 8.3% faster
