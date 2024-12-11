@@ -126,9 +126,9 @@ char* compress(char* s) {
 
 #define OUTNIBBLE(nibble) do { \
     o|= (nibble); \
-    printf("  [c='%c' $%02X U=%d map=%d] => nibble %d\to=%2x", c, c, U, map, nibble, o); \
+    printf("  [c='%c' $%02X U=%d map=%d] => nibble %d\to=%2x   '%c'", c, c, U, map, nibble, o, CORE[nibble]); \
     if (--i) o<<= 4; \
-    else { printf("   => %02x", o); *++p=o,o=0,i=2; } \
+    else { printf("   => %02x ", o); *++p=o,o=0,i=2; } \
     putchar('\n'); \
     } while (0);
 
@@ -148,9 +148,10 @@ char* compress(char* s) {
     nibble= j&15;
     map= j>>4;
     U= map&1;
+    map/=2;
 
     if (U) { putchar(' '); OUTNIBBLE(12); }
-    if (map) { putchar(' '); OUTNIBBLE(12+map); }
+    if (map) { putchar(' '); OUTNIBBLE(11+map); }
     OUTNIBBLE(nibble);
     ++s;
   }
@@ -161,26 +162,27 @@ char* compress(char* s) {
 }
 
 char* decompress(char* cs) {
-  char *r= calloc(strlen(cs)*4, 1), *o= r;
+  char *r= calloc(strlen(cs)*4, 1), *p= r;
   uchar* s= (uchar*)cs;
   // states
   char i= 2, m= 0, C= 0, U= 0; // CapsLock
   uchar nibble, c;
   char* map;
 
+  --p;
   while (*s && i) {
     nibble= --i? *s>>4: *s&15;
-    //printf("[nibble=%2d] ", nibble);
+    printf("[nibble=%2d] ", nibble);
     if (!i) ++s,i=2;
 
     // Change map?
-    if (m<2 && nibble>=12) {
+    if (m<2 && nibble>=11) {
       // 'U' upcase & caps-lock
-      if (nibble==12) {
+      if (nibble==11) {
         if (U) C=1-C,U=0; // toggle U if 'UU'
         else U= 1-C; // opposite Caps
         m= 0;
-      } else m= (nibble-12)*2; // select map SNPD
+      } else m= (nibble-11)*2; // select map SNPD
 
       // get next nibble
       continue; 
@@ -191,8 +193,9 @@ char* decompress(char* cs) {
     c= map[nibble];
 
     printf("[i=%d C=%d U=%d m=%d nibble=%2d] => '%c'\n", i, C, U, m+U, nibble, c);
+    *++p= c;
 
-    U=0;
+    U=0;m=0;
   }
 
   // adjust to actual size
@@ -219,7 +222,7 @@ int main(void) {
   d= decompress(c);
   printf("DCMP[%3d]: >%s<\n\n", dl= (int)strlen(d), d);
 
-  printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (cl*10000+4000)/sl/100); // 4000? why not 5000?
+  printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10000L+4000)/sl/100)); // 4000? why not 5000?
   printf(">%s:\n", d);
 
   if (dl!=sl) { printf("--CONVERSION FAILED!\n"); }
