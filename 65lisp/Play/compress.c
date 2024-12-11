@@ -6,6 +6,16 @@
 // characters ordered in terms of frequency - "Oxford stuff"
 // " eariotnslcudpmhgbfywkvxzjq"
 
+// least frequent letters
+//   B  1.49
+//   V  1.11
+//   K  0.69
+//   ---- the rest so improbable!
+//   X  0.17
+//   Q  0.11
+//   J  0.10
+//   Z  0.07
+
 // The 14 punctuation marks in English are period (called “full stop” in the UK), question mark, exclamation point, comma, colon, semicolon, dash, hyphen, brackets, braces, parentheses, apostrophe, quotation mark, and ellipsis.
 
 // https://www3.nd.edu/~busiforc/handouts/cryptography/Letter%20Frequencies.html#quadrigrams
@@ -61,11 +71,24 @@ Of 1,699,542,842 trigrams scanned:
 //   two spaces (or any nibble 0) can NOT be encoded as '  ',
 //   but as ' U ', for more, see REPEPAT
 
-#define CORE       " eariotnslcUSNPD" // U=Upcase next letter (auto after .), "SN PD" - shifters
-#define COREs      " eariotnslc     " // U=Upcase next letter (auto after .), "SN PD" - shifters
-#define  UCORE     " EARIOTNSLC     " //   Upcase letters, 'Uu' => toggle sticky Upcase "sn pd" - shifters
-#define SECOND     "udpmhgbfywkvxzjq" // the rest of alphabet
-#define  USECOND   "UDPMHGBFYWKVXZJQ" //   upcase 'US?'
+#define CORE       " eariotnslcUSNPD"      // U=Upcase next letter (auto after .), "SN PD" - shifters
+#define COREs      " eariotnslc     "      // U=Upcase next letter (auto after .), "SN PD" - shifters
+#define  UCORE     " EARIOTNSLC     "      //   Upcase letters, 'Uu' => toggle sticky Upcase "sn pd" - shifters
+#define SECOND     "udpmhgbfywkvxzjq"      // the rest of alphabet
+#define  USECOND   "UDPMHGBFYWKVXZJQ"      //   upcase 'US?'
+
+// TODO:
+//#define SECOND     "udpmhgbfywkvZQR8"      // the rest of alphabet Zees Quads Repeat utf-8 'S8'
+//#define  USECOND   "UDPMHGBFYWKVzqr8"      //   upcase 'US?'
+//#define THIRD      "zxjq????????????"      // tertary  letters/map +12 encodings, DELTA? 'SZ?'
+//#define  UTHIRD    "ZXJQ???????????1"      //   upcase 
+
+
+#define NUMS       " 0123456789.,+-E"      // numbers, sticky till '\0' (not give space), prefix U - nonstick
+#define PUNCT      ".,:;-'\"/<>(){}[]"     // ., assumes spaces before, unless 'U', 2 nilbbles 'P.' PROGRAMMING/HTML
+#define  UPUNCT    "?!#%_`&=@^|~\\\n\t\b"; // ?! assumes space after, 'UP?', \h=backspace!
+
+// TODO: END string encoding === 'N ' !!
 
 char chars[]      = COREs UCORE SECOND USECOND;
 
@@ -75,41 +98,44 @@ char   Ucore[16]  = UCORE;
 // These are secondary maps
 char  Second[16]  = SECOND;
 char   USecond[16]= USECOND;
-char  Nums[16]    = " 0123456789.,+-E"; // numbers, sticky till '\0' (not give space), prefix U - nonstick
-char  Punct[16]   = ".,:;-'\"/<>(){}[]"; // ., assumes spaces before, unless 'U', 2 nilbbles 'P.'
-char   UPunct[16] = "?!#%_`&=@^|~\\\n\t\b"; // ?! assumes space after, 'UP?', \h=backspace!
+char  Nums[16]    = NUMS;
+char  Punct[16]   = PUNCT;
+char   UPunct[16] = UPUNCT;
 
 // Dictionary of most common words, 2 nibbles 'D?'
 // Space is assumed before and after, double implicitly removed
 char* Dict[16]= { 
   // most common words (>= 4 nibbles -> 2 nibbles)
 // - https://en.m.wikipedia.org/wiki/Most_common_words_in_English 'D?'
-  "the", "be", /*"to"*,*/ "of", "and", /*"a",*/ /*"in",*/ "that",           // 5  8
-  "have", /*"I",*/ /*"it",*/ "for", "not", /*"on",*/ /*"he",*/ "with",      // 4 12
-  /*"as",*/ "you", "do", /*"at",*/ "this", "but", // "his", "by", "from",   // 7 19
-  // "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",
-
-  // Secondary quotes -> tertirary map
-  "REPEAT", "SEQS", "UTF-8",                                                // 3
+  "the", "be", /*"to"*,*/ "of", "and", /*"a",*/ /*"in",*/ "that",                        // 5  8
+  "have", /*"I",*/ /*"it",*/ "for", "not", /*"on",*/ /*"he",*/ "with",                   // 4  9
+  /*"as",*/ "you", /*"do"*,*/ /*"at",*/ "this", "but", "his", "by", "from",              // 6 15
+  "they", //"we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",  // 1 16
 };
+#define DICT     "\x10" "the"   "\x11" "be"   "\x12" "of"   "\x13" "and"  \
+  "\x14" "that"  "\x15" "have"  "\x16" "for"  "\x17" "not"  "\x18" "with" \
+  "\x19" "you"   "\x1a" "this"  "\x1b" "but"  "\x1c" "his"  "\x1d" "by"   \
+  "\x1e" "from"  "\x1f" "they"
+
 // Unicode is prefied by 2 nibbles 'DU' (also can use for single 8-bit char)
 
 // This is a tertiary map, thus: 3 nibbles, 1.5 byte, 'DR4'
 char Repeat[16]= "456789??????????"; // Repat 4-9 times, 10 
-  // URL
+  // --- URL
   // "https://", ".com", "www.", ".html", "index",   // 5
-  // HTML
+  // --- HTML
   // "<h3", "<h2", "<p", "<li", "<a href=\"'         // 5
 
 // This is tertiary map, thus: 3 nibble, 1.5 byte, 'DS?'
 char* Seqs[16]= {
   // quadrams
-  "tion", "ould", "ight", "hich", "thing", "they",// 6    "thinG" lol
-  "atio", "ever", "ough", "ment"                  // 4 10
+  "tion", "ould", "ight", "hich", "thing",           // 5  
+  "atio", "ever", "ough", "ment"                     // 4  9
   // trigrams - not worth it (maybe 25%?)
   // others
-  "&nbsp;", "&lt;", "&gt;", "&amp;", "&quot;",    // 5 15
-  "fuck",                                         // 1 16 - for English
+  "...",                                             // 1 10
+  "&nbsp;", "&lt;", "&gt;", "&amp;", "&quot;",       // 5 15
+  "fuck",                                            // 1 16 - for English ... or "ing "
 };
 
 char* maps[]= { core, Ucore, Second, USecond, Nums, Nums, Punct, UPunct, (char*)Dict, (char*)Dict };
@@ -120,9 +146,11 @@ typedef unsigned char uchar;
 char* compress(char* s) {
   char *r= calloc(strlen(s)*2, 1), *p=r;
   char c,*m;
-  uchar j,nibble;
+  uchar j,k,nibble;
   uchar U,map;
   uchar C=0, o=0,i=2;
+  uchar space=0;
+  char* d;
 
 #define OUTNIBBLE(nibble) do { \
     o|= (nibble); \
@@ -134,7 +162,20 @@ char* compress(char* s) {
 
   --p;
   while((c= *s)) {
-    // TODO: prefix string match first
+
+    // try dictionary
+    if ((space= *s==' ')) ++s;
+    for(k=0; k<16; ++k) {
+      d= Dict[k];
+      // TODO: store length in array
+      if (0==strncasecmp(d, s, strlen(d))) {
+        OUTNIBBLE(15); OUTNIBBLE(k);
+        s+= strlen(d);
+        continue;
+      }
+    }
+    
+    if (space) --s;
 
     // find map of char
     m= strchr(chars, c);
@@ -156,7 +197,7 @@ char* compress(char* s) {
     ++s;
   }
   
-  OUTNIBBLE(0); OUTNIBBLE(0);
+  OUTNIBBLE(13); OUTNIBBLE(0); // 'N ' -- END! (non-ambigous)
   if (i) OUTNIBBLE(0);
   return realloc(r, strlen(r)+1);
 }
@@ -214,7 +255,7 @@ int main(void) {
   printf("TEXT[%3d]: >%s<\n\n", sl= (int)strlen(s), s);
 
   c= compress(s);
-  printf("COMP[%3d]: >", cl= (int)strlen(c), c);
+  printf("COMP[%3d]: >", cl= (int)strlen(c));
   p= c;
   while(*p) printf("%02x ", *p++);
   printf("<\n\n");
