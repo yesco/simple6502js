@@ -58,29 +58,32 @@ Of 1,699,542,842 trigrams scanned:
 //   two spaces (or any nibble 0) can NOT be encoded as '  ',
 //   but as ' U ', for more, see REPEPAT
 
-char  core[16]    = " eariotnslcSNUPD"; // Upcase next letter (auto after .)
-char   Ucore[16]  = " EARIOTNSLCsnupd"; //   upcase letters, 'Uu' => overflow map?
-char   UU[16]     = "????????????????"; // overflow map: TODO: nible 'Uu?'
+char  core[16]    = " eariotnslcSNUPD"; // U=Upcase next letter (auto after .), "SN PD" - shifters
+char   Ucore[16]  = " EARIOTNSLCsnupd"; //   Upcase letters, 'Uu' => toggle sticky Upcase "sn pd" - shifters
 
 // These are secondary maps
 char  Second[16]  = "udpmhgbfywkvxzjq"; // the rest of alphabet
-char   USecond[16]= "UDPMHGBFYWKVXZJQ"; //   upcase
+char   USecond[16]= "UDPMHGBFYWKVXZJQ"; //   upcase 'US?'
 char  Nums[16]    = " 0123456789.,+-E"; // numbers, sticky till '\0' (not give space), prefix U - nonstick
-char  Punct[16]   = ".,:;-</>(){}[]'\""; // ., assumes spaces before, unless 'U', 2 nilbbles 'P.'
-char   UPunct[16] = "?!_#%&=@\^`|~\n\t\r"; // ?! assumes space after
+char  Punct[16]   = ".,:;-'\"/<>(){}[]"; // ., assumes spaces before, unless 'U', 2 nilbbles 'P.'
+char   UPunct[16] = "?!#%_`&=@^|~\\\n\t\b"; // ?! assumes space after, 'UP?', \h=backspace!
 
-// Dictionary of most common words
-// Space is assumed before and after
-char* Dict[16]= { // https://en.m.wikipedia.org/wiki/Most_common_words_in_English
-  "REPEAT", "SEQS", "UTF-8",                                                // 3
+// Dictionary of most common words, 2 nibbles 'D?'
+// Space is assumed before and after, double implicitly removed
+char* Dict[16]= { 
+  // most common words (>= 4 nibbles -> 2 nibbles)
+// - https://en.m.wikipedia.org/wiki/Most_common_words_in_English 'D?'
   "the", "be", /*"to"*,*/ "of", "and", /*"a",*/ /*"in",*/ "that",           // 5  8
-  "have", /*"I"*/, /*"it",*/ "for", "not", /*"on",*/ /*"he",*/ "with",      // 4 12
+  "have", /*"I",*/ /*"it",*/ "for", "not", /*"on",*/ /*"he",*/ "with",      // 4 12
   /*"as",*/ "you", "do", /*"at",*/ "this", "but", // "his", "by", "from",   // 7 19
   // "they", "we", "say", "her", "she", "or", "an", "will", "my", "one", "all", "would",
+
+  // Secondary quotes -> tertirary map
+  "REPEAT", "SEQS", "UTF-8",                                                // 3
 };
 // Unicode is prefied by 2 nibbles 'DU' (also can use for single 8-bit char)
 
-// This is a tertiarey map, thus: 3 nibbles, 1.5 byte, 'DR4'
+// This is a tertiary map, thus: 3 nibbles, 1.5 byte, 'DR4'
 char Repeat[16]= "456789??????????"; // Repat 4-9 times, 10 
   // URL
   // "https://", ".com", "www.", ".html", "index",   // 5
@@ -96,7 +99,7 @@ char* Seqs[16]= {
   // others
   "&nbsp;", "&lt;", "&gt;", "&amp;", "&quot;",    // 5 15
   "fuck",                                         // 1 16 - for English
-}
+};
   
 int main(void) {
   return 0;
