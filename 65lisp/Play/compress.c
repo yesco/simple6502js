@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 
 // characters ordered in terms of frequency - "Oxford stuff"
 // " eariotnslcudpmhgbfywkvxzjq"
@@ -70,6 +71,22 @@ Of 1,699,542,842 trigrams scanned:
 // Since strings are still zero terminated ('  ' == '\0'),
 //   two spaces (or any nibble 0) can NOT be encoded as '  ',
 //   but as ' U ', for more, see REPEPAT
+
+// tr -cd "A-Za-z" # filter to only get these letters!
+
+#ifndef FOO
+  #define ONE        " eariotnslcudpS8"      // ' a...p' Second utf-8
+  #define ONEs       " eariotnslcudp  "      // ' a...p' Second utf-8
+  #define  TWO       "mhgbfywkvxzjqNPD"
+  #define  TWOs      "mhgbfywkvxzjqN  "
+#else
+  #define ONE        " eariotnslcudDS8"      //  you want 'd' to be here!
+  #define ONEs       " eariotnslcud   "      // 
+  #define  TWO       "pmhgbfywkvxzjqNP"
+  #define  TWOs      "pmhgbfywkvxzjqNP"      // .,-\n  "
+#endif
+
+char chars12[]     = ONEs TWOs;
 
 #define CORE       " eariotnslcUSNPD"      // U=Upcase next letter (auto after .), "SN PD" - shifters
 #define COREs      " eariotnslc     "      // U=Upcase next letter (auto after .), "SN PD" - shifters
@@ -194,7 +211,7 @@ char* compress(char* s) {
 
     if (U) { putchar(' '); OUTNIBBLE(12); }
     if (map) { putchar(' '); OUTNIBBLE(11+map); }
-    // can't have two 0 in a row (sometimes)
+    // can't have two 0 in a row (if would create \0)
     if (i && nibble==0 && lastnibble==0) OUTNIBBLE(12); 
     OUTNIBBLE(nibble);
     ++s;
@@ -202,6 +219,88 @@ char* compress(char* s) {
   
   OUTNIBBLE(13); OUTNIBBLE(0); // 'N ' -- END! (non-ambigous)
   if (i) OUTNIBBLE(0);
+  return realloc(r, strlen(r)+1);
+}
+
+char* compress12(char* s) {
+  char *r= calloc(strlen(s)*2, 1), *p=r;
+  char c,*m;
+  uchar j,k,nibble;
+  uchar U,map;
+  uchar C=0, o=0,i=2;
+  uchar space=0,lastnibble=0,lastchar=0;
+  char* d;
+
+#undef OUTNIBBLE
+#define OUTNIBBLE(nibble) do { \
+    o|= (nibble); \
+    printf("  [c='%c' $%02X U=%d map=%d] => nibble %d\to=%2x   '%c'", c, c, U, map, nibble, o, ONE[nibble]); \
+    if (--i) o<<= 4; \
+    else { printf("   => %02x ", o); *++p=o,o=0,i=2; } \
+    lastnibble= nibble; \
+    lastchar= c; \
+    putchar('\n'); \
+    } while (0);
+
+  --p;
+  while((c= *s)) {
+
+    // auto space after . ,
+    if (lastchar!='.' && lastchar!=',' && c==' ') { ++s; continue; }
+    // TODO: detect that space follows for sure
+      
+    printf(">>>%.15s ...\n", s);
+    if (0==strncasecmp(" the ", s, 5)) {
+      printf("\n-----------THE------------\n");
+      OUTNIBBLE(13); s+=5; continue;
+    }
+
+    // find map of char
+    m= strchr(chars12, c);
+    if (!m) {
+
+      // Numbers (nibbles: start, each digit..., end "12" => 4, "12"
+      if (strchr("0123456789.,+-eE;", c) && strchr("0123456789.,+-eE;", s[1])) {
+        OUTNIBBLE(15);
+        while((c=*s) && strchr("0123456789.,+-eE;", c)) {
+          // TODO: actual encoding
+          OUTNIBBLE(15);
+          ++s;
+        }
+        OUTNIBBLE(15);
+
+        continue;
+      }
+
+      // after ., auto space and auto
+      if (lastchar=='.' && lastchar==',' && isupper(c)) ; // no need to quote
+      else {
+        // TODO: utf-8
+        putchar('8'); OUTNIBBLE(15);
+        putchar('8'); OUTNIBBLE(15);
+        putchar('8'); OUTNIBBLE(15);
+        //print("-- %%ERROR: can't find char '%c' (%d, %02x)\n", c, c, c);
+        //exit(1);
+        ++s;
+        continue;
+      }
+    }
+
+    // Encode
+    j= m-chars12;
+    nibble= j&15;
+    map= j>>4;
+
+    if (map) { putchar(' '); OUTNIBBLE(14); }
+    // can't have two 0 in a row (if would create \0)
+    if (i && nibble==0 && lastnibble==0) { OUTNIBBLE(15);OUTNIBBLE(15); }
+
+    OUTNIBBLE(nibble);
+    ++s;
+  }
+  
+  if (!i) OUTNIBBLE(13);
+  OUTNIBBLE(0); OUTNIBBLE(0); // 'N ' -- END! (non-ambigous)
   return realloc(r, strlen(r)+1);
 }
 
@@ -249,27 +348,29 @@ char* decompress(char* cs) {
 //char* d= decompress("\x11\xc1\x02\xc2\x0c\x20");
 
 void oneline(char* s) {
-  char *c, *d, *p;
+  char *c=0, *d=0, *p=0;
   int sl,cl,dl;
 
   printf("TEXT[%3d]: >%s<\n\n", sl= (int)strlen(s), s);
 
-  c= compress(s);
+//  c= compress(s);
+  c= compress12(s);
   printf("COMP[%3d]: >", cl= (int)strlen(c));
   p= c;
   while(*p) printf("%02x ", *p++);
   printf("<\n\n");
 
-  d= decompress(c);
-  printf("DCMP[%3d]: >%s<\n\n", dl= (int)strlen(d), d);
-
-  printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10000L+4000)/sl/100)); // 4000? why not 5000?
+  //d= decompress(c);
+  if (d) printf("DCMP[%3d]: >%s<\n\n", dl= (int)strlen(d), d);
+    
+  //printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10000L+4000)/sl/100)); // 4000? why not 5000?
+  printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10050L)/sl/100)); // 4000? why not 5000?
   printf(">%s:\n", d);
 
   if (dl!=sl) { printf("--CONVERSION FAILED!\n"); }
   //assert(dl==sl);
   
-  free(c); free(d); free(p);
+//  free(c); free(d); free(p);
 }
 
 int main(void) {
