@@ -149,7 +149,7 @@ char* compress(char* s) {
   uchar j,k,nibble;
   uchar U,map;
   uchar C=0, o=0,i=2;
-  uchar space=0;
+  uchar space=0,lastnibble=0;
   char* d;
 
 #define OUTNIBBLE(nibble) do { \
@@ -157,6 +157,7 @@ char* compress(char* s) {
     printf("  [c='%c' $%02X U=%d map=%d] => nibble %d\to=%2x   '%c'", c, c, U, map, nibble, o, CORE[nibble]); \
     if (--i) o<<= 4; \
     else { printf("   => %02x ", o); *++p=o,o=0,i=2; } \
+    lastnibble= nibble; \
     putchar('\n'); \
     } while (0);
 
@@ -193,6 +194,8 @@ char* compress(char* s) {
 
     if (U) { putchar(' '); OUTNIBBLE(12); }
     if (map) { putchar(' '); OUTNIBBLE(11+map); }
+    // can't have two 0 in a row (sometimes)
+    if (i && nibble==0 && lastnibble==0) OUTNIBBLE(12); 
     OUTNIBBLE(nibble);
     ++s;
   }
@@ -245,10 +248,7 @@ char* decompress(char* cs) {
 
 //char* d= decompress("\x11\xc1\x02\xc2\x0c\x20");
 
-int main(void) {
-  //char *s= "eE aAAaa foo";
-  //char *s= "Hello My name is Jonas S Karlsson";
-  char *s= "hello my name is jonas s karlsson";
+void oneline(char* s) {
   char *c, *d, *p;
   int sl,cl,dl;
 
@@ -269,5 +269,21 @@ int main(void) {
   if (dl!=sl) { printf("--CONVERSION FAILED!\n"); }
   //assert(dl==sl);
   
+  free(c); free(d); free(p);
+}
+
+int main(void) {
+  //char *s= "eE aAAaa foo";
+  //char *s= "Hello My name is Jonas S Karlsson";
+  //char *s= "hello my name is jonas s karlsson";
+  char* c= NULL; size_t l= 0;
+
+  printf("CHARS= >%s<\n", chars);
+
+  while (getline(&c, &l, stdin)>=0) {
+    oneline(c);
+  }
+
+
   return 0;
 }
