@@ -68,25 +68,101 @@ Of 1,699,542,842 trigrams scanned:
 20. tio (6425262, 0.378058%)
 */
 
+/* Sherlock Holmes collected works 3M2B or so.
+
+  nibbles    freq       word
+  =======  ======       ==============
+  252847    36121	the
+  139329    17416	and
+  100540    11171	that
+   94170    15695	to
+   83724    16745	of
+   68712     9816	was
+   66567    16642	i
+   64296    10716	in
+   63618    10603	it
+   62663    15666	a
+   56237     9373	you
+   54782     7826	his
+   50964    10193	he
+   44176     5522	have
+   42266     6038	had
+   41936     5242	with
+
+   39798     6633	is
+   38331     4259	which
+   35510     3228	there
+   35114     2926	holmes
+   32879     4697	for
+   31645     3516	this
+   30952     3095	said
+   29537     3692	not
+   28452     4742	as
+   27696     4616	at
+   24461     4077	but
+   23304     2913	from
+   21941     2194	would
+   21583     2398	been
+*/
+
+
 // Since strings are still zero terminated ('  ' == '\0'),
 //   two spaces (or any nibble 0) can NOT be encoded as '  ',
 //   but as ' U ', for more, see REPEPAT
 
 // tr -cd "A-Za-z" # filter to only get these letters!
 
-#ifndef FOO
+#ifdef FOO
   #define ONE        " eariotnslcudpS8"      // ' a...p' Second utf-8
   #define ONEs       " eariotnslcudp  "      // ' a...p' Second utf-8
   #define  TWO       "mhgbfywkvxzjqNPD"
   #define  TWOs      "mhgbfywkvxzjqN  "
 #else
-  #define ONE        " eariotnslcudDS8"      //  you want 'd' to be here!
-  #define ONEs       " eariotnslcud   "      // 
-  #define  TWO       "pmhgbfywkvxzjqNP"
-  #define  TWOs      "pmhgbfywkvxzjqNP"      // .,-\n  "
+  // RUN: cat sherlock.txt | (clang Play/compress.c && ./a.out) | grep -a '^>' | less
+  //        55% 1968427/3544339
+
+  // -- most common character by frequency:
+  // " eta onhs irdl umwc fyg, p.b\" vIkH '-TWM ?SAx BYq! CNjL D0EP ..."
+  //   XXX XX X XXXX    X    
+  #define ONE        " eariotnslcdNDS8"      //  you want 'd' to be here! D=" the "
+  #define  ONEs      " eariotnslcd    "      //
+  //  ., saves 1%
+  //  "  saves 1%
+  #define TWO        "upmhgbfywkvq.,\" "
+  #define  TWOs      "upmhgbfywkvq.,\" "
+
+  // TODO: P is secondary, using only 8 utf-8 quoting costs 1% more...
+  //   cost/savings much bigger for program/html?
+  // - cost savings for sherlock is only 1%
+  #define THREEs     "_=:;-'\"/<>(){}[]"    
+  #define FOURs      "?!#%_`&=@^|~\\\n\t\b"
 #endif
 
+//char chars12[]     = ONEs TWOs THREEs;
 char chars12[]     = ONEs TWOs;
+
+char* onedict[]=   {
+  // 63% - 55% => saves 8%
+  " the ", " and ", " that ", " to ", " of ", " was ", " I ", " in ",   // saves 5%
+  " it ", " a ", " you ", " his ", " he ", " have ", " had ", " with ", // saves 3%
+
+  // saves 2% only
+  // " is ", " which ", " there ", " for ", " said ", " not ", " as ", " at ",
+  // " but ", " from ", " would ", " been ", " my ", " were ", " could ", " upon ",
+
+  // - saves 1% only
+  // " we ", " one ", " him ", " all ", " me ", " what ", " your " , " be ",
+  //" are ", " no ", " on ", " will ", " some ", " very ", " then ", " her ",
+
+  // --- saves 1% only
+  //  " when ", " should ", " so ", " man ", " into ", " little ", " she ", " well ",
+  //  " an ", " out ", " before ", " they ", " out ", " has ", " more ", " down ",
+};
+  
+// (/ (+  252847  139329  100540   94170   83724   68712   66567   64296   63618   62663   56237   54782   50964   44176   42266   41936 ) 2)
+// = 643413 bytes saved (?)
+
+// TODO: idea of 16 last seen symbols ordered by last accessed, can pick 1/16 cheaply
 
 #define CORE       " eariotnslcUSNPD"      // U=Upcase next letter (auto after .), "SN PD" - shifters
 #define COREs      " eariotnslc     "      // U=Upcase next letter (auto after .), "SN PD" - shifters
@@ -226,15 +302,15 @@ char* compress12(char* s) {
   char *r= calloc(strlen(s)*2, 1), *p=r;
   char c,*m;
   uchar j,k,nibble;
-  uchar U,map;
+  uchar map;
   uchar C=0, o=0,i=2;
-  uchar space=0,lastnibble=0,lastchar=0;
+  uchar space=0,lastnibble=0,lastchar='.';
   char* d;
 
 #undef OUTNIBBLE
 #define OUTNIBBLE(nibble) do { \
     o|= (nibble); \
-    printf("  [c='%c' $%02X U=%d map=%d] => nibble %d\to=%2x   '%c'", c, c, U, map, nibble, o, ONE[nibble]); \
+    printf("  [c='%c' $%02X last='%c' map=%d] => nibble %d\to=%2x   '%c'", c, c, lastchar, map, nibble, o, ONE[nibble]); \
     if (--i) o<<= 4; \
     else { printf("   => %02x ", o); *++p=o,o=0,i=2; } \
     lastnibble= nibble; \
@@ -244,41 +320,94 @@ char* compress12(char* s) {
 
   --p;
   while((c= *s)) {
+    // Savings (+ 53 10 24 3) = 71 bytes total improved...
 
-    // auto space after . ,
-    if (lastchar!='.' && lastchar!=',' && c==' ') { ++s; continue; }
-    // TODO: detect that space follows for sure
-      
-    printf(">>>%.15s ...\n", s);
-    if (0==strncasecmp(" the ", s, 5)) {
-      printf("\n-----------THE------------\n");
-      OUTNIBBLE(13); s+=5; continue;
+    // Dictionary of only " the ", lol
+    //printf(">>>%.15s ...\n", s);
+    
+    //  63% 2250821/3544339
+    //  60% 2143233/3544339 before only get THE AND WHICH
+    //  55% 1949339/3544339 (- 2250821 1949339) = 301482 bytes half of expected? hmmmm? THE already done?
+
+    //  3544339 sherlock.txt
+    //  1317604 sherlock-all.txt.gz (/ 1317604 3544339.0) = 37%
+    if (1) { // 658 -> 605: 53 bytes
+      char k;
+
+      if (1)
+      for(k= 0; k<sizeof(onedict)/sizeof(onedict[0]); ++k) {
+        // TODO: precompute strlen...
+        if (0==strncasecmp(onedict[k], s, strlen(onedict[k]))) {
+          printf("\nDICT: -----------%s------------\n", onedict[k]);
+          OUTNIBBLE(13); OUTNIBBLE(3);
+          lastchar= ' ';
+          s+= strlen(onedict[k]);
+          continue;
+        }
+      }
+
+      if (0) {
+      if (0==strncasecmp(" the ", s, 5)) {
+        printf("\n-----------THE------------\n");
+        lastchar= ' ';
+        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
+        s+=5; continue;
+      }
+      if (0==strncasecmp(" and ", s, 5)) {
+        printf("\n-----------AND------------\n");
+        lastchar= ' ';
+        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
+        s+=5; continue;
+      }
+      if (0==strncasecmp(" which ", s, 7)) {
+        printf("\n-----------WHICH------------\n");
+        lastchar= ' ';
+        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
+        s+=7; continue;
+      }
+      }
     }
 
+    // auto space after . , 634 -> 624: 10 bytes
+    // TODO: ? ! : ; ???
+    if ((lastchar=='.' || lastchar==',') && c==' ') { ++s; continue; }
+    // TODO: detect that space follows for sure
+      
     // find map of char
     m= strchr(chars12, c);
     if (!m) {
 
-      // Numbers (nibbles: start, each digit..., end "12" => 4, "12"
+      // Numbers (nibbles: start, each digit..., end "12" => 4, "12"   648 -> 624: 24 bytes
       if (strchr("0123456789.,+-eE;", c) && strchr("0123456789.,+-eE;", s[1])) {
-        OUTNIBBLE(15);
+        putchar('N'); OUTNIBBLE(15);
         while((c=*s) && strchr("0123456789.,+-eE;", c)) {
           // TODO: actual encoding
-          OUTNIBBLE(15);
+          putchar(' '); putchar('n'); OUTNIBBLE(15);
           ++s;
         }
-        OUTNIBBLE(15);
+        putchar('N'); OUTNIBBLE(15);
 
         continue;
       }
 
-      // after ., auto space and auto
-      if (lastchar=='.' && lastchar==',' && isupper(c)) ; // no need to quote
-      else {
+      // after ., auto space and auto: 629 -> 624: 3 bytes, lol
+      // 
+      // 1961260/3544339
+      // 1947256/3544339  (/ (- 1961260 1947256) 3544339.0) = 0.4% only
+      if (0 && (lastchar=='.' || lastchar==',') && isupper(c)) {
+        c= tolower(c); // no need to quote
+        m= strchr(chars12, c);
+        //printf("UPPER, lastwas '%c' now '%c'\n", lastchar, c);
+      }
+
+      // TODO: delta unicode from last code-point?
+      //   or just output replacement bytes? (not enought?)
+      if (!m) {
+        //printf("UTF-8, lastwas '%c' now '%c'\n", lastchar, c);
         // TODO: utf-8
-        putchar('8'); OUTNIBBLE(15);
-        putchar('8'); OUTNIBBLE(15);
-        putchar('8'); OUTNIBBLE(15);
+        putchar('U'); OUTNIBBLE(15);
+        putchar('T'); OUTNIBBLE(15);
+        putchar('F'); OUTNIBBLE(15);
         //print("-- %%ERROR: can't find char '%c' (%d, %02x)\n", c, c, c);
         //exit(1);
         ++s;
@@ -364,8 +493,8 @@ void oneline(char* s) {
   if (d) printf("DCMP[%3d]: >%s<\n\n", dl= (int)strlen(d), d);
     
   //printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10000L+4000)/sl/100)); // 4000? why not 5000?
-  printf("\n>%s:%d:%d:%d%%\n", s, sl, cl, (int)((cl*10050L)/sl/100)); // 4000? why not 5000?
-  printf(">%s:\n", d);
+  printf("\n>%3d%% %4d/%4d\t>%s<\n\n", (int)((cl*10050L)/sl/100), cl, sl, s); // 4000? why not 5000?
+  //printf(">%s:\n", d);
 
   if (dl!=sl) { printf("--CONVERSION FAILED!\n"); }
   //assert(dl==sl);
@@ -379,7 +508,7 @@ int main(void) {
   //char *s= "hello my name is jonas s karlsson";
   char* c= NULL; size_t l= 0;
 
-  printf("CHARS= >%s<\n", chars);
+  //printf("CHARS= >%s<\n", chars);
 
   while (getline(&c, &l, stdin)>=0) {
     oneline(c);

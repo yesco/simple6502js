@@ -1,0 +1,1 @@
+cat sherlock.txt | tr ' ' '\n' | tr 'A-Z' 'a-z' | tr -cd 'A-Za-z\n'  | sort | uniq -c | sort -r
