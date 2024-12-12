@@ -124,12 +124,17 @@ Of 1,699,542,842 trigrams scanned:
   // -- most common character by frequency:
   // " eta onhs irdl umwc fyg, p.b\" vIkH '-TWM ?SAx BYq! CNjL D0EP ..."
   //   XXX XX X XXXX    X    
-  #define ONE        " eariotnslcdNDS8"      //  you want 'd' to be here! D=" the "
-  #define  ONEs      " eariotnslcd    "      //
+
+  // 'd' here saves 2% !
+  // 'u' here saves 1% !
+  #define ONE        " eariotnslcduDS8"      //  you want 'd' to be here! D=" the "
+  #define  ONEs      " eariotnslcdu   "      //
+
   //  ., saves 1%
   //  "  saves 1%
-  #define TWO        "upmhgbfywkvq.,\" "
-  #define  TWOs      "upmhgbfywkvq.,\" "
+  //  q  isn't even 1%...  ... TODO: we need Repeat Delta
+  #define TWO        "pmhgbfywkvq.,\"N"
+  #define  TWOs      "pmhgbfywkvq.,\"N"
 
   // TODO: P is secondary, using only 8 utf-8 quoting costs 1% more...
   //   cost/savings much bigger for program/html?
@@ -379,7 +384,10 @@ char* compress12(char* s) {
 
       // Numbers (nibbles: start, each digit..., end "12" => 4, "12"   648 -> 624: 24 bytes
       if (strchr("0123456789.,+-eE;", c) && strchr("0123456789.,+-eE;", s[1])) {
+        // 'N' is secondary, this means one more byte
+        putchar('S'); OUTNIBBLE(15);
         putchar('N'); OUTNIBBLE(15);
+
         while((c=*s) && strchr("0123456789.,+-eE;", c)) {
           // TODO: actual encoding
           putchar(' '); putchar('n'); OUTNIBBLE(15);
