@@ -7,6 +7,11 @@
 // characters ordered in terms of frequency - "Oxford stuff"
 // " eariotnslcudpmhgbfywkvxzjq"
 
+// char freq on wikipedia:Sweden HTML
+//               50% of 'e'      50% of 'o'
+// "eati nsr\"l  oc/pd><=-hmfwg  u2.k0b_%..."
+
+
 // least frequent letters
 //   B  1.49
 //   V  1.11
@@ -133,8 +138,11 @@ Of 1,699,542,842 trigrams scanned:
   //  ., saves 1%
   //  "  saves 1%
   //  q  isn't even 1%...  ... TODO: we need Repeat Delta
-  #define TWO        "pmhgbfywkvq.,\"N"
-  #define  TWOs      "pmhgbfywkvq.,\"N"
+//  #define TWO        "pmhgbfywkvq.,\"N"
+//  #define  TWOs      "pmhgbfywkvq.,\"N"
+// for sherlock, this is -1%, for html saves 2%
+  #define TWO        "pmhgfyw</>.,\"N"
+  #define  TWOs      "pmhgfyw</>.,\"N"
 
   // TODO: P is secondary, using only 8 utf-8 quoting costs 1% more...
   //   cost/savings much bigger for program/html?
@@ -147,7 +155,8 @@ Of 1,699,542,842 trigrams scanned:
 char chars12[]     = ONEs TWOs;
 
 char* onedict[]=   {
-  // 63% - 55% => saves 8%
+  // --- most common english words, ordered by savings in sherlock!
+  // 63% - 55% => saves 8%, saves 1% on sweden.html
   " the ", " and ", " that ", " to ", " of ", " was ", " I ", " in ",   // saves 5%
   " it ", " a ", " you ", " his ", " he ", " have ", " had ", " with ", // saves 3%
 
@@ -162,6 +171,31 @@ char* onedict[]=   {
   // --- saves 1% only
   //  " when ", " should ", " so ", " man ", " into ", " little ", " she ", " well ",
   //  " an ", " out ", " before ", " they ", " out ", " has ", " more ", " down ",
+
+  // --- URL & HTML - 16 saves 6% for sweden.html
+  // TODO: switch map... hmmm, cost? (need to steal secondary token, increase 1%)
+  // 'SS#' - 'SS'=toggle '#' is entry number
+/*
+  "https://", ".com", "www.", ".html", "/index",               // 5    - 1% savings
+  "<h3", "<h2", "<p", "<li", "<a href=\"", "</",               // 6 11 - 1% savings
+  " id=\"", " name=\", ", " class=\"",                         // 3 14 - 3% savings!
+  "><", "\">",                                                 // 2 16
+*/
+  // ".org", // 1% on wikipedia, lol
+/*
+  // -- saves 2% for sweden.html
+  "</li>", "span", "div"
+
+  // --- prefixes - 16 - saves only 1%
+  "tion", "ould", "ight", "hich", "thing",                     // 5
+  "atio", "ever", "ough", "ment",                              // 4  9
+  // html encoding
+  // TODO: add "&#" ?
+  "...",                                                       // 1 10
+  // sweden.html saves 1% 
+  "&nbsp;", "&lt;", "&gt;", "&amp;", "&quot;",                 // 5 15
+  "fuck",                                                      // 1 16 - for English ... or "ing "
+*/
 };
   
 // (/ (+  252847  139329  100540   94170   83724   68712   66567   64296   63618   62663   56237   54782   50964   44176   42266   41936 ) 2)
