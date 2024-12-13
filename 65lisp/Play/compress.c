@@ -158,7 +158,9 @@ char* onedict[]=   {
   // --- most common english words, ordered by savings in sherlock!
   // 63% - 55% => saves 8%, saves 1% on sweden.html
   " the ", " and ", " that ", " to ", " of ", " was ", " I ", " in ",   // saves 5%
+//  " it ", " you ", " his ", " he ", " have ", " had ", " with ", " this ", // saves 3%
   " it ", " a ", " you ", " his ", " he ", " have ", " had ", " with ", // saves 3%
+  // " a " was replaced by " this ", any better ? " this " not as probable as " a "
 
   // saves 2% only
   // " is ", " which ", " there ", " for ", " said ", " not ", " as ", " at ",
@@ -358,6 +360,7 @@ char* compress12(char* s) {
     } while (0);
 
   --p;
+ next:
   while((c= *s)) {
     // Savings (+ 53 10 24 3) = 71 bytes total improved...
 
@@ -368,6 +371,12 @@ char* compress12(char* s) {
     //  60% 2143233/3544339 before only get THE AND WHICH
     //  55% 1949339/3544339 (- 2250821 1949339) = 301482 bytes half of expected? hmmmm? THE already done?
 
+    if (lastchar==' ' && c==' ') {
+      ++s;
+      lastchar= 0;d
+      continue;
+    }
+
     //  3544339 sherlock.txt
     //  1317604 sherlock-all.txt.gz (/ 1317604 3544339.0) = 37%
     if (1) { // 658 -> 605: 53 bytes
@@ -375,35 +384,18 @@ char* compress12(char* s) {
 
       if (1)
       for(k= 0; k<sizeof(onedict)/sizeof(onedict[0]); ++k) {
-        // TODO: precompute strlen...
-        if (0==strncasecmp(onedict[k], s, strlen(onedict[k]))) {
-          printf("\nDICT: -----------%s------------\n", onedict[k]);
-          OUTNIBBLE(13); OUTNIBBLE(3);
-          lastchar= ' ';
-          s+= strlen(onedict[k]);
-          continue;
-        }
-      }
+        d= onedict[k];
+        // it's ok to skip space (if first) TODO: verify
+        //printf("--- s='%c' and d='%c'\n", *s, *d);
+        if (*s!=' ' && *d==' ') d++;
 
-      if (0) {
-      if (0==strncasecmp(" the ", s, 5)) {
-        printf("\n-----------THE------------\n");
-        lastchar= ' ';
-        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
-        s+=5; continue;
-      }
-      if (0==strncasecmp(" and ", s, 5)) {
-        printf("\n-----------AND------------\n");
-        lastchar= ' ';
-        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
-        s+=5; continue;
-      }
-      if (0==strncasecmp(" which ", s, 7)) {
-        printf("\n-----------WHICH------------\n");
-        lastchar= ' ';
-        putchar('D'); OUTNIBBLE(13); OUTNIBBLE(13);
-        s+=7; continue;
-      }
+        // TODO: precompute strlen...
+        if (0==strncasecmp(d, s, strlen(d))) {
+          putchar('D'); OUTNIBBLE(13); OUTNIBBLE(3);
+          lastchar= ' ';
+          s+= strlen(d)-1;
+          goto next;
+        }
       }
     }
 
@@ -553,6 +545,11 @@ int main(void) {
   //printf("CHARS= >%s<\n", chars);
 
   while (getline(&c, &l, stdin)>=0) {
+    if (*c=='\\') { printf(">  %s\n", c); continue; }
+
+    // TODO: should we count \n... it gives 3 nibbles, lol
+    c[strlen(c)-1]= 0;
+
     oneline(c);
   }
 
