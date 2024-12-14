@@ -4,6 +4,28 @@
 #include <assert.h>
 #include <ctype.h>
 
+// HUFFMAN encoding of 4*sweden.html + sherlock-all.txt ==> 4561022/7325099 == 62.27% only
+//
+//   "eatinosrhld\"cumwpfg./-y><=bk,v20_%1IS3Ax8T:9F;CH4B5E'M&W76+DN\nPjR?LOG()z#qY...J.\\][.!\tVUZK....}{^...............Q............X..."
+
+// Huffman on sweden.html - 67%
+// huffman on sherlock-all.txt - 57% lol
+
+// engrams encoding savings (128-255 char is token pointing to n-gram)
+//   i.e. we encode the 128 most frequent n-grams:
+//   from all.txt 2231980/7325099
+//
+// -- 2-gram     2231980  -> 30.47% savings "only"0
+// -- 3-gram     1323610
+// -- 4-gram     1071429
+// -- 5-gram      928160
+// -- 6-gram      796490
+// -- 7-gram      628248
+// -- 8-gram      546119
+// -- 9-gram      496024
+// -- 10-gram     439749
+
+
 // characters ordered in terms of frequency - "Oxford stuff"
 // " eariotnslcudpmhgbfywkvxzjq"
 

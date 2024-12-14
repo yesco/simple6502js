@@ -9,7 +9,7 @@
 // not very good, for bigrams can save 30%
 // I guess it's better than wasting 1/8 bits = 12.5%
 
-#define N 3
+#define N 2
 
 //        sherlock   sweden.html
 // N:  1  100%      100%
