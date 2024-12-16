@@ -1,3 +1,6 @@
+// TODO: This one ./65asm is obsolute.
+//   We want to use ./65jit instead. Similar list there...
+
 // Define DASM on compilation to DebugASM !!!!
 
 //#define DASM
@@ -26,7 +29,9 @@ char* mcp= mc;
  
 // compile AL bytecode to simple JSR/asm
 
-/* Byte codes that are compiled
+// TODO: this list is correclated to the list in: lisp-vmal.c
+
+/* Byte codes that are COMPILED
 
    ' ' \t \r \n - skip
    !    - store (val, addr) => val (TODO: redundant? uses : ??)

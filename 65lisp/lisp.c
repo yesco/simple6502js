@@ -446,8 +446,11 @@ void error1(char* msg, L a);
 #define HFREE   0xFE
 #define HATOM   0xA7
 #define HARRAY  0xA6
-#define HSTRING 0x57
+// TODO: +HCONST string for program read
+#define HSTRING 0x57 // dynamica alloc, may need to be GC:ed
 #define HBIN    0xB1
+#define HAL     0xA1
+#define HASM    0xA5
 #define HSLICE  0x51 // do you get it? ;-)
 
 #define HTYP(x) (*((char*)(((L)x)-1)))
@@ -552,7 +555,11 @@ typedef struct Atom {
   // - but not faster, 0.01% slower...?
   // echo "foo" | ./run -t ==> 0.01% faster LOL
   L val;
-  struct Atom* next;
+  struct Atom* next; // IF symbol it's next sym
+
+  char nargs;  // number of argumnets
+  char code[3]; // machine code       // TODO: ...
+
   char name[];
 } Atom;
 
@@ -570,7 +577,8 @@ char hash(char* s) {
 }
 
 // Arena - simple for now
-char* arena, *arptr, *arend;
+//   TODO: what do when run out?
+char* arena, *arptr, *arend; // arptr is "next arena pointer"
 
 char isatomchar(char c) { return (char)(int)!strchr(" \t\n\r.;`'\"()[]{}", c); }
 
@@ -633,7 +641,7 @@ L atomstr(char* s, uchar typ, size_t len) {
   h= (len?len:hash(s)) & (HASH-1);
   if (typ==HATOM || typ==HSTRING || !len) {
     a= findatom((Atom*)syms[h], s, typ); // fast 14s for 4x150.words
-    if (a) return (L)a;
+    if (a) return (L)a; // found
   }
 
   // create atom
@@ -643,7 +651,7 @@ L atomstr(char* s, uchar typ, size_t len) {
   //    char type;
   // -> L val;
 
-  // put type byte "before" pointer, and align
+  // MIS-align: put at least one type byte "before" pointer
   do {
     *arptr++= typ; // HTYP
   } while (!isatom((L)arptr));
@@ -655,6 +663,10 @@ L atomstr(char* s, uchar typ, size_t len) {
 
   // CAR bytes len if !atom
   a->val= MKNUM(typ==HSTRING? strlen(s): len);
+
+  // store a letter like '1' '2', or '-' or 'n'...
+  //a->nargs= 0;  / TDOO: arena is \0 already...
+
   // copy name/data, alt, store pointer?
   a->name[0]= 0; // for safety (HBIN)
   if (len) memcpy(a->name+1, s, len); else strcpy(a->name, s);
@@ -967,7 +979,9 @@ L lread() {
     if (!q) unc(c);
     return q=='"'? mkstr(s): atom(s);
   }
+  // quoted
   if (c=='\'') return cons(quote, cons(lread(), nil));
+  // comment
   if (c==';') { while((c=nextc()) && c!='\n' && c!='\r'); return lread(); }
 
   printf("%%ERROR: unexpected '%c' (%d)\n", c, c);
@@ -1207,6 +1221,7 @@ L evalX(L x, L env) {
     //b= x;
     f= CAR(x);
     // 0.2% cost (* (+ but LAMBDA time/2 !
+    // TODO: this isn't working if call inside AL or JIT..
     if (f==lambda) return cons(closure, cons(CDR(x), env));
     // TODO: needed?
     if (f==closure) return x;
@@ -1395,12 +1410,11 @@ L evalX(L x, L env) {
 #ifdef OLD
     a= 2;
     switch(f) {
-    // - nlambda - no eval
-    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case ':': return setval(car(x), eval(car(cdr(x)), env), env);  // no-eval
     case '!': return setval(eval(car(x),env), eval(car(cdr(x)), env), env); 
     // TODO: if it allows local defines, how to
     //   extend the env,setq should not, two words?
-    case ';': return df(x);
+    //case ';': return df(x); // TODO: wrong
     case 'I': return iff(x, env);
     //case 'X': return TODO: FUNCALL! eXecute
       // TODO: non-blocking getchar (0 if none)
@@ -1441,12 +1455,11 @@ L evalX(L x, L env) {
     b= 2;      // b=mknum(1), used by + * for temporary
     //            x is still orig
     switch(f) {
-    // - nlambda - no eval
-    case ':': return setval(car(x), eval(car(cdr(x)), env), env); 
+    case ':': return setval(car(x), eval(car(cdr(x)), env), env);  // no-eval
     case '!': return setval(eval(car(x),env), eval(car(cdr(x)), env), env); 
     // TODO: if it allows local defines, how to
     //   extend the env,setq should not, two words?
-    case ';': return df(a);
+    //case ';': return df(a); // TODO: wrong
     case 'I': return iff(a, env);
     //case 'X': return TODO: FUNCALL! eXecute
       // TODO: non-blocking getchar (0 if none)
@@ -1605,6 +1618,9 @@ L evalTrace(L x, L env) {
 
 #ifndef AL
   #define STACKSIZE 1
+  L al(char* code) {
+    error("Not compiled with AL or JIT\n");
+  }
 #else
   #ifndef ASM
     #define STACKSIZE 255
@@ -1632,18 +1648,30 @@ unsigned long bench=1;
 //   2nd char: '0' - no args
 //             '1' - takes one arg
 //             '2' - 2...
-//             '-' - context known, variable, hmmm, or if funcall, as in delayed?
-//             'n' - counted as in vararg?
+//             '-' - non-eval, context known
+//             'n' - counted as in vararg? set Y register to count?
 //   ...rest   "name" of function
+//   \0
 //
-// NOTE: all primitives are either 0 1 2 - n ...
+//   \0: if 1st char is \0 then it means end of defines.
+
+// NOTE: all primitives are either: - n 0 1 2 ...
 //       user funcs may be more, up to 8 (?)
+
+
+// SEE: x-call.c for test/discussion
+
+// nargs  	lisp		al		asm
+
+// '0' -	jsr lisp0	jsr al0		jmp code
+// '1' -        jsr lisp1	jsr al1		jsr
 
 char* names[]= {
   // nargs
-  ":2de",
-  ":2setq", // TODO: not right for "VM"
-  ":3dc",
+  ":-de",   // DEfine var/lambda       TODO: implicit progn?
+  ":-dc",   // Define Compile bytecode TODO: implicit progn?
+  ":-da",   // Define compile Assembly TODO: implicit progn?
+  ":2setq", // TODO: not right for "VM" // TODO: 2xN for multiple assigments?
   "!2set",
   //"; df",
 
@@ -1717,38 +1745,47 @@ void initlisp() {
 
   send= stack+STACKSIZE-1;
 
-  // Align lower bits == xx01, CONS inc by 4!
+  // MIS-align lower bits == xx01, CONS inc by 4!
   x= (L)cell;
   while(!iscons(x)) ++x;
   //printf("x   = %04x %d\n", x, x);
   cstart= cnext= (L*)x;
+
   --cnext; // as we inc before assign!
   //printf("next= %04x\n", cnext);
   assert(x&1);
   cend= cstart+MAXCELL;
 
-  // statistics
+  // -- statistics
   nops= natoms= ncons= nalloc= 0;
 
-  // special symbols
-    nil= atom("nil");   ATOMVAL(nil)= nil; // LOL
+  // -- special symbols - they evaluate to themselves, include car/cdr!
+    // TODO: for assembly, consider relocating nil to address $0001;
+    // much easier to detect nUll!
+    nil= atom("nil");   ATOMVAL(nil)= nil;
+
       T= atom("T");     setval(T, T, nil);
    FREE= atom("*FREE*");setval(FREE, FREE, nil);
-  quote= atom("quote");
- lambda= atom("lambda");
-closure= atom("closure");
   ERROR= atom("ERROR"); setval(ERROR, ERROR, nil);
     eof= atom("*EOF*"); setval(eof, eof, nil);
     bye= atom("bye");   setval(bye, bye, nil);
+  // -- symbols used for compilation, typically
+  //   TODO: hmmm, these are duplicates from constant names
+  quote= atom("quote");
+ lambda= atom("lambda");
+closure= atom("closure");
    SETQ= atom("setq");
      IF= atom("if");
     AND= atom("and");
      OR= atom("or");
      DC= atom("dc");
 
-  // register function names
-  // TODO: funatom()
-  while(*s) { setatomval(atom(2+*s), MKNUM(**s)); ++s; }
+  // -- register function names
+  while(*s) {
+    setatomval(x= atom(*s+2), MKNUM(**s));
+    ((Atom*)x)->nargs= (*s)[1];
+    ++s;
+  }
 
   // direct code pointers
   // nearly 10% faster... but little dangerous
@@ -1803,6 +1840,12 @@ char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
 
 #define DOPRINT 0
 
+// Read and Eval lines of text
+
+// If LiNe given, set it as input to read.
+// Read and execute froms, until EOF or symbol bye.
+
+// Returns modified env
 L readeval(char *ln, L env, char noprint) {
   // TODO: not sure what function env has an toplevel:
   //   we're setting/modifying globals, right?
@@ -1816,7 +1859,7 @@ L readeval(char *ln, L env, char noprint) {
   char* saved= _rs;
   _rs= ln;
 
-  // TODO wanted result, abort rest?
+  // TODO wanted result, abort/rest?
   if (setjmp(toploop)) printf("\n%% Recovering...\n");
 
   r= ERROR;
@@ -1844,15 +1887,11 @@ L readeval(char *ln, L env, char noprint) {
       // option to compare results? slow but equal
       for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
 
-        #ifndef AL
-          #ifndef FIB
-            r= eval(x, env);
-          #else
-            r= MKNUM(fib(NUM(x)));
-          #endif
-        #else
+        if (ISBIN(x)) {
           r= al(ISBIN(x)? BINSTR(x): NULL);
-        #endif // AL
+        } else {
+          r= eval(x, env);
+        }
 
         if (r==ERROR) break;
       }

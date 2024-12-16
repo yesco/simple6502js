@@ -4,6 +4,105 @@
 // AL: 23.728s instead of EVAL: 38.29s => 38% faster
 //   now 27.67s... why? cons x 5000= 16.61s 
 
+// 
+
+
+// compile LISP to AL bytecode
+
+/* Byte codes that are GENERATED
+
+   ' ' \t \r \n - skip
+   !    - store (val, addr) => val (TODO: redundant? uses : ??)
+   "	- (extended ops?)
+// #    - (isnum)    = LOL cc65 preprocessor runs inside comments?
+   $	- (isstr)
+   %    - (mod)
+   &    - (bit-and)
+   '    - (isatom?/issymbol?)
+   ()   - (incf/decf? lol rather use SIa SDa)
+   *    - mul
+   +    - add
+   ,nn  - literal word (== quote ' !)
+   -    - (sub)
+   .    - princ
+   /    - (div)
+   012345678 - literal single digit number
+   9    - nil (or T and swap with _ for nil?)
+   :aa  - setq at AAdress
+   ;nn  - ;BEEF read value at BEEF
+   <    - (lt)
+   =    - (eq)
+   >    - (gt)
+   ?    - (cmp anything)
+   @    - read value at addr from stack (use for array) (TODO: redundant w N? see @ too)
+   A    - cAr
+   B    - (memBer)
+   C    - Cons
+   D    - cDr
+   E    - (Eval) - call lisp
+   F    - (Filter+Reduce?)
+   G    - (Gassoc)
+   H    - (evalappend?) ???
+   I    - If
+   J    - (Japply) - funcall?
+   K    - (Kons?)
+   L    - (evallist? / nList?)
+   M    - (Map, use generic all?)
+   N    - (Nth)
+   O    - (Ord/length)
+   P    - Print
+   Q    - (eQual)
+   R    - Recurse
+   S    - (Setq local/closure named var: Sa S+a, SIa,SDa=incf,decf? etc..)
+   T    - Terpri (newline)
+   U    - nUll
+   V    - (reduce? or see F)
+   W    - princ
+   X    - apply/eXecute addr on stack (use 'z' for tail-call)
+   Y    - read
+   Z    - loop/tail-recurse (jmp, no reassign of variables/parameters, cleanup stack?)
+   [    - pushax, as new value comes
+   \    - (lambda?)
+   ]    - popax? ( "][" will do nothing! )
+   ^    - return
+   _    - machine code call ADDRESS        (old IDEA: (nil, but that's 9, hmmm, swap 9 to T?, OR _ jmp?))
+   `    - (backquote construct)
+
+   abcdefgh - (local stack variables, only 8)
+   ijklmnop - (local/closure frame variables, only 8)
+   qrst
+   uv   - (more ops dispatch? u=byte v=word? lol)
+   w    - (ax Word?)
+   x    - (x lol?)
+   y    - (y lol?)
+   znn  - (jsr nn), but how to jmp?
+   {    - forth ELSE (starts THEN part, lol)
+   |    - (bit-or)
+   }    - forth THEN (ends if-else-then)
+   ~    - (bit-not)
+      - ermh?
+
+   CTRL-CHARS:
+   \0     - end, implicit RTSish (if at expected ALop location)
+   ^A     - 
+   ^B-^F  - 
+   ^G     - BELL/Error?
+   ^H     - backspace
+   ^I \t  - formatting char
+   ^J \r? - formatting char
+   ^K     -
+   ^L     - formatting char (new page)
+   ^M \n  - formatting char
+   ^N-^Z  - 
+   ^[     - ESC (?) 
+   ^\     -
+   ^]     - 
+   ^DEL   - ?
+
+HIBIT set?
+          - could be relative JMP forward... i.e. compiled {}
+
+*/
 
 
 #define NEXT goto next
@@ -226,6 +325,9 @@ JMPARR(gA)case 'A': if (isnum(top)) goto setnil; top= CAR(top); goto next; // 13
 JMPARR(gD)case 'D': if (isnum(top)) goto setnil; top= CDR(top); goto next;
 
 JMPARR(gZ)case 'z':
+    // TODO: what is this, lol, remove, look above at doc
+
+    // benchmarking
     { int i=5000; static L x; x= top;
       // nair fair, EVAL: ./run -b 10000 => 92.38s !!!!    
       for(;i;--i) {
@@ -263,7 +365,7 @@ JMPARR(gat)case '@': top= ATOMVAL(top); goto next; // same car 'A' lol
 JMPARR(gcomma)case ',': *++s= top; top= *(L*)++pc; pc+= sizeof(L)-1; goto next;
 JMPARR(gsemis)case ';': *++s= top; top= *(L*)++pc; top= ATOMVAL(top); pc+= sizeof(L)-1; goto next;
 JMPARR(gsetq)case ':': setval(*(L*)++pc, top, nil); pc+= sizeof(L)-1; goto next;
-JMPARR(gcall)case '_': {
+JMPARR(gcall)case '_': { // followed by 2-byte machine code ADDRESS
       L a, b;
       char n= 1; // TODO: extract number of arguments from function
       void* f= (void*)*(L*)++pc; pc+= sizeof(L)-1;
@@ -291,6 +393,8 @@ JMPARR(gexec)case'X': {
       goto next;
 
     } else if (ISBIN(f)) {
+      // TODO: test for VM
+      // TODO: and detect and call ASM?
       char* fp= BINSTR(f);
       char n= 1; // TODO: extract number of arguments from function
       alcall(n, fp); // TOOD: tailrecursion?
@@ -537,6 +641,26 @@ void alcompile() {
 
     if (verbose>2) { printf("\n%% compile: "); prin1(x); printf("\t=> '%c' (%d)\n\n", bf, bf); }
  
+    // (lambda PARAMS BODY) // TODO BODY ... 
+    // TODO: this could delay compilation till "invoked" (can only do one at a time...)
+    if (x==lambda) {
+      x= cons(lambda, cons(lread(), cons(lread(), nil)));
+      if (skipspc()!=')') goto expectedparen;
+      // just compled as quoted list
+
+      // TODO: should compile to make a CLOSURE over free/outer variables
+      //                   (for example, opt)
+      //   "SBCL will tell you if it has created a closure or not:
+      //      #<FUNCTION ...> vs #<CLOSURE ...>.
+      //    Your code does not create a closure because there are
+      //    no free vars in the body of the lambda."
+      //   - https://stackoverflow.com/questions/38028483/dynamic-variable-closure-in-common-lisp-sbcl
+      //
+      // TODO: Actually, we want a third case where if this lambda isn't returned "up/out"
+      //   it just becomes a lexical closure (lambda (x) ...) or (function (x) ...) maybe could be used?
+      goto quote;
+    }
+
     // DefineCompile to al bytecode
     if (x==DC) {
       L name;
@@ -675,8 +799,9 @@ void alcompile() {
       return;
     }
 
-    // GENERIC argument compiler
     if (verbose) printf("F='%c' (%d)\n", bf, bf);
+
+    // GENERIC argument compiler
     {
       char calledF= 0;
       while((c=nextc())!=')') {
@@ -698,11 +823,25 @@ void alcompile() {
       else if (bf>0 && bf<255 && n>1) { ALC(bf); n-=2; break; }
 
     }
+
     // TODO: merge with quote?
     if (!isnum(f)) {
-      printf("Compile: call lambda: "); prin1(f); NL;
-      ALC('_'); ALW(f);
-      return; 
+      // arguments have been compiled before
+      // TODO: How many parameters? matches? give error if not, or add/remove?
+      if (verbose) printf("Compile: call lambda: "); prin1(f); NL;
+
+      // TODO: isn't this just compilequote() ? (goto quote)
+      extra= 'X';
+      x= f;
+      goto quote;
+
+      // Thisis just quote??? - YES!
+      ALC('[');
+      ALC(',');
+      ALW(f);
+
+      ALC('X');
+      return;
     }
 
     // foldr?

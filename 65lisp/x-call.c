@@ -115,21 +115,69 @@ L applyN(char fn, L f, L args, L env) {
 L apply(L f, L args, L env) {
   char fn= NUM(f);
   switch(funparams(f)) {
-  case 0: return apply0(fn);
-  case 1: return apply1(fn, eval(car(args), env));
-  case 2: return apply2(fn, eval(car(args), env), eval(car(cdr(args)),env));
-  case 3: return apply3(fn, eval(car(args), env), eval(car(cdr(args)),env), eval(car(cdr(cdr(args))),env));
-  default: return applyN(fn, f, args, env); // no-eval
+    // TODO: how much code are these switches?
+  case '0': return apply0(fn); // 4 + 9
+  case '1': return apply1(fn, eval(car(args), env)); // 4 + 32
+  case '2': return apply2(fn, eval(car(args), env), eval(car(cdr(args)),env)); // 4 + 56
+  case '3': return apply3(fn, eval(car(args), env), eval(car(cdr(args)),env), eval(car(cdr(cdr(args))),env)); // 4 + 
+  default: return applyN(fn, f, args, env); // no-eval // 4 + 28
   }
+}
+
+L applyNEW(L f, L args, L env) {
+  char fn= NUM(f);
+  char n= funparams(f);
+
+  if (!n) return apply0(fn); // 4 + 
+  else {
+    L a= eval(car(args), env);
+    if (n==1) return apply1(fn, a); // 4 + 
+    else {
+      L b= eval(car(cdr(args)),env);
+      if (n==2) return apply2(fn, a,b); // 4 + 
+      else {
+        L c= eval(car(cdr(cdr(args))),env);
+        if (n==3) return apply3(fn, a,b,c); // 4 + 
+        else return applyN(fn, f, args, env); // no-eval // 4 + 
+      }
+    }
+  }
+}
+
+void* funptr(L f) {
+  if (!isnum(f)) { printf("%%Error !fun number: \n"); prin1(f); exit(1); }
+
+  f= num(f);
+  switch(f) {
+    // no arg
+  case 'T': return terpri;
+    // one arg
+  case 'A': return car;
+  case 'D': return cdr;
+//  case '\'': return ...;
+  case '#': return isnum;
+//  case 'U': return isnull;
+  case 'K': return iscons;
+    // two args
+//  case '=': return eq;
+//  case '<': return lt;
+//  case '>': return gt;
+  case 'C': return cons;
+    // three args
+    // n args
+    // '-' - non-eval args
+  }
+
 }
 
 L applyF(L f, L args, L env) {
   void* fp= funptr(f);
   switch(funparams(f)) {
-  case 0: return (*(F0)fp)();
-  case 1: return (*(F1)fp)(eval(car(args), env) );
-  case 2: return (*(F2)fp)(eval(car(args), env), eval(car(cdr(args)),env) );
-  case 3: return (*(F3)fp)(eval(car(args), env), eval(car(cdr(args)),env), eval(car(cdr(cdr(args))), env) );
+    // TODO: how much code are these switches?
+  case '0': return (*(F0)fp)();
+  case '1': return (*(F1)fp)(eval(car(args), env) );
+  case '2': return (*(F2)fp)(eval(car(args), env), eval(car(cdr(args)),env) );
+  case '3': return (*(F3)fp)(eval(car(args), env), eval(car(cdr(args)),env), eval(car(cdr(cdr(args))), env) );
   default: return (*(FN)fp)(fp, f, args, env); // no-eval
   }
 }
