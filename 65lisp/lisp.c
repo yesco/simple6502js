@@ -4,6 +4,15 @@
 // ...
 
 
+// current tasks:
+//  - ./65vm       make VM be           able to call lisp         - done
+//  - ./65lisp     make lisp/EVAL/APPLY able to call VM/AL        -   TODO
+//  - ./65lisp     make LISP            able to call ASM          - 
+//  - ./65vm       make VM              able to call ASM          - 
+
+//  - ./65asm/jit  make ASM able to compile DA code and call ASM  -
+//  - ./65asm/jit  make AMS able to call VM/lisp                  -
+
 // ------------------------------------------------------------
 // Current Performance:
 
@@ -448,10 +457,11 @@ void error1(char* msg, L a);
 #define HARRAY  0xA6
 // TODO: +HCONST string for program read
 #define HSTRING 0x57 // dynamica alloc, may need to be GC:ed
-#define HBIN    0xB1
-#define HAL     0xA1
-#define HASM    0xA5
 #define HSLICE  0x51 // do you get it? ;-)
+// All Bin object hi nibble == 'B', ISBIN, BINSTR
+#define HBIN    0xB0 // BinObject
+#define HAL     0xBA //   BinAl
+#define HCODE   0xBC //   BinCode/asm
 
 #define HTYP(x) (*((char*)(((L)x)-1)))
 
@@ -706,12 +716,16 @@ L funatom(char* snn, char* code, int len) {
 L mkstr(char* s) { return atomstr(s, HSTRING, 0); }
 
 
-#define ISBIN(x) (isatom(x)&&HTYP(x)==HBIN)
+#define ISBIN(x) (isatom(x)&&((HTYP(x)&0xf0)==HBIN))
+#define ISAL(x)  (isatom(x)&&HTYP(x)==HAL)
+#define ISCODE(x) (isatom(x)&&HTYP(x)==HCODE)
 #define BINSTR(x) (ISBIN(x)? ATOMSTR(x)+1: 0)
 #define BINLEN(x) (ISBIN(x)? NUM(ATOMVAL(x)): 0)
 
 // TODO: provide alternative
-L mkbin(char* s, size_t len) { return atomstr(s, HBIN, len); }
+L mkbin(char* s, size_t len)  { return atomstr(s, HBIN,  len); }
+L mkal(char* s, size_t len)   { return atomstr(s, HAL,   len); }
+L mkcode(char* s, size_t len) { return atomstr(s, HCODE, len); }
 
 // ---------------- GC Garbage Collector
 // just do a simple mark and sweep
@@ -1005,8 +1019,8 @@ L prinq(L x, signed char quoted) {
   else if (isnum(x)) printf("%d", num(x));
   //TODO: printatom as |foo bar| isn't written readable...
   else if (isatom(x)) {
-    if (HTYP(x)==HBIN) { char* p= BINSTR(x); size_t z= BINLEN(x);
-      (quoted>=0) && printf("#%d$\"", z);
+    if (ISBIN(x)) { char* p= BINSTR(x); size_t z= BINLEN(x);
+      (quoted>=0) && printf("#%02X[%d]=\"", HTYP(x), z);
       while(z-->0) if (quoted<0) putchar(*p++);
         else if (*p>=32 && *p<=126 &&* p!='"') putchar(*p++);
         else { revers(1); printf("%02x", *p++); revers(0); }
@@ -1134,6 +1148,8 @@ L evalX(L,L);
   #define indent() ;
 
 #endif // ETRACE
+
+extern L runal(char* la);
 
 L de(L args) { return args?ERROR:ERROR; } // TODO:
 L df(L args) { return args?ERROR:ERROR; } // TODO:
@@ -1576,6 +1592,11 @@ L evalX(L x, L env) {
 
     // TODO: string is kind of an atom for now... LOL
     if (ISSTR(x)) return x;
+    // TODO: switch() ?
+    if (ISBIN(x)) {
+      // TODO: ISCODE ?
+      return runal(BINSTR(x));
+    }
 
     // TODO: make @var be global, no search, or just *var*?
     //if (isglobalatom(x)) return ATOMVAL(x);
@@ -1590,7 +1611,6 @@ L evalX(L x, L env) {
     // 9.95s => 9.28s using ATOMVAL
     //return iscons(env)? CDR(p): ATOMVAL(x);
   }
-
 
   // TODO: if we assumed all atoms global:
   //   2.29s same as number, instead of 6.7s
@@ -1637,6 +1657,8 @@ unsigned long bench=1;
 
 #ifdef AL
   #include "lisp-vmal.c"
+#else
+  extern L runal(char* la) { error("Not compiled with AL/ASM-compiler\n"); return nil; }
 #endif // AL
 
 // ---------------- Register Functions
@@ -1836,7 +1858,7 @@ void statistics(int level) {
 }
 
 // TODO: turn on GC
-char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
+char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0,docompile=0;
 
 #define DOPRINT 0
 
@@ -1866,43 +1888,48 @@ L readeval(char *ln, L env, char noprint) {
   do {
     //printf("X=%d Y=%d\n", wherex(), wherey());
 
-    // read
+    // -- read
     if (!ln && !quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
-    #ifndef AL
-      x= lread();
-    #else
+
+    switch(docompile) {
+    case 0: x= lread(); break;
+
+    #ifdef AL
+    case 1:
+      // TODO: lread() does "macro expansion" ? lol?
+    case 2:
       x= alcompileread();
       NL;
       if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
+      break;
     #endif // AL
 
+    default: printf("Unknown docompile %d\n", docompile); return env;
+    }
+
+    // -- info/end
     if (x==eof || x==bye) break;
+
     if (echo) { printf("> "); prin1(x); NL; }
 
-    if (!bench) bench= 1;
-
     //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
-    // eval
+
+    // -- eval
+    if (!bench) bench= 1;
     if (!noeval && x!=ERROR) {
-      // option to compare results? slow but equal
+      // TODO: option to compare results? slow but equal
       for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
-
-        if (ISBIN(x)) {
-          r= al(ISBIN(x)? BINSTR(x): NULL);
-        } else {
-          r= eval(x, env);
-        }
-
+        r= eval(x, env);
         if (r==ERROR) break;
       }
     }
 
-    // print
+    // -- print
     //{ printf("RES= "); prin1(r); NL; }
     //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
     if (!noprint && (echo || !quiet || bench)) { prin1(r); NL; }
 
-    // info
+    // -- info
     if (gc) GC(env, alvals); // TODO: only if needed?
     if (!quiet & stats) {NL; statistics(stats); }
 
@@ -1970,7 +1997,7 @@ int main(int argc, char** argv) {
       case 'q': quiet=1,echo=stats=0;  break;
       case 's': ++stats,statistics(stats);  break;
       case 't': test=1,quiet=1,echo=0,env=testing(env);  break;
-        
+      case 'c': ++docompile; break;
       // actions
       case 'b': bench= atol(argv[1]); if (bench) --argc,++argv; else bench= 5000;
         echo= 1; quiet= 1;  break;

@@ -223,6 +223,8 @@ extern L runal(char* la) {
   char* orig= la; // global 10% faster
   pc= la;
 
+  printf("\n=================RUNAL\n");
+
 #ifndef JMPARR
   // TODO: static allocation, less code!
   #define JMPARR(a) a:
@@ -285,7 +287,8 @@ extern L runal(char* la) {
   //assert(s<send);
   // cost: 13.50s from 13.11s... (/ 13.50 13.11) => 3%
 
-  //if (verbose>1) { printf("%02d:al %c stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
+  if (verbose>1) { printf("%02d:al %c stk=%d top=", pc-orig+1, pc[1], s-(stack-1)); prin1(top); NL; }
+
   if (verbose>1) { L* x= stack;
     printf("%02d:al %c    STK[%d]: ", pc-orig+1, pc[1], s-(stack-2));
     while(x<=s) { prin1(*x++); putchar(' '); }  prin1(top); NL; }
@@ -662,6 +665,7 @@ void alcompile() {
     }
 
     // DefineCompile to al bytecode
+    // TODO: too much code, if it was macro/defined lisp - less?
     if (x==DC) {
       L name;
 
@@ -699,7 +703,7 @@ void alcompile() {
       alcompile();
       assert(b);
       ALC('^');
-      x= mkbin(buff, b+1);
+      x= mkal(buff, b+1);
 
       printf("  BODY= "); prin1(x); NL;
       b= 0;
@@ -909,5 +913,5 @@ L alcompileread() {
   if (!b || b==1) return eof; // TODO: b==1 for ']' above
   if (buff[b]) return ERROR; // out of buffer TODO: fix assert in ACL
   ALC('^'); // all need to return & cleanup
-  return mkbin(buff, b+1); // add one to additionally zero-terminate?
+  return mkal(buff, b+1); // add one to additionally zero-terminate?
 }  
