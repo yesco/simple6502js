@@ -152,7 +152,8 @@ static char c, *pc;
 
 
 // 2883 Bytes for the bytecode interpreter!
-#ifndef GENASM
+//#ifndef GENASM
+#ifndef FOOBARFIEFUMGENSASM
 
 //#if 0
 
@@ -666,8 +667,8 @@ void alcompile() {
 
     // DefineCompile to al bytecode
     // TODO: too much code, if it was macro/defined lisp - less?
-    if (x==DC) {
-      L name;
+    if (x==DE || x==DA || x==DC) {
+      L name, deftype= x;
 
       assert(!compileDC);
       
@@ -695,15 +696,13 @@ void alcompile() {
 
       // - parse body
       // (remove ], why is it there?) TODO:
+      // TODO: this is duplicated from alcompileread
       b= 0;
       buff[0]= 0;
 
-      // TODO: should this just be a funciton of parsing a (n expliecit) lambda?
-      // TOOD: this is duplicated from alcompileread
       alcompile();
       assert(b);
       ALC('^');
-      x= mkal(buff, b+1);
 
       printf("  BODY= "); prin1(x); NL;
       b= 0;
@@ -712,6 +711,29 @@ void alcompile() {
       c= skipspc();
       if (c!=')') goto expectedparen;
       
+      // docompie
+      // --------
+      // 0: INTERPRET-ALL (no compilation)
+      //    readeval - just lisp
+      //    de, da, dc - just all lisp
+      // 1: (default) BYTE-COMPILE
+      //    readeval - bytecode
+      //    de= interpret lisp
+      //    da= compile to al, store al
+      //    dc= compile to al, then machine code, store it
+      // 2: CODE-COMPILE
+      //    readeval - machine code
+      //    de, da, dc - all compile to machine code
+      // 3: OLD-ASM-COMPILE
+
+      if (docompile) {
+        if (deftype==DA) {
+          x= mkal(buff, b+1);
+        } else {
+          error("TODO: jit/asm compile");
+        }
+      }
+
       // - define and store function
       setval(name, x, nil);
       return;

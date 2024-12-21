@@ -968,20 +968,12 @@ void promoteReturn(char* bc) {
 #endif // MATCHER
 
 
-// takes compiled bytecode and compiles to asm,
-// then runs bench times
-
-// TODO: redo to make everything JSR/JMP asm, even lisp,
-// similar to FORTH threading.
-long sum= 0;
-
-L al(char* la) {
-  int xx= 4711;
-  L r= nil;
-  L i= 8*2; // TODO: remove, is input for hardcoded tests
-  static unsigned int n;
-  n= bench+1;
-
+// JIT compile and run! Just-In-Time compilation
+//
+// Takes AL compiled bytecode and compiles to 6502 machine code.
+//
+// Result: in gen[], end at gen[bytes]
+void machinecompile(char* la) {
   bc= strdup(la);
   promoteReturn(bc);
 
@@ -993,6 +985,9 @@ L al(char* la) {
   ax= 0;
   saveax= 0;
 
+  // generate machine code
+  // input : char* bc
+  // output: gen[]
   compile();
   
   if (stk<60) {
@@ -1001,10 +996,27 @@ L al(char* la) {
     gen[bytes++]= 0x60; // RTS
   }
 
-  //if (verbose) DISASM(gen, gen+bytes, 0);
-
   relocate(bytes, gen);
   if (verbose) DISASM(gen, gen+bytes, 0);
+
+  free(bc); bc= NULL;
+}
+
+// Sum up dummy return values, otherwise an optimizing
+// c-compiler might just remove the loop!
+long sum= 0;
+
+// Run machine code in gen[] bench times.
+//
+// Returns: value of last invokation.
+//
+// Warning: can't be nested
+L coderun() {
+  int stackcheck= 4711;
+  L r= nil;
+  static unsigned int n;
+
+  n= bench+1;
 
   // Actually call, bench times (n)
   while(--n>0) { // (--n) doesn't work! it jumps out early!
@@ -1013,11 +1025,11 @@ L al(char* la) {
     } else if (0) { // 25% overhead cmp next...
       // 39.32s
       //r= ((F1)gen)(i); // one argument, one result
-      r= ((F0)gen)(); // no argument, one result, hmmmm works?
+      r= ((F0)cd)(); // no argument, one result, hmmmm works?
     } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
       // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
       __AX__= i;
-      asm(" jsr %v", gen);
+      asm(" jsr %v", cd);
       r= __AX__;
       
       // TODO: why doesn't it work - loops forever!
@@ -1029,7 +1041,7 @@ L al(char* la) {
     sum+= NUM(r);
 
     // DEBUG
-    if (0 && xx!=4711) {
+    if (0 && stackcheck!=4711) {
       // TODO:doesn't work
       //   ERROR: ./65jit -E -v -e "(+ 3 4)" -e "(+ 2 5)"
       //   FINE:  (echo "(+ 3 4)"; echo "(+ 2 5)") | ./65jit -v
@@ -1039,17 +1051,16 @@ L al(char* la) {
 
   }
 
+  // If not print, maybe didn't happen...
   printf("SUM=%ld\n", sum);
 
-  // TODO: bad hack, lisp.c epxects bench to be counted
+  // TODO: bad hack, lisp.c expects bench to be counted
   bench= 0;
 
   //print(r);
 
   return r;
 }
-
-
 
 #ifdef TEST
 

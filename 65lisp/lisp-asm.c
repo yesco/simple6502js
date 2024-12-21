@@ -881,39 +881,30 @@ char* asmpile(char* pla) {
 
 // takes compiled bytecode and compiles to asm,
 // then runs bench times
-L al(char* la) {
-  char *m= 0;
+L alasmrun(char* m) {
+  L x= top; L check= ERROR, ft= MKNUM(42);
 
   top= MKNUM(8);
 
   // TODO: implement real function call...
 
-  if (verbose) printf("\nVMAL.run: %s\n", pc);
+  if (verbose) printf("\nlisp-asm.c run: %s\n", pc);
 
-  // TODO: move OUT
-  m= asmpile(la);
+  // Bench cut all overhead, run form there...
+  // TODO: not fair to VM... lol
+  // TODO: why one arg?
+  for(; bench>0; --bench) top= ((FUN1)m)(x);
 
-  if (m) {
-    // Run machine code
-    { L x= top; L check= ERROR, ft= MKNUM(42);
-
-      // Bench cut all overhead, run form there...
-      // TODO: not fair to VM... lol
-      for(; bench>0; --bench) top= ((FUN1)m)(x);
-
-      if (ft!=MKNUM(42) || check!=ERROR) {
-        // TODO: calculate how much? lol
-        printf("\n%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
-        printf("top="); prin1(top);
-        printf(" ft="); prin1(ft);
-        printf(" check="); prin1(check); NL;
-        exit(99);
-      }
-      //top= ((FUN1)m)(x);
-      if (verbose) printf("RETURN: %04x == ", top); prin1(top);NL;
-      // TODO: need to balance the stack!
-      return top;
-    }
+  if (ft!=MKNUM(42) || check!=ERROR) {
+      // TODO: calculate how much? lol
+    printf("\n%% ASM: STACK MISALIGNED: %d\n", -666); // get and store SP
+    printf("top="); prin1(top);
+    printf(" ft="); prin1(ft);
+    printf(" check="); prin1(check); NL;
+    exit(99);
   }
-  return ERROR;
+  //top= ((FUN1)m)(x);
+  if (verbose) printf("RETURN: %04x == ", top); prin1(top);NL;
+  // TODO: need to balance the stack!
+  return top;
 }

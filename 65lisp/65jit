@@ -14,7 +14,7 @@ cl65 -O $OPTS -T -t sim6502 $name.c -m $name.map vm-asm.s -o $name.out 2>&1 && (
 # show and format error messages, generate .s too, (makes no out?)
 ( cl65 -S -O $OPTS -T -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
 
-echo "DONE< ./65vm $xx"
+echo "DONE< ./65jit $xx"
 echo
 echo
 

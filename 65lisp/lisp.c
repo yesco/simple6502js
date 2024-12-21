@@ -361,13 +361,16 @@ void* zalloc(size_t n) {
 
 //#define UNSAFE // doesn't save much 3.09s => 2.83 (/ 3.09 2.83) 9.2%
 
+char docompile=0; // switch argument
+
 #include "extern-vm.c"
 
 
 // --- special atoms
 //const L nil= 0;
 //#define nil 0 // slightly faster 0.1% !
-L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, DC, quote= 0;
+L nil, T, FREE, ERROR, eof, lambda, closure, bye, SETQ, IF, AND, OR, DE,DA,DC;
+L  quote= 0;
 
 #define notnull(x) (x!=nil) // faster than !null
 #define null(x) (x==nil)    // crazy but this is 81s instead of 91s!
@@ -1313,6 +1316,13 @@ L evalX(L x, L env) {
       // TODO: really needed? or put limit on it?
       if (isatom(f)) continue;
 
+      // Handle AL/code call
+      if (ISBIN(f)) {
+        // TODO: implement
+        printf("evalX: BINARY? f= "); prin1(f); NL;
+        assert(!"note implemented yet!");
+      }
+
       // A closure let's APPLY
       if (CAR(f)==closure) {
         ETRACE(printf("CLOSURE: "); prin1(f); NL);
@@ -1356,6 +1366,7 @@ L evalX(L x, L env) {
     // CALL direct address of function
     // (test highbyte this was is "cheaper" 1%)
 #ifdef OLD
+    // TODO: handle more parameters, see applyN in call-x.c
     if (f & 0xff00) return ((FUN1)f)( eval(car(x), env) );
 #else
 
@@ -1422,9 +1433,10 @@ L evalX(L x, L env) {
     // TODO: V=and _=or Z=not??? lol
     // TODO: "=string
 
+    if (a)
     // --- nargs
 #ifdef OLD
-    a= 2;
+    a= 2; // num 1, used by +* loop for accumulation
     switch(f) {
     case ':': return setval(car(x), eval(car(cdr(x)), env), env);  // no-eval
     case '!': return setval(eval(car(x),env), eval(car(cdr(x)), env), env); 
@@ -1590,13 +1602,9 @@ L evalX(L x, L env) {
   if (isatom(x)) { // getval inlined 4.56s insteadof 8s
     L p;
 
-    // TODO: string is kind of an atom for now... LOL
+    //if (ISSTR(x)) return x;
     if (ISSTR(x)) return x;
-    // TODO: switch() ?
-    if (ISBIN(x)) {
-      // TODO: ISCODE ?
-      return runal(BINSTR(x));
-    }
+    if (ISBIN(x)) return x;
 
     // TODO: make @var be global, no search, or just *var*?
     //if (isglobalatom(x)) return ATOMVAL(x);
@@ -1800,6 +1808,8 @@ closure= atom("closure");
      IF= atom("if");
     AND= atom("and");
      OR= atom("or");
+     DE= atom("de");
+     DA= atom("da");
      DC= atom("dc");
 
   // -- register function names
@@ -1858,7 +1868,7 @@ void statistics(int level) {
 }
 
 // TODO: turn on GC
-char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0,docompile=0;
+char echo=0,noeval=0,quiet=0,gc=0,stats=1,test=0;
 
 #define DOPRINT 0
 
@@ -1899,9 +1909,11 @@ L readeval(char *ln, L env, char noprint) {
       // TODO: lread() does "macro expansion" ? lol?
     case 2:
       x= alcompileread();
-      NL;
+      NL; // hmmm
       if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
+      assert(ISAL(x));
       break;
+    case 3:
     #endif // AL
 
     default: printf("Unknown docompile %d\n", docompile); return env;
@@ -1917,10 +1929,51 @@ L readeval(char *ln, L env, char noprint) {
     // -- eval
     if (!bench) bench= 1;
     if (!noeval && x!=ERROR) {
-      // TODO: option to compare results? slow but equal
-      for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
-        r= eval(x, env);
-        if (r==ERROR) break;
+
+// TODO: clean this up, this is only special for top-level
+#ifdef AL
+      // TODO: all this replace by JSR ?
+      if (ISBIN(x)) {
+        switch(docompile) {
+        case 1: // byte-code al
+          if (ISAL(x)) {
+            // run n tests // slow? interact with MC
+            for(; bench>0; bench>0 && --bench) {
+              r= al(BINSTR(x));
+              if (r==ERROR) break;
+            }
+          } else error1("dcompile=1 and NOT AL", x);
+          break;
+#ifdef GENASM
+        case 2: // machine code
+          #ifdef JIT
+            // compiles AL from buff to gen
+            machinecompile(buff);
+            // run gen
+            r= coderun();
+          #else // ASM
+            printf("--------------HERE alcodecompileandrun!\n");
+            // one-shot
+            {
+              // Compiling to and returning static buffer
+              char* m= asmpile(BINSTR(x));
+              r= alasmrun(m);
+            }
+            // TODO: free x? lol
+          #endif // JIT
+#endif // GENASM
+          break;
+        default: error1("Unknown BIN type", x);
+        }
+      } else
+#endif AL
+      {
+
+        // TODO: option to compare results? slow but equal
+        for(; bench>0; bench>0 && --bench) { // run n tests // slow? interact with MC
+          r= eval(x, env);
+          if (r==ERROR) break;
+        }
       }
     }
 
@@ -2012,9 +2065,6 @@ int main(int argc, char** argv) {
       }
     
   } // while more args
-
-  printf("FUFUF %d\n", argc);
-  
 
   if (!interpret) return 0;
   if (!quiet) {
