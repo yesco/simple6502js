@@ -224,7 +224,7 @@ extern L runal(char* la) {
   char* orig= la; // global 10% faster
   pc= la;
 
-  printf("\n=================RUNAL\n");
+  //printf("\n=================RUNAL\n");
 
 #ifndef JMPARR
   // TODO: static allocation, less code!

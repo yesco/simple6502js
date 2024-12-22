@@ -1011,6 +1011,7 @@ long sum= 0;
 // Returns: value of last invokation.
 //
 // Warning: can't be nested
+// TODO: remove, so inefficient.... lol 40% more costly than genrun()
 L coderun(char* code) {
   int stackcheck= 4711;
   L r= nil;
@@ -1034,6 +1035,56 @@ L coderun(char* code) {
       // TODO: this doesn't work?
       assert(!"can't call");
       //asm(" jsr %v", cd);
+      r= __AX__;
+      
+      // TODO: why doesn't it work - loops forever!
+      //__AX__= i;
+      //((F)gen)();
+    }
+    
+    //printf("one %d => %d %ld \n", n, NUM(r), sum);
+    sum+= NUM(r);
+
+    // DEBUG
+    if (0 && stackcheck!=4711) {
+      // TODO:doesn't work
+      //   ERROR: ./65jit -E -v -e "(+ 3 4)" -e "(+ 2 5)"
+      //   FINE:  (echo "(+ 3 4)"; echo "(+ 2 5)") | ./65jit -v
+      printf("STACK MESSED UP: xx!=4711 x==%d\n", stackcheck);
+      exit(1);
+    }
+
+  }
+
+  // If not print, maybe didn't happen...
+  printf("SUM=%ld\n", sum);
+
+  // TODO: bad hack, lisp.c expects bench to be counted
+  bench= 0;
+
+  //print(r);
+
+  return r;
+}
+
+L genrun() {
+  int stackcheck= 4711;
+  L r= nil;
+  static unsigned int n;
+
+  n= bench+1;
+
+  // Actually call, bench times (n)
+  while(--n>0) { // (--n) doesn't work! it jumps out early!
+    if (0) { // 50k noopt- 1579794, opt: 5207599
+      3;
+    } else if (0) { // 25% overhead cmp next...
+      // 39.32s
+      r= ((F0)gen)(); // no argument, one result, hmmmm works?
+    } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
+      // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
+      __AX__= 8;
+      asm(" jsr %v", gen);
       r= __AX__;
       
       // TODO: why doesn't it work - loops forever!

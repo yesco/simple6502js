@@ -1950,7 +1950,8 @@ L readeval(char *ln, L env, char noprint) {
             // compiles AL from buff to gen
             machinecompile(buff);
             // run gen
-            r= coderun(gen);
+            //r= coderun(gen); // 40% overhead!
+            r= genrun();
           #else // ASM
             printf("--------------HERE alcodecompileandrun!\n");
             // one-shot
