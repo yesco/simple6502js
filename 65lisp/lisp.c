@@ -1911,7 +1911,7 @@ L readeval(char *ln, L env, char noprint) {
       x= alcompileread();
       NL; // hmmm
       if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
-      assert(ISAL(x));
+      assert(x==eof || ISAL(x));
       break;
     case 3:
     #endif // AL
@@ -1950,7 +1950,7 @@ L readeval(char *ln, L env, char noprint) {
             // compiles AL from buff to gen
             machinecompile(buff);
             // run gen
-            r= coderun();
+            r= coderun(gen);
           #else // ASM
             printf("--------------HERE alcodecompileandrun!\n");
             // one-shot

@@ -1011,10 +1011,12 @@ long sum= 0;
 // Returns: value of last invokation.
 //
 // Warning: can't be nested
-L coderun() {
+L coderun(char* code) {
   int stackcheck= 4711;
   L r= nil;
   static unsigned int n;
+  static void* cd= NULL;
+  cd= code;
 
   n= bench+1;
 
@@ -1022,14 +1024,16 @@ L coderun() {
   while(--n>0) { // (--n) doesn't work! it jumps out early!
     if (0) { // 50k noopt- 1579794, opt: 5207599
       3;
-    } else if (0) { // 25% overhead cmp next...
+    } else if (1) { // 25% overhead cmp next...
       // 39.32s
       //r= ((F1)gen)(i); // one argument, one result
       r= ((F0)cd)(); // no argument, one result, hmmmm works?
     } else { // 50k RTS - 2179807 (/ (- 2179807 1579794) 50000.0) = 12 = JSR+RTS!
       // 38.98s instead of 39.32s (/ 39.32 38.98) = 0.88% savings
-      __AX__= i;
-      asm(" jsr %v", cd);
+      __AX__= 8;
+      // TODO: this doesn't work?
+      assert(!"can't call");
+      //asm(" jsr %v", cd);
       r= __AX__;
       
       // TODO: why doesn't it work - loops forever!
@@ -1045,7 +1049,7 @@ L coderun() {
       // TODO:doesn't work
       //   ERROR: ./65jit -E -v -e "(+ 3 4)" -e "(+ 2 5)"
       //   FINE:  (echo "(+ 3 4)"; echo "(+ 2 5)") | ./65jit -v
-      printf("STACK MESSED UP: xx!=4711 x==%d\n", xx);
+      printf("STACK MESSED UP: xx!=4711 x==%d\n", stackcheck);
       exit(1);
     }
 
