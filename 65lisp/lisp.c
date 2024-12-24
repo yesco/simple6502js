@@ -318,7 +318,7 @@
 #define MAXCELL 4096*2
 
 // Arena len to store symbols/constants (and global ptr)
-#define ARENA_LEN 2048
+#define ARENA_LEN 2048*2
 
 // Defined to use hash-table (with Arena
 // must be power of two!
@@ -1922,7 +1922,7 @@ L readeval(char *ln, L env, char noprint) {
     // -- info/end
     if (x==eof || x==bye) break;
 
-    if (echo || test) { printf("\n\n> "); prin1(x); NL; }
+    if (echo || test) { printf("> "); prin1(x); NL; }
 
     //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
 
@@ -1985,7 +1985,8 @@ L readeval(char *ln, L env, char noprint) {
 
     // -- info
     if (gc) GC(env, alvals); // TODO: only if needed?
-    if (!quiet & stats) {NL; statistics(stats); }
+    if (!quiet & stats) {NL; statistics(stats); NL;}
+    if (test) { NL; NL; }
 
   } while (1);
   if (!noprint) NL;

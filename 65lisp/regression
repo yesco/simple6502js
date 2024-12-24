@@ -1,2 +1,6 @@
-./65lisp -t < regression.lsp > regression.out
-diff -C 3 regression.res regression.res | tee regression.diff
+PROG="./65asm"
+PROG="./65jit"
+PROG="./65lisp"
+PROG="./65vm"
+
+$PROG -t $* < regression.lsp > regression.out && diff -U 3 -W 80 regression.res regression.out | tee regression.diff
