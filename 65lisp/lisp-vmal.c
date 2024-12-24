@@ -488,7 +488,7 @@ JMPARR(gvar)case 'a':case'b':case'c':case'd':case'e':case'f':case'g':case'h':
 //  default : if (isdigit(*pc)) { ++s; *s= MKNUM(*pc-'0'); NEXT; }
 //   printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
 JMPARR(gerr)default:
-    printf("%% AL: illegal op '%c'\n", *pc); return ERROR;
+    printf("%% AL: illegal op '%c' (%d $%02x) @%04X\n", *pc, *pc, *pc, pc); return ERROR;
   }
 }
 
@@ -704,9 +704,6 @@ void alcompile() {
       assert(b);
       ALC('^');
 
-      printf("  BODY= "); prin1(x); NL;
-      b= 0;
-
       // end DC
       c= skipspc();
       if (c!=')') goto expectedparen;
@@ -726,6 +723,7 @@ void alcompile() {
       //    de, da, dc - all compile to machine code
       // 3: OLD-ASM-COMPILE
 
+      x= ERROR;
       if (docompile) {
         if (deftype==DA) {
           x= mkal(buff, b+1);

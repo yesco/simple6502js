@@ -887,7 +887,7 @@ char nextc() {
   if (_nc) { r= _nc; _nc= 0; }
   else {
     if (_rs) { r= *_rs; if (r) ++_rs; } else r= getchar();
-    if (echo) putchar(r);
+   if (echo) putchar(r);
   }
 
   return r>=0? r: 0;
@@ -1899,8 +1899,8 @@ L readeval(char *ln, L env, char noprint) {
     //printf("X=%d Y=%d\n", wherex(), wherey());
 
     // -- read
-    if (!ln && !quiet && !echo) printf("65> "); // TODO: maybe make nextc echo???
-
+    if (!ln && !quiet && !echo && !test) printf("65> "); // TODO: maybe make nextc echo???
+    r= ERROR;
     switch(docompile) {
     case 0: x= lread(); break;
 
@@ -1922,7 +1922,7 @@ L readeval(char *ln, L env, char noprint) {
     // -- info/end
     if (x==eof || x==bye) break;
 
-    if (echo) { printf("> "); prin1(x); NL; }
+    if (echo || test) { printf("\n\n> "); prin1(x); NL; }
 
     //printf("!noprint=%d && (echo=%d || !quiet=%d || bench=%d)\n", !noprint, echo, !quiet, bench);
 
@@ -2035,7 +2035,7 @@ int main(int argc, char** argv) {
   env= nil; // must be done after initlisp();
 
   // - read args
-  while (--argc>1) {
+  while (--argc>0) {
     ++argv;
     if (!*argv) break;
 
@@ -2050,7 +2050,9 @@ int main(int argc, char** argv) {
       case 'v': ++verbose,++stats;  break;
       case 'q': quiet=1,echo=stats=0;  break;
       case 's': ++stats,statistics(stats);  break;
-      case 't': test=1,quiet=1,echo=0,env=testing(env);  break;
+//      case 't': test=1,quiet=1,echo=0,env=testing(env);  break;
+      case 't':
+        echo=0;env=testing(env);test=1;  break;
       case 'c': ++docompile; break;
       // actions
       case 'b': bench= atol(argv[1]); if (bench) --argc,++argv; else bench= 5000;
@@ -2062,14 +2064,16 @@ int main(int argc, char** argv) {
         env=readeval(argv[1], env, (*argv)[1]=='x');
         interpret= 0; --argc; ++argv;  break;
 
-      default: printf("%% ERROR.args: %s\n", *argv); exit(1);
+      default: printf("%% ERROR.args: %s\n", *argv);
+        printf("\n-e '(+ 3 4)'    eval (and maybe print result)\n-x '(+ 3 4)'	eval & echo expression\n-i 		interactive (till EOF) can be several\n\n-q		quiet\n-N		No-eval\n-E		echo (input)\n-d ...		increase debug level\n-v ...		increase verbosity\n-s		print/increase statistics\n\n-t		test setup, echo input/output\n\n-b [N]		set benchmarking, N default 5000\n-p 'text'	print text for debugging purposes\n\n\n--nogc		turn of gc (has bugs)\n-c		increase defautlt compilation level\n");
+        exit(1);
       }
     
   } // while more args
 
   if (!interpret) return 0;
   if (!quiet) {
-    if (bench==1) clrscr(); // || only if interactive?
+    if (bench==1 && !test) clrscr(); // || only if interactive?
     PRINTARRAY(syms, HASH, 0, 1); // debug
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
   }

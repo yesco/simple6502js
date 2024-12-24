@@ -1,0 +1,2 @@
+./65lisp -t < regression.lsp > regression.out
+diff -C 3 regression.res regression.res | tee regression.diff
