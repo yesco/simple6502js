@@ -568,8 +568,9 @@ void alcompile() {
   switch((c=nextc())) {
   case 0  : return;
   case ' ': case '\t': case '\n': case '\r': goto again;
+  case ';': while((c=nextc()) && c!='\n' && c!='\r'); goto again; // TODO: same as in lread
 
-  case'\'': quote:
+  case '\'': quote:
     // TODO: make subroutine compile const
     //printf("QUOTE: %d\n", x);
     x= x==0xbeef? lread(): x;
@@ -899,6 +900,7 @@ void alcompile() {
 
     // atom name
     unc(c); x= lread(); // x use by quote if !0
+    if (!isatom(x)) error1("Expected atom, but got", x);
     assert(isatom(x));
     // local variable a-w (x y z special)
     nm= ATOMSTR(x);
