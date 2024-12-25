@@ -47,12 +47,13 @@
 // nothing: 3578, rules NO-OPT: 4002 bytes, OPT: 4499 bytes (rule no-opt: +424, opt: + 497)
 // NO-OPT fac => 87 bytes, OPT: 45 bytes, with delay-pushax it would be 40 bytes...
 
-#define RULES
-#define MATCHER
+// "EMTPY PROGRAM       //  3677 bytes  ... with nothing 3677 bytes
+#define RULES         //  1070 bytes  .... wihout rules 9140 bytes
+#define MATCHER       //  5463 bytes  ...  with all 10210 bytes
 
 
 // uncomment to get DISASM
-#define DISASM
+//#define DISASM
 
 #ifdef DISASM
   #undef DISASM
@@ -67,8 +68,8 @@
 //#define DEBASM(a) do { a; } while (0)
 
 // into about the matched rule and code-gen
-#define APRINT(...) do { if (verbose) printf(__VA_ARGS__); } while(0)
-//#define APRINT(...) 
+//#define APRINT(...) do { if (verbose) printf(__VA_ARGS__); } while(0)
+#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -173,7 +174,26 @@
  // TODO: if this is ever changed, need to change codegen "[9=I" and "UI"
  const unsigned int nil=1;
 
-  #define NIL (1)
+
+ // dummys
+ #define verbose 0
+
+
+ #define NIL (1)
+ #define NUM(a) ((a)>>1)
+
+ L cons(L a, L d) { return NIL; }
+
+ // patchup
+#ifdef MATCHER
+ void machinecompile(char* la);
+ L genrun();
+
+ L al(char* bc) {
+   machinecompile(bc);
+   return genrun();
+ }
+#endif
 
 #endif
 
@@ -581,6 +601,8 @@ char* rules[]= {
 
   0};
 
+#else
+  #define rules 0
 #endif // RULES
 
 // No OP:
@@ -696,7 +718,7 @@ unsigned char changesAX(char* rule) {
 //
 // Returns bytes (length)
 
-int compile() {
+extern int compile() {
   // register: (/ 1137712 766349.0) 49% slower without register
   // (however, no function below here can use it, as it'll trash/copy too much!)
 
@@ -968,6 +990,8 @@ void promoteReturn(char* bc) {
 #endif // MATCHER
 
 
+#ifdef MATCHER
+
 // JIT compile and run! Just-In-Time compilation
 //
 // Takes AL compiled bytecode and compiles to 6502 machine code.
@@ -1116,6 +1140,7 @@ L genrun() {
 
   return r;
 }
+#endif // MATCHER
 
 #ifdef TEST
 
