@@ -645,11 +645,15 @@ void alcompile() {
     //printf("ALC.read fun: "); prin1(x);
     if (!isnum(x) && !isatom(x)) { prin1(x); printf(" => need EVAL: %04X ", f); prin1(f); NL; error("ALC: Need to do eval"); }
 
+    // TODO: we actually might to:
+    // - 1. keep a runtime lookup/dispatch to the NAME
+    // - 2. OR, compile JSR to actual compiled code
+    //      (again: if all used JSR to call all codes)
     if (isatom(x)) f= ATOMVAL(x);
     if (!f || !isnum(f)) { // 0== not primtive?
       if (verbose) { printf("\n%%TODO: funcall: "); prin1(x); printf(" => ATOMVAL $%04X = ", f); prin1(f); NL; }
       if (iscons(f) && car(f)==lambda) {
-        printf("LAMBDA!...\n");
+        printf("compiling call to LAMBDA!...\n");
       } else {
         if (ISBIN(f)) { // AL bytecode
 
@@ -845,7 +849,14 @@ void alcompile() {
         if (deftype==DA) {
           x= mkal(buff, b+1);
         } else {
-          error("TODO: jit/asm compile");
+          #ifdef JIT
+            // TODO: store byte-code?
+            // x= machinecompilefunction(buff);
+            x= mkal(buff, b+1);
+            x= machinecompilefunction(x);
+          #else // JIT
+            error("Cannot compile machine code in lisp/vm");
+          #endif //JIT
         }
       }
 
@@ -942,7 +953,7 @@ void alcompile() {
 
 #endif // COMP
 
-    if (verbose) printf("F='%c' (%d)\n", bf, bf);
+    if (verbose) printf("  F='%c' (%d)\n", bf, bf);
 
     // GENERIC argument compiler
     {
@@ -971,19 +982,16 @@ void alcompile() {
     if (!isnum(f)) {
       // arguments have been compiled before
       // TODO: How many parameters? matches? give error if not, or add/remove?
-      if (verbose) printf("Compile: call lambda: "); prin1(f); NL;
+      if (verbose) printf("TODO: Compile: call lambda: "); prin1(f); NL;
 
       // TODO: isn't this just compilequote() ? (goto quote)
       extra= 'X';
       x= f;
       goto quote;
 
-      // Thisis just quote??? - YES!
-      ALC('[');
-      ALC(',');
-      ALW(f);
-
-      ALC('X');
+      // This is just quote??? - YES!
+      ALC('['); ALC(','); ALW(f);
+      ALC('X'); // "apply"
       return;
     }
 

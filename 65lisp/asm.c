@@ -53,7 +53,7 @@
 
 
 // uncomment to get DISASM
-//#define DISASM
+#define DISASM
 
 #ifdef DISASM
   #undef DISASM
@@ -68,8 +68,8 @@
 //#define DEBASM(a) do { a; } while (0)
 
 // into about the matched rule and code-gen
-//#define APRINT(...) do { if (verbose) printf(__VA_ARGS__); } while(0)
-#define APRINT(...) 
+#define APRINT(...) do { if (verbose) printf(__VA_ARGS__); } while(0)
+//#define APRINT(...) 
 
 
 //  bc= "[a[2<I][a^{][a[1-R[a[2-R+^}";
@@ -541,10 +541,15 @@ char* rules[]= {
   ";%d", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
   "_%d", JSR("ww"),            U 3, REND // call address (eval?)
 
+  // TODO: lastparam
+  "[a%0",    "", U 0, REND // TODO: this is not right...
+
   OPT("][", 0, U 0, REND) // 3 zeroes! lol
   "]", "s-" JSR("w?"), U 5, U popax,  REND // TODO: useful to actually pop value?
   // TODO: if ax is 0 then dont? (no specific value worth saving, or just prefix with ']'
+  "[%d", "s+" JSR("w?") LDAn("#") LDXn("\""), U 9, U pushax, REND
   "[", "s+" JSR("w?"), U 5, U pushax, REND
+
 
 //OPT("0^%0", JMP("w?"), U 3, U push0, REND)   // return 0 (if no need clean stack) // 1 byte savings, slower
 //OPT("1^%0", JMP("w?"), U 3, U push2, REND)   // return 1 (if no need clean stack) // 2 byte savings
@@ -554,6 +559,7 @@ char* rules[]= {
 //"9",        JSR("w?"), U 3, U retnil, REND   // load nil 
   "9",        LDAn("\x01") LDXn("\x00"), U 4, REND // load nil
   OPT("0",    LDAn("\0") TAX(), U 3, REND)     // load 0
+  ",%d",       LDAn("#") LDXn("\""), U 4, REND
   "%d",       LDAn("#") LDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
@@ -579,6 +585,7 @@ char* rules[]= {
 
   // CALL = "Xcode" - would prefer other prefix?
   //"X^^",    "<" JMP("ww"),     U 4, REND // ERROR (need popstack first/move)
+  // TODO: rename "<" to "s<" ???
   OPT("%dX^", "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
   OPT("%dX",  "<" JSR("ww"),       U 4, REND) // Call other function // TODO: param/STK?
   OPT("X^",   "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
@@ -702,13 +709,22 @@ char matching(char* bc, char* r) {
 
 unsigned int bytes= 0; // char would save 50 bytes, but very limited
 char* bc, saveax;
+char np= 1; // number of parametres to current function being compiled
 
 unsigned char changesAX(char* rule) {
+  //if (0==strcmp(rule, "[%d")) return 1;
+  // TODO: lastparam
+  if (0==strcmp(rule, "[a%0")) return 0;
+
   // TODO: get first char?
   if (0==strcmp(rule, "[%d<I") || 0==strcmp(rule, "[%d=I") || 0==strcmp(rule, "[%d>I") || 0==strcmp(rule, "][")) return 0;
   if (*bc == lastvar) return 0;
   // Hmmmm... not very good?
+  if (0==strcmp(rule, "[%d")) return 1;
+  if (0==strcmp(rule, "[,%d")) return 1;
+  //if (strchr("I[{}^", *rule) && !strchr("+-/*", rule[strlen(rule)-1])) return 0;
   if (strchr("I[{}^", *rule) && !strchr("+-/*", rule[strlen(rule)-1])) return 0;
+  //if (strcmp(rule, "[,%d")) return 1;
 
   // all other ops changes AX
   return 1;
@@ -740,7 +756,7 @@ extern int compile() {
 
   // process byte code
   while(*bc) {
-    APRINT("\n\n- %-30s\tSTK=%d AX=%c bytes=%d\n", bc, stk, ax, bytes);
+    APRINT("\n\n- %-30s[%d]\tSTK=%d AX=%c (saveax=%d) bytes=%d\n", bc, strlen(bc), stk, ax, saveax, bytes);
 
     // Search all rules for first match
     // TODO: move out
@@ -769,12 +785,11 @@ extern int compile() {
 
         // -- need to save AX?
         if (saveax) {
-          APRINT("SAVEAX?");
+          APRINT("saveax?");
           if (changesAX(r)) {// && 0) {
             APRINT(" SAVE AX\n");
-            gen[bytes++]= 0x20;
-            *(int*)(gen+bytes)= U pushax;
-            bytes+= 2;
+            gen[bytes]= 0x20; ++bytes;
+            *(int*)(gen+bytes)= U pushax; bytes+= 2;
             ++stk;
             saveax= 0;
           }
@@ -785,8 +800,8 @@ extern int compile() {
         // TODO: keep or remove?
 //    if (*r=='I') *--patch= stk;
 //    if (*r=='{' && stk>60) stk= patch[1]; // TODO: who pops it?
+// LOL, need to find next matching rule to decide if pushax! GRRRRR
 
-        // LOL, need to find next matching rule to decide if pushax! GRRRRR
 
         // Parse ASM and ACTION of single rule
         // (also consumes parameters from p)
@@ -801,7 +816,8 @@ extern int compile() {
           // WARNING: may give totally random bugs, depending on memory locs of data!
 
           // -- use a byte from last %d matched valuie (low/high)
-               if (c=='#') { APRINT(" # =>$%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
+          // TODO: switch better?
+          if (c=='#')      { APRINT(" # =>$%02x  ", ww & 0xff); gen[bytes]= ww & 0xff; }
           else if (c=='"') { APRINT(" \" =>$%02x  ", ww>>8); gen[bytes]= ww>>8; }
           // -- use a word from matched data/parameters
           // TODO: is *(uint)gen+bytes better than *(uint)&gen[bytes]?
@@ -818,6 +834,62 @@ extern int compile() {
 
             --z;++pc;
             ++bytes;
+
+          } else if (c=='<') {
+            void* popper;
+            char n= (stk-(1-saveax)-np)*2; // TODO: +- 1?
+            // TODO: ? number of arguments of func called?
+
+            assert(!saveax); // TODO: special case, need load ax again?
+            assert(n==0); // TODO: code not working yet - make subroutine?
+            if (n>0) {
+#ifdef SHIFT
+              // -- move np elements of the stack down stack-np
+              // save a copy of sp in tmp1
+              LDY sp;
+              STY tmp1;
+              LDY sp+1;
+              STY tmp2;
+
+              // -- JSR shrink stack (update sp)
+              // TODO: array less code?
+              gen[bytes]= 0x20; ++bytes; // JSR
+              switch(n) {
+              case 0: break;
+              case 1: popper= U incsp2; break;
+              case 2: popper= U incsp4; break;
+              case 3: popper= U incsp6; break;
+              case 4: popper= U incsp8; break;
+              default: error("Stack too big", MKNUM(stack));
+              }
+              *(int*)(gen+bytes)= U popper;
+              bytes+= 2;
+
+              // save A
+              STA tmp3;
+
+              // init loop
+              LDY #[ n ];
+  loop:
+              LDA (sp),Y;
+              STA (tmp1),Y;
+
+              DEY;
+              BNE loop;
+
+              // restore A
+              LDA tmp3;
+
+#endif // SHIFT
+              //stk= 0;
+            }
+            if (!saveax) { // JSR "drop" (a if saved)
+              APRINT("(<drop %d NP=%d) ", n, np);
+              gen[bytes]= 0x20; ++bytes; 
+              *(int*)(gen+bytes)= U incsp2; bytes+=1; // TODO: 1? hmmm
+              stk= 0;
+            }
+//            --z;++pc;
           }
           // -- actions to track stack changes
           else if (c=='s') {
@@ -947,13 +1019,13 @@ extern int compile() {
   return bytes;
 }
 
-void relocate(int n, char* to) {
+void relocate(char* code, int n, char* to) {
   unsigned char i= 0, c;
   ++n;
   while (--n) {
-    c= gen[i]; ++i;
+    c= code[i]; ++i;
     if (c==0x20 || c==0x4c || c==0x6c) {
-      int* p= (int*)(gen+i);
+      int* p= (int*)(code+i);
       if (*p==0) *p= (int)to;
       i+= 2;
     }
@@ -963,6 +1035,8 @@ void relocate(int n, char* to) {
 // "I... {... }^"  =>  "I...^{...^} "
 #define FIND " }^"
 void promoteReturn(char* bc) {
+  // TODO: if 0 inside... changechange! 
+  // TODO: need len of code...
   char *r= strstr(bc, FIND);
   while(r) {
     char d= 1;
@@ -997,21 +1071,17 @@ void promoteReturn(char* bc) {
 // Takes AL compiled bytecode and compiles to 6502 machine code.
 //
 // Result: in gen[], end at gen[bytes]
-void machinecompile(char* la) {
-  bc= strdup(la);
+
+// TODO: take fun descriptor / no args?
+void machinecompile(L la) {
+  bc= malloc(BINLEN(la));
+  memcpy(bc, BINSTR(la), BINLEN(la));
   promoteReturn(bc);
-
-  bytes= 0;
-
-  // TODO: only for compiling "function"
-  //saveax= 1; ax= 'a'; stk= ?
-  stk= 0;
-  ax= 0;
-  saveax= 0;
 
   // generate machine code
   // input : char* bc
-  // output: gen[]
+  // output: gen[bytes]
+  bytes= 0;
   compile();
   
   if (stk<60) {
@@ -1019,11 +1089,35 @@ void machinecompile(char* la) {
     // TODO: this isn't right.... add ^ at end?
     gen[bytes++]= 0x60; // RTS
   }
-
-  relocate(bytes, gen);
   if (verbose) DISASM(gen, gen+bytes, 0);
 
   free(bc); bc= NULL;
+}
+
+L machinecompilefunction(L la) {
+  char* code; L r;
+
+  np= 1; 
+  stk= 0; ax= 'a'; saveax= 1;
+  machinecompile(la);
+
+  r= mkcode(gen, bytes);
+  // TODO: mkcode should prefix with JMP xxxx == x+5+3 below
+  code= r+5; // Atom.code offset? LOL
+  relocate(code, bytes, code);
+  //relocate(code, bytes, x+3); // TODO: the indirection "JMP code"
+
+  return r;
+}
+
+void machinecompilecode(L la) {
+  np= 0;
+  stk= 0; ax= 0; saveax= 0;
+printf("--------HERE WE GO!\n");
+  machinecompile(la);
+
+  // "dummy" - this can only be run once in top, never save
+  relocate(gen, bytes, gen);
 }
 
 // Sum up dummy return values, otherwise an optimizing

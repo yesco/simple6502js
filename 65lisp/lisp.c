@@ -1910,7 +1910,7 @@ L readeval(char *ln, L env, char noprint) {
     case 2:
       x= alcompileread();
       NL; // hmmm
-      if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
+      //if (verbose) { printf("\n\n=============AL.compiled: "); prin1(x); NL; }
       assert(x==eof || ISAL(x));
       break;
     case 3:
@@ -1947,8 +1947,9 @@ L readeval(char *ln, L env, char noprint) {
 #ifdef GENASM
         case 2: // machine code
           #ifdef JIT
-            // compiles AL from buff to gen
-            machinecompile(buff);
+            // TODO: compiles AL from buff to gen
+            // TODO: this created mkal?
+            machinecompilecode(x);
             // run gen
             //r= coderun(gen); // 40% overhead!
             r= genrun();
