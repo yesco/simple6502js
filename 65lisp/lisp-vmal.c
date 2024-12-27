@@ -740,11 +740,29 @@ void alcompile() {
     // 28587 bytes siwth ififif/ one match call less param
     {
       char* pat;
+        // (defmacro de (f a b) `(set `,f a b))
       if (x==DE) pat= "%A,%L%C:@1"; else
       if (x==IF) pat= "%CI]%C{]%C)"; else
+        // (defmacro or l
+        //   `(cond ((null ,l) nil)
+        //       ((consp ,l) (cond 
       if (x==OR) pat= "%CUI%R { }"; else
+        // (defmacro and (a . r)
+        //   `(cond ((null ,r) ,a)
+        //       (,a (and ,r))))
       if (x==AND) pat= "%CUI {]%R }"; else
+        // (defmacro setq (a b) `(set `,a b))
+      if (x==SETQ) pat= "%A%C@1"; else
+        // (setq+ a 3) (setqcdr a) = inc/dec step/next
+        // (inc a) (inc a 3) (mul a 3)
+        // (++ a) (-- a) (+= a 3) (*= a 2)
+        // (step a) == (setq a (cdr a))
+        // (next a) == (let ((r (car a))) (step a) r)
       if (x==SETQ) pat= "%A%C@1";
+        // (do ((i 1 10)
+        //      (x '(a b c))
+        //      (j (+ 1 2))
+        // 
       else pat= 0;
       
       if (pat) if (match(pat)) return;
@@ -753,7 +771,17 @@ void alcompile() {
 
 
 #else // COMP - // 1017 bytes
-
+    // DE always (?) make lisp style function,
+    // TODO: or should it upgrade to da/dc depending on -c?
+    if (x==DE) {
+      f= lread(); assert(isatom(f));
+      x= cons(lambda,
+           cons(lread(),
+                // TODO: implicit progn
+                cons(lread(), nil) ));
+      setval(f, x, nil);
+      return;
+    }
     // DefineCompile to al bytecode
     // TODO: too much code, if it was macro/defined lisp - less?
     if (x==DE || x==DA || x==DC) {
