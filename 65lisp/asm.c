@@ -207,14 +207,18 @@
 // We use this for runtime codegen, so cannot use the
 // built-in cc65 asm.
 //
-// Since these are expanded next to eachaother they form
+// Since these are expanded next to each other they form
 // a single string. Parameters are passed either as:
 // - "\xbe\xef" - inline string constant, 1 bytes, or 2 bytes
-// - "#" - take low byte from last matching "%d" in rule
+//
+// (the following is somewhat ambigious! TODO:detect/warn)
+//
+// - "#"  - take low  byte from last matching "%d" in rule
 // - "\"" - take high byte from last matching "%d" in rule
+//
 // - "w?" - take argument from after rule length in array
-// - "ww" - take word argument from last %d match
-// - "w+" - word argument + 1 from last %d match
+// - "ww" - take word argument     from last %d match
+// - "w+" -      word argument + 1 from last %d match
 //
 //
 // The string generated may contain 0:oes, thus, after
@@ -222,10 +226,10 @@
 //
 // The string contains a mix of assembly 6502 macro instructions
 // for codegen and tracking of side-effects, such as:
-// - "s-" "s+" - stack depths changes (data stack)
-// - ":" ";" "/" - instructions for labelleing in IF-THEN-ELSE and patching
-// - "w?" "w'" .... - picking parameters from constants (typically for JSR), or bytecode
-// - and a "<" move stack instructions.
+// - ":" ";" "/"  - labeling IF-THEN-ELSE and patching
+// - "w?" "ww"... - picking parameters from constants (typically for JSR), or bytecode
+// - "s-" "s+"    - stack depths changes (data stack)
+// - "<"          -move stack instructions. TODO: "s<" ?
 //
 // See below for details
 
@@ -664,9 +668,9 @@ char  gen[255]; // generate asm bytes
 //   %d    == match ",xxxx" or "3" (digit) sets "ww"
 //            used by ww, w+, w? and #, and "
 //   %b    == TODO: match "byte value" (< 256)
-//   %a    == match 'a'-'z'
-//   %0 -9 == match only if STK is 0-9
-//   %^    == match if STK is 60+ == after RETURN
+//   %a    == match 'a'-'z' TODO: store last var if val in AX
+//   %0-9  == match only if STK is 0-9
+//   %^    == match if STK is 60+ == after RETURN (no gen)
 char matching(char* bc, char* r) {
   char c, nc, b, pb= 0;
   charmatch= ww= whi= 0;
@@ -734,13 +738,6 @@ extern int compile() {
 
   char *pc, c, nc, z, changeax;
 
-  // print ax arg first thing
-  //gen[bytes++]= 0x20;
-  //gen[bytes++]= ((int)print) & 0xff;
-  //gen[bytes++]= ((int)print) >> 8;
-
-  //ax= 'a';
-
   if (verbose) printf(">>>>>COMPILED called: %s\n", bc);
 
   // process byte code
@@ -753,20 +750,18 @@ extern int compile() {
     // for each rule
     p= rules;
     while(*p) {
-
       r= *p; ++p;
 
       // get action/asm of rule, and length in bytes
       pc= *p; z= 0x00ff & (uint)*++p; changeax= !(PAX & (uint)*p); ++p;
 
-      // find matching prefix ("peep-hole code-gen/optimizer")
+      // find matching prefix - PEEP-HOLE CODE-GEN/OPT
       if (matching(bc, r)) {
         int start= bytes;
 
-        //APRINT("---MATCH: '%s'\ton '%s'\n", *p, bc);
         APRINT("  %s\t", r);
 
-        // if variable and ax alread contains, done!
+        // if variable and already inAX, done!
         if (islower(*bc) && *bc==ax) {
           APRINT(" parameter requested is already in AX!\n");
           break;
@@ -775,9 +770,10 @@ extern int compile() {
         // -- need to save AX?
         if (saveax) {
           APRINT("saveax?");
-          if (changeax) {// && 0) {
-            APRINT(" SAVE AX\n");
-            gen[bytes]= 0x20; ++bytes;
+          if (changeax) { // YES - it'll be changed
+            APRINT(" SAVED AX\n");
+            // JSR pushax
+            gen[bytes]= 0x20; ++bytes; 
             *(int*)(gen+bytes)= U pushax; bytes+= 2;
             ++stk;
             saveax= 0;
@@ -834,6 +830,12 @@ extern int compile() {
             if (n>0) {
 #ifdef SHIFT
               // -- move np elements of the stack down stack-np
+              // TODO: make call to shift routine
+              LDY #[ n ];
+              JSR shift_stack_y;
+
+              // TODO: remove and make shiff_stack_y
+              //
               // save a copy of sp in tmp1
               LDY sp;
               STY tmp1;
@@ -842,7 +844,7 @@ extern int compile() {
 
               // -- JSR shrink stack (update sp)
               // TODO: array less code?
-              gen[bytes]= 0x20; ++bytes; // JSR
+              gen[bytes]= 0x20; ++bytes;
               switch(n) {
               case 0: break;
               case 1: popper= U incsp2; break;
@@ -878,7 +880,7 @@ extern int compile() {
               *(int*)(gen+bytes)= U incsp2; bytes+=1; // TODO: 1? hmmm
               stk= 0;
             }
-//            --z;++pc;
+//            --z;++pc; // TODO: ????
           }
           // -- actions to track stack changes
           else if (c=='s') {
@@ -886,7 +888,7 @@ extern int compile() {
             else if (nc=='-') { APRINT("(stack-) "); --stk; }
             else if (nc=='^') { APRINT("(stack^) "); stk=64; }
 
-            --z;++pc;
+            --z;++pc; // no code gen
           }
           // TODO: unsigned...
           //else if (c=='\'') lastbyte ^= 0x80; // TODO: when gen to buffer...
@@ -949,9 +951,12 @@ extern int compile() {
     // -- update ax
     if (islower(*bc)) ax= *bc; // TODO: not fully correct...
     else if (changeax) ax= '?';
-
+    // TODO: capture value: 0-8, nil, T
+    // TODO: capture if hibyte/lobyte 0
 
     // -- handle IF by recursion
+    // TODO: maybe make part of GENRULE?
+    // 
     if ('I'==bc[charmatch-1]) { // TODO: hmmm?
       // TODO: if have more, is it better to do struct?
       int i_stk= stk; char i_ax= ax, i_sax= saveax;
