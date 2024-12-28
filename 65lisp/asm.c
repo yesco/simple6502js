@@ -439,13 +439,17 @@
 //   # " - from byte code
 
 
+// PAX means AX value is unchanged after the rule!
+// PAX = Peace AX if you will :-D
+#define PAX 0x0100
+
 char* rules[]= {
 //  "&", JSR("w?"), U 3, U tosandax, REND
 //  "|", JSR("w?"), U 3, U tosorax, REND
 //  "~", JSR("w?"), U 3, U tosnot, REND
 //  "%", JSR("w?"), U 3, U tosmodax, REND
 
-  OPT("[0+", "", 0, 0,)
+  OPT("[0+", "", U(PAX+0), REND)
 //  OPT("[1+", CLC() ADCn("\x02") TAY() TXA() ADCn("\0") TAX() TYA(), U 9, REND) // 9 bytes // SLOWER THAN JSR!
 //OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND) // 6 bytes // SLIGHLY FASTER than JSR
 //OPT("[1+", CLC() ADCn("\x02") BCC("\x01") INX(), U 6, REND)
@@ -457,7 +461,7 @@ char* rules[]= {
   "+", JSR("w?") "s-", U 5, U tosaddax, REND
 
 
-  OPT("[0-", "", 0, REND)
+  OPT("[0-", "", U(PAX+0), REND)
   OPT("[1-", SEC() SBCn("\x02") BCS("\x01") DEX(), U 6, REND) // 6 bytes // fib 9% faster
 //  OPT("[1-", JSR("w?"), U 3, U decax2, REND)
   OPT("[2-", SEC() SBCn("\x04") BCS("\x01") DEX(), U 6, REND) // 6 bytes // fib 9% faster
@@ -471,7 +475,7 @@ char* rules[]= {
 
   // TODO: make safe value?
   OPT("[0*", LDAn("\0") TAX(), U 3, REND)
-  OPT("[1*", "", 0, 0,)
+  OPT("[1*", "", U(PAX+0), 0,)
 //OPT("[2*", ASL() TAY() TXA() ROL() TAX() TYA(), U 6, REND) // slower than JSR?
 //OPT("[2*", STXz("\x00") ASL() ROLz("\x00") LDXz("\x00"), U 7, REND) // inline aslax1/shlax1
   OPT("[2*", JSR("w?"), U 3, U aslax1, REND) // 18B
@@ -490,6 +494,7 @@ char* rules[]= {
 
   // TODO: make safe value?
   //OPT("[2/", TAY() TXA() LSR() TAX() TYA() ROR() ANDn("\xfe"), U 8, REND) // 8 bytes
+//  OPT("[1/", "", U(PAX+0), REND)
   OPT("[2/", JSR("w?") ANDn("\xfe"), U 5, U asrax1, REND) // 5 bytes // TODO: make safe ANDn("\xfe")
   OPT("[4/", JSR("w?") ANDn("\xfe"), U 5, U asrax2, REND)
   OPT("[8/", JSR("w?") ANDn("\xfe"), U 5, U asrax3, REND)
@@ -498,28 +503,28 @@ char* rules[]= {
   // OPT("%b/", LDAn("#") JSR("w?"), U 5, U pushax, U tosdiva0, REND) // TODO: load byte
 //  "/", JSR("w?") JSR("w?") ANDn("\xfe") "s-", U 10, U tosdivax, U aslax1, REND
 
-  "#I", TAY() LSR() TYA() BCS("\x00") ":", U 6, REND // Number?
-  "KI", TAY() LSR() BCC("\x01") LSR() TYA() BCC("\x00") ":", U 9, REND // Kons?
-  "KI", TAY() LSR() ANDn("\x01") ADCn("\xfe") TYA() BCC("\x00") ":", U 10, REND // ok alt?
-  "$I", TAY() LSR() ANDn("\x01") SBCn("\x00") TYA() BCC("\x00") ":", U 10, REND // ?? ok alt????
-//  "$I", TAY() LSR() BCC("\x03") XORn("\x01") LSR() TYA() BCC("\x00") ":", U 11, REND // Atom?/String? // TODO: smaller?
-//  "$I", TAY() ANDn("\x03") CMPn("\x01") BNE("\x00") ":", U 8, REND // Atom/String?
+  "#I", TAY() LSR() TYA() BCS("\x00") ":", U(PAX+6), REND // Number?
+  "KI", TAY() LSR() BCC("\x01") LSR() TYA() BCC("\x00") ":", U(PAX+9), REND // Kons?
+  "KI", TAY() LSR() ANDn("\x01") ADCn("\xfe") TYA() BCC("\x00") ":", U(PAX+10), REND // ok alt?
+  "$I", TAY() LSR() ANDn("\x01") SBCn("\x00") TYA() BCC("\x00") ":", U(PAX+10), REND // ?? ok alt????
+//  "$I", TAY() LSR() BCC("\x03") XORn("\x01") LSR() TYA() BCC("\x00") ":", U(PAX+11), REND // Atom?/String? // TODO: smaller?
+//  "$I", TAY() ANDn("\x03") CMPn("\x01") BNE("\x00") ":", U(PAX+8), REND // Atom/String?
   // OPT("%aI", ...                         REND) // TODO: if (boolvar) ...
   // TODO: if minsize: JSR() & BNE => 5 bytes... slow...
-  OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
-  OPT("[9=I", CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U 9, REND) // NIL nil address inline...
+  OPT("UI",   CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U(PAX+9), REND) // NIL nil address inline...
+  OPT("[9=I", CMPn("\x01") BNE("\x02") CPXn("\x00") BNE("\0") ":", U(PAX+9), REND) // NIL nil address inline...
   // TODO: "U" generate "bool" -1/0
 
-  OPT("[0=I",  TAY()     BNE("\x02") CPXn("\0") BNE("\0") ":", U 8, REND) // v==0, less code
-  OPT("I",     TAY()     BNE("\x02") CPXn("\0") BEQ("\0") ":", U 8, REND) // v!=0 kindof... // TODO: should !U?
-  OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U 9, REND) // generic == test
+  OPT("[0=I",  TAY()     BNE("\x02") CPXn("\0") BNE("\0") ":", U(PAX+8), REND) // v==0, less code
+  OPT("I",     TAY()     BNE("\x02") CPXn("\0") BEQ("\0") ":", U(PAX+8), REND) // v!=0 kindof... // TODO: should !U?
+  OPT("[%d=I", CMPn("#") BNE("\x02") CPXn("\"") BNE("\0") ":", U(PAX+9), REND) // generic == test
 
   "=", JSR("w?") "s-", U 5, U toseqax, REND // TODO: make it a number? TODO: make my own generic CMP
 
   // Unsigned Int
   // OPT("[%a<", ... - local
   // OPT("[%g<", ... - global
-  OPT("[%d<I", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00") ":", U 10, REND)
+  OPT("[%d<I", TAY() CMPn("#") TXA() SBCn("\"") TYA() BCS("\x00") ":", U(PAX+10), REND)
 
   "<", JSR("w?"), U 3, U toseqax, REND
   // TODO: signed int - maybe use "function argument"
@@ -529,26 +534,27 @@ char* rules[]= {
   "D", JSR("w?"), U 3, U ffcdr, REND
   "C", JSR("w?") "s-", U 5, U cons, REND // TODO: make more efficient one?
 
-  "!", JSR("w?") "s-", U 5, U staxspidx, REND
+  "!", JSR("w?") "s-", U(PAX+5), U staxspidx, REND
   "@", JSR("w?"), U 3, U ldaxi, REND
-  ".", JSR("w?"), U 3, U princ, REND
-//"W", JSR("w?"), U 3, U prin1, REND
-  "P", JSR("w?"), U 3, U print, REND
-//"T", JSR("w?"), U 3, U terpri, REND
+  ".", JSR("w?"), U(PAX+3), U princ, REND
+//"W", JSR("w?"), U(PAX+3), U prin1, REND
+  "P", JSR("w?"), U(PAX+3), U print, REND
+//"T", JSR("w?"), U(PAX+3), U terpri, REND
+
 //"Y", JSR("w?"), U 3, U lread, REND
 
-  ":%d", STA("ww") STX("w+"),  U 6, REND // store variable at address
+  ":%d", STA("ww") STX("w+"),  U(PAX+6), REND // store variable at address
   ";%d", LDA("ww") LDX("w+"),  U 6, REND // read variable from address
   "_%d", JSR("ww"),            U 3, REND // call address (eval?)
 
   // TODO: lastparam
   "[a%0",    "", U 0, REND // TODO: this is not right...
 
-  OPT("][", 0, U 0, REND) // 3 zeroes! lol
+  OPT("][", 0, U(PAX+0), REND) // 3 zeroes! lol
   "]", "s-" JSR("w?"), U 5, U popax,  REND // TODO: useful to actually pop value?
   // TODO: if ax is 0 then dont? (no specific value worth saving, or just prefix with ']'
   "[%d", "s+" JSR("w?") LDAn("#") LDXn("\""), U 9, U pushax, REND
-  "[", "s+" JSR("w?"), U 5, U pushax, REND
+  "[", "s+" JSR("w?"), U(PAX+5), U pushax, REND
 
 
 //OPT("0^%0", JMP("w?"), U 3, U push0, REND)   // return 0 (if no need clean stack) // 1 byte savings, slower
@@ -559,7 +565,7 @@ char* rules[]= {
 //"9",        JSR("w?"), U 3, U retnil, REND   // load nil 
   "9",        LDAn("\x01") LDXn("\x00"), U 4, REND // load nil
   OPT("0",    LDAn("\0") TAX(), U 3, REND)     // load 0
-  ",%d",       LDAn("#") LDXn("\""), U 4, REND
+  ",%d",      LDAn("#") LDXn("\""), U 4, REND
   "%d",       LDAn("#") LDXn("\""), U 4, REND
 
   // TODO: %a relateive stack...
@@ -567,11 +573,11 @@ char* rules[]= {
   // TODO: if request ax_
   // TODO: if request => w==1 then JSR(ldax0sp)
   // TODO: use %1357 to indicate depth on stack?
-  //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals
+  //"[a", JSR("w?"), U 3, U ldax0sp, REND // TODO: ?? parameters/locals // TODO: how to keep value/name
   //OPT("%a%1", JSR("w?"), U 3, U ldax0sp, REND) // TODO: ?? parameters/locals
   "%a",  LDYn("#") JSR("w?"), U 5, U ldaxysp, REND // TODO: ?? parameters/locals
 
-  // TODO: more than 4 ...
+  // TODO: more than 4 ... LDY ...
   "^%4", "s^" JMP("w?"), U 5, U incsp8, REND
   "^%3", "s^" JMP("w?"), U 5, U incsp6, REND
   "^%2", "s^" JMP("w?"), U 5, U incsp4, REND
@@ -581,7 +587,7 @@ char* rules[]= {
   //"X^^",   "<" JMP("ww"),   U 4, REND // ERROR (need popstack first/move)
   OPT("R^", "<" JMP("\0\0") "s^", U 6, REND) // SelfTailRecursion
   "R",      JSR("\0\0"),      U 3, REND // SelfRecursion // TODO: param count/STK?
-  "Z",  "<" JMP("\0\0") "s^", U 6, REND // SelfTailRecursion/loop/Z
+  "Z",  "<" JMP("\0\0") "s^", U 6, REND // LOOP/SelfTailRecursion/loop/Z
 
   // CALL = "Xcode" - would prefer other prefix?
   //"X^^",    "<" JMP("ww"),     U 4, REND // ERROR (need popstack first/move)
@@ -589,19 +595,21 @@ char* rules[]= {
   OPT("%dX^", "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
   OPT("%dX",  "<" JSR("ww"),       U 4, REND) // Call other function // TODO: param/STK?
   OPT("X^",   "<" JMP("ww") "s^",  U 6, REND) // TailCall other function
-  "X",            JSR("w?"),       U 3, U callax, REND // Call other function // TODO: param/STK?
+  // TODO: this is to call lisp/VM/or we don't know!
+  "X",            JSR("w?"),       U 3, U callax, REND // Call using atom name? maybe collapse with _
   
   // TODO: not complete yet
   //   patching ops=="immediate": :=save ;=patch /=swap
   // TODO: how aobut balancing stack, recurse on compiler?
   //   pop to same level?
   //   if return stack ... 64 lol
-  //OPT("I", ":", U 1, REND)
-  //"I", BCS("\0") ":", U 1, REND // TODO: not correct, what does the generic <, or = do?
+  // TODO: this is solved outside?
+  //OPT("I", ":", ?U(PAX+1), REND)
+  //"I", BCS("\0") ":", U(PAX+1), REND // TODO: not correct, what does the generic <, or = do?
 
-  OPT("{}", ";", U 1, REND) // Typically output by (and ...) or (if EXP THEN)
+  OPT("{}", ";", U(PAX+1), REND) // gen by (AND ...) or (if EXP THEN)
   OPT("{%^", "z" "/" ";", U 3, REND) // push z, no need to resolve/patch! after return no need jmp endif!
-  "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save
+  "{", SEC() BCS("\0") ":" "/" ";", U 6, REND // TODO: restore IF stk, lol need save TODO: handle long jmp?
 
   // TODO: if "{%^" before, then no patch!
   "}", ";", U 1, REND
@@ -711,25 +719,6 @@ unsigned int bytes= 0; // char would save 50 bytes, but very limited
 char* bc, saveax;
 char np= 1; // number of parametres to current function being compiled
 
-unsigned char changesAX(char* rule) {
-  //if (0==strcmp(rule, "[%d")) return 1;
-  // TODO: lastparam
-  if (0==strcmp(rule, "[a%0")) return 0;
-
-  // TODO: get first char?
-  if (0==strcmp(rule, "[%d<I") || 0==strcmp(rule, "[%d=I") || 0==strcmp(rule, "[%d>I") || 0==strcmp(rule, "][")) return 0;
-  if (*bc == lastvar) return 0;
-  // Hmmmm... not very good?
-  if (0==strcmp(rule, "[%d")) return 1;
-  if (0==strcmp(rule, "[,%d")) return 1;
-  //if (strchr("I[{}^", *rule) && !strchr("+-/*", rule[strlen(rule)-1])) return 0;
-  if (strchr("I[{}^", *rule) && !strchr("+-/*", rule[strlen(rule)-1])) return 0;
-  //if (strcmp(rule, "[,%d")) return 1;
-
-  // all other ops changes AX
-  return 1;
-}
-
 // Compiles ByteCode to asm in gen[]
 //
 // Returns bytes (length)
@@ -743,7 +732,7 @@ extern int compile() {
   // TODO: ax and saved and lastvar tracking... [-delay
   // TODO: can't this be done before here, in byte code gen?
 
-  char *pc, c, nc, z;
+  char *pc, c, nc, z, changeax;
 
   // print ax arg first thing
   //gen[bytes++]= 0x20;
@@ -768,7 +757,7 @@ extern int compile() {
       r= *p; ++p;
 
       // get action/asm of rule, and length in bytes
-      pc= *p; z= (uint)*++p; ++p;
+      pc= *p; z= 0x00ff & (uint)*++p; changeax= !(PAX & (uint)*p); ++p;
 
       // find matching prefix ("peep-hole code-gen/optimizer")
       if (matching(bc, r)) {
@@ -786,7 +775,7 @@ extern int compile() {
         // -- need to save AX?
         if (saveax) {
           APRINT("saveax?");
-          if (changesAX(r)) {// && 0) {
+          if (changeax) {// && 0) {
             APRINT(" SAVE AX\n");
             gen[bytes]= 0x20; ++bytes;
             *(int*)(gen+bytes)= U pushax; bytes+= 2;
@@ -958,8 +947,8 @@ extern int compile() {
     }
 
     // -- update ax
-    if (islower(*bc)) ax= *bc;
-    else if (changesAX(r)) ax= '?';
+    if (islower(*bc)) ax= *bc; // TODO: not fully correct...
+    else if (changeax) ax= '?';
 
 
     // -- handle IF by recursion
