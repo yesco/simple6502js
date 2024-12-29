@@ -1179,7 +1179,7 @@ L evallist(L args, L env) {
 
 L length(L a) {
   int n= 0;
-  if (ISSTR(a)) return CAR(a);
+  if (ISSTR(a)) return CDR(a);
   while(iscons(a)) ++n,a= CDR(a);
   return mknum(n);
 }
@@ -1196,6 +1196,7 @@ L mapcar(L f, L l) {
 }
   
 // TODO: nthcdr
+// TODO: == aref?
 L nth(L n, L l) { n= num(n);
   while(--n >= 0) if (!iscons(l)) return nil; else l= CDR(l);
   return CAR(l);
@@ -1714,14 +1715,76 @@ unsigned long bench=1;
 // '0' -	jsr lisp0	jsr al0		jmp code
 // '1' -        jsr lisp1	jsr al1		jsr
 
+// TODO: these are same order as names[] below...
+
+void* funs[]= {
+  de,
+  0, // dc,
+  0, // da,
+  0, // df,
+
+  0, // setq,
+  0, // set,
+
+  0, // recurse,
+  0, // lreturn,
+
+  0, // lif,
+  0, // land,
+  0, // lor,
+
+  lread, // 1 arg, or 0 (c=func)
+  0, // lquote,
+  0, // llambda,
+
+  0, // llist, // evallist nospread vararg
+  evalappend, // vararg
+
+  0, // latom,
+  0, // lnumberp,
+
+  car, cdr,
+
+  0, // consp,
+  length,
+  0, // terpri,
+  0, // nullp,
+
+  print, prin1, princ,
+
+  0, // lbigneg,
+
+  // -- two args
+  0, // lpercent,
+  0, // lbitand,
+  0,0,0,0, // lminus, lplus, lmul, ldiv,
+
+  0, // lbitor,
+  0, 0, // leq, leq,
+  0, // lcmp,
+  0, // llt,
+  0, // lgt,
+  cons,
+  member,
+  assoc,
+  mapcar,
+  nth,
+
+  0, // rec,
+  0, // loop,
+
+  0 // END
+};
+
 char* names[]= {
   // nargs
   ":-de",   // DEfine var/lambda       TODO: implicit progn?
   ":-dc",   // Define Compile bytecode TODO: implicit progn?
   ":-da",   // Define compile Assembly TODO: implicit progn?
+  "; df",
+
   ":2setq", // TODO: not right for "VM" // TODO: 2xN for multiple assigments?
   "!2set",
-  //"; df",
 
   "R-recurse",
   "^1return",
@@ -1729,6 +1792,7 @@ char* names[]= {
   "I-if",
   "I-and", // TODO: dummy
   "I-or",  // TODO: dummy
+
   "Y1read",
   "\'1quote",
   "\\-lambda",
@@ -1740,13 +1804,17 @@ char* names[]= {
   "!1atom", // "! symbolp", // or symbol? // TODO: change... lol
   "#1numberp", // "# intp"
   //"$ stringp", 
+
   "A1car",
   "D1cdr",
+
   "K1consp", // listP
   "O1length",
   "T0terpri",
   "U1null",
+
   "P1print", "W1prin1", ".1princ", // swap 'W' and '.'??? '.' should be "pretty"
+
   "~1~", // bit neg
 
   // two args
@@ -1756,6 +1824,7 @@ char* names[]= {
   "+2+", // vararg?
   "*2*", // vargarg?
   "/2/", // vararg?
+
   "|2|", // bitor vararg
   "=2eq", "=2=",
   "?2cmp",
@@ -1768,7 +1837,6 @@ char* names[]= {
   "N2nth",
 
   "R-rec", // recurse on self
-
   "Z-loop",
 
   //"i1inc", // TODO: remove, only used for testing
@@ -1778,7 +1846,8 @@ char* names[]= {
 
 void initlisp() {
   L x;
-  char** s= names;
+  char** s= names; void** f= funs;
+  assert(sizeof(funs)==sizeof(names));
 
   // important assumption for cc65
   // (supress warning: error is set later, now 0)
@@ -1834,7 +1903,11 @@ closure= atom("closure");
   while(*s) {
     setatomval(x= atom(*s+2), MKNUM(**s));
     ((Atom*)x)->nargs= (*s)[1];
-    ++s;
+    if (*f && 1) {
+      ((Atom*)x)->code[0]= 0x4c; // JMP fun
+      *(int*)&((Atom*)x)->code[1]= *f;
+    }
+    ++s; ++f;
   }
 
   // direct code pointers
@@ -1999,11 +2072,13 @@ L readeval(char *ln, L env, char noprint) {
 
     // TESTING JSR all
     if (isatom(r) && r!=eof) {
+      printf("----TESING...\n"); {
       F1 j= (F1)(((Atom*)r)->code);
-      //L rr= j(cons(mknum(42),mknum(7)));
-      L rr= j(mknum(8));
+      L rr= j(cons(mknum(42),mknum(7)));
+      //L rr= j(mknum(8));
       printf("--- %04X --- %04X ---> ",r,rr);
       prin1(rr); NL;
+      }
     }
 
 
