@@ -677,6 +677,12 @@ L atomstr(char* s, uchar typ, size_t len) {
   // CAR bytes len if !atom
   a->val= MKNUM(typ==HSTRING? strlen(s): len);
 
+  a->nargs= 0;
+
+  // JSR getcalled
+  a->code[0]= 0x20; 
+  *(void**)&(a->code[1])= (void*)getcalled;
+
   // store a letter like '1' '2', or '-' or 'n'...
   //a->nargs= 0;  / TDOO: arena is \0 already...
 
@@ -1630,6 +1636,18 @@ L evalX(L x, L env) {
   //return ERROR;
 }
 
+// kindof an reverse apply(f, arg, ...)
+
+extern L doapply1(L a, L f) {
+  L r,e;
+  printf("\nFUNDEF: "); prin1(f); putchar('='); prin1(car(f)); NL;
+  e= cons(f, cons(cons(quote, cons(a, nil)), nil));
+
+  printf("\nDOAPPLY1( "); prin1(f); putchar(' '); prin1(a); printf(" ) == "); prin1(e); NL;
+  // TODO: we need an APPLY without eval again!
+  return eval(e, nil);
+}
+
 #ifdef ETRACERUN
 L evalTrace(L x, L env) {
   L r;
@@ -1978,6 +1996,16 @@ L readeval(char *ln, L env, char noprint) {
         }
       }
     }
+
+    // TESTING JSR all
+    if (isatom(r) && r!=eof) {
+      F1 j= (F1)(((Atom*)r)->code);
+      //L rr= j(cons(mknum(42),mknum(7)));
+      L rr= j(mknum(8));
+      printf("--- %04X --- %04X ---> ",r,rr);
+      prin1(rr); NL;
+    }
+
 
     // -- print
     //{ printf("RES= "); prin1(r); NL; }

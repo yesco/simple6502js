@@ -5,7 +5,7 @@ name="lisp"
 xx="$*"
 echo "unix> ./65lisp $xx"
 
-cl65 -O $OPTS -T -t sim6502 $name.c -o $name.out -m $name.map && (sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep -a ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time")
+cl65 -O $OPTS -T -t sim6502 $name.c vm-asm.s -o $name.out -m $name.map && (sim65 -c $name.out "$@" ; echo "--- EXIT=$? ---") | tee $name.log && (echo "`grep -a ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time")
 
 echo
 echo

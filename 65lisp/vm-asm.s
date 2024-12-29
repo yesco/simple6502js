@@ -94,6 +94,9 @@
 
 .export _retnil, _rettrue
 
+.export _getcalled
+
+
 ;;; make names visible from C
 
 _return0        = return0
@@ -827,3 +830,44 @@ Ladd:   lda     tmp1
 @Lsp1:  inc     sp         
 @Lsp2:  inc     sp+1       
         rts
+
+;;; Subroutine that when 
+;;; JSR:ed into from an Atom->code
+;;; will return the Atom.
+
+;;; TODO: used to invoke any type of function
+;;; lisp - get Atom, then jmp to EVAL
+;;; vm   - get Atom, then jmp to AL interpreter
+;;; code - jmp to actual code
+
+        ;; 18c
+_getcalled2:
+        pla
+        sec
+        sbc #$07
+        tay
+        pla
+        sbc #$00
+        tax
+        tya
+        rts
+
+.import _doapply1
+
+        ;; 18c
+_getcalled:
+        jsr _print
+        jsr pushax
+
+        pla
+        sec
+        sbc #$07
+        tay
+        pla
+        sbc #$00
+        tax
+        tya
+
+        ;;; C-stack: arg1.. argn AX=FUNATOM
+        jmp _doapply1
+

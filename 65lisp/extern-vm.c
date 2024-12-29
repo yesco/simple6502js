@@ -126,3 +126,5 @@ extern void toseqax();
 extern void addysp();
 
 extern void staxspidx();
+
+extern L getcalled();
