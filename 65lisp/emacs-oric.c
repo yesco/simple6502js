@@ -58,131 +58,11 @@
 #include <stdio.h>
 #include <string.h>
 
-//#include <conio.h>
+#include <conio.h>
 //#include <peekpoke.h>
+
 ///#include "simconio.c"
 //void revers(char) {}
-
-// hundreths of second
-unsigned int time() {
-  return *(unsigned int*)0x276;
-}
-
-// Do my own screen print
-
-// TextMode, Graphics mode: 
-#define CHARSET    (0xB400) // -0xB7FF
-#define ALTSET     (0xB800) // -0xBB7F
-#define TEXTSCREEN ((char*)0xBB80) // -0xBF3F
-#define SCREENSIZE (28*40))
-#define SCREENENDE (TEXTSCREEN+SCREENSIZE)
-
-#define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
-
-char curx=0, cury=0, *cursc= TEXTSCREEN;
-
-#define gotoxy(x,y) do { curx= (x); cury= (y); cursc=SCREENXY(curx, cury); } while(0)
-
-void clrscr() {
-  // TODO: break-out to a fill?
-  cursc= TEXTSCREEN;
-  for(cury=29; --cury;) 
-    for(curx=41; --curx;) 
-      *cursc= ' ', ++cursc;
-  cursc= TEXTSCREEN;
-}
-
-#define wherex() curx
-#define wherey() cury
-
-void revers();
-
-// TODO: do it for real
-char kbhit() { return 1; }
-char cgetc() { return 'A'; }
-
-void scrollup(char n) { }
-
-void cputc(char c) {
-  if ((c & 0x7f) < ' ') {
-    if (c < 128) {
-      // control-codes
-      switch(c) {
-      case  7  : break; // TODO: bell?
-      case  8  : --curx; --cursc; break;
-      case  9  : ++curx; ++cursc; break;
-//    case 10  : ++cury; cursc+= 40; break;
-      case 11  : --cury; cursc-= 40; break;
-      case 12  : clrscr(); return;
-      case '\n': curx= 0; ++cury;
-        cursc= SCREENXY(curx, cury);
-        break;
-//    case '\r': curx= 0; break;
-      }
-      // fix state
-      if (curx==255) --cury,curx=39;
-      else if (curx>=40) ++cury,curx=0;
-
-      if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) scrollup(cury-27),cury=0;
-
-      if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
-      if (cursc>=TEXTSCREEN) cursc= SCREENXY(curx, cury);
-
-      return;
-    }
-  }
-  // 32-127, 128+32-255 (inverse)
-  *cursc= c; ++cursc;
-  if (++curx>=40) ++cury,curx=0;
-  if (cury>=28) scrollup(cury-27);
-}
-
-//int putchar(int c) { cputc(c); return c; }
-#define putchar(c) (cputc(c),c)
-
-// raw?
-void cputsxy(char x, char y, char* s) {
-  char *p = SCREENXY(x,y);
-  while(*s) *p=*s,++p,++s;
-}
-
-int puts(const char* s) {
-  const char* p= s;
-  if (!s) return 0;
-  while(*p) putchar(*p),++p;
-  return p-s;
-}
-
-
-char* spr= NULL; size_t sprlen= 0;
-
-#include <stdlib.h>
-
-// maybe faster than printf
-void printnum(int n) {
-  if (n<0) { putchar('-'); n= -n; }
-  if (n>9) printnum(n/10);
-  putchar('0'+(n%10));
-}
-
-int printf(const char* fmt, ...) {
-  int n= 0;
-  va_list argptr;
-  va_start(argptr, fmt);
-  do {
-    n= spr? vsnprintf(spr, sprlen, fmt, argptr): 0;
-    putchar('['); printnum(n); putchar(']');
-    if (!n || n>sprlen) {
-      sprlen= (n>sprlen)?n+30: 80;
-      spr= realloc(spr, sprlen);
-      n= 0;
-    }
-  } while(!n);
-  puts(spr);
-  va_end(argptr);
-  return n;
-}
 
 // Dummys for ./r script
 int T,nil,doapply1,print;
@@ -226,9 +106,14 @@ void restorecursor() {
     *(char*)0x269= x;
     //*(int*)0x12= (*(int*)0x27a)-(y-1)*40;
     SCREENROWADDR= w;
-    
-    gotoxy(x, y);
 }
+
+// TextMode, Graphics mode: 
+
+#define CHARSET    (0xB400) // -0xB7FF
+#define ALTSET     (0xB800) // -0xBB7F
+#define TEXTSCREEN (0xBB80) // -0xBF3F
+#define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
 // TODO: resize
 void edit(char* e, size_t size) {
@@ -253,7 +138,6 @@ void edit(char* e, size_t size) {
 
   cursor:
     // show guessed cursor
-
     *SCREENXY(xx,yy) |= 128;
 
     x= homex;
@@ -272,13 +156,12 @@ void edit(char* e, size_t size) {
     if (cur < e) cur= e;
     if (cur > e+elen) cur= e+elen;
 
+    // 0276-#0277  timer
     // 270 curon
     //*(char*)0x270= 0;
 
     // print till current cursor
-    printf("FOOBAR");
     if (cur!=e) printf("%.*s", (int)(cur-e), e);
-    printf("FIEFUM");
 
     savecursor();
     *SCREENXY(x,y)   |= 128;
@@ -398,34 +281,6 @@ char buff[2014]=
 ;
 
 int main(int argc, char** argv) {
-  int i, j= 10;
-  char x, y;
-  unsigned int start= time();
-
-  switch(0) {
-  case 1:
-    while(j--) {
-      clrscr();
-      //for(i=28*40+1;--i;) putchar('A');
-      for(y=29;--y;)
-        for(x=41;--x;)
-          putchar('A'+28-y);
-    }
-    clrscr();
-    printf("\nTIMEhs: %u\n", start-time());
-    return 0;
-  case 2:
-    clrscr();
-    for(y=0; y<28; ++y) {
-      putchar('A'+y);
-      putchar('0'+(y/10)); putchar('0'+(y%10));
-      putchar('/');
-      printf("-FOOBAR-%d--\n", y*40);
-      return 0;
-    }
-    default: break;
-  }
-  
   edit(buff, sizeof(buff));
   return 0;
 }
