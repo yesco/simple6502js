@@ -86,6 +86,7 @@ int T,nil,doapply1,print;
 #define SCREENROWADDR *((int*)0x12)
 
 char x,y; int w; int s;
+char xx,yy;
 
 void savecursor() {
   //printf("[s"); // TODO: only vt100
@@ -106,6 +107,13 @@ void restorecursor() {
     //*(int*)0x12= (*(int*)0x27a)-(y-1)*40;
     SCREENROWADDR= w;
 }
+
+// TextMode, Graphics mode: 
+
+#define CHARSET    (0xB400) // -0xB7FF
+#define ALTSET     (0xB800) // -0xBB7F
+#define TEXTSCREEN (0xBB80) // -0xBF3F
+#define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
 // TODO: resize
 void edit(char* e, size_t size) {
@@ -129,6 +137,9 @@ void edit(char* e, size_t size) {
     homex= x; homey= y; homew= w;
 
   cursor:
+    // show guessed cursor
+    *SCREENXY(xx,yy) |= 128;
+
     x= homex;
     y= homey;
     w= homew;
@@ -153,6 +164,8 @@ void edit(char* e, size_t size) {
     if (cur!=e) printf("%.*s", (int)(cur-e), e);
 
     savecursor();
+    *SCREENXY(x,y)   |= 128;
+    *SCREENXY(xx,yy) &= 127;
 
     //printf("<<<%d;%d>>>", x, y);
 
@@ -174,7 +187,8 @@ void edit(char* e, size_t size) {
     //revers(1); printf("65EMACS ESC< ^APNBFOE^DHKYG ESC> ^X\n"); revers(0);
 
     restorecursor();
-    SCREENSTATE|= 1;
+
+    //SCREENSTATE|= 1;
 
     // start of line, end of line
     sl= cur; while(sl>e && sl[-1]!='\n') --sl;
@@ -183,15 +197,20 @@ void edit(char* e, size_t size) {
     // adjust for x column ctrl-P and ctrl-N (must be here after new sl/el)
     // TODO: can do more efficient?
     if (xpos>=0) { --xpos; cur= (sl+xpos<=el)? sl+xpos: el; xpos=-1; goto cursor; }
+    // update cursor actual position
+    xx=x; yy=y;
 
     elen= strlen(e);
     curlen= elen + cur-e;
 
   next:
     xpos= -1;
+    // cursor on
+    //*SCREENXY(x, y) |= 128;
     // -- process key
+    // TODO: cursor only vis if loop?
+    while(!kbhit()) *SCREENXY(x, y) |= 128;
     k= cgetc();
-    // TODO: use FUNC key as META
     if (k==27) k= 128+cgetc()-32;
 
     lastkey= k;
@@ -201,11 +220,11 @@ void edit(char* e, size_t size) {
     // movement // TODO: simplier, make a search fun?
     case META+'<': case META+'V':cur= e; goto cursor;
     case META+'>': case CTRL+'V':cur= e+elen; goto cursor;
-    case CTRL+'P': case 11: xpos= cur-sl+1; cur= sl-1; goto cursor;
+    case CTRL+'P': case 11: xpos= cur-sl+1; cur= sl-1; yy=--y; goto cursor;
     case CTRL+'A': cur= sl; goto cursor;
-    case CTRL+'B': case 8: --cur; goto cursor;
-    case CTRL+'F': case 9: ++cur; goto cursor;
-    case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; goto cursor;
+    case CTRL+'B': case 8: --cur; xx=--x; goto cursor;
+    case CTRL+'F': case 9: ++cur; xx=++x; goto cursor;
+    case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++y; goto cursor;
     case CTRL+'E': cur= el; goto cursor;
 
     // exit/other
@@ -230,21 +249,23 @@ void edit(char* e, size_t size) {
       --cur; k=*cur; memmove(cur, cur+1, elen);
       if (k=='\n') break;  putchar(8); goto updateline;
     case CTRL+'D': k=*cur; memmove(cur, cur+1, elen);
+      //putchar(*cur); putchar(8);
       if (k=='\n') break;  goto updateline;
     case CTRL+'O': memmove(cur+1, cur, elen); *cur= '\n'; break;
     default: if ((k>=' ' && k<127) || k==13) {
       if (k==13) k= '\n';
       memmove(cur+1, cur, elen); *cur= k; ++cur;
-      putchar(k);
       if (k<' ') break; // redraw
+      putchar(k);
     updateline:
-      SCREENSTATE &= 0xfe;
+      //SCREENSTATE &= 127;
+      *SCREENXY(x, y) &= 127;
       savecursor();
       p= cur;
       while(*p && *p!='\n' && *p!='\r') putchar(*p),++p;
       putchar(' ');
       restorecursor();
-      SCREENSTATE |= 1;
+      *SCREENXY(xx, yy) |= 128;
       goto next;
       }
     }
