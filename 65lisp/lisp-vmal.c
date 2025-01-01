@@ -602,6 +602,47 @@ char match(char* pat) {
 
 #endif
 
+L codeal(L self) {
+  Atom* a= (Atom*)self;
+  printf("\n%% CALLING AL: "); prin1(self); NL;
+  error("NIY");
+  return nil;
+}
+
+L codelambda(L a, L self) {
+  L lam= self;
+  L env= nil; // "free-standing lambda - not closure"
+  L r= nil;
+
+  if (isatom(self)) {
+    Atom* a= (Atom*)self;
+    lam= CAR(a);
+  }
+  if (CAR(lam)==closure) { env= CDR(CDR(lam)); lam= CAR(CDR(lam)); }
+  if (CAR(lam)!=lambda) error1("Unknown type in codelambda", self);
+
+  printf("\n%% CALLING LAMBDA: "); prin1(self); NL;
+
+  {
+    L fargs= CAR(CDR(lam));
+    L body= CDR(CDR(lam));
+    // - bind args
+    // TODO: overkill for 1, lol
+    while(iscons(fargs)) {
+      env= cons( cons(CAR(fargs), a),
+                 env);
+      fargs= CDR(fargs);
+    }
+    // - progn
+    while(iscons(body)) {
+      r= eval(CAR(body), env);
+      body= CDR(body);
+    }
+    // TODO: can we make this one pretend to
+    //   return from vararg, given length(fargs)*2+2 bytes?
+  }
+  return r;
+}
 
 char compileDC= 0;
 
@@ -652,6 +693,7 @@ void alcompile() {
     if (isatom(x)) f= ATOMVAL(x);
     if (!f || !isnum(f)) { // 0== not primtive?
       if (verbose) { printf("\n%%TODO: funcall: "); prin1(x); printf(" => ATOMVAL $%04X = ", f); prin1(f); NL; }
+      if (car(f)==closure) f= CAR(CDR(f));
       if (iscons(f) && car(f)==lambda) {
         printf("compiling call to LAMBDA!...\n");
       } else {
@@ -700,6 +742,7 @@ void alcompile() {
     // (lambda PARAMS BODY) // TODO BODY ... 
     // TODO: this could delay compilation till "invoked" (can only do one at a time...)
     if (x==lambda) {
+      // TODO: progn?
       x= cons(lambda, cons(lread(), cons(lread(), nil)));
       if (skipspc()!=')') goto expectedparen;
       // just compled as quoted list
@@ -775,17 +818,28 @@ void alcompile() {
 
 
 #else // COMP - // 1017 bytes
+
     // DE always (?) make lisp style function,
     // TODO: or should it upgrade to da/dc depending on -c?
     if (x==DE) {
+      L args;
       f= lread(); assert(isatom(f));
-      x= cons(lambda,
-           cons(lread(),
-                // TODO: implicit progn
-                cons(lread(), nil) ));
+      x= cons(closure, cons(
+              cons(lambda,
+              cons(args=lread(),
+              // TODO: implicit progn
+              cons(lread(),
+              nil))),
+            nil));
+      // define lambda function
       setval(f, x, nil);
+      ((Atom*)f)->nargs= '0'+NUM(length(args));
+      // JSR lambdacall
+      ((Atom*)f)->code[0]= 0x20;
+      *(int*)&((Atom*)f)->code[1]= codelambda;
       return;
     }
+
     // DefineCompile to al bytecode
     // TODO: too much code, if it was macro/defined lisp - less?
     if (x==DE || x==DA || x==DC) {
@@ -862,6 +916,16 @@ void alcompile() {
 
       // - define and store function
       setval(name, x, nil);
+      ((Atom*)name)->nargs= '0'+NUM(compileDC-1);
+      // - make the name's call-action be
+      if (ISAL(x)) { // interpret AL
+        ((Atom*)name)->code[0]= 0x20; // JSR selfal
+        *(int*)&((Atom*)name)->code[1]= codeal;
+      } else { // JMP to code
+        ((Atom*)name)->code[0]= 0x4c; // JMP code
+        *(int*)&((Atom*)name)->code[1]= BINSTR(x);
+      }
+        
       return;
     }
 

@@ -86,7 +86,7 @@
 .export _ffmul
 .export _ffcar, _ffcdr
 .export _fffcar, _fffcdr
-.export _ffffcar, _ffffcdr
+.export _ffffcar, _ffffcdr, _fffffcar, _fffffcdr
 .export _ffnull, _ffisnum, _ffiscons, _ffisatom, _fftype
 .export _istrue, _iscarry
 
@@ -269,6 +269,8 @@ _ffmul:
 ;;; 4B 5c slightly better (?)
 _fffffcar:      
         ;; very cheap isnum
+;;; WARNING
+        ;;  TODO: store 01 at address 01!
         bit $01
         beq _retnil
 
@@ -303,6 +305,17 @@ _ffcar:
 _ffat: 
         jmp ldaxi
 
+
+;;; 4B 5c slightly better (?)
+_fffffcdr:
+        ;; very cheap isnum
+;;; WARNING
+        ;;  TODO: store 01 at address 01!
+        bit $01
+        beq _retnil
+
+        ;; consider inlining, 3c save
+        jmp ldaxi
 
 ;;; TOOD: 4B is better!
 _ffffcdr:   

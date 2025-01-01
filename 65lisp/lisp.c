@@ -543,7 +543,8 @@ L cdr(L c)         { return iscons(c)? CDR(c): nil; }
 L setcar(L c, L a) { return iscons(c)? CAR(c)= a: nil; }
 L setcdr(L c, L d) { return iscons(c)? CDR(c)= d: nil; } 
 
-
+L lplus(L a, L b) { return a+b; }
+L lmul(L a, L b) { return (a*b/2)&0xfffe; }
 
 // --- Atoms / Symbols / Constants
 // 
@@ -1222,7 +1223,57 @@ L bindevlist(L fargs, L args, L env, L evalenv) {
                bindevlist(cdr(fargs), cdr(args), env, evalenv) );
 }
 
+L evalX2(L x, L env);
+
+// TODO: we want to replace the current BIG
+//   overCOMPLICATED evalX2...
+
+// singlisp      =24.50s   =22.66s
+//      carcdrcdr=26.7s  +*=25.58s
+// new evalX= ccc=19.49s +*=22.31s  37% 15%
+// vm            =16.95s    22.00s
+// asm             4.46s
+// jit             2.99s   !!!!
 L evalX(L x, L env) {
+  //printf("EVALX: "); prin1(x); printf(" ENV="); prin1(env); NL;
+  if (iscons(x)) {
+    // car cdr cdr - 24.08s instead of 26 cdrptr or 29 old
+    L f= CAR(x);
+    //printf("evalX: "); prin1(f); NL;
+    if (f==quote) return CAR(CDR(x));
+    else if (isatom(f)) {
+      void* j= (((Atom*)f)->code);
+      //printf("\nATOM=== %04x ", f); prin1(f); NL;
+      // 19.49s w nargs, +*=22.31s
+      switch(((Atom*)f)->nargs) {
+      case '1': return ((F1)j)(evalX(CAR(CDR(x)), env));
+        // nested CAR/CDR faster than resetting x!
+      case '2': return ((F2)j)(evalX(CAR(CDR(x)), env),
+                               evalX(CAR(CDR(CDR(x))), env));
+      case '\\': return cons(closure, cons(x, env));
+      case 'I': return CAR(CDR(x)); // closure==Identity
+      // TODO: lambda?
+      default: printf("NARGS='%c' %d\n", ((Atom*)f)->nargs, ((Atom*)f)->nargs);
+        error1("Can't call this type, unkonwn args", f);
+      }
+    }
+  }
+  // slightly faster after iscons!
+  // ccc=19.95s   +*=19.22s from 22.31
+  if (isnum(x)) return x;
+  if (isatom(x)) {
+    L p;
+    while(iscons(env)) {
+      p= CAR(env);
+      if (iscons(p) && CAR(p)==x) break;
+      env= CDR(env);
+    }
+    return iscons(env)? cdr(p): atomval(x);
+  }
+  return evalX2(x, env);
+}
+
+L evalX2(L x, L env) {
   ++neval;
   // other: 42.20s return x FOR (+ (* ...  => 3.7% SPEEDUP
   
@@ -1649,6 +1700,52 @@ extern L doapply1(L a, L f) {
   return eval(e, nil);
 }
 
+// evaluate arguments if needed
+// call JSR all
+L evalapply(L f, L args, L env) {
+  if (isatom(f)) {
+    void* call= &(((Atom*)f)->code[0]);
+    char n= ((Atom*)f)->nargs;
+    L a,b;
+
+    // "same" 0 or no-eval, or spread... lol
+    if (n=='0') return ((F0)call)();
+    if (n=='-') return ((F3)call)(f, env, args); // TODO: FN?
+    if (n=='n') return ((F3)call)(f, env, args); // TODO: FN?
+
+    a= eval(CAR(args), env); args= CDR(args);
+    if (n=='1') return ((F1)call)(a);
+
+    b= eval(CAR(args), env); args= CDR(args);
+    if (n=='2') return ((F2)call)(a,b);
+
+    {
+      L d,c= eval(CAR(args), env); args= CDR(args);
+      if (n=='3') return ((F3)call)(a,b,c);
+    }
+  }
+
+  error1("evalapply called with non-atom/too many args", f);
+}
+
+L apply(L f, L args, L a, L b, L c) {
+  if (isatom(f)) {
+    void* call= &(((Atom*)f)->code[0]);
+    char n= ((Atom*)f)->nargs;
+
+    switch(n) {
+    case '0': return ((F0)call)();
+    case '1': return ((F1)call)(a);
+    case '2': return ((F2)call)(a,b);
+    case '3': return ((F3)call)(a,b,c);
+    case 'n':
+    case '-': return ((F3)call)(f, nil, args); // TODO: FN?
+    }
+  }
+
+  error1("apply called with non-atom/too many args", f);
+}
+
 #ifdef ETRACERUN
 L evalTrace(L x, L env) {
   L r;
@@ -1736,6 +1833,7 @@ void* funs[]= {
   lread, // 1 arg, or 0 (c=func)
   0, // lquote,
   0, // llambda,
+  0, // lclosure,
 
   0, // llist, // evallist nospread vararg
   evalappend, // vararg
@@ -1757,7 +1855,7 @@ void* funs[]= {
   // -- two args
   0, // lpercent,
   0, // lbitand,
-  0,0,0,0, // lminus, lplus, lmul, ldiv,
+  0,lplus,lmul,0, // lminus, lplus, lmul, ldiv,
 
   0, // lbitor,
   0, 0, // leq, leq,
@@ -1781,7 +1879,7 @@ char* names[]= {
   ":-de",   // DEfine var/lambda       TODO: implicit progn?
   ":-dc",   // Define Compile bytecode TODO: implicit progn?
   ":-da",   // Define compile Assembly TODO: implicit progn?
-  "; df",
+  ";-df",
 
   ":2setq", // TODO: not right for "VM" // TODO: 2xN for multiple assigments?
   "!2set",
@@ -1795,10 +1893,11 @@ char* names[]= {
 
   "Y1read",
   "\'1quote",
-  "\\-lambda",
+  "\\\\lambda",
+  " Iclosure",
 
   "Lnlist",
-  "H2append",
+  "H2append", // TODO: really 2? 
   
   // one arg
   "!1atom", // "! symbolp", // or symbol? // TODO: change... lol
@@ -1912,12 +2011,13 @@ closure= atom("closure");
 
   // direct code pointers
   // nearly 10% faster... but little dangerous
-  #ifndef AL
-    setval(atom("car"), mknum((int)(char*)car), nil);
-    setval(atom("cdr"), mknum((int)(char*)cdr), nil);
+  //#ifndef AL
+  // 29 -> 26s
+  //setval(atom("car"), mknum((int)(char*)car), nil);
+  //setval(atom("cdr"), mknum((int)(char*)cdr), nil);
     // only for ... TODO: remove
     //setval(atom("cons"), mknum((int)(char*)cons), nil);
-  #endif // AL
+  //#endif // AL
 
 }
 
@@ -2071,7 +2171,7 @@ L readeval(char *ln, L env, char noprint) {
     }
 
     // TESTING JSR all
-    if (isatom(r) && r!=eof) {
+    if (0 &&isatom(r) && r!=eof) {
       printf("----TESING...\n"); {
       F1 j= (F1)(((Atom*)r)->code);
       L rr= j(cons(mknum(42),mknum(7)));

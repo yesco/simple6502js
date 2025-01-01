@@ -1,0 +1,14 @@
+
+manual.txt : OricLisp manual, print on every standard 80 columns printer with
+	63 lines per page.
+
+ORICLISP: OricLisp program in oric tape format. If you have a PC with Euphoric,
+	just use CLOAD"ORICLISP". Use a 3"1/2 or 5"1/4 sedoric disk to transfer
+	to a real Oric.
+
+ORICLISP.24K:	Same OricLisp program with a different memory allocation : 24KB
+	CONS and 4 KB atom space instead of 16KB CONS and 12 KB atom space.
+
+CAVALIER:	a memory image of OricLisp with Knight's Ride example
+	(see Appendix E). Load from the Basic prompt with CLOAD"CAVALIER".
+	(Disk users, please note memory images are saved to tape only).

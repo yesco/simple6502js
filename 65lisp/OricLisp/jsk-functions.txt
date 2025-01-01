@@ -1,0 +1,105 @@
+read
+nil
+t
+- dotted pair
+quote
+'
++
+eval
+print
+car
+cdr
+cons
+- (car 'atom) -> value
+- (cdr 'atom) -> properties
+list
+atom
+numberp
+consp
+null
+equal
+eq
+cond
+-
+*
+/
+<
+setq
+set
+lambda
+putd
+- (putd 'identify '(lambda (x) ...))
+- 32 bit full arithmetic
+- radix 2..36
+- symbols up to 256 characters (can have space)
+- segmented virtual stack 3K "same speed as 256-byte stack"
+- 16KB cons, 12KB atoms
+- GC: compresses strings/pairs/numbers/symbols
+- character macros
+- closed pointer space
+- addressed-typed data
+- 38/40 x 28 rows
+- 15% faster by scanning keyboard only every 0.03s, and every 1s during calc and 0.1s during print
+- 128 byte read buffer (3 rows)
+- edit: insert/overwrite ctrl-I toggle
+- DEL deletes last
+- ctrl-A copies current char from buffer (displaying on screen)
+- ctrl-D deletes next char
+- result displayed as "\n=VALUE"
+c??r
+c???r
+- atom points to itself initially
+last
+assoc (using equal)
+member (using equal)
+oblist (all symbols)
+append (2 lists, or 1 to copy)
+nconc
+reverse (2nd argument appended at end of first reversed)
+gc
+plusp
+minusp
+zerop
+prin
+progn (implicit in lambda)
+prog1
+and
+not
+(while pred exp...) -> nil
+'NONNUMERIC error
+'DIVIDEBYZERO
+mod
+div (/ = (and . mod))
+<
+>
+rplaca
+rplacd
+nconc
+memory = (peek 42) (poke 42 77)->prev value
+time (1/100th seconds)
+print - CR at end
+- atom has value, property, function def
+getd - get lambda def, T for machine code, nil if undefined
+movd - (movd 'append 'copy)
+flambda - no eval (FLAMBDA L exp...) only single parameter
+- character macros '=quote
+(putd '"#" '(lambda () (eval (read))))
+mlambda - (MLAMBDA L exp...) - can replace car/cdr of L
+no apply - (eval (cons f args))
+
+- maybe not defined:
+-- apply and append assoc caaar caadr cadar addr cddaar cdadr cddar cdddr caar cadr cdar cddr equal last length list member nconc or prog1 progn quote reverse set setq while
+-- mulisp not defined: nth lconc evenp pop push put get remprop flagp flag remflag gcd comment lessp greaterp plus difference times substring findstring pack unpack length ascii catch throw not read/write file
+- memory map: $200-$300: system vars, $400-$500: keyboard buffer+conversion area, $500-$1000 link stack, $1000-: character strings> <dotted pairs, $5000-: numbers> <symbols, $8000-
+
+
+
+
+
+
+
+
+
+
+
+

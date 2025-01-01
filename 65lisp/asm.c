@@ -534,7 +534,13 @@ char* rules[]= {
   // TODO: signed int - maybe use "function argument"
   //"%d<", mTAY() mEORn("\x80") mCMPn("#") mTXA() mEORn("\x80") mSBCn("\"") mBCS("\0") mTYA() mBCS("\0"), U 12, REND
 
+//  "A", JSR("w?"), U 3, U ffffcar, REND // 2% FASTER
+  // UNSAFE: 2% faster
+  //OPT("A", JSR("w?"), U 3, U ldaxi, REND)
   "A", JSR("w?"), U 3, U ffcar, REND
+//  "D", JSR("w?"), U 3, U ffffcdr, REND
+  // UNSAFE: 3% faster
+  //OPT("D", LDYn("\x03") JSR("w?"), U 5, U ldaxidx, REND)
   "D", JSR("w?"), U 3, U ffcdr, REND
   "C", JSR("w?") "s-", U 5, U cons, REND // TODO: make more efficient one?
 

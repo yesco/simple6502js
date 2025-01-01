@@ -1,9 +1,43 @@
+// CURRENTLY IMPLEMENTED
+//
+// Primitives:
+//   car cdd cons
+//   null quote consp number atom eq
+//   print terpri princ
+//   set
+//   eq < + * /
+//   rplaca rplacd memory
+//
+// Special:
+//    if
+
+// TODO:
+// Primtives:
+//   read eval
+//   time
+//   plusp minusp zerop 
+//   mod div >
+//   putd getd movd
+//
+// Lisp:
+//   equal
+//   assoc member append reverse
+//   last nconc
+//   gc oblist
+//
+// NLAMBDA/FLAMBDA
+//   list cond setq
+//   c??r c???r
+//   progn prog1
+//   and or not
+//   while
+//
+// flambda - mlambda
+
 // WARNING: this file is in complete flux,
 // as it's being EXPERIMENTED ON
 //
 // ...
-
-
 // A 6502 lisp from Hackware presentation in Singapore
 // (>) 2024 Jonas S Karlsson
 
@@ -88,10 +122,6 @@
   #define ETRACE(a) do { a; } while(0)
 #endif
 
-// ---------------- CONFIG
-#define MAXCONS  1024*8
-#define MAXATOM  1024
-
 // ---------------- lisp Datatype
 typedef unsigned int D;  D nil, LAMBDA, QUOTE, T;
 
@@ -100,7 +130,8 @@ D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
 typedef struct { D car, cdr; } Cons;  Cons *C, *CS, *CE;
 
 // return N multiple of 4 bytes, aligned bits (bPPP..PPP01) if bits==01
-void* callaign(size_t n, char bits) { char* p= calloc(n+1, sizeof(Cons)); 
+void* callaign(size_t n, char bits) { char* p= calloc(n+1, 1);
+  // TODO: assumption of size for atoms too...
   while((((D)p) & 0x03) != bits) p++; return p;
 }
 
@@ -121,7 +152,7 @@ D cons(D a, D d) { ++C; assert(C<CE); C->car= a; C->cdr= d; return (D)C; }
 //    car(atom) == global value
 
 // DO NOT ADD ANYTHING TO THIS! *A is an aligned array...
-typedef struct { D val; char* str; } Atom;  Atom *A, *AE;
+typedef struct { D val; char* str; } Atom;  Atom *A, *AS, *AE;
 
 // marker used to know when to strdup new atoms
 char initialized= 0;
@@ -311,22 +342,29 @@ int main(int argc, char** argv) {
   m= 50000; // standard test
   m= 1;
 
-  //assert(sizeof(Atom)==sizeof(Cons));
-
   // allocate memory, init special atoms
-  CS= C= ((Cons*)callaign(MAXCONS, 3))-1; CE= CS+MAXCONS;
-  nil= (D)callaign(MAXATOM, 1); car(nil)= nil; cdr(nil)= nil;
-  A= 1+(Atom*)nil; AE= A+MAXATOM;
-  T= atom("T"); car(T)= T;  QUOTE= atom("quote"); LAMBDA= atom("lambda");
+  printf("FREE: %u Bytes (max %u)\n", _heapmemavail(), _heapmaxavail());  {
+    unsigned int maxcons= _heapmaxavail()/sizeof(Cons)/10*8;
+    unsigned int maxatom= maxcons/20;
+    printf("maxcons=%d maxatom=%d\n", maxcons, maxatom);
+    // gives 10% left for names
+    CS= C= ((Cons*)callaign(maxcons*sizeof(Cons), 3))-1; CE= CS+maxcons;
+    nil= (D)callaign(maxatom*sizeof(Atom), 1); car(nil)= nil; cdr(nil)= nil; // nil special
+    AS= A= 1+(Atom*)nil; AE= A+maxatom-1;
+    T= atom("T"); car(T)= T;  QUOTE= atom("quote"); LAMBDA= atom("lambda");
+  }
 
   // register primitives
   ++np; while(*np) { car(atom(np+2))= mknum(*np); np+= strlen(np)+1; }
   initialized= 1;
 
+  printf("CS...C...CE: %04x-%04x-%04x\n", CS, C, CE);
+  printf("CONS: %u/%u ATOMS: %u/%u FREE: %u Bytes (max %u) \n", ((D)C-(D)CS)/sizeof(Cons), ((D)CE-(D)CS)/sizeof(Cons), ((D)A-(D)AS)/sizeof(Atom), ((D)AE-(D)AS)/sizeof(Atom), _heapmemavail(), _heapmaxavail());
   // read-eval loop
   while(!feof(stdin)) { printf("65> "); x= lread(); terpri(); 
     for(i=m; i; --i) r= eval(x, nil);
     princ(r); terpri();
+    printf("CONS: %u/%u ATOMS: %u/%u FREE: %u Bytes (max %u) \n", ((D)C-(D)CS)/sizeof(Cons), ((D)CE-(D)CS)/sizeof(Cons), ((D)A-(D)AS)/sizeof(Atom), ((D)AE-(D)AS)/sizeof(Atom), _heapmemavail(), _heapmaxavail());
   }
 
   PROGSIZE;

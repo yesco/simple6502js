@@ -1,0 +1,23 @@
+
+manuel	: le manuel d'OricLisp, imprimez-le sur n'importe quelle imprimante
+	reconnaissant les caractères Ansi. Je ne l'ai pas lu sous dos, il est
+	possible que vous ayez à passer sous Windows pour avoir les caractères
+	accentués.
+
+ORICLISP: le programme OricLisp sous forme de fichier cassette. Si vous avez
+	un PC avec Euphoric, CLOAD"ORICLISP" sous Euphoric suffit à le lancer.
+	Si vous avez un Oric à lecteur de disquette 3"1/2 ou 5"1/4, demandez à
+	un ami ayant un PC de vous le transférer sur disquette. Si vous avez
+	un Oric à lecteur de disquette 3" ou pas de lecteur du tout, demandez à
+	un ami ayant un lecteur 3"1/2 ou 5"1/4 de vous le transférer sur
+	disquette 3" ou sur cassette. 
+
+ORICLISP.24K: le meme programme OricLisp avec une répartition mémoire
+	différente, 24Ko de CONS et 4Ko d'atomes au lieu de 16Ko et 12Ko.
+
+CAVALIER: une image mémoire d'OricLisp avec le problème du parcours du cavalier
+	(cf Annexe D). Charger simplement depuis le Basic avec CLOAD"CAVALIER".
+	(utilisateurs de disquette, attention, les images mémoire ne sont
+	sauvées que sur cassette).
+
+
