@@ -99,7 +99,7 @@ void revers();
 
 // TODO: do it for real
 char kbhit() { return 1; }
-char cgetc() { return 'A'; }
+char cgetc() { return 'F'-64; }
 
 void scrollup(char n) { }
 
@@ -160,10 +160,10 @@ char* spr= NULL; size_t sprlen= 0;
 #include <stdlib.h>
 
 // maybe faster than printf
-void printnum(int n) {
+void putint(int n) {
   if (n<0) { putchar('-'); n= -n; }
-  if (n>9) printnum(n/10);
-  putchar('0'+(n%10));
+  if (n>9) putint(n/10);
+  putint('0'+(n%10));
 }
 
 int printf(const char* fmt, ...) {
@@ -172,7 +172,7 @@ int printf(const char* fmt, ...) {
   va_start(argptr, fmt);
   do {
     n= spr? vsnprintf(spr, sprlen, fmt, argptr): 0;
-    putchar('['); printnum(n); putchar(']');
+    //putchar('['); printnum(n); putchar(']');
     if (!n || n>sprlen) {
       sprlen= (n>sprlen)?n+30: 80;
       spr= realloc(spr, sprlen);
@@ -247,7 +247,7 @@ void edit(char* e, size_t size) {
     // -- update screen
     //clrscr();
     putchar(12);
-    //printf("(CLEAR:%d", ++clear);
+    printf("(CLEAR:%d", ++clear);
     savecursor();
     homex= x; homey= y; homew= w;
 
@@ -264,9 +264,9 @@ void edit(char* e, size_t size) {
 
     SCREENSTATE&= 0xfe;
 
-    //printf(" REDRAW:%d", ++redraw);
-    //printf(" XPOS=%d", xpos);
-    //printf(" KEY=%d)\n", lastkey);
+    printf(" REDRAW:%d", ++redraw);
+    printf(" XPOS=%d", xpos);
+    printf(" KEY=%d)\n", lastkey);
 
     // fix cur in bounds
     if (cur < e) cur= e;
@@ -276,9 +276,7 @@ void edit(char* e, size_t size) {
     //*(char*)0x270= 0;
 
     // print till current cursor
-    printf("FOOBAR");
     if (cur!=e) printf("%.*s", (int)(cur-e), e);
-    printf("FIEFUM");
 
     savecursor();
     *SCREENXY(x,y)   |= 128;
@@ -341,6 +339,9 @@ void edit(char* e, size_t size) {
     case CTRL+'A': cur= sl; goto cursor;
     case CTRL+'B': case 8: --cur; xx=--x; goto cursor;
     case CTRL+'F': case 9: ++cur; xx=++x; goto cursor;
+// TODO: faster but breaks.. lol
+//    case CTRL+'F': case 9: k=*cur; ++cur; xx=++x;
+//      if (k=='\n') goto cursor;  putchar(k); goto updateline;
     case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++y; goto cursor;
     case CTRL+'E': cur= el; goto cursor;
 
