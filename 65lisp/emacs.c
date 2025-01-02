@@ -74,22 +74,25 @@ unsigned int time() {
 #define CHARSET    (0xB400) // -0xB7FF
 #define ALTSET     (0xB800) // -0xBB7F
 #define TEXTSCREEN ((char*)0xBB80) // -0xBF3F
-#define SCREENSIZE (28*40))
-#define SCREENENDE (TEXTSCREEN+SCREENSIZE)
+#define SCREENSIZE (28*40)
+#define SCREENEND  (TEXTSCREEN+SCREENSIZE)
 
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
 char curx=0, cury=0, *cursc= TEXTSCREEN;
 
-#define gotoxy(x,y) do { curx= (x); cury= (y); cursc=SCREENXY(curx, cury); } while(0)
+void cputc(char c);
+
+void gotoxy(char x, char y) {
+  curx= x; cury= y;
+  cputc(0);
+}
 
 void clrscr() {
-  // TODO: break-out to a fill?
+  memset(cursc, ' ', 28*40);
+  curx= cury= 0;
   cursc= TEXTSCREEN;
-  for(cury=29; --cury;) 
-    for(curx=41; --curx;) 
-      *cursc= ' ', ++cursc;
-  cursc= TEXTSCREEN;
+  return;
 }
 
 #define wherex() curx
@@ -97,7 +100,12 @@ void clrscr() {
 
 void revers();
 
-void scrollup(char n) { }
+void scrollup(char n) {
+  memcpy(TEXTSCREEN, TEXTSCREEN+40, (28-n)*40);
+  memset(TEXTSCREEN+(28-n)*40, ' ', 40*n);
+  cury= 27;
+  cputc(0);
+}
 
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
@@ -110,11 +118,8 @@ void cputc(char c) {
 //    case 10  : ++cury; cursc+= 40; break;
       case 11  : --cury; cursc-= 40; break;
       case 12  : clrscr(); return;
-      case '\r': curx= 0; 
-        cursc= SCREENXY(curx, cury);
-        goto recalc;
-      case '\n': curx= 0; ++cury;
-        goto recalc;
+      case '\r': curx= 0; break;
+      case '\n': curx= 0; ++cury; break;
 //    case '\r': curx= 0; break;
       }
       // fix state
@@ -122,19 +127,19 @@ void cputc(char c) {
       else if (curx>=40) ++cury,curx=0;
 
       if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) scrollup(cury-27),cury=0;
+      else if (cury>=28) { scrollup(cury-27); return; }
 
-      if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
-      else if (cursc>=TEXTSCREEN)
-      recalc:
-        cursc= SCREENXY(curx, cury);
+      //if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
+      //else if (cursc>=SCREENEND);
+
+      cursc= SCREENXY(curx, cury);
 
       return;
     }
   }
   // 32-127, 128+32-255 (inverse)
   *cursc= c; ++cursc;
-  if (++curx>=40) ++cury,curx=0;
+  if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(cury-27);
 }
 
@@ -514,6 +519,7 @@ int main(int argc, char** argv) {
   char x, y;
   unsigned int start= time();
 
+  if (0){
   if (0) {
     while(1) {
       KeyboardRead();
@@ -523,6 +529,7 @@ int main(int argc, char** argv) {
       gotoxy(0,15); savecursor();
       while (1) {
         char a;
+#ifdef FOOR
         gotoxy(0,1);
         printf("a 00 FE FD FB F7 EF DF BF 7F FF\n");
         for(a=0; a<8; ++a) {
@@ -543,17 +550,20 @@ int main(int argc, char** argv) {
           putchar('\n');
         }
         putchar('\n');
+#endif
         if (kbhit()) {
           char c= cgetc();
-          restorecursor();
+          //restorecursor();
           if ((c&127)<=' ') printf("^%c", c+64);
           else if (c>=127) printf(" M-%c($%02x) ", c, c);
           else printf("%c",  c&127);
-          savecursor();
+          if (c=='A') putchar('\n');
+          //savecursor();
         }
       }
     }
-  switch(0) {
+  }
+  switch(1) {
   case 1:
     while(j--) {
       clrscr();
