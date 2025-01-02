@@ -519,7 +519,7 @@ int main(int argc, char** argv) {
   char x, y;
   unsigned int start= time();
 
-  if (0){
+  if (1){
   if (0) {
     while(1) {
       KeyboardRead();
@@ -551,6 +551,7 @@ int main(int argc, char** argv) {
         }
         putchar('\n');
 #endif
+        asm("SEI");
         if (kbhit()) {
           char c= cgetc();
           //restorecursor();
@@ -560,6 +561,7 @@ int main(int argc, char** argv) {
           if (c=='A') putchar('\n');
           //savecursor();
         }
+        asm("CLI");
       }
     }
   }
