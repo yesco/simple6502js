@@ -114,6 +114,9 @@ void cputc(char c) {
 //    case 10  : ++cury; cursc+= 40; break;
       case 11  : --cury; cursc-= 40; break;
       case 12  : clrscr(); return;
+      case '\r': curx= 0; 
+        cursc= SCREENXY(curx, cury);
+        break;
       case '\n': curx= 0; ++cury;
         cursc= SCREENXY(curx, cury);
         break;
@@ -339,7 +342,7 @@ void edit(char* e, size_t size) {
     case CTRL+'A': cur= sl; goto cursor;
     case CTRL+'B': case 8: --cur; xx=--x; goto cursor;
     case CTRL+'F': case 9: ++cur; xx=++x; goto cursor;
-// TODO: faster but breaks.. lol
+// TODO: faster but 
 //    case CTRL+'F': case 9: k=*cur; ++cur; xx=++x;
 //      if (k=='\n') goto cursor;  putchar(k); goto updateline;
     case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++y; goto cursor;
@@ -398,10 +401,20 @@ char buff[2014]=
   "this is a longer\n  program that is\n    indented and many lines\n    more lines\n    and more\n  and less indent\n  same   and more\nlast lines coming\nalso last lines\nbut this is the last line\nsorry end\n"
 ;
 
+extern char gKey;
+extern void KeyboardRead();
+
 int main(int argc, char** argv) {
   int i, j= 10;
   char x, y;
   unsigned int start= time();
+
+  if (1) {
+    while(1) {
+      KeyboardRead();
+      printf("%02x  ", gKey);
+    }
+  }
 
   switch(0) {
   case 1:

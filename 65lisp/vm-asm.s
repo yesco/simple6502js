@@ -884,3 +884,76 @@ _getcalled:
         ;;; C-stack: arg1.. argn AX=FUNATOM
         jmp _doapply1
 
+
+
+.export _gKey, _KeyboardRead
+
+_gKey:  .res 1
+
+
+_KeyboardRead:
+	lda #00
+	sta _gKey
+
+read_left:      
+	ldx #$df
+	jsr KeyboardSetUp
+	beq read_right
+	lda _gKey
+	ora #1
+	sta _gKey
+	
+read_right:     
+	ldx #$7f
+	jsr KeyboardSetUp
+	beq read_up
+	lda _gKey	
+	ora #2
+	sta _gKey
+	
+read_up:        
+	ldx #$f7
+	jsr KeyboardSetUp
+	beq read_down
+	lda _gKey	
+	ora #4
+	sta _gKey
+	
+
+read_down:      
+	ldx #$bf
+	jsr KeyboardSetUp
+	beq read_fire
+	lda _gKey	
+	ora #8
+	sta _gKey
+	
+read_fire:      
+	ldx #$fe
+	jsr KeyboardSetUp
+	beq read_end
+	lda _gKey	
+	ora #16
+	sta _gKey
+	
+read_end:       
+	rts
+
+
+KeyboardSetUp:  
+	;x=column a=row
+	lda #04
+	sta $300
+	lda #$0e
+	sta $30f
+	lda #$ff
+	sta $30c
+	ldy #$dd
+	sty $30c
+	stx $30f
+	lda #$fd
+	sta $30c
+	sty $30c
+	lda $300
+	and #08
+	rts
