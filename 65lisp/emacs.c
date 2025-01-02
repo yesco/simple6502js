@@ -97,10 +97,6 @@ void clrscr() {
 
 void revers();
 
-// TODO: do it for real
-char kbhit() { return 1; }
-char cgetc() { return 'F'-64; }
-
 void scrollup(char n) { }
 
 void cputc(char c) {
@@ -116,10 +112,9 @@ void cputc(char c) {
       case 12  : clrscr(); return;
       case '\r': curx= 0; 
         cursc= SCREENXY(curx, cury);
-        break;
+        goto recalc;
       case '\n': curx= 0; ++cury;
-        cursc= SCREENXY(curx, cury);
-        break;
+        goto recalc;
 //    case '\r': curx= 0; break;
       }
       // fix state
@@ -130,7 +125,9 @@ void cputc(char c) {
       else if (cury>=28) scrollup(cury-27),cury=0;
 
       if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
-      if (cursc>=TEXTSCREEN) cursc= SCREENXY(curx, cury);
+      else if (cursc>=TEXTSCREEN)
+      recalc:
+        cursc= SCREENXY(curx, cury);
 
       return;
     }
@@ -210,28 +207,130 @@ int T,nil,doapply1,print;
 
 char x,y; int w; int s;
 char xx,yy;
+char savex=0, savey=0;
 
-void savecursor() {
-  //printf("[s"); // TODO: only vt100
-  x= wherex(); y= wherey();
-  w= SCREENROWADDR;
+#define savecursor() do { savex= wherex(); savey= wherey(); } while(0)
+#define restorecursor() gotoxy(savex, savey)
+
+// key encoding
+// 0-31 : CTRL+'A' ... 'Z' ((CTRL==-64)
+// 13   : KRETURN
+// 27   : KESC
+// 32   : ' '
+// ...
+// 127  : KDEL
+// 128  : KFUNCT
+// ...
+// 128+ 8: KLEFT
+// 128+ 9: KLEFT
+// 128+10: KLEFT
+// 128+11: KLEFT
+// ...
+// 128+'A': KFUNCT+'A' (KFUNCT=128)
+// ...
+// 128+'Z'
+// 128+'a': funct ctrl
+
+#define KRETURN "\x0d" //  13
+#define KESC    "\x1b" //  27
+#define KDEL    "\x7f" // 127
+
+// ORIC keyboard routines gives 8-11 ascii
+// - I choose to distinguish these from CTRL-HIJK
+#define KLEFT   "\x88" // 128+ 8
+#define KRIGHT  "\x89" // 128+ 9
+#define KDOWN   "\x8a" // 128+10
+#define KUP     "\x8b" // 128+11
+
+#define KRCTRL  "\x81" // 128+1
+#define KLCTRL  "\x82" // 128+2
+#define KLSHIFT "\x83" // 128+3
+#define KRSHIFT "\x84" // 128+4
+
+#define KFUNCT  "\x80" // 128+letter
+
+// wrong: CD K->X W 3 =
+char* upperkeys[]= {
+  "7N5V" KRCTRL "1X3",
+  "JTRF\0" KESC  "QD",
+  "M6B4" KLCTRL "Z2C",
+  "K9;-\0\0\\\0", // last char == 39?
+  " ,." KUP KLSHIFT KLEFT KDOWN KRIGHT,
+  "UIOP" KFUNCT KDEL "][",
+  "YHGE\0ASW",
+  "8L0\\" KRSHIFT KRETURN "\0="};
+
+char* lowerkeys[]= {
+  "&n%v" KRCTRL "!x#",
+  "jtrf\0" KESC "qd",
+  "m^b$]" KLCTRL "z@c",
+  "k(;^\0\0|\0",
+  " <>" KUP KLSHIFT KLEFT KDOWN KRIGHT,
+  "uiop]" KFUNCT KDEL "}{",
+  "yhge\0asw",
+  "*l)|" KRSHIFT KRETURN "\0-"};
+
+extern char gKey;
+extern void KeyboardRead();
+
+#define MEM(a) *((char*)a)
+
+char key(char row, char x) {
+  // - set row
+  MEM(0x0300)= row;
+  // - select column register
+  MEM(0x030f)= 0x0e;
+  // - tell AY register number
+  MEM(0x030c)= 0xff;
+  // -- clear CB2 (prevents hang?)
+  MEM(0x030c)= 0xdd;
+  // -- write column register
+  MEM(0x030f)= x;
+  MEM(0x030c)= 0xfd;
+  MEM(0x030c)= 0xdd;
+  // and #08  ???
+  return MEM(0x0300);
 }
 
-void restorecursor() {
-    // restore cursor
-    //printf("[u"); // TODO: only vt100
-    // gotoxy(x, y); // doesn't work!
-    // POKE#268,D
-    // POKE4269,A
-    // DOKE#12, DEEK(#27A)+(D – 1)*40
-    //printf("\n(*%d;%d*)", x, y);
-    *(char*)0x268= y;
-    *(char*)0x269= x;
-    //*(int*)0x12= (*(int*)0x27a)-(y-1)*40;
-    SCREENROWADDR= w;
-    
-    gotoxy(x, y);
+int unc= 0;
+char keybits[8]={0};
+
+char kbhit() {
+  if (!unc) {
+    static const char MASK[]= {
+      0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
+    char row= 0, c= 0, col, v, k;
+    for(;row<8;++row) {
+      v= 0;
+      if (key(row, 0x00)!=row) { // some key in row pressed
+        for(col=0;col<8;++col) {
+          v<<= 2;
+          if (key(row, MASK[col])!=row) {
+            ++v;
+            k= upperkeys[row][col];
+            if      (k==*KLCTRL  || k==*KRCTRL)  c-= 64;
+            else if (k==*KLSHIFT || k==*KRSHIFT) c+= 32;
+            else if (k==*KFUNCT)                 c+= 128;
+            else c+= k; // LOL TODO: several keys?
+          }
+        }
+      }
+      keybits[row]= v;
+    }
+    unc= c;
+  }
+  return unc;
 }
+
+char cgetc() {
+  char c;
+  while(!kbhit());
+  c= unc;
+  unc= 0;
+  return c;
+}
+
+
 
 // TODO: resize
 void edit(char* e, size_t size) {
@@ -401,21 +500,59 @@ char buff[2014]=
   "this is a longer\n  program that is\n    indented and many lines\n    more lines\n    and more\n  and less indent\n  same   and more\nlast lines coming\nalso last lines\nbut this is the last line\nsorry end\n"
 ;
 
-extern char gKey;
-extern void KeyboardRead();
+char pp(char a, char x) {
+  char k= key(a, x);
+  if (k!=a)
+    printf(" %02x", k&(255-8));
+  else
+    printf("   ");
+  return k;
+}
 
 int main(int argc, char** argv) {
   int i, j= 10;
   char x, y;
   unsigned int start= time();
 
-  if (1) {
+  if (0) {
     while(1) {
       KeyboardRead();
       printf("%02x  ", gKey);
     }
-  }
-
+  } else {
+      gotoxy(0,15); savecursor();
+      while (1) {
+        char a;
+        gotoxy(0,1);
+        printf("a 00 FE FD FB F7 EF DF BF 7F FF\n");
+        for(a=0; a<8; ++a) {
+          printf("%d", a);
+          if (pp(a, 0x00)!=a) {
+            pp(a, 0xFE);
+            pp(a, 0xFD);
+            pp(a, 0xFB);
+            pp(a, 0xF7);
+            pp(a, 0xEF);
+            pp(a, 0xDF);
+            pp(a, 0xBF);
+            pp(a, 0x7F);
+            pp(a, 0xFF);
+          } else {
+            printf("                        ");
+          }
+          putchar('\n');
+        }
+        putchar('\n');
+        if (kbhit()) {
+          char c= cgetc();
+          restorecursor();
+          if ((c&127)<=' ') printf("^%c", c+64);
+          else if (c>=127) printf(" M-%c($%02x) ", c, c);
+          else printf("%c",  c&127);
+          savecursor();
+        }
+      }
+    }
   switch(0) {
   case 1:
     while(j--) {

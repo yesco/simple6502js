@@ -885,6 +885,7 @@ _getcalled:
         jmp _doapply1
 
 
+;;; from - https://www.defence-force.org/computing/oric/coding/annexe_4/files/keyboard/keyboard.s
 
 .export _gKey, _KeyboardRead
 
@@ -957,3 +958,17 @@ KeyboardSetUp:
 	lda $300
 	and #08
 	rts
+
+
+_jkey: 
+	lda #00
+	sta _gKey
+
+jread_left:      
+	ldx #$df
+	jsr KeyboardSetUp
+	beq read_right
+	lda _gKey
+	ora #1
+	sta _gKey
+	
