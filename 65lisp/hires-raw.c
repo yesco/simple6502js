@@ -76,9 +76,22 @@ void gclear() {
   memset(HIRESSCREEN, 64, HIRESSIZE);
 }
 
+static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
+
+// optimizations, 10x draw line
+// 938hs plain
+// 892hs PIXMASK -5.16% 
+// 842hs (5*y)*8 -5.94%
+// 708hs q=x/6  -18.9%
+// 672hs static q,m,*p -3.81%
+// 632hs inline curset -6.33%
+// 618hs static yy -2.3%
+// 569hs move mod lookup out, mi loop, -8.6%
 void curset(char x, char y, char v) {
-  char* p= HIRESSCREEN+ 40*y + x/6;
-  char m= 32>>(x%6);
+  static char q, m, *p;
+  q= x/6;
+  p= HIRESSCREEN+ (5*y)*8 + q;
+  m= PIXMASK[x-q*6];
   // TODO; if attribute, don't modify...
   //   or extra v mode?
   switch(v) {
@@ -89,8 +102,9 @@ void curset(char x, char y, char v) {
 }
 
 char point(char x, char y) {
-  char* p= HIRESSCREEN+ 40*y + x/6;
-  char m= 32>>(x%6);
+  char q= x/6;
+  char* p= HIRESSCREEN+ (5*y)*8 + q;
+  char m= PIXMASK[x-6*q];
   return *p & m;
 }
 
@@ -98,10 +112,22 @@ void draw(char x, char y, char dx, char dy, char v) {
   if (dx<0) { x+= dx; dx= -dx; }
   if (dy<0) { y+= dy; dy= -dy; }
   if (dx>dy) {
+    // inline curset
     char i= dx+1;
+    char mi= x+i-((x+i)/6)*6;
     while(--i) {
-      char yy= y+dy*i/dx;
-      curset(x+i, yy, v);
+      static char yy, q, m, *p;
+      yy= y+dy*i/dx;
+      q= (x+i)/6;
+      p= HIRESSCREEN+ (5*yy)*8 + q;
+      m= PIXMASK[mi];
+      mi= mi? mi-1: 5;
+      // 627hs without switch from  632hs
+      switch(v) {
+      case 0: *p &= ~m;
+      case 1: *p |= m;
+      case 2: *p ^= m;
+      }
     }
   } else {
     char i= dy+1;
@@ -124,9 +150,11 @@ void main() {
   gclear();
   gfill(60, 15, 10*6, 10, 64+63);
 
-  for(j=0; j<200; ++j) {
+  { unsigned int t= time();
+  for(j=0; j<10; ++j) {
     draw(0, j, 239, 30, 2);
   }
+  gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());}
 
   //text();
   //printf("HELLO TEST\n");
