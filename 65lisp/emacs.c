@@ -104,23 +104,23 @@ void edit(char* e, size_t size) {
   *last= 0; // end used as yank buffer
   do {
     // -- update screen
-    //clrscr();
-    putchar(12);
-    printf("(CLEAR:%d", ++clear);
-    savecursor();
+    clrscr();
+    //printf("(CLEAR:%d", ++clear);
 
   cursor:
-    // show guessed cursor
+    // show guessed cursor, will be overwritten here...
     *SCREENXY(xx,yy) |= 128;
-    restorecursor();
+    gotoxy(0, 1);
+
     // turn off cursor? doesn't seem right...
 
     SCREENSTATE&= 0xfe;
 
+#ifdef EMDEFUG
     printf(" REDRAW:%d", ++redraw);
     printf(" XPOS=%d", xpos);
     printf(" KEY=%d)\n", lastkey);
-
+#endif
     // fix cur in bounds
     if (cur < e) cur= e;
     if (cur > e+elen) cur= e+elen;
@@ -185,17 +185,20 @@ void edit(char* e, size_t size) {
 
     switch(k) {
 
-    // movement // TODO: simplier, make a search fun?
+    // movement
+    // TODO: make a search fun?
     case META+'<': case META+'V':cur= e; goto cursor;
     case META+'>': case CTRL+'V':cur= e+elen; goto cursor;
-    case CTRL+'P': case 11: xpos= cur-sl+1; cur= sl-1; yy=--wherey(); goto cursor;
+
+      // TODO: improve speed of cursor navigation!
+    case CTRL+'P': case KEY_UP: xpos= cur-sl+1; cur= sl-1; yy=--wherey(); goto cursor;
     case CTRL+'A': cur= sl; goto cursor;
-    case CTRL+'B': case 8: --cur; xx=--wherex(); goto cursor;
-    case CTRL+'F': case 9: ++cur; xx=++wherex(); goto cursor;
+    case CTRL+'B': case KEY_LEFT: --cur; xx=--wherex(); goto cursor;
+    case CTRL+'F': case KEY_RIGHT: ++cur; xx=++wherex(); goto cursor;
 // TODO: faster but 
 //    case CTRL+'F': case 9: k=*cur; ++cur; xx=++x;
 //      if (k=='\n') goto cursor;  putchar(k); goto updateline;
-    case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++wherey(); goto cursor;
+    case CTRL+'N': case KEY_DOWN: xpos= cur-sl+1; cur= el+1; yy=++wherey(); goto cursor;
     case CTRL+'E': cur= el; goto cursor;
 
     // exit/other
@@ -206,7 +209,7 @@ void edit(char* e, size_t size) {
     // TODO: CTRL-K on '(' will cut only till matching ')' !
     // TODO: conflict with arrows! remove META
     // detect CTRL ?
-    case META+CTRL+'K': if (*cur) do {
+    case CTRL+'K': if (*cur) do {
           k= *cur; memmove(cur, cur+1, e+size-cur-1); *last= k;
         } while(*cur && *cur!='\n' && k!='\n'); break;
     case CTRL+'Y': if (elen+2*yank>size-5) break; // safe

@@ -74,10 +74,12 @@ void gotoxy(char x, char y) {
   cputc(0);
 }
 
+// TODO: what's ORIC wherey() default? 0 or 1
 void clrscr() {
-  memset(cursc, ' ', 28*40);
-  curx= cury= 0;
-  cursc= TEXTSCREEN;
+  // Don't clear status line (/)
+  memset(cursc+40, ' ', (SCREENROWS-1)*SCREENCOLS);
+  curx= 0; cury= 1;
+  cputc(0);
   return;
 }
 
@@ -196,6 +198,26 @@ int printf(const char* fmt, ...) {
 // 128+'Z'
 // 128+'a': funct ctrl
 
+// --- key codes
+#define KEY_RETURN  13
+#define KEY_ESC     27
+#define KEY_DEL    127
+
+// ORIC keyboard routines gives 8-11 ascii
+// - I choose to distinguish these from CTRL-HIJKEY_
+#define KEY_LEFT   128+ 8
+#define KEY_RIGHT  128+ 9
+#define KEY_DOWN   128+10
+#define KEY_UP     128+11
+
+#define KEY_RCTRL  128+1
+#define KEY_LCTRL  128+2
+#define KEY_LSHIFT 128+3
+#define KEY_RSHIFT 128+4
+
+#define KEY_FUNCT  128
+
+// --- key strings (for use to construct maps)
 #define KRETURN "\x0d" //  13
 #define KESC    "\x1b" //  27
 #define KDEL    "\x7f" // 127
@@ -214,6 +236,7 @@ int printf(const char* fmt, ...) {
 
 #define KFUNCT  "\x80" // 128+letter
 
+
 // TODO: replace with one 64B string?
 char* upperkeys[]= {
   "7N5V" KRCTRL "1X3",
@@ -228,13 +251,14 @@ char* upperkeys[]= {
 char* lowerkeys[]= {
   "&n%v" KRCTRL "!x#",
   "jtrf\0" KESC "qd",
-  "m^b$]" KLCTRL "z@c",
+  "m^b$" KLCTRL "z@c",
   "k(;^\0\0|\0",
   " <>" KUP KLSHIFT KLEFT KDOWN KRIGHT,
-  "uiop]" KFUNCT KDEL "}{",
+  "uiop" KFUNCT KDEL "}{",
   "yhge\0asw",
   "*l)|" KRSHIFT KRETURN "\0-"};
 
+// TODO: remove asm
 extern char gKey;
 extern void KeyboardRead();
 
@@ -275,7 +299,7 @@ static const char KEYMASK[]= {
 // Returns: 0 - no key, or the character
 char kbhit() {
   if (!unc) {
-    char row= 0, c= 0, o= 0, col, v, k;
+    char row=0,c=0,o=0,R=8,K=0, col, v, k;
     asm("SEI");
     for(;row<8;++row) {
       v= 0;
@@ -287,15 +311,24 @@ char kbhit() {
             k= upperkeys[row][col];
             if      (k==*KLCTRL  || k==*KRCTRL)  o-= 64;
             else if (k==*KLSHIFT || k==*KRSHIFT) o+= 32;
-            else if (k==*KFUNCT)                 o+= 128;
-            else c= k; // several keys: last overwrites
+            else if (k==*KFUNCT)                   o+=128;
+            else c=k,R=row,K=col; // several keys: last overwrites
           }
         }
       }
       keybits[row]= v;
     }
     asm("CLI");
-    unc= c? o+c: 0;
+    if (R!=8) {
+      // TODO: can make this simplier?
+      //   not call lowerkeys in two places?
+      if (c>='A' && c<='Z') {
+        if (o==32) o= 0;
+        else if (!o) c= lowerkeys[R][K];
+      }
+      if (c<'A' && o==32) o=0,c= lowerkeys[R][K];
+      unc= c? o+c: 0;
+    }
   }
   return unc;
 }
