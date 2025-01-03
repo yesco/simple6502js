@@ -100,7 +100,7 @@ void fill(char x, char y, char w, char h, char c) {
   }
 }
 
-char curpaper= 0; curink =7;
+char curpaper= 0, curink =7;
 
 void paper(char c) {
   curpaper= c & 7;
