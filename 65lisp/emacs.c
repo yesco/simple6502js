@@ -265,32 +265,36 @@ int main(int argc, char** argv) {
   char x, y;
   unsigned int start= time();
 
-  switch(5) {
+  switch(0) {
+
+    // keypos & keypressed
   case 5: clrscr(); {
     char A= keypos('A');
     assert(A);
     while(1) putchar(keypressed(A)? 'A': '.');
     return 0;
     }
+
+    // keymatrix & kbhit & cgetc
   case 4: 
       gotoxy(0,15); savecursor();
       while (1) {
         char a;
-#ifdef SHOWMATRIX
+#ifdef showmatrix
         gotoxy(0,1);
-        printf("a 00 FE FD FB F7 EF DF BF 7F FF\n");
+        printf("a 00 fe fd fb f7 ef df bf 7f ff\n");
         for(a=0; a<8; ++a) {
           printf("%d", a);
           if (pp(a, 0x00)!=a) {
-            pp(a, 0xFE);
-            pp(a, 0xFD);
-            pp(a, 0xFB);
-            pp(a, 0xF7);
-            pp(a, 0xEF);
-            pp(a, 0xDF);
-            pp(a, 0xBF);
-            pp(a, 0x7F);
-            pp(a, 0xFF);
+            pp(a, 0xfe);
+            pp(a, 0xfd);
+            pp(a, 0xfb);
+            pp(a, 0xf7);
+            pp(a, 0xef);
+            pp(a, 0xdf);
+            pp(a, 0xbf);
+            pp(a, 0x7f);
+            pp(a, 0xff);
           } else {
             printf("                        ");
           }
@@ -302,19 +306,23 @@ int main(int argc, char** argv) {
           char c= cgetc();
           //restorecursor();
           if ((c&127)<=' ') printf("^%c", c+64);
-          else if (c>=127) printf(" M-%c($%02x) ", c, c);
+          else if (c>=127) printf(" m-%c($%02x) ", c, c);
           else printf("%c",  c&127);
-          if (c=='A') putchar('\n');
+          if (c=='\r') putchar('\n');
           //savecursor();
         }
       }
       return 0;
+
+      // testing asm
   case 3:
     while(1) {
       KeyboardRead();
       printf("%02x  ", gKey);
     }
     return 0;
+
+      // timing of clrscr
   case 2:
     while(j--) {
       clrscr();
@@ -326,6 +334,8 @@ int main(int argc, char** argv) {
     clrscr();
     printf("\nTIMEhs: %u\n", start-time());
     return 0;
+
+    // testing putchar?
   case 1:
     clrscr();
     for(y=0; y<28; ++y) {
@@ -335,7 +345,9 @@ int main(int argc, char** argv) {
       printf("-FOOBAR-%d--\n", y*40);
       return 0;
     }
-    default: break;
+
+    // 0 - editor
+    case 0: default: break;
   }
   
   edit(buff, sizeof(buff));

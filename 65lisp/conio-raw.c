@@ -7,6 +7,11 @@
 // 
 // (c) 2024 Jonas S Karlsson (jsk@yesco.org)
 
+// TODO: kbhit, cgetc - don't give repeat directly...
+// TODO: kbhit, cgetc - no buffer, so miss keystroke?
+// TODO: hook it up to interrupts and buffer!
+
+
 // Modelled and replacing cc65 <conio.h>
 
 // Functions:
@@ -16,7 +21,7 @@
 // - putchar(c) - macro
 // - wherex()
 // - wherey()
-// - revers()
+// - revers() - TODO
 // - cputsxy(x, y, s) - doesn't update cursor pos
 // - puts(s)
 // - printf(fmt, ...) - uses sprintf
@@ -34,12 +39,13 @@
 // - key(row, colmask)
 // - keypos(c)
 // - keypresed(keypos)
+
+// Unixy:
 // - ungetchar(c)
 // - getchar() - macro
 
 // TextMode
 // TODO: how to solve graphics mode?
-
 #define CHARSET    (0xB400)        // $B400-B7FF
 #define ALTSET     (0xB800)        // $B800-BB7F
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
@@ -235,25 +241,23 @@ extern void KeyboardRead();
 // peek/poke all in one *MEM(4711)= 42;
 #define MEM(a) *((char*)a)
 
-// Reads hardware keyboard ROW using column MASK
+// Reads hardware keyboard ROW using COLMASK
 // 
 // ROW:  0-7
-// MASK: 0x00 -> key pressed in row?
-// MASK: mask for column 0-7
+// COLMASK: mask for column 0-7
 //   (0xFE 0xFD 0xFB 0xF7 0xEF 0xDF 0xBF 0x7F)
+// COLMASK: 0x00 -> any key pressed in row
 //
-// Returns: ROW if no key presssed, otherwise
-//   (ROW|8) if key pressed
-char key(char row, char mask) {
+// Returns: 0 if no key pressed, 8 if pressed
+char key(char row, char colmask) {
   MEM(0x0300)= row;
-  MEM(0x030f)= 0x0e; // select column reg
-  MEM(0x030c)= 0xff; // tell AY register number
-  MEM(0x030c)= 0xdd; // clear CB2 (prevents hang?)
-  MEM(0x030f)= mask; // write column reg
+  MEM(0x030f)= 0x0e;    // select column reg
+  MEM(0x030c)= 0xff;    // tell AY register number
+  MEM(0x030c)= 0xdd;    // clear CB2 (prevents hang?)
+  MEM(0x030f)= colmask; // write column reg
   MEM(0x030c)= 0xfd;
   MEM(0x030c)= 0xdd;
-  // and #08  ???
-  return MEM(0x0300);
+  return MEM(0x0300) & 8;
 }
 
 int unc= 0;
@@ -263,22 +267,22 @@ int ungetchar(int c) {
   return unc? -1: unc=c;
 }
 
+static const char KEYMASK[]= {
+  0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
 // True if a key is pressed (not shift/ctrl/funct)
 // (stores key in unc)
 //
 // Returns: 0 - no key, or the character
 char kbhit() {
   if (!unc) {
-    static const char MASK[]= {
-      0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
     char row= 0, c= 0, o= 0, col, v, k;
     asm("SEI");
     for(;row<8;++row) {
       v= 0;
-      if (key(row, 0x00)!=row) { // some key in row pressed
+      if (key(row, 0x00)) { // some key in row pressed
         for(col=0;col<8;++col) {
           v<<= 2;
-          if (key(row, MASK[col])!=row) {
+          if (key(row, KEYMASK[col])) {
             ++v;
             k= upperkeys[row][col];
             if      (k==*KLCTRL  || k==*KRCTRL)  o-= 64;
@@ -317,9 +321,9 @@ char keypos(char c) {
 char keypressed(char keypos) {
   char c;
   asm("SEI");
-  c= key(keypos>>4, keypos & 7);
+  c= key(keypos>>4, KEYMASK[keypos & 7]);
   asm("CLI");
-  return c & 8;
+  return c;
 }
 
 char cgetc() {
