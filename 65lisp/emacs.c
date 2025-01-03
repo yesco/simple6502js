@@ -61,139 +61,16 @@
 //#include <conio.h>
 //#include <peekpoke.h>
 ///#include "simconio.c"
-//void revers(char) {}
+#include "conio-raw.c" // LOL, no .h
 
 // hundreths of second
 unsigned int time() {
   return *(unsigned int*)0x276;
 }
 
-// Do my own screen print
-
-// TextMode, Graphics mode: 
-#define CHARSET    (0xB400) // -0xB7FF
-#define ALTSET     (0xB800) // -0xBB7F
-#define TEXTSCREEN ((char*)0xBB80) // -0xBF3F
-#define SCREENSIZE (28*40)
-#define SCREENEND  (TEXTSCREEN+SCREENSIZE)
-
-#define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
-
-char curx=0, cury=0, *cursc= TEXTSCREEN;
-
-void cputc(char c);
-
-void gotoxy(char x, char y) {
-  curx= x; cury= y;
-  cputc(0);
-}
-
-void clrscr() {
-  memset(cursc, ' ', 28*40);
-  curx= cury= 0;
-  cursc= TEXTSCREEN;
-  return;
-}
-
-#define wherex() curx
-#define wherey() cury
-
-void revers();
-
-void scrollup(char n) {
-  memcpy(TEXTSCREEN, TEXTSCREEN+40, (28-n)*40);
-  memset(TEXTSCREEN+(28-n)*40, ' ', 40*n);
-  cury= 27;
-  cputc(0);
-}
-
-void cputc(char c) {
-  if ((c & 0x7f) < ' ') {
-    if (c < 128) {
-      // control-codes
-      switch(c) {
-      case  7  : break; // TODO: bell?
-      case  8  : --curx; --cursc; break;
-      case  9  : ++curx; ++cursc; break;
-//    case 10  : ++cury; cursc+= 40; break;
-      case 11  : --cury; cursc-= 40; break;
-      case 12  : clrscr(); return;
-      case '\r': curx= 0; break;
-      case '\n': curx= 0; ++cury; break;
-//    case '\r': curx= 0; break;
-      }
-      // fix state
-      if (curx==255) --cury,curx=39;
-      else if (curx>=40) ++cury,curx=0;
-
-      if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) { scrollup(cury-27); return; }
-
-      //if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
-      //else if (cursc>=SCREENEND);
-
-      cursc= SCREENXY(curx, cury);
-
-      return;
-    }
-  }
-  // 32-127, 128+32-255 (inverse)
-  *cursc= c; ++cursc;
-  if (++curx>=40) { ++cury; curx=0; }
-  if (cury>=28) scrollup(cury-27);
-}
-
-//int putchar(int c) { cputc(c); return c; }
-#define putchar(c) (cputc(c),c)
-
-// raw?
-void cputsxy(char x, char y, char* s) {
-  char *p = SCREENXY(x,y);
-  while(*s) *p=*s,++p,++s;
-}
-
-int puts(const char* s) {
-  const char* p= s;
-  if (!s) return 0;
-  while(*p) putchar(*p),++p;
-  return p-s;
-}
-
-
-char* spr= NULL; size_t sprlen= 0;
-
-#include <stdlib.h>
-
-// maybe faster than printf
-void putint(int n) {
-  if (n<0) { putchar('-'); n= -n; }
-  if (n>9) putint(n/10);
-  putint('0'+(n%10));
-}
-
-int printf(const char* fmt, ...) {
-  int n= 0;
-  va_list argptr;
-  va_start(argptr, fmt);
-  do {
-    n= spr? vsnprintf(spr, sprlen, fmt, argptr): 0;
-    //putchar('['); printnum(n); putchar(']');
-    if (!n || n>sprlen) {
-      sprlen= (n>sprlen)?n+30: 80;
-      spr= realloc(spr, sprlen);
-      n= 0;
-    }
-  } while(!n);
-  puts(spr);
-  va_end(argptr);
-  return n;
-}
 
 // Dummys for ./r script
 int T,nil,doapply1,print;
-
-#define CTRL 1-'A'
-#define META 128
 
 // TODO: these are buffered! use elsewhere
 //k= getchar();
@@ -210,141 +87,15 @@ int T,nil,doapply1,print;
 
 #define SCREENROWADDR *((int*)0x12)
 
-char x,y; int w; int s;
-char xx,yy;
-char savex=0, savey=0;
-
-#define savecursor() do { savex= wherex(); savey= wherey(); } while(0)
-#define restorecursor() gotoxy(savex, savey)
-
-// key encoding
-// 0-31 : CTRL+'A' ... 'Z' ((CTRL==-64)
-// 13   : KRETURN
-// 27   : KESC
-// 32   : ' '
-// ...
-// 127  : KDEL
-// 128  : KFUNCT
-// ...
-// 128+ 8: KLEFT
-// 128+ 9: KLEFT
-// 128+10: KLEFT
-// 128+11: KLEFT
-// ...
-// 128+'A': KFUNCT+'A' (KFUNCT=128)
-// ...
-// 128+'Z'
-// 128+'a': funct ctrl
-
-#define KRETURN "\x0d" //  13
-#define KESC    "\x1b" //  27
-#define KDEL    "\x7f" // 127
-
-// ORIC keyboard routines gives 8-11 ascii
-// - I choose to distinguish these from CTRL-HIJK
-#define KLEFT   "\x88" // 128+ 8
-#define KRIGHT  "\x89" // 128+ 9
-#define KDOWN   "\x8a" // 128+10
-#define KUP     "\x8b" // 128+11
-
-#define KRCTRL  "\x81" // 128+1
-#define KLCTRL  "\x82" // 128+2
-#define KLSHIFT "\x83" // 128+3
-#define KRSHIFT "\x84" // 128+4
-
-#define KFUNCT  "\x80" // 128+letter
-
-// wrong: CD K->X W 3 =
-char* upperkeys[]= {
-  "7N5V" KRCTRL "1X3",
-  "JTRF\0" KESC  "QD",
-  "M6B4" KLCTRL "Z2C",
-  "K9;-\0\0\\\0", // last char == 39?
-  " ,." KUP KLSHIFT KLEFT KDOWN KRIGHT,
-  "UIOP" KFUNCT KDEL "][",
-  "YHGE\0ASW",
-  "8L0\\" KRSHIFT KRETURN "\0="};
-
-char* lowerkeys[]= {
-  "&n%v" KRCTRL "!x#",
-  "jtrf\0" KESC "qd",
-  "m^b$]" KLCTRL "z@c",
-  "k(;^\0\0|\0",
-  " <>" KUP KLSHIFT KLEFT KDOWN KRIGHT,
-  "uiop]" KFUNCT KDEL "}{",
-  "yhge\0asw",
-  "*l)|" KRSHIFT KRETURN "\0-"};
-
-extern char gKey;
-extern void KeyboardRead();
-
-#define MEM(a) *((char*)a)
-
-char key(char row, char x) {
-  // - set row
-  MEM(0x0300)= row;
-  // - select column register
-  MEM(0x030f)= 0x0e;
-  // - tell AY register number
-  MEM(0x030c)= 0xff;
-  // -- clear CB2 (prevents hang?)
-  MEM(0x030c)= 0xdd;
-  // -- write column register
-  MEM(0x030f)= x;
-  MEM(0x030c)= 0xfd;
-  MEM(0x030c)= 0xdd;
-  // and #08  ???
-  return MEM(0x0300);
-}
-
-int unc= 0;
-char keybits[8]={0};
-
-char kbhit() {
-  if (!unc) {
-    static const char MASK[]= {
-      0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
-    char row= 0, c= 0, col, v, k;
-    for(;row<8;++row) {
-      v= 0;
-      if (key(row, 0x00)!=row) { // some key in row pressed
-        for(col=0;col<8;++col) {
-          v<<= 2;
-          if (key(row, MASK[col])!=row) {
-            ++v;
-            k= upperkeys[row][col];
-            if      (k==*KLCTRL  || k==*KRCTRL)  c-= 64;
-            else if (k==*KLSHIFT || k==*KRSHIFT) c+= 32;
-            else if (k==*KFUNCT)                 c+= 128;
-            else c+= k; // LOL TODO: several keys?
-          }
-        }
-      }
-      keybits[row]= v;
-    }
-    unc= c;
-  }
-  return unc;
-}
-
-char cgetc() {
-  char c;
-  while(!kbhit());
-  c= unc;
-  unc= 0;
-  return c;
-}
-
-
+// cursor
+char xx=0, yy=1;
 
 // TODO: resize
 void edit(char* e, size_t size) {
   char *p= e, *cur= e, *sl, *el, *last= e+size-1, k;
   int xpos= -1, yank= 0, elen, curlen;
 
-  char homex, homey; int homew;
-
-  // TODO: remove 
+  // debugging TODO: remove 
   int clear= 0, redraw= 0; char lastkey= 0;
 
   cputsxy(0, 0, "65emacs (c) 2024 Jonas S Karlsson");
@@ -356,16 +107,10 @@ void edit(char* e, size_t size) {
     putchar(12);
     printf("(CLEAR:%d", ++clear);
     savecursor();
-    homex= x; homey= y; homew= w;
 
   cursor:
     // show guessed cursor
-
     *SCREENXY(xx,yy) |= 128;
-
-    x= homex;
-    y= homey;
-    w= homew;
     restorecursor();
     // turn off cursor? doesn't seem right...
 
@@ -386,7 +131,7 @@ void edit(char* e, size_t size) {
     if (cur!=e) printf("%.*s", (int)(cur-e), e);
 
     savecursor();
-    *SCREENXY(x,y)   |= 128;
+    *SCREENXY(wherex(), wherey())   |= 128;
     *SCREENXY(xx,yy) &= 127;
 
     //printf("<<<%d;%d>>>", x, y);
@@ -420,7 +165,7 @@ void edit(char* e, size_t size) {
     // TODO: can do more efficient?
     if (xpos>=0) { --xpos; cur= (sl+xpos<=el)? sl+xpos: el; xpos=-1; goto cursor; }
     // update cursor actual position
-    xx=x; yy=y;
+    xx=wherex(); yy=wherey();
 
     elen= strlen(e);
     curlen= elen + cur-e;
@@ -431,7 +176,7 @@ void edit(char* e, size_t size) {
     //*SCREENXY(x, y) |= 128;
     // -- process key
     // TODO: cursor only vis if loop?
-    while(!kbhit()) *SCREENXY(x, y) |= 128;
+    while(!kbhit()) *SCREENXY(wherex(), wherey()) |= 128;
     k= cgetc();
     if (k==27) k= 128+cgetc()-32;
 
@@ -442,14 +187,14 @@ void edit(char* e, size_t size) {
     // movement // TODO: simplier, make a search fun?
     case META+'<': case META+'V':cur= e; goto cursor;
     case META+'>': case CTRL+'V':cur= e+elen; goto cursor;
-    case CTRL+'P': case 11: xpos= cur-sl+1; cur= sl-1; yy=--y; goto cursor;
+    case CTRL+'P': case 11: xpos= cur-sl+1; cur= sl-1; yy=--wherey(); goto cursor;
     case CTRL+'A': cur= sl; goto cursor;
-    case CTRL+'B': case 8: --cur; xx=--x; goto cursor;
-    case CTRL+'F': case 9: ++cur; xx=++x; goto cursor;
+    case CTRL+'B': case 8: --cur; xx=--wherex(); goto cursor;
+    case CTRL+'F': case 9: ++cur; xx=++wherex(); goto cursor;
 // TODO: faster but 
 //    case CTRL+'F': case 9: k=*cur; ++cur; xx=++x;
 //      if (k=='\n') goto cursor;  putchar(k); goto updateline;
-    case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++y; goto cursor;
+    case CTRL+'N': case 10: xpos= cur-sl+1; cur= el+1; yy=++wherey(); goto cursor;
     case CTRL+'E': cur= el; goto cursor;
 
     // exit/other
@@ -484,7 +229,7 @@ void edit(char* e, size_t size) {
       putchar(k);
     updateline:
       //SCREENSTATE &= 127;
-      *SCREENXY(x, y) &= 127;
+      *SCREENXY(wherex(), wherey()) &= 127;
       savecursor();
       p= cur;
       while(*p && *p!='\n' && *p!='\r') putchar(*p),++p;
@@ -551,7 +296,6 @@ int main(int argc, char** argv) {
         }
         putchar('\n');
 #endif
-        asm("SEI");
         if (kbhit()) {
           char c= cgetc();
           //restorecursor();
@@ -561,7 +305,6 @@ int main(int argc, char** argv) {
           if (c=='A') putchar('\n');
           //savecursor();
         }
-        asm("CLI");
       }
     }
   }
