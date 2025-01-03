@@ -44,10 +44,14 @@
 // - ungetchar(c)
 // - getchar() - macro
 
+#include <stdarg.h>
+#include <stdio.h>
+
 // TextMode
 // TODO: how to solve graphics mode?
-#define CHARSET    (0xB400)        // $B400-B7FF
-#define ALTSET     (0xB800)        // $B800-BB7F
+#define CHARSET    ((char*)0xB400) // $B400-B7FF
+#define CHARDEF(c) ((char*)0xB400+c*8)
+#define ALTSET     ((char*)0xB800) // $B800-BB7F
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
 #define SCREENROWS 28
 #define SCREENCOLS 40
@@ -215,6 +219,7 @@ int printf(const char* fmt, ...) {
 #define KEY_LSHIFT 128+3
 #define KEY_RSHIFT 128+4
 
+// TODO: function keys FUNCT+1 2 3 ...
 #define KEY_FUNCT  128
 
 // --- key strings (for use to construct maps)
