@@ -15,6 +15,8 @@
 // Modelled on and replacing cc65 <conio.h>
 
 // Functions:
+// - time() - hundreths of second
+
 // - clrscr()
 // - paper(c)
 // - ink(c)
@@ -59,6 +61,13 @@
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
 #define SCREENEND  (TEXTSCREEN+SCREENSIZE)
+
+// hundreths of second
+unsigned int time() {
+  // ORIC TIMER 100 interrupts/s,
+  // TODO: my own? no ROM...
+  return *(unsigned int*)0x276;
+}
 
 // *SCREEN(X,Y)='A';
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))

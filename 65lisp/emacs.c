@@ -64,12 +64,6 @@
 ///#include "simconio.c"
 #include "conio-raw.c" // LOL, no .h
 
-// hundreths of second
-unsigned int time() {
-  return *(unsigned int*)0x276;
-}
-
-
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
