@@ -12,10 +12,12 @@
 // TODO: hook it up to interrupts and buffer!
 
 
-// Modelled and replacing cc65 <conio.h>
+// Modelled on and replacing cc65 <conio.h>
 
 // Functions:
 // - clrscr()
+// - paper(c)
+// - ink(c)
 // - gotoxy(x, y)
 // - cputc(c)
 // - putchar(c) - macro
@@ -85,6 +87,33 @@ void clrscr() {
   curx= 0; cury= 1;
   cputc(0);
   return;
+}
+
+void fill(char x, char y, char w, char h, char c) {
+  // TODO: adjust so not out of screen?
+  // TODO: and use for hires?
+  char* p= SCREENXY(x, y);
+  for(; h; --h) {
+    // TODO: is memset faster?
+    for(x= w; x; --x) *p=c,++p;
+    p+= 40-w;
+  }
+}
+
+char curpaper= 0; curink =7;
+
+void paper(char c) {
+  curpaper= c & 7;
+  fill(0,1, 1,SCREENROWS-1, c | 16);
+// scrollbar?
+//  fill(0,1,  1,7,  (c & 7)|16+0);
+//  fill(0,8,  1,12, (c & 7)|16+128);
+//  fill(0,21, 1,5,  (c & 7)|16+0);
+}
+
+void ink(char c) {
+  curink= c & 7;
+  fill(1,1, 1,SCREENROWS-1, (c & 7));
 }
 
 // TODO:

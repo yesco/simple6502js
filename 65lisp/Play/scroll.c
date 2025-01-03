@@ -34,20 +34,24 @@ int main() {
 
   clrscr();
   while(1) {
-    if (wherey()<27) {
-    putchar(128+(n&7));
-    putchar(128+((n/8)&7)+16);
+    if (n<8*8) {
+      putchar(128+(n&7));
+      putchar(128+((n/8)&7)+16);
 
-    putchar('O'+128);
-    putchar('R'+128);
-    putchar('I'+128);
-    putchar('C'+128);
-    putchar(9);
-    putchar(9);
-    putchar(9);
-    putchar(9);
-    ++n;
+      putchar('O'+128);
+      putchar('R'+128);
+      putchar('I'+128);
+      putchar('C'+128);
+      putchar(9);
+      putchar(9);
+      putchar(9);
+      putchar(9);
+    } else {
+      char i= n/16;
+      paper(i/8);
+      ink(i);
     }
+    ++n;
 
     keydef(' ', row, col);
     c= cgetc();
