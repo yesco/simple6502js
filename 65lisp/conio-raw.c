@@ -32,9 +32,10 @@
 // - putint(i)
 
 // - key(row, colmask)
+// - keypos(c)
+// - keypresed(keypos)
 // - ungetchar(c)
 // - getchar() - macro
-// 
 
 // TextMode
 // TODO: how to solve graphics mode?
@@ -207,7 +208,7 @@ int printf(const char* fmt, ...) {
 
 #define KFUNCT  "\x80" // 128+letter
 
-// wrong: CD K->X W 3 =
+// TODO: replace with one 64B string?
 char* upperkeys[]= {
   "7N5V" KRCTRL "1X3",
   "JTRF\0" KESC  "QD",
@@ -262,11 +263,15 @@ int ungetchar(int c) {
   return unc? -1: unc=c;
 }
 
+// True if a key is pressed (not shift/ctrl/funct)
+// (stores key in unc)
+//
+// Returns: 0 - no key, or the character
 char kbhit() {
   if (!unc) {
     static const char MASK[]= {
       0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
-    char row= 0, c= 0, col, v, k;
+    char row= 0, c= 0, o= 0, col, v, k;
     asm("SEI");
     for(;row<8;++row) {
       v= 0;
@@ -276,19 +281,45 @@ char kbhit() {
           if (key(row, MASK[col])!=row) {
             ++v;
             k= upperkeys[row][col];
-            if      (k==*KLCTRL  || k==*KRCTRL)  c-= 64;
-            else if (k==*KLSHIFT || k==*KRSHIFT) c+= 32;
-            else if (k==*KFUNCT)                 c+= 128;
-            else c+= k; // LOL TODO: several keys?
+            if      (k==*KLCTRL  || k==*KRCTRL)  o-= 64;
+            else if (k==*KLSHIFT || k==*KRSHIFT) o+= 32;
+            else if (k==*KFUNCT)                 o+= 128;
+            else c= k; // several keys: last overwrites
           }
         }
       }
       keybits[row]= v;
-      asm("CLI");
     }
-    unc= c;
+    asm("CLI");
+    unc= c? o+c: 0;
   }
   return unc;
+}
+
+// Get the ORIC ATMOS keymatrix (row,col)-position
+// Searches keymatrix for characters 32-127
+//
+// Returns: row<<4 | col | 8 (0RRR 1CCC)
+//   0 if not found
+char keypos(char c) {
+  char row, col;
+  for(row=0; row<8; ++row)
+    for(col=0; col<8; ++col)
+      if (c==upperkeys[row][col] || c==lowerkeys[row][col])
+        return (row<<4) | col | 8;
+  return 0;
+}
+
+// Using a KEYPOS test if key is pressed
+// (this is a very efficient test for a single key)
+// 
+// Returns: 0=not pressed or !0 if pressed (8)
+char keypressed(char keypos) {
+  char c;
+  asm("SEI");
+  c= key(keypos>>4, keypos & 7);
+  asm("CLI");
+  return c & 8;
 }
 
 char cgetc() {

@@ -57,6 +57,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 //#include <conio.h>
 //#include <peekpoke.h>
@@ -264,17 +265,18 @@ int main(int argc, char** argv) {
   char x, y;
   unsigned int start= time();
 
-  if (1){
-  if (0) {
-    while(1) {
-      KeyboardRead();
-      printf("%02x  ", gKey);
+  switch(5) {
+  case 5: clrscr(); {
+    char A= keypos('A');
+    assert(A);
+    while(1) putchar(keypressed(A)? 'A': '.');
+    return 0;
     }
-  } else {
+  case 4: 
       gotoxy(0,15); savecursor();
       while (1) {
         char a;
-#ifdef FOOR
+#ifdef SHOWMATRIX
         gotoxy(0,1);
         printf("a 00 FE FD FB F7 EF DF BF 7F FF\n");
         for(a=0; a<8; ++a) {
@@ -306,10 +308,14 @@ int main(int argc, char** argv) {
           //savecursor();
         }
       }
+      return 0;
+  case 3:
+    while(1) {
+      KeyboardRead();
+      printf("%02x  ", gKey);
     }
-  }
-  switch(1) {
-  case 1:
+    return 0;
+  case 2:
     while(j--) {
       clrscr();
       //for(i=28*40+1;--i;) putchar('A');
@@ -320,7 +326,7 @@ int main(int argc, char** argv) {
     clrscr();
     printf("\nTIMEhs: %u\n", start-time());
     return 0;
-  case 2:
+  case 1:
     clrscr();
     for(y=0; y<28; ++y) {
       putchar('A'+y);
