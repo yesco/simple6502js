@@ -108,9 +108,9 @@ void curset(char x, char y, char v) {
   // TODO; if attribute, don't modify...
   //   or extra v mode?
   switch(v) {
-  case 0: *p &= ~m;
-  case 1: *p |= m;
-  case 2: *p ^= m;
+  case 0: *p &= ~m; break;
+  case 1: *p |= m;  break;
+  case 2: *p ^= m;  break;
   }
 }
 
@@ -154,9 +154,9 @@ void draw(char x, char y, int dx, int dy, char v) {
 
         // plot it
         switch(v) { // about 10% overhead
-        case 0: *p &= ~m;
-        case 1: *p |= m;
-        case 2: *p ^= m;
+        case 0: *p &= ~m; break;
+        case 1: *p |= m;  break;
+        case 2: *p ^= m;  break;
         }
 
         // step x, wrap around bit
@@ -189,11 +189,12 @@ void draw(char x, char y, int dx, int dy, char v) {
           }
         }
 
+        // TODO: simple function w globals?
         // plot it
         switch(v) { // about 10% overhead
-        case 0: *p &= ~m;
-        case 1: *p |= m;
-        case 2: *p ^= m;
+        case 0: *p &= ~m; break;
+        case 1: *p |= m;  break;
+        case 2: *p ^= m;  break;
         }
 
         // step y
@@ -204,13 +205,23 @@ void draw(char x, char y, int dx, int dy, char v) {
   }
 }
 
+// https://en.m.wikipedia.org/wiki/Midpoint_circle_algorithm
+// = 5x circle(120,100,75+j,2)
+// 320hs ORIC BASIC!
+// 358hs bresham w 8x curset
 void circle(char x, char y, int r, char v) {
-  // 181/256 == 1/sqrt(2)
-  int dy=(r*181)>>8, dx= dy;
-  while(--dy>=0) {
-    // bad approxmiation, lol
-    dx+= 1;
+  int t1= r/16, t2;
+  int dx = r;
+  int dy = 0;
 
+  do {
+    ++dy;
+    t1+= dy;
+    t2=t1-dx;
+    if (t2>=0) {
+      t1= t2;
+      --dx;
+    }
 
     curset(x+dx, y+dy, v);
     curset(x-dx, y+dy, v);
@@ -224,8 +235,7 @@ void circle(char x, char y, int r, char v) {
 
     curset(x+dy, y-dx, v);
     curset(x-dy, y-dx, v);
-
-  }
+  } while (dx>dy);
 }
 
 // Dummys for ./r script
@@ -249,7 +259,8 @@ void main() {
   t= time();
 
   if (1) {
-    circle(120, 100, 75, 2);
+    for(j=0; j<5; ++j)
+      circle(120, 100, 75+j, 2);
   } else if (0) {
     for(j=0; j<10; ++j) {
       //draw(0, j, 239, 30, 2); // 92hs
