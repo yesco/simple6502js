@@ -102,9 +102,11 @@ char div6[255], mod6[255];
 
 void curset(char x, char y, char v) {
   static char q, m, *p;
-  q= x/6;
-  p= HIRESSCREEN+ (5*y)*8 + q;
-  m= PIXMASK[x-q*6];
+//  q= x/6;
+//  p= HIRESSCREEN+ (5*y)*8 + q;
+//  m= PIXMASK[x-q*6];
+  p= HIRESSCREEN+ (5*y)*8 + div6[x];
+  m= PIXMASK[mod6[x]];
   // TODO; if attribute, don't modify...
   //   or extra v mode?
   switch(v) {
@@ -210,6 +212,7 @@ void draw(char x, char y, int dx, int dy, char v) {
 // 320hs ORIC BASIC!
 // 358hs bresham w 8x curset
 // 347hs dx,dy char
+// 174hs using div6 mod6 in curset -84%
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
