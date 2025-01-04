@@ -118,8 +118,7 @@ void draw(char x, char y, char dx, char dy, char v) {
   if (dy<0) { y+= dy; dy= -dy; }
   if (dx>dy) {
     // inline curset
-    static char m, q, mi, sy;
-    static char *p;
+    static char m, q, mi, sy, *p;
     char i= dx+1;
     q= (x+i-1)/6;
     mi= x+i-1-q*6;
@@ -128,17 +127,13 @@ void draw(char x, char y, char dx, char dy, char v) {
     y+= dy;
     p= HIRESSCREEN+(5*y)*8+q;
     while(--i) {
-      //if ((sy+= dy) >= dx) sy-=dx,--y,p-=40;
       if ((sy+= dy) > dx) sy-=dx,p-=40;
-      // p= HIRESSCREEN+ (5*y)*8 + q;
-      // 627hs without switch from  632hs
-      switch(v) {
+      switch(v) { // only 5hs for 10x
       case 0: *p &= ~m;
       case 1: *p |= m;
       case 2: *p ^= m;
       }
       // wrap around
-      //if ((m<<=1)==64) m=1,--q,--p;
       if ((m<<=1)==64) m=1,--p;
     }
   } else {
