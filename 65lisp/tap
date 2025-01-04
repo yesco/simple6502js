@@ -16,7 +16,7 @@ rm $name.s    2>/dev/null
 
 cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
 
-echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`)"
+echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 
 cp $name.tap ORIC/
 ls -l $name.o $name.tap

@@ -141,20 +141,28 @@ void scrollup(char n) {
   cputc(0);
 }
 
+#define SAVE    "\x1d"
+#define RESTORE "\x1e"
+#define NEXT    "\x1f"
+
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
     if (c < 128) {
       // control-codes
       switch(c) {
       case  7  : break; // TODO: bell?
-      case  8  : --curx; --cursc; break;
-      case  9  : ++curx; ++cursc; break;
-//    case 10  : ++cury; cursc+= 40; break;
-      case 11  : --cury; cursc-= 40; break;
+      case  8  : --curx; --cursc; break;     // back
+      case  9  : ++curx; ++cursc; break;     // forward
+//    case 10  : ++cury; cursc+= 40; break;  // down ?
+      case 11  : --cury; cursc-= 40; break;  // up
       case 12  : clrscr(); return;
       case '\r': curx= 0; break;
       case '\n': curx= 0; ++cury; break;
 //    case '\r': curx= 0; break;
+
+      case 0x1d: savecursor(); break;
+      case 0x1e: restorecursor(); break;
+      case 0x1f: restorecursor(); savey= ++cury; break;
       }
       // fix state
       if (curx==255) --cury,curx=39;
