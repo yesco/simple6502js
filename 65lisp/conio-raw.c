@@ -7,10 +7,12 @@
 // 
 // (c) 2024 Jonas S Karlsson (jsk@yesco.org)
 
+// TDOO: protect the first 2 columns
+// TODO: capslock
+// TODO: disable ROM cursor?
 // TODO: kbhit, cgetc - don't give repeat directly...
 // TODO: kbhit, cgetc - no buffer, so miss keystroke?
 // TODO: hook it up to interrupts and buffer!
-
 
 // Modelled on and replacing cc65 <conio.h>
 
@@ -129,9 +131,12 @@ void ink(char c) {
 //void revers(char) {}
 void revers();
 
+// TODO: in curmode=HIRESMODE then scroll only last 3 lines!
 void scrollup(char n) {
   memcpy(TEXTSCREEN, TEXTSCREEN+40, (28-n)*40);
   memset(TEXTSCREEN+(28-n)*40, ' ', 40*n);
+  *(SCREENEND-40)= curpaper;
+  *(SCREENEND-39)= curink;
   cury= 27;
   cputc(0);
 }

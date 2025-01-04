@@ -114,20 +114,20 @@ char point(char x, char y) {
 }
 
 void draw(char x, char y, char dx, char dy, char v) {
+  static char m, s, *p;
   if (dx<0) { x+= dx; dx= -dx; }
   if (dy<0) { y+= dy; dy= -dy; }
   if (dx>dy) {
     // inline curset
-    static char m, sy, *p;
     char i= dx+1;
     char q= (x+dx)/6;
     char mi= x+dx-q*6;
     m= PIXMASK[mi];
-    sy= 0;
+    s= 0;
     y+= dy;
     p= HIRESSCREEN+(5*y)*8+q;
     while(--i) {
-      if ((sy+= dy) > dx) sy-=dx,p-=40;
+      if ((s+= dy) > dx) s-=dx,p-=40;
       switch(v) { // only 5hs for 10x
       case 0: *p &= ~m;
       case 1: *p |= m;
@@ -136,11 +136,28 @@ void draw(char x, char y, char dx, char dy, char v) {
       // wrap around
       if ((m<<=1)==64) m=1,--p;
     }
-  } else {
+  } else { // dy >= dx
+    // inline curset
     char i= dy+1;
+    char q= (x+dx)/6;
+    char mi= x+dx-q*6;
+    m= PIXMASK[mi];
+    s= 0;
+    y+= dy;
+    p= HIRESSCREEN+(5*y)*8+q;
     while(--i) {
-      char xx= x+dx*i/dy;
-      curset(xx, y+i, v);
+      if ((s+= dx) > dy) {
+        s-=dy;
+        // wrap around
+        if ((m<<=1)==64) m=1,--p;
+        //if (!(m>>=1)) m=32,--p;
+      }
+      switch(v) { // only 5hs for 10x
+      case 0: *p &= ~m;
+      case 1: *p |= m;
+      case 2: *p ^= m;
+      }
+      p-= 40;
     }
   }
 }
@@ -159,7 +176,8 @@ void main() {
 
   { unsigned int t= time();
   for(j=0; j<10; ++j) {
-    draw(0, j, 239, 30, 2);
+    //draw(0, j, 239, 30, 2);
+    draw(j, 0, 30, 199, 2);
   }
   gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());}
 
