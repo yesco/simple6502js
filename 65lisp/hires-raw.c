@@ -78,13 +78,65 @@ void gclear() {
 
 static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 
+// TODO: no effect on draw long line...
+//   however on many curset?
+char div6[240], mod6[240];
+//char* rowaddr[200];
+
+
+//    char q= div6[x]; // no time saving!?
+//    char mi= mod6[x]; // nah
+
+
+// TODO: rename
+static char gcurx, gcury, gmode;
+
+// TODO: remove?
+static char curq, curm, *curp;
+
+// light-wedith function, call by setting
+//   (gcurx, gcury, gmode)
+void setpixel() {
+  if (gmode==2) { 
+    // 84hs to use rowaddr[] - 30% faster
+    // *(rowaddr[gcury] + div6[gcurx]) ^= PIXMASK[mod6[gcurx]];
+    // 99hs - 10% faster than else
+    *(HIRESSCREEN+ (5*gcury)*8 + div6[gcurx])
+      ^= PIXMASK[mod6[gcurx]];
+  } else { // 109hs
+    // 305hs - just slightly faster than BASIC!
+    // curq= gcurx/6;
+    // curp= HIRESSCREEN+ (5*gcury)*8 + curq;
+    // curm= PIXMASK[gcurx-curq*6];
+    curp= HIRESSCREEN+ (5*gcury)*8 + div6[gcurx];
+    curm= PIXMASK[mod6[gcurx]];
+    switch(gmode) {
+    case 0: *curp &= ~curm; break;
+    case 1: *curp |= curm;  break;
+    case 2: *curp ^= curm;  break;
+    }
+  }
+}
+
+// probably uses less code than call!
+#define curset(x,y,v) do {gcurx= (x); gcury= (y); gmode= (v); setpixel(); } while (0)
+
+char point(char x, char y) {
+  gcurx= x; gcury= y; gmode= 3; setpixel();
+  return *curp & curm;
+}
+
+
+// draw(x, y, v)
+
 // optimizations, 10x draw line
+// 112hs ORIC BASIC    we are 50% faster than BASIC
 // 938hs plain
-// 892hs PIXMASK -5.16% 
-// 842hs (5*y)*8 -5.94%
-// 708hs q=x/6  -18.9%
-// 672hs static q,m,*p -3.81%
-// 632hs inline curset -6.33%
+// 892hs PIXMASK -5.16%         (curset)
+// 842hs (5*y)*8 -5.94%         (curset)
+// 708hs q=x/6  -18.9%          (curset)
+// 672hs static q,m,*p -3.81%   (curset)
+// 632hs inline curset -6.33%   
 // 618hs static yy -2.3%
 // 569hs move mod lookup out, mi loop, -8.6%
 // 560hs shift static m -1.6%
@@ -92,40 +144,8 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 // 313hs remove mult from dy*i -24.6%
 // 113hs remove /6 from loop -77%q
 //  72hs not calculate p -57%    13x FASTER!
-// 112hs ORIC BASIC    we are 50% faster than BASIC
 
-// TODO: no effect on draw long line...
-//   however on many curset?
-char div6[255], mod6[255];
-//    char q= div6[x]; // no time saving!?
-//    char mi= mod6[x]; // nah
-
-// TODO: rename
-static char curq, curm, *curp;
-
-void curset(char x, char y, char v) {
-//  q= x/6;
-//  p= HIRESSCREEN+ (5*y)*8 + q;
-//  m= PIXMASK[x-q*6];
-  curp= HIRESSCREEN+ (5*y)*8 + div6[x];
-  curm= PIXMASK[mod6[x]];
-  // TODO; if attribute, don't modify...
-  //   or extra v mode?
-  switch(v) {
-  case 0: *curp &= ~curm; break;
-  case 1: *curp |= curm;  break;
-  case 2: *curp ^= curm;  break;
-  }
-}
-
-char point(char x, char y) {
-  // TODO: use curset calc
-  char q= x/6;
-  char* p= HIRESSCREEN+ (5*y)*8 + q;
-  char m= PIXMASK[x-6*q];
-  return *p & m;
-}
-
+// TODO: works, but can we have smaller code?
 void draw(char x, char y, int dx, int dy, char v) {
   static char adx, ady, m, s, *p;
 
@@ -211,111 +231,61 @@ void draw(char x, char y, int dx, int dy, char v) {
 }
 
 // https://en.m.wikipedia.org/wiki/Midpoint_circle_algorithm
+//
+// Surprising little and simple code to draw circle!
+//
 // = 5x circle(120,100,75+j,2)
-// 320hs ORIC BASIC!
-// 358hs bresham w 8x curset
-// 347hs dx,dy char
-// 174hs using div6 mod6 in curset -84%
-// 129hs storing state from upper & mod pointers -35%
-// 112hs inline curset
-//  99hs inline simplify
-//  92hs shift instead of mod7[]
-//  89hs with simplified displacement
-//  86hs with pa inc
-//  83hs pb inc
-//  81hs with no inc!?! lol but need tables...
-//       ( 4.2x faster than BASIC! )
-//       ( 14hs is navigation, rest is ^= update)
-void circle(char x, char y, int r, char v) {
+//  320hs ORIC ATMOS BASIC
+//   97hs circle() w setpixel()
+//   81hs - fancy pointer stuff, 1010 BYTES!
+void circle(char x, char y, char r, char v) {
   int rr= r/16, e;
   char dx = r;
   char dy = 0;
 
-  char ma=0,mb,mc,md;
-  char *pa=0,*pb,*pc,*pd;
-  int disy= 0, disx= dx*40;
-
-  char *basep, basem;
-  char *yp, ym;
-  char *xp, xm;
-
-  char* pp= HIRESSCREEN + 40*y;
-
-  //pa= pp + div6[x+dx];
-  //pb= pp + div6[x-dx];
-
-  ma= PIXMASK[mod6[x+dx]];
-  mb= PIXMASK[mod6[x-dx]];
-  mc= PIXMASK[mod6[x+dy]];
-  md= PIXMASK[mod6[x-dy]];
+  gmode= v;
 
   do {
     ++dy;
-    { // incremental update state
-      disy+= 40;
-      //pa+= 40; pb+=40;
-      if (!(mc>>=1)) mc= 32;
-      if ((md<<=1)==64) md= 1;
-    }
-
     rr+= dy;
     e=rr-dx;
     if (e>=0) {
       rr= e;
       --dx;
-      { // incremental update state
-        disx-= 40;
-        if ((ma<<=1)==64) ma=1;//,--pa;
-        if (!(mb>>=1)) mb=32;//,++pb;
-      }
     }
 
-    // base
-    //curset(x,y,3); basep= curp; basem= curm;
-    //curset(0,dy);  yp= curp; ym = curm;
-    //curset(0,dx);  xp= curp; xm = curm;
+    // TODO: out-of-bounds?
 
-    //... TODO: use to build pa, pb, pc, pd?
-
-    // lower part
-    if (0) {
-      // TODO: incremental should be faster
-      /// or at least save 256*2 bytes?
-      *pa ^= ma;
-      *pb ^= mb;
-      *pc ^= mc;
-      *pd ^= md;
-
-    } else {
-      // faster than inc, but waste 256 bytes!
-      *(pp+disy+div6[x+dx]) ^= ma;
-      *(pp+disy+div6[x-dx]) ^= mb;
-      *(pp+disx+div6[x+dy]) ^= mc;
-      *(pp+disx+div6[x-dy]) ^= md;
-    }
-
-    // upper symmetries
-    *(pp-disy+div6[x+dx]) ^= ma;
-    *(pp-disy+div6[x-dx]) ^= mb;
-    *(pp-disx+div6[x+dy]) ^= mc;
-    *(pp-disx+div6[x-dy]) ^= md;
-
-    //printf("%d %d %d %d %d\n", dx, dy, pa-pc, pb-pd, pa-pc-(pb-pd));
-    //if (kbhit()==3) break;
+    // set 8 symmetries
+    gcurx= x+dx; gcury= y+dy; setpixel();
+    gcurx= x-dx;              setpixel();
+                 gcury= y-dy; setpixel();
+    gcurx= x+dx;              setpixel();
+    
+    gcurx= x+dy; gcury= y+dx; setpixel();
+    gcurx= x-dy;              setpixel();
+                 gcury= y-dx; setpixel();
+    gcurx= x+dy;              setpixel();
+                 
   } while (dx>dy);
 }
+
+/////////////////////////////////////////////////////////////
+// testing
 
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
 void main() {
   char* p= HIRESSCREEN;
-  int j;
+  int i,j;
   unsigned int t;
 
-  for(j=0; j<255; ++j) {
+  // init lookup table
+  for(j=0; j<240; ++j) {
     div6[j]= j/6;
     mod6[j]= j%6;
+    //rowaddr[j]= HIRESSCREEN + 40*j;
   }
 
   for(j=100; j; --j) printf("FOOBAR   ");
@@ -325,7 +295,13 @@ void main() {
 
   t= time();
 
-  if (1) {
+  if (0) {
+    // DFLAT circles
+    for(i=10; i>=0; --i) {
+      for(j=9; j<65; j+=65/13)
+        circle(120, 100, j, 2);
+    }
+  } else  if (1) {
     //text();
     for(j=0; j<5; ++j)
       circle(120, 100, 75+j, 2);
