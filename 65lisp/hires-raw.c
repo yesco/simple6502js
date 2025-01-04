@@ -204,6 +204,30 @@ void draw(char x, char y, int dx, int dy, char v) {
   }
 }
 
+void circle(char x, char y, int r, char v) {
+  // 181/256 == 1/sqrt(2)
+  int dy=(r*181)>>8, dx= dy;
+  while(--dy>=0) {
+    // bad approxmiation, lol
+    dx+= 1;
+
+
+    curset(x+dx, y+dy, v);
+    curset(x-dx, y+dy, v);
+
+    curset(x+dy, y+dx, v);
+    curset(x-dy, y+dx, v);
+
+
+    curset(x+dx, y-dy, v);
+    curset(x-dx, y-dy, v);
+
+    curset(x+dy, y-dx, v);
+    curset(x-dy, y-dx, v);
+
+  }
+}
+
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
@@ -223,7 +247,10 @@ void main() {
   gfill(60, 15, 10*6, 10, 64+63);
 
   t= time();
-  if (0) {
+
+  if (1) {
+    circle(120, 100, 75, 2);
+  } else if (0) {
     for(j=0; j<10; ++j) {
       //draw(0, j, 239, 30, 2); // 92hs
       //draw(239, j+30, -239, -30, 2); // 92hs same reverse
@@ -248,6 +275,7 @@ void main() {
       draw(0,     199-j, j,     j-199, 2);
     }
   }
+
   gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());
 
   //text();
