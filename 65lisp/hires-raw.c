@@ -219,6 +219,7 @@ void draw(char x, char y, int dx, int dy, char v) {
 // 129hs storing state from upper & mod pointers -35%
 // 112hs inline curset
 //  99hs inline simplify
+//  92hs shift instead of mod7[]
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
@@ -235,9 +236,9 @@ void circle(char x, char y, int r, char v) {
   char* pp= HIRESSCREEN + 40*y;
   do {
     ++dy;
-    {
+    { // incremental update state
       disy+= 80;
-      if ((mc<<=1)==64) mc= 1;
+      if (!(mc>>=1)) mc= 32;
       if ((md<<=1)==64) md= 1;
     }
 
@@ -246,7 +247,11 @@ void circle(char x, char y, int r, char v) {
     if (e>=0) {
       rr= e;
       --dx;
-      disx-= 80;
+      { // incremental update state
+        disx-= 80;
+        if ((ma<<=1)==64) ma= 1;
+        if (!(mb>>=1)) mb= 32;
+      }
     }
 
     // base
@@ -258,9 +263,6 @@ void circle(char x, char y, int r, char v) {
 
     // lower part
     if (1) {
-      //int ypy= (5*(y+dy))*8;
-      //int ypx= (5*(y+dx))*8;
-      
       int ypy= disy/2;
       int ypx= disx/2;
       
@@ -269,13 +271,7 @@ void circle(char x, char y, int r, char v) {
       pc= pp + ypx + div6[x+dy];
       pd= pp + ypx + div6[x-dy];
 
-      if (ma) {
-        ma= PIXMASK[mod6[x+dx]];
-        mb= PIXMASK[mod6[x-dx]];
-        
-//        if (!(mc>>=1)) mc= 32;
-//        if (!(md>>=1)) md= 32;
-      } else {
+      if (!ma) {
         ma= PIXMASK[mod6[x+dx]];
         mb= PIXMASK[mod6[x-dx]];
         mc= PIXMASK[mod6[x+dy]];
