@@ -209,17 +209,18 @@ void draw(char x, char y, int dx, int dy, char v) {
 // = 5x circle(120,100,75+j,2)
 // 320hs ORIC BASIC!
 // 358hs bresham w 8x curset
+// 347hs dx,dy char
 void circle(char x, char y, int r, char v) {
-  int t1= r/16, t2;
-  int dx = r;
-  int dy = 0;
+  int rr= r/16, e;
+  char dx = r;
+  char dy = 0;
 
   do {
     ++dy;
-    t1+= dy;
-    t2=t1-dx;
-    if (t2>=0) {
-      t1= t2;
+    rr+= dy;
+    e=rr-dx;
+    if (e>=0) {
+      rr= e;
       --dx;
     }
 
