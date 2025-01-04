@@ -100,23 +100,26 @@ char div6[255], mod6[255];
 //    char q= div6[x]; // no time saving!?
 //    char mi= mod6[x]; // nah
 
+// TODO: rename
+static char curq, curm, *curp;
+
 void curset(char x, char y, char v) {
-  static char q, m, *p;
 //  q= x/6;
 //  p= HIRESSCREEN+ (5*y)*8 + q;
 //  m= PIXMASK[x-q*6];
-  p= HIRESSCREEN+ (5*y)*8 + div6[x];
-  m= PIXMASK[mod6[x]];
+  curp= HIRESSCREEN+ (5*y)*8 + div6[x];
+  curm= PIXMASK[mod6[x]];
   // TODO; if attribute, don't modify...
   //   or extra v mode?
   switch(v) {
-  case 0: *p &= ~m; break;
-  case 1: *p |= m;  break;
-  case 2: *p ^= m;  break;
+  case 0: *curp &= ~curm; break;
+  case 1: *curp |= curm;  break;
+  case 2: *curp ^= curm;  break;
   }
 }
 
 char point(char x, char y) {
+  // TODO: use curset calc
   char q= x/6;
   char* p= HIRESSCREEN+ (5*y)*8 + q;
   char m= PIXMASK[x-6*q];
@@ -213,32 +216,42 @@ void draw(char x, char y, int dx, int dy, char v) {
 // 358hs bresham w 8x curset
 // 347hs dx,dy char
 // 174hs using div6 mod6 in curset -84%
+// 129hs storing state from upper & mod pointers -35%
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
   char dy = 0;
 
+  char ma,mb,mc,md;
+  char *pa,*pb,*pc,*pd;
+  int disy= 0, disx= dx*2*40;
+
   do {
     ++dy;
+    disy+= 80;
+
     rr+= dy;
     e=rr-dx;
     if (e>=0) {
       rr= e;
       --dx;
+      disx-= 80;
     }
 
-    curset(x+dx, y+dy, v);
-    curset(x-dx, y+dy, v);
+    // lower
+    curset(x+dx, y+dy, v); pa= curp; ma= curm;
+    curset(x-dx, y+dy, v); pb= curp; mb= curm;
 
-    curset(x+dy, y+dx, v);
-    curset(x-dy, y+dx, v);
+    curset(x+dy, y+dx, v); pc= curp; mc= curm;
+    curset(x-dy, y+dx, v); pd= curp; md= curm;
 
+    // upper symmetries
+    *(pa-disy) ^= ma;
+    *(pb-disy) ^= mb;
 
-    curset(x+dx, y-dy, v);
-    curset(x-dx, y-dy, v);
+    *(pc-disx) ^= mc;
+    *(pd-disx) ^= md;
 
-    curset(x+dy, y-dx, v);
-    curset(x-dy, y-dx, v);
   } while (dx>dy);
 }
 
