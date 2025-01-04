@@ -225,6 +225,7 @@ void draw(char x, char y, int dx, int dy, char v) {
 //  83hs pb inc
 //  81hs with no inc!?! lol but need tables...
 //       ( 4.2x faster than BASIC! )
+//       ( 14hs is navigation, rest is ^= update)
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
