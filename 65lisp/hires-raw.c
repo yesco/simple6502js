@@ -263,13 +263,10 @@ void circle(char x, char y, int r, char v) {
 
     // lower part
     if (1) {
-      int ypy= disy/2;
-      int ypx= disx/2;
-      
-      pa= pp + ypy + div6[x+dx];
-      pb= pp + ypy + div6[x-dx];
-      pc= pp + ypx + div6[x+dy];
-      pd= pp + ypx + div6[x-dy];
+      pa= pp + disy/2 + div6[x+dx];
+      pb= pp + disy/2 + div6[x-dx];
+      pc= pp + disx/2 + div6[x+dy];
+      pd= pp + disx/2 + div6[x-dy];
 
       if (!ma) {
         ma= PIXMASK[mod6[x+dx]];
@@ -287,8 +284,8 @@ void circle(char x, char y, int r, char v) {
     }
 
     // upper symmetries
-    *(pa-disy) ^= ma;
-    *(pb-disy) ^= mb;
+    *(pp+div6[x+dx]-disy/2) ^= ma;
+    *(pp+div6[x-dx]-disy/2) ^= mb;
 
     *(pc-disx) ^= mc;
     *(pd-disx) ^= md;
