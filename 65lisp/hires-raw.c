@@ -91,7 +91,15 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 // 390hs remove q/6 from loop -43.6%
 // 313hs remove mult from dy*i -24.6%
 // 113hs remove /6 from loop -77%
-//  72hs not calculate p -57%
+//  72hs not calculate p -57%    13x FASTER!
+// 112hs ORIC BASIC    we are 50% faster than BASIC
+
+// TODO: no effect on draw long line...
+//   however on many curset?
+// char div6[255], mod6[255];
+//    char q= div6[x]; // no time saving!?
+//    char mi= mod6[x]; // nah
+
 void curset(char x, char y, char v) {
   static char q, m, *p;
   q= x/6;
@@ -117,15 +125,17 @@ void draw(char x, char y, char dx, char dy, char v) {
   static char m, s, *p;
   if (dx<0) { x+= dx; dx= -dx; }
   if (dy<0) { y+= dy; dy= -dy; }
-  if (dx>dy) {
+
+  y+= dy;
+  x+= dx;
+  if (dx>dy) { 
     // inline curset
     char i= dx+1;
-    char q= (x+dx)/6;
-    char mi= x+dx-q*6;
+    char q= x/6;
+    char mi= x-q*6;
     m= PIXMASK[mi];
     s= 0;
-    y+= dy;
-    p= HIRESSCREEN+(5*y)*8+q;
+    p= HIRESSCREEN+40*y+q;
     while(--i) {
       if ((s+= dy) > dx) s-=dx,p-=40;
       switch(v) { // only 5hs for 10x
@@ -167,7 +177,12 @@ int T,nil,doapply1,print;
 
 void main() {
   char* p= HIRESSCREEN;
-  int j;
+  char j;
+
+  for(j=0; j<255; ++j) {
+    div6[j]= j/6;
+    mod6[j]= j%6;
+  }
 
   for(j=100; j; --j) printf("FOOBAR   ");
   hires();
@@ -176,8 +191,8 @@ void main() {
 
   { unsigned int t= time();
   for(j=0; j<10; ++j) {
-    //draw(0, j, 239, 30, 2);
-    draw(j, 0, 30, 199, 2);
+    draw(0, j, 239, 30, 2);
+    //draw(j, 0, 30, 199, 2);
   }
   gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());}
 
