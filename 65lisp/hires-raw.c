@@ -227,7 +227,7 @@ void circle(char x, char y, int r, char v) {
 
   char ma=0,mb,mc,md;
   char *pa=0,*pb,*pc,*pd;
-  int disy= 0, disx= dx*2*40;
+  int disy= 0, disx= dx*40;
 
   char *basep, basem;
   char *yp, ym;
@@ -237,7 +237,7 @@ void circle(char x, char y, int r, char v) {
   do {
     ++dy;
     { // incremental update state
-      disy+= 80;
+      disy+= 40;
       if (!(mc>>=1)) mc= 32;
       if ((md<<=1)==64) md= 1;
     }
@@ -248,7 +248,7 @@ void circle(char x, char y, int r, char v) {
       rr= e;
       --dx;
       { // incremental update state
-        disx-= 80;
+        disx-= 40;
         if ((ma<<=1)==64) ma= 1;
         if (!(mb>>=1)) mb= 32;
       }
@@ -263,10 +263,10 @@ void circle(char x, char y, int r, char v) {
 
     // lower part
     if (1) {
-      pa= pp + disy/2 + div6[x+dx];
-      pb= pp + disy/2 + div6[x-dx];
-      pc= pp + disx/2 + div6[x+dy];
-      pd= pp + disx/2 + div6[x-dy];
+      pa= pp + disy + div6[x+dx];
+      pb= pp + disy + div6[x-dx];
+      pc= pp + disx + div6[x+dy];
+      pd= pp + disx + div6[x-dy];
 
       if (!ma) {
         ma= PIXMASK[mod6[x+dx]];
@@ -284,11 +284,14 @@ void circle(char x, char y, int r, char v) {
     }
 
     // upper symmetries
-    *(pp+div6[x+dx]-disy/2) ^= ma;
-    *(pp+div6[x-dx]-disy/2) ^= mb;
+    *(pp+div6[x+dx]-disy) ^= ma;
+    *(pp+div6[x-dx]-disy) ^= mb;
 
-    *(pc-disx) ^= mc;
-    *(pd-disx) ^= md;
+    //*(pc-disx) ^= mc;
+    //a*(pd-disx) ^= md;
+
+    *(pp+div6[x+dy]-disx) ^= mc;
+    *(pp+div6[x-dy]-disx) ^= md;
 
     //printf("%d %d %d %d %d\n", dx, dy, pa-pc, pb-pd, pa-pc-(pb-pd));
     //if (kbhit()==3) break;
