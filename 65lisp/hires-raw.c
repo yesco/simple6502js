@@ -220,6 +220,7 @@ void draw(char x, char y, int dx, int dy, char v) {
 // 112hs inline curset
 //  99hs inline simplify
 //  92hs shift instead of mod7[]
+//  89hs with simplified displacement
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
@@ -234,6 +235,12 @@ void circle(char x, char y, int r, char v) {
   char *xp, xm;
 
   char* pp= HIRESSCREEN + 40*y;
+
+  ma= PIXMASK[mod6[x+dx]];
+  mb= PIXMASK[mod6[x-dx]];
+  mc= PIXMASK[mod6[x+dy]];
+  md= PIXMASK[mod6[x-dy]];
+
   do {
     ++dy;
     { // incremental update state
@@ -268,13 +275,6 @@ void circle(char x, char y, int r, char v) {
       pc= pp + disx + div6[x+dy];
       pd= pp + disx + div6[x-dy];
 
-      if (!ma) {
-        ma= PIXMASK[mod6[x+dx]];
-        mb= PIXMASK[mod6[x-dx]];
-        mc= PIXMASK[mod6[x+dy]];
-        md= PIXMASK[mod6[x-dy]];
-      }
-
       *pa ^= ma;
       *pb ^= mb;
       *pc ^= mc;
@@ -286,10 +286,6 @@ void circle(char x, char y, int r, char v) {
     // upper symmetries
     *(pp+div6[x+dx]-disy) ^= ma;
     *(pp+div6[x-dx]-disy) ^= mb;
-
-    //*(pc-disx) ^= mc;
-    //a*(pd-disx) ^= md;
-
     *(pp+div6[x+dy]-disx) ^= mc;
     *(pp+div6[x-dy]-disx) ^= md;
 
