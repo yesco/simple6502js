@@ -91,6 +91,7 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 // 390hs remove q/6 from loop -43.6%
 // 313hs remove mult from dy*i -24.6%
 // 113hs remove /6 from loop -77%
+//  72hs not calculate p -57%
 void curset(char x, char y, char v) {
   static char q, m, *p;
   q= x/6;
@@ -118,16 +119,18 @@ void draw(char x, char y, char dx, char dy, char v) {
   if (dx>dy) {
     // inline curset
     static char m, q, mi, sy;
+    static char *p;
     char i= dx+1;
     q= (x+i-1)/6;
     mi= x+i-1-q*6;
     m= PIXMASK[mi];
     sy= 0;
     y+= dy;
+    p= HIRESSCREEN+(5*y)*8+q;
     while(--i) {
-      static char *p;
-      if ((sy+= dy) >= dx) sy-=dx,--y;
-      p= HIRESSCREEN+ (5*y)*8 + q;
+      //if ((sy+= dy) >= dx) sy-=dx,--y,p-=40;
+      if ((sy+= dy) > dx) sy-=dx,p-=40;
+      // p= HIRESSCREEN+ (5*y)*8 + q;
       // 627hs without switch from  632hs
       switch(v) {
       case 0: *p &= ~m;
@@ -135,7 +138,8 @@ void draw(char x, char y, char dx, char dy, char v) {
       case 2: *p ^= m;
       }
       // wrap around
-      if ((m<<=1)==64) m=1,--q;
+      //if ((m<<=1)==64) m=1,--q,--p;
+      if ((m<<=1)==64) m=1,--p;
     }
   } else {
     char i= dy+1;
