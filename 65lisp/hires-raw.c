@@ -118,10 +118,10 @@ void draw(char x, char y, char dx, char dy, char v) {
   if (dy<0) { y+= dy; dy= -dy; }
   if (dx>dy) {
     // inline curset
-    static char m, q, mi, sy, *p;
+    static char m, sy, *p;
     char i= dx+1;
-    q= (x+i-1)/6;
-    mi= x+i-1-q*6;
+    char q= (x+dx)/6;
+    char mi= x+dx-q*6;
     m= PIXMASK[mi];
     sy= 0;
     y+= dy;
