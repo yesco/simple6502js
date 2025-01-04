@@ -222,6 +222,9 @@ void draw(char x, char y, int dx, int dy, char v) {
 //  92hs shift instead of mod7[]
 //  89hs with simplified displacement
 //  86hs with pa inc
+//  83hs pb inc
+//  81hs with no inc!?! lol but need tables...
+//       ( 4.2x faster than BASIC! )
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
@@ -237,8 +240,8 @@ void circle(char x, char y, int r, char v) {
 
   char* pp= HIRESSCREEN + 40*y;
 
-  pa= pp + div6[x+dx];
-  pb= pp + div6[x-dx];
+  //pa= pp + div6[x+dx];
+  //pb= pp + div6[x-dx];
 
   ma= PIXMASK[mod6[x+dx]];
   mb= PIXMASK[mod6[x-dx]];
@@ -249,7 +252,7 @@ void circle(char x, char y, int r, char v) {
     ++dy;
     { // incremental update state
       disy+= 40;
-      pa+= 40; pb+=40;
+      //pa+= 40; pb+=40;
       if (!(mc>>=1)) mc= 32;
       if ((md<<=1)==64) md= 1;
     }
@@ -261,8 +264,8 @@ void circle(char x, char y, int r, char v) {
       --dx;
       { // incremental update state
         disx-= 40;
-        if ((ma<<=1)==64) ma=1,--pa;
-        if (!(mb>>=1)) mb=32,++pb;
+        if ((ma<<=1)==64) ma=1;//,--pa;
+        if (!(mb>>=1)) mb=32;//,++pb;
       }
     }
 
@@ -274,25 +277,27 @@ void circle(char x, char y, int r, char v) {
     //... TODO: use to build pa, pb, pc, pd?
 
     // lower part
-    if (1) {
-      //*(pa+div6[x+dx]) ^= ma;
-      //pb= pp + disy + div6[x-dx];
-      pc= pp + disx + div6[x+dy];
-      pd= pp + disx + div6[x-dy];
-
+    if (0) {
+      // TODO: incremental should be faster
+      /// or at least save 256*2 bytes?
       *pa ^= ma;
       *pb ^= mb;
       *pc ^= mc;
       *pd ^= md;
 
     } else {
+      // faster than inc, but waste 256 bytes!
+      *(pp+disy+div6[x+dx]) ^= ma;
+      *(pp+disy+div6[x-dx]) ^= mb;
+      *(pp+disx+div6[x+dy]) ^= mc;
+      *(pp+disx+div6[x-dy]) ^= md;
     }
 
     // upper symmetries
-    *(pp+div6[x+dx]-disy) ^= ma;
-    *(pp+div6[x-dx]-disy) ^= mb;
-    *(pp+div6[x+dy]-disx) ^= mc;
-    *(pp+div6[x-dy]-disx) ^= md;
+    *(pp-disy+div6[x+dx]) ^= ma;
+    *(pp-disy+div6[x-dx]) ^= mb;
+    *(pp-disx+div6[x+dy]) ^= mc;
+    *(pp-disx+div6[x-dy]) ^= md;
 
     //printf("%d %d %d %d %d\n", dx, dy, pa-pc, pb-pd, pa-pc-(pb-pd));
     //if (kbhit()==3) break;
