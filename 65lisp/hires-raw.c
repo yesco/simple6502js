@@ -224,8 +224,8 @@ void circle(char x, char y, int r, char v) {
   char dx = r;
   char dy = 0;
 
-  char ma,mb,mc,md;
-  char *pa,*pb,*pc,*pd;
+  char ma=0,mb,mc,md;
+  char *pa=0,*pb,*pc,*pd;
   int disy= 0, disx= dx*2*40;
 
   char *basep, basem;
@@ -235,7 +235,11 @@ void circle(char x, char y, int r, char v) {
   char* pp= HIRESSCREEN + 40*y;
   do {
     ++dy;
-    disy+= 80;
+    {
+      disy+= 80;
+      if ((mc<<=1)==64) mc= 1;
+      if ((md<<=1)==64) md= 1;
+    }
 
     rr+= dy;
     e=rr-dx;
@@ -265,10 +269,18 @@ void circle(char x, char y, int r, char v) {
       pc= pp + ypx + div6[x+dy];
       pd= pp + ypx + div6[x-dy];
 
-      ma= PIXMASK[mod6[x+dx]];
-      mb= PIXMASK[mod6[x-dx]];
-      mc= PIXMASK[mod6[x+dy]];
-      md= PIXMASK[mod6[x-dy]];
+      if (ma) {
+        ma= PIXMASK[mod6[x+dx]];
+        mb= PIXMASK[mod6[x-dx]];
+        
+//        if (!(mc>>=1)) mc= 32;
+//        if (!(md>>=1)) md= 32;
+      } else {
+        ma= PIXMASK[mod6[x+dx]];
+        mb= PIXMASK[mod6[x-dx]];
+        mc= PIXMASK[mod6[x+dy]];
+        md= PIXMASK[mod6[x-dy]];
+      }
 
       *pa ^= ma;
       *pb ^= mb;
