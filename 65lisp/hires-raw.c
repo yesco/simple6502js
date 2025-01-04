@@ -253,24 +253,20 @@ void circle(char x, char y, int r, char v) {
 
     // lower part
     if (1) {
-      //curset(x+dx, y+dy, v);
+
       pa= HIRESSCREEN+ (5*(y+dy))*8 + div6[x+dx];
-      ma= PIXMASK[mod6[x+dx]];
-      *pa ^= ma;
-
-      //curset(x-dx, y+dy, v);
       pb= HIRESSCREEN+ (5*(y+dy))*8 + div6[x-dx];
-      mb= PIXMASK[mod6[x-dx]];
-      *pb ^= mb;
-
-      //curset(x+dy, y+dx, v);
       pc= HIRESSCREEN+ (5*(y+dx))*8 + div6[x+dy];
-      mc= PIXMASK[mod6[x+dy]];
-      *pc ^= mc;
-
-      //curset(x-dy, y+dx, v);
       pd= HIRESSCREEN+ (5*(y+dx))*8 + div6[x-dy];
+
+      ma= PIXMASK[mod6[x+dx]];
+      mb= PIXMASK[mod6[x-dx]];
+      mc= PIXMASK[mod6[x+dy]];
       md= PIXMASK[mod6[x-dy]];
+
+      *pa ^= ma;
+      *pb ^= mb;
+      *pc ^= mc;
       *pd ^= md;
 
     } else {
