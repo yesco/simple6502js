@@ -232,6 +232,7 @@ void circle(char x, char y, int r, char v) {
   char *yp, ym;
   char *xp, xm;
 
+  char* pp= HIRESSCREEN + 40*y;
   do {
     ++dy;
     disy+= 80;
@@ -253,11 +254,16 @@ void circle(char x, char y, int r, char v) {
 
     // lower part
     if (1) {
-
-      pa= HIRESSCREEN+ (5*(y+dy))*8 + div6[x+dx];
-      pb= HIRESSCREEN+ (5*(y+dy))*8 + div6[x-dx];
-      pc= HIRESSCREEN+ (5*(y+dx))*8 + div6[x+dy];
-      pd= HIRESSCREEN+ (5*(y+dx))*8 + div6[x-dy];
+      //int ypy= (5*(y+dy))*8;
+      //int ypx= (5*(y+dx))*8;
+      
+      int ypy= disy/2;
+      int ypx= disx/2;
+      
+      pa= pp + ypy + div6[x+dx];
+      pb= pp + ypy + div6[x-dx];
+      pc= pp + ypx + div6[x+dy];
+      pd= pp + ypx + div6[x-dy];
 
       ma= PIXMASK[mod6[x+dx]];
       mb= PIXMASK[mod6[x-dx]];
