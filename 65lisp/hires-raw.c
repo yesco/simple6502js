@@ -90,7 +90,7 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 // 560hs shift static m -1.6%
 // 390hs remove q/6 from loop -43.6%
 // 313hs remove mult from dy*i -24.6%
-// 113hs remove /6 from loop -77%
+// 113hs remove /6 from loop -77%q
 //  72hs not calculate p -57%    13x FASTER!
 // 112hs ORIC BASIC    we are 50% faster than BASIC
 
@@ -217,6 +217,8 @@ void draw(char x, char y, int dx, int dy, char v) {
 // 347hs dx,dy char
 // 174hs using div6 mod6 in curset -84%
 // 129hs storing state from upper & mod pointers -35%
+// 112hs inline curset
+//  99hs inline simplify
 void circle(char x, char y, int r, char v) {
   int rr= r/16, e;
   char dx = r;
@@ -225,6 +227,10 @@ void circle(char x, char y, int r, char v) {
   char ma,mb,mc,md;
   char *pa,*pb,*pc,*pd;
   int disy= 0, disx= dx*2*40;
+
+  char *basep, basem;
+  char *yp, ym;
+  char *xp, xm;
 
   do {
     ++dy;
@@ -238,12 +244,37 @@ void circle(char x, char y, int r, char v) {
       disx-= 80;
     }
 
-    // lower
-    curset(x+dx, y+dy, v); pa= curp; ma= curm;
-    curset(x-dx, y+dy, v); pb= curp; mb= curm;
+    // base
+    //curset(x,y,3); basep= curp; basem= curm;
+    //curset(0,dy);  yp= curp; ym = curm;
+    //curset(0,dx);  xp= curp; xm = curm;
 
-    curset(x+dy, y+dx, v); pc= curp; mc= curm;
-    curset(x-dy, y+dx, v); pd= curp; md= curm;
+    //... TODO: use to build pa, pb, pc, pd?
+
+    // lower part
+    if (1) {
+      //curset(x+dx, y+dy, v);
+      pa= HIRESSCREEN+ (5*(y+dy))*8 + div6[x+dx];
+      ma= PIXMASK[mod6[x+dx]];
+      *pa ^= ma;
+
+      //curset(x-dx, y+dy, v);
+      pb= HIRESSCREEN+ (5*(y+dy))*8 + div6[x-dx];
+      mb= PIXMASK[mod6[x-dx]];
+      *pb ^= mb;
+
+      //curset(x+dy, y+dx, v);
+      pc= HIRESSCREEN+ (5*(y+dx))*8 + div6[x+dy];
+      mc= PIXMASK[mod6[x+dy]];
+      *pc ^= mc;
+
+      //curset(x-dy, y+dx, v);
+      pd= HIRESSCREEN+ (5*(y+dx))*8 + div6[x-dy];
+      md= PIXMASK[mod6[x-dy]];
+      *pd ^= md;
+
+    } else {
+    }
 
     // upper symmetries
     *(pa-disy) ^= ma;
@@ -252,6 +283,8 @@ void circle(char x, char y, int r, char v) {
     *(pc-disx) ^= mc;
     *(pd-disx) ^= md;
 
+    //printf("%d %d %d %d %d\n", dx, dy, pa-pc, pb-pd, pa-pc-(pb-pd));
+    //if (kbhit()==3) break;
   } while (dx>dy);
 }
 
@@ -276,6 +309,7 @@ void main() {
   t= time();
 
   if (1) {
+    //text();
     for(j=0; j<5; ++j)
       circle(120, 100, 75+j, 2);
   } else if (0) {
