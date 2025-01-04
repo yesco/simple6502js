@@ -96,7 +96,7 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 
 // TODO: no effect on draw long line...
 //   however on many curset?
-// char div6[255], mod6[255];
+char div6[255], mod6[255];
 //    char q= div6[x]; // no time saving!?
 //    char mi= mod6[x]; // nah
 
@@ -121,53 +121,85 @@ char point(char x, char y) {
   return *p & m;
 }
 
-void draw(char x, char y, char dx, char dy, char v) {
-  static char m, s, *p;
-  if (dx<0) { x+= dx; dx= -dx; }
-  if (dy<0) { y+= dy; dy= -dy; }
+void draw(char x, char y, int dx, int dy, char v) {
+  static char adx, ady, m, s, *p;
 
-  y+= dy;
-  x+= dx;
-  if (dx>dy) { 
-    // inline curset
-    char i= dx+1;
-    char q= x/6;
-    char mi= x-q*6;
-    m= PIXMASK[mi];
-    s= 0;
-    p= HIRESSCREEN+40*y+q;
-    while(--i) {
-      if ((s+= dy) > dx) s-=dx,p-=40;
-      switch(v) { // only 5hs for 10x
-      case 0: *p &= ~m;
-      case 1: *p |= m;
-      case 2: *p ^= m;
+  adx= dx>=0? dx: -dx;
+  ady= dy>=0? dy: -dy;
+
+  if (adx>ady) {
+    if (dx<0) { x+= dx; dx= -dx; y+= dy; dy= -dy; }
+    y+= dy;
+    x+= dx;
+    {
+      // inline curset
+      int i= adx+1;
+      char q= x/6;
+      char mi= x-q*6;
+      m= PIXMASK[mi];
+      s= 0;
+      p= HIRESSCREEN+40*y+q;
+
+      while(--i) {
+
+        // adjust y
+        if ((s+= ady) > adx) {
+          s-=adx;
+          if (dy>=0) {
+            if ((p-= 40)<HIRESSCREEN) break;
+          } else {            
+            if ((p+= 40)>=HIRESEND) break;
+          }
+        }
+
+        // plot it
+        switch(v) { // about 10% overhead
+        case 0: *p &= ~m;
+        case 1: *p |= m;
+        case 2: *p ^= m;
+        }
+
+        // step x, wrap around bit
+        if ((m<<=1)==64) m=1,--p;
       }
-      // wrap around
-      if ((m<<=1)==64) m=1,--p;
     }
   } else { // dy >= dx
-    // inline curset
-    char i= dy+1;
-    char q= (x+dx)/6;
-    char mi= x+dx-q*6;
-    m= PIXMASK[mi];
-    s= 0;
+    if (dy<0) { x+= dx; dx= -dx; y+= dy; dy= -dy; }
     y+= dy;
-    p= HIRESSCREEN+(5*y)*8+q;
-    while(--i) {
-      if ((s+= dx) > dy) {
-        s-=dy;
-        // wrap around
-        if ((m<<=1)==64) m=1,--p;
-        //if (!(m>>=1)) m=32,--p;
+    x+= dx;
+    {
+      // inline curset
+      int i= ady+1;
+      char q= x/6;
+      char mi= x-q*6;
+      m= PIXMASK[mi];
+      s= 0;
+      p= HIRESSCREEN+(5*y)*8+q;
+
+      while(--i) {
+
+        // adjust x
+        if ((s+= adx) > ady) {
+          s-=ady;
+          // step x, wrap around bit
+          if (dx>=0) {
+            if ((m<<=1)==64) m=1,--p; // ok
+          } else {
+            if (!(m>>=1)) m=32,++p;
+          }
+        }
+
+        // plot it
+        switch(v) { // about 10% overhead
+        case 0: *p &= ~m;
+        case 1: *p |= m;
+        case 2: *p ^= m;
+        }
+
+        // step y
+        p-= 40;
+        if (p<HIRESSCREEN) break;
       }
-      switch(v) { // only 5hs for 10x
-      case 0: *p &= ~m;
-      case 1: *p |= m;
-      case 2: *p ^= m;
-      }
-      p-= 40;
     }
   }
 }
@@ -177,7 +209,8 @@ int T,nil,doapply1,print;
 
 void main() {
   char* p= HIRESSCREEN;
-  char j;
+  int j;
+  unsigned int t;
 
   for(j=0; j<255; ++j) {
     div6[j]= j/6;
@@ -189,12 +222,33 @@ void main() {
   gclear();
   gfill(60, 15, 10*6, 10, 64+63);
 
-  { unsigned int t= time();
-  for(j=0; j<10; ++j) {
-    draw(0, j, 239, 30, 2);
-    //draw(j, 0, 30, 199, 2);
+  t= time();
+  if (0) {
+    for(j=0; j<10; ++j) {
+      //draw(0, j, 239, 30, 2); // 92hs
+      //draw(239, j+30, -239, -30, 2); // 92hs same reverse
+
+      //draw(0, 30+j, 239, -30, 2); // 92hs
+
+      draw(j, 0, 30, 199, 2); // 75hs
+//      draw(j+30, 199, -30, -199, 2); // 75hs same reverse
+
+      draw(30+j, 0, -30, 199, 2); // 76hs
+      //draw(j, 199, 30, -199, 2); // ???? what is it
+    }
+  } else { 
+    // BASIC: 7.47s, DLFAT: 3.75s
+    // ... 4.63s using dx,dy= int
+    // ... 4.68s with bounds check
+    //    ( 4.40?s if hardcode xor)
+    for(j=0; j<200; j+= 10) {
+      draw(j,     0,     199-j, j,     2);
+      draw(199,   j,     -j,    199-j, 2);
+      draw(199-j, 199,   j-199, -j,    2);
+      draw(0,     199-j, j,     j-199, 2);
+    }
   }
-  gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());}
+  gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());
 
   //text();
   //printf("HELLO TEST\n");
