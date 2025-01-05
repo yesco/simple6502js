@@ -114,6 +114,7 @@ void gotoxy(char x, char y) {
 // TODO: what's ORIC wherey() default? 0 or 1
 void clrscr() {
   // Don't clear status line (/)
+  cursc= TEXTSCREEN;
   memset(cursc+40, ' ', (SCREENROWS-1)*SCREENCOLS);
   curx= 0; cury= 1;
   cputc(0);

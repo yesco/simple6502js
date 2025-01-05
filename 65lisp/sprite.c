@@ -61,8 +61,16 @@ char sp6[]= { /* heigth */ 3, /* widthbytes */ 4,
   0b00000000, 0b00000000, 0b00000000,  0b00000000,
 };
 
-long x= 0b00000100000000110000001000000001;
-long y= 0x04030201;
+char* byteblit(char h, char w, char* b) {
+  char *p; 
+  if (!b) b= malloc(2+h*w); assert(b);
+  p= b; *p= h; *++p= w;
+  do {
+    memcpy(p, SCREENXY(curx, cury), w);
+    p+= w;
+  } while (--h);
+  return b;
+}
 
 // Layout as sprite
 // 
@@ -216,18 +224,26 @@ void scrollspritecharsup(char base, char* sprite) {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+//char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
+char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
+
+char spx,spy,sdx=0,sdy= 0;
+
+void redraw() {
+  gotoxy(spx, spy);
+  printf(A);
+  // TODO: use byteblit();
+}
+
 void main() {
-  //char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
-  char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
+  char i;
+
   clrscr();
-  printf("long= %ld %08lx\n", x, x);
-  printf("long= %ld %08lx\n", y, y);
-  printf(A);
-  printf(A);
-  printf(A);
 
   cgetc();
   spritedef('A', sp6);
+
+  spx=5; spy=12; redraw();
 
   while(1) {
     switch(cgetc()) {
@@ -235,18 +251,39 @@ void main() {
       spritedef('A', sp6);
       break;
     case KEY_RIGHT:
-      scrollspritecharsright('A', sp6);
-      //scrollspriteright(sp6);
-      //spritedef('A', sp6);
+      if (6 == ++sdx) {sdx=0;
+        ++spx;
+        clrscr();
+        spritedef('A', sp6);
+        redraw();
+      } else {
+        scrollspritecharsright('A', sp6);
+      }
       break;
     // these are so fast that we put wait...
     case KEY_DOWN :
-      scrollspritecharsdown('A', sp6);
-      wait(7);
+      if (8 == ++sdy) {sdy=0;
+        ++spy;
+        clrscr();
+        spritedef('A', sp6);
+        redraw();
+      } else {
+        scrollspritecharsdown('A', sp6);
+      }
+      wait(2);
       break;
     case KEY_UP :
-      scrollspritecharsup('A', sp6);
-      wait(7);
+      if (0 == sdy--) {sdy=7;
+        --spy;
+        clrscr();
+        spritedef('A', sp6);
+        // TODO: make one
+        for(i=8;--i;)scrollspritecharsdown('A', sp6);
+        redraw();
+      } else {
+        scrollspritecharsup('A', sp6);
+      }
+      wait(2);
       break;
     }
   }
