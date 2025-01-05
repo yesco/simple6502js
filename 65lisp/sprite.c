@@ -292,8 +292,8 @@ void main() {
         redraw();
       } else {
         scrollspritecharsdown('A', sp6);
+        wait(2);
       }
-      wait(2);
       break;
     case KEY_UP :
       if (0 == sdy--) {sdy=7;
@@ -305,8 +305,8 @@ void main() {
         redraw();
       } else {
         scrollspritecharsup('A', sp6);
+        wait(2);
       }
-      wait(2);
       break;
     }
   }
