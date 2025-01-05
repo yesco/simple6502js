@@ -17,7 +17,8 @@
 // Modelled on and replacing cc65 <conio.h>
 
 // Functions:
-// - time() - hundreths of second
+// - time() - hundreths of second (hs)
+// - wait(hs) 
 
 // - clrscr()
 // - paper(c)
@@ -70,6 +71,24 @@ unsigned int time() {
   // ORIC TIMER 100 interrupts/s,
   // TODO: my own? no ROM...
   return *(unsigned int*)0x276;
+}
+
+char kbhit();
+
+// wait HS hectoseconds
+// -HS: wait till HS or keystroke
+// 
+// Returns: 0 for +HS
+//   -hs waited if key pressed
+//   +hs waited (i.e. HS actual)
+int wait(int hs) {
+  unsigned int t= time(), r;
+  char k= hs<0? (hs=-hs,1): 0;
+  while((r=t-time()) < hs) {
+    if (r>=0x8000) t+= 0x8000; // correct? LOL
+    if (k && kbhit()) { k=2; break; }
+  }
+  return (1-k)*r;
 }
 
 // *SCREEN(X,Y)='A';
