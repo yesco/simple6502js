@@ -1,3 +1,26 @@
+// SPRITE-RAW
+
+// This is an embryo to movable sprites,
+// using the text-screen and redefinable charcters.
+
+// A sprite is a placable bitmap.
+//
+// It can have a combination of these qualities:
+// - size of one character      (uses 1 of 96 chars)
+// - size of 2h x 3w characters (uses 6-12 of 96 chars)
+// - (repetable tile) pattern
+// - animated cycle
+// - updateable pattern from state 
+// - pixel scrollable up/down    (12 chars)
+// - pixel scrollable left/right (12 chars)
+// - movable
+// - restricted to one of two sets of rows/regions
+// - all over movable (cost 2x space)
+// - can be a single one
+// - can have multiple instances
+// - multi instances in sync
+// - multi instances not in sync (more costly)
+
 #include <string.h>
 #include <assert.h>
 
