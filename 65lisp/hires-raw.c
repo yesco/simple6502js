@@ -202,9 +202,13 @@ void drawSimple(int dx, int dy, char v) {
 // 390hs remove q/6 from loop -43.6%
 // 313hs remove mult from dy*i -24.6%
 // 113hs remove /6 from loop -77%q
-//  72hs not calculate p -57%    13x FASTER!
+//  72hs not calculate p -57%  13x imprve,
+//
+//    (/ 112 72.0) = 55% faster than ORIC
 
 // TODO: works, but can we have smaller code?
+//   some bug manifested only in 1) LineBench?
+//
 // gcurx,gcury changed after
 void drawFast(int dx, int dy, char v) {
   static char adx, ady, m, s, *p;
