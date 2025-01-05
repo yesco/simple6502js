@@ -14,6 +14,7 @@
 // 
 
 #include <string.h>
+#include <assert.h>
 
 #include "conio-raw.c"
 
@@ -83,6 +84,19 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 char div6[240], mod6[240];
 //char* rowaddr[200];
 
+char shift6lo[256], shift6hi[256];
+#define SHIFT6(x) ((unsigned long)(shift6lo[(x) & 0xff] || shift6hi[((x)>>8) & 0xff]))
+
+unsigned long shift6(unsigned long l) {
+  char* b= (char*)l;
+  // return l>>6; slow
+  unsigned long r;
+  r= SHIFT6(b[0]);
+  r+= SHIFT6(b[1])<<8;
+  r+= SHIFT6(b[2])<<16;
+  r+= SHIFT6(b[2])<<24;
+  return r;
+}
 
 //    char q= div6[x]; // no time saving!?
 //    char mi= mod6[x]; // nah
@@ -119,7 +133,8 @@ void setpixel() {
 }
 
 // probably uses less code than call!
-#define curset(x,y,v) do {gcurx= (x); gcury= (y); gmode= (v); setpixel(); } while (0)
+#define GXY(x,y) do {gcurx= (x); gcury= (y); } while (0)
+#define CURSET(x,y,v) do { GXY(x, y); gmode= (v); setpixel(); } while (0)
 
 char point(char x, char y) {
   gcurx= x; gcury= y; gmode= 3; setpixel();
@@ -127,7 +142,51 @@ char point(char x, char y) {
 }
 
 
-// draw(x, y, v)
+// draw(dx, dy, v)
+
+#define draw(dx,dy,v) drawSimple(dx,dy,v)
+//#define draw(dx,dy,v) drawFast(dx,dy,v)
+
+// Dammnit - this displays crap and out of bounds?
+// so simple, what is going wrong?
+void drawSimple(int dx, int dy, char v) {
+  char i,x,y;
+
+  char adx= dx<0?-dx:dx;
+  char ady= dy<0?-dy:dy;
+
+  gmode= v;
+
+  if (adx>ady) {
+    if (dx<0) { gcurx+=dx; dx=-dx; gcury+=dy; dy=-dy; }
+    x= gcurx+dx+1;
+    y= gcury;
+    for(i= dx+1; --i;) {
+      gcury= y+i*ady/adx; gcurx= --x;
+      if (gcurx>=240 || gcury>=200)
+      printf("x=%d y=%d dx=%d dy=%d i=%d\n", gcurx, gcury, dx, dy, i);
+      assert(gcurx<240);
+      assert(gcury<200);
+      //*(HIRESSCREEN+ (5*gcury)*8 + div6[gcurx])
+      //^= PIXMASK[mod6[gcurx]];
+      setpixel();
+    }
+  } else {
+    if (dy<0) { gcurx+=dx; dx=-dx; gcury+=dy; dy=-dy; }
+    x= gcurx;
+    y= gcury+dy+1;
+    for(i= dy+1; --i;) {
+      gcurx= x+i*adx/ady; gcury= --y;
+      if (gcurx>=240 || gcury>=200)
+      printf("x=%d y=%d dx=%d dy=%d i=%d\n", gcurx, gcury, dx, dy, i);
+      assert(gcurx<240);
+      assert(gcury<200);
+      //*(HIRESSCREEN+ (5*gcury)*8 + div6[gcurx])
+      //^= PIXMASK[mod6[gcurx]];
+      setpixel();
+    }
+  }
+}
 
 // optimizations, 10x draw line
 // 112hs ORIC BASIC    we are 50% faster than BASIC
@@ -146,24 +205,28 @@ char point(char x, char y) {
 //  72hs not calculate p -57%    13x FASTER!
 
 // TODO: works, but can we have smaller code?
-void draw(char x, char y, int dx, int dy, char v) {
+// gcurx,gcury changed after
+void drawFast(int dx, int dy, char v) {
   static char adx, ady, m, s, *p;
 
   adx= dx>=0? dx: -dx;
   ady= dy>=0? dy: -dy;
 
+  gmode= v;
+
   if (adx>ady) {
-    if (dx<0) { x+= dx; dx= -dx; y+= dy; dy= -dy; }
-    y+= dy;
-    x+= dx;
+    if (dx<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+    gcury+= dy;
+    gcurx+= dx;
     {
       // inline curset
+      // TODO: too much duplication - make macro!
       int i= adx+1;
-      char q= x/6;
-      char mi= x-q*6;
+      char q= gcurx/6;
+      char mi= gcurx-q*6;
       m= PIXMASK[mi];
       s= 0;
-      p= HIRESSCREEN+40*y+q;
+      p= HIRESSCREEN+40*gcury+q;
 
       while(--i) {
 
@@ -178,7 +241,7 @@ void draw(char x, char y, int dx, int dy, char v) {
         }
 
         // plot it
-        switch(v) { // about 10% overhead
+        switch(gmode) { // about 10% overhead
         case 0: *p &= ~m; break;
         case 1: *p |= m;  break;
         case 2: *p ^= m;  break;
@@ -189,17 +252,18 @@ void draw(char x, char y, int dx, int dy, char v) {
       }
     }
   } else { // dy >= dx
-    if (dy<0) { x+= dx; dx= -dx; y+= dy; dy= -dy; }
-    y+= dy;
-    x+= dx;
+    if (dy<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+    gcury+= dy;
+    gcurx+= dx;
     {
       // inline curset
+      // TODO: too much duplication - make macro!
       int i= ady+1;
-      char q= x/6;
-      char mi= x-q*6;
+      char q= gcurx/6;
+      char mi= gcurx-q*6;
       m= PIXMASK[mi];
       s= 0;
-      p= HIRESSCREEN+(5*y)*8+q;
+      p= HIRESSCREEN+(5*gcury)*8+q;
 
       while(--i) {
 
@@ -216,7 +280,7 @@ void draw(char x, char y, int dx, int dy, char v) {
 
         // TODO: simple function w globals?
         // plot it
-        switch(v) { // about 10% overhead
+        switch(gmode) { // about 10% overhead
         case 0: *p &= ~m; break;
         case 1: *p |= m;  break;
         case 2: *p ^= m;  break;
@@ -238,12 +302,17 @@ void draw(char x, char y, int dx, int dy, char v) {
 //  320hs ORIC ATMOS BASIC
 //   97hs circle() w setpixel()
 //   81hs - fancy pointer stuff, 1010 BYTES!
-void circle(char x, char y, char r, char v) {
-  int rr= r/16, e;
-  char dx = r;
-  char dy = 0;
+void circle(char r, char v) {
+  static int  rr, e;
+  static char x,y, dx,dy;
 
   gmode= v;
+  x= gcurx, y= gcury;
+
+  // Algorithm
+  rr= r/16;
+  dx= r;
+  dy= 0;
 
   do {
     ++dy;
@@ -399,7 +468,8 @@ void drawsprite(unsigned long* sp) {
       // take cell groups of 6 bits
       while(--i) {
         sc[i]= (l & 63) | 64;
-        l >>= 6;
+        //l >>= 6;
+        l= shift6(l);
       }
 
       // next row
@@ -461,17 +531,38 @@ void main() {
     //rowaddr[j]= HIRESSCREEN + 40*j;
   }
 
+  for(j=0; j<256; ++j) {
+    shift6lo[j]= j>>6;
+    shift6hi[j]= (j>>2) & 0xfd;
+  }
+
   for(j=100; j; --j) printf("FOOBAR   ");
   hires();
   gclear();
   gfill(60, 15, 10*6, 10, 64+63);
 
+  gclear();
+
+  gotoxy(10, 25); printf("Start...");
   t= time();
 
-  if (1) {
+  switch(6) {
+
+  case 1: {
+    // WTF does my code do? lol
+    char i;
+    printf("LineBench-3. hires-raw.c Jonas\n");
+    for (i=0; i<239; ++i) {
+      //GXY(i, 0); draw(239-i-i, 199, 2);
+      GXY(239-i, 199); draw(i+i-239, -199, 2);
+    }
+    for (i=0; i<199; ++i) {
+      GXY(0, i); draw(239, 199-i-i, 2);
+    } } break;
+
+  case 2: {
     long W= 100, w;
 
-    gotoxy(10, 25); printf("Start...");
     // draw sprite()
     gcurx= 10; gcury= 100; drawsprite(spHi);
     gcurx= 0;  gcury=  50; drawsprite(spHi);
@@ -500,45 +591,62 @@ void main() {
         gcury= 150; drawsprite62(sp6);
         wait(50);
       }
-    }
+    } } break;
 
-  } else if (0) {
+  case 3:
     // DFLAT circles
     for(i=10; i>=0; --i) {
-      for(j=9; j<65; j+=65/13)
-        circle(120, 100, j, 2);
+      for(j=9; j<65; j+=65/13) {
+        GXY(120, 100);
+        circle(j, 2);
+      }
     }
-  } else  if (1) {
+    break;
+    
+  case 4:
     //text();
-    for(j=0; j<5; ++j)
-      circle(120, 100, 75+j, 2);
-  } else if (0) {
+    for(j=0; j<5; ++j) {
+      GXY(120, 100);
+      circle(75+j, 2);
+    }
+    break;
+
+  case 5:
     for(j=0; j<10; ++j) {
       //draw(0, j, 239, 30, 2); // 92hs
       //draw(239, j+30, -239, -30, 2); // 92hs same reverse
 
       //draw(0, 30+j, 239, -30, 2); // 92hs
 
-      draw(j, 0, 30, 199, 2); // 75hs
+      gcurx=j; gcury=0; draw(30, 199, 2); // 75hs
 //      draw(j+30, 199, -30, -199, 2); // 75hs same reverse
 
-      draw(30+j, 0, -30, 199, 2); // 76hs
+      gcurx=30+j; gcury=0; draw(-30, 199, 2); // 76hs
       //draw(j, 199, 30, -199, 2); // ???? what is it
     }
-  } else { 
-    // BASIC: 7.47s, DLFAT: 3.75s
-    // ... 4.63s using dx,dy= int
-    // ... 4.68s with bounds check
-    //    ( 4.40?s if hardcode xor)
-    for(j=0; j<200; j+= 10) {
-      draw(j,     0,     199-j, j,     2);
-      draw(199,   j,     -j,    199-j, 2);
-      draw(199-j, 199,   j-199, -j,    2);
-      draw(0,     199-j, j,     j-199, 2);
-    }
-  }
+    break;
 
-  gotoxy(10,25); printf("TIME %d times = %d hs", 10, t-time());
+  case 6: 
+    // square turning
+    //
+    // BASIC: 7.47s, DLFAT: 3.75s
+    // ... 4.64s with bounds check
+    //    ( 4.40?s if hardcode xor)
+    #define M (200-1)
+    for(j=0; j<=M; j+= 10) {
+      gcurx= j;   gcury=0;   draw(M-j, j,   2);
+      gcurx= M;   gcury=j;   draw(-j,  M-j, 2);
+      gcurx= M-j; gcury=M;   draw(j-M, -j,  2);
+      gcurx= 0;   gcury=M-j; draw(j, j-M,   2);
+    }
+    #undef M
+    break;
+
+  case 7:
+    GXY(10, 10); draw(150, 100, 2);
+    break;
+  }
+  gotoxy(10,25); printf("TIME %d hs", t-time());
 
   //text();
   //printf("HELLO TEST\n");
