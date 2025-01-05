@@ -25,7 +25,9 @@ long spHi[]= {
 };
 
 // sprite 16 x 18 pixels (padding right+bottom)
+// 96 bytes! 3*4= 12 chars
 char sp6[]= { /* heigth */ 3, /* widthbytes */ 4,
+              /* keep pointers to shifted variants? */
   0b00111111, 0b00111111, 0b00111111,  0b00000000,
   0b00100000, 0b00000000, 0b00000001,  0b00000000,
   0b00100010, 0b00000000, 0b00000001,  0b00000000,
@@ -84,6 +86,28 @@ void spritedef(char base, char* sprite) {
   // Parsing:
   // sp6 style byte layout:
   // - easy to do chardef
+  for(c=0; c<w; ++c) {
+    x= s;
+    for(r=0; r<h; ++r) {
+      // copy one char
+      for(i=0; i<8; ++i) {
+        *d++ = *x; x+= w;
+      }
+      // step down to next char-row
+    }
+    ++s; // next column
+  }
+}
+
+void spritedefABC(char base, char* sprite) {
+  char *d= CHARDEF(base);
+  char *s= sprite;
+  char h= *s++, w= *s++;
+  char r,c,i, *x;
+
+  // Parsing:
+  // sp6 style byte layout:
+  // - easy to do chardef
   for(r=0; r<h; ++r) {
     x= s;
     for(c=0; c<w; ++c) {
@@ -134,6 +158,44 @@ void scrollspriteright(char* sprite) {
   }
 }
 
+void scrollspritecharsright(char base, char* sprite) {
+  char *d= CHARDEF(base);
+  char *s= sprite;
+  char h= *s++, w= *s++, r;
+  unsigned long l,tl;
+  char *cl= (char*)&l; // overlaps l
+  char o= h*8;
+  
+  // only works for this shape...
+  assert(w==4);
+
+  for(r=0; r<h*8; ++r) {
+    // make long from 4 char scan line
+    cl[0]= d[3*o];
+    cl[1]= d[2*o];
+    cl[2]= d[1*o];
+    cl[3]= d[0*o];
+
+    // shift right
+    l >>= 1;
+
+    // recover hibit of each cell
+    tl = l & 0x80808080;
+    tl >>= 2; // move to 6th bit!
+    l |= tl;
+    l &= 0x3f3f3f3f; // remove 2 highest
+
+    // write it back
+    d[3*o]= cl[0];
+    d[2*o]= cl[1];
+    d[1*o]= cl[2];
+    d[0*o]= cl[3];
+
+    // next scanline
+    ++d;
+  }
+}
+
 // taking 8x6 char sprite def sp6
 void scrollspritecharsdown(char base, char* sprite) {
   char *d= CHARDEF(base);
@@ -142,14 +204,21 @@ void scrollspritecharsdown(char base, char* sprite) {
 
   memmove(d+1, d, h*8*w-1);
   *d= 0;
-  //memset(d, 255, h*8*w);
+}
+void scrollspritecharsup(char base, char* sprite) {
+  char *d= CHARDEF(base);
+  char *s= sprite;
+  char h= *s++, w= *s++;
+
+  memmove(d, d+1, h*8*w-1);
 }
 
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
 void main() {
-  char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
+  //char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
+  char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
   clrscr();
   printf("long= %ld %08lx\n", x, x);
   printf("long= %ld %08lx\n", y, y);
@@ -161,15 +230,23 @@ void main() {
   spritedef('A', sp6);
 
   while(1) {
-    wait(10);
     switch(cgetc()) {
-    case KEY_RIGHT:
-      // TODO: do in place!
-      scrollspriteright(sp6);
+    case 'r':
       spritedef('A', sp6);
       break;
+    case KEY_RIGHT:
+      scrollspritecharsright('A', sp6);
+      //scrollspriteright(sp6);
+      //spritedef('A', sp6);
+      break;
+    // these are so fast that we put wait...
     case KEY_DOWN :
-      scrollspritecharsdown('A', sp6); break;
+      scrollspritecharsdown('A', sp6);
+      wait(7);
+      break;
+    case KEY_UP :
+      scrollspritecharsup('A', sp6);
+      wait(7);
       break;
     }
   }
