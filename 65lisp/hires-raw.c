@@ -392,7 +392,7 @@ void drawsprite(unsigned long* sp) {
       l = *++sp;
 
       // first is disaligned, take bi bits
-      i= (bi==0)? 7: 8; // cells+1
+      i= (bi==0)? 6: 7; // cells+1
       sc[--i]= (l & bm)<<(6-bi) | 64;
       l >>= bi;
 
