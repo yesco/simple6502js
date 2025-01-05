@@ -439,6 +439,11 @@ char sp6[]= { /* heigth */ 24, /* widthbytes */ 4,
 };
 
 // bitblt?
+//
+// Any way of making this more efficient/faster?
+
+// TODO: idea, it could write a restore background
+// stream of bytes, just play back next time.
 void drawsprite(unsigned long* sp) {
   char h= *sp, w= *++sp, r, c, i;
   unsigned long l;
