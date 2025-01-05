@@ -370,6 +370,7 @@ void drawsprite(unsigned long* sp) {
   char h= *sp, w= *++sp, r, c, i;
   unsigned long l;
 
+  unsigned t= time();
   // last pixel pos in x
   // 
   // gcurx=0 32 bits -> bi= 2
@@ -377,10 +378,11 @@ void drawsprite(unsigned long* sp) {
   //   012345 6789ab cdef01 234567 89abcdef
   //   012345 012345 012345 012345 01234512
   //                            bm=  000011
-  char x= gcurx + w*32;
-  char *sc= HIRESSCREEN + (gcury*5)*8 + div6[x];
-  char bi= mod6[x];        
-  char bm= PIXMASK[5-bi]*2-1;
+  char x= gcurx + w*32-1;
+  char *sc= HIRESSCREEN + (gcury*5)*8 + div6[gcurx+1];
+  char bi= mod6[x]+1;        
+  char bm= PIXMASK[6-bi]*2-1; // extract mask
+//  char bm= PIXMASK[(6-bi)%6]*2-1;
   char bits, mask;
 
   r= h;
@@ -390,7 +392,7 @@ void drawsprite(unsigned long* sp) {
       l = *++sp;
 
       // first is disaligned, take bi bits
-      i= (bi==0)? 8: 9;
+      i= (bi==0)? 7: 8; // cells+1
       sc[--i]= (l & bm)<<(6-bi) | 64;
       l >>= bi;
 
@@ -405,6 +407,8 @@ void drawsprite(unsigned long* sp) {
 
     } while(--c);
   } while(--r);
+
+  printf("%uhs (%d,%d) x=%d bi=%d bm=%02x\n", t-time(), gcurx, gcury, x, bi, bm);
 }
 
 void drawsprite62(char* p) {
@@ -471,6 +475,18 @@ void main() {
     // draw sprite()
     gcurx= 10; gcury= 100; drawsprite(spHi);
     gcurx= 0;  gcury=  50; drawsprite(spHi);
+
+    
+    gcurx= 0;  gcury= 0;
+    while(1) {
+      drawsprite(spHi);
+      switch(cgetc()) {
+      case KEY_UP    : --gcury; break;
+      case KEY_DOWN  : ++gcury; break;
+      case KEY_RIGHT : ++gcurx; break;
+      case KEY_LEFT  : --gcurx; break;
+      }
+    }
 
     while(1) {
       gcury= 150;
