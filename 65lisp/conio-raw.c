@@ -141,6 +141,28 @@ void scrollup(char n) {
   cputc(0);
 }
 
+// TODO: add new terminal controls
+
+// - home
+// - gotoxy x y - hmmm 0,0 ???
+// - repeat n c
+
+// - print in status line col nchars text.... \n
+// - nowrap / wrap (autonl)
+
+// - clear till end of line
+// - clear to end of screen
+// - clear whole line
+
+// - save screen
+// - restore screen
+
+// - cursor on
+// - cursor off
+
+// - reverse on
+// - reverse off
+
 #define SAVE    "\x1d"
 #define RESTORE "\x1e"
 #define NEXT    "\x1f"
@@ -160,6 +182,9 @@ void cputc(char c) {
       case '\n': curx= 0; ++cury; break;
 //    case '\r': curx= 0; break;
 
+      case 0x1a: 
+      case 0x1b: break; // ESC
+      case 0x1c: 
       case 0x1d: savecursor(); break;
       case 0x1e: restorecursor(); break;
       case 0x1f: restorecursor(); savey= ++cury; break;
