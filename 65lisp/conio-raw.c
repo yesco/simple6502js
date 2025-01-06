@@ -7,19 +7,58 @@
 // 
 // (c) 2024 Jonas S Karlsson (jsk@yesco.org)
 
+// TODO: disable ROM cursor?
 // TDOO: protect the first 2 columns
 // TODO: capslock
-// TODO: disable ROM cursor?
 // TODO: kbhit, cgetc - don't give repeat directly...
 // TODO: kbhit, cgetc - no buffer, so miss keystroke?
 // TODO: hook it up to interrupts and buffer!
 
 // Modelled on and replacing cc65 <conio.h>
 
-// Functions:
-// - time() - hundreths of second (hs)
-// - wait(hs) 
+// Extended terminal operations
+// ============================
 
+// - extensive string macros to change color etc
+// puts( RED BGWHITE "FOOBAR" YELLOW BGBLACK );
+//
+// Cursor movement
+//
+// - similar to ORIC, just different codes
+//   (to keep printf \n \r \t \v semantics)
+// - HOME
+// - SAVE RESTORE (NEXT) - saves cursor position!
+// - BACK FORWARD DOWN UP
+
+// Formatting
+//
+// - INVERSE - ENDINVERSE
+// - DOUBLE - (auto align row, and types double)
+//   ( DOUBLE GREEN "BIG GREEN" NORMAL )
+
+// Clearing
+//
+// - CLEAR
+// - REMOVELINE
+// - CENTER - centers the rest of the (assumed) simple text
+
+// Scripting
+//
+// - WAIT   - waits for key pressed!
+// - WAIT1s WAIT3s WAIT10s - waits 1, 3, 10 second(s), or key
+// - for example definaing a ANYKEY macro
+//   #define ANYKEY  STATUS BLINK "Press any key to continue" \
+//                   NORMAL RESTORE WAIT STATUS RESTORE
+//   puts(ANYKEY);
+
+
+// FUNCTIONS
+// =========
+// - time()   - hundreths of second (hs)
+// - wait(hs) - wait HS, -HS= or wait for key, 0= wait key
+
+// Standard cc65
+//
 // - clrscr()
 // - paper(c)
 // - ink(c)
@@ -31,32 +70,36 @@
 // - revers() - TODO
 // - cputsxy(x, y, s) - doesn't update cursor pos
 // - puts(s)
-// - printf(fmt, ...) - uses sprintf
+// - printf(fmt, ...) - uses sprintf and puts
 // 
 // - kbhit()
 // - cgetc()
 
 // Additions:
+//
 // - SCREENXY(x, y) - gives address *SCREENXY(0,0)='A'
 // - savecursor()
 // - restorecursor()
-// - scrollup(rows)
-// - putint(i)
+// - scrollup(atrowy)
+// - putint(i) - very fast!
 
 // - key(row, colmask)
-// - keypos(c)
-// - keypresed(keypos)
+// - keypos(c)          - get char defining single key-row+col
+// - keypresed(keypos)  - using keypos() value test that key only
 
-// Unixy:
-// - ungetchar(c)
-// - getchar() - macro
+// UNIXy
+// 
+// - ungetchar(c) - ungets one char ala, ungetc but for stdio
+// - getchar()    - macro
+
 
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
 
 // TextMode
-// TODO: how to solve graphics mode?
+// TODO: how to solve graphics mode HIRESTTEXT?
+// TODO: use variable for TEXTSCREEN, allowing virtual screens!
 #define CHARSET    ((char*)0xB400) // $B400-B7FF
 #define CHARDEF(c) ((char*)0xB400+c*8)
 #define ALTSET     ((char*)0xB800) // $B800-BB7F
@@ -76,16 +119,17 @@ unsigned int time() {
 char kbhit();
 
 // wait HS hectoseconds
-// -HS: wait till HS or keystroke
+//   0: wait till key pressed
+// -HS: wait till HS or key pressed, whichever first
 // 
 // Returns: 0 for +HS
 //   -hs waited if key pressed
 //   +hs waited (i.e. HS actual)
 int wait(int hs) {
   unsigned int t= time(), r;
-  char k= hs<0? (hs=-hs,1): 0;
-  while((r=t-time()) < hs) {
-    if (r>=0x8000) t+= 0x8000; // correct? LOL
+  char k= hs<=0? (hs=-hs,1): 0;
+  while(!hs || (r=t-time()) < hs) {
+    //if (r>=0x8000) t+= 0x8000; // correct? LOL
     if (k && kbhit()) { k=2; break; }
   }
   return (1-k)*r;
@@ -94,21 +138,29 @@ int wait(int hs) {
 // *SCREEN(X,Y)='A';
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
-char curx=0, cury=0, *cursc= TEXTSCREEN;
+char curx=0, cury=0, *cursc=TEXTSCREEN;
+char curinv=0, curdouble=0;
+
+void cputc(char c);
+char cgetc();
 
 #define wherex() curx
 #define wherey() cury
 
-char savex=0, savey=0;
-
-#define savecursor() do { savex= wherex(); savey= wherey(); } while(0)
-#define restorecursor() gotoxy(savex, savey)
-
-void cputc(char c);
-
 void gotoxy(char x, char y) {
   curx= x; cury= y;
   cputc(0);
+}
+
+char savex=0, savey=0;
+
+void savecursor() {
+  savex= wherex();
+  savey= wherey();
+}
+
+void restorecursor() {
+  gotoxy(savex, savey);
 }
 
 // TODO: what's ORIC wherey() default? 0 or 1
@@ -152,70 +204,183 @@ void ink(char c) {
 //void revers(char) {}
 void revers();
 
+void clearline(char y) {
+  char* p= SCREENXY(0, y);
+  memset(p, ' ', 40);
+  p[0]= curpaper;
+  p[1]= curink;
+}
+
 // TODO: in curmode=HIRESMODE then scroll only last 3 lines!
-void scrollup(char n) {
-  memcpy(TEXTSCREEN, TEXTSCREEN+40, (28-n)*40);
-  memset(TEXTSCREEN+(28-n)*40, ' ', 40*n);
-  *(SCREENEND-40)= curpaper;
-  *(SCREENEND-39)= curink;
-  cury= 27;
+void scrollup(char y) {
+  char* p= SCREENXY(0, y);
+  memmove(p, p+40, (28-y)*40);
+  clearline(27);
   cputc(0);
 }
 
 // TODO: add new terminal controls
 
-// - home
-// - gotoxy x y - hmmm 0,0 ???
-// - repeat n c
+// + no print mode (erase w space) ?
 
-// - print in status line col nchars text.... \n
-// - nowrap / wrap (autonl)
+// + no protected
+// + protected 2 columns
 
-// - clear till end of line
-// - clear to end of screen
-// - clear whole line
+// + cursor on - hmmm, no use?  call routine
+// + cursor off - hmmm, no use? call routine
 
-// - save screen
-// - restore screen
+// + clear till end of line
+// + clear to end of screen
+// + clear whole line
 
-// - cursor on
-// - cursor off
+// + save screen
+// + restore screen
 
-// - reverse on
-// - reverse off
+// + insert line
+// + remove line
+// + insert column
+// + remove column
 
-#define SAVE    "\x1d"
-#define RESTORE "\x1e"
-#define NEXT    "\x1f"
+#define ESC      "\x1b" // currently not used (skip vt100!?)
+#define TAB      "\t"
+#define CR       "\r"
+#define NEWLINE  "\n"
+
+//#define BELL    "\x07"
+
+// clear (32 chars) & write statusline...RESTORE
+#define STATUS   "\x01"
+#define STATUS32 "\x02" // overwrite chars at position 32
+
+// Move cursor
+#define BACK     "\x08"
+#define FORWARD  "\x0f" // ORIC is 09, but is '\t'
+#define DOWN     "\x0e" // ORIC is 10, but is '\n'
+#define UP       "\x0b"
+
+#define CLEAR    "\x0c"
+#define REMOVELINE "\x13"
+
+#define HOME     "\x1c"
+#define SAVE     "\x1d"
+#define RESTORE  "\x1e"
+#define NEXT     "\x1f"
+
+// Formatting
+#define ENDINVERSE "\x10"
+#define INVERSE  "\x11"
+
+#define CENTER   "\x12"
+
+// text colours
+#define BLACK    "\x80"
+#define RED      "\x81"
+#define GREEN    "\x82"
+#define YELLOW   "\x83"
+#define BLUE     "\x84"
+#define MAGNENTA "\x85"
+#define CYAN     "\x86"
+#define WHITE    "\x87"
+
+// background colours
+#define BGBLACK    "\x90"
+#define BGRED      "\x91"
+#define BGGREEN    "\x92"
+#define BGYELLOW   "\x93"
+#define BGBLUE     "\x94"
+#define BGMAGNENTA "\x95"
+#define BGCYAN     "\x96"
+#define BGWHITE    "\x97"
+
+// charset, double, blink
+//   for double it'll align to odd even row
+#define NORMAL      "\x88"   
+#define ALTCHARS    "\x89"   
+#define DOUBLE      "\x8a"
+#define ALTDOUBLE   "\x8b"   
+
+#define BLINK          "\x8c"
+#define ALTBLINK       "\x8d"
+#define DOUBLEBLINK    "\x8e"
+#define ALTDOUBLEBLINK "\x8f"
+
+#define FULL       "\x7f"
+
+// Waitinig (for key, or specified seconds)
+#define WAIT10s  "\x03" // WAIT 10 seconds or key
+#define WAIT3s   "\x04" // WAIT 3 seconds or key
+#define WAIT1s   "\x05" // WAIT 1 second or key
+#define WAIT     "\x06" // WAIT for key (ACK)
+
+// Combined!
+#define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAIT STATUS RESTORE
 
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
     if (c < 128) {
+      int i= 0;
+
       // control-codes
       switch(c) {
-      case  7  : break; // TODO: bell?
-      case  8  : --curx; --cursc; break;     // back
-      case  9  : ++curx; ++cursc; break;     // forward
-//    case 10  : ++cury; cursc+= 40; break;  // down ?
-      case 11  : --cury; cursc-= 40; break;  // up
-      case 12  : clrscr(); return;
-      case '\r': curx= 0; break;
-      case '\n': curx= 0; ++cury; break;
-//    case '\r': curx= 0; break;
 
-      case 0x1a: 
-      case 0x1b: break; // ESC
-      case 0x1c: 
-      case 0x1d: savecursor(); break;
-      case 0x1e: restorecursor(); break;
-      case 0x1f: restorecursor(); savey= ++cury; break;
+      //case    0: // *is* UPDATE - cursc from curx,cury
+
+      case    1:                     // STATUS lines write
+        savecursor();
+        memset(TEXTSCREEN, 32, 32);
+        gotoxy(0,0);
+        return;
+      case    2:                     // STATUS32 xxxxCAPS
+        savecursor(); gotoxy(0,32); return;
+
+      case    3: i+= 700;            // WAIT10s
+      case    4: i+= 200;            // WAIT3s
+      case    5: i+= 100;            // WAIT1s
+      case    6:
+        while(kbhit()) cgetc();
+        wait(-i); break;             // WAIT (key)
+
+      case    7: break;              // TODO: (taco) BELL
+
+      case    8: --curx; break;      // BACK
+      case 0x0f: ++curx; break;      // FORWARD
+      case 0x0e: ++cury; break;      // DOWN
+      case   11: --cury; break;      // UP
+
+      case   12: clrscr(); return;   // CLEAR
+
+      case '\n': curx= 0; ++cury; break;     // NEWLINE 10 ^J
+      case '\r': curx= 0; break;             // CR      13 ^M
+      case '\t': curx= (curx+8)&0xf7; break; // TAB      8 ^I
+
+      case 0x10: curinv= 0; break;           // ENDINVERSE
+      case 0x11: curinv= 128; break;         // INVERSE
+
+      //case 0x12: // CENTER (see puts)
+      case 0x13: scrollup(cury);             // REMOVELINE
+
+      //case 0x14:
+      //case 0x15: // NAK
+      //case 0x16: // SYN
+      //case 0x17:
+      //case 0x18: // CAN
+      //case 0x19: 
+      //case 0x1a:
+        
+      case 0x1b: break; // ESC TODO: ORIC attribute prefix
+
+      case 0x1c: gotoxy(0,1); break;     // HOME
+      case 0x1d: savecursor(); break;    // SAVE
+      case 0x1e: restorecursor(); break; // RESTORE
+      case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
       }
-      // fix state
+
+      // fix state, update cursc
       if (curx==255) --cury,curx=39;
       else if (curx>=40) ++cury,curx=0;
 
       if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) { scrollup(cury-27); return; }
+      else if (cury>=28) { scrollup(cury); return; }
 
       //if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
       //else if (cursc>=SCREENEND);
@@ -223,10 +388,20 @@ void cputc(char c) {
       cursc= SCREENXY(curx, cury);
 
       return;
+    } else {
+      char x= c & 0b11111110;
+      if      (x==0x8a) curdouble= 1;
+      else if (x==0x88) curdouble= 0;
+      c&= 0x7f;
     }
   }
+
   // 32-127, 128+32-255 (inverse)
-  *cursc= c; ++cursc;
+  if (curdouble) {
+    if (cury&1) { ++cury; cputc(0); }
+    cursc[40]= c|curinv;
+  }
+  *cursc= c|curinv;  ++cursc;
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(cury-27);
 }
@@ -234,17 +409,37 @@ void cputc(char c) {
 //int putchar(int c) { cputc(c); return c; }
 #define putchar(c) (cputc(c),c)
 
-// raw?
+// really raw!
 void cputsxy(char x, char y, char* s) {
-  char *p = SCREENXY(x,y);
+  char *p = SCREENXY(x,y);;
   while(*s) *p=*s,++p,++s;
 }
 
 int puts(const char* s) {
-  const char* p= s;
+  const char* p= s; char c;
+
   if (!s) return 0;
-  while(*p) putchar(*p),++p;
-  return p-s;
+
+  --p;
+ next:
+  switch(c= *++p) {
+  case 0: return p-s;
+    // ! = these REQUIRE multiby sequence
+    //     so cannot do in cputc, but in puts?
+    //
+    // ! ESC c gives c-64 = ORIC way of attribute
+    // ! print in status line col nchars text.... \n
+    // ! gotoxy x y - hmmm 0,0 ???
+    // ! repeat n c
+    
+    // ! copy byteblit w c
+    // + restore byteblit
+    // + swap byteblit
+  
+    // + nowrap / wrap (autonl)
+  case 0x12: c= strlen(s); gotoxy(curx+(40-c)/2, cury); goto next;
+  default: putchar(c); goto next;
+  }
 }
 
 
@@ -470,3 +665,39 @@ char cgetc() {
 }
 
 #define getchar() cgetc()
+
+#ifdef TEST
+
+// Dummys for ./r script
+int T,nil,doapply1,print;
+
+void main() {
+  int i;
+
+  printf(CLEAR ANYKEY);
+
+  printf("\n\n\nconio: "
+         DOUBLE "Hello"
+           YELLOW BGRED "RAW" CYAN BGBLACK
+           "World!"
+         NORMAL
+         WHITE "yeah");
+
+  printf(SAVE);
+  printf("\n\n\n" CENTER "Once upon a time..."     WAIT1s);
+  printf("\n"     CENTER "In a galaxy far away..." WAIT1s);
+  printf("\n\n"   CENTER "(Wait for it!)"          WAIT3s);
+  printf("\n\n\n" CENTER "There was ORIC ATMOS!"   WAIT10s);
+
+  printf("\n\n\n\n\n" CENTER DOUBLE RED "B" GREEN "Y" BLUE "E" NORMAL);
+
+  cputsxy(0, 26, "END");
+
+  // Scroll up
+  printf(RESTORE);
+  i= 27;
+  while(i--) printf(WAIT1s REMOVELINE);
+
+}
+
+#endif // TEST

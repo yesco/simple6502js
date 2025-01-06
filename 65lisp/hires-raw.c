@@ -521,10 +521,6 @@ void clearsprite62(char* p) {
 /////////////////////////////////////////////////////////////
 // testing
 
-void wait(long w) {
-  while(w-- >0);
-}
-
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
@@ -555,7 +551,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(6) {
+  switch(8) {
 
   case 1: {
     // WTF does my code do? lol
@@ -652,9 +648,40 @@ void main() {
     break;
 
   case 7:
+    // single line draw test
     GXY(10, 10); draw(150, 100, 2);
     break;
+
+  case 8:
+    text();
+
+    // red scan line from top to bottom of text screen
+#define DOTIMES(N, WHAT) do { int _dotimes=N; do {WHAT;} while (--_dotimes>0); } while(0)
+
+    DOTIMES(100, { printf("FOOBAR   "); } );
+
+    gotoxy(39, 1); DOTIMES(27, { *cursc=HIRESMODE; cursc+=40; } );
+    { char* p= HIRESSCREEN;
+      DOTIMES(200, { *p=curpaper; p+= 40; } );
+    }
+    { char* p= HIRESSCREEN+1;
+      DOTIMES(200, { *p=TEXTMODE; p+= 40; } );
+    }
+    { char* p= HIRESSCREEN+3;
+      DOTIMES(200, { *p=7; p+= 40; } );
+    }
+
+    while(1)
+    { char* p= HIRESSCREEN;
+      DOTIMES(200, {
+          *p=16+1; // bgred
+          DOTIMES(40, {});
+          *p=curpaper;
+          p+= 40; } );
+    }
+    break;
   }
+
   gotoxy(10,25); printf("TIME %d hs", t-time());
 
   //text();
