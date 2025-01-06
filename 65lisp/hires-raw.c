@@ -541,7 +541,9 @@ void main() {
     shift6hi[j]= (j>>2) & 0xfd;
   }
 
-  for(j=100; j; --j) printf("FOOBAR   ");
+  for(j=300; j; --j) printf("FOOBAR   ");
+  exit(1);
+
   hires();
   gclear();
   gfill(60, 15, 10*6, 10, 64+63);

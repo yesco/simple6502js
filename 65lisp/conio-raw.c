@@ -20,6 +20,7 @@
 // ============================
 
 // - extensive string macros to change color etc
+//
 // puts( RED BGWHITE "FOOBAR" YELLOW BGBLACK );
 //
 // Cursor movement
@@ -93,6 +94,7 @@
 // - getchar()    - macro
 
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -138,7 +140,7 @@ int wait(int hs) {
 // *SCREEN(X,Y)='A';
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
-char curx=0, cury=0, *cursc=TEXTSCREEN;
+char curx=0, cury=1, *cursc=TEXTSCREEN;
 char curinv=0, curdouble=0;
 
 void cputc(char c);
@@ -161,6 +163,16 @@ void savecursor() {
 
 void restorecursor() {
   gotoxy(savex, savey);
+}
+
+char* cursaved= 0;
+void savescreen() {
+  if (!cursaved) cursaved= malloc(SCREENSIZE);
+  memcpy(cursaved, TEXTSCREEN, SCREENSIZE);
+}
+
+void restorescreen() {
+  if (cursaved) memcpy(TEXTSCREEN, cursaved, SCREENSIZE);
 }
 
 // TODO: what's ORIC wherey() default? 0 or 1
@@ -212,10 +224,11 @@ void clearline(char y) {
 }
 
 // TODO: in curmode=HIRESMODE then scroll only last 3 lines!
-void scrollup(char y) {
-  char* p= SCREENXY(0, y);
-  memmove(p, p+40, (28-y)*40);
+void scrollup(char fromy) {
+  char* p= SCREENXY(0, fromy);
+  memmove(p, p+40, (28-fromy)*40);
   clearline(27);
+  if (cury>27) cury= 27;
   cputc(0);
 }
 
@@ -357,7 +370,7 @@ void cputc(char c) {
       case 0x11: curinv= 128; break;         // INVERSE
 
       //case 0x12: // CENTER (see puts)
-      case 0x13: scrollup(cury);             // REMOVELINE
+      case 0x13: scrollup(1);                // REMOVELINE
 
       //case 0x14:
       //case 0x15: // NAK
@@ -380,7 +393,7 @@ void cputc(char c) {
       else if (curx>=40) ++cury,curx=0;
 
       if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) { scrollup(cury); return; }
+      else if (cury>=28) { scrollup(1); return; }
 
       //if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
       //else if (cursc>=SCREENEND);
@@ -403,7 +416,7 @@ void cputc(char c) {
   }
   *cursc= c|curinv;  ++cursc;
   if (++curx>=40) { ++cury; curx=0; }
-  if (cury>=28) scrollup(cury-27);
+  if (cury>=28) scrollup(1);
 }
 
 //int putchar(int c) { cputc(c); return c; }
@@ -671,7 +684,7 @@ char cgetc() {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
-void main() {
+void demo() {
   int i;
 
   printf(CLEAR ANYKEY);
@@ -691,13 +704,54 @@ void main() {
 
   printf("\n\n\n\n\n" CENTER DOUBLE RED "B" GREEN "Y" BLUE "E" NORMAL);
 
-  cputsxy(0, 26, "END");
-
   // Scroll up
   printf(RESTORE);
   i= 27;
   while(i--) printf(WAIT1s REMOVELINE);
 
+}
+
+void init_conioraw() {
+  // ORIC BASIC ROMs remap interrupt vector to page 2...
+  if (MEM(0xFFFF)==0x02) {
+    // We're running under an ORIC BASIC ROM!
+
+    // status location is at #26A.
+    //  1 – cursor ON when set.
+    //  2 – screen ON when set.
+    //  4 – not used.
+    //  8 – keyboard click OFF when set.
+    // 16 – ESC has been pressed.
+    // 32 – columns 0 and 1 protected when set.
+    #define SCREENSTATE *((char*)0x26a)
+    SCREENSTATE= 0; //*(char*)0x026A= 0;
+  }
+}
+
+
+    
+
+
+void main() {
+  int i= 1;
+
+  init_conioraw();
+
+  savescreen();
+  clrscr();
+
+  switch(0) {
+
+  case 1: while(!kbhit()) {
+      printf("row %d\n", i++);
+      wait(5);
+    } break;
+
+  default: demo(); break;
+
+  }
+
+  restorescreen();
 }
 
 #endif // TEST
