@@ -141,7 +141,7 @@ int wait(int hs) {
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
 char curx=0, cury=1, *cursc=TEXTSCREEN;
-char curinv=0, curdouble=0;
+char curinv=0, curdouble=0, curai=0;
 
 void cputc(char c);
 char cgetc();
@@ -279,6 +279,8 @@ void scrollup(char fromy) {
 #define RESTORE  "\x1e"
 #define NEXT     "\x1f"
 
+#define TOGGLEAI "\x14"
+
 // Formatting
 #define ENDINVERSE "\x10"
 #define INVERSE  "\x11"
@@ -369,10 +371,11 @@ void cputc(char c) {
       case 0x10: curinv= 0; break;           // ENDINVERSE
       case 0x11: curinv= 128; break;         // INVERSE
 
-      //case 0x12: // CENTER (see puts)
-      case 0x13: scrollup(1);                // REMOVELINE
+      //case 0x12:                           // CENTER (see puts)
+      case 0x13: scrollup(1); break;         // REMOVELINE
 
-      //case 0x14:
+      case 0x14: curai= !curai; break;       // TOGGLEAI
+
       //case 0x15: // NAK
       //case 0x16: // SYN
       //case 0x17:
@@ -417,6 +420,7 @@ void cputc(char c) {
   *cursc= c|curinv;  ++cursc;
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
+  if (curai) wait(10);
 }
 
 //int putchar(int c) { cputc(c); return c; }
@@ -684,6 +688,15 @@ char cgetc() {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+
+
+
+
+
+
+
+// useless test of conio-raw.c
+
 void demo() {
   int i;
 
@@ -699,6 +712,12 @@ void demo() {
   printf(SAVE);
   printf("\n\n\n" CENTER "Once upon a time..."     WAIT1s);
   printf("\n"     CENTER "In a galaxy far away..." WAIT1s);
+
+  printf("\n" CENTER
+         TOGGLEAI
+           "AI speaking: what's this?\n"
+         TOGGLEAI);
+
   printf("\n\n"   CENTER "(Wait for it!)"          WAIT3s);
   printf("\n\n\n" CENTER "There was ORIC ATMOS!"   WAIT10s);
 
@@ -710,6 +729,12 @@ void demo() {
   while(i--) printf(WAIT1s REMOVELINE);
 
 }
+
+
+
+
+
+
 
 void init_conioraw() {
   // ORIC BASIC ROMs remap interrupt vector to page 2...

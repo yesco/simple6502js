@@ -82,7 +82,8 @@ static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
 // TODO: no effect on draw long line...
 //   however on many curset?
 char div6[240], mod6[240];
-//char* rowaddr[200];
+char mask6[240];
+char* rowaddr[200];
 
 char shift6lo[256], shift6hi[256];
 #define SHIFT6(x) ((unsigned long)(shift6lo[(x) & 0xff] || shift6hi[((x)>>8) & 0xff]))
@@ -301,11 +302,6 @@ void drawFast(int dx, int dy, char v) {
 // https://en.m.wikipedia.org/wiki/Midpoint_circle_algorithm
 //
 // Surprising little and simple code to draw circle!
-//
-// = 5x circle(120,100,75+j,2)
-//  320hs ORIC ATMOS BASIC
-//   97hs circle() w setpixel()
-//   81hs - fancy pointer stuff, 1010 BYTES!
 void circle(char r, char v) {
   static int  rr, e;
   static char x,y, dx,dy;
@@ -330,6 +326,7 @@ void circle(char r, char v) {
     // TODO: out-of-bounds?
 
     // set 8 symmetries
+#define setpixel() *(rowaddr[gcury] + div6[gcurx]) ^= mask6[gcurx]
     gcurx= x+dx; gcury= y+dy; setpixel();
     gcurx= x-dx;              setpixel();
                  gcury= y-dy; setpixel();
@@ -339,6 +336,7 @@ void circle(char r, char v) {
     gcurx= x-dy;              setpixel();
                  gcury= y-dx; setpixel();
     gcurx= x+dy;              setpixel();
+#undef setpixel()
                  
   } while (dx>dy);
 }
@@ -533,7 +531,8 @@ void main() {
   for(j=0; j<240; ++j) {
     div6[j]= j/6;
     mod6[j]= j%6;
-    //rowaddr[j]= HIRESSCREEN + 40*j;
+    mask6[j]= PIXMASK[mod6[j]];
+    rowaddr[j]= HIRESSCREEN + 40*j;
   }
 
   for(j=0; j<256; ++j) {
@@ -542,7 +541,6 @@ void main() {
   }
 
   for(j=300; j; --j) printf("FOOBAR   ");
-  exit(1);
 
   hires();
   gclear();
@@ -553,7 +551,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(8) {
+  switch(3) {
 
   case 1: {
     // WTF does my code do? lol
@@ -601,7 +599,12 @@ void main() {
     } } break;
 
   case 3:
-    // DFLAT circles
+    // DFLAT circles - https://youtu.be/kxXUAiZ40lY
+    //   (they have no timing for it? in video)
+    //          (but it looks faster)
+    // 1175 hs - without rowaddr[] and mask6[]
+    //  865 hs - my code w rowaddress[] macro and mask6[]
+    // - generally DFLAT says circle: 12x faster than BASIC ROM
     for(i=10; i>=0; --i) {
       for(j=9; j<65; j+=65/13) {
         GXY(120, 100);
@@ -611,7 +614,15 @@ void main() {
     break;
     
   case 4:
-    //text();
+    // = 5x circle(120,100,75+j,2)
+    // - generally DFLAT says circle: 12x faster than BASIC ROM
+    //   so they would be -- 26 hs?
+    //
+    //  320hs ORIC ATMOS BASIC
+    //   97hs circle() w setpixel()
+    //   81hs - fancy pointer stuff, 1010 BYTES! - reverted
+    //   93hs - with mod6[] and div6[] - (/ 320 93.0) = 3.44x ! 
+    //   70hs - with rowaddr[] and mask6[] - 4.57 ...
     for(j=0; j<5; ++j) {
       GXY(120, 100);
       circle(75+j, 2);
@@ -637,7 +648,7 @@ void main() {
     // square turning
     //
     // BASIC: 7.47s, DLFAT: 3.75s
-    // ... 4.64s with bounds check
+    // me ... 4.64s with bounds check, pure C!
     //    ( 4.40?s if hardcode xor)
     #define M (200-1)
     for(j=0; j<=M; j+= 10) {
@@ -680,6 +691,26 @@ void main() {
           DOTIMES(40, {});
           *p=curpaper;
           p+= 40; } );
+    }
+    break;
+
+  case 9:
+    // - https://osdk.org/index.php?page=articles&ref=ART19
+    // BASIC takes 320 hs...
+    // Inline here: I get 75 hs, no address lookup.
+    // They get 64 hs w addess lookup.
+    // And with machine code they get 29 hs.
+    // ... using mask6[] - I get 60 hs in C!
+    // ... using rowaddr[] - I get 49 hs !!! using C
+    for(gcury= 75; gcury<= 125; ++gcury) {
+      for (gcurx = 150; gcurx <= 210; gcurx+=2) {
+        //CURSET(x, y, 1);
+        // *(HIRESSCREEN+ (5*gcury)*8 + div6[gcurx])
+          //|= PIXMASK[mod6[gcurx]];
+        //*(HIRESSCREEN+ (5*gcury)*8 + div6[gcurx])
+        //|= mask6[gcurx];
+        *(rowaddr[gcury] + div6[gcurx]) |= mask6[gcurx];
+      }
     }
     break;
   }
