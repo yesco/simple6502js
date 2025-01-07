@@ -45,7 +45,7 @@
 
 // Scripting
 //
-// - WAIT   - waits for key pressed!
+// - WAITKEY   - waits for key pressed!
 // - WAIT1s WAIT3s WAIT10s - waits 1, 3, 10 second(s), or key
 // - for example definaing a ANYKEY macro
 //   #define ANYKEY  STATUS BLINK "Press any key to continue" \
@@ -93,6 +93,28 @@
 // - ungetchar(c) - ungets one char ala, ungetc but for stdio
 // - getchar()    - macro
 
+
+// ORIC ORIGINAL TERMINAL CODES
+// ============================
+// 1 = A :USED FOR EDITING"          - TODO: when do input
+// 3 = C :BREAK KEY"                 abort input?
+// 4 = D :DOUBLE CHARACTER ON/OFF"   - TODO: double toggle
+// 6 = F :KEY CLICK ON/OFF"          - keyclick lol
+// 7 = 6 :PING"                      - TODO::
+// 8 = H :CURSOR MOVES LEFT"         = 128+24
+// 9 = I : CURSOR MOVES RIGHT"       = 128+25
+// 10 = J :CURSOR DOWN"              = 128+26
+// 11 = K . :CURSOR UP"              = 128+27
+// 12 = L :CLEAR SCREEN"             yes
+// 14 = N :CLEAR LINE"               yes
+// 16 = P :PRINTER ON/OFF" 
+// 17 = Q :CURSOR ON/OFF"            = input:
+// 19 = S :SCREEN ON/OFF"            hmmm (make it go faster?)
+// 20 = T :UPPER CASE ON/OFF"        = input: CAPS-lock
+// 24 = X :EDITS LINE FROM MEMORY"   = input
+// 26 = Z :BACKGROUND BLACK"         = ah, input... next char like ESC!
+// 27 = ESC:AFFECTS NEXT CHARACTER"  = hmm, same...
+// 29 = J :INVERSE VIDEO ON/OFF      = TODO:
 
 #include <stdlib.h>
 #include <string.h>
@@ -262,17 +284,18 @@ void scrollup(char fromy) {
 //#define BELL    "\x07"
 
 // clear (32 chars) & write statusline...RESTORE
-#define STATUS   "\x01"
-#define STATUS32 "\x02" // overwrite chars at position 32
+#define STATUS   "\x19"
+#define STATUS32 "\x1a" // overwrite chars at position 32
 
 // Move cursor
 #define BACK     "\x08"
-#define FORWARD  "\x0f" // ORIC is 09, but is '\t'
-#define DOWN     "\x0e" // ORIC is 10, but is '\n'
+#define FORWARD  "\x01" // ORIC is 09, but is '\t' 
+#define DOWN     "\x02" // ORIC is 10, but is '\n' // TODO: change ^N
 #define UP       "\x0b"
 
-#define CLEAR    "\x0c"
+#define CLEAR     "\x0c"
 #define REMOVELINE "\x13"
+#define CLEARLINE  "\x0e"
 
 #define HOME     "\x1c"
 #define SAVE     "\x1d"
@@ -309,10 +332,10 @@ void scrollup(char fromy) {
 
 // charset, double, blink
 //   for double it'll align to odd even row
-#define NORMAL      "\x88"   
-#define ALTCHARS    "\x89"   
-#define DOUBLE      "\x8a"
-#define ALTDOUBLE   "\x8b"   
+#define NORMAL         "\x88"
+#define ALTCHARS       "\x89"
+#define DOUBLE         "\x8a"
+#define ALTDOUBLE      "\x8b"
 
 #define BLINK          "\x8c"
 #define ALTBLINK       "\x8d"
@@ -321,14 +344,111 @@ void scrollup(char fromy) {
 
 #define FULL       "\x7f"
 
-// Waitinig (for key, or specified seconds)
+// Waiting (for key, or specified seconds)
 #define WAIT10s  "\x03" // WAIT 10 seconds or key
 #define WAIT3s   "\x04" // WAIT 3 seconds or key
 #define WAIT1s   "\x05" // WAIT 1 second or key
-#define WAIT     "\x06" // WAIT for key (ACK)
+#define WAITKEY  "\x06" // WAIT for key (ACK)
+//      TOGGLEAI        // waits after each character processed
 
 // Combined!
-#define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAIT STATUS RESTORE
+#define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAITKEY STATUS RESTORE
+
+#define CTRL 1-'A'
+#define META 128
+
+// KEY ENCODING
+// ============
+// 0-31 : CTRL+'A' ... 'Z' ((CTRL==-64)
+// 13   : KYE_RETURN
+// 27   : KEY_ESC
+// 32   : ' '
+// ...
+// 127  : KEY_DEL
+
+// -- hi bit set
+// 128+ 0-31: ORIC: hibit === raw attribute
+// 128+ 31..: ORIC: hibit === INVERSE chars!
+
+// 128+ 0: KEY_FUNCT - same code as BLACK
+// 128+ 1:           - same code as RED (ink)
+// ...                 IF PRINTED!
+// 128+ 7:           - WHITE
+
+// ORIC: these when printed set attributes...
+// 128+ 8:           (free) CHARSET
+// 128+ 9:           (free) ALTSET
+// 128+10:           (free) DOUBLE
+// 128+11:           (free) ALTDOBULE
+// 128+12:           (free) CHARSETBLINK
+// 128+13:           (free) ALTBLINK
+// 128+14:           (free) DOUBLEBLINK - lol
+// 128+15:           (free) DOUBLEALTBLINK  - lol
+
+// 128+16:           - same as BGBLACK
+// ...               ...
+// 128+23:           - BGWHITE
+
+// 128+24: KEY_LEFT   when printed will move cursor!
+// 128+25: KEY_RIGHT
+// 128+26: KEY_DOWN
+// 128+27: KEY_UP
+
+// 128+28: KEY_      - FREE! 
+// 128+29: KEY_      - FREE!
+// 128+30: KEY_      - FREE!
+// 128+31: KEY_      - FREE!
+
+// ...
+// 128+'A': KEY_FUNCT+'A' (KFUNCT=128)
+// ...
+// 128+'Z': 
+
+// --- C-M-a gives..
+// 128+'a': funct ctrl a !
+// ...
+// 255
+
+// --- key codes
+#define KEY_RETURN  13
+#define KEY_ESC     27
+#define KEY_DEL    127
+
+// TODO: function keys FUNCT+1 2 3 ...
+#define KEY_FUNCT  128
+
+// ORIC keyboard routines gives 8-11 ascii
+// - I choose to distinguish these from CTRL-HIJKEY_
+#define KEY_LEFT   128+24
+#define KEY_RIGHT  128+25
+#define KEY_DOWN   128+26
+#define KEY_UP     128+27
+
+// Just these by themselves
+#define KEY_RCTRL  128+28
+#define KEY_LCTRL  128+29
+#define KEY_LSHIFT 128+30
+#define KEY_RSHIFT 128+31
+
+// --- key strings (for use to construct maps)
+#define KRETURN "\x0d" //  13
+#define KESC    "\x1b" //  27
+#define KDEL    "\x7f" // 127
+
+// ORIC keyboard routines gives 8-11 ascii
+// - I choose to distinguish these from CTRL-HIJK
+#define KLEFT   "\x88" // 128+ 8
+#define KRIGHT  "\x89" // 128+ 9
+#define KDOWN   "\x8a" // 128+10
+#define KUP     "\x8b" // 128+11
+
+#define KRCTRL  "\x81" // 128+1
+#define KLCTRL  "\x82" // 128+2
+#define KLSHIFT "\x83" // 128+3
+#define KRSHIFT "\x84" // 128+4
+
+#define KFUNCT  "\x80" // 128+letter
+
 
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
@@ -338,56 +458,64 @@ void cputc(char c) {
       // control-codes
       switch(c) {
 
-      //case    0: // *is* UPDATE - cursc from curx,cury
+      //case  0: // *is* UPDATE - cursc from curx,cury
+      //case  1: // used for FORWARD
+      //case  2: // used for DOWN
 
-      case    1:                     // STATUS lines write
-        savecursor();
-        memset(TEXTSCREEN, 32, 32);
-        gotoxy(0,0);
-        return;
-      case    2:                     // STATUS32 xxxxCAPS
-        savecursor(); gotoxy(0,32); return;
-
-      case    3: i+= 700;            // WAIT10s
-      case    4: i+= 200;            // WAIT3s
-      case    5: i+= 100;            // WAIT1s
-      case    6:
+      case    3: i+= 700;                    // WAIT10s
+      case    4: i+= 200;                    // WAIT3s
+      case    5: i+= 100;                    // WAIT1s
+      case    6:                             // WAITKEY
         while(kbhit()) cgetc();
-        wait(-i); break;             // WAIT (key)
+        wait(-i); break;                     
 
-      case    7: break;              // TODO: (taco) BELL
+      case    7: break;                      // TODO: (taco) BELL
 
-      case    8: --curx; break;      // BACK
-      case 0x0f: ++curx; break;      // FORWARD
-      case 0x0e: ++cury; break;      // DOWN
-      case   11: --cury; break;      // UP
+      case    8:case KEY_LEFT: --curx; break; // BACK
+      case    1:case KEY_RIGHT:++curx; break; // FORWARD (not 9 = \t)
+      case    2:case KEY_DOWN: ++cury; break; // DOWN    (not 10= \r)
+      case   11:case KEY_UP:   --cury; break; // UP
 
-      case   12: clrscr(); return;   // CLEAR
+      case   12: clrscr(); return;           // CLEAR
 
+      case '\t': curx= (curx+8)&0xf7; break; // TAB      9 ^I
       case '\n': curx= 0; ++cury; break;     // NEWLINE 10 ^J
       case '\r': curx= 0; break;             // CR      13 ^M
-      case '\t': curx= (curx+8)&0xf7; break; // TAB      8 ^I
+
+      case   14:                             // CLEARLINE  ^N
+        memset(TEXTSCREEN+40*cury, 32, 40);
+        return;
+
+      // TODO:
+      //case   15: scrolldown(1); break;       // INSERTLINE ^O
 
       case 0x10: curinv= 0; break;           // ENDINVERSE
       case 0x11: curinv= 128; break;         // INVERSE
 
       //case 0x12:                           // CENTER (see puts)
-      case 0x13: scrollup(1); break;         // REMOVELINE
+      //case 0x13: scrollup(cury); break;      // TODO: REMOVELINE ^O
 
       case 0x14: curai= !curai; break;       // TOGGLEAI
 
       //case 0x15: // NAK
-      //case 0x16: // SYN
-      //case 0x17:
-      //case 0x18: // CAN
-      //case 0x19: 
-      //case 0x1a:
+      //case 0x16: // SYN                    // TODO: search SYN '2'
+      //case 0x17: // ETB
+      //case 0x18: // CAN                    // TODO: stop!
+
+      case 0x19:                             // STATUS lines write
+        savecursor();
+        memset(TEXTSCREEN, 32, 32);
+        gotoxy(0,0);
+        return;
+      case 0x1a:                             // STATUS32 xxxxCAPS
+        savecursor(); gotoxy(0,32); return;
         
       case 0x1b: break; // ESC TODO: ORIC attribute prefix
 
-      case 0x1c: gotoxy(0,1); break;     // HOME
-      case 0x1d: savecursor(); break;    // SAVE
-      case 0x1e: restorecursor(); break; // RESTORE
+      case 0x1c: gotoxy(0,1); break;                    // HOME
+      case 0x1d: savecursor(); break;                   // SAVE
+      // case 0x1d: // ORIC - toogleinv?
+      case 0x1e: restorecursor(); break;                // RESTORE
       case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
       }
 
@@ -398,19 +526,16 @@ void cputc(char c) {
       if (cury==255) cury=0; // TODO: scroll up?
       else if (cury>=28) { scrollup(1); return; }
 
-      //if (cursc<TEXTSCREEN) cursc= TEXTSCREEN;
-      //else if (cursc>=SCREENEND);
-
       cursc= SCREENXY(curx, cury);
-
       return;
+
     } else {
       char x= c & 0b11111110;
       if      (x==0x8a) curdouble= 1;
       else if (x==0x88) curdouble= 0;
-      c&= 0x7f;
     }
   }
+  c&= 0x7f;
 
   // 32-127, 128+32-255 (inverse)
   if (curdouble) {
@@ -488,67 +613,6 @@ int printf(const char* fmt, ...) {
   va_end(argptr);
   return n;
 }
-
-#define CTRL 1-'A'
-#define META 128
-
-// key encoding
-// 0-31 : CTRL+'A' ... 'Z' ((CTRL==-64)
-// 13   : KRETURN
-// 27   : KESC
-// 32   : ' '
-// ...
-// 127  : KDEL
-// 128  : KFUNCT
-// ...
-// 128+ 8: KLEFT
-// 128+ 9: KLEFT
-// 128+10: KLEFT
-// 128+11: KLEFT
-// ...
-// 128+'A': KFUNCT+'A' (KFUNCT=128)
-// ...
-// 128+'Z'
-// 128+'a': funct ctrl
-
-// --- key codes
-#define KEY_RETURN  13
-#define KEY_ESC     27
-#define KEY_DEL    127
-
-// ORIC keyboard routines gives 8-11 ascii
-// - I choose to distinguish these from CTRL-HIJKEY_
-#define KEY_LEFT   128+ 8
-#define KEY_RIGHT  128+ 9
-#define KEY_DOWN   128+10
-#define KEY_UP     128+11
-
-#define KEY_RCTRL  128+1
-#define KEY_LCTRL  128+2
-#define KEY_LSHIFT 128+3
-#define KEY_RSHIFT 128+4
-
-// TODO: function keys FUNCT+1 2 3 ...
-#define KEY_FUNCT  128
-
-// --- key strings (for use to construct maps)
-#define KRETURN "\x0d" //  13
-#define KESC    "\x1b" //  27
-#define KDEL    "\x7f" // 127
-
-// ORIC keyboard routines gives 8-11 ascii
-// - I choose to distinguish these from CTRL-HIJK
-#define KLEFT   "\x88" // 128+ 8
-#define KRIGHT  "\x89" // 128+ 9
-#define KDOWN   "\x8a" // 128+10
-#define KUP     "\x8b" // 128+11
-
-#define KRCTRL  "\x81" // 128+1
-#define KLCTRL  "\x82" // 128+2
-#define KLSHIFT "\x83" // 128+3
-#define KRSHIFT "\x84" // 128+4
-
-#define KFUNCT  "\x80" // 128+letter
 
 
 // TODO: replace with one 64B string?
