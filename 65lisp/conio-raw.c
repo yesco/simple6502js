@@ -453,7 +453,6 @@ void scrollup(char fromy) {
 
 void bell() {
   char *saved= cursc, t;
-  unsigned int n;
   // ORIC: ping();
   // TODO: research how to do directy AY-hardware sounds
 

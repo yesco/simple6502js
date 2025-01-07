@@ -58,7 +58,17 @@ void hires() {
 void text() {
   if (curmode==HIRESMODE) {
     memcpy(CHARSET, HIRESCHARSET, 256*8); // incl ALTSET
-    curmode= *SCREENEND= TEXTMODE;
+    curmode= SCREENEND[-1]= *HIRESSCREEN= TEXTMODE;
+  }
+
+  { char v, * p= HIRESSCREEN;
+    while(p<HIRESEND) {
+      v= *p;
+      if (v==HIRESMODE || v==HIRESMODE+1 ||
+          v==HIRESMODE+128 || v==HIRESMODE+1+128) 
+        v= *p = TEXTMODE;
+      ++p;
+    }
   }
 }
 
@@ -145,8 +155,8 @@ char point(char x, char y) {
 
 // draw(dx, dy, v)
 
-#define draw(dx,dy,v) drawSimple(dx,dy,v)
-//#define draw(dx,dy,v) drawFast(dx,dy,v)
+//#define draw(dx,dy,v) drawSimple(dx,dy,v)
+#define draw(dx,dy,v) drawFast(dx,dy,v)
 
 // Dammnit - this displays crap and out of bounds?
 // so simple, what is going wrong?
@@ -212,7 +222,9 @@ void drawSimple(int dx, int dy, char v) {
 //
 // gcurx,gcury changed after
 void drawFast(int dx, int dy, char v) {
-  static char adx, ady, m, s, *p;
+  register char* p;
+  register char s, m, adx, ady;
+  char i;
 
   adx= dx>=0? dx: -dx;
   ady= dy>=0? dy: -dy;
@@ -226,9 +238,10 @@ void drawFast(int dx, int dy, char v) {
     {
       // inline curset
       // TODO: too much duplication - make macro!
-      int i= adx+1;
       char q= gcurx/6;
       char mi= gcurx-q*6;
+
+      i= adx+1;
       m= PIXMASK[mi];
       s= 0;
       p= HIRESSCREEN+40*gcury+q;
@@ -263,9 +276,9 @@ void drawFast(int dx, int dy, char v) {
     {
       // inline curset
       // TODO: too much duplication - make macro!
-      int i= ady+1;
       char q= gcurx/6;
       char mi= gcurx-q*6;
+      i= ady+1;
       m= PIXMASK[mi];
       s= 0;
       p= HIRESSCREEN+(5*gcury)*8+q;
@@ -517,6 +530,55 @@ void clearsprite62(char* p) {
   }
 }
 
+void zoom() {
+  register char *p, *xx;
+  static char *t,*s;
+  static char v, i, inv, c, tc;
+
+  p= s= HIRESSCREEN + (gcury*5)*8 + div6[gcurx];
+  c= 0; tc= 0;
+
+  xx= cursc= t= TEXTSCREEN;
+  while(1) {
+
+    // get next cell
+  nextline:
+    v= *p;
+
+    // TODO: inefficient?
+    if (xx+6 > SCREENEND) break;
+
+    if ( (v & 0x7f) < 32) {
+      // attribute
+
+      // remove graphics aa
+      if ( (v & 0x7e) == HIRESMODE )
+        v= *p = TEXTMODE;
+
+      for(i=7; --i; ) {
+        *xx= v; ++xx;
+        if (++tc==41) { tc=0; p= s+= 40;
+          xx= t+= 40;
+          goto nextline; }
+      }
+    } else {
+      // 6 bits
+      //inv= v & 128; ????
+      for(i=7; --i; ) {
+        //*cursc= ( v&1? 0x1f: ' ') | inv;
+        //*cursc= v&1? inv+32: 32;
+        *xx= v&32? 128+' ': ' ';
+        v <<= 1; ++xx;
+        if (++tc==41) { tc=0; p= s+= 40;
+          xx= t+= 40;
+          goto nextline; }
+      }
+    }
+
+    ++p;
+  }
+}
+
 /////////////////////////////////////////////////////////////
 // testing
 
@@ -552,7 +614,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(3) {
+  switch(6) {
 
   case 1: {
     // WTF does my code do? lol
@@ -659,6 +721,9 @@ void main() {
       gcurx= 0;   gcury=M-j; draw(j, j-M,   2);
     }
     #undef M
+
+    goto zoom;
+
     break;
 
   case 7:
@@ -714,6 +779,45 @@ void main() {
       }
     }
     break;
+
+  case 10:
+    // come here from 
+  zoom:
+
+    text();
+    // lol
+//    {  char c;
+//      for(p=HIRESSCREEN,c=200; --c; ) 
+//        *p=TEXTMODE, p+=40;
+//    }
+//    curmode= SCREENEND[-1]= TEXTMODE;
+
+    // a text graphics zoomer!
+    {
+      int x= 0, y= 0;
+
+      while(1) {
+        gcurx= x; gcury= y; zoom();
+        gotoxy(15, 25); printf("  (%d,%d)  ", x, y);
+
+        // wait for release
+        //while(kbhit());
+
+        // step
+        switch(cgetc()) {
+        case KEY_LEFT:  x-=6; break;
+        case KEY_RIGHT: x+=6; break;
+        case KEY_DOWN:  y+=4; break;
+        case KEY_UP:    y-=4; break;
+        }
+
+        // fix out of bounds
+        if (x<0) x= 0;
+        if (y<0) y= 0;
+        if (x>240-44) x= 240-44;
+        if (y>200-25-3) y= 200-25-3;
+      }
+    }
   }
 
   gotoxy(10,25); printf("TIME %d hs", t-time());
