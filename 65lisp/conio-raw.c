@@ -730,12 +730,7 @@ void demo() {
 
 }
 
-
-
-
-
-
-
+// TODO: https://www.cc65.org/doc/ld65-5.html
 void init_conioraw() {
   // ORIC BASIC ROMs remap interrupt vector to page 2...
   if (MEM(0xFFFF)==0x02) {
@@ -752,10 +747,6 @@ void init_conioraw() {
     SCREENSTATE= 0; //*(char*)0x026A= 0;
   }
 }
-
-
-    
-
 
 void main() {
   int i= 1;

@@ -125,7 +125,7 @@
 // ---------------- lisp Datatype
 typedef unsigned int D;  D nil, LAMBDA, QUOTE, T;
 
-D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
+extern D eval(D, D); D apply(D, D, D); D lread(); D princ(D); // forward
 
 typedef struct { D car, cdr; } Cons;  Cons *C, *CS, *CE;
 
@@ -247,7 +247,7 @@ D eval(D x, D env) {
   return car(x)==QUOTE? car(cdr(x)): apply(car(x), cdr(x), env);
 }
 
-D apply(D f, D x, D env) {
+extern D apply(D f, D x, D env) {
   char nf= 0;
   D a, b;
 

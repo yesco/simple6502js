@@ -1,0 +1,1 @@
+perl map.pl $* | sort -r -n

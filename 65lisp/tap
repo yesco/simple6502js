@@ -12,11 +12,14 @@ rm $name.s    2>/dev/null
 # TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
 # TODO: linker -D __AUTORUN__=$C7
 
-( cl65 -O $* $OPTS '-D__AUTORUN__=$C7' -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || (echo "??????????????? FAILED ???????????"; exit 72)
+( cl65 -O $* $OPTS '-D__AUTORUN__=$C7' -t atmos $name.c vm-asm.s -o $name.tap -vm -m $name.map 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || (echo "??????????????? FAILED ???????????"; exit 72)
 
 cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
 
 echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 
+cl65 -vm -m $name.map $name.o
+
 cp $name.tap ORIC/
 ls -l $name.o $name.tap
+

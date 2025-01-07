@@ -54,6 +54,8 @@ echo
 
 #ls -l $name.o $name.out $name.tap
 
+cl65 -vm -m $name.map $name.o
+
 #echo
 #grep '^Name' $name.map
 #grep '^CODE' $name.map

@@ -303,6 +303,7 @@ void drawFast(int dx, int dy, char v) {
 //
 // Surprising little and simple code to draw circle!
 void circle(char r, char v) {
+  // TODO: try use register vars!
   static int  rr, e;
   static char x,y, dx,dy;
 
