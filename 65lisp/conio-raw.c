@@ -437,10 +437,10 @@ void scrollup(char fromy) {
 
 // ORIC keyboard routines gives 8-11 ascii
 // - I choose to distinguish these from CTRL-HIJK
-#define KLEFT   "\x88" // 128+ 8
-#define KRIGHT  "\x89" // 128+ 9
-#define KDOWN   "\x8a" // 128+10
-#define KUP     "\x8b" // 128+11
+#define KLEFT   "\x98" // 128+24
+#define KRIGHT  "\x99" // 128+25
+#define KDOWN   "\x9a" // 128+26
+#define KUP     "\x9b" // 128+27
 
 #define KRCTRL  "\x81" // 128+1
 #define KLCTRL  "\x82" // 128+2
@@ -452,7 +452,8 @@ void scrollup(char fromy) {
 
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
-    if (c < 128) {
+    // control chars (0-31), or (arrow keys)
+    if (c<32 || (c & 0xf8)==0x98) {
       int i= 0;
 
       // control-codes
@@ -508,7 +509,7 @@ void cputc(char c) {
         gotoxy(0,0);
         return;
       case 0x1a:                             // STATUS32 xxxxCAPS
-        savecursor(); gotoxy(0,32); return;
+        savecursor(); gotoxy(32,0); return;
         
       case 0x1b: break; // ESC TODO: ORIC attribute prefix
 
@@ -534,8 +535,7 @@ void cputc(char c) {
       if      (x==0x8a) curdouble= 1;
       else if (x==0x88) curdouble= 0;
     }
-  }
-  c&= 0x7f;
+  } else c&= 0x7f;
 
   // 32-127, 128+32-255 (inverse)
   if (curdouble) {
@@ -820,9 +820,28 @@ void main() {
   savescreen();
   clrscr();
 
-  switch(0) {
+  switch(2) {
 
-  case 1: while(!kbhit()) {
+  case 2:
+    // stupid terminal to test out control keys...
+    puts(STATUS "StupiTerm");
+    gotoxy(0, 1);
+
+    while(1) {
+      printf(STATUS32 "(%d,%d) " RESTORE, wherex(), wherey());
+      printf(STATUS "Key: (%d 128+%d $%02x)   " RESTORE, i, i-128, i);
+
+      *cursc ^= 128;
+      i=getchar();;
+      *cursc ^= 128;
+
+      putchar(i);
+
+    } break;
+
+  case 1:
+    // just scroll test
+    while(!kbhit()) {
       printf("row %d\n", i++);
       wait(5);
     } break;
