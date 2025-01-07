@@ -116,6 +116,7 @@
 // 27 = ESC:AFFECTS NEXT CHARACTER"  = hmm, same...
 // 29 = J :INVERSE VIDEO ON/OFF      = TODO:
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
@@ -140,7 +141,7 @@ unsigned int time() {
   return *(unsigned int*)0x276;
 }
 
-char kbhit();
+unsigned int kbhit();
 
 // wait HS hectoseconds
 //   0: wait till key pressed
@@ -163,7 +164,7 @@ int wait(int hs) {
 #define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
 
 char curx=0, cury=1, *cursc=TEXTSCREEN;
-char curinv=0, curdouble=0, curai=0;
+char curinv=0, curdouble=0, curai=0, curcaps=0;
 
 void cputc(char c);
 char cgetc();
@@ -284,7 +285,7 @@ void scrollup(char fromy) {
 //#define BELL    "\x07"
 
 // clear (32 chars) & write statusline...RESTORE
-#define STATUS   "\x19"
+#define STATUS   "\x18"
 #define STATUS32 "\x1a" // overwrite chars at position 32
 
 // Move cursor
@@ -293,9 +294,10 @@ void scrollup(char fromy) {
 #define DOWN     "\x02" // ORIC is 10, but is '\n' // TODO: change ^N
 #define UP       "\x0b"
 
-#define CLEAR     "\x0c"
-#define REMOVELINE "\x13"
-#define CLEARLINE  "\x0e"
+#define CLEAR      "\x0c" // ^L clearscreen
+#define REMOVELINE "\x13" // ^K
+#define CLEARLINE  "\x0e" //
+//#define INSERTLINE
 
 #define HOME     "\x1c"
 #define SAVE     "\x1d"
@@ -354,7 +356,7 @@ void scrollup(char fromy) {
 // Combined!
 #define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAITKEY STATUS RESTORE
 
-#define CTRL 1-'A'
+#define CTRL (1-'A')
 #define META 128
 
 // KEY ENCODING
@@ -418,7 +420,7 @@ void scrollup(char fromy) {
 #define KEY_FUNCT  128
 
 // ORIC keyboard routines gives 8-11 ascii
-// - I choose to distinguish these from CTRL-HIJKEY_
+// - I choose to distinguish these from CTRL-HIJK
 #define KEY_LEFT   128+24
 #define KEY_RIGHT  128+25
 #define KEY_DOWN   128+26
@@ -449,6 +451,20 @@ void scrollup(char fromy) {
 
 #define KFUNCT  "\x80" // 128+letter
 
+void bell() {
+  char *saved= cursc, t;
+  unsigned int n;
+  // ORIC: ping();
+  // TODO: research how to do directy AY-hardware sounds
+
+  // Visual Bell (reverse twice)
+  for(t=3; --t; ) {
+    for(cursc=TEXTSCREEN; ++cursc<SCREENEND; ) *cursc ^= 128;
+    //wait(10);
+  }
+
+  cursc= saved;
+}
 
 void cputc(char c) {
   if ((c & 0x7f) < ' ') {
@@ -456,68 +472,143 @@ void cputc(char c) {
     if (c<32 || (c & 0xf8)==0x98) {
       int i= 0;
 
+      // EMACS DONE: ^ ABcDEFGhIjk mNoPqrs u  y
+      //             M-ab def  ij   n pqrs
+      //    almost            h jk      rS 
+      //    can't                 L H     T VXZ
+      // ESC-q reformat paragraph/fill
+
       // control-codes
       switch(c) {
 
-      //case  0: // *is* UPDATE - cursc from curx,cury
-      //case  1: // used for FORWARD
-      //case  2: // used for DOWN
+      //case 0: // *is* UPDATE - cursc from curx,cury
+      case 1: curx= 0; break;                 // ^A beginning of line
+      // case  2:                             // ^B back
+      //case CTRL+'C':
+      case CTRL+'D':                          // ^D del char forward
+        memmove(cursc, cursc+1, 39-curx);
+        *SCREENXY(39, cury); break; // TODO: cclearxy()
+      case CTRL+'E': gotoxy(39,cury);         // ^E end of line
+        while(cursc[-1]==' ') --cursc,--curx;
+        break;
+      // case 6:                              // ^F forward
+      case CTRL+'G': bell(); break;           // ^G break/bell
+      case    8: if (cursc>TEXTSCREEN)        // ^H -- \b
+          *cursc= ' '; --curx; break;
+      // TODO: distinguish CTRL-'B' and \b !
+      case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
+      case CTRL+'F':case KEY_RIGHT: ++curx; break; // ^F ->
+      case CTRL+'N':case KEY_DOWN:  ++cury; break; // ^N DOWN
+// TODO:???     case   11 on oric: CTRL+'K' ????
+      case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
+      case   12: clrscr(); return;                 // ^L clear
 
-      case    3: i+= 700;                    // WAIT10s
-      case    4: i+= 200;                    // WAIT3s
-      case    5: i+= 100;                    // WAIT1s
-      case    6:                             // WAITKEY
-        while(kbhit()) cgetc();
-        wait(-i); break;                     
+      case '\t': curx= (curx+8)&0xf7; break;       // ^I TAB
+      case '\n': curx= 0; ++cury; break;           // ^J
+      // TODO: distinguish RETURN
+      case '\r': curx= 0; break;                   // ^M
 
-      case    7: break;                      // TODO: (taco) BELL
+      //case CTRL+'Q': break;                      // TODO: ^Q quote char
+      case CTRL+'R':                               // TODO: ^R
+      case CTRL+'S': { char k, s[32]={0}; i=0;     // ^S s
+          do {
+            *cursc ^= 128;
+            k=cgetc();
+            *cursc ^= 128;
 
-      case    8:case KEY_LEFT: --curx; break; // BACK
-      case    1:case KEY_RIGHT:++curx; break; // FORWARD (not 9 = \t)
-      case    2:case KEY_DOWN: ++cury; break; // DOWN    (not 10= \r)
-      case   11:case KEY_UP:   --cury; break; // UP
+            if (k==KEY_RETURN) break;
+            if (k==CTRL+'G') { cursc= 0; break; }
+            // TODO: backspace
 
-      case   12: clrscr(); return;           // CLEAR
+            s[i]= k; ++i;
 
-      case '\t': curx= (curx+8)&0xf7; break; // TAB      9 ^I
-      case '\n': curx= 0; ++cury; break;     // NEWLINE 10 ^J
-      case '\r': curx= 0; break;             // CR      13 ^M
+            //if (c==CTRL+'S') 
+            cursc= memchr(cursc, s[0], SCREENEND-cursc-1);
+            //else 
+            //  cursc= memrchr(cursc, s[0], cursc-TEXTSCREEN);
+          } while (cursc);
+          if (!cursc) { bell(); break; }
 
-      case   14:                             // CLEARLINE  ^N
-        memset(TEXTSCREEN+40*cury, 32, 40);
-        return;
+          // found!
+          i= cursc-TEXTSCREEN;
+          curx= i % 40;
+          cury= i % 40;
+          break; }
+      case CTRL+'T': curcaps =! curcaps; break;    // ^T toggle CAPS
 
-      // TODO:
-      //case   15: scrolldown(1); break;       // INSERTLINE ^O
+      // TODO: use cclear()      // TODO: clear end of line
+      // TODO: hmmm... CLEARLINE?
+       // TDOO: same key as
+      //case CTRL+'K':                             // TODO: ^K CLEARLINE
+        //memset(TEXTSCREEN+40*cury, 32, 40);
+        //return;
+      case CTRL+'K': scrollup(cury); break;    // ^K: REMOVELINE
 
-      case 0x10: curinv= 0; break;           // ENDINVERSE
-      case 0x11: curinv= 128; break;         // INVERSE
+      // TODO: use cclear()      // TODO: clear end of line
+      //case CTRL+'O': scrolldown(1); break;     // ^O INSERTLINE
+
+      //case 0x10: curinv= 0; break;           // ENDINVERSE
+      //case 0x11: curinv= 128; break;         // INVERSE
 
       //case 0x12:                           // CENTER (see puts)
-      //case 0x13: scrollup(cury); break;      // TODO: REMOVELINE ^O
+      //case    3: i+= 700;                    // WAIT10s
+      //case    4: i+= 200;                    // WAIT3s
+      //case    5: i+= 100;                    // WAIT1s
+      //case    6:                             // WAITKEY
+        //while(kbhit()) cgetc();
+        //wait(-i); break;                     
 
-      case 0x14: curai= !curai; break;       // TOGGLEAI
+
+      //case 0x14: curai= !curai; break;       // TOGGLEAI
 
       //case 0x15: // NAK
       //case 0x16: // SYN                    // TODO: search SYN '2'
       //case 0x17: // ETB
       //case 0x18: // CAN                    // TODO: stop!
 
-      case 0x19:                             // STATUS lines write
+      case CTRL+'U': // ^U repeat
+      case CTRL+'V': // ^V page down ?  next page?/screen
+      case CTRL+'W': //cut region
+      case CTRL+'Y': // ^Y yank
+
+      //case CTRL+'X': // extended menu
+      //case CTRL+'Z': // ^Z sleep (go other mode?)
+      case CTRL+'C': // ^C exit ? // compile
+
+      // case 0x1d: // ORIC - toogleinv?
+
+      // redundant
+      //case 0x1c: gotoxy(0,1); break;       // HOME
+
+      case CTRL+'X': // 0x18                  // STATUS txt RESTORE
         savecursor();
         memset(TEXTSCREEN, 32, 32);
         gotoxy(0,0);
         return;
-      case 0x1a:                             // STATUS32 xxxxCAPS
+      case CTRL+'Z': // 0x1a                  // STATUS32 txt8 RESTORE
         savecursor(); gotoxy(32,0); return;
         
-      case 0x1b: break; // ESC TODO: ORIC attribute prefix
 
-      case 0x1c: gotoxy(0,1); break;                    // HOME
+      // ESC TODO: ORIC attribute prefix
+      case 0x1b: break;                                 // TODO: ESC
+
+      case 0x1c: 
       case 0x1d: savecursor(); break;                   // SAVE
-      // case 0x1d: // ORIC - toogleinv?
       case 0x1e: restorecursor(); break;                // RESTORE
       case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
+
+      // Cursor:      SAVE RESTORE NEXT HOME GOTOXY bx by
+      // Page:        PAGESWAP n, PAGESAVE n PAGELOAD n
+      // Status:      STATUS t, STATUS32 t
+      // Format:      ENDINVERSE INVERSE CENTER
+      // Repeat:      REPEAT n c (CTRL+'U')
+      // Input:       WAIT10s WAIT3s WAITKEY WAIT n
+      // Lines:       CLEARLINE INSLLINE REMLINE
+      // Columns:     CLEARCOL INSCOL REMCOL
+      // Bytes:       BFILL BCOPY B
+      // Window:
+      // Xperiment:   TOOGLEAI
+
       }
 
       // fix state, update cursc
@@ -662,22 +753,37 @@ char key(char row, char colmask) {
   return MEM(0x0300) & 8;
 }
 
-int unc= 0;
+unsigned int unc= 0;
 char keybits[8]={0};
 
 int ungetchar(int c) {
   return unc? -1: unc=c;
 }
 
+// upper byte
+#define FUNCTBIT  0b10000000
+#define CTRLBIT   0b01000000
+#define SHIFTBIT  0b00100000
+#define ARROWBIT  0b00010000
+
+// why these? because they map to CTRL+something
+#define ESCBIT    0b00001000
+#define DELBIT    0b00000100
+#define RETURNBIT 0b00000010
+
+#define RIGHTBIT  0b00000001
+
 static const char KEYMASK[]= {
   0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
+
 // True if a key is pressed (not shift/ctrl/funct)
 // (stores key in unc)
 //
 // Returns: 0 - no key, or the character
-char kbhit() {
+unsigned int kbhit() {
+  char bits= 0;
   if (!unc) {
-    char row=0,c=0,o=0,R=8,K=0, col, v, k;
+    char row=0,c=0,o=0,K=0,R=8, col, v, k;
     asm("SEI");
     for(;row<8;++row) {
       v= 0;
@@ -687,16 +793,34 @@ char kbhit() {
           if (key(row, KEYMASK[col])) {
             ++v;
             k= upperkeys[row][col];
-            if      (k==*KLCTRL  || k==*KRCTRL)  o-= 64;
-            else if (k==*KLSHIFT || k==*KRSHIFT) o+= 32;
-            else if (k==*KFUNCT)                   o+=128;
-            else c=k,R=row,K=col; // several keys: last overwrites
+
+            // TODO: test this once after all scannned!
+            //   use the matrix(bits), Luke!
+            if (k & 128) {
+              if (k==*KLCTRL || k==*KRCTRL) {
+                o-= 64; bits|=CTRLBIT; continue;
+              } else if (k==*KLSHIFT || k==*KRSHIFT) {
+                o+= 32; bits|=SHIFTBIT; continue;
+              } else if (k==*KFUNCT) {
+                o+=128,bits|=FUNCTBIT; continue;
+              }
+              // maybe arrow keys?
+            }
+            // if fallthrough these are "real chars"
+                 if (k>=*KLEFT)   bits|=ARROWBIT;
+            else if (k==*KRETURN) bits|=RETURNBIT;
+            else if (k==*KESC)    bits|=ESCBIT;
+            else if (k==*KDEL)    bits|=DELBIT;
+            
+            c=k,R=row,K=col; // last char overwrites
           }
         }
       }
       keybits[row]= v;
     }
     asm("CLI");
+
+    // decode ascii
     if (R!=8) {
       // TODO: can make this simplier?
       //   not call lowerkeys in two places?
@@ -705,8 +829,10 @@ char kbhit() {
         else if (!o) c= lowerkeys[R][K];
       }
       if (c<'A' && o==32) o=0,c= lowerkeys[R][K];
-      unc= c? o+c: 0;
+      unc= (bits<<8) | (c? o+c: 0);
+      if (curcaps && isalpha(c)) c ^= 32; // switch lower/upper!
     }
+    // update bits (TODO: move here?)
   }
   return unc;
 }
@@ -729,6 +855,7 @@ char keypos(char c) {
 // (this is a very efficient test for a single key)
 // 
 // Returns: 0=not pressed or !0 if pressed (8)
+
 char keypressed(char keypos) {
   char c;
   asm("SEI");
