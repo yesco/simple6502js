@@ -23,3 +23,5 @@ cl65 -vm -m $name.map $name.o
 cp $name.tap ORIC/
 ls -l $name.o $name.tap
 
+cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$name.tap ; hexdump -C $name.tap | head -1 ; hexdump -C ORIC/$name.tap | head -1 ; ls -l conio-raw.tap ORIC/conio-raw.tap 
+

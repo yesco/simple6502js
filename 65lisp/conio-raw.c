@@ -420,7 +420,7 @@ void cputc(char c) {
   *cursc= c|curinv;  ++cursc;
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
-  if (curai) wait(10);
+  if (curai) wait(-10);
 }
 
 //int putchar(int c) { cputc(c); return c; }
