@@ -191,7 +191,7 @@ void restorecursor() {
 char* cursaved= 0;
 void savescreen() {
   if (!cursaved) cursaved= malloc(SCREENSIZE);
-  memcpy(cursaved, TEXTSCREEN, SCREENSIZE);
+  memmove(cursaved, TEXTSCREEN, SCREENSIZE);
 }
 
 void restorescreen() {
@@ -890,31 +890,31 @@ int T,nil,doapply1,print;
 void demo() {
   int i;
 
-  printf(CLEAR ANYKEY);
+  puts(CLEAR ANYKEY);
 
-  printf("\n\n\nconio: "
-         DOUBLE "Hello"
-           YELLOW BGRED "RAW" CYAN BGBLACK
-           "World!"
-         NORMAL
-         WHITE "yeah");
+  puts("\n\n\nconio: "
+       DOUBLE "Hello"
+         YELLOW BGRED "RAW" CYAN BGBLACK
+         "World!"
+       NORMAL
+       WHITE "yeah");
 
-  printf(SAVE);
-  printf("\n\n\n" CENTER "Once upon a time..."     WAIT1s);
-  printf("\n"     CENTER "In a galaxy far away..." WAIT1s);
+  puts(SAVE);
+  puts("\n\n\n" CENTER "Once upon a time..."     WAIT1s);
+  puts("\n"     CENTER "In a galaxy far away..." WAIT1s);
 
-  printf("\n" CENTER
-         TOGGLEAI
-           "AI speaking: what's this?\n"
-         TOGGLEAI);
+  puts("\n" CENTER
+       TOGGLEAI
+         "AI speaking: what's this?\n"
+       TOGGLEAI);
 
-  printf("\n\n"   CENTER "(Wait for it!)"          WAIT3s);
-  printf("\n\n\n" CENTER "There was ORIC ATMOS!"   WAIT10s);
+  puts("\n\n"   CENTER "(Wait for it!)"          WAIT3s);
+  puts("\n\n\n" CENTER "There was ORIC ATMOS!"   WAIT10s);
 
-  printf("\n\n\n\n\n" CENTER DOUBLE RED "B" GREEN "Y" BLUE "E" NORMAL);
+  puts("\n\n\n\n\n" CENTER DOUBLE RED "B" GREEN "Y" BLUE "E" NORMAL);
 
   // Scroll up
-  printf(RESTORE);
+  puts(RESTORE);
   i= 27;
   while(i--) printf(WAIT1s REMOVELINE);
 
@@ -946,7 +946,7 @@ void main() {
   savescreen();
   clrscr();
 
-  switch(2) {
+  switch(3) {
 
   case 2:
     // stupid terminal to test out control keys...
@@ -972,6 +972,49 @@ void main() {
       wait(5);
     } break;
 
+  case 3: {
+    char i, j, buff[40];
+    unsigned int t;
+
+    /// give us some text
+    t= time();
+    for(i=0; i<40; ++i) {
+      // TODO: vnspprintf can't do?
+      //printf("%.*sPanWorld", j, " ");
+      for(j=0; j<i; ++j) cputc(' ');
+      puts("PanWorld");
+    }
+    printf("\nTime: %d hs\n", t-time());
+
+    // pan-around w wrap
+    while(1) {
+
+      switch(cgetc()) {
+      case KEY_DOWN:
+        memcpy(buff, TEXTSCREEN, 40);
+        memmove(TEXTSCREEN, TEXTSCREEN+40, SCREENSIZE-40);
+        memcpy(SCREENEND-40, buff, 40);
+        break;
+      case KEY_UP:
+        memcpy(buff, SCREENEND-40, 40);
+        memmove(TEXTSCREEN+40, TEXTSCREEN, SCREENSIZE-40);
+        memcpy(TEXTSCREEN, buff, 40);
+        break;
+      case KEY_LEFT:
+        for(i=0; i<28; ++i) buff[i]= TEXTSCREEN[i*40+39];
+        memmove(TEXTSCREEN+1, TEXTSCREEN, SCREENSIZE-28);
+        for(i=0; i<28; ++i) TEXTSCREEN[i*40]= buff[i];
+        break;
+      case KEY_RIGHT:
+        for(i=0; i<28; ++i) buff[i]= TEXTSCREEN[i*40];
+        memmove(TEXTSCREEN, TEXTSCREEN+1, SCREENSIZE-28);
+        for(i=0; i<28; ++i) TEXTSCREEN[i*40+39]= buff[i];
+        break;
+      }
+
+    } } break;
+
+      // demo
   default: demo(); break;
 
   }

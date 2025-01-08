@@ -1,6 +1,6 @@
 OPTS=" -DPROGSIZE "
 
-echo "unix> ./r $*"
+echo "unix> ./tap $*"
 
 name=$1
 shift

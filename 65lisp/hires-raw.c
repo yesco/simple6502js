@@ -530,6 +530,8 @@ void clearsprite62(char* p) {
   }
 }
 
+char sc[SCREENSIZE], *scend= sc+SCREENSIZE;
+
 void zoom() {
   register char *p, *xx;
   static char *t,*s;
@@ -538,7 +540,7 @@ void zoom() {
   p= s= HIRESSCREEN + (gcury*5)*8 + div6[gcurx];
   c= 0; tc= 0;
 
-  xx= cursc= t= TEXTSCREEN;
+  xx= t= sc;
   while(1) {
 
     // get next cell
@@ -546,7 +548,7 @@ void zoom() {
     v= *p;
 
     // TODO: inefficient?
-    if (xx+6 > SCREENEND) break;
+    if (xx+6 > scend) break;
 
     if ( (v & 0x7f) < 32) {
       // attribute
@@ -577,6 +579,9 @@ void zoom() {
 
     ++p;
   }
+
+  // flicker-free!
+  memcpy(TEXTSCREEN, sc, SCREENSIZE);
 }
 
 /////////////////////////////////////////////////////////////
@@ -723,7 +728,7 @@ void main() {
     #undef M
 
     goto zoom;
-
+f
     break;
 
   case 7:
@@ -795,10 +800,12 @@ void main() {
     // a text graphics zoomer!
     {
       int x= 0, y= 0;
+      unsigned int t;
 
       while(1) {
+        t= time();
         gcurx= x; gcury= y; zoom();
-        gotoxy(15, 25); printf("  (%d,%d)  ", x, y);
+        gotoxy(15, 25); printf(" %d hs (%d,%d)  ", t-time(), x, y);
 
         // wait for release
         //while(kbhit());
@@ -819,7 +826,6 @@ void main() {
       }
     }
   }
-
   gotoxy(10,25); printf("TIME %d hs", t-time());
 
   //text();
