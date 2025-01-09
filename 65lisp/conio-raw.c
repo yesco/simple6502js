@@ -1,11 +1,18 @@
-// CONIO-RAW 
+// CONIO-RAW
 //
-// A raw, NON-ROM-less implementation of display and
-// keyboard routines for ORIC ATMOS.
-//
-// Intended to be used under Loci
-// 
 // (c) 2024 Jonas S Karlsson (jsk@yesco.org)
+//
+//
+// A raw, NON-ROM-less implementation of conio display
+// and keyboard routines for ORIC ATMOS.
+// 
+// Implements full-screen editing, similar to ORIC.
+//
+// However, it has a twist - it impements an EMACSy
+// full-screen editor, intended to be used for editing.
+//
+// It's RAW since it's intended to be used under Loci,
+// when no ROM may be available!
 
 // TODO: disable ROM cursor?
 // TDOO: protect the first 2 columns
@@ -289,20 +296,24 @@ void scrollup(char fromy) {
 #define STATUS32 "\x1a" // overwrite chars at position 32
 
 // Move cursor
-#define BACK     "\x08"
-#define FORWARD  "\x01" // ORIC is 09, but is '\t' 
-#define DOWN     "\x02" // ORIC is 10, but is '\n' // TODO: change ^N
-#define UP       "\x0b"
+#define BACK     "\x90" // see KEY_LEFT
+#define FORWARD  "\x91" //     KEY_RIGHT
+#define DOWN     "\x92" //     KEY_DOWN
+#define UP       "\x93" //     KEY_UP
 
 #define CLEAR      "\x0c" // ^L clearscreen
 #define REMOVELINE "\x13" // ^K
-#define CLEARLINE  "\x0e" //
-//#define INSERTLINE
+#define CLEARLINE  "\x0e" // 
+//#define INSERTLINE      // ^O ???
 
-#define HOME     "\x1c"
+//#define HOME   GOTOXY:0;1; // maybe?
 #define SAVE     "\x1d"
 #define RESTORE  "\x1e"
-#define NEXT     "\x1f"
+// useful for sprite print: SAVE "abc" NEXT "def" NEXT "ghi"
+// gives  abc
+//        def
+//        ghi
+#define NEXT     RESTORE KEY_DOWN SAVE
 
 #define TOGGLEAI "\x14"
 
@@ -421,13 +432,14 @@ void scrollup(char fromy) {
 
 // ORIC keyboard routines gives 8-11 ascii
 // - I choose to distinguish these from CTRL-HIJK
-#define KEY_LEFT   128+24
-#define KEY_RIGHT  128+25
-#define KEY_DOWN   128+26
-#define KEY_UP     128+27
+#define KEY_LEFT   128+24 // 0x90
+#define KEY_RIGHT  128+25 // 0x91
+#define KEY_DOWN   128+26 // 0x92
+#define KEY_UP     128+27 // 0x93
 
 // Just these by themselves
-#define KEY_RCTRL  128+28
+// TODO: other?
+#define KEY_RCTRL  128+28 
 #define KEY_LCTRL  128+29
 #define KEY_LSHIFT 128+30
 #define KEY_RSHIFT 128+31
@@ -465,10 +477,65 @@ void bell() {
   cursc= saved;
 }
 
+// interal "raw" terminal
+
+// Basically, it implements EMACS style editing
+// on the screen!
+//
+// On ORIC you traditionally can edit the screen,
+// which is a rather unique function.
+//
+// But ehre we don't have the CTRL-A read character
+// under cursor and type nilwilly anywhere into
+// a hidden keyboard buffer!
+//
+
+// Emacs bindings implemented
+//
+// CTRL-A : At the aabeginning of line
+// CTRL-B : Back one character
+// CTRL-D ::Delete current chracter
+// CTRL-E : End of line
+// CTRL-G : PING, or rather bell() (visual!)
+// CTRL-H : // TODO: helps
+// CTRL-I : TAB chacter, moves to next 8 char pos
+// CTRL-J : newline // TODO: new line/insert/indent!
+// CTRL-K : Kill current line (TODO: add to Yank buffer)
+// CTRL-L : clears the screen (all erased!)
+// CTRL-M : same as RETURN (maybe)
+// CTRL-N : Next line
+// CTRL-O : insert line break here
+// CTRL-P : Previous line
+// CTRL-Q : TODO: Quote next char (insert raw?/hex?)
+// CTRL-R : TODO: re-search backwards
+// CTRL-S : TODO: search, have some code, untested
+// CTRL-T : ORIC: CAPS-toggle, implemeneted but have bug
+// CTRL-U : TODO: numeric prefix, quadruplicate next char
+// CTRL-V : TODO: Next Page
+// CTRL-W : TODO: wank? cut region
+// CRRL-X : TODO: eXtended commands, file system etc
+// CTRL-Y : TODO: Yank insert kill-buffers
+// CTRL-Z : TODO: Zleep?
+
+// FUNCT-B: TODO: Backward word
+// FUNCT-F: TODO: Forward word
+// FUNCT-P: TODO: bottom?
+// FUNCT-N: TODO: top?
+// FUNCT-Q: TODO: fill-paragraph/reindent "region"
+
+// Special keys
+//
+// RETURN : new line
+// CTRL-J : LF
+// CTRL-M ; CR
+
 void cputc(char c) {
-  if ((c & 0x7f) < ' ') {
+  // Basically, if not easily printable?
+  if (((c & 0x7f) < ' ') || c==127) {
+
     // control chars (0-31), or (arrow keys)
-    if (c<32 || (c & 0xf8)==0x98) {
+    // TODO: why this test, just let switch do it?
+    if (c<32 || (c & 0xf8)==0x98 || c==127) {
       int i= 0;
 
       // EMACS DONE: ^ ABcDEFGhIjk mNoPqrs u  y
@@ -486,15 +553,19 @@ void cputc(char c) {
       //case CTRL+'C':
       case CTRL+'D':                          // ^D del char forward
         memmove(cursc, cursc+1, 39-curx);
-        *SCREENXY(39, cury); break; // TODO: cclearxy()
+        cursc[39-curx]= ' '; break; // TODO: cclearxy()
       case CTRL+'E': gotoxy(39,cury);         // ^E end of line
         while(cursc[-1]==' ') --cursc,--curx;
         break;
       // case 6:                              // ^F forward
       case CTRL+'G': bell(); break;           // ^G break/bell
-      case    8: if (cursc>TEXTSCREEN)        // ^H -- \b
-          *cursc= ' '; --curx; break;
-      // TODO: distinguish CTRL-'B' and \b !
+      // TODO: 8 is roubout
+      case  127: if (cursc>TEXTSCREEN)        // ^H -- \b
+          // TODO: insert/overwrite
+          memmove(cursc-1, cursc, 39-1-curx);
+          cursc[39-curx]= ' '; --curx; break;
+
+      case '\b':
       case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
       case CTRL+'F':case KEY_RIGHT: ++curx; break; // ^F ->
       case CTRL+'N':case KEY_DOWN:  ++cury; break; // ^N DOWN
@@ -502,8 +573,8 @@ void cputc(char c) {
       case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
       case   12: clrscr(); return;                 // ^L clear
 
-      case '\t': curx= (curx+8)&0xf7; break;       // ^I TAB
-      case '\n': curx= 0; ++cury; break;           // ^J
+      case '\t': curx= (curx+8)/8*8; break;          // ^I TAB
+      case '\n': curx= 0; ++cury; break;           // not key
       // TODO: distinguish RETURN
       case '\r': curx= 0; break;                   // ^M
 
@@ -533,7 +604,9 @@ void cputc(char c) {
           curx= i % 40;
           cury= i % 40;
           break; }
-      case CTRL+'T': curcaps =! curcaps; break;    // ^T toggle CAPS
+
+      // TODO: Not working?
+      case CTRL+'T': curcaps = 1-curcaps; break;    // ^T toggle CAPS
 
       // TODO: use cclear()      // TODO: clear end of line
       // TODO: hmmm... CLEARLINE?
@@ -591,7 +664,7 @@ void cputc(char c) {
       // ESC TODO: ORIC attribute prefix
       case 0x1b: break;                                 // TODO: ESC
 
-      case 0x1c: 
+      case 0x1c: break;
       case 0x1d: savecursor(); break;                   // SAVE
       case 0x1e: restorecursor(); break;                // RESTORE
       case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
@@ -621,18 +694,22 @@ void cputc(char c) {
       return;
 
     } else {
+
+      // Hi-Bit control chars; DOUBLE specials...
+      // (arrowkeys are exempt and handles above)
       char x= c & 0b11111110;
       if      (x==0x8a) curdouble= 1;
       else if (x==0x88) curdouble= 0;
+
     }
-  } else c&= 0x7f;
+  }
 
   // 32-127, 128+32-255 (inverse)
   if (curdouble) {
     if (cury&1) { ++cury; cputc(0); }
     cursc[40]= c|curinv;
   }
-  *cursc= c|curinv;  ++cursc;
+  *cursc= c^curinv;  ++cursc;
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
   if (curai) wait(-10);
@@ -706,25 +783,29 @@ int printf(const char* fmt, ...) {
 
 
 // TODO: replace with one 64B string?
-char* upperkeys[]= {
+char* upperkeys[]= { // lol, bad name
   "7N5V" KRCTRL "1X3",
   "JTRF\0" KESC  "QD",
   "M6B4" KLCTRL "Z2C",
-  "K9;-\0\0\\\0", // last char == 39?
+//  "K9;-\0\0\\\0", // last char == 39???? - got S-@ once?
+  "K9;-\0\0\\'", // last char == 39? - not working
+//  "K9;-\0\0\\q", // last char == 39? -- not workgin
   " ,." KUP KLSHIFT KLEFT KDOWN KRIGHT,
   "UIOP" KFUNCT KDEL "][",
   "YHGE\0ASW",
-  "8L0\\" KRSHIFT KRETURN "\0="};
+  "8L0/" KRSHIFT KRETURN "\0="};
 
 char* lowerkeys[]= {
   "&n%v" KRCTRL "!x#",
   "jtrf\0" KESC "qd",
   "m^b$" KLCTRL "z@c",
-  "k(;^\0\0|\0",
+//  "k(;^\0\0|\0", // before and almost works S-@ !
+  "k(:^\0\0|\"", // not working
+//  "k(:^\0\0|Q",
   " <>" KUP KLSHIFT KLEFT KDOWN KRIGHT,
   "uiop" KFUNCT KDEL "}{",
   "yhge\0asw",
-  "*l)|" KRSHIFT KRETURN "\0-"};
+  "*l)?" KRSHIFT KRETURN "\0-"};
 
 // TODO: remove asm
 extern char gKey;
@@ -756,19 +837,30 @@ unsigned int unc= 0;
 char keybits[8]={0};
 
 int ungetchar(int c) {
-  return unc? -1: unc=c;
+  return unc? 0: unc=c;
 }
 
 // upper byte
-#define FUNCTBIT  0b10000000
-#define CTRLBIT   0b01000000
-#define SHIFTBIT  0b00100000
-#define ARROWBIT  0b00010000
+#define FUNCTmask 0b10000000
+#define CTRLmask  0b01000000
+#define SHIFTmask 0b00100000
+#define ARROWmask 0b00010000
 
 // why these? because they map to CTRL+something
-#define ESCBIT    0b00001000
-#define DELBIT    0b00000100
-#define RETURNBIT 0b00000010
+#define ESCmask 0b00001000
+#define DELmask 0b00000100
+#define RETURNmask 0b00000010
+
+#define RIGHTmask  0b00000001
+
+/// use these: FUNCTBIT & getchar()
+#define FUNCTBIT  (FUNCTmask<<8)
+#define CTRLBIT   (CTRLmask<<8)
+#define SHIFTBIT  (SHIFTmask<<8)
+#define ARROWBIT  (ARROWmask<<8)
+#define ESCBIT    (ESCmask<<8)
+#define DELBIT    (DELmask<<8)
+#define RETURNBIT (RETURNmask<<8)
 
 #define RIGHTBIT  0b00000001
 
@@ -797,19 +889,19 @@ unsigned int kbhit() {
             //   use the matrix(bits), Luke!
             if (k & 128) {
               if (k==*KLCTRL || k==*KRCTRL) {
-                o-= 64; bits|=CTRLBIT; continue;
+                o-= 64; bits|=CTRLmask; continue;
               } else if (k==*KLSHIFT || k==*KRSHIFT) {
-                o+= 32; bits|=SHIFTBIT; continue;
+                o+= 32; bits|=SHIFTmask; continue;
               } else if (k==*KFUNCT) {
-                o+=128,bits|=FUNCTBIT; continue;
+                o+=128; bits|=FUNCTmask; continue;
               }
               // maybe arrow keys?
             }
             // if fallthrough these are "real chars"
-                 if (k>=*KLEFT)   bits|=ARROWBIT;
-            else if (k==*KRETURN) bits|=RETURNBIT;
-            else if (k==*KESC)    bits|=ESCBIT;
-            else if (k==*KDEL)    bits|=DELBIT;
+                 if (k>=*KLEFT)   bits|=ARROWmask;
+            else if (k==*KRETURN) bits|=RETURNmask;
+            else if (k==*KESC)    bits|=ESCmask;
+            else if (k==*KDEL)    bits|=DELmask;
             
             c=k,R=row,K=col; // last char overwrites
           }
@@ -821,6 +913,12 @@ unsigned int kbhit() {
 
     // decode ascii
     if (R!=8) {
+
+      // specific workaround for Oricutron that
+      // dosn't recognize '" and \| keys1
+      if (c==';' && (bits & CTRLmask))
+        return unc= (bits & SHIFTmask)? '\'': '\"';
+
       // TODO: can make this simplier?
       //   not call lowerkeys in two places?
       if (c>='A' && c<='Z') {
@@ -863,15 +961,54 @@ char keypressed(char keypos) {
   return c;
 }
 
-char cgetc() {
-  char c;
-  while(!kbhit());
-  c= unc;
-  unc= 0;
-  return c;
+void printkey(unsigned int k) {
+  if (k & FUNCTBIT)  putchar('F');
+  if (k & CTRLBIT)   putchar('C');
+  if (k & SHIFTBIT)  putchar('S');
+  if (k & ARROWBIT)  putchar('a');
+  if (k & ESCBIT)    putchar('e');
+  if (k & DELBIT)    putchar('d');
+  if (k & RETURNBIT) putchar('r');
+  if (k & 0xff00)    putchar('-');
+  k= (char)k;
+  putchar((k&0x7f)<' '? k+64: k);
+  //printf(" ($%04x)", k);
 }
 
-#define getchar() cgetc()
+// Waits for keypress
+// Returns:
+unsigned int keylasttime=0;
+unsigned int keylast= -1;
+
+// time() doesn't seem correct...
+#define KEYREPEAT_DELAY 70 // hs
+
+// getchar() returns an "EXTENDED CHAR"
+//
+// (char)getchar()     =>   pure ascii
+// int getchar() usage => BITS + ascii
+// 
+// BITS are defined above, search for
+// FUNCTBITS and you;ll find them.
+int getchar() {
+  unsigned int t;
+  while(kbhit()==keylast
+        && (t=keylasttime-time()) < KEYREPEAT_DELAY)
+    unc=0; // force read
+  //printf(STATUS32 "%02x%02x%4d" RESTORE, (char)keylast, (char)kbhit(), t);
+
+  if (unc!=keylast) keylasttime=time();
+  // wait for key
+  while(!kbhit());
+  keylast= unc;
+  unc= 0;
+  return keylast;
+}
+
+char cgetc() {
+  // This truncates, returning only low byte
+  return getchar();
+}
 
 #ifdef TEST
 
@@ -939,29 +1076,37 @@ void init_conioraw() {
 }
 
 void main() {
-  int i= 1;
+  unsigned int i= 1, k= 0;
 
   init_conioraw();
 
   savescreen();
   clrscr();
 
-  switch(3) {
+  switch(2) {
 
   case 2:
     // stupid terminal to test out control keys...
-    puts(STATUS "StupiTerm");
+
     gotoxy(0, 1);
 
     while(1) {
-      printf(STATUS32 "(%d,%d) " RESTORE, wherex(), wherey());
-      printf(STATUS "Key: (%d 128+%d $%02x)   " RESTORE, i, i-128, i);
+      printf(STATUS INVERSE "-ORIMACS:-- *scratch*    L%dc%d",
+             wherey(), wherex());
+      // TODO: see character code at position!
+      puts("   " ENDINVERSE RESTORE);
+      puts(STATUS32); printkey(k); puts(" " RESTORE);
 
       *cursc ^= 128;
-      i=getchar();;
+      k=getchar();
       *cursc ^= 128;
 
-      putchar(i);
+      // Terminal implementation code!
+      // TODO: why is it needed again?
+      // is keyboard mapping wrong?
+      // CTRL-M hmmm, CRRL-J, hmmm, RETURN
+      if (k & RETURNBIT) k= '\n';
+      putchar(k);
 
     } break;
 
@@ -973,7 +1118,10 @@ void main() {
     } break;
 
   case 3: {
-    char i, j, buff[40];
+    // TODO: use these to implement scroll in cputc()
+    char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
+    char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
+    char i, j, buff[40], *b, *s;
     unsigned int t;
 
     /// give us some text
@@ -986,14 +1134,19 @@ void main() {
     }
     printf("\nTime: %d hs\n", t-time());
 
+    *TEXTSCREEN= 'x'; // for timing!
+    t= time();
+
     // pan-around w wrap
     while(1) {
 
       switch(cgetc()) {
       case KEY_DOWN:
+          asm("SEI");
         memcpy(buff, TEXTSCREEN, 40);
         memmove(TEXTSCREEN, TEXTSCREEN+40, SCREENSIZE-40);
         memcpy(SCREENEND-40, buff, 40);
+          asm("CLI");
         break;
       case KEY_UP:
         memcpy(buff, SCREENEND-40, 40);
@@ -1001,15 +1154,44 @@ void main() {
         memcpy(TEXTSCREEN, buff, 40);
         break;
       case KEY_LEFT:
-        for(i=0; i<28; ++i) buff[i]= TEXTSCREEN[i*40+39];
-        memmove(TEXTSCREEN+1, TEXTSCREEN, SCREENSIZE-28);
-        for(i=0; i<28; ++i) TEXTSCREEN[i*40]= buff[i];
+        while(keypressed(kl)) {
+          asm("SEI");
+        b= buff-1; s= TEXTSCREEN+39-40;
+        for(i=0; i<28; ++i) *++b= *(s+=40),*s=' ';
+
+        memmove(TEXTSCREEN+1, TEXTSCREEN, SCREENSIZE-1);
+
+        // For some reason this variant have no "artifact"?
+        // but panning whole screen takes 3s instead of 2s!
+        // --- and it's jerky!
+        //s= TEXTSCREEN; for(i=0; i<28; ++i) memmove(s+1, s, 39),s+=40;
+
+        b= buff-1; s= TEXTSCREEN+0-40;;
+        for(i=0; i<28; ++i) *(s+=40)= *++b; 
+
+        if (*TEXTSCREEN=='x') {
+          gotoxy(1,0); printf("TIME: %d hs ", time()-t);
+          t= time();
+        }
+
+          asm("CLI");
+        }
         break;
       case KEY_RIGHT:
-        for(i=0; i<28; ++i) buff[i]= TEXTSCREEN[i*40];
-        memmove(TEXTSCREEN, TEXTSCREEN+1, SCREENSIZE-28);
-        for(i=0; i<28; ++i) TEXTSCREEN[i*40+39]= buff[i];
+        b= buff-1; s= TEXTSCREEN+0-40;
+        for(i=0; i<28; ++i) *++b= *(s+=40),*s=' ';
+
+        memmove(TEXTSCREEN, TEXTSCREEN+1, SCREENSIZE-1);
+
+        b= buff-1; s= TEXTSCREEN+39-40;
+        for(i=0; i<28; ++i) *(s+=40)= *++b; 
+
         break;
+      }
+
+      if (*TEXTSCREEN=='x') {
+        gotoxy(1,0); printf("TIME: %d hs ", time()-t);
+        t= time();
       }
 
     } } break;

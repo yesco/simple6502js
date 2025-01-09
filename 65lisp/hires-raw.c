@@ -619,7 +619,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(6) {
+  switch(3) {
 
   case 1: {
     // WTF does my code do? lol
@@ -673,6 +673,7 @@ void main() {
     // 1175 hs - without rowaddr[] and mask6[]
     //  865 hs - my code w rowaddress[] macro and mask6[]
     // - generally DFLAT says circle: 12x faster than BASIC ROM
+    asm("SEI"); // no differencea
     for(i=10; i>=0; --i) {
       for(j=9; j<65; j+=65/13) {
         GXY(120, 100);
@@ -728,7 +729,7 @@ void main() {
     #undef M
 
     goto zoom;
-f
+
     break;
 
   case 7:

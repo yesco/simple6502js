@@ -315,10 +315,12 @@
 // (+ (* 8192 2 2) (* 32 2) (* 2048 1)) = 34880 bytes!
 
 //#define MAXCELL 8192*2
-#define MAXCELL 4096*2
+//#define MAXCELL 4096*2
+unsigned int maxcons= 0;
 
 // Arena len to store symbols/constants (and global ptr)
-#define ARENA_LEN 2048*2
+//#define ARENA_LEN 2048*2
+unsigned int arena_len= 0;
 
 // Defined to use hash-table (with Arena
 // must be power of two!
@@ -350,6 +352,8 @@ uint natoms= 0, ncons=0, nalloc= 0, neval= 0, nmark= 0;
 long nops= 0;
 
 int debug= 0, verbose= 0;
+
+// TODO: use callaign from singlisp.c
 
 void* zalloc(size_t n) {
   void* r= calloc(n, 1);
@@ -813,7 +817,7 @@ void mark(L a) {
 void sweep() {
   uint n, i;
   char b;
-  L *a= cstart-1, *cend= cstart+MAXCELL;
+  L *a= cstart-1, *cend= cstart+maxcons/2;
   DEBUG(printf("\n-->sweep\n"));
   DEBUG(printmap());
   do {
@@ -846,8 +850,8 @@ void GC(L env, L alvals) {
   // TODO: anything on the stack if called deeply is problem!!!
   //   (worst case not marked and then deallocated => corruption)
 
-  // -- clear
-  memset(cused, 0, MAXCELL/(sizeof(L)*8));
+  // -- clear *2? hmmm, used to be MAX_CELL
+  memset(cused, 0, maxcons*2/(sizeof(L)*8));
 
   // -- enumerate all variables in program, like env
   mark(env);
@@ -1953,12 +1957,17 @@ void initlisp() {
   assert(sizeof(L)+ERROR==2); 
   assert(sizeof(void*)+ERROR==2); // used in atom function
 
-  // allocate memory
-  arptr= arena= zalloc(ARENA_LEN); arend= arena+ARENA_LEN;
-  syms= (L*)zalloc(HASH*sizeof(L));
-  cstart= cell= (L*)zalloc(MAXCELL*sizeof(L)); ncell= MAXCELL-2;
-  cused= (char*)zalloc((MAXCELL+1)/(sizeof(L)*8));
+  // allocate memory take 80% for cons
+  maxcons= _heapmaxavail()/sizeof(L)/2/10*8;
+  cstart= cell= (L*)zalloc(maxcons*2*sizeof(L)); ncell= maxcons*2-2;
 
+  // symbols, hash-table, and arena for names/strings/blobls
+  syms= (L*)zalloc(HASH*sizeof(L)); // hash table of symbols
+  arena_len= _heapmaxavail()/2; // used for atoms
+  arptr= arena= zalloc(arena_len); arend= arena+arena_len;
+
+  // GC data (cheaper if fixed alloc?) or zpage
+  cused= (char*)zalloc((maxcons+1)/(sizeof(L)*8));
   send= stack+STACKSIZE-1;
 
   // MIS-align lower bits == xx01, CONS inc by 4!
@@ -1970,7 +1979,7 @@ void initlisp() {
   --cnext; // as we inc before assign!
   //printf("next= %04x\n", cnext);
   assert(x&1);
-  cend= cstart+MAXCELL;
+  cend= cstart+maxcons*2;
 
   // -- statistics
   nops= natoms= ncons= nalloc= 0;
@@ -2044,7 +2053,7 @@ void statistics(int level) {
   if (level>1) {
     printf("%% Heap: max=%u mem=%u\n", _heapmaxavail(), _heapmemavail());
     printf("%% Cons: %u/%u  Hash: %u/%u  Arena: %u/%u  Atoms: %u\n",
-      ncons, MAXCELL/2,  hslots, HASH,  arptr-arena, ARENA_LEN, natoms);
+      ncons, maxcons,  hslots, HASH,  arptr-arena, arena_len, natoms);
   }
 
   if (level) {
@@ -2278,7 +2287,7 @@ int main(int argc, char** argv) {
 
   if (!interpret) return 0;
   if (!quiet) {
-    if (bench==1 && !test) clrscr(); // || only if interactive?
+    //if (bench==1 && !test) clrscr(); // || only if interactive?
     PRINTARRAY(syms, HASH, 0, 1); // debug
     printf("\n65LISP>02 (>) 2024 Jonas S Karlsson, jsk@yesco.org\n\n");
   }
