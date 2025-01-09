@@ -1083,7 +1083,7 @@ void init_conioraw() {
 //   n - matched n chars
 char match(char* d, char* s);
 
-char matchx(char* d, char* s) {
+char match(char* d, char* s) {
   signed char i= 0, dc, sc, n= 0, r;
 
   for(i=0; i<2; ++i) {
@@ -1104,16 +1104,6 @@ char matchx(char* d, char* s) {
   }
   //printf("  -----> N=%d\n", n);
   return n;
-}
-
-int deep= 0;
-
-char match(char* d, char* s) {
-  char r;
-//  printf(STATUS32 "%2d ", ++deep);
-  r= matchx(d, s);
-//  printf(STATUS32 "%2d ", --deep);
-  return r;
 }
 
 // TODO: add bytes as parameter
@@ -1169,6 +1159,18 @@ s[max-1]=(de-1-p)+'A'+128;
   return realloc(dict, strlen(dict)+1); // shrink
 }
 
+char* decomp(char* z, char* d) {
+  signed char i= *z;
+  if (i >= 0) *d=i,++d;
+  else d=decomp(z+i, d),d=decomp(z+i+1, d);
+  return d;
+}
+
+char* decompress(char* z, char* d) {
+  while(*z) d= decomp(z,d),++z;
+  return d;
+}
+
 ////////////////////////////////////////////////////
 
 
@@ -1182,8 +1184,11 @@ void main() {
 
   switch(2) {
 
-  case 2:
+  case 2: {
     // StupidTerm to test out control keys...
+
+    // 1080 chars
+    char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
 
     gotoxy(0, 1);
 
@@ -1210,7 +1215,10 @@ void main() {
         char* zip;
         *SCREENEND= 0; // lol
         zip= compress(TEXTSCREEN+40);
-        exit(1);
+        while(1) {
+          decompress(zip, TEXTSCREEN+40);
+          clrscr();
+        }
         // TODO:
         //decompress(zip, TEXTSCREEN);
       }
@@ -1221,9 +1229,12 @@ void main() {
           puts("Compresz");
         }
       }
+      if ((char)k==CTRL+'S') {
+        puts(sherlock);
+      }
       putchar(k);
 
-    } break;
+    } } break;
 
   case 1:
     // just scroll test
