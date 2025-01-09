@@ -296,10 +296,10 @@ void scrollup(char fromy) {
 #define STATUS32 "\x1a" // overwrite chars at position 32
 
 // Move cursor
-#define BACK     "\x90" // see KEY_LEFT
-#define FORWARD  "\x91" //     KEY_RIGHT
-#define DOWN     "\x92" //     KEY_DOWN
-#define UP       "\x93" //     KEY_UP
+#define BACK     "\x98" // see KEY_LEFT
+#define FORWARD  "\x99" //     KEY_RIGHT
+#define DOWN     "\x9a" //     KEY_DOWN
+#define UP       "\x9b" //     KEY_UP
 
 #define CLEAR      "\x0c" // ^L clearscreen
 #define REMOVELINE "\x13" // ^K
@@ -432,10 +432,10 @@ void scrollup(char fromy) {
 
 // ORIC keyboard routines gives 8-11 ascii
 // - I choose to distinguish these from CTRL-HIJK
-#define KEY_LEFT   128+24 // 0x90
-#define KEY_RIGHT  128+25 // 0x91
-#define KEY_DOWN   128+26 // 0x92
-#define KEY_UP     128+27 // 0x93
+#define KEY_LEFT   128+24 // 0x98
+#define KEY_RIGHT  128+25 // 0x99
+#define KEY_DOWN   128+26 // 0x9a
+#define KEY_UP     128+27 // 0x9b
 
 // Just these by themselves
 // TODO: other?
@@ -1075,6 +1075,103 @@ void init_conioraw() {
   }
 }
 
+////////////////////////////////////////////////////
+// Play/128dict.c
+
+// return:
+//   0 - failed to match
+//   n - matched n chars
+char match(char* d, char* s);
+
+char matchx(char* d, char* s) {
+  signed char i= 0, dc, sc, n= 0, r;
+
+  for(i=0; i<2; ++i) {
+    sc= s[i]; if (!sc) return 0;
+    dc= d[i]; if (!dc) return 0;
+    if (dc > 0) {
+      // simple char
+      //printf("\t- match char: '%c' '%c' -> %d\n", dc, sc, dc==sc);
+      if (dc!=sc) return 0;
+      ++n;
+    } else {
+      // dictionary entry
+      //printf("\t- match dic entry: %d\n", dc);
+      r= match(d+i+dc, s+n);
+      if (!r) return 0;
+      n+= r;
+    }
+  }
+  //printf("  -----> N=%d\n", n);
+  return n;
+}
+
+int deep= 0;
+
+char match(char* d, char* s) {
+  char r;
+//  printf(STATUS32 "%2d ", ++deep);
+  r= matchx(d, s);
+//  printf(STATUS32 "%2d ", --deep);
+  return r;
+}
+
+// TODO: add bytes as parameter
+char* compress(char* o) {
+  char *dict= calloc(strlen(o)+1, 1), *de= dict;
+  char *s= o, *d= o, *p, r, max, *best;
+  int n= 0;
+
+  while(*s) {
+    // sliding dictionary
+    d= de-(128+2+1);
+    if (d<dict) d= dict;
+    // search from xo for N matching characters of s
+    max= 0;
+    best= NULL;
+    //printf(">>> '%s'\n", s);
+    for(p= de-2; p>=d; --p) {
+      //printf(STATUS32 "%04x%04x", p, d);
+      //printf("  %ld ? '%.5s'\n", p-de, p);
+      r= match(p, s);
+      //if (r) break;
+      if (r) {
+        //printf("    n=%d [%.*s]\n", r, r, s);
+        if (r>max) { max= r; best= p;
+//break; // give up at first match - fast
+        }
+      }
+    }
+    p= best;
+
+    // match
+    if (max) {
+      ////printf("%.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128));
+      //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
+      // TODO: is full range used?
+      *de = -(char)(de-p); ++de;
+s[max-1]=(de-1-p)+'A'+128;
+      { char i;
+        for(i=0; i<max-1;++i) s[i]='-';
+      }
+      s+= max;
+    } else {
+      ////printf("%c\n", *s);
+      //putchar(*s);
+      *de= *s; ++de;
+      ++s;
+    }
+    ++n;
+    //printf("\n%3d%% %4d/%4d\n", (int)((n*10050L)/(s-o)/100), s-o);
+  }
+  printf(STATUS "%3d%% %4d/%4d" RESTORE, (int)((n*10050L)/strlen(o)/100), (int)strlen(dict), (int)strlen(o));
+  
+  return realloc(dict, strlen(dict)+1); // shrink
+}
+
+////////////////////////////////////////////////////
+
+
 void main() {
   unsigned int i= 1, k= 0;
 
@@ -1086,9 +1183,12 @@ void main() {
   switch(2) {
 
   case 2:
-    // stupid terminal to test out control keys...
+    // StupidTerm to test out control keys...
 
     gotoxy(0, 1);
+
+    paper(*YELLOW);
+    ink(*MAGNENTA);
 
     while(1) {
       printf(STATUS INVERSE "-ORIMACS:-- *scratch*    L%dc%d",
@@ -1106,6 +1206,21 @@ void main() {
       // is keyboard mapping wrong?
       // CTRL-M hmmm, CRRL-J, hmmm, RETURN
       if (k & RETURNBIT) k= '\n';
+      if ((char)k==CTRL+'Z') {
+        char* zip;
+        *SCREENEND= 0; // lol
+        zip= compress(TEXTSCREEN+40);
+        exit(1);
+        // TODO:
+        //decompress(zip, TEXTSCREEN);
+      }
+      if ((char)k==CTRL+'X') {
+        char i, j;
+        for(i=0; i<40; ++i) {
+          for(j=0; j<i; ++j) cputc(' ');
+          puts("Compresz");
+        }
+      }
       putchar(k);
 
     } break;

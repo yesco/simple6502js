@@ -47,7 +47,7 @@ char match(char* d, char* s) {
 }
 
 void oneline(char* o) {
-  char *dict= calloc(strlen(o)+1, 0), *de= dict;
+  char *dict= calloc(strlen(o)+1, 1), *de= dict;
   char *s= o, *d= o, *p, i, r, max, *best;
   int n= 0;
 
