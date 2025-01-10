@@ -1076,6 +1076,7 @@ void init_conioraw() {
   }
 }
 
+#define COMPRESS_PROGRESS
 #include "compress.c"
 
 
@@ -1126,8 +1127,10 @@ void main() {
         saved= strdup(TEXTSCREEN+40);
         zip= compress(TEXTSCREEN+40);
         while(!kbhit()) {
+          int ol= strlen(saved), n= strlen(zip);
           decompress(zip, TEXTSCREEN+40);
           i = strprefix(TEXTSCREEN+40, saved);
+          printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol);
           if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
           wait(50);
           clrscr();

@@ -8,6 +8,23 @@
 
 // TODO: move where?
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#ifdef COMPRESS_PROGRESS
+  #define COMPRESS(a) a
+#else
+  #define COMPRESS(a) do {} while(0)
+#endif // COMPRESS_PROGESS
+
+#ifdef COMPRESS_DEBUG
+  #define COMDEBUG(a) a
+#else
+  #define COMDEBUG(a)
+#endif // COMPRESS_DEBUG
+
 int strprefix(char* a, char* b) {
   int i= 0;
   while(*a && *b) {
@@ -54,27 +71,29 @@ char* compress(char* o) {
   int n= 0;
   int ol= strlen(o);
 
-  gotoxy(0,25);
+  //gotoxy(0,25);
   while(*s) {
-    if (*s>=128) *s &= 127;
-    assert(*s<128);
-//gotoxy(0,25); printf("%d: %3d $%02x '%c'  ", s-o, *s, *s, *s);
-//gotoxy(0,26); printf("         ");
+if (*s>=128) *s &= 127; // TODO: handle....
+     assert(*s<128);
+COMDEBUG(printf("    %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
     // sliding dictionary
-    d= de-128;
+    d= de-127+2;
     if (d<dict) d= dict;
     // search from xo for N matching characters of s
     max= 0;
     best= NULL;
     //printf(">>> '%s'\n", s);
     for(p= de-2; p>=d; --p) {
-//      gotoxy(0,26); printf("try idx: %3d                 ", de-p);
+COMDEBUG(printf("      try idx: %3d\n", (int)(p-de)));
+ assert(p-de < 0);
+ assert(p-de != -1);
+ assert(p-de >= -127);
       //printf(STATUS32 "%04x%04x", p, d);
-      //printf("  %ld ? '%.5s'\n", p-de, p);
+      //printf("  %d ? '%.5s'\n", p-de, p);
       r= match(p, s);
       //if (r) break;
       if (r) {
-        //printf("    n=%d [%.*s]\n", r, r, s);
+COMDEBUG(printf("        MAX! n=%d [%.*s]\n", r, r, s));
         if (r>max) { max= r; best= p;
 //break; // give up at first match - fast
 //printf(STATUS "Zng: %4d/%4d => %4d  max=%3d (%02x,%02x) " RESTORE,
@@ -86,36 +105,38 @@ char* compress(char* o) {
 
     // match
     if (max) {
-      ////printf("%.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128));
+      signed char x;
+COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128)));
       //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
       // TODO: is full range used?
-signed char x;x=
-      *de = -(char)(de-p); ++de;
+ x=
+   *de = (char)(p-de); ++de;
  //gotoxy(0,26); printf("max=%2d idx=%d      ", max, x);
 
 if (x>=0) {
-  gotoxy(0,25);
-  printf(STATUS "ZERROR: %d %02x %02x", x, de[x], de[x+1]);
+  printf(STATUS "ZERROR: %d %02x %02x\n", x, de[x], de[x+1]);
   exit(1);
 }
 
-s[max-1]=128+'<';
-      { char i;
-        for(i=0; i<max-1;++i) s[i]=32;
-      }
+COMPRESS( {
+    char i;
+    s[max-1]=128+'<';
+    for(i=0; i<max-1;++i) s[i]=32;
+  } );
+
       s+= max;
     } else {
-//    gotoxy(0,26); printf("plain char= %d %02x '%c' max=%2d idx=%d      ", *s, *s, *s);
+      COMDEBUG(printf("    => plain char= %d %02x '%c'\n", *s, *s, *s));
      ////printf("%c\n", *s);
       //putchar(*s);
       *de= *s; ++de;
-*s ^= 128;
+COMPRESS( *s ^= 128 );
       ++s;
     }
     ++n;
-    //printf("\n%3d%% %4d/%4d\n", (int)((n*10050L)/(s-o)/100), s-o);
+COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
   }
-  printf(STATUS "%3d%% %4d/%4d" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol);
+COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
   
   return realloc(dict, strlen(dict)+1); // shrink
