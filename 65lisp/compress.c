@@ -66,7 +66,7 @@ char match(char* d, char* s) {
 
 // TODO: add bytes as parameter
 char* compress(char* o) {
-  char *dict= calloc(strlen(o)+1, 1), *de= dict;
+  char *dict= calloc(strlen(o)+1, 1), *de= dict; // lol!
   char *s= o, *d= o, *p, r, max, *best;
   int n= 0;
   int ol= strlen(o);
@@ -77,7 +77,7 @@ if (*s>=128) *s &= 127; // TODO: handle....
      assert(*s<128);
 COMDEBUG(printf("    %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
     // sliding dictionary
-    d= de-127+2;
+    d= de-128+2;
     if (d<dict) d= dict;
     // search from xo for N matching characters of s
     max= 0;
@@ -87,7 +87,7 @@ COMDEBUG(printf("    %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
 COMDEBUG(printf("      try idx: %3d\n", (int)(p-de)));
  assert(p-de < 0);
  assert(p-de != -1);
- assert(p-de >= -127);
+ assert(p-de >= -128); // limit of signed byte
       //printf(STATUS32 "%04x%04x", p, d);
       //printf("  %d ? '%.5s'\n", p-de, p);
       r= match(p, s);
