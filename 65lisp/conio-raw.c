@@ -128,6 +128,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <assert.h>
 
 // TextMode
 // TODO: how to solve graphics mode HIRESTTEXT?
@@ -573,7 +574,7 @@ void cputc(char c) {
       case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
       case   12: clrscr(); return;                 // ^L clear
 
-      case '\t': curx= (curx+8)/8*8; break;          // ^I TAB
+      case '\t': curx= (curx+8)/8*8; break;        // ^I TAB // TODO: BUG: fill out w space!
       case '\n': curx= 0; ++cury; break;           // not key
       // TODO: distinguish RETURN
       case '\r': curx= 0; break;                   // ^M
@@ -1075,103 +1076,7 @@ void init_conioraw() {
   }
 }
 
-////////////////////////////////////////////////////
-// Play/128dict.c
-
-// return:
-//   0 - failed to match
-//   n - matched n chars
-char match(char* d, char* s);
-
-char match(char* d, char* s) {
-  signed char i= 0, dc, sc, n= 0, r;
-
-  for(i=0; i<2; ++i) {
-    sc= s[i]; if (!sc) return 0;
-    dc= d[i]; if (!dc) return 0;
-    if (dc > 0) {
-      // simple char
-      //printf("\t- match char: '%c' '%c' -> %d\n", dc, sc, dc==sc);
-      if (dc!=sc) return 0;
-      ++n;
-    } else {
-      // dictionary entry
-      //printf("\t- match dic entry: %d\n", dc);
-      r= match(d+i+dc, s+n);
-      if (!r) return 0;
-      n+= r;
-    }
-  }
-  //printf("  -----> N=%d\n", n);
-  return n;
-}
-
-// TODO: add bytes as parameter
-char* compress(char* o) {
-  char *dict= calloc(strlen(o)+1, 1), *de= dict;
-  char *s= o, *d= o, *p, r, max, *best;
-  int n= 0;
-
-  while(*s) {
-    // sliding dictionary
-    d= de-(128+2+1);
-    if (d<dict) d= dict;
-    // search from xo for N matching characters of s
-    max= 0;
-    best= NULL;
-    //printf(">>> '%s'\n", s);
-    for(p= de-2; p>=d; --p) {
-      //printf(STATUS32 "%04x%04x", p, d);
-      //printf("  %ld ? '%.5s'\n", p-de, p);
-      r= match(p, s);
-      //if (r) break;
-      if (r) {
-        //printf("    n=%d [%.*s]\n", r, r, s);
-        if (r>max) { max= r; best= p;
-//break; // give up at first match - fast
-        }
-      }
-    }
-    p= best;
-
-    // match
-    if (max) {
-      ////printf("%.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128));
-      //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
-      // TODO: is full range used?
-      *de = -(char)(de-p); ++de;
-s[max-1]=(de-1-p)+'A'+128;
-      { char i;
-        for(i=0; i<max-1;++i) s[i]='-';
-      }
-      s+= max;
-    } else {
-      ////printf("%c\n", *s);
-      //putchar(*s);
-      *de= *s; ++de;
-      ++s;
-    }
-    ++n;
-    //printf("\n%3d%% %4d/%4d\n", (int)((n*10050L)/(s-o)/100), s-o);
-  }
-  printf(STATUS "%3d%% %4d/%4d" RESTORE, (int)((n*10050L)/strlen(o)/100), (int)strlen(dict), (int)strlen(o));
-  
-  return realloc(dict, strlen(dict)+1); // shrink
-}
-
-char* decomp(char* z, char* d) {
-  signed char i= *z;
-  if (i >= 0) *d=i,++d;
-  else d=decomp(z+i, d),d=decomp(z+i+1, d);
-  return d;
-}
-
-char* decompress(char* z, char* d) {
-  while(*z) d= decomp(z,d),++z;
-  return d;
-}
-
-////////////////////////////////////////////////////
+#include "compress.c"
 
 
 void main() {
@@ -1189,6 +1094,8 @@ void main() {
 
     // 1080 chars
     char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
+
+    int u= -1, n;
 
     gotoxy(0, 1);
 
@@ -1211,16 +1118,20 @@ void main() {
       // is keyboard mapping wrong?
       // CTRL-M hmmm, CRRL-J, hmmm, RETURN
       if (k & RETURNBIT) k= '\n';
+
       if ((char)k==CTRL+'Z') {
-        char* zip;
+        char* zip, *saved;
+        int i;
         *SCREENEND= 0; // lol
+        saved= strdup(TEXTSCREEN+40);
         zip= compress(TEXTSCREEN+40);
-        while(1) {
+        while(!kbhit()) {
           decompress(zip, TEXTSCREEN+40);
+          i = strprefix(TEXTSCREEN+40, saved);
+          if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
+          wait(50);
           clrscr();
         }
-        // TODO:
-        //decompress(zip, TEXTSCREEN);
       }
       if ((char)k==CTRL+'X') {
         char i, j;
@@ -1231,8 +1142,17 @@ void main() {
       }
       if ((char)k==CTRL+'S') {
         puts(sherlock);
+      } 
+
+      if ((char)k==CTRL+'U') u*= 4;
+      else {
+        // Do it!
+        n= u<0? -u: u;
+        do {
+          putchar(k);
+        } while(--n > 0);
+        u= -1;
       }
-      putchar(k);
 
     } } break;
 

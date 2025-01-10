@@ -590,6 +590,28 @@ void zoom() {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+#include "compress.c"
+
+void hirescompress() {
+  char* zip, * saved;
+
+  gotoxy(0,25); printf("COMPRESzING...");
+  *HIRESEND= 0; // lol
+  saved= strdup(HIRESSCREEN);
+  zip= compress(HIRESSCREEN);
+  gotoxy(0,25); printf("DONE COMPRESS!    ");
+  gotoxy(7,26); printf("Comprez: %3d%% %4d/%4d", (int)((strlen(zip)*10050L)/strlen(HIRESSCREEN)/100), strlen(zip), strlen(HIRESSCREEN));
+
+  while(!kbhit()) {
+    int i;
+    decompress(zip, HIRESSCREEN);
+    i= strprefix(HIRESSCREEN, saved);
+    if (i<=0) { gotoxy(10, 27); printf("  DIFFER AT POSITION: %d  ", i); }
+    wait(50);
+    gclear();
+  }
+}
+
 void main() {
   char* p= HIRESSCREEN;
   int i,j;
@@ -827,7 +849,8 @@ void main() {
       }
     }
   }
-  gotoxy(10,25); printf("TIME %d hs", t-time());
+  gotoxy(25,25); printf(" TIME %d hs", t-time());
+  hirescompress();
 
   //text();
   //printf("HELLO TEST\n");
