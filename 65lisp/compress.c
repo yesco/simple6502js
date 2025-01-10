@@ -56,6 +56,7 @@ char* compress(char* o) {
 
   gotoxy(0,25);
   while(*s) {
+    if (*s>=128) *s &= 127;
     assert(*s<128);
 //gotoxy(0,25); printf("%d: %3d $%02x '%c'  ", s-o, *s, *s, *s);
 //gotoxy(0,26); printf("         ");

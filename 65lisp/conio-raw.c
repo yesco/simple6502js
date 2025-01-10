@@ -231,7 +231,7 @@ char curpaper= 0, curink =7;
 
 void paper(char c) {
   curpaper= c & 7;
-  fill(0,1, 1,SCREENROWS-1, c | 16);
+  fill(0,1, 1,SCREENROWS-1, (c&0x7) | 16);
 // scrollbar?
 //  fill(0,1,  1,7,  (c & 7)|16+0);
 //  fill(0,8,  1,12, (c & 7)|16+128);
