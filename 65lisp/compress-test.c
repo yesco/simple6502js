@@ -11,12 +11,12 @@ int test(char* in) {
   printf("\n------ \"%s\"\n\n", in);
   char big[64*1024]= {0};
   char* out= compress(in, strlen(in));
-  printf("\ncompressed\n");
+  printf("\ncompressed: len=%d\n", *(uint16_t*)out);
   decompress(out, big);
   int r= strprefix(in, big);
   printf("\n   IN[%ld]:\t\"%s\"\n  OUT[%ld]:\t...\n  DEC[%ld]:\t\"%s\"\n   strprefix=%4d\n", strlen(in), in, strlen(out), strlen(big), big, r);
 
-  if (r<0) {
+  if (r<0 || strlen(in)!=strlen(big)) {
     printf("ERROR ---------------------------- ERROR\n");
     printf("IN:  '%c' %3d %02x\n",  in[-r], in[-r],   in[-r]);
     printf("BIG: '%c' %3d %02x\n", big[-r], big[-r], big[-r]);

@@ -13,6 +13,8 @@
 #include <string.h>
 #include <assert.h>
 
+#include <stdint.h> // uint8_t, uint16_t, uint32_t
+
 // This visualizes compressing text/hires screen
 // (but also destroyes the source data)
 #ifdef COMPRESS_PROGRESS
@@ -43,7 +45,7 @@ int strprefix(char* a, char* b) {
 // Returns:
 //   0 - failed to match
 //   n - matched n chars
-unsigned int match(char* d, char* s, int len) {
+int match(char* d, char* s, int len) {
   signed char i= 0, dc, sc;
   int n=0, r;
 
@@ -69,18 +71,24 @@ unsigned int match(char* d, char* s, int len) {
   return n;
 }
 
-// TODO: add bytes as parameter
+// Compress a stream of BYTES of LENgth
+//
+// Returns: a pointer to the result
+//   first two bytes are compresslength
 char* compress(char* o, int len) {
-  char *dict= calloc(strlen(o)+1, 1), *de= dict; // lol!
-  char *s= o, *d= o, *p, r, max, *best;
-  int n= 0;
-  int ol= strlen(o);
+  char *res= calloc(strlen(o)*2+2, 1); // lol, is it enough? (>127...)
+  char *dict= res+2, *de= dict;
+  char *s= o, *d= o, *p, *best;
+  signed char c;
+  int n= 0, r, max;
+  int ol= len;
 
   //gotoxy(0,25);
   while(len>0) {
-if (*s>=128) *s &= 127; // TODO: handle....
-     assert(*s<128);
-COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
+    c= *s;
+if (c&128) c &= 127; // TODO: handle....
+     assert(!(c&128));
+COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
     // sliding dictionary
     d= de-128; // signed char range is -1..-128
     if (d<dict) d= dict;
@@ -148,9 +156,19 @@ COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o)
   }
 COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
+
+  // store length
+  *(uint16_t*)res= n;
   
-  return realloc(dict, strlen(dict)+1); // shrink
+  return realloc(res, n+2); // shrink
 }
+
+// TODO: return pointer to struct
+
+typedef struct compressed {
+  uint16_t len;
+  char data[];
+} compressed;
 
 char* decomp(char* z, char* d) {
   signed char i= *z;
@@ -160,7 +178,9 @@ char* decomp(char* z, char* d) {
 }
 
 char* decompress(char* z, char* d) {
-  while(*z) d= decomp(z,d),++z;
+  int len= *(uint16_t*)z;
+  z+= 2;
+  while(len--) d= decomp(z,d),++z;
   return d;
 }
 
