@@ -124,22 +124,18 @@ COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
     best= NULL;
     //printf(">>> '%s'\n", s);
     for(p= de-2; p>=d; --p) {
-*de= (p-de);
-COMDEBUG(printf("      try idx:%3d\t\"", (signed char)*de);deprint(de);printf("\"\n"););
- assert(p-de < 0);
- assert(p-de != -1);
- assert(p-de >= -128); // limit of signed byte
-      //printf(STATUS32 "%04x%04x", p, d);
-      //printf("  %d ? '%.5s'\n", p-de, p);
-r= dematch(de, s, len);
-// r= match(p, s, len); // error on some data!
-      //if (r) break;
+      *de= (p-de);
+      COMDEBUG(printf("      try idx:%3d\t\"", (signed char)*de);deprint(de);printf("\"\n"););
+
+      r= dematch(de, s, len);
+      // r= match(p, s, len); // error on some data!
+
       if (r) {
-COMDEBUG(printf("        MAX! n=%d\t'%.*s'\n", r, r, s));
+        COMDEBUG(printf("        MAX! n=%d\t'%.*s'\n", r, r, s));
         if (r>max) { max= r; best= p;
-//break; // give up at first match - fast
-//printf(STATUS "Zng: %4d/%4d => %4d  max=%3d (%02x,%02x) " RESTORE,
-//       s-o, ol, p-dict, max, s[0], s[1]);
+          //break; // give up at first match - fast
+          //printf(STATUS "Zng: %4d/%4d => %4d  max=%3d (%02x,%02x) " RESTORE,
+          //       s-o, ol, p-dict, max, s[0], s[1]);
         }
       }
     }
@@ -148,51 +144,50 @@ COMDEBUG(printf("        MAX! n=%d\t'%.*s'\n", r, r, s));
     // match
     if (max) {
       signed char x;
-COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128)));
+      COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128)));
       //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
       // TODO: is full range used?
  //printf("assert: p-de= %d char= %d\n", p-de, (signed char)(p-de));
-   assert(p-de==(signed char)(p-de)); // sanity check
+      assert(p-de==(signed char)(p-de)); // sanity check
 
- x=
-   *de = (signed char)(p-de); ++de;
- //gotoxy(0,26); printf("max=%2d idx=%d      ", max, x);
+      x= *de = (signed char)(p-de); ++de;
+      //gotoxy(0,26); printf("max=%2d idx=%d      ", max, x);
 
-if (x>=0) {
-  printf(STATUS "ZERROR: %d %02x %02x\n", x, de[x], de[x+1]);
-  exit(1);
-}
+      if (x>=0) {
+        printf(STATUS "ZERROR: %d %02x %02x\n", x, de[x], de[x+1]);
+        exit(1);
+      }
 
-COMSHOW( {
-    char i;
-    s[max-1]=128+'<';
-    for(i=0; i<max-1;++i) s[i]=32;
-  } );
-
+      COMSHOW( {
+          char i;
+          s[max-1]=128+'<';
+          for(i=0; i<max-1;++i) s[i]=32;
+        } );
+      
       s+= max;
       len-= max;
     } else {
       COMDEBUG(printf("    => plain char= %d %02x '%c'\n", *s, *s, *s));
-     ////printf("%c\n", *s);
+      ////printf("%c\n", *s);
       //putchar(*s);
       *de= *s; ++de;
-COMSHOW( *s ^= 128 );
+      COMSHOW( *s ^= 128 );
       ++s;
       --len;
     }
     ++n;
-COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
+    COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
 
-#ifdef __ATMOS__
-  // update progress during hires to debug
-printf(STATUS "=>%3d%% %d from %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
-// if def hires...
-//  gotoxy(0,26);
-//  printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
-#endif
+    #ifdef __ATMOS__
+      // update progress during hires to debug
+      printf(STATUS "=>%3d%% %d from %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
+      // if def hires...
+      //  gotoxy(0,26);
+      //  printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
+    #endif
 
   }
-COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
+  COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
 
   // store length
