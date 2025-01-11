@@ -1125,7 +1125,7 @@ void main() {
         int i;
         *SCREENEND= 0; // lol
         saved= strdup(TEXTSCREEN+40);
-        zip= compress(TEXTSCREEN+40);
+        zip= compress(TEXTSCREEN+40, strlen(TEXTSCREEN+40));
         while(!kbhit()) {
           int ol= strlen(saved), n= strlen(zip);
           decompress(zip, TEXTSCREEN+40);

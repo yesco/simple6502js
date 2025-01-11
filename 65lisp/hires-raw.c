@@ -590,15 +590,17 @@ void zoom() {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+#define COMPRESS_PROGRESS
+
 #include "compress.c"
 
 void hirescompress() {
   char* zip, * saved;
 
   gotoxy(0,25); printf("COMPRESzING...");
-  *HIRESEND= 0; // lol
+  *HIRESEND= 0; // lol, haha, and then strlen?
   saved= strdup(HIRESSCREEN);
-  zip= compress(HIRESSCREEN);
+  zip= compress(HIRESSCREEN, strlen(HIRESSCREEN)); // strlen?  lol, fix it!
   gotoxy(0,25); printf("DONE COMPRESS!    ");
   gotoxy(7,26); printf("Comprez: %3d%% %4d/%4d", (int)((strlen(zip)*10050L)/strlen(HIRESSCREEN)/100), strlen(zip), strlen(HIRESSCREEN));
 

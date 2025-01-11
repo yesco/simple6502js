@@ -1,7 +1,7 @@
 #define STATUS ""
 #define RESTORE ""
 
-///#define COMPRESS_PROGRESS
+//#define COMPRESS_PROGRESS
 
 #define COMPRESS_DEBUG
 #include "compress.c"
@@ -10,7 +10,7 @@ int test(char* in) {
   in= strdup(in);
   printf("\n------ \"%s\"\n\n", in);
   char big[64*1024]= {0};
-  char* out= compress(in);
+  char* out= compress(in, strlen(in));
   printf("\ncompressed\n");
   decompress(out, big);
   int r= strprefix(in, big);

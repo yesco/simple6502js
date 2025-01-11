@@ -13,10 +13,12 @@
 #include <string.h>
 #include <assert.h>
 
+// This visualizes compressing text/hires screen
+// (but also destroyes the source data)
 #ifdef COMPRESS_PROGRESS
-  #define COMPRESS(a) a
+  #define COMSHOW(a) a
 #else
-  #define COMPRESS(a) do {} while(0)
+  #define COMSHOW(a) do {} while(0)
 #endif // COMPRESS_PROGESS
 
 #ifdef COMPRESS_DEBUG
@@ -41,23 +43,26 @@ int strprefix(char* a, char* b) {
 // Returns:
 //   0 - failed to match
 //   n - matched n chars
-char match(char* d, char* s) {
-  signed char i= 0, dc, sc, n= 0, r;
+unsigned int match(char* d, char* s, int len) {
+  signed char i= 0, dc, sc;
+  int n=0, r;
 
   for(i=0; i<2; ++i) {
-    sc= s[i]; if (!sc) return 0;
-    dc= d[i]; if (!dc) return 0;
+    if (!(sc= s[i])) return 0;
+    if (!(dc= d[i])) return 0;
     if (dc >= 0) {
       // simple char
       //printf("\t- match char: '%c' '%c' -> %d\n", dc, sc, dc==sc);
       if (dc!=sc) return 0;
       ++n;
+      if (!--len) return 0;
     } else {
       // dictionary entry
       //printf("\t- match dic entry: %d\n", dc);
-      r= match(d+i+dc, s+n);
-      if (!r) return 0;
+      r= match(d+i+dc, s+n, len);
+      if (!r || r>len) return 0;
       n+= r;
+      len-= r;
     }
   }
   //printf("  -----> N=%d\n", n);
@@ -65,19 +70,19 @@ char match(char* d, char* s) {
 }
 
 // TODO: add bytes as parameter
-char* compress(char* o) {
+char* compress(char* o, int len) {
   char *dict= calloc(strlen(o)+1, 1), *de= dict; // lol!
   char *s= o, *d= o, *p, r, max, *best;
   int n= 0;
   int ol= strlen(o);
 
   //gotoxy(0,25);
-  while(*s) {
+  while(len>0) {
 if (*s>=128) *s &= 127; // TODO: handle....
      assert(*s<128);
-COMDEBUG(printf("    %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
+COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), *s, *s, *s));
     // sliding dictionary
-    d= de-128+2;
+    d= de-128; // signed char range is -1..-128
     if (d<dict) d= dict;
     // search from xo for N matching characters of s
     max= 0;
@@ -90,7 +95,7 @@ COMDEBUG(printf("      try idx: %3d\n", (int)(p-de)));
  assert(p-de >= -128); // limit of signed byte
       //printf(STATUS32 "%04x%04x", p, d);
       //printf("  %d ? '%.5s'\n", p-de, p);
-      r= match(p, s);
+      r= match(p, s, len);
       //if (r) break;
       if (r) {
 COMDEBUG(printf("        MAX! n=%d [%.*s]\n", r, r, s));
@@ -109,8 +114,11 @@ COMDEBUG(printf("        MAX! n=%d [%.*s]\n", r, r, s));
 COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128)));
       //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
       // TODO: is full range used?
+ //printf("assert: p-de= %d char= %d\n", p-de, (signed char)(p-de));
+   assert(p-de==(signed char)(p-de)); // sanity check
+
  x=
-   *de = (char)(p-de); ++de;
+   *de = (signed char)(p-de); ++de;
  //gotoxy(0,26); printf("max=%2d idx=%d      ", max, x);
 
 if (x>=0) {
@@ -118,20 +126,22 @@ if (x>=0) {
   exit(1);
 }
 
-COMPRESS( {
+COMSHOW( {
     char i;
     s[max-1]=128+'<';
     for(i=0; i<max-1;++i) s[i]=32;
   } );
 
       s+= max;
+      len-= max;
     } else {
       COMDEBUG(printf("    => plain char= %d %02x '%c'\n", *s, *s, *s));
      ////printf("%c\n", *s);
       //putchar(*s);
       *de= *s; ++de;
-COMPRESS( *s ^= 128 );
+COMSHOW( *s ^= 128 );
       ++s;
+      --len;
     }
     ++n;
 COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
