@@ -632,7 +632,7 @@ void main() {
     shift6hi[j]= (j>>2) & 0xfd;
   }
 
-  for(j=300; j; --j) printf("FOOBAR   ");
+  //for(j=300; j; --j) printf("FOOBAR   ");
 
   hires();
   gclear();
@@ -643,7 +643,9 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(3) {
+  switch(11) {
+
+  case 11: break;
 
   case 1: {
     // WTF does my code do? lol

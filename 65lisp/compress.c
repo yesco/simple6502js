@@ -153,6 +153,9 @@ COMSHOW( *s ^= 128 );
     }
     ++n;
 COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
+
+gotoxy(0,26); printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
+
   }
 COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
