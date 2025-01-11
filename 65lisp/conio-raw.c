@@ -1127,7 +1127,7 @@ void main() {
         saved= strdup(TEXTSCREEN+40);
         zip= compress(TEXTSCREEN+40, strlen(TEXTSCREEN+40));
         while(!kbhit()) {
-          int ol= strlen(saved), n= strlen(zip);
+          int ol= strlen(saved), n= *(int*)zip;
           decompress(zip, TEXTSCREEN+40);
           i = strprefix(TEXTSCREEN+40, saved);
           printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol);

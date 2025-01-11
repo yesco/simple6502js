@@ -71,12 +71,39 @@ int match(char* d, char* s, int len) {
   return n;
 }
 
+void deprint(char* z) {
+  signed char i= *z;
+  if (i >= 0) putchar(i);
+  else {deprint(z+i);deprint(z+i+1);}
+}
+
+char* mmm= NULL;
+int mmmlen= 0;
+
+int dematch2(char* z) {
+  signed char i= *z; int a, b;
+  //printf("DEMATCH2: %d \"%s\"\n", mmmlen, z, mmm);
+  if (mmmlen <= 0) return 0;
+  if (i >= 0) return *z==*mmm++? 1: 0;
+  else {
+    if (!(a= dematch2(z+i  ))) return 0;
+    if (!(b= dematch2(z+i+1))) return 0;
+    return a+b;
+  }
+}
+
+int dematch(char* z, char* m, int len) {
+  mmm= m; mmmlen= len;
+  return dematch2(z);
+}
+
 // Compress a stream of BYTES of LENgth
 //
 // Returns: a pointer to the result
 //   first two bytes are compresslength
 char* compress(char* o, int len) {
-  char *res= calloc(strlen(o)*2+2, 1); // lol, is it enough? (>127...)
+  char *res= malloc(len*2+2); // lol, is it enough? (>127...)
+  // TODO: realloc as we go?
   char *dict= res+2, *de= dict;
   char *s= o, *d= o, *p, *best;
   signed char c;
@@ -97,16 +124,18 @@ COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
     best= NULL;
     //printf(">>> '%s'\n", s);
     for(p= de-2; p>=d; --p) {
-COMDEBUG(printf("      try idx: %3d\n", (int)(p-de)));
+*de= (p-de);
+COMDEBUG(printf("      try idx:%3d\t\"", (signed char)*de);deprint(de);printf("\"\n"););
  assert(p-de < 0);
  assert(p-de != -1);
  assert(p-de >= -128); // limit of signed byte
       //printf(STATUS32 "%04x%04x", p, d);
       //printf("  %d ? '%.5s'\n", p-de, p);
-      r= match(p, s, len);
+r= dematch(de, s, len);
+// r= match(p, s, len); // error on some data!
       //if (r) break;
       if (r) {
-COMDEBUG(printf("        MAX! n=%d [%.*s]\n", r, r, s));
+COMDEBUG(printf("        MAX! n=%d\t'%.*s'\n", r, r, s));
         if (r>max) { max= r; best= p;
 //break; // give up at first match - fast
 //printf(STATUS "Zng: %4d/%4d => %4d  max=%3d (%02x,%02x) " RESTORE,
@@ -154,7 +183,13 @@ COMSHOW( *s ^= 128 );
     ++n;
 COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
 
-gotoxy(0,26); printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
+#ifdef __ATMOS__
+  // update progress during hires to debug
+printf(STATUS "=>%3d%% %d from %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
+// if def hires...
+//  gotoxy(0,26);
+//  printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
+#endif
 
   }
 COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
@@ -180,10 +215,15 @@ char* decomp(char* z, char* d) {
   return d;
 }
 
-char* decompress(char* z, char* d) {
+char* decompress(char* z, char* r) {
   int len= *(uint16_t*)z;
-  z+= 2;
-  while(len--) d= decomp(z,d),++z;
+  char* d;
+  if (!r) r= malloc(len);
+  d= r; z+= 2;
+  while(len--) {
+    d= decomp(z,d),++z;
+    //printf("LEN=%2d   \"%s\"\n", len, r);
+  }
   return d;
 }
 
