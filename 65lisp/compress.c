@@ -110,24 +110,40 @@ char* compress(char* o, int len) {
   int n= 0, r, max;
   int ol= len;
 
+  // Store first char of cmopressed string,
+  // speeds up test
+  char firstchar[128]={0};
+
   //gotoxy(0,25);
   while(len>0) {
     c= *s;
-if (c&128) c &= 127; // TODO: handle....
-     assert(!(c&128));
-COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
+
+    // TODO: handle....
+    if (c&128) c &= 127;
+    assert(!(c&128));
+
+    COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
+
     // sliding dictionary
-    d= de-128; // signed char range is -1..-128
+    d= de-128;
     if (d<dict) d= dict;
+
     // search from xo for N matching characters of s
     max= 0;
     best= NULL;
+
     //printf(">>> '%s'\n", s);
+
     for(p= de-2; p>=d; --p) {
       *de= (p-de);
       COMDEBUG(printf("      try idx:%3d\t\"", (signed char)*de);deprint(de);printf("\"\n"););
 
-      r= dematch(de, s, len);
+      // incorrect!?!?!?!? not complete
+      // ANY FASTER? benchmark...
+      //if (de>dict+128 && firstchar[((int)(*de+de))&0x7f] != *s) continue;
+      // NO- lol, slower!!!!
+
+      r= dematch(de, s, len); // correct (!) and faster?
       // r= match(p, s, len); // error on some data!
 
       if (r) {
@@ -140,6 +156,8 @@ COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
       }
     }
     p= best;
+
+    //firstchar[((int)de)&0x7f]= *s; // lol, raw!
 
     // match
     if (max) {
@@ -200,6 +218,7 @@ COMDEBUG(printf("  @ %d: %3d $%02x '%c'\n", (int)(s-o), c, c, c));
 
 typedef struct compressed {
   uint16_t len;
+  uint16_t origlen;
   char data[];
 } compressed;
 
@@ -213,7 +232,7 @@ char* decomp(char* z, char* d) {
 char* decompress(char* z, char* r) {
   int len= *(uint16_t*)z;
   char* d;
-  if (!r) r= malloc(len);
+  //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
   d= r; z+= 2;
   while(len--) d= decomp(z,d),++z;
   return d;
