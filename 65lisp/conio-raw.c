@@ -746,7 +746,7 @@ int puts(const char* s) {
     // + restore byteblit
     // + swap byteblit
   
-    // + nowrap / wrap (autonl)
+    // + nowrap / wrap (autonl) using strchrnul find \n or eof instead
   case 0x12: c= strlen(s); gotoxy(curx+(40-c)/2, cury); goto next;
   default: putchar(c); goto next;
   }

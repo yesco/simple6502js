@@ -220,10 +220,7 @@ char* decompress(char* z, char* r) {
   char* d;
   if (!r) r= malloc(len);
   d= r; z+= 2;
-  while(len--) {
-    d= decomp(z,d),++z;
-    //printf("LEN=%2d   \"%s\"\n", len, r);
-  }
+  while(len--) d= decomp(z,d),++z;
   return d;
 }
 
