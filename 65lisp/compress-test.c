@@ -63,10 +63,10 @@ int main() {
     char* z= compress(hisc, i);
     assert(z);
     char dec[8016]={0};
-    memset(dec, 0xff, 8000);
+    //memset(dec, xff, 8000);
     decompress(z, dec);
-    printf("HIRES: len=%4d => %4d => %4d == %s\n", i, (int)*(uint16_t*)z, (int)strlen(dec), 0==memcmp(hisc, dec, i)?"OK":"FAILED");
-    //for(int j=0; j<i; ++j) printf("%02x", dec[j]);   putchar('\n');
+    printf("HIRES: len=%4d => %4d => %4d == %s\n", i, (int)*(uint16_t*)z, (int)strlen(dec), 0==memcmp(hisc, dec, 8000)?"OK":"FAILED");
+    for(int j=0; j<8000; ++j) printf("%02x", dec[j]);   putchar('\n');
   }
   return 0;
 }

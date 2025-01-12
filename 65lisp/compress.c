@@ -146,30 +146,17 @@ char* compress(char* o, int len) {
       r= dematch(de, s, len); // correct (!) and faster?
       // r= match(p, s, len); // error on some data!
 
-      if (r) {
-        COMDEBUG(printf("        MAX! n=%d\t'%.*s'\n", r, r, s));
-        if (r>max) { max= r; best= p;
-          //break; // give up at first match - fast
-          //printf(STATUS "Zng: %4d/%4d => %4d  max=%3d (%02x,%02x) " RESTORE,
-          //       s-o, ol, p-dict, max, s[0], s[1]);
-        }
-      }
+      if (r>max) { max= r; best= p; }
     }
     p= best;
 
     //firstchar[((int)de)&0x7f]= *s; // lol, raw!
 
-    // match
+    // -- encode best match
     if (max) {
-      signed char x;
-      COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128)));
-      //printf("[" INVERSE "%.*s" ENDINVERSE "]", max, s);
-      // TODO: is full range used?
- //printf("assert: p-de= %d char= %d\n", p-de, (signed char)(p-de));
-      assert(p-de==(signed char)(p-de)); // sanity check
-
-      x= *de = (signed char)(p-de); ++de;
-      //gotoxy(0,26); printf("max=%2d idx=%d      ", max, x);
+      // for debug only
+      signed char x; COMDEBUG(printf("    => %.*s< @%3d -> %d\n", max, s, -(int)(de-p), (unsigned char)-(int)(de-p+128))); x=
+                                                                                                         *de = (signed char)(p-de); ++de;
 
       if (x>=0) {
         printf(STATUS "ZERROR: %d %02x %02x\n", x, de[x], de[x+1]);
@@ -186,13 +173,13 @@ char* compress(char* o, int len) {
       len-= max;
     } else {
       COMDEBUG(printf("    => plain char= %d %02x '%c'\n", *s, *s, *s));
-      ////printf("%c\n", *s);
-      //putchar(*s);
       *de= *s; ++de;
       COMSHOW( *s ^= 128 );
+
       ++s;
       --len;
     }
+
     ++n;
     COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
 
@@ -203,8 +190,8 @@ char* compress(char* o, int len) {
       //  gotoxy(0,26);
       //  printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
     #endif
-
   }
+
   COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
 
