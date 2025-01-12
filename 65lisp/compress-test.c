@@ -14,7 +14,7 @@ int test(char* in) {
   printf("\ncompressed: len=%d\n", *(uint16_t*)out);
   decompress(out, big);
   int r= strprefix(in, big);
-  printf("\n   IN[%ld]:\t\"%s\"\n  OUT[%ld]:\t...\n  DEC[%ld]:\t\"%s\"\n   strprefix=%4d\n", strlen(in), in, strlen(out), strlen(big), big, r);
+  printf("\n   IN[%ld]:\t\"%s\"\n  OUT[%ld]:\t...\n  DEC[%ld]:\t\"%s\"\n   strprefix=%4d\n   maxdeep=\t%d\n", strlen(in), in, (long)*(uint16_t*)out, strlen(big), big, r, maxdeep);
 
   if (r<0 || strlen(in)!=strlen(big)) {
     printf("ERROR ---------------------------- ERROR\n");
@@ -65,8 +65,53 @@ int main() {
     char dec[8016]={0};
     //memset(dec, xff, 8000);
     decompress(z, dec);
-    printf("HIRES: len=%4d => %4d => %4d == %s\n", i, (int)*(uint16_t*)z, (int)strlen(dec), 0==memcmp(hisc, dec, 8000)?"OK":"FAILED");
+    printf("HIRES: len=%4d => %4d => %4d == %s maxdeep=%d\n", i, (int)*(uint16_t*)z, (int)strlen(dec), 0==memcmp(hisc, dec, 8000)?"OK":"FAILED", maxdeep);
     for(int j=0; j<8000; ++j) printf("%02x", dec[j]);   putchar('\n');
   }
+
+  // LAMER.tap - 8000 B
+  //         zip: 593 B
+  //   fileback: 1238 B
+  //       symon: 610 B
+  //        mine: 531 B + 2B
+  //
+  // - https://forum.defence-force.org/viewtopic.php?p=11069&hilit=Compressing#p11069
+
+  // Symoon wrote: 
+  //   I have results that go, for the simplest screens, to about 200 bytes
+  // (empty screen), and up to 4100 bytes for complex ones (4070 for the
+  // title screen of Murder On the Atlantic; 3815 for the Théoric's faamous
+  // pirate boat).
+
+  // Before wasting (lots of) time writing the decoding routines, can you
+  // guys already tell me how this compares to existing methods you'd know on Oric?
+  //
+  // Hi, these two pictures are in the Oric slideshow "Pushing The Envelope",
+  // and were compressed with PictConv:
+  // 
+  // - Entry #9 '..\build\files\murder_on_the_atlantic.hir'
+  //     Loads at address 40960 starts on track 7 sector 6 and is 13 sectors long
+  //     (3188 compressed bytes: 39% of 8000 bytes).
+  //     Associated metadata: author='Dom' name='Murder on the Atlantic' 
+  // - Entry #10 '..\build\files\trois_mats.hir'
+  //     Loads at address 40960 starts on track 8 sector 2 and is 17 sectors long
+  //     (4222 compressed bytes: 52% of 8000 bytes).
+  //     Associated metadata: author='Vasiloric' name='Sailing ship'
+  //
+  // HRC: 40 B depacking routine!
+  // filepack: 115 B
+  char* name= "LAMER.tap";
+
+  FILE* f= fopen(name, "r");
+  fread(hisc, 1, 20, f); // skip 20 bytes header!
+  fread(hisc, 1, 8000, f);
+  fclose(f);
+
+  char* z= compress(hisc, i);
+  assert(z);
+  char dec[8016]={0};
+  decompress(z, dec);
+  printf("%s: => %4d => %4d == %s\n", name, (int)*(uint16_t*)z, -1, 0==memcmp(hisc, dec, 8000)?"OK":"FAILED");  
+
   return 0;
 }

@@ -80,19 +80,24 @@ void deprint(char* z) {
 char* mmm= NULL;
 int mmmlen= 0;
 
+int deep, maxdeep;
+
 int dematch2(char* z) {
   signed char i= *z; int a, b;
   //printf("DEMATCH2: %d \"%s\"\n", mmmlen, z, mmm);
   if (mmmlen <= 0) return 0;
   if (i >= 0) return *z==*mmm++? 1: 0;
   else {
+    if (++deep > maxdeep) maxdeep= deep;
     if (!(a= dematch2(z+i  ))) return 0;
     if (!(b= dematch2(z+i+1))) return 0;
+    --deep;
     return a+b;
   }
 }
 
 int dematch(char* z, char* m, int len) {
+  deep= 0;
   mmm= m; mmmlen= len;
   return dematch2(z);
 }
@@ -109,6 +114,8 @@ char* compress(char* o, int len) {
   signed char c;
   int n= 0, r, max;
   int ol= len;
+
+  maxdeep= 0;
 
   // Store first char of cmopressed string,
   // speeds up test
