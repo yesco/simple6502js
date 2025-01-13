@@ -596,19 +596,22 @@ int T,nil,doapply1,print;
 
 void hirescompress() {
   char* zip, * saved;
+  int len;
 
   gotoxy(0,25); printf("COMPRESzING...");
-  *HIRESEND= 0; // lol, haha, and then strlen?
-  saved= strdup(HIRESSCREEN);
-  zip= compress(HIRESSCREEN, strlen(HIRESSCREEN)); // strlen?  lol, fix it!
-  gotoxy(0,25); printf("DONE COMPRESS!    ");
-  gotoxy(7,26); printf("Comprez: %3d%% %4d/%4d", (int)((strlen(zip)*10050L)/strlen(HIRESSCREEN)/100), strlen(zip), strlen(HIRESSCREEN));
+  //saved= malloc(HIRESSIZE);
+  //assert(saved);
+  //memcpy(saved, HIRESSCREEN, HIRESSIZE);
+  zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
+  len= *(int*)zip;
+  gotoxy(0,25); printf("DONE COMPRESS! => %d    <", len);
+  gotoxy(0,26); printf("Comprez: %3d%% %4d/%4d", (int)(len*10050L/HIRESSIZE/100), len, HIRESSIZE);
 
   while(!kbhit()) {
     int i;
     decompress(zip, HIRESSCREEN);
-    i= strprefix(HIRESSCREEN, saved);
-    if (i<=0) { gotoxy(10, 27); printf("  DIFFER AT POSITION: %d  ", i); }
+    //i= strprefix(HIRESSCREEN, saved);
+    //if (i<=0) { gotoxy(10, 27); printf("  DIFFER AT POSITION: %d  ", i); }
     wait(50);
     gclear();
   }
@@ -645,7 +648,9 @@ void main() {
 
   switch(4) {
 
-  case 11: break;
+  case 11:
+    // compress clear screen
+    break;
 
   case 1: {
     // WTF does my code do? lol
@@ -699,7 +704,7 @@ void main() {
     // 1175 hs - without rowaddr[] and mask6[]
     //  865 hs - my code w rowaddress[] macro and mask6[]
     // - generally DFLAT says circle: 12x faster than BASIC ROM
-    asm("SEI"); // no differencea
+//    asm("SEI"); // no differencea
     for(i=10; i>=0; --i) {
       for(j=9; j<65; j+=65/13) {
         GXY(120, 100);

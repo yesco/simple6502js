@@ -29,17 +29,6 @@
   #define COMDEBUG(a)
 #endif // COMPRESS_DEBUG
 
-int strprefix(char* a, char* b) {
-  int i= 0;
-  while(*a && *b) {
-    if (*a!=*b) return -i;
-    ++i;
-    ++a,++b;
-  }
-  if (*a || *b) return -i;
-  return i;
-}
-
 // Match using a DICTIONARY of length 2 pointed at for a STRING
 //
 // Returns:
@@ -82,7 +71,7 @@ int mmmlen= 0;
 
 int deep, maxdeep;
 
-int dematch2(char* z) {
+int dematch2(signed char* z) {
   signed char i= *z; int a, b;
   //printf("DEMATCH2: %d \"%s\"\n", mmmlen, z, mmm);
   if (mmmlen <= 0) return 0;
@@ -96,7 +85,7 @@ int dematch2(char* z) {
   }
 }
 
-int dematch(char* z, char* m, int len) {
+int dematch(signed char* z, char* m, int len) {
   deep= 0;
   mmm= m; mmmlen= len;
   return dematch2(z);
@@ -107,23 +96,46 @@ int dematch(char* z, char* m, int len) {
 // Returns: a pointer to the result
 //   first two bytes are compresslength
 char* compress(char* o, int len) {
-  char *res= malloc(len*2+2); // lol, is it enough? (>127...)
+  char *s= o;
+  signed char *res= malloc(len+2); // lol, is it enough? (>127...)
   // TODO: realloc as we go?
-  char *dict= res+2, *de= dict;
-  char *s= o, *d= o, *p, *best;
+  signed char *dict= res+2;
+  signed char *de= dict;
+  signed char *d;
+  signed char *p;
+  signed char *best;
   signed char c;
   int n= 0, r, max;
   int ol= len;
-
-  maxdeep= 0;
 
   // Store first char of cmopressed string,
   // speeds up test
   char firstchar[128]={0};
 
+  assert(res);
+
+  maxdeep= 0;
+
   //gotoxy(0,25);
   while(len>0) {
     c= *s;
+
+    COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
+
+    #ifdef __ATMOS__
+
+      #ifdef HIRESSCREEN
+        if (curmode==TEXTMODE) 
+      #else
+        if (1) 
+      #endif
+        {
+          // update progress during hires to debug
+          printf(STATUS "=>%3d%% %d @ %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
+        } else {
+          gotoxy(0,25); printf("%3d%% => %d,deep=%2d %02x @ %d/%d ", (int)((n*10050L)/(s-o)/100), n, maxdeep, *s, (int)(s-o), (int)ol);
+        }
+    #endif
 
     // TODO: handle....
     if (c&128) c &= 127;
@@ -133,6 +145,8 @@ char* compress(char* o, int len) {
 
     // sliding dictionary
     d= de-128;
+    //d= de-128+5; //TODO hmmm
+
     if (d<dict) d= dict;
 
     // search from xo for N matching characters of s
@@ -142,13 +156,16 @@ char* compress(char* o, int len) {
     //printf(">>> '%s'\n", s);
 
     for(p= de-2; p>=d; --p) {
-      *de= (p-de);
+      *de= (signed char)(p-de);
       COMDEBUG(printf("      try idx:%3d\t\"", (signed char)*de);deprint(de);printf("\"\n"););
 
       // incorrect!?!?!?!? not complete
       // ANY FASTER? benchmark...
       //if (de>dict+128 && firstchar[((int)(*de+de))&0x7f] != *s) continue;
       // NO- lol, slower!!!!
+
+      //gotoxy(0,26); printf("Try: %02x @ %d \n", *s, *de);
+      //getchar();
 
       r= dematch(de, s, len); // correct (!) and faster?
       // r= match(p, s, len); // error on some data!
@@ -173,7 +190,7 @@ char* compress(char* o, int len) {
       COMSHOW( {
           char i;
           s[max-1]=128+'<';
-          for(i=0; i<max-1;++i) s[i]=32;
+          for(i=0; i<max-1;++i) s[i]=64;
         } );
       
       s+= max;
@@ -186,17 +203,9 @@ char* compress(char* o, int len) {
       ++s;
       --len;
     }
+    //getchar();
 
     ++n;
-    COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
-
-    #ifdef __ATMOS__
-      // update progress during hires to debug
-      printf(STATUS "=>%3d%% %d from %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
-      // if def hires...
-      //  gotoxy(0,26);
-      //  printf("%3d%% %4d/%4d (n=%d)", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol, n);
-    #endif
   }
 
   COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));

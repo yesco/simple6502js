@@ -6,6 +6,17 @@
 //#define COMPRESS_DEBUG
 #include "compress.c"
 
+int strprefix(char* a, char* b) {
+  int i= 0;
+  while(*a && *b) {
+    if (*a!=*b) return -i;
+    ++i;
+    ++a,++b;
+  }
+  if (*a || *b) return -i;
+  return i;
+}
+
 int test(char* in) {
   in= strdup(in);
   printf("\n------ \"%s\"\n\n", in);
@@ -107,11 +118,17 @@ int main() {
   fread(hisc, 1, 8000, f);
   fclose(f);
 
+  printf("\nHISC:\n");
+  for(int j=0; j<8000; ++j) printf("%02x", hisc[j]);   putchar('\n');
+
   char* z= compress(hisc, i);
   assert(z);
   char dec[8016]={0};
   decompress(z, dec);
   printf("%s: => %4d => %4d == %s\n", name, (int)*(uint16_t*)z, -1, 0==memcmp(hisc, dec, 8000)?"OK":"FAILED");  
+
+  printf("\nDEC:\n");
+  for(int j=0; j<8000; ++j) printf("%02x", dec[j]);   putchar('\n');
 
   return 0;
 }

@@ -1129,9 +1129,9 @@ void main() {
         while(!kbhit()) {
           int ol= strlen(saved), n= *(int*)zip;
           decompress(zip, TEXTSCREEN+40);
-          i = strprefix(TEXTSCREEN+40, saved);
+          //i = strprefix(TEXTSCREEN+40, saved);
+          //if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
           printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol);
-          if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
           wait(50);
           clrscr();
         }
