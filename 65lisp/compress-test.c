@@ -1,6 +1,9 @@
 #define STATUS ""
 #define RESTORE ""
 
+char curmode= 0;
+#define HIRESMODE 30
+
 //#define COMPRESS_PROGRESS
 
 //#define COMPRESS_DEBUG
@@ -21,7 +24,7 @@ int test(char* in) {
   in= strdup(in);
   printf("\n------ \"%s\"\n\n", in);
   char big[64*1024]= {0};
-  char* out= compress(in, strlen(in));
+  char* out= compress(in, strlen(in)+1); // include the \0
   printf("\ncompressed: len=%d\n", *(uint16_t*)out);
   decompress(out, big);
   int r= strprefix(in, big);
@@ -39,8 +42,19 @@ int test(char* in) {
 int main() {
   test("");
   test("a");
-  test("aa");
-  test("aaa");
+  test("ab");
+  test("abc");
+  test("abcd");
+  test("abcde");
+  test("abcdef");
+  test("abcdefg");
+
+  test("aba");
+  test("abab");
+  test("ababab");
+  test("abababab");
+  test("ababababab");
+  test("abababababab");
   test("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); // 100
 
   char* s= calloc(101,1);

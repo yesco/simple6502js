@@ -594,21 +594,29 @@ int T,nil,doapply1,print;
 void hirescompress() {
   char* zip, * saved;
   int len;
+  unsigned C;
 
   gotoxy(0,25); printf("COMPRESzING...");
   //saved= malloc(HIRESSIZE);
   //assert(saved);
   //memcpy(saved, HIRESSCREEN, HIRESSIZE);
+  C= time();
+  asm("CLI");
   zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
+  C= C-time();
   len= *(int*)zip;
   gotoxy(0,25); printf("DONE COMPRESS! => %d    <", len);
-  gotoxy(0,26); printf("Comprez: %3d%% %4d/%4d", (int)(len*10050L/HIRESSIZE/100), len, HIRESSIZE);
+  gotoxy(0,26); printf("Comprez: %3d%% %4d/%4d      ", (int)(len*10050L/HIRESSIZE/100), len, HIRESSIZE);
 
-  while(!kbhit()) {
+  while((char)kbhit()!=CTRL+'C') {
     int i;
+    unsigned int T;
+    asm("CLI");
+    T= time();
     decompress(zip, HIRESSCREEN);
     //i= strprefix(HIRESSCREEN, saved);
     //if (i<=0) { gotoxy(10, 27); printf("  DIFFER AT POSITION: %d  ", i); }
+    gotoxy(0,27); printf("Z=%u hs DZ=%u hs         ", C, T-time());
     wait(50);
     gclear();
   }

@@ -103,7 +103,7 @@ char* compress(char* o, int len) {
   int n= 0, r, max;
   int ol= len;
 
-#ifdef COMSHOW
+#ifdef COMPRESS_PROGRESS
   char isHires= (curmode==HIRESMODE);
   char showSkipped= isHires? 64: 32;
   char showCompressed= isHires? 64+1: 128+'<';
@@ -123,7 +123,7 @@ char* compress(char* o, int len) {
 
     COMDEBUG(printf("  - %3d%% %4d/%4d\n\n", (int)((n*10050L)/(s-o)/100), (int)(s-o), (int)ol));
 
-    #ifdef __ATMOS__
+    #ifdef COMPRESS_PROGRESS
 
       #ifdef HIRESSCREEN
         if (isHires) 
@@ -177,6 +177,7 @@ char* compress(char* o, int len) {
 
     //firstchar[((int)de)&0x7f]= *s; // lol, raw!
 
+    //*s= '-'; // to show progress, but this messes up compressing?
     // -- encode best match
     if (max) {
       // for debug only
@@ -210,7 +211,6 @@ char* compress(char* o, int len) {
 
     ++n;
   }
-
   COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
 
@@ -228,19 +228,103 @@ typedef struct compressed {
   char data[];
 } compressed;
 
-char* decomp(char* z, char* d) {
+// hires squares 42%, Z= 27067 D= 734 hs
+char* old_decomp(char* z, char* d) {
   signed char i= *z;
   if (i >= 0) *d=i,++d;
-  else d=decomp(z+i, d),d=decomp(z+i+1, d);
+  else d=old_decomp(z+i, d),d=old_decomp(z+i+1, d);
+  return d;
+}
+ 
+// Compresz: Z=3400 D=112 hs (Z=2893 w/o COMPRESS_PROGRESS 18% faster)
+// Sherlock: Z=20030 D=95 hs
+char* old_decompress(char* z, char* r) {
+  int len= *(uint16_t*)z;
+  char* d;
+  d= r; z+= 2;
+  while(len--) d= old_decomp(z,d),++z;
+}
+
+//#define decompress(a,b) old_decompress(a,b)
+#define decompress(a,b) static_unroll_decompress(a,b)
+// static tmp
+// TODO: create a set typed of these..., in zero page!
+char* dest;
+
+void sdecomp(char* z) {
+  signed char i= *z;
+  if (i >= 0) *++dest=i;
+  else sdecomp(z+i),sdecomp(z+i+1);
+}
+
+// Compresz: Z=3410 D=67 hs (decompress double speed!)
+//             3078   67
+// Sherlock: Z=20028 D=58 hs
+//                    59
+// --HIRES--
+// Rotating squares: => 42% 3376 Z= ? D=449 hs
+//                   Z=1969 (?)       D=543 hs (no unroll top)
+//                   Z=27067          D=734 hs (/ 734 543.0)
+
+// 63% faster than old original
+char* static_unroll_decompress(char* z, char* d) {
+  int len= *(uint16_t*)z;
+  dest= d-1;
+  //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
+  z+= 2; --z;
+  while(len--)
+    if ((signed char)(*++z)>=0) *++dest= *z;
+    else sdecomp(z);
   return d;
 }
 
-char* decompress(char* z, char* r) {
+// 35% faster than old original
+// 21% slower compared to unrolled
+char* static_not_unrulled_decompress(char* z, char* d) {
   int len= *(uint16_t*)z;
-  char* d;
+  dest= d-1;
   //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
-  d= r; z+= 2;
-  while(len--) d= decomp(z,d),++z;
+  z+= 2;
+  while(len--) sdecomp(z),++z;
+}
+
+
+// make your own stack, faster? not?
+// not working... lol
+
+char* stack[128];
+
+char* ydecompress(char* z, char* d) {
+  int len= *(uint16_t*)z;
+  char** se= stack+128, ** sp= se;
+  signed char c;
+  char *topz, *p;
+  //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
+  p= d; z+= 2;
+  while(sp!=se || len) {
+    if (len<=0) break;
+    printf(" [%d:%d] ", len, se-sp);
+
+    assert(sp<=se);
+    // next to process
+    if (sp==se) {
+      c= *z,++z,--len;
+      printf(" {%c;%d} ", c, c); }
+    else {
+      z= *sp;
+      c= *z; ++sp;
+      if (sp==se) z= topz;
+    }
+    // simple char
+    if (c>=0) *p=c,++p,putchar(c);
+    // or compressed token - push destination
+    else {
+      printf(" [T:%d] ", c);
+      if (sp==se) topz= z;
+      *--sp= z+c; // second of bi-token
+      *--sp= z+c-1;   // first of bi-token
+    }
+  }
   return d;
 }
 
