@@ -31,10 +31,10 @@
 
 // Compressed data is returned as a pointer to memory of this type
 typedef struct Compressed {
-  //uint16_t id; // "JK"
+  char J; char K; // 'J' 'K'
   uint16_t len;
-  //uint16_t origlen;
-  //uint16_t addr;
+  uint16_t origlen;
+  uint16_t addr;
   char data[];
 } Compressed;
 
@@ -105,12 +105,16 @@ int dematch(signed char* z, char* m, int len) {
 // Compress a stream of BYTES of LENgth
 //
 // Returns: a pointer to the result
-//   first two bytes are compresslength
+//     first two bytes are compresslength
+//   NULL if fail to allocate
+//   NULL if not compress to less!
+
 Compressed* compress(char* o, int len) {
   char *s= o;
   // TODO: realloc as we go?
-  signed char *res= malloc(len+2); // lol, is it enough? (>127...)
-  signed char *dict= res+2, *de= dict, *d, *p, *best, c;
+  int size= len;
+  Compressed* res= (Compressed*)malloc(size+sizeof(Compressed));
+  signed char *dict= (signed char*)(res->data), *de= dict, *d, *p, *best, c;
   int n= 0, r, max;
   int ol= len;
 
@@ -123,6 +127,8 @@ Compressed* compress(char* o, int len) {
   // Store first char of compressed string,
   // speeds up test, NOT!
   char firstchar[128]={0};
+
+  if (!res) return NULL;
 
   assert(res);
 
@@ -148,6 +154,10 @@ Compressed* compress(char* o, int len) {
           printf(STATUS "=>%3d%% %d @ %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
         }
     #endif
+
+    // Too big compreseed result: FAIL!
+    // TODO: set lower threshold? 90% at last?
+    if (n>=size) { free(res); return NULL; }
 
     // TODO: handle....
     if (c&128) c &= 127;
@@ -225,10 +235,13 @@ Compressed* compress(char* o, int len) {
   COMDEBUG(printf(STATUS "=>%3d%% %4d/%4d\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol));
   //assert(strlen(dict)==n);
 
-  // store length
-  *(uint16_t*)res= n;
+  // store meta-data
+  res->J= 'J'; res->K= 'K';
+  res->len= n;
+  res->origlen= ol;
+  res->addr= (unsigned int)o;
   
-  return (Compressed*)realloc(res, n+2); // shrink
+  return (Compressed*)realloc(res, n+sizeof(Compressed)); // shrink it
 }
 
 // hires squares 42%, Z= 27067 D= 734 hs
@@ -277,16 +290,30 @@ void sdecomp(char* z) {
   else sdecomp(z+=i),sdecomp(z+1);
 }
 
+// Decompress to give address
+//
+// if address==NULL: use memory location remembered in zz.
+//
+// Returns: pointer to decompressed memory location
 char* static_unroll_decompress(Compressed* zz, char* d) {
   char* z= zz->data;
   int len= zz->len;
+  if (!d) d= (char*)(zz->addr);
   dest= d-1;
-  //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
   z+= 2; --z;
   while(len--)
     if ((signed char)(*++z)>=0) *++dest= *z;
     else sdecomp(z);
   return d;
+}
+
+// Decompressed to a newly allocated memory
+//
+// Returns: pointer to decompressed memory location
+//   or NULL if fail to allocate
+char* newdecompress(Compressed* zz) {
+  char* d= malloc(zz->origlen);
+  return d? decompress(zz, d): NULL;
 }
 
 // 35% faster than old original
@@ -318,7 +345,7 @@ char* ydecompress(Compressed* zz, char* d) {
   p= d; z+= 2;
   while(sp!=se || len) {
     if (len<=0) break;
-    printf(" [%d:%d] ", len, se-sp);
+    printf(" [%d:%d] ", len, (int)(se-sp));
 
     assert(sp<=se);
     // next to process

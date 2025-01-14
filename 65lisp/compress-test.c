@@ -24,11 +24,11 @@ int test(char* in) {
   in= strdup(in);
   printf("\n------ \"%s\"\n\n", in);
   char big[64*1024]= {0};
-  char* out= compress(in, strlen(in)+1); // include the \0
-  printf("\ncompressed: len=%d\n", *(uint16_t*)out);
+  Compressed* out= compress(in, strlen(in)+1); // include the \0
+  printf("\ncompressed: len=%d\n", out->len);
   decompress(out, big);
   int r= strprefix(in, big);
-  printf("\n   IN[%ld]:\t\"%s\"\n  OUT[%ld]:\t...\n  DEC[%ld]:\t\"%s\"\n   strprefix=%4d\n   maxdeep=\t%d\n", strlen(in), in, (long)*(uint16_t*)out, strlen(big), big, r, maxdeep);
+  printf("\n   IN[%ld]:\t\"%s\"\n  OUT[%ld]:\t...\n  DEC[%ld]:\t\"%s\"\n   strprefix=%4d\n   maxdeep=\t%d\n", strlen(in), in, (long)out->len, strlen(big), big, r, maxdeep);
 
   if (r<0 || strlen(in)!=strlen(big)) {
     printf("ERROR ---------------------------- ERROR\n");
@@ -85,12 +85,12 @@ int main() {
   memset(hisc, 0, 8000);
   for(i=1; i<=8000; ++i) {
     memset(hisc, 64, i);
-    char* z= compress(hisc, i);
+    Compressed* z= compress(hisc, i);
     assert(z);
     char dec[8016]={0};
     //memset(dec, xff, 8000);
     decompress(z, dec);
-    printf("HIRES: len=%4d => %4d => %4d == %s maxdeep=%d\n", i, (int)*(uint16_t*)z, (int)strlen(dec), 0==memcmp(hisc, dec, 8000)?"OK":"FAILED", maxdeep);
+    printf("HIRES: len=%4d => %4d => %4d == %s maxdeep=%d\n", i, z->len, (int)strlen(dec), 0==memcmp(hisc, dec, 8000)?"OK":"FAILED", maxdeep);
     for(int j=0; j<8000; ++j) printf("%02x", dec[j]);   putchar('\n');
   }
 
@@ -135,7 +135,7 @@ int main() {
   printf("\nHISC:\n");
   for(int j=0; j<8000; ++j) printf("%02x", hisc[j]);   putchar('\n');
 
-  char* z= compress(hisc, i);
+  Compressed* z= compress(hisc, i);
   assert(z);
   char dec[8016]={0};
   decompress(z, dec);

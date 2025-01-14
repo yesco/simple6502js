@@ -1184,7 +1184,7 @@ void init_conioraw() {
   }
 }
 
-#define COMPRESS_PROGRESS
+//#define COMPRESS_PROGRESS
 #include "compress.c"
 
 
@@ -1237,6 +1237,7 @@ void main() {
         *SCREENEND= 0; // lol
         saved= strdup(TEXTSCREEN+40);
         zip= compress(TEXTSCREEN+40, strlen(TEXTSCREEN+40));
+        assert(zip);
         C= C-time();
         while((char)kbhit()!=CTRL+'C') {
           int ol= strlen(saved), n= zip->len;

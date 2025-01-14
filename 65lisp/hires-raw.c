@@ -604,6 +604,7 @@ void hirescompress() {
   C= time();
   asm("CLI");
   zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
+  assert(zip);
   C= C-time();
   len= zip->len;
   gotoxy(0,25); printf("DONE COMPRESS! => %d    <", len);
