@@ -243,6 +243,7 @@ char* old_decompress(char* z, char* r) {
   char* d;
   d= r; z+= 2;
   while(len--) d= old_decomp(z,d),++z;
+  return r;
 }
 
 //#define decompress(a,b) old_decompress(a,b)
@@ -251,22 +252,27 @@ char* old_decompress(char* z, char* r) {
 // TODO: create a set typed of these..., in zero page!
 char* dest;
 
-void sdecomp(char* z) {
-  signed char i= *z;
-  if (i >= 0) *++dest=i;
-  else sdecomp(z+i),sdecomp(z+i+1);
-}
-
 // Compresz: Z=3410 D=67 hs (decompress double speed!)
 //             3078   67
+//                    58 static i in sdecomp, z+=i
+//
 // Sherlock: Z=20028 D=58 hs
-//                    59
+//                     59
+//                     54 static i - 7.5%
 // --HIRES--
-// Rotating squares: => 42% 3376 Z= ? D=449 hs
-//                   Z=1969 (?)       D=543 hs (no unroll top)
-//                   Z=27067          D=734 hs (/ 734 543.0)
-
+//                   Z=27067           D=734 hs orig
+//                   Z=1969 (?)        D=543 hs (no unroll top)
+// Rotating squares: => 42% 3376 Z=15m D=449 hs
+//                                     D=399 hs 32% w static i,+=i
+//
 // 63% faster than old original
+
+void sdecomp(char* z) {
+  static signed char i;
+  i= *z;
+  if (i >= 0) *++dest=i;
+  else sdecomp(z+=i),sdecomp(z+1);
+}
 char* static_unroll_decompress(char* z, char* d) {
   int len= *(uint16_t*)z;
   dest= d-1;

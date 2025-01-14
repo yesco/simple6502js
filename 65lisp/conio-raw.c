@@ -4,20 +4,38 @@
 //
 //
 // A raw, NON-ROM-less implementation of conio display
-// and keyboard routines for ORIC ATMOS.
+// and keyboard routines for ORIC ATMOS. It's inteded to
+// be used under Loci!
 // 
-// Implements full-screen editing, similar to ORIC.
+// The terminal implements full-screen editing, similar to ORIC.
+// Most key-codes can be printed directly putchar/cputc to
+// get cursor movements and editing!
 //
 // However, it has a twist - it impements an EMACSy
-// full-screen editor, intended to be used for editing.
+// full-screen editor!
 //
-// It's RAW since it's intended to be used under Loci,
-// when no ROM may be available!
+// Cursor keys works for moving around.
+//
+// The terminal implements extra features, such as
+// a vt100-ignore mode for unkonwn codes.
+//
+// It also implements a minimal vt100 code,
+// commands on form ESC [ <param> ; ... <letter>
+//
+//   ABCD - cursor movements
+//   H    - gotoxy
+//   J    - clear screen
+//
+// KEYS
+// ====
+// Keys are encoded capturing not only the expected ASCII-code;
+// such as CTRL+'A' gives the keycode that cgetc() returns.
+// FUNCT key adds 128 to the code, this is similar to ESC-x M-x or META-x
+//
+// CTRL-T: changes CAPS-lock when printed! (LOL?)
 
 // TODO: disable ROM cursor?
 // TDOO: protect the first 2 columns
-// TODO: capslock
-// TODO: kbhit, cgetc - don't give repeat directly...
 // TODO: kbhit, cgetc - no buffer, so miss keystroke?
 // TODO: hook it up to interrupts and buffer!
 
@@ -34,23 +52,22 @@
 //
 // - similar to ORIC, just different codes
 //   (to keep printf \n \r \t \v semantics)
-// - HOME
 // - SAVE RESTORE (NEXT) - saves cursor position!
 // - BACK FORWARD DOWN UP
 
-// Formatting
+// Formatting 
 //
 // - INVERSE - ENDINVERSE
 // - DOUBLE - (auto align row, and types double)
 //   ( DOUBLE GREEN "BIG GREEN" NORMAL )
 
-// Clearing
+// Clearing (TODO: need to map codes...)
 //
-// - CLEAR
+// - CLEAR clrscr()
 // - REMOVELINE
 // - CENTER - centers the rest of the (assumed) simple text
 
-// Scripting
+// Scripting (TODO: need to map codes...)
 //
 // - WAITKEY   - waits for key pressed!
 // - WAIT1s WAIT3s WAIT10s - waits 1, 3, 10 second(s), or key
@@ -374,6 +391,7 @@ void scrollup(char fromy) {
 
 #define CTRL (1-'A')
 #define META 128
+#define FUNCT META
 
 // KEY ENCODING
 // ============
@@ -490,12 +508,13 @@ void bell() {
 // On ORIC you traditionally can edit the screen,
 // which is a rather unique function.
 //
-// But ehre we don't have the CTRL-A read character
+// But here we don't have the CTRL-A read character
 // under cursor and type nilwilly anywhere into
 // a hidden keyboard buffer!
 //
 
-// Emacs bindings implemented
+// Emacs bindings implemented:
+//   (Free: CXYZ, TODO: HJK(L)MOQRSTW V
 //
 // CTRL-A : At the aabeginning of line
 // CTRL-B : Back one character
@@ -515,7 +534,7 @@ void bell() {
 // CTRL-R : TODO: re-search backwards
 // CTRL-S : TODO: search, have some code, untested
 // CTRL-T : ORIC: CAPS-toggle, implemeneted but have bug
-// CTRL-U : TODO: numeric prefix, quadruplicate next char
+// CTRL-U : numeric prefix, or quadruplicate next char
 // CTRL-V : TODO: Next Page
 // CTRL-W : TODO: wank? cut region
 // CRRL-X : TODO: eXtended commands, file system etc
@@ -534,93 +553,99 @@ void bell() {
 // CTRL-J : LF
 // CTRL-M ; CR
 
+// TODO: kputc? to take extended keycodes!
+
+#define CURNPARAM 3
+int curparam[CURNPARAM];
+char curnparam= 0;
+char curvt100= 0;
+
 void cputc(char c) {
-  // Basically, if not easily printable?
-  if (((c & 0x7f) < ' ') || c==127) {
+  // not printable ASCII
+  if (c < ' ' || c > 126) {
+    int i= 0;
 
-    // control chars (0-31), or (arrow keys)
-    // TODO: why this test, just let switch do it?
-    if (c<32 || (c & 0xf8)==0x98 || c==127) {
-      int i= 0;
+    // EMACS DONE: ^ ABcDEFGhIjk mNoPqrs u  y
+    //             M-ab def  ij   n pqrs
+    //    almost            h jk      rS 
+    //    can't                 L H     T VXZ
+    // ESC-q reformat paragraph/fill
 
-      // EMACS DONE: ^ ABcDEFGhIjk mNoPqrs u  y
-      //             M-ab def  ij   n pqrs
-      //    almost            h jk      rS 
-      //    can't                 L H     T VXZ
-      // ESC-q reformat paragraph/fill
+    // control-codes
+    switch(c) {
+    case 0: break; // *is* UPDATE - recalc cursc from curx,cury
+    case 1: curx= 0; break;                 // ^A beginning of line
+    case CTRL+'C': break;
+    case CTRL+'D':                          // ^D del char forward
+      memmove(cursc, cursc+1, 39-curx);
+      cursc[39-curx]= ' '; break;           // TODO: cclearxy()
+    case CTRL+'E': gotoxy(39,cury);         // ^E end of line
+      while(cursc[-1]==' ') --cursc,--curx;
+      break;
+    case CTRL+'G': bell(); break;           // ^G break/bell
+    case 127: if (cursc>TEXTSCREEN)         // ^H -- \b
+        // TODO: insert/overwrite
+        memmove(cursc-1, cursc, 39-1-curx);
+      cursc[39-curx]= ' '; --curx; break;
 
-      // control-codes
-      switch(c) {
+    case '\b':                                   // rubout?
+    case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
+    case CTRL+'F':case KEY_RIGHT: ++curx; break; // ^F ->
 
-      //case 0: // *is* UPDATE - cursc from curx,cury
-      case 1: curx= 0; break;                 // ^A beginning of line
-      // case  2:                             // ^B back
-      //case CTRL+'C':
-      case CTRL+'D':                          // ^D del char forward
-        memmove(cursc, cursc+1, 39-curx);
-        cursc[39-curx]= ' '; break; // TODO: cclearxy()
-      case CTRL+'E': gotoxy(39,cury);         // ^E end of line
-        while(cursc[-1]==' ') --cursc,--curx;
-        break;
-      // case 6:                              // ^F forward
-      case CTRL+'G': bell(); break;           // ^G break/bell
-      // TODO: 8 is roubout
-      case  127: if (cursc>TEXTSCREEN)        // ^H -- \b
-          // TODO: insert/overwrite
-          memmove(cursc-1, cursc, 39-1-curx);
-          cursc[39-curx]= ' '; --curx; break;
+    case CTRL+'N':case KEY_DOWN:  ++cury; break; // ^N DOWN
+      // TODO:???     case   11 on oric: CTRL+'K' ????
+    case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
 
-      case '\b':
-      case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
-      case CTRL+'F':case KEY_RIGHT: ++curx; break; // ^F ->
-      case CTRL+'N':case KEY_DOWN:  ++cury; break; // ^N DOWN
-// TODO:???     case   11 on oric: CTRL+'K' ????
-      case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
-      case   12: clrscr(); return;                 // ^L clear
+    case FUNCT+'P':               cury=1; break; // Top of screen
+    case FUNCT+'N':              cury=27; break; // Bot of screen
+        
+    case   12: clrscr(); return;                 // ^L clear
 
-      case '\t': curx= (curx+8)/8*8; break;        // ^I TAB // TODO: BUG: fill out w space!
-      case '\n': curx= 0; ++cury; break;           // not key
+    case CTRL+'O': break;
+
+    case '\t': curx= (curx+8)/8*8; break;        // ^I TAB // TODO: BUG: fill out w space!
+    case '\n': curx= 0; ++cury; break;           // not key
       // TODO: distinguish RETURN
-      case '\r': curx= 0; break;                   // ^M
+    case '\r': curx= 0; break;                   // ^M
 
-      //case CTRL+'Q': break;                      // TODO: ^Q quote char
-      case CTRL+'R':                               // TODO: ^R
-      case CTRL+'S': { char k, s[32]={0}; i=0;     // ^S s
-          do {
-            *cursc ^= 128;
-            k=cgetc();
-            *cursc ^= 128;
+    case CTRL+'Q': break;                      // TODO: ^Q quote char
+    case CTRL+'R':                               // TODO: ^R
+    case CTRL+'S': { char k, s[32]={0}; i=0;     // ^S s
+        do {
+          *cursc ^= 128;
+          k=cgetc();
+          *cursc ^= 128;
 
-            if (k==KEY_RETURN) break;
-            if (k==CTRL+'G') { cursc= 0; break; }
-            // TODO: backspace
+          if (k==KEY_RETURN) break;
+          if (k==CTRL+'G') { cursc= 0; break; }
+          // TODO: backspace
 
-            s[i]= k; ++i;
+          s[i]= k; ++i;
 
-            //if (c==CTRL+'S') 
-            cursc= memchr(cursc, s[0], SCREENEND-cursc-1);
-            //else 
-            //  cursc= memrchr(cursc, s[0], cursc-TEXTSCREEN);
-          } while (cursc);
-          if (!cursc) { bell(); break; }
+          //if (c==CTRL+'S') 
+          cursc= memchr(cursc, s[0], SCREENEND-cursc-1);
+          //else 
+          //  cursc= memrchr(cursc, s[0], cursc-TEXTSCREEN);
+        } while (cursc);
+        if (!cursc) { bell(); break; }
 
-          // found!
-          i= cursc-TEXTSCREEN;
-          curx= i % 40;
-          cury= i % 40;
-          break; }
+        // found!
+        i= cursc-TEXTSCREEN;
+        curx= i % 40;
+        cury= i % 40;
+        break; }
 
       // TODO: Not working?
-      case CTRL+'T': curcaps = 1-curcaps; break;    // ^T toggle CAPS
+    case CTRL+'T': curcaps = !curcaps; break;    // ^T toggle CAPS
+
 
       // TODO: use cclear()      // TODO: clear end of line
       // TODO: hmmm... CLEARLINE?
-       // TDOO: same key as
+      // TDOO: same key as
       //case CTRL+'K':                             // TODO: ^K CLEARLINE
-        //memset(TEXTSCREEN+40*cury, 32, 40);
-        //return;
-      case CTRL+'K': scrollup(cury); break;    // ^K: REMOVELINE
-
+      //memset(TEXTSCREEN+40*cury, 32, 40);
+      //return;
+    case CTRL+'K': scrollup(cury); break;    // ^K: REMOVELINE
       // TODO: use cclear()      // TODO: clear end of line
       //case CTRL+'O': scrolldown(1); break;     // ^O INSERTLINE
 
@@ -632,8 +657,8 @@ void cputc(char c) {
       //case    4: i+= 200;                    // WAIT3s
       //case    5: i+= 100;                    // WAIT1s
       //case    6:                             // WAITKEY
-        //while(kbhit()) cgetc();
-        //wait(-i); break;                     
+      //while(kbhit()) cgetc();
+      //wait(-i); break;                     
 
 
       //case 0x14: curai= !curai; break;       // TOGGLEAI
@@ -643,36 +668,32 @@ void cputc(char c) {
       //case 0x17: // ETB
       //case 0x18: // CAN                    // TODO: stop!
 
-      case CTRL+'U': // ^U repeat
-      case CTRL+'V': // ^V page down ?  next page?/screen
-      case CTRL+'W': //cut region
-      case CTRL+'Y': // ^Y yank
+    case CTRL+'U': // TODO: move code from StupidTerminal? ^U repeat
+    case CTRL+'V': // ^V page down ?  next page?/screen
+    case CTRL+'W': //cut region
+    case CTRL+'Y': // ^Y yank
 
-      //case CTRL+'X': // extended menu
-      //case CTRL+'Z': // ^Z sleep (go other mode?)
-      case CTRL+'C': // ^C exit ? // compile
+    //case CTRL+'X': // extended menu
+    //case CTRL+'Z': // ^Z sleep (go other mode?)
 
-      // case 0x1d: // ORIC - toogleinv?
+    // case 0x1d: // ORIC - toogleinv?
+      break;
 
-      // redundant
-      //case 0x1c: gotoxy(0,1); break;       // HOME
+    case CTRL+'X': // 0x18                  // STATUS txt RESTORE
+      savecursor();
+      memset(TEXTSCREEN, 32, 32);
+      gotoxy(0,0);
+      return;
+    case CTRL+'Z': // 0x1a                  // STATUS32 txt8 RESTORE
+      savecursor(); gotoxy(32,0); return;
 
-      case CTRL+'X': // 0x18                  // STATUS txt RESTORE
-        savecursor();
-        memset(TEXTSCREEN, 32, 32);
-        gotoxy(0,0);
-        return;
-      case CTRL+'Z': // 0x1a                  // STATUS32 txt8 RESTORE
-        savecursor(); gotoxy(32,0); return;
-        
+    // ESC TODO: ORIC attribute prefix
+    case 0x1b: curvt100= 1;                 // ESC: VT-100 mini-compatibility
 
-      // ESC TODO: ORIC attribute prefix
-      case 0x1b: break;                                 // TODO: ESC
-
-      case 0x1c: break;
-      case 0x1d: savecursor(); break;                   // SAVE
-      case 0x1e: restorecursor(); break;                // RESTORE
-      case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
+    case 0x1c: break; // TODO: use
+    case 0x1d: savecursor(); break;                   // SAVE
+    case 0x1e: restorecursor(); break;                // RESTORE
+    case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
 
       // Cursor:      SAVE RESTORE NEXT HOME GOTOXY bx by
       // Page:        PAGESWAP n, PAGESAVE n PAGELOAD n
@@ -686,27 +707,80 @@ void cputc(char c) {
       // Window:
       // Xperiment:   TOOGLEAI
 
-      }
-
-      // fix state, update cursc
-      if (curx==255) --cury,curx=39;
-      else if (curx>=40) ++cury,curx=0;
-
-      if (cury==255) cury=0; // TODO: scroll up?
-      else if (cury>=28) { scrollup(1); return; }
-
-      cursc= SCREENXY(curx, cury);
-      return;
-
-    } else {
-
-      // Hi-Bit control chars; DOUBLE specials...
-      // (arrowkeys are exempt and handles above)
-      char x= c & 0b11111110;
-      if      (x==0x8a) curdouble= 1;
-      else if (x==0x88) curdouble= 0;
-
+    default: 
+      {
+        // Hi-Bit control chars; DOUBLE specials...
+        char x= c & 0b11111110;
+        if      (x==0x8a) curdouble= 1;
+        else if (x==0x88) curdouble= 0;
+        // print anything else
+        else goto print;
+      } break;
     }
+
+    goto recalc;
+  }
+
+ print:
+
+  // minimal vt100 simulation, TODO: vt52?
+  // - https://espterm.github.io/docs/VT100%20escape%20codes.html
+  if (curvt100) {
+    int n= curparam[0];
+
+    // specials...
+    if (curvt100==1) {
+      switch(c) {
+      case '[': case '?': curvt100= c; return;
+      case 'D': // scroll window up one line
+      case 'M': // scroll window down one line
+      case '7': savecursor(); return;
+      case '8': restorecursor(); return;
+      }
+    } else {
+      switch(c) {
+        // ESC ? 5 h = reverse video
+      case 'm': // 0=off 1=bold 2=low 4=_ 5=blink 7=inverse 8=hide
+      //setwin DECSTBM        Set top and bottom line#s of a window  ^[[<v>;<v>r
+
+      // cursor movements
+      case 'A': cury-= n; goto vtdone;
+      case 'B': cury+= n; goto vtdone;
+      case 'C': curx+= n; goto vtdone;
+      case 'D': curx-= n; goto vtdone;
+      case 'f':
+      case 'H': gotoxy(n,curparam[1]); goto vtdone;
+
+      // getcursor DSR         Get cursor position                    ^[6n
+      // cursorpos CPR            Response: cursor is at v,h          ^[<v>;<h>R
+
+      case 'K': // clear line
+        switch(n) {
+        case 0: // clear right
+        case 1: // clear left
+        case 2: // clear whole line
+        case 3: // TODO: cclear()
+          goto vtdone;
+        }
+        
+      case 'J': // clear screen
+        switch(n) {
+        case 0: // from cursor down
+        case 1: // cursor up
+        case 2: clrscr(); goto vtdone;
+        }
+
+      // parse numeric parameters
+      case ';': if (++curnparam>CURNPARAM) curnparam= 0; return;
+      default:
+        if (isdigit(c))
+          curparam[curnparam]= curparam[curnparam]*10 + c-'0';
+        // Unknown code: letter terminates
+        else if (isalpha(c)) goto vtdone;
+      }
+    }
+    
+    return;
   }
 
   // 32-127, 128+32-255 (inverse)
@@ -714,10 +788,35 @@ void cputc(char c) {
     if (cury&1) { ++cury; cputc(0); }
     cursc[40]= c|curinv;
   }
+
+  // output actual char
   *cursc= c^curinv;  ++cursc;
+
+  // wrap/adjust cursor position
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
   if (curai) wait(-10);
+
+  // done with printing
+  return;
+
+
+ vtdone:
+  curvt100= 0;
+
+ recalc:
+
+  // fix state, update cursc
+  if (curx==255) --cury,curx=39;
+  else if (curx==40) ++cury,curx=0;
+  else if (curx>0x80) curx=0;
+  else if (curx>40 && curx<0x80) curx=39;
+
+  if (cury>0x80) cury=0;
+  else if (cury==28) { scrollup(1); cury=27; return; }
+  else if (cury>27) cury=27;
+
+  cursc= SCREENXY(curx, cury);
 }
 
 //int putchar(int c) { cputc(c); return c; }
@@ -931,8 +1030,9 @@ unsigned int kbhit() {
         else if (!o) c= lowerkeys[R][K];
       }
       if (c<'A' && o==32) o=0,c= lowerkeys[R][K];
-      unc= (bits<<8) | (c? o+c: 0);
-      if (curcaps && isalpha(c)) c ^= 32; // switch lower/upper!
+      c= c? o+c: 0;
+      if (curcaps && isalpha(c) && c<128) c ^= 32; // switch lower/upper!
+      unc= (bits<<8) | c;
     }
     // update bits (TODO: move here?)
   }
@@ -996,10 +1096,14 @@ unsigned int keylast= -1;
 // BITS are defined above, search for
 // FUNCTBITS and you;ll find them.
 int getchar() {
-  unsigned int t;
+  // wait some time to repeat same key
   while(kbhit()==keylast
-        && (t=keylasttime-time()) < KEYREPEAT_DELAY)
+        && keylasttime-time() < KEYREPEAT_DELAY)
     unc=0; // force read
+
+  // debounce (wait at least 5 hs between keystrokes)
+  while(keylasttime-time() < 5);
+
   //printf(STATUS32 "%02x%02x%4d" RESTORE, (char)keylast, (char)kbhit(), t);
 
   if (unc!=keylast) keylasttime=time();
@@ -1080,7 +1184,7 @@ void init_conioraw() {
   }
 }
 
-//#define COMPRESS_PROGRESS
+#define COMPRESS_PROGRESS
 #include "compress.c"
 
 
@@ -1107,13 +1211,14 @@ void main() {
     paper(*YELLOW);
     ink(*MAGNENTA);
 
+    puts(KESC "[20;13H*HERE!");
+
     while(1) {
-      printf(STATUS INVERSE "-ORIMACS:-- *scratch*    L%dc%d",
+      printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
              wherey(), wherex());
-      // TODO: see character code at position!
-      puts("   " ENDINVERSE RESTORE);
       puts(STATUS32); printkey(k); puts(" " RESTORE);
 
+      // show cursor, wait for char
       *cursc ^= 128;
       k=getchar();
       *cursc ^= 128;
@@ -1151,14 +1256,19 @@ void main() {
           puts("Compresz");
         }
       }
-      if ((char)k==CTRL+'S') {
+      if ((char)k==CTRL+'C') {
         puts(sherlock);
       } 
 
-      if ((char)k==CTRL+'U') u*= 4;
-      else {
-        // Do it!
+      // repeat character/take argument
+      if ((char)k==CTRL+'U' && u<0) u*= 4;
+      else if (abs(u) > 1 && isdigit((char)k)) {
+        if (u<0) u=0;
+        u= 10*u + (char)k-'0';
+      } else {
+        // print char! (n-times?)
         n= u<0? -u: u;
+        if (n>1080) n= SCREENSIZE;
         do {
           putchar(k);
         } while(--n > 0);
