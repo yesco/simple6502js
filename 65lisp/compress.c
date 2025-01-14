@@ -29,6 +29,15 @@
   #define COMDEBUG(a)
 #endif // COMPRESS_DEBUG
 
+// Compressed data is returned as a pointer to memory of this type
+typedef struct Compressed {
+  //uint16_t id; // "JK"
+  uint16_t len;
+  //uint16_t origlen;
+  //uint16_t addr;
+  char data[];
+} Compressed;
+
 // Match using a DICTIONARY of length 2 pointed at for a STRING
 //
 // Returns:
@@ -71,6 +80,8 @@ int mmmlen= 0;
 
 int deep, maxdeep;
 
+// TODO: maybe figure out why this one gives error
+// in encoding? or just delete. lol
 int dematch2(signed char* z) {
   signed char i= *z; int a, b;
   //printf("DEMATCH2: %d \"%s\"\n", mmmlen, z, mmm);
@@ -95,7 +106,7 @@ int dematch(signed char* z, char* m, int len) {
 //
 // Returns: a pointer to the result
 //   first two bytes are compresslength
-char* compress(char* o, int len) {
+Compressed* compress(char* o, int len) {
   char *s= o;
   // TODO: realloc as we go?
   signed char *res= malloc(len+2); // lol, is it enough? (>127...)
@@ -217,16 +228,8 @@ char* compress(char* o, int len) {
   // store length
   *(uint16_t*)res= n;
   
-  return realloc(res, n+2); // shrink
+  return (Compressed*)realloc(res, n+2); // shrink
 }
-
-// TODO: return pointer to struct
-
-typedef struct compressed {
-  uint16_t len;
-  uint16_t origlen;
-  char data[];
-} compressed;
 
 // hires squares 42%, Z= 27067 D= 734 hs
 char* old_decomp(char* z, char* d) {
@@ -238,20 +241,16 @@ char* old_decomp(char* z, char* d) {
  
 // Compresz: Z=3400 D=112 hs (Z=2893 w/o COMPRESS_PROGRESS 18% faster)
 // Sherlock: Z=20030 D=95 hs
-char* old_decompress(char* z, char* r) {
-  int len= *(uint16_t*)z;
-  char* d;
-  d= r; z+= 2;
+char* old_decompress(Compressed* zz, char* r) {
+  char *z= zz->data, *d= r;
+  int len= zz->len;
+
   while(len--) d= old_decomp(z,d),++z;
   return r;
 }
 
 //#define decompress(a,b) old_decompress(a,b)
 #define decompress(a,b) static_unroll_decompress(a,b)
-// static tmp
-// TODO: create a set typed of these..., in zero page!
-char* dest;
-
 // Compresz: Z=3410 D=67 hs (decompress double speed!)
 //             3078   67
 //                    58 static i in sdecomp, z+=i
@@ -267,14 +266,20 @@ char* dest;
 //
 // 63% faster than old original
 
+// static tmp
+// TODO: create a set typed of these..., in zero page!
+char* dest;
+
 void sdecomp(char* z) {
   static signed char i;
   i= *z;
   if (i >= 0) *++dest=i;
   else sdecomp(z+=i),sdecomp(z+1);
 }
-char* static_unroll_decompress(char* z, char* d) {
-  int len= *(uint16_t*)z;
+
+char* static_unroll_decompress(Compressed* zz, char* d) {
+  char* z= zz->data;
+  int len= zz->len;
   dest= d-1;
   //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
   z+= 2; --z;
@@ -286,12 +291,15 @@ char* static_unroll_decompress(char* z, char* d) {
 
 // 35% faster than old original
 // 21% slower compared to unrolled
-char* static_not_unrulled_decompress(char* z, char* d) {
-  int len= *(uint16_t*)z;
+char* static_not_unrulled_decompress(Compressed* zz, char* d) {
+  char* z= zz->data;
+  int len= zz->len;
+
   dest= d-1;
   //if (!r) r= malloc(len); // TODO: wrong! lOL we don't know original length!
   z+= 2;
   while(len--) sdecomp(z),++z;
+  return d;
 }
 
 
@@ -300,8 +308,9 @@ char* static_not_unrulled_decompress(char* z, char* d) {
 
 char* stack[128];
 
-char* ydecompress(char* z, char* d) {
-  int len= *(uint16_t*)z;
+char* ydecompress(Compressed* zz, char* d) {
+  char* z= zz->data;
+  int len= zz->len;
   char** se= stack+128, ** sp= se;
   signed char c;
   char *topz, *p;

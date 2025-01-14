@@ -1230,7 +1230,8 @@ void main() {
       if (k & RETURNBIT) k= '\n';
 
       if ((char)k==CTRL+'Z') {
-        char* zip, *saved;
+        char* saved;
+        Compressed* zip;
         int i;
         unsigned int C= time();
         *SCREENEND= 0; // lol
@@ -1238,7 +1239,7 @@ void main() {
         zip= compress(TEXTSCREEN+40, strlen(TEXTSCREEN+40));
         C= C-time();
         while((char)kbhit()!=CTRL+'C') {
-          int ol= strlen(saved), n= *(int*)zip;
+          int ol= strlen(saved), n= zip->len;
           unsigned int T= time();
           asm("CLI");
           decompress(zip, TEXTSCREEN+40);

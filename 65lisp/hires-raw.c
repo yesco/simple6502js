@@ -592,7 +592,8 @@ int T,nil,doapply1,print;
 #include "compress.c"
 
 void hirescompress() {
-  char* zip, * saved;
+  char* saved;
+  Compressed* zip;
   int len;
   unsigned C;
 
@@ -604,7 +605,7 @@ void hirescompress() {
   asm("CLI");
   zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
   C= C-time();
-  len= *(int*)zip;
+  len= zip->len;
   gotoxy(0,25); printf("DONE COMPRESS! => %d    <", len);
   gotoxy(0,26); printf("Comprez: %3d%% %4d/%4d      ", (int)(len*10050L/HIRESSIZE/100), len, HIRESSIZE);
 
