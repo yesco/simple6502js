@@ -20,7 +20,7 @@
 #ifdef COMPRESS_PROGRESS
   #define COMSHOW(a) a
 #else
-  #define COMSHOW(a) do {} while(0)
+  #define COMSHOW(a)
 #endif // COMPRESS_PROGESS
 
 #ifdef COMPRESS_DEBUG
@@ -97,19 +97,20 @@ int dematch(signed char* z, char* m, int len) {
 //   first two bytes are compresslength
 char* compress(char* o, int len) {
   char *s= o;
-  signed char *res= malloc(len+2); // lol, is it enough? (>127...)
   // TODO: realloc as we go?
-  signed char *dict= res+2;
-  signed char *de= dict;
-  signed char *d;
-  signed char *p;
-  signed char *best;
-  signed char c;
+  signed char *res= malloc(len+2); // lol, is it enough? (>127...)
+  signed char *dict= res+2, *de= dict, *d, *p, *best, c;
   int n= 0, r, max;
   int ol= len;
 
-  // Store first char of cmopressed string,
-  // speeds up test
+#ifdef COMSHOW
+  char isHires= (curmode==HIRESMODE);
+  char showSkipped= isHires? 64: 32;
+  char showCompressed= isHires? 64+1: 128+'<';
+#endif
+
+  // Store first char of compressed string,
+  // speeds up test, NOT!
   char firstchar[128]={0};
 
   assert(res);
@@ -125,15 +126,15 @@ char* compress(char* o, int len) {
     #ifdef __ATMOS__
 
       #ifdef HIRESSCREEN
-        if (curmode==TEXTMODE) 
+        if (isHires) 
       #else
-        if (1) 
+        if (0) 
       #endif
         {
+          gotoxy(0,25); printf("%3d%% => %d,deep=%2d %02x @ %d/%d ", (int)((n*10050L)/(s-o)/100), n, maxdeep, *s, (int)(s-o), (int)ol);
+        } else {
           // update progress during hires to debug
           printf(STATUS "=>%3d%% %d @ %4d/%4d\n\n" RESTORE, (int)((n*10050L)/(int)(s-o)/100), n, (int)(s-o), (int)ol);
-        } else {
-          gotoxy(0,25); printf("%3d%% => %d,deep=%2d %02x @ %d/%d ", (int)((n*10050L)/(s-o)/100), n, maxdeep, *s, (int)(s-o), (int)ol);
         }
     #endif
 
@@ -189,8 +190,8 @@ char* compress(char* o, int len) {
 
       COMSHOW( {
           char i;
-          s[max-1]=128+'<';
-          for(i=0; i<max-1;++i) s[i]=64;
+          s[max-1]= showCompressed;
+          for(i=0; i<max-1;++i) s[i]= showSkipped;
         } );
       
       s+= max;
@@ -198,7 +199,9 @@ char* compress(char* o, int len) {
     } else {
       COMDEBUG(printf("    => plain char= %d %02x '%c'\n", *s, *s, *s));
       *de= *s; ++de;
-      COMSHOW( *s ^= 128 );
+      // Text inverts
+      // Hires keeps set bit, or if none then inverts, this keeps image visible
+      COMSHOW( if (isHires) { if (*s==64) *s= 64+1; } else *s ^= 128; );
 
       ++s;
       --len;

@@ -142,6 +142,9 @@
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
 #define SCREENEND  (TEXTSCREEN+SCREENSIZE)
 
+#define TEXTMODE  26 // and 24-39 (2x 60 Hz, 2x 50 Hz)
+#define HIRESMODE 30 // and 28-31 (2x 60 Hz, 2x 50 Hz)
+
 // hundreths of second
 unsigned int time() {
   // ORIC TIMER 100 interrupts/s,
@@ -173,6 +176,7 @@ int wait(int hs) {
 
 char curx=0, cury=1, *cursc=TEXTSCREEN;
 char curinv=0, curdouble=0, curai=0, curcaps=0;
+char curmode= TEXTMODE;
 
 void cputc(char c);
 char cgetc();

@@ -33,9 +33,6 @@
 #define HIRESCHARSET ((char*)0x9800) // $9800-9BFF
 #define HIRESALTSET  ((char*(0x9C00) // $9C00-9FFF
 
-#define HIRESMODE 30 // and 31
-#define TEXTMODE  26 // and 27
-
 // TODO:
 // void gfill(r, c, h, w, v);
 // void circle(x, y, r, v);
@@ -45,7 +42,7 @@
 // void curset(x, y, v);
 // char curget(x, y);
 
-char curmode= TEXTMODE;
+extern char curmode; // defined in conio-raw.c
 
 void hires() {
   if (curmode==TEXTMODE) {
@@ -642,11 +639,13 @@ void main() {
   gfill(60, 15, 10*6, 10, 64+63);
 
   gclear();
+  // turn off, cursor keeps inverting random bit on text screen!
+  asm("SEI"); 
 
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(4) {
+  switch(6) {
 
   case 11:
     // compress clear screen
@@ -759,7 +758,7 @@ void main() {
     }
     #undef M
 
-    goto zoom;
+    //goto zoom;
 
     break;
 
