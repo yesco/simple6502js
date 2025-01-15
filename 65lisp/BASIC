@@ -1,0 +1,44 @@
+// BASIC in C (<) 2024 Jonas S Karlsson
+#include <stdlib.h>
+#include <unistd.h>
+
+void foo() { fflush(stdout); usleep(70); }
+int A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z;
+#define LOOPN 10
+int loopn= 0, *lop, *loop[LOOPN]={0};
+
+#define BASIC int main() { goto lastline; run: foo(
+#define line(N) ln##N: foo(
+//#define LINE ); line(
+#define L(N) ); line(N) 
+
+#define PRINT ); printf("%s",
+#define PRINTLN ); printf("%s\n",
+#define GOTO(N) ); goto ln##N; foo(
+#define END ); exit(0
+#define RUN END ); lastline: goto run; }
+
+#define IF ); if(
+#define THEN ) { foo(
+#define ELSE ); } else { foo(
+#define FI ); } foo(
+
+#define FOR(V) ); for(lop= loop[loopn]=&V, V
+#define TO ; ++loopn,*lop<=
+#define STEP ; (*lop)+=
+#define ROF ) { foo(
+#define NEXT ); lop= loop[--loopn]; } --loopn;  foo(
+
+#define MOD %
+
+BASIC
+L(10) FOR(I)=0 TO 300 STEP 1 ROF
+L(15)   IF I MOD 2==1 THEN PRINT "*" ELSE PRINT "!" FI
+L(20)   PRINT "HELLO"
+L(30)   FOR(J)=0 TO I STEP 1 ROF
+L(40)     PRINT " "
+L(50)   NEXT
+L(60) NEXT
+L(70) GOTO(10)
+L(80) END
+RUN
