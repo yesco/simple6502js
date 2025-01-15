@@ -4,30 +4,45 @@
 
 void foo() { fflush(stdout); usleep(70); }
 int A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z;
-#define LOOPN 10
-int loopn= 0, *lop, *loop[LOOPN]={0};
+char *A$,*B$,*C$,*D$,*E$,*F$,*G$,*H$,*I$,*J$,*K$,*L$,*M$,*N$,*O$,*P$,*Q$,*R$,*S$,*T$,*U$,*V$,*W$,*X$,*Y$,*Z$;
+
+void reset() {
+  A=B=C=D=E=F=G=H=I=J=K=L=M=N=O=P=Q=R=S=T=U=V=W=X=Y=Z=0;
+  A$=B$=C$=D$=E$=F$=G$=H$=I$=J$=K$=L$=M$=N$=O$=P$=Q$=R$=S$=T$=U$=V$=W$=X$=Y$=Z$="";
+}
 
 #define BASIC int main() { goto lastline; run: foo(
+
 #define line(N) ln##N: foo(
 //#define LINE ); line(
 #define L(N) ); line(N) 
 
-#define PRINT ); printf("%s",
-#define PRINTLN ); printf("%s\n",
 #define GOTO(N) ); goto ln##N; foo(
 #define END ); exit(0
-#define RUN END ); lastline: goto run; }
+#define RUNN(N) END ); lastline: reset(); foo( GOTO(N) ); }
+#define RUN END ); lastline: reset(); goto run; }
+
+#define PRINT ); printf("%s",
+#define PRINTV ); printf("%d\n",
+#define PRINTLN ); printf("%s\n",
 
 #define IF ); if(
 #define THEN ) { foo(
 #define ELSE ); } else { foo(
 #define FI ); } foo(
 
+#define LOOPN 10
+int loopn= 0, *lop, *loop[LOOPN]={0};
+
 #define FOR(V) ); for(lop= loop[loopn]=&V, V
 #define TO ; ++loopn,*lop<=
 #define STEP ; (*lop)+=
 #define ROF ) { foo(
-#define NEXT ); lop= loop[--loopn]; } --loopn;  foo(
+#define NEXT ); lop= loop[--loopn]; } --loopn; foo(
+
+#define REPEAT ); do { foo(
+#define UNTIL ); } while(!(
+#define LITNU )); foo(
 
 #define MOD %
 
@@ -40,5 +55,9 @@ L(40)     PRINT " "
 L(50)   NEXT
 L(60) NEXT
 L(70) GOTO(10)
-L(80) END
+L(80) REPEAT
+L(90)    PRINT "*"
+L(100)  UNTIL A==1 LITNU
+L(110) END
+//RUNN(80)
 RUN
