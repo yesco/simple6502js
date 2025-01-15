@@ -12,10 +12,9 @@ void reset() {
   A$=B$=C$=D$=E$=F$=G$=H$=I$=J$=K$=L$=M$=N$=O$=P$=Q$=R$=S$=T$=U$=V$=W$=X$=Y$=Z$="";
 }
 
-int i, len;
-#define LEFT$(S,N)  strndup((S), (N))
-#define RIGHT$(S,N) (len=strlen(S),i=len-(N),strdup((S)+(i>0?i:0)))
-#define MID$(S,I,N) (len=strlen(S),i=(I),i>=len?i=len:i,strndup((S)+i,(N)))
+char* LEFT$(char* s, int n) { return strndup(s, n); }
+char* RIGHT$(char* s, int n) { int len=strlen(s), i=len-n; return strdup(s+(i>0?i:0)); }
+char* MID$(char* s, int i, int n) { int len=strlen(s); if(i>=len) i=len; return strndup(s+i,n); }
 
 #define BASIC int main() { goto lastline; ln0: foo(
 
@@ -23,6 +22,7 @@ int i, len;
 //#define LINE ); line(
 #define L(N) ); line(N) 
 
+#define REM(a)
 #define GOTO(N) ); goto ln##N; foo(
 #define END ); exit(0
 
@@ -55,36 +55,42 @@ int loopn= 0, *lop, *loop[LOOPN]={0};
 
 #define REPEAT ); do { foo(
 #define UNTIL ); } while(!(
-#define LITNU )); foo(
+#define TAEPER )); foo(
 
 #define MOD %
 
 BASIC
- L(10) FOR(I)=0 TO 300 STEP 1 ROF
- L(15)   IF I MOD 2==1 THEN PRINT "*" ELSE PRINT "!" FI
- L(20)   PRINT "HELLO"
- L(30)   FOR(J)=0 TO I STEP 1 ROF
- L(40)     PRINT " "
- L(50)   NEXT
- L(60) NEXT
- L(70) GOTO(10)
-L(100) REPEAT
-L(110)    PRINT "*"
-L(120) UNTIL A==1 LITNU
-L(130) END
-L(200) LET A=3
-L(210) PRINTV A
-L(220) LET A=7
-L(230) PRINTV A
-L(240) CLEAR
-L(250) PRINTV A
-L(260) END
-L(300) LETS A$="FOOBAR"
-L(310) PRINTS A$
-L(320) PRINTS RIGHT$(A$,3)
+ L(10) REM( *** SINUSY *** )
+ L(20) FOR(I)=0 TO 300 STEP 1 ROF
+ L(30)   IF I MOD 2==1 THEN PRINT "*" ELSE PRINT "!" FI
+ L(40)   PRINT "HELLO"
+ L(50)   FOR(J)=0 TO I STEP 1 ROF
+ L(60)     PRINT " "
+ L(70)   NEXT
+ L(80) NEXT
+ L(90) GOTO(10)
+L(100) REM( *** MANY STARS *** )
+L(110) REPEAT
+L(120)    PRINT "*"
+L(130) UNTIL A==1 TAEPER
+L(140) END
+L(200) REM( *** SETTIN VARS/CLEARING *** )
+L(210) LET A=3
+L(220) PRINTV A
+L(230) LET A=7
+L(240) PRINTV A
+L(250) CLEAR
+L(260) PRINTV A
+L(270) END
+L(300) REM( *** STRINGS *** )
+L(310) LETS A$="FOOBAR"
+L(320) PRINTS A$
 L(330) PRINTS RIGHT$(A$,3)
-L(340) PRINTS LEFT$(A$,3)
-L(350) PRINTS MID$(A$,1,2)
+L(340) PRINTS RIGHT$(A$,3)
+L(350) PRINTS LEFT$(A$,3)
+L(360) PRINTS MID$(A$,1,2)
+L(370) END
+L(400) REM( *** MORE ... *** )
 L(999) END
 RUNN(300)
 //RUN
