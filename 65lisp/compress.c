@@ -1,3 +1,7 @@
+// ORIC Live Compression program
+//
+// https://youtube.com/watch?v=sIxJ1Xs4NrY&feature=shared
+// 
 ////////////////////////////////////////////////////
 // from Play/128dict.c
 
@@ -103,20 +107,47 @@ int dematch(signed char* z, char* m, int len) {
 }
 
 // RLE estimator...
+char bits[256/8+1]; // 32+1 bytes
+char bitmask[]= { 1,2,4,8, 16,32,64,128 };
+int bestprefix, bestn;
 
 unsigned int RLE(char* s, unsigned int len) {
-  unsigned int n=0, current=-1;
+  int n=0, current=-1;
   int r;
+
+  memset(bits, 0, sizeof(bits)); bits[sizeof(bits)-1]= 0xff;
+
   ++len;
   while(--len) {
     // repeats?
     r= 0;
     current = *s;
+    bits[((char)current)>>3] |= bitmask[((char)current) & 0x07];
     while(len-r-1>0 && s[++r]==current);
     // assuming have N bytes as RPT_N codes
     if (--r>4) { s+=r; len-=r; n+= r<64? 2: (r<255? 3: 4); } // RPT_N CHAR
     else { ++n; ++s; }
   }
+
+  // free char values, sequences >= 4
+  if (curmode==HIRESMODE) gotoxy(0,26); else gotoxy(0,0);
+
+  current= -1; bestprefix= -1; bestn= 0;
+  for(r= 0; r<128; ++r) { // not test hibitters
+    if (bits[((char)r)>>3] & bitmask[((char)r) & 0x07]) {
+      if (current>=0 && r-current>=4) {
+        // report
+        if (r-current>bestn) { bestprefix= current; bestn= r-current; }
+        printf("%02x#%d ", current, r-current);
+      }
+      current= -1;
+    } else {
+      if (current>=0) ;
+      else current= r;
+    }
+  }
+  printf("%02x#%d ", current, r-current);
+  cgetc();
   return n;
 } 
 
@@ -274,8 +305,10 @@ Compressed* compress(char* o, int len) {
 }
 
 // hires squares 42%, Z= 27067 D= 734 hs
+
 char* old_decomp(char* z, char* d) {
   signed char i= *z;
+
   if (i >= 0) *d=i,++d;
   else d=old_decomp(z+i, d),d=old_decomp(z+i+1, d);
   return d;
