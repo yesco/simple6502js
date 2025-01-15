@@ -102,6 +102,24 @@ int dematch(signed char* z, char* m, int len) {
   return dematch2(z);
 }
 
+// RLE estimator...
+
+unsigned int RLE(char* s, unsigned int len) {
+  unsigned int n=0, current=-1;
+  int r;
+  ++len;
+  while(--len) {
+    // repeats?
+    r= 0;
+    current = *s;
+    while(len-r-1>0 && s[++r]==current);
+    // assuming have N bytes as RPT_N codes
+    if (--r>4) { s+=r; len-=r; n+= r<64? 2: (r<255? 3: 4); } // RPT_N CHAR
+    else { ++n; ++s; }
+  }
+  return n;
+} 
+
 // Compress a stream of BYTES of LENgth
 //
 // Returns: a pointer to the result
@@ -295,7 +313,9 @@ char* old_decompress(Compressed* zz, char* r) {
 //                                     D=399 hs 32% w static i,+=i
 //
 //                               Z=16m40s=100000 hs=1ks lastchar+upate screen
-// 63% faster than old original
+//                                  - 63% faster than old original!
+//
+//                          4740 B RLE encoded (estimate)
 
 // static tmp
 // TODO: create a set typed of these..., in zero page!

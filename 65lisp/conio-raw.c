@@ -1233,10 +1233,14 @@ void main() {
         char* saved;
         Compressed* zip;
         int i;
-        unsigned int C= time();
+        unsigned int C, rle;
         *SCREENEND= 0; // lol
         saved= strdup(TEXTSCREEN+40);
-        zip= compress(TEXTSCREEN+40, strlen(TEXTSCREEN+40));
+        rle= RLE(TEXTSCREEN+40, SCREENSIZE-40);
+        gotoxy(32, 0); printf("RLE=%4d ", rle);
+
+        C= time();
+        zip= compress(TEXTSCREEN+40, SCREENSIZE-40);
         assert(zip);
         C= C-time();
         while((char)kbhit()!=CTRL+'C') {

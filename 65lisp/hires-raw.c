@@ -595,12 +595,15 @@ void hirescompress() {
   char* saved;
   Compressed* zip;
   int len;
-  unsigned C;
+  unsigned int C, rle;
 
   gotoxy(0,25); printf("COMPRESzING...");
   //saved= malloc(HIRESSIZE);
   //assert(saved);
   //memcpy(saved, HIRESSCREEN, HIRESSIZE);
+  rle= RLE(HIRESSCREEN, HIRESSIZE);
+  gotoxy(32, 27); printf("RLE=%4d ", rle);
+
   C= time();
   asm("CLI");
   zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
