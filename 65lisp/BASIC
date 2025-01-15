@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 void foo() { fflush(stdout); usleep(70); }
-void let(int x) { }
+void let(int x) { } void lets(char* x) { }
 int A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z;
 char *A$,*B$,*C$,*D$,*E$,*F$,*G$,*H$,*I$,*J$,*K$,*L$,*M$,*N$,*O$,*P$,*Q$,*R$,*S$,*T$,*U$,*V$,*W$,*X$,*Y$,*Z$;
 
@@ -11,6 +11,12 @@ void reset() {
   A=B=C=D=E=F=G=H=I=J=K=L=M=N=O=P=Q=R=S=T=U=V=W=X=Y=Z=0; A=0;
   A$=B$=C$=D$=E$=F$=G$=H$=I$=J$=K$=L$=M$=N$=O$=P$=Q$=R$=S$=T$=U$=V$=W$=X$=Y$=Z$="";
 }
+
+int i, len;
+#define LEFT$(S,N)  strndup((S), (N))
+#define RIGHT$(S,N) (len=strlen(S),i=len-(N),strdup((S)+(i>0?i:0)))
+#define MID$(S,I,N) (len=strlen(S),i=(I),i>=len?i=len:i,strndup((S)+i,(N)))
+
 #define BASIC int main() { goto lastline; ln0: foo(
 
 #define line(N) ln##N: foo(
@@ -24,11 +30,15 @@ void reset() {
 #define RUNN(N) END ); lastline: reset( GOTO(N) ); }
 #define RUN END ); lastline: reset( GOTO(0) ); }
 
-#define PRINT ); printf("%s",
-#define PRINTV ); printf("%d\n",
-#define PRINTLN ); printf("%s\n",
+#define PRINT    ); printf("%s",
+#define PRINTV   ); printf("%d",
+#define PRINTS   ); printf("%s",
+#define PRINTLN  ); printf("%s\n",
+#define PRINTLNV ); printf("%d\n",
+#define PRINTLNS ); printf("%s\n",
 
 #define LET ); let(
+#define LETS ); lets(
 #define IF ); if(
 #define THEN ) { foo(
 #define ELSE ); } else { foo(
@@ -69,6 +79,12 @@ L(230) PRINTV A
 L(240) CLEAR
 L(250) PRINTV A
 L(260) END
+L(300) LETS A$="FOOBAR"
+L(310) PRINTS A$
+L(320) PRINTS RIGHT$(A$,3)
+L(330) PRINTS RIGHT$(A$,3)
+L(340) PRINTS LEFT$(A$,3)
+L(350) PRINTS MID$(A$,1,2)
 L(999) END
-//RUNN(200)
-RUN
+RUNN(300)
+//RUN
