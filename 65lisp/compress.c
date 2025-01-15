@@ -109,6 +109,11 @@ int dematch(signed char* z, char* m, int len) {
 //   NULL if fail to allocate
 //   NULL if not compress to less!
 
+// Store last char of compressed string,
+// speeds up test, NOT!
+char lastchar[128];
+int  length[128];
+
 Compressed* compress(char* o, int len) {
   char *s= o;
   // TODO: realloc as we go?
@@ -117,6 +122,7 @@ Compressed* compress(char* o, int len) {
   signed char *dict= (signed char*)(res->data), *de= dict, *d, *p, *best, c;
   int n= 0, r, max;
   int ol= len;
+  int ll,li;
 
 #ifdef COMPRESS_PROGRESS
   char isHires= (curmode==HIRESMODE);
@@ -124,9 +130,8 @@ Compressed* compress(char* o, int len) {
   char showCompressed= isHires? 64+1: 128+'<';
 #endif
 
-  // Store first char of compressed string,
-  // speeds up test, NOT!
-  char firstchar[128]={0};
+  memset(lastchar, 0, sizeof(lastchar));
+  memset(length, 0, sizeof(length));
 
   if (!res) return NULL;
 
@@ -183,8 +188,12 @@ Compressed* compress(char* o, int len) {
 
       // incorrect!?!?!?!? not complete
       // ANY FASTER? benchmark...
-      //if (de>dict+128 && firstchar[((int)(*de+de))&0x7f] != *s) continue;
-      // NO- lol, slower!!!!
+      if (de>dict+128) {
+        li= ((int)(*de+de))&0x7f;
+        ll= length[li];
+        if (ll>len) continue;
+        if (lastchar[li] != s[ll]) continue;
+      }
 
       //gotoxy(0,26); printf("Try: %02x @ %d \n", *s, *de);
       //getchar();
@@ -196,7 +205,9 @@ Compressed* compress(char* o, int len) {
     }
     p= best;
 
-    //firstchar[((int)de)&0x7f]= *s; // lol, raw!
+    li= ((int)(de))&0x7f;
+    length[li]= max;
+    lastchar[li]= s[max];
 
     //*s= '-'; // to show progress, but this messes up compressing?
     // -- encode best match
@@ -267,16 +278,23 @@ char* old_decompress(Compressed* zz, char* r) {
 // Compresz: Z=3410 D=67 hs (decompress double speed!)
 //             3078   67
 //                    58 static i in sdecomp, z+=i
-//
+//           Z=3487 w lastchar... Hmmm, worse?
+
 // Sherlock: Z=20028 D=58 hs
 //                     59
 //                     54 static i - 7.5%
+//           Z=16693 w NO PROGRESS, before lastchar
+//           Z=14754 w lastchar! PROGRESS (29% overhead)
+//           Z=11411 w lastchar, no progress -46%
+
 // --HIRES--
 //                   Z=27067           D=734 hs orig
 //                   Z=1969 (?)        D=543 hs (no unroll top)
+//
 // Rotating squares: => 42% 3376 Z=15m D=449 hs
 //                                     D=399 hs 32% w static i,+=i
 //
+//                               Z=16m40s=100000 hs=1ks lastchar+upate screen
 // 63% faster than old original
 
 // static tmp

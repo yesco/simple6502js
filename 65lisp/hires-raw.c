@@ -655,7 +655,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(11) {
+  switch(6) {
 
   case 11:
     // compress clear screen

@@ -59,6 +59,9 @@ int loopn= 0, *lop, *loop[LOOPN]={0};
 #define TAEPER )); foo(
 
 #define MOD %
+#define AND &&
+#define OR ||
+#define NOT !
 
 BASIC
  L(10) REM( *** SINUSY *** )
