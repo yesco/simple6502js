@@ -14,10 +14,10 @@
 //  6%   66/1080 of paper+ink blank screen, BUT WRONG!
 //       23/ 162 RLE
 //
-//  42% 3376/8000 hires rotating squares 25m  = 1500s
-//                           w lastchar 16m40 = 1000s 63% faster
-//  40% 3250/5148 RLE  w progress       14m33 =  873s 72% faster!
-//       (/ 3376 3250.0) 3.9% better compression, but 15% faster
+//  42% 3376/8000 hires rotating squares 25m  = 1500s             DZ=734 hs
+//                           w lastchar 16m40 = 1000s 63% faster  DZ=399 hs (449 w progress)
+//  40% 3250/5148 RLE  w progress       14m33 =  873s 72% faster! DZ=250 hs not unRLEed...
+//       (/ 3376 3250.0) 3.9% better compression, but 15% faster 
 
 // TODO: move where?
 
