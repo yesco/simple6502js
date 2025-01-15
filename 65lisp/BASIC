@@ -16,19 +16,20 @@ char* LEFT$(char* s, int n) { return strndup(s, n); }
 char* RIGHT$(char* s, int n) { int len=strlen(s), i=len-n; return strdup(s+(i>0?i:0)); }
 char* MID$(char* s, int i, int n) { int len=strlen(s); if(i>=len) i=len; return strndup(s+i,n); }
 
-#define BASIC int main() { goto lastline; ln0: foo(
+#define BASIC int main(int go,char**X) { if (!go) goto lastline; switch(go) { ln0: case 0: foo(
 
-#define line(N) ln##N: foo(
-//#define LINE ); line(
+#define line(N) ln##N: case N: foo(
 #define L(N) ); line(N) 
 
 #define REM(a)
 #define GOTO(N) ); goto ln##N; foo(
 #define END ); exit(0
 
+#define GOSUB(N) ); main(N,0
+#define RETURN ); return 0; foo(
 #define CLEAR ); reset(
-#define RUNN(N) END ); lastline: reset( GOTO(N) ); }
-#define RUN END ); lastline: reset( GOTO(0) ); }
+#define RUNN(N) END ); } lastline: reset( GOTO(N) ); }
+#define RUN END ); } lastline: reset( GOTO(0) ); }
 
 #define PRINT    ); printf("%s",
 #define PRINTV   ); printf("%d",
@@ -62,6 +63,7 @@ int loopn= 0, *lop, *loop[LOOPN]={0};
 BASIC
  L(10) REM( *** SINUSY *** )
  L(20) FOR(I)=0 TO 300 STEP 1 ROF
+ L(21)   GOSUB(400)
  L(30)   IF I MOD 2==1 THEN PRINT "*" ELSE PRINT "!" FI
  L(40)   PRINT "HELLO"
  L(50)   FOR(J)=0 TO I STEP 1 ROF
@@ -90,7 +92,10 @@ L(340) PRINTS RIGHT$(A$,3)
 L(350) PRINTS LEFT$(A$,3)
 L(360) PRINTS MID$(A$,1,2)
 L(370) END
-L(400) REM( *** MORE ... *** )
+L(400) REM( *** SUBROUTINE *** )
+L(410) PRINT "-"
+L(420) RETURN
+L(500) REM( *** MORE ... *** )
 L(999) END
-RUNN(300)
-//RUN
+//RUNN(300)
+RUN
