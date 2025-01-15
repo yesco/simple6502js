@@ -602,11 +602,12 @@ void hirescompress() {
   //assert(saved);
   //memcpy(saved, HIRESSCREEN, HIRESSIZE);
   rle= RLE(HIRESSCREEN, HIRESSIZE);
-  gotoxy(32, 27); printf("RLE=%4d ", rle);
+  gotoxy(32, 27); printf("RLE=%4d ", rle); while((char)cgetc()!=CTRL+'C');
 
   C= time();
   asm("CLI");
-  zip= compress(HIRESSCREEN, HIRESSIZE); // strlen?  lol, fix it!
+  //zip= compress(HIRESSCREEN, HIRESSIZE);
+  zip= compress(HIRESSCREEN, rle);
   assert(zip);
   C= C-time();
   len= zip->len;

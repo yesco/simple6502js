@@ -1240,7 +1240,8 @@ void main() {
         gotoxy(32, 0); printf("RLE=%4d ", rle);
 
         C= time();
-        zip= compress(TEXTSCREEN+40, SCREENSIZE-40);
+        //zip= compress(TEXTSCREEN+40, SCREENSIZE-40);
+        zip= compress(TEXTSCREEN+40, rle);
         assert(zip);
         C= C-time();
         while((char)kbhit()!=CTRL+'C') {

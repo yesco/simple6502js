@@ -5,10 +5,19 @@
 ////////////////////////////////////////////////////
 // from Play/128dict.c
 
-// 68% 632/932  (1080? of sherlock.txt English)
-//  8%  89/1080 Of "Compress" with increasing spaces between
-//  1%  18/1080 of a screenful of "a"s!
-//  6%  66/1080 of paper+ink blank screen, BUT WRONG!
+// 68%  632/932  (1080? of sherlock.txt English)
+//       
+//  8%   89/1080 Of "Compresz" with increasing spaces between
+//       92/ 417 RLE
+//  1%   18/1080 of a screenful of "a"s! 
+//       13/  28 RLE
+//  6%   66/1080 of paper+ink blank screen, BUT WRONG!
+//       23/ 162 RLE
+//
+//  42% 3376/8000 hires rotating squares 25m  = 1500s
+//                           w lastchar 16m40 = 1000s 63% faster
+//  40% 3250/5148 RLE  w progress       14m33 =  873s 72% faster!
+//       (/ 3376 3250.0) 3.9% better compression, but 15% faster
 
 // TODO: move where?
 
@@ -106,13 +115,16 @@ int dematch(signed char* z, char* m, int len) {
   return dematch2(z);
 }
 
+#define RLE_REPEAT 15
+
 // RLE estimator...
 char bits[256/8+1]; // 32+1 bytes
 char bitmask[]= { 1,2,4,8, 16,32,64,128 };
 int bestprefix, bestn;
 
 unsigned int RLE(char* s, unsigned int len) {
-  int n=0, current=-1;
+  char* d= s;
+  int n=0, current=-1, ol= len;
   int r;
 
   memset(bits, 0, sizeof(bits)); bits[sizeof(bits)-1]= 0xff;
@@ -125,8 +137,29 @@ unsigned int RLE(char* s, unsigned int len) {
     bits[((char)current)>>3] |= bitmask[((char)current) & 0x07];
     while(len-r-1>0 && s[++r]==current);
     // assuming have N bytes as RPT_N codes
-    if (--r>4) { s+=r; len-=r; n+= r<64? 2: (r<255? 3: 4); } // RPT_N CHAR
-    else { ++n; ++s; }
+    if (current==RLE_REPEAT) {
+      // Can't fit it!
+      if (d+1>=s) {
+        gotoxy(0,0); printf("%%%%ERROR: %04x+1>=%04x: can't fit 15 ", d, s);
+        cgetc(); return ol;
+      }
+      n+= 2;
+      *d= RLE_REPEAT; d++;
+      *d= 0; d++;
+      s++;
+    } else if (--r>=4) {
+      s+=r; len-=r;
+      while(r>0) {
+        n+= 3;
+        *d= RLE_REPEAT; ++d;
+        *d= current; ++d;
+        // Only output < 128, no hib as that is dictionary ref
+        if (r>127) { *d= 127; ++d; r-= 127; }
+        else if (r>=24 && r<= 31) { *d= 23; ++d; r-= 23; } // attributes
+        else { *d= r; ++d; r= 0; }
+      }
+    } // RPT_N CHARi
+    else { *d= *s; ++n; ++s; ++d; }
   }
 
   // free char values, sequences >= 4
@@ -304,7 +337,7 @@ Compressed* compress(char* o, int len) {
   return (Compressed*)realloc(res, n+sizeof(Compressed)); // shrink it
 }
 
-// hires squares 42%, Z= 27067 D= 734 hs
+// hires squares 42%, Z= 27067? D= 734 hs
 
 char* old_decomp(char* z, char* d) {
   signed char i= *z;
@@ -345,7 +378,7 @@ char* old_decompress(Compressed* zz, char* r) {
 // Rotating squares: => 42% 3376 Z=15m D=449 hs
 //                                     D=399 hs 32% w static i,+=i
 //
-//                               Z=16m40s=100000 hs=1ks lastchar+upate screen
+//                               Z=16m40s=1000,00 hs=1ks lastchar+upate screen
 //                                  - 63% faster than old original!
 //
 //                          4740 B RLE encoded (estimate)
