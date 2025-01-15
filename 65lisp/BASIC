@@ -21,7 +21,7 @@ char* MID$(char* s, int i, int n) { int len=strlen(s); if(i>=len) i=len; return 
 #define line(N) ln##N: case N: foo(
 #define L(N) ); line(N) 
 
-#define REM(a)
+#define REM(...)
 #define GOTO(N) ); goto ln##N; foo(
 #define END ); exit(0
 
