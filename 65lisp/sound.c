@@ -68,14 +68,17 @@
 //        Registers+envelops :
 //        - http://download.abandonware.org/magazin ... e%2021.jpg
 
+#include <stdio.h>
+
 // ORIC Predefined Sounds (from BASIC ROM)
 
-#define PONG    {238,2,0,0,0,0,0,62,16,0,0,208,7,0}
 #define PING    {24,0,0,0,0,0,0,62,16,0,0,0,15,0}
 #define SHOOT   {0,0,0,0,0,0,15,7,16,16,16,0,8,0}
 #define EXPLODE {0,0,0,0,0,0,31,7,16,16,16,0,24,0}
+#define PONG    {238,2,0,0,0,0,0,62,16,0,0,208,7,0}
 
 // Flying related
+#define AHELICOPTER  "\xa8\xbf\x00\x03\xb8\xbf\x0e\x00\x00\x00\xa7\xc2\x4c\xb0"
 #define HELICOPTER   {168,191,0,3,184,191,14,0,0,0,167,194,76,176}
 #define HELICOPTER2  {206,108,231,36,137,112,70,182,170,239,83,246,12,165}
 #define HELI_DISTANT {14,136,132,12,140,0,69,173,0,5,208,4,169,192}
@@ -101,5 +104,46 @@
 //                      Al   Ah   Bl   Bh   Cl   Bh   N4   Ch   Va   Vb   Vc Env-freq   ENV 
 #define PONG2        {0xEE,0x02,0x00,0x00,0x00,0x00,0x00,0x3E,0x10,0x00,0x00,0xD0,0x07,0x00}
 #define PCHH         {0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x37,0x10,0x00,0x00,0xD6,0x0B,0x00}
+#define APONG2       "\xEE\x02\x00\x00\x00\x00\x00\x3E\x10\x00\x00\xD0\x07\x00"
 
 #define soundfx(soundtableadr)  ldx #<soundtableadr:ldy #>soundtableadr:jmp $FA86
+
+char sound[]= PONG;
+
+extern int T=0;
+extern int nil=0;
+extern int doapply1=0;
+extern int print=0;
+
+void fx(char* sound) {
+  char* pb= (void*)&sound;
+  __AX__= (pb[0]>>8) || (pb[1]<<8);
+  __AX__= sound;
+//  __AX__= 0xFAA7; // a: a7 x: fa
+  asm("pha"); // stack: a7
+  asm("txa"); // a= fa
+  asm("tay"); // y= fa
+  asm("pla"); // a= 
+  asm("tax");
+  // PING from ORIC BASIC ROM
+  //asm("ldx #$a7");
+  //asm("ldy #$fa");
+  asm("jsr $FA86");
+}
+
+#include <conio.h>
+
+void wait(unsigned int ms) {
+  long w= ms*7L;
+  while(--w);
+}
+
+void main() {
+  while(1) {
+    printf("Hello Sound!\n");
+    //fx(sound);
+    //fx(APONG2);
+    fx(AHELICOPTER);
+    wait(1000);
+  }
+}
