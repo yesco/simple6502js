@@ -147,7 +147,7 @@ unsigned int RLE(char* s, unsigned int len) {
       *d= RLE_REPEAT; d++;
       *d= 0; d++;
       s++;
-    } else if (--r>=4) {
+    } else if (--r>=4) {  // RLE_REPEAT char n (n<128, not 23..31)
       s+=r; len-=r;
       while(r>0) {
         n+= 3;
@@ -158,7 +158,7 @@ unsigned int RLE(char* s, unsigned int len) {
         else if (r>=24 && r<= 31) { *d= 23; ++d; r-= 23; } // attributes
         else { *d= r; ++d; r= 0; }
       }
-    } // RPT_N CHARi
+    }
     else { *d= *s; ++n; ++s; ++d; }
   }
 
@@ -183,6 +183,33 @@ unsigned int RLE(char* s, unsigned int len) {
   cgetc();
   return n;
 } 
+
+// TODO: not correct... for "last line"
+unsigned int unRLE(char* s, int len, unsigned int expected) {
+  char i, c, * p= s+(expected-len), * d= s-1;
+  int n= 0;
+  
+  // not compressed?
+  assert(len>=0);
+  if (len==expected) return len;
+
+  // More easy to do from front, so move it down!
+  memmove(p, s, len);
+  memset(s, 0, expected-len);
+
+  ++len; --p;
+  while(--len > 0) { // length of RLE_REPEAT char n (n<128)
+    if (d==p) break;
+    if ((*++d= *++p)==RLE_REPEAT) {
+      len-= 2;
+      c= *++p; --d;
+      i= *++p; n+= i;
+      do { *++d= c; } while (--i);
+    } else ++n;
+  }
+  if (d!=p) { gotoxy(0,0); printf("%%ERROR unRLE: p!=d %04x != %04x n=%d ", p, d, n); cgetc(); }
+  return n;
+}
 
 // Compress a stream of BYTES of LENgth
 //

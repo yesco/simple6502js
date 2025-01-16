@@ -1184,7 +1184,7 @@ void init_conioraw() {
   }
 }
 
-//#define COMPRESS_PROGRESS
+#define COMPRESS_PROGRESS
 #include "compress.c"
 
 
@@ -1246,14 +1246,16 @@ void main() {
         C= C-time();
         while((char)kbhit()!=CTRL+'C') {
           int ol= strlen(saved), n= zip->len;
-          unsigned int T= time();
+          unsigned int T;
+          clrscr();
           asm("CLI");
+          T= time();
           decompress(zip, TEXTSCREEN+40);
+          unRLE(TEXTSCREEN+40, zip->origlen, SCREENSIZE-40);
           //i = strprefix(TEXTSCREEN+40, saved);
           //if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
           printf(STATUS "=>%3d%% %4d/%4d z=%u hs dez=%u hs\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol, C, T-time());
           wait(50);
-          clrscr();
         }
       }
       if ((char)k==CTRL+'X') {

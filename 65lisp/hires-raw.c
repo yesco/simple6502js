@@ -620,6 +620,7 @@ void hirescompress() {
     asm("CLI");
     T= time();
     decompress(zip, HIRESSCREEN);
+    unRLE(HIRESSCREEN, zip->origlen, HIRESSIZE);
     //i= strprefix(HIRESSCREEN, saved);
     //if (i<=0) { gotoxy(10, 27); printf("  DIFFER AT POSITION: %d  ", i); }
     gotoxy(0,27); printf("Z=%u hs DZ=%u hs         ", C, T-time());
