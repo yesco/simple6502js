@@ -122,6 +122,15 @@ char bits[256/8+1]; // 32+1 bytes
 char bitmask[]= { 1,2,4,8, 16,32,64,128 };
 int bestprefix, bestn;
 
+// TODO: possible bitblt encodings:
+// - RLE_REPEAT c n
+// - RLE_SKIP n (strides!) can do .mov ? rough animation by diff files!
+// - RLE_LSKIP lon hin (strides!) can do .mov ? rough animation by diff files!
+// - RLE_ASKIP addrlo addrhi load actual address for next byte
+// - RLE_COPY n (from one row up)
+// - RLE_2COPY n (from one row up)
+// - RLE_RCOPY r n (from Row)
+
 unsigned int RLE(char* s, unsigned int len) {
   char* d= s;
   int n=0, current=-1, ol= len;
