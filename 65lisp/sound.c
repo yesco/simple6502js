@@ -300,7 +300,8 @@ RTS
 #define soundfx(soundtableadr)  ldx #<soundtableadr:ldy #>soundtableadr:jmp $FA86
 
 //char sound[]= PONG;
-//char sound[]= PING;
+char ping[]= PING;
+
 
 extern int T=0;
 extern int nil=0;
@@ -473,19 +474,40 @@ void play(char tonemap, char noisemap, char env, unsigned int env_period) {
 
 // ------------------------------------------------------------
 
-#include <conio.h>
+#include "conio-raw.c"
 
-void wait(unsigned int ms) {
-  long w= ms*7L;
-  while(--w);
-}
+//void wait(unsigned int ms) {
+//  long w= ms*7L;
+//  while(--w);
+//}
+
+char KLAVIATUR[]= "awsedftgyhuj";
 
 void main() {
+  char c, *p;
+
+  // TODO: keys not working after sound! need some cleanup/setup?
+  while((c= cgetc())!=CTRL+'C') {
+    putchar(c);
+    if (c==' ') play(0,0,0,0);
+    else if (c=='p') fx(ping);
+    else {
+      p= strchr(KLAVIATUR, c);
+      if (p) {
+        printf(" [%d] ", p-KLAVIATUR+1);
+        music(1, 3, p-KLAVIATUR+1, 6);
+        play(1, 0, 0, 2000);
+      }
+    }
+    putchar('>');
+  }
+
   while(1) {
     printf("Hello Sound!\n");
-    //fx(sound);
+    fx(ping);
     fx(APONG2);
     //fx(AHELICOPTER);
-    wait(1000);
+    //wait(1000);
+    wait(100);
   }
 }
