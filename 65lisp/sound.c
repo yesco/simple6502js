@@ -382,9 +382,9 @@ void sound(char ch, unsigned int period, char vol) {
 // n=real_period/16/T0 (TO=1µS for Oric) or in short
 // Frequency=1MHz/16/n (n=0 acts as n=1)
 // (/ 1000000 16) so ... 62500/hz (/ 62500 440)=142
-//
+
 #define DIVHZ 62500L // 1000000/16
-//
+
 void freq(char ch, unsigned int hz, char vol) {
   sound(ch, DIVHZ/hz, vol); // TODO: rounding?
 }
