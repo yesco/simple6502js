@@ -351,6 +351,47 @@ void fx(char* fourteenbytes) {
 
 #endif // BASIC_ROM
 
+// PLAY 0,0,0,0 - silence
+//
+// SOUND(ch, period, vol:0-15)
+//  ch: 1,2,3 - tone
+//       4,5,6 - noise
+// 
+// MUSIC(ch:1-3, octave:0-6, note, vol:0-15)
+//
+// Note, piano layout:
+// 
+//     2  4     7  9 11  
+//
+//    C# D#    F# G# A#
+//   C  D  E  F  G  A  H
+//
+//   1  3  5  6  8 10 12
+// 
+// If volume level zero is chosen on SOUND or MUSIC, then the
+// output is directed to the envelope section of the PLAY command.
+// Both SOUND and MUSIC are switched on by PLAY. Note length can
+// be controlled by WAIT statements and the sound is switched off
+// by PLAY 0,0,0,0.
+//
+// PLAY(tone_enable, noise_enable, envelope, env_period)
+//
+//   tone:  A=1, B=2, C=4 => A+C==5 all=7
+//   noise: similar to tone for each channel
+//   env_period: 0..32767
+
+// -- example from ORIC manual
+// 
+//  10 REM ** TUNE **
+//  20 FOR N= 1 TO 11
+//  30   READ A,B
+//  40   MUSIC 2,3,A,0
+//  50   PLAY 3,0,7,2000
+//  60   WAIT B
+//  70   PLAY 0,0,0,0
+//  80 NEXT N
+// 100 DATA 5,30, 5,30, 7,30, 8,75, 5,75
+// 110 DATA 8,60, 10,30, 7,60, 5,30, 3,30, 5,180
 // ------------------------------------------------------------
 
 #include <conio.h>
