@@ -326,29 +326,12 @@ void fx(char* sound) {
 #else
 
 void setAYreg(char r, char v) {
-  //     LDA #8        'Set the register to 8
-  //     STA $030F
-  *(char*)0x030f= r;
-  
-  //     LDA #$FF
-  //     STA $030C
-  *(char*)0x030c= 0xff;
-
-  //     LDA #$DD
-  //     STA $030C
-  *(char*)0x30c= 0xdd;
-
-  //     LDA #15       'Set the Value for this register
-  //     STA $030F
-  *(char*)0x30f= v;
-
-  //     LDA #$FD
-  //     STA $030C
-  *(char*)0x30c= 0xfd;
-
-  //     LDA #$DD      'Reset the state of the control lines
-  //     STA $030C
-  *(char*)0x30c= 0xdd;
+  *(char*)0x030f= r;       // Set the register
+  *(char*)0x030c= 0xff;    //   toggle
+  *(char*)0x030c= 0xdd;    //   toggle
+  *(char*)0x030f= v;       // Set the Value for this register
+  *(char*)0x030c= 0xfd;    //   toogle
+  *(char*)0x030c= 0xdd;    //   toggle Reset the state of the control lines
 }
 
 void setAYword(char ch, unsigned int w) {
