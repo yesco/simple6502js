@@ -1,5 +1,14 @@
-// - https://forum.defence-force.org/viewtopic.php?t=692
+// SOUND-RAW
+//
+// (BASIC) ROM-less sounds in plain C
+//
+// (C) 2024 Jonas S Karlsson
+//
 
+// Various resources used...
+
+// - https://forum.defence-force.org/viewtopic.php?t=692
+//
 // ORIC uses a 14 byte table to play it's built-in sounds
 //
 //   Now, what is the meaning of each byte of the table ?
@@ -48,9 +57,9 @@
 //        but only 10 are available because only
 //        B2 is taken into account when B3 is equal to zero :
 //
-//        B3 - Continue
-//        B2 - Attack
-//        B1 - Alternate
+//        B3 - Continue   
+//        B2 - Attack     0=\ 1=/
+//        B1 - Alternate  
 //        B0 - Hold
 //
 //        Binary  Hex      Shape
@@ -259,14 +268,14 @@ RTS
 */
 
 
-#include <stdio.h>
-
 // ORIC Predefined Sounds (from BASIC ROM)
+//   we want to keep these 14 bytes sounds as a constant string
+//   this allows the compiler to remove it if not used!
 
-#define PING    {24,0,0,0,0,0,0,62,16,0,0,0,15,0}
-#define SHOOT   {0,0,0,0,0,0,15,7,16,16,16,0,8,0}
-#define EXPLODE {0,0,0,0,0,0,31,7,16,16,16,0,24,0}
-#define PONG    {238,2,0,0,0,0,0,62,16,0,0,208,7,0}
+#define PING         "\x18\x00\x00\x00\x00\x00\x00\x3e\x10\x00\x00\x00\x0f\x00"
+#define SHOOT        "\x00\x00\x00\x00\x00\x00\x0f\x07\x10\x10\x10\x00\x08\x00"
+#define EXPLODE      "\x00\x00\x00\x00\x00\x00\x1f\x07\x10\x10\x10\x00\x18\x00"
+#define PONG         "\xee\x02\x00\x00\x00\x00\x00\x3e\x10\x00\x00\xd0\x07\x00"
 
 // Flying related
 #define AHELICOPTER  "\xa8\xbf\x00\x03\xb8\xbf\x0e\x00\x00\x00\xa7\xc2\x4c\xb0"
@@ -290,17 +299,14 @@ RTS
 //      Env-freq = T = n*256 / 1MHz      ;with n in range 1..65535 (256µs .. 16.7 seconds)
 //      Va,Vb,Vc = real_world_amplitude = max / sqrt(2)^(15-n)
 //
-//                                                  0-31 NNNcba     (Mod)vvvv   T      0-15
-//                       0    1    2    3    4    5    6    7    8    9   10  11   12    13
-//                      Al   Ah   Bl   Bh   Cl   Bh   N4   Ch   Va   Vb   Vc Env-freq   ENV 
-#define PONG2        {0xEE,0x02,0x00,0x00,0x00,0x00,0x00,0x3E,0x10,0x00,0x00,0xD0,0x07,0x00}
-#define PCHH         {0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x37,0x10,0x00,0x00,0xD6,0x0B,0x00}
+//                                      0-31 NNNcba     (Mod)vvvv   T      0-15
+//                       0   1   2   3   4   5   6   7   8   9  10  11  12  13
+//                      Al  Ah  Bl  Bh  Cl  Ch  N4  Ch  Va  Vb  Vc Env-freq ENV
+#define PONG2        "\xEE\x02\x00\x00\x00\x00\x00\x3E\x10\x00\x00\xD0\x07\x00"
+#define PCHH         "\x00\x00\x00\x00\x00\x00\x01\x37\x10\x00\x00\xD6\x0B\x00"
 #define APONG2       "\xEE\x02\x00\x00\x00\x00\x00\x3E\x10\x00\x00\xD0\x07\x00"
 
-#define soundfx(soundtableadr)  ldx #<soundtableadr:ldy #>soundtableadr:jmp $FA86
-
-//char sound[]= PONG;
-char ping[]= PING;
+#define SILENCE      "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
 
 extern int T=0;
@@ -340,7 +346,7 @@ void setAYword(char ch, unsigned int w) {
   setAYreg(ch*2+1, w >> 8);
 }
 
-void fx(char* fourteenbytes) {
+void sfx(char* fourteenbytes) {
   char i=0;
   for(; i<14; ++i) {
     setAYreg(i, *fourteenbytes);
@@ -474,23 +480,56 @@ void play(char tonemap, char noisemap, char env, unsigned int env_period) {
 
 // ------------------------------------------------------------
 
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
 #include "conio-raw.c"
 
-//void wait(unsigned int ms) {
-//  long w= ms*7L;
-//  while(--w);
-//}
+//#include <conio.h>
+//void wait(unsigned int ms) { long w= ms*7L; while(--w); }
 
 char KLAVIATUR[]= "awsedftgyhuj";
+
+//  10 REM ** TUNE **
+//  20 FOR N= 1 TO 11
+//  30   READ A,B
+//  40   MUSIC 2,3,A,0
+//  50   PLAY 3,0,7,2000  ' 500 ms ? (1M/p)
+//  60   WAIT B           ' B   hs
+//  70   PLAY 0,0,0,0
+//  80 NEXT N
+// 100 DATA 5,30, 5,30, 7,30, 8,75, 5,75
+// 110 DATA 8,60, 10,30, 7,60, 5,30, 3,30, 5,180
+
+void p(char n, unsigned int w) { 
+  printf("%d", n);
+  music(2,3,n,0);
+  play(3,0,7,2000);
+  putchar('W');
+  wait(w);
+  putchar('.');
+}
+
+void tune() {
+  p(5,30); p(5,30); p(7,30); p(8,75); p(5,75);
+  p(8,60); p(10,30); p(7,70); p(5,30); p(3,30); p(5,180);
+}
 
 void main() {
   char c, *p;
 
+  sfx(PING);
+  tune();
+  sfx(PING);
+  sfx(SILENCE);
+
   // TODO: keys not working after sound! need some cleanup/setup?
-  while((c= cgetc())!=CTRL+'C') {
+  printf("\nPIANO> ");
+  while((c= tolower(cgetc()))!='q') {
     putchar(c);
     if (c==' ') play(0,0,0,0);
-    else if (c=='p') fx(ping);
+    else if (c=='p') sfx(PING);
     else {
       p= strchr(KLAVIATUR, c);
       if (p) {
@@ -504,8 +543,8 @@ void main() {
 
   while(1) {
     printf("Hello Sound!\n");
-    fx(ping);
-    fx(APONG2);
+    sfx(PING);
+    sfx(APONG2);
     //fx(AHELICOPTER);
     //wait(1000);
     wait(100);
