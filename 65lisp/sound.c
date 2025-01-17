@@ -68,6 +68,187 @@
 //        Registers+envelops :
 //        - http://download.abandonware.org/magazin ... e%2021.jpg
 
+
+// - https://forum.defence-force.org/viewtopic.php?t=30
+// 
+// AY Crudentials: Accessing the AY
+//
+//   Post by Twilighte » Fri Jan 20, 2006 9:58 pm
+//   
+//   The AY-3-8912 is not memory mapped in the Oric and the method
+//   of accessing it is obscure (to say the least).
+//
+//   However, with a little knowledge, it is easy enough to write
+//   and read from any register.
+//   
+//   The AY-3-8912 is linked to the system by the way of one
+//   data/register port and 2 control lines.
+//
+//   The control lines are known as CA2 and CB2 since they are
+//   held within the VIA 6522 and may be set/reset in Memory location $030C.
+//
+//   The Data/Register Port is also used by the Printer Port (Which may
+//   also be attached to a joystick interface) and appears at location $030F.
+//   
+//   The control line Register (Also known as the PCR) actually
+//   controls the behaviour of CA1,CA2,CB1 and CB2, but for the
+//   most part, we can get away with 3 values directly poked into
+//   this location.
+//
+//   The three values are...
+//
+//     $DD == $030F is inactive
+//     $FD == $030F holds data for a preset Register
+//     $FF == $030F holds a Register number
+//   
+//   The AY-3-8912 has 15 Registers numbered $00 to $0E:
+//
+//     00 Bits 0 to 7(0-255) - Pitch Register LSB Channel A
+//     01 Bits 0 to 3(0-15) - Pitch Register MSB Channel A
+//
+//     02 Bits 0 to 7(0-255) - Pitch Register LSB Channel B
+//     03 Bits 0 to 3(0-15) - Pitch Register MSB Channel B
+//
+//     04 Bits 0 to 7(0-255) - Pitch Register LSB Channel C
+//     05 Bits 0 to 3(0-15) - Pitch Register MSB Channel C
+//
+//     06 Bits 0 to 4(0-31) - Noise Pulsewidth
+//
+//     07 Bit 0(0-1) - Link Pitch A to Output D/A converter A
+//     07 Bit 1(0-1) - Link Pitch B to Output D/A converter B
+//     07 Bit 2(0-1) - Link Pitch C to Output D/A converter C
+//     07 Bit 3(0-1) - Link Noise to Output D/A converter A
+//     07 Bit 4(0-1) - Link Noise to Output D/A converter B
+//     07 Bit 5(0-1) - Link Noise to Output D/A converter C
+//
+//     08 Bits 0-3 (0-15) - D/A Converter Amplitude(Volume) A
+//     08 Bit  4 - Envelope Generator controls Amplitude of A
+//
+//     09 Bits 0-3 (0-15) - D/A Converter Amplitude(Volume) B
+//     09 Bit  4 - Envelope Generator controls Amplitude of B
+//
+//     0A Bits 0-3 (0-15) - D/A Converter Amplitude(Volume) C
+//     0A Bit  4 - Envelope Generator controls Amplitude of C
+//
+//     0B Bits 0 to 7(0-255) Envelope Generator Period Counter LSB
+//     0C Bits 0 to 7(0-255) Envelope Generator Period Counter MSB
+//
+//     0D Bits 0 to 3(0- 15) Envelope Generator Cycle Register
+//   
+// So to write the value of 15 into register 8 (Volume of channel A)
+// the following code could be used...
+//
+//     LDA #8        'Set the register to 8
+//     STA $030F
+//     LDA #$FF
+//     STA $030C
+//     LDA #$DD
+//     STA $030C
+//     LDA #15       'Set the Value for this register
+//     STA $030F
+//     LDA #$FD
+//     STA $030C
+//     LDA #$DD      'Reset the state of the control lines
+//     STA $030C
+//
+// Note: it is assumed that when starting, the control register is $DD
+//
+// It is also worth mentioning that when setting the register,
+// the last value in $030C is taken so in some scenarios it is unneccasary
+// to set the control lines inactive whilst setting the Register.
+//
+// Dbug--------------------------------------------------
+//
+// I was checking my old replay code, and I found out that instead
+// of FD and DD I have EC and CC:
+//
+//     sta VIA_ORA
+//     lda #$EC
+//     sta VIA_PCR
+//     lda #$CC
+//
+// What's the actual difference and the impact?
+//
+// T--------------------------------------------------
+//
+// Hi there.
+//
+// Both bits of code will work equally well. The difference is in
+// the CA1 and CB1 control bits in the PCR of the 6522 VIA. Bit 0 of
+// the PCR (at location $30C on Oric) relates to CA1 which is the
+// 'ACK' line of the printer port and bit 4 relates to CB1 which
+// is connected to the Tape In circuitry.
+//
+// Neither should make any difference as both the printer and tape
+// routines in ROM set up the 6522 VIA anyway.
+//
+// I guess the only way it could make a difference is if the VSYNC-
+// hack is implemented (on a real Oric!) as it's fed through the tape input.
+//
+// I hope I haven't made this ten times more boring than it needed be!
+// 
+// T
+// 
+// T: Dbug, you have the advanced user guide,
+// refer to page 38 and see that it controls four lines.
+
+/* ORIC-ROM code:
+
+$FA86:
+
+PHP                                     This routine takes X and Y
+SEI                                     as the low and high halves of
+STX   $14                               the start address of a table
+STY   $15                               to send data to the sound
+LDY   #$00                              chip from.
+LDA   ($14),Y                           14 bytes are sent to the 8912
+TAX                                     starting with register 0 and
+TYA                                     working up in order until
+PHA                                     register D. The data from
+JSR   $F590                             the table is used starting
+PLA                                     from the low address.
+TAY
+INY                                     The I/O port is not written
+CPY   #$0E                              to.
+BNE   <a href="https://iss.sandacite.com/tools/oric-atmos-rom.html#LFA8E">$FA8E</a>
+PLP
+RTS
+
+$F590 WRITETOAY:
+
+PHP                                     WRITE X TO REGISTER A OF 8912
+SEI
+STA   $030F                             Send A to port A of 6522.
+TAY
+TXA
+CPY   #$07                              If writing to register 7, set
+BNE   $F59D                             1/0 port to output.
+ORA   #$40
+
+$F59D:
+
+PHA
+LDA   $030C                             Set CA2 (BC1 of 8912) to 1,
+ORA   #$EE                              set CB2 (BDIR of 8912) to 1.
+STA   $030C                             8912 latches the address.
+AND   #$11                              Set CA2 and CB2 to 0, BC1 and
+ORA   #$CC                              BDIR in inactive state.
+STA   $030C
+TAX
+PLA
+STA   $030F                             Send data to 8912 register.
+TXA
+ORA   #$EC                              Set CA2 to 0 and CB2 to 1,
+STA   $030C                             8912 latches data.
+AND   #$11                              Set CA2 and CB2 to 0, BC1 and
+ORA   #$CC                              BDIR in inactive state.
+STA   $030C
+PLP
+RTS
+
+*/
+
+
 #include <stdio.h>
 
 // ORIC Predefined Sounds (from BASIC ROM)
@@ -108,28 +289,69 @@
 
 #define soundfx(soundtableadr)  ldx #<soundtableadr:ldy #>soundtableadr:jmp $FA86
 
-char sound[]= PONG;
+//char sound[]= PONG;
+char sound[]= PING;
 
 extern int T=0;
 extern int nil=0;
 extern int doapply1=0;
 extern int print=0;
 
+#ifdef BASIC_ROM
+
 void fx(char* sound) {
-  char* pb= (void*)&sound;
-  __AX__= (pb[0]>>8) || (pb[1]<<8);
   __AX__= sound;
-//  __AX__= 0xFAA7; // a: a7 x: fa
+  //  __AX__= 0xFAA7; // a: a7 x: fa
   asm("pha"); // stack: a7
   asm("txa"); // a= fa
   asm("tay"); // y= fa
-  asm("pla"); // a= 
-  asm("tax");
+  asm("pla"); // a= a7
+  asm("tax"); // x= a7
   // PING from ORIC BASIC ROM
   //asm("ldx #$a7");
   //asm("ldy #$fa");
   asm("jsr $FA86");
 }
+
+#else
+
+void setAYreg(char r, char v) {
+  //     LDA #8        'Set the register to 8
+  //     STA $030F
+  *(char*)0x030f= r;
+  
+  //     LDA #$FF
+  //     STA $030C
+  *(char*)0x030c= 0xff;
+
+  //     LDA #$DD
+  //     STA $030C
+  *(char*)0x30c= 0xdd;
+
+  //     LDA #15       'Set the Value for this register
+  //     STA $030F
+  *(char*)0x30f= v;
+
+  //     LDA #$FD
+  //     STA $030C
+  *(char*)0x30c= 0xfd;
+
+  //     LDA #$DD      'Reset the state of the control lines
+  //     STA $030C
+  *(char*)0x30c= 0xdd;
+}
+
+void fx(char* fourteenbytes) {
+  char i=0;
+  for(; i<14; ++i) {
+    setAYreg(i, *fourteenbytes);
+    ++fourteenbytes;
+  }
+}
+
+#endif // BASIC_ROM
+
+// ------------------------------------------------------------
 
 #include <conio.h>
 
@@ -141,9 +363,9 @@ void wait(unsigned int ms) {
 void main() {
   while(1) {
     printf("Hello Sound!\n");
-    //fx(sound);
+    fx(sound);
     //fx(APONG2);
-    fx(AHELICOPTER);
+    //fx(AHELICOPTER);
     wait(1000);
   }
 }
