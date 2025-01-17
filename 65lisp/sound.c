@@ -268,6 +268,9 @@ RTS
 */
 
 
+#include <stdio.h>
+
+
 // ORIC Predefined Sounds (from BASIC ROM)
 //   we want to keep these 14 bytes sounds as a constant string
 //   this allows the compiler to remove it if not used!
@@ -359,16 +362,15 @@ void sfx(char* fourteenbytes) {
 
 #endif // BASIC_ROM
 
-// PLAY 0,0,0,0 - silence
-//
 // SOUND(ch, period, vol:0-15)
-//  ch: 1,2,3 - tone
-//       4,5,6 - noise
+//   ch: 1,2,3 - tone
+//       4,5,6 - noise -- TODO
 
 void sound(char ch, unsigned int period, char vol) {
+  printf(" [sound %d %d %d] ", ch, period, vol);
   if (1 <= ch && ch<= 3) {
     setAYword(ch*2-2, period);
-    setAYreg(8+ch, vol);
+    setAYreg(8-1+ch, vol);
   }
 }
 
@@ -440,25 +442,26 @@ void freq(char ch, unsigned int hz, char vol) {
 
 // (/ 62500000 34648.0)
 // (/ 1911 8.0) = 239 close enougn!
-// (ORIC uses 26 bytes MUSICDATA)
+// could use C0..B0 ? double... now misses out one level?
 unsigned int hpitch[]= {1911, 1804, 1703, 1607, 1517, 1432, 1351, 1276, 1204, 1136, 1073, 1012}; 
 
 void music(char ch, char oct, char note, char vol) {
   // loop for >> but do we want this many tables?
-  sound(ch, hpitch[note-1] >> (oct-1), vol);
+  sound(ch, hpitch[note-1] >> (oct), vol); // oct-1 ??
 }
 
-// PLAY(tone_enable, noise_enable, envelope, env_period)
+// ORIC: PLAY(tone_enable, noise_enable, envelope, env_period)
 //
 //   tone:  A=1, B=2, C=4 => A+C==5 all=7
 //   noise: similar to tone for each channel
 //   env_period: 0..32767
+//
+//   T= n*256 / 1MHz = (1..65535) (256us..16.7s), 0.ls==380
 
-// T= n*256 / 1MHz = (1..65535) (256us..16.7s), 0.ls==380
 void play(char tonemap, char noisemap, char env, unsigned int env_period) {
-  setAYword(11, env_period);         // env period
-  setAYreg(13, env);                 // set envelope
-  setAYreg(7, tonemap + noisemap*8); // channel activation
+  setAYword(11, env_period);                 // env period
+  setAYreg(13, env);                         // set envelope
+  setAYreg(7, (7-tonemap) + (7-noisemap)*8); // channel activation
 }
 
 // -- example from ORIC manual
@@ -484,7 +487,6 @@ void play(char tonemap, char noisemap, char env, unsigned int env_period) {
 
 // ------------------------------------------------------------
 
-#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -508,8 +510,9 @@ char KLAVIATUR[]= "awsedftgyhuj";
 
 void p(char n, unsigned int w) { 
   printf("%d", n);
-  music(2,3,n,0);
-  play(3,0,7,2000);
+  music(1, 3, n, 7);
+  play(1,0,7,2000);
+  //play(1,0,0,10);
   putchar('W');
   wait(w);
   putchar('.');
@@ -527,6 +530,25 @@ void main() {
   tune();
   sfx(PING);
   sfx(SILENCE);
+
+  play(1,0,0,10);
+  music(1,4,10,7);
+  wait(300);
+
+  {
+    int period= 25;
+
+    // noise get enabled with 7, but not tones?
+    play(1,0,0,10);
+    while(period < 150) {
+      sound(1, period, 5);
+      wait(1);
+      //printf(" %d ", period);
+      ++period;
+    }
+    //sfx(EXPLODE);
+    play(0,0,0,0);
+  }
 
   // TODO: keys not working after sound! need some cleanup/setup?
   printf("\nPIANO> ");
