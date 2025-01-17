@@ -192,6 +192,16 @@
 // T: Dbug, you have the advanced user guide,
 // refer to page 38 and see that it controls four lines.
 
+
+
+// TODO: http://twilighte.oric.org/twinew/sending.htm
+// - potential extra information: shift register CB2 use for samples!
+
+// Arcade sounds on ORIC ATMOS
+//
+// - https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.youtube.com/watch%3Fv%3DOtZxezhC_TU&ved=2ahUKEwjL4-GdwvyKAxVOZWwGHauoGF4QtwJ6BAgkEAE&usg=AOvVaw0VLKivbKXYm8p9xeMnIBWK
+
+
 /* ORIC-ROM code:
 
 $FA86:
@@ -290,7 +300,7 @@ RTS
 #define soundfx(soundtableadr)  ldx #<soundtableadr:ldy #>soundtableadr:jmp $FA86
 
 //char sound[]= PONG;
-char sound[]= PING;
+//char sound[]= PING;
 
 extern int T=0;
 extern int nil=0;
@@ -341,6 +351,11 @@ void setAYreg(char r, char v) {
   *(char*)0x30c= 0xdd;
 }
 
+void setAYword(char ch, unsigned int w) {
+  setAYreg(ch*2,   w & 0xff);
+  setAYreg(ch*2+1, w >> 8);
+}
+
 void fx(char* fourteenbytes) {
   char i=0;
   for(; i<14; ++i) {
@@ -356,7 +371,25 @@ void fx(char* fourteenbytes) {
 // SOUND(ch, period, vol:0-15)
 //  ch: 1,2,3 - tone
 //       4,5,6 - noise
-// 
+
+void sound(char ch, unsigned int period, char vol) {
+  if (1 <= ch && ch<= 3) {
+    setAYword(ch*2-2, period);
+    setAYreg(8+ch, vol);
+  }
+}
+
+// n=real_period/16/T0 (TO=1µS for Oric) or in short
+// Frequency=1MHz/16/n (n=0 acts as n=1)
+// (/ 1000000 16) so ... 62500/hz (/ 62500 440)=142
+//
+#define DIVHZ 62500L // 1000000/16
+//
+void freq(char ch, unsigned int hz, char vol) {
+  sound(ch, DIVHZ/hz, vol); // TODO: rounding?
+}
+
+
 // MUSIC(ch:1-3, octave:0-6, note, vol:0-15)
 //
 // Note, piano layout:
@@ -373,12 +406,66 @@ void fx(char* fourteenbytes) {
 // Both SOUND and MUSIC are switched on by PLAY. Note length can
 // be controlled by WAIT statements and the sound is switched off
 // by PLAY 0,0,0,0.
+
+// - https://newt.phys.unsw.edu.au/jw/notes.html
 //
+//    A7 =3136 (!)
+//    A6 =1568 (!)
+//    A5 = 880 Hz
+//
+// -- one base octave
+//
+// B= B4 = 493.88     (12) // H
+//         466.16     (11)
+// A= A4 = 440    Hz  (10)
+//         415.30     (9)
+// G= G4 = 392        (8)
+//         369.99     (7)
+//    F4 = 349.23     (6)
+//    E4 = 329.63     (5)
+//         311.13     (4)
+//    D4 = 293.67     (3)
+//         277.18     (2)
+//    C4 = 261.6      (1)
+// -- end
+//    B3 = 246.94
+//    C3 = 220    1/2!
+//    C2 = 110
+//    C1 = 
+//
+// C4..B4
+//
+// unsigned int hfreq= {26160, 27718, 29367, 31113, 32963, 34923, 36999, 39200, 41530, 44000, 46616, 49388};
+// unsigned int pitch= {239, 225, 212, 200, 189, 178, 168, 159, 150, 142, 134, 126}
+
+
+// C1..B1
+//unsigned int hfreq= {32703, 34648, 36708, 38891, 41203, 43654, 46249, 48999, 51913, 55000, 58270, 61735};
+
+// bigger values easier to halve - higher precision
+// but this isn't perfrect frequency by math?
+
+// (/ 62500000 34648.0)
+// (/ 1911 8.0) = 239 close enougn!
+unsigned int hpitch[]= {1911, 1804, 1703, 1607, 1517, 1432, 1351, 1276, 1204, 1136, 1073, 1012}; 
+
+void music(char ch, char oct, char note, char vol) {
+  // loop for >> but do we want this many tables?
+  sound(ch, hpitch[note-1] >> (oct-1), vol);
+}
+
 // PLAY(tone_enable, noise_enable, envelope, env_period)
 //
 //   tone:  A=1, B=2, C=4 => A+C==5 all=7
 //   noise: similar to tone for each channel
 //   env_period: 0..32767
+
+// T= n*256 / 1MHz = (1..65535) (256us..16.7s), 0.ls==380
+void play(char tonemap, char noisemap, char env, unsigned int env_period) {
+  setAYword(11, env_period);         // env period
+  setAYreg(13, env);                 // set envelope
+  setAYreg(7, tonemap + noisemap*8); // channel activation
+}
 
 // -- example from ORIC manual
 // 
@@ -386,12 +473,21 @@ void fx(char* fourteenbytes) {
 //  20 FOR N= 1 TO 11
 //  30   READ A,B
 //  40   MUSIC 2,3,A,0
-//  50   PLAY 3,0,7,2000
-//  60   WAIT B
+//  50   PLAY 3,0,7,2000  ' 500 ms ? (1M/p)
+//  60   WAIT B           ' B   hs
 //  70   PLAY 0,0,0,0
 //  80 NEXT N
 // 100 DATA 5,30, 5,30, 7,30, 8,75, 5,75
 // 110 DATA 8,60, 10,30, 7,60, 5,30, 3,30, 5,180
+
+// -- introductory programming oric-1
+//
+// 10 LET PERIOD = 25
+// 20 SOUND 1,PERIOD,12
+// 30 LET PERIOD = PERIOD + 1
+// 40 IF PERIOD = 150 THEN EXPLODE ELSE GOTO 20
+// 50 STOP
+
 // ------------------------------------------------------------
 
 #include <conio.h>
@@ -404,8 +500,8 @@ void wait(unsigned int ms) {
 void main() {
   while(1) {
     printf("Hello Sound!\n");
-    fx(sound);
-    //fx(APONG2);
+    //fx(sound);
+    fx(APONG2);
     //fx(AHELICOPTER);
     wait(1000);
   }
