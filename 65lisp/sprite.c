@@ -339,14 +339,25 @@ void scrollspritecharsup(char base, char* sprite) {
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
 //char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
-char* A= SAVE "ADGJ" NEXT; // "BEHK" NEXT "CFIL";
 
 char spx,spy,sdx=0,sdy= 0;
 
 void redraw() {
   gotoxy(spx, spy);
   printf(A);
+
+  { char j=32;
+    gotoxy(1,1); puts("CHR: ");
+    for(;j<128;++j) putchar(j);
+    putchar('\n');
+    gotoxy(0,1); puts("ALT:" ALTCHARS);
+    for(;j<128;++j) {
+        if (wherex()%40==0) puts(ALTCHARS);
+        putchar(j);
+    }
+  }
   // TODO: use byteblit();
 }
 
