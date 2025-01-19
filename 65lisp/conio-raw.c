@@ -330,15 +330,6 @@ void scrollup(char fromy) {
 #define CLEARLINE  "\x0e" // 
 //#define INSERTLINE      // ^O ???
 
-//#define HOME   GOTOXY:0;1; // maybe?
-#define SAVE     "\x1d"
-#define RESTORE  "\x1e"
-// useful for sprite print: SAVE "abc" NEXT "def" NEXT "ghi"
-// gives  abc
-//        def
-//        ghi
-#define NEXT     RESTORE KEY_DOWN SAVE
-
 #define TOGGLEAI "\x14"
 
 // Formatting
@@ -487,6 +478,16 @@ void scrollup(char fromy) {
 #define KRSHIFT "\x84" // 128+4
 
 #define KFUNCT  "\x80" // 128+letter
+
+// TODO: move all terminal combos here...
+
+#define SAVE     "\x1d"
+#define RESTORE  "\x1e"
+// useful for sprite print: SAVE "abc" NEXT "def" NEXT "ghi"
+// gives  abc
+//        def
+//        ghi
+#define NEXT     RESTORE KDOWN SAVE
 
 void bell() {
   char *saved= cursc, t;

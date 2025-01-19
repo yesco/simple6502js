@@ -21,12 +21,83 @@
 // - multi instances in sync
 // - multi instances not in sync (more costly)
 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - --
+// - -- - - - AAEIIM- - - -- - - - - -- - - - - - -- - - - -- - - -- - --
+// - -- - - - BBFJJN- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - CCGKKO- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+// - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+
+// SPRITES  (N=n+1)
+// 
+// There are 5 sizes of sprites
+//
+// 1x PLAYER    24x24 movable xy/20c, x/15c, y/16c, tile/12c   (906B, 720B, 128B, 96B)
+// 2x BALL      18x16 movable xy/12c, x/ 8c, y/ 9c, tile/ 6c   (576B, 348B,  72B, 48B)
+// 3. MISSILES  12x16 movable xy/ 9c, x/ 6c, y/ 6c, tile/ 4c   (432B, 288B,  48B, 32B)
+// 4. HORIZ     6nx 8         xy/2Nc, x/ Nc, y/2nc, tile/ nc   (96*N, 48*N, 16*n, 8*n)
+// 5. VERT      6 xn8         xy/2Nc, x/2nc, y/1Nc, tile/ nc   (16*N, 16*n,  8*N, 8*n)
+//
+// If you have two sets of lines, any interleaving is possible,
+// you can have two sets of sprites (ALPHABETIC, ALTERNATIVE)
+
+// xyPLAYER(1)  - 1 sprite move independently XY                            =  20c, 906B
+// xyPLAYER(4)  - 4 sprites jiggles in xy sync, but 4 different XY positions=  20c, 906B
+// xyBALL(1)    - 1 sprite move independently XY                            =  12c, 576B
+// xyMISSILE(4) - 4 sprites perfectly independently movable                 = 4*9c, 432B
+//  yVERT(8,16) - 16 sprite sync strep char, bug 16 xy pos                  =   8c,   8B
+//
+// (+ 20 20 12 (* 4 9) 8) = 96 maxed out!
+
+// - PLAYER (max 2? 3?)
+//
+//     AEIM|Q
+//     BFJN|R
+//     CGKO|S     w: 4,  h: 3 == 4*6 x 3*8 = 24 x 24 px
+//     ----+-
+//     DHLP|T
+//
+// xySprite24x24 (width 4 chars, height 3 chars) uses 5x4= 20 chars
+// x Sprite24x24                                      5x3= 15 chars
+//  ySprite24x24                                      4x4= 16 chars
+
+//
+//
+//     ADG|J
+//     BEH|K      w: 3,  h: 2 == 3*6 x 2*8 = 18 x 16 px
+//     ---+-
+//     CFI|L
+//
+// xySprite18x16 (width 3 chars, height 2 chars) - uses 4*3= 12 chars
+// x Sprite18x16                                   uses 4*2=  8 chars
+//  ySprite18x16                                   uses 3*3=  9 chars 
+//   Sprite18x16                                   uses 3*2=  6 chars
+
 #include <string.h>
 #include <assert.h>
 
 #include "conio-raw.c"
 
-long spHi[]= {
+long sp32Hi[]= {
   //0123456789abcdef0123456789abcdef
   //  123456123456123456123456123456
   0b11111111111111111111111111111111,
@@ -101,13 +172,21 @@ char* byteblit(char h, char w, char* b) {
 
 // Layout of chars, slack space so can scroll
 // down and right!
-
+//
+// w: 3*6 y: 2*8 => (18x16)
+//
 // ADGJ  XXX|
 // BEHK  XXX|
 // CFIL  ---+
 
 // scrolling down/up use memcpy! (limit 8 down)
 
+// XYSprite18x16: 3 chars by 2 lines
+//
+// Writes the sprite in row-column, last column+row empty
+// into the chardef of BASE characters from SPRITE definition.
+// 
+// It ueses (3+1)*(2+1)= 4*3= 12 chars
 void spritedef(char base, char* sprite) {
   char *d= CHARDEF(base);
   char *s= sprite;
@@ -248,7 +327,7 @@ void scrollspritecharsup(char base, char* sprite) {
 int T,nil,doapply1,print;
 
 //char* A= SAVE "ABCD" NEXT "EFGH" NEXT "IJKL";
-char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
+char* A= SAVE "ADGJ" NEXT; // "BEHK" NEXT "CFIL";
 
 char spx,spy,sdx=0,sdy= 0;
 
