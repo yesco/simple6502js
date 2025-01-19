@@ -159,7 +159,7 @@
 #define SCREENROWS 28
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
-#define SCREENEND  (TEXTSCREEN+SCREENSIZE)
+//#define SCREENEND  (curp+SCREENSIZE) // TODO: remove...
 
 #define TEXTMODE  26 // and 24-39 (2x 60 Hz, 2x 50 Hz)
 #define HIRESMODE 30 // and 28-31 (2x 60 Hz, 2x 50 Hz)
@@ -191,9 +191,9 @@ int wait(int hs) {
 }
 
 // *SCREEN(X,Y)='A';
-#define SCREENXY(x, y) ((char*)(TEXTSCREEN+40*(y)+(x)))
+#define SCREENXY(x, y) ((char*)(curscr+(5*(y))*8+(x)))
 
-char curx=0, cury=1, *cursc=TEXTSCREEN;
+char curx=0, cury=1, * curp=TEXTSCREEN, * curscr= TEXTSCREEN;
 char curinv=0, curdouble=0, curai=0, curcaps=0;
 char curmode= TEXTMODE;
 
@@ -222,18 +222,18 @@ void restorecursor() {
 char* cursaved= 0;
 void savescreen() {
   if (!cursaved) cursaved= malloc(SCREENSIZE);
-  memmove(cursaved, TEXTSCREEN, SCREENSIZE);
+  memmove(cursaved, curscr, SCREENSIZE);
 }
 
 void restorescreen() {
-  if (cursaved) memcpy(TEXTSCREEN, cursaved, SCREENSIZE);
+  if (cursaved) memcpy(curscr, cursaved, SCREENSIZE);
 }
 
 // TODO: what's ORIC wherey() default? 0 or 1
 void clrscr() {
   // Don't clear status line (/)
-  cursc= TEXTSCREEN;
-  memset(cursc+40, ' ', (SCREENROWS-1)*SCREENCOLS);
+  curp= curscr;
+  memset(curp+40, ' ', (SCREENROWS-1)*SCREENCOLS);
   curx= 0; cury= 1;
   cputc(0);
   return;
@@ -490,17 +490,18 @@ void scrollup(char fromy) {
 #define NEXT     RESTORE KDOWN SAVE
 
 void bell() {
-  char *saved= cursc, t;
+  char *saved= curp, t;
   // ORIC: ping();
   // TODO: research how to do directy AY-hardware sounds
 
   // Visual Bell (reverse twice)
+  char* end= curscr+SCREENSIZE;
   for(t=3; --t; ) {
-    for(cursc=TEXTSCREEN; ++cursc<SCREENEND; ) *cursc ^= 128;
+    for(curp=curscr; ++curp<end; ) *curp ^= 128;
     //wait(10);
   }
 
-  cursc= saved;
+  curp= saved;
 }
 
 // interal "raw" terminal
@@ -576,20 +577,20 @@ void cputc(char c) {
 
     // control-codes
     switch(c) {
-    case 0: break; // *is* UPDATE - recalc cursc from curx,cury
+    case 0: break; // *is* UPDATE - recalc curp from curx,cury
     case 1: curx= 0; break;                 // ^A beginning of line
     case CTRL+'C': break;
     case CTRL+'D':                          // ^D del char forward
-      memmove(cursc, cursc+1, 39-curx);
-      cursc[39-curx]= ' '; break;           // TODO: cclearxy()
+      memmove(curp, curp+1, 39-curx);
+      curp[39-curx]= ' '; break;            // TODO: cclearxy()
     case CTRL+'E': gotoxy(39,cury);         // ^E end of line
-      while(cursc[-1]==' ') --cursc,--curx;
+      while(curp[-1]==' ') --curp,--curx;
       break;
     case CTRL+'G': bell(); break;           // ^G break/bell
-    case 127: if (cursc>TEXTSCREEN)         // ^H -- \b
+    case 127: if (curp>curscr)              // ^H -- \b
         // TODO: insert/overwrite
-        memmove(cursc-1, cursc, 39-1-curx);
-      cursc[39-curx]= ' '; --curx; break;
+        memmove(curp-1, curp, 39-1-curx);
+      curp[39-curx]= ' '; --curx; break;
 
     case '\b':                                   // rubout?
     case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
@@ -611,29 +612,31 @@ void cputc(char c) {
       // TODO: distinguish RETURN
     case '\r': curx= 0; break;                   // ^M
 
-    case CTRL+'Q': break;                      // TODO: ^Q quote char
+    case CTRL+'Q': break;                        // TODO: ^Q quote char
     case CTRL+'R':                               // TODO: ^R
-    case CTRL+'S': { char k, s[32]={0}; i=0;     // ^S s
+    case CTRL+'S': { char k, s[32]={0};          // ^S s
+        char* end= curscr+SCREENSIZE;
+        i= 0;
         do {
-          *cursc ^= 128;
+          *curp ^= 128;
           k=cgetc();
-          *cursc ^= 128;
+          *curp ^= 128;
 
           if (k==KEY_RETURN) break;
-          if (k==CTRL+'G') { cursc= 0; break; }
+          if (k==CTRL+'G') { curp= 0; break; }
           // TODO: backspace
 
           s[i]= k; ++i;
 
           //if (c==CTRL+'S') 
-          cursc= memchr(cursc, s[0], SCREENEND-cursc-1);
+          curp= memchr(curp, s[0], end-curp-1);
           //else 
-          //  cursc= memrchr(cursc, s[0], cursc-TEXTSCREEN);
-        } while (cursc);
-        if (!cursc) { bell(); break; }
+          //  curp= memrchr(curp, s[0], curp-curscr);
+        } while (curp);
+        if (!curp) { bell(); break; }
 
         // found!
-        i= cursc-TEXTSCREEN;
+        i= curp-curscr;
         curx= i % 40;
         cury= i % 40;
         break; }
@@ -646,7 +649,7 @@ void cputc(char c) {
       // TODO: hmmm... CLEARLINE?
       // TDOO: same key as
       //case CTRL+'K':                             // TODO: ^K CLEARLINE
-      //memset(TEXTSCREEN+40*cury, 32, 40);
+      //memset(curscr+40*cury, 32, 40);
       //return;
     case CTRL+'K': scrollup(cury); break;    // ^K: REMOVELINE
       // TODO: use cclear()      // TODO: clear end of line
@@ -684,7 +687,7 @@ void cputc(char c) {
 
     case CTRL+'X': // 0x18                  // STATUS txt RESTORE
       savecursor();
-      memset(TEXTSCREEN, 32, 32);
+      memset(curscr, 32, 32);
       gotoxy(0,0);
       return;
     case CTRL+'Z': // 0x1a                  // STATUS32 txt8 RESTORE
@@ -790,11 +793,11 @@ void cputc(char c) {
   // 32-127, 128+32-255 (inverse)
   if (curdouble) {
     if (cury&1) { ++cury; cputc(0); }
-    cursc[40]= c|curinv;
+    curp[40]= c|curinv;
   }
 
   // output actual char
-  *cursc= c^curinv;  ++cursc;
+  *curp= c^curinv;  ++curp;
 
   // wrap/adjust cursor position
   if (++curx>=40) { ++cury; curx=0; }
@@ -810,7 +813,7 @@ void cputc(char c) {
 
  recalc:
 
-  // fix state, update cursc
+  // fix state, update curp
   if (curx==255) --cury,curx=39;
   else if (curx==40) ++cury,curx=0;
   else if (curx>0x80) curx=0;
@@ -820,7 +823,7 @@ void cputc(char c) {
   else if (cury==28) { scrollup(1); cury=27; return; }
   else if (cury>27) cury=27;
 
-  cursc= SCREENXY(curx, cury);
+  curp= SCREENXY(curx, cury);
 }
 
 //int putchar(int c) { cputc(c); return c; }
@@ -1223,9 +1226,9 @@ void main() {
       puts(STATUS32); printkey(k); puts(" " RESTORE);
 
       // show cursor, wait for char
-      *cursc ^= 128;
+      *curp ^= 128;
       k=getchar();
-      *cursc ^= 128;
+      *curp ^= 128;
 
       // Terminal implementation code!
       // TODO: why is it needed again?
@@ -1238,7 +1241,7 @@ void main() {
         Compressed* zip;
         int i;
         unsigned int C, rle;
-        *SCREENEND= 0; // lol
+        curscr[SCREENSIZE+1]= 0; // lol // TODO: remove!
         saved= strdup(TEXTSCREEN+40);
         rle= RLE(TEXTSCREEN+40, SCREENSIZE-40);
         gotoxy(32, 0); printf("RLE=%4d ", rle);
@@ -1317,6 +1320,8 @@ void main() {
     *TEXTSCREEN= 'x'; // for timing!
     t= time();
 
+    // TODO: make scrollkey()?
+
     // pan-around w wrap
     while(1) {
 
@@ -1325,11 +1330,11 @@ void main() {
           asm("SEI");
         memcpy(buff, TEXTSCREEN, 40);
         memmove(TEXTSCREEN, TEXTSCREEN+40, SCREENSIZE-40);
-        memcpy(SCREENEND-40, buff, 40);
+        memcpy(curscr+SCREENSIZE-40, buff, 40);
           asm("CLI");
         break;
       case KEY_UP:
-        memcpy(buff, SCREENEND-40, 40);
+        memcpy(buff, curscr+SCREENSIZE-40, 40);
         memmove(TEXTSCREEN+40, TEXTSCREEN, SCREENSIZE-40);
         memcpy(TEXTSCREEN, buff, 40);
         break;

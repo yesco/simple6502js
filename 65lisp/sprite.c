@@ -367,16 +367,18 @@ void save(char** savep, char* sprite) {
   case KEY_DOWN: // DOWN
     // TODO: more codes?
     putchar(*sprite); break;
-  default: *p= *cursc; ++cursc; ++curx; break; // save char!
+  default: *p= *curp; ++curp; ++curx; break; // save char!
   }
   ++sprite; ++p;
   goto next;
 }
 
-void redraw() {
+void undraw() {
   // restore
   puts(savedA);
+}
 
+void redraw() {
   // draw new (save first)
   // TODO: combine?
   // TODO: shadow update in virtual screen?
@@ -442,7 +444,7 @@ void main() {
     case KEY_RIGHT:
       if (6 == ++sdx) {sdx=0;
         ++spx;
-        //clrscr();
+        undraw();
         spritedef('A', sp6);
         redraw();
       } else {
@@ -453,7 +455,7 @@ void main() {
     case KEY_DOWN :
       if (8 == ++sdy) {sdy=0;
         ++spy;
-        //clrscr();
+        undraw();
         spritedef('A', sp6);
         redraw();
       } else {
@@ -464,7 +466,7 @@ void main() {
     case KEY_UP :
       if (0 == sdy--) {sdy=7;
         --spy;
-        //clrscr();
+        undraw();
         spritedef('A', sp6);
         // TODO: make one
         for(i=8;--i;)scrollspritecharsdown('A', sp6);
