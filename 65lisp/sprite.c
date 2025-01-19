@@ -8,6 +8,8 @@
 // It can have a combination of these qualities:
 // - size of one character      (uses 1 of 96 chars)
 // - size of 2h x 3w characters (uses 6-12 of 96 chars)
+// - either: 2 bit of: | texture | mask | z height
+// - cut/outline of one bit around (may require one more row?)
 // - (repetable tile) pattern
 // - animated cycle
 // - updateable pattern from state 
@@ -46,6 +48,17 @@
 // - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
 // - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
 // - -- - - - - -- -- - - -- - - - - -- - - - - - -- - - - -- - - -- - -- 
+
+// BITMAP formats
+//
+// -- GENERIC BITMAP
+// LONGMAP:  L x     32 bit                    L longs x r rows pixels (byte order 4backwards)
+// BYTEMAP:  c x      8 bit                    c chars x r rows pixels (row: col by col, next row)
+//
+// -- ORIC SPECIFIC
+// LCELLMAP: L x 4x6=30 bit 6 bit/char         L longs x r rows
+// CELLMAP:  c x            6 bit/char         c chars x r rows
+
 
 // SPRITES  (N=n+1)
 // 
