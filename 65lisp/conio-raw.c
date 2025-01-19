@@ -153,7 +153,7 @@
 // TODO: how to solve graphics mode HIRESTTEXT?
 // TODO: use variable for TEXTSCREEN, allowing virtual screens!
 #define CHARSET    ((char*)0xB400) // $B400-B7FF
-#define CHARDEF(c) ((char*)0xB400+c*8)
+#define CHARDEF(C) ((char*)CHARSET+(C)*8)
 #define ALTSET     ((char*)0xB800) // $B800-BB7F
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
 #define SCREENROWS 28
@@ -734,7 +734,8 @@ void cputc(char c) {
     // specials...
     if (curvt100==1) {
       switch(c) {
-      case '[': case '?': curvt100= c; return;
+      case '[': case '?': curvt100= c; curnparam= 0;
+        memset(curparam, 0, sizeof(curparam)); return;
       case 'D': // scroll window up one line
       case 'M': // scroll window down one line
       case '7': savecursor(); return;
@@ -774,7 +775,7 @@ void cputc(char c) {
         }
 
       // parse numeric parameters
-      case ';': if (++curnparam>CURNPARAM) curnparam= 0; return;
+      case ';': if (++curnparam>CURNPARAM); return; // TODO: overflow?
       default:
         if (isdigit(c))
           curparam[curnparam]= curparam[curnparam]*10 + c-'0';

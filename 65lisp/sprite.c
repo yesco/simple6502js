@@ -344,11 +344,61 @@ char* A= SAVE "ADGJ" NEXT "BEHK" NEXT "CFIL";
 
 char spx,spy,sdx=0,sdy= 0;
 
-void redraw() {
-  gotoxy(spx, spy);
-  printf(A);
+char* savedA= NULL;
 
+// interpret sprite movement, save each "print" char
+// TODO: replace by MOVE! lol
+void save(char** savep, char* sprite) {
+  char *p;
+  if (!*savep) *savep= calloc(strlen(sprite)+(1+(4+2+2)), 1);
+  p= *savep;
+  memset(p, 0, strlen(sprite)+(1+(4+2+2)));
+  
+  // save location so it's self-printable!
+  p+= sprintf(p, "\x1b[%d;%dH", wherex(), wherey());
+
+  // specialized interpreter for SAVE/RESTORE/DOWN/print!
+ next:
+  *p= *sprite;
+  switch(*sprite) {
+  case 0x00: return;
+  case 0x1d:  // SAVE
+  case 0x1e:  // RESTORE
+  case KEY_DOWN: // DOWN
+    // TODO: more codes?
+    putchar(*sprite); break;
+  default: *p= *cursc; ++cursc; ++curx; break; // save char!
+  }
+  ++sprite; ++p;
+  goto next;
+}
+
+void redraw() {
+  // restore
+  puts(savedA);
+
+  // draw new (save first)
+  // TODO: combine?
+  // TODO: shadow update in virtual screen?
+  gotoxy(spx, spy);
+  save(&savedA, A);
+
+  // TODO: redef char here?
+
+  gotoxy(spx, spy);
+  puts(A);
+
+  // TODO: use byteblit();
+}
+
+void main() {
+  char i;
+
+  clrscr();
+
+  // Show charset
   { char j=32;
+
     gotoxy(1,1); puts("CHR: ");
     for(;j<128;++j) putchar(j);
     putchar('\n');
@@ -358,19 +408,32 @@ void redraw() {
         putchar(j);
     }
   }
-  // TODO: use byteblit();
-}
+  putchar('\n');
+  { char r, c;
+    for(r=3; r<25; ++r) {
+      for(c=0; c<=39; c+=2) {
+        putchar(96+c/2);
+        putchar(96+c/2);
+      }
+    }
+  }
+    
 
-void main() {
-  char i;
-
-  clrscr();
-
-  cgetc();
   spritedef('A', sp6);
 
-  spx=5; spy=12; redraw();
+  { char i;
+    for(i=0; i<25; ++i) {
+      gotoxy(i-1,i); putchar('z');
+      printf(KESC "[%d;%dH\\(%d,%d)", i,i,i,i);
+    }
+  }
 
+  // init sprite
+  spx=5; spy=12;
+  save(&savedA, A);
+  redraw();
+
+  // move sprite w cursor keys
   while(1) {
     switch(cgetc()) {
     case 'r':
@@ -379,7 +442,7 @@ void main() {
     case KEY_RIGHT:
       if (6 == ++sdx) {sdx=0;
         ++spx;
-        clrscr();
+        //clrscr();
         spritedef('A', sp6);
         redraw();
       } else {
@@ -390,7 +453,7 @@ void main() {
     case KEY_DOWN :
       if (8 == ++sdy) {sdy=0;
         ++spy;
-        clrscr();
+        //clrscr();
         spritedef('A', sp6);
         redraw();
       } else {
@@ -401,7 +464,7 @@ void main() {
     case KEY_UP :
       if (0 == sdy--) {sdy=7;
         --spy;
-        clrscr();
+        //clrscr();
         spritedef('A', sp6);
         // TODO: make one
         for(i=8;--i;)scrollspritecharsdown('A', sp6);
