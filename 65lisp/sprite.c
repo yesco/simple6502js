@@ -430,6 +430,12 @@ void main() {
     }
   }
 
+  // less irritating?
+  clrscr();
+  // TODO: update in backscreen and then move actual?
+  //   problem is updating chardef while displaying them!
+  //   usually resolved by using ALT set and switch each time?
+
   // init sprite
   spx=5; spy=12;
   save(&savedA, A);
