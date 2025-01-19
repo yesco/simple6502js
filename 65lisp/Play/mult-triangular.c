@@ -33,7 +33,8 @@ unsigned recmul(unsigned int a, unsigned int b) {
 
 static unsigned int r, aa, bb;
 
-unsigned loopmul() {
+unsigned int loopmul() {
+//unsigned int loopmul(unsigned int a, unsigned int b) {
   // unsigned int a, unsigned int b) {
   //register unsigned int r, aa, bb; // slower!
   r= 0; //aa= a; bb= b;
