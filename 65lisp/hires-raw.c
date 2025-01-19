@@ -629,6 +629,8 @@ void hirescompress() {
   }
 }
 
+#ifndef MAIN
+
 void main() {
   char* p= HIRESSCREEN;
   int i,j;
@@ -879,3 +881,5 @@ void main() {
   //printf("HELLO TEST\n");
   //gotoxy(10,25); printf("TIME %d times = %d hs", N*2, t-time());
 }
+
+#endif MAIN

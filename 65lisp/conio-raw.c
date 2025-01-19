@@ -147,6 +147,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+#define TIMER (*(unsigned int*)0x306)
+
 // TextMode
 // TODO: how to solve graphics mode HIRESTTEXT?
 // TODO: use variable for TEXTSCREEN, allowing virtual screens!
