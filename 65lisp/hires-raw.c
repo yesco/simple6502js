@@ -47,7 +47,7 @@ extern char curmode; // defined in conio-raw.c
 void hires() {
   if (curmode==TEXTMODE) {
     memcpy(HIRESCHARSET, CHARSET, 256*8); // incl ALTSET
-    curmode= SCREENEND[-1]= HIRESMODE;
+    curmode= curscr[SCREENSIZE-1]= HIRESMODE;
   }
 }
 
@@ -55,7 +55,7 @@ void hires() {
 void text() {
   if (curmode==HIRESMODE) {
     memcpy(CHARSET, HIRESCHARSET, 256*8); // incl ALTSET
-    curmode= SCREENEND[-1]= *HIRESSCREEN= TEXTMODE;
+    curmode= curscr[SCREENSIZE-1]= *HIRESSCREEN= TEXTMODE;
   }
 
   { char v, * p= HIRESSCREEN;
@@ -113,8 +113,9 @@ unsigned long shift6(unsigned long l) {
 // TODO: rename
 static char gcurx, gcury, gmode;
 
-// TODO: remove?
-static char curq, curm, *curp;
+// used for speeding and caching pixel calc
+//static char gcurq; // TODO: remove?
+static char gcurm, *gcurp;
 
 // light-wedith function, call by setting
 //   (gcurx, gcury, gmode)
@@ -127,15 +128,15 @@ void setpixel() {
       ^= PIXMASK[mod6[gcurx]];
   } else { // 109hs
     // 305hs - just slightly faster than BASIC!
-    // curq= gcurx/6;
-    // curp= HIRESSCREEN+ (5*gcury)*8 + curq;
-    // curm= PIXMASK[gcurx-curq*6];
-    curp= HIRESSCREEN+ (5*gcury)*8 + div6[gcurx];
-    curm= PIXMASK[mod6[gcurx]];
+    // gcurq= gcurx/6;
+    // curp= HIRESSCREEN+ (5*gcury)*8 + gcurq;
+    // curm= PIXMASK[gcurx-gcurq*6];
+    gcurp= HIRESSCREEN+ (5*gcury)*8 + div6[gcurx];
+    gcurm= PIXMASK[mod6[gcurx]];
     switch(gmode) {
-    case 0: *curp &= ~curm; break;
-    case 1: *curp |= curm;  break;
-    case 2: *curp ^= curm;  break;
+    case 0: *gcurp &= ~gcurm; break;
+    case 1: *gcurp |= gcurm;  break;
+    case 2: *gcurp ^= gcurm;  break;
     }
   }
 }
@@ -146,7 +147,7 @@ void setpixel() {
 
 char point(char x, char y) {
   gcurx= x; gcury= y; gmode= 3; setpixel();
-  return *curp & curm;
+  return *gcurp & gcurm;
 }
 
 
@@ -352,180 +353,7 @@ void circle(char r, char v) {
   } while (dx>dy);
 }
 
-unsigned long spHi[]= { /* height */ 32, /* Lwidth*/ 1,
-  //0123456789abcdef0123456789abcdef
-  //  123456123456123456123456123456
-  0b11111111111111111111111111111111,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-
-  0b10000000000000000000000000000001,
-  0b10001000000010000000000000000001,
-  0b10001000000010000000000000000001,
-  0b10001000000010000000000000000001,
-  0b10001111111110000000001000000001,
-  0b10001000000010000000001000000001,
-  0b10001000000010000000001000000001,
-  0b10001000000010000000001000000001,
-
-  0b10001000000010000000001000000001,
-  0b10000000000000000000001000000001,
-  0b10000000000000000000001000000001,
-  0b10000000000000000000001000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b10000000000000000000000000000001,
-  0b11111111111111111111111111111111,
-};
-
-char sprite[]= { /* heigth */ 16, /* widthbytes */ 4,
-  0b11111111, 0b11111111, 0b11111111, 0b11111111,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b10000000, 0b00000000, 0000000000, 0b00000001,
-  0b11111111, 0b11111111, 0b11111111, 0b11111111,
-};
-
-char sp6[]= { /* heigth */ 24, /* widthbytes */ 4,
-  0b00111111, 0b00111111, 0b00111111, 0b00111111,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00100000, 0b00000000, 0000000000, 0b00000001,
-  0b00111111, 0b00111111, 0b00111111, 0b00111111,
-};
-
-// bitblt?
-//
-// Any way of making this more efficient/faster?
-
-// TODO: idea, it could write a restore background
-// stream of bytes, just play back next time.
-void drawsprite(unsigned long* sp) {
-  char h= *sp, w= *++sp, r, c, i;
-  unsigned long l;
-
-  unsigned t= time();
-  // last pixel pos in x
-  // 
-  // gcurx=0 32 bits -> bi= 2
-  //   1-----------------------------32
-  //   012345 6789ab cdef01 234567 89abcdef
-  //   012345 012345 012345 012345 01234512
-  //                            bm=  000011
-  char x= gcurx + w*32-1;
-  char *sc= HIRESSCREEN + (gcury*5)*8 + div6[gcurx+1];
-  char bi= mod6[x]+1;        
-  char bm= PIXMASK[6-bi]*2-1; // extract mask
-//  char bm= PIXMASK[(6-bi)%6]*2-1;
-  char bits, mask;
-
-  r= h;
-  do {
-    c= w;
-    do {
-      l = *++sp;
-
-      // first is disaligned, take bi bits
-      i= (bi==0)? 6: 7; // cells+1
-      sc[--i]= (l & bm)<<(6-bi) | 64;
-      l >>= bi;
-
-      // take cell groups of 6 bits
-      while(--i) {
-        sc[i]= (l & 63) | 64;
-        //l >>= 6;
-        l= shift6(l);
-      }
-
-      // next row
-      sc+= 40;
-
-    } while(--c);
-  } while(--r);
-
-  printf("%uhs (%d,%d) x=%d bi=%d bm=%02x\n", t-time(), gcurx, gcury, x, bi, bm);
-}
-
-void drawsprite62(char* p) {
-  char h= p[0], w= p[1], r= h, c;
-  char *s= HIRESSCREEN + (gcury*5)*8 + div6[gcurx];
-  char m= mod6[gcurx];
-
-  ++p;
-  for(r= 0; r<h; ++r) {
-    for(c= 0; c<w; ++c) {
-      s[c]^= *++p;
-    }
-    s+= 40;
-  }
-}
-
-void clearsprite62(char* p) {
-  char h= p[0], w= p[1], r= h, c;
-  char *s= HIRESSCREEN + (gcury*5)*8 + div6[gcurx];
-  char m= mod6[gcurx];
-
-  ++p;
-  for(r= 0; r<h; ++r) {
-    for(c= 0; c<w; ++c) {
-      s[c]^= 64;
-    }
-    s+= 40;
-  }
-}
+#ifndef MAIN
 
 char sc[SCREENSIZE], *scend= sc+SCREENSIZE;
 
@@ -629,8 +457,6 @@ void hirescompress() {
   }
 }
 
-#ifndef MAIN
-
 void main() {
   char* p= HIRESSCREEN;
   int i,j;
@@ -681,37 +507,7 @@ void main() {
     } } break;
 
   case 2: {
-    long W= 100, w;
-
-    // draw sprite()
-    gcurx= 10; gcury= 100; drawsprite(spHi);
-    gcurx= 0;  gcury=  50; drawsprite(spHi);
-
-    
-    gcurx= 0;  gcury= 0;
-    while(1) {
-      drawsprite(spHi);
-      switch(cgetc()) {
-      case KEY_UP    : --gcury; break;
-      case KEY_DOWN  : ++gcury; break;
-      case KEY_RIGHT : ++gcurx; break;
-      case KEY_LEFT  : --gcurx; break;
-      }
-    }
-
-    while(1) {
-      gcury= 150;
-      for(gcurx= 50; gcurx<200; gcurx+= 6) {
-        --gcury; drawsprite62(sp6);
-        ++gcury; gcurx-= 6; drawsprite62(sp6);
-        --gcury; gcurx+= 6;
-        wait(100);
-      }
-      for(; gcurx>=50; gcurx-= 6) {
-        gcury= 150; drawsprite62(sp6);
-        wait(50);
-      }
-    } } break;
+  } break;
 
   case 3:
     // DFLAT circles - https://youtu.be/kxXUAiZ40lY
