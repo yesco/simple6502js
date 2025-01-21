@@ -254,6 +254,7 @@ char curpaper= 0, curink =7;
 
 void paper(char c) {
   curpaper= c & 7;
+  // TODO: hires mode?
   fill(0,1, 1,SCREENROWS-1, (c&0x7) | 16);
 // scrollbar?
 //  fill(0,1,  1,7,  (c & 7)|16+0);
@@ -263,6 +264,7 @@ void paper(char c) {
 
 void ink(char c) {
   curink= c & 7;
+  // TODO: hires mode?
   fill(1,1, 1,SCREENROWS-1, (c & 7));
 }
 
@@ -790,15 +792,41 @@ void cputc(char c) {
     return;
   }
 
+  // -- ACTUALLY PRINT
+
   // 32-127, 128+32-255 (inverse)
   if (curdouble) {
     if (cury&1) { ++cury; cputc(0); }
     curp[40]= c|curinv;
   }
 
-  // output actual char
+  // -- output actual char
+  if (curmode==HIRESMODE && cury<25) {
+    // copy chardef to graphics memory!
+    // TODO: expensive, maybe assume gcurp? but it's not updated...
+
+    // TODO: how to handle scrollup! now text leaks into pixels at bottom then lol!
+    #define HIRESSCREEN ((char*)0xA000) // $A000-BF3F // duplicate from hires-raw.c
+    #define HIRESCHARSET ((char*)0x9800) // $9800-9BFF
+
+    char* d= (cury*5)*8*8 + curx + HIRESSCREEN - 40;
+    char* ch= c*8 + (HIRESCHARSET-1);
+    char i= 8;
+
+    // TODO: other fonts? wide-stretch? BitBlt?
+    // TODO: out of bounds?
+    do {
+      *(d+= 40)= *++ch | 64;
+      if (curdouble) *(d+= 40)= *ch | 64;
+    } while(--i);
+
+    goto adjust; // simulate writing to screen
+  }
+
+  // print on text-screen
   *curp= c^curinv;  ++curp;
 
+ adjust:
   // wrap/adjust cursor position
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
@@ -1208,22 +1236,43 @@ void main() {
   case 2: {
     // StupidTerm to test out control keys...
 
+#define HIRESSCREEN ((char*)0xA000) // $A000-BF3F
+#define HIRESSIZE   8000
+#define HIRESEND    (HIRESSCREEN+HIRESSIZE)
+
+#define HIRESROWS   200
+#define HIRESCELLS  40
+
+#define HIRESTEXT   ((char*)0xBF68) // $BF68-BFDF
+#define HIRESTEXTSIZE 120
+#define HIRESTEXTEND (HIRESTEXT+HIRESTEXTSIZE)
+
+#define HIRESCHARSET ((char*)0x9800) // $9800-9BFF
+#define HIRESALTSET  ((char*(0x9C00) // $9C00-9FFF
+
     // 1080 chars
     char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
 
     int u= -1, n;
+
+    // hires();
+    memcpy(HIRESCHARSET, CHARSET, 256*8); curmode= curscr[SCREENSIZE-1]= HIRESMODE;
+    // gclear();
+    memset(HIRESSCREEN, 64, HIRESSIZE);
 
     gotoxy(0, 1);
 
     paper(*YELLOW);
     ink(*MAGNENTA);
 
+    // again?
+
     puts(KESC "[20;13H*HERE!");
 
     while(1) {
-      printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
-             wherey(), wherex());
-      puts(STATUS32); printkey(k); puts(" " RESTORE);
+      //printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
+      //wherey(), wherex());
+      //puts(STATUS32); printkey(k); puts(" " RESTORE);
 
       // show cursor, wait for char
       *curp ^= 128;
