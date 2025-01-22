@@ -224,30 +224,129 @@ void ClrCellBlit(char* p) {
 #define BBMIRROR  7
 #define BBSTRETCH 8 // TODO: (need params, how?)
 
+typedef struct BitMap {
+  char type;
+  char mod6; // if set, then it's not aligned (first mod6 bit uesless)
+  char rowbytes; // should be 1 byte more than needed by width pixels
+  unsigned int width;
+  unsigend int height;
+  // need extra pointer, or this needs to be put before HIRES/LORES screens, lol
+  // otherwise this would basically STEAL the last ALTCHARSET character definition...
+  char bits[];
+} BitMap;
+
+// possible types?
+// - HIRESSCREEN-1 (means full copy)
+// - TEXTSCREEN-1  (means full copy)
+// - 
+
+BitMap* mkBitMap(char type, int w, int h) {
+  char rowsbytes= (w+(6+5))/6; // always one more, allow non-aligned
+  BitMap* r= calloc( * h + sizeof(BitMap), 1);
+  r->type= type; r->width= w; r->height= h; r->rowbytes= rowbytes;
+ of ALT  return r;
+}
+
+BitMap hiresBitMap  { 42, 0, 40, 240, 200}; // can we store it before HIRES? lol
+BitMap screenBitMap { 42, 0, 40, 240, 200}; // can we store it before LORES? lol
+
 char parseDev(char* p) {
-  if (p<256) return (char)(int)p;
+  if (p<256) return 42; // charset, address varies
   if (p>=HIRESSCREEN && p<HIRESCREEN+HIRESSIZE)  return HIRESMODE;
   if (p>=TEXTSCREEN  && p<TEXTSCREEN+SCREENSIZE) return TEXTMODE;
-  // Depending on screenmode? Hmmm...
-  if (p>=CHARSET     && p<CHARSET+128*8)         return 42;
-  if (p>=ALTSET      && p<ALTSET+80*8)           return 43; // TODO: 80?
-  // 
+  // TODO: hmmm?
   return *p;
 }
 
 char* bltaddr(char* p, char x, char y, char dev) {
-  return (x==0 && y==0)? p:
-    (y*5)*8 + x +
-    (dev==HIRESMODE? HIRESSCREEN:
-     dev==TEXTMODE ? TEXTSCREEN: p);
+  return dev==42? x*8 + (dev==HIRESMODE? HIRESCHARSET: CHARSET):
+    (x==0 && y==0)? p:
+      (y*5)*8 + x +
+      (dev==HIRESMODE? HIRESSCREEN:
+       dev==TEXTMODE ? TEXTSCREEN: p);
 }
     
+// BITBLT OPS
+//
+// Copy
+//  '='         = copy bits/bytes
+
+// Set/unset
+//  1 0 '1' '0' = set all bits 1 or 0
+
+// Inverse ops:
+//  128 '7'     = set inverse bit    (1)
+//  i           = invert inverse bit (^)
+//  r           = revert inverse bit (0)
+
+// Logical ops:
+//  '&'         = and
+//  '|'         = or
+//  '^'         = xor
+//  '~'         = reverse bits
+//  '-'         = subtract bits ("undraw")
+
+// Exchange
+//  'x'         = exchange two areas values
+
+
+void memop(char op, char* d, char* f, char len) {
+  // copy
+  // TODO: |64 ? or at least for charset
+  char fwdest= 40; // TODO: set for real...
+  if (op=='=') { memmove(d, f, len); return; }
+  else {
+    // TODO: is forward direction safe?
+    --d; --f; ++len;
+    switch(op) {
+
+    // fixed values
+    case 0:
+    case '0': while(--len) { *++d = 64; } return;
+    case 1: case 64:
+    case '1': while(--len) { *++d = 64+63; } return;
+
+    // inverting
+    case 128: while(--len) { *++d |= 128; } return;
+    case 'i': while(--len) { *++d ^= 128; } return;
+    case 'r': while(--len) { *++d &= 127; } return;
+
+    // logical ops
+    // TODO: what it does with attributes? undefined?
+    case '&': while(--len) { *++d &= ++f; } return;
+    case '|': while(--len) { *++d |= *++f; } return;
+    case '^': while(--len) { ++d; *d = (*d ^ *++f)|64; } return;
+    case '~': while(--len) { ++d; *d = ((~*d)&63)|64; } return;
+    case '-': while(--len) { *++d &= (~*++f)|64; } return;
+
+    // Exchange:
+    case 'x': while(--len) { op= *++f; *f = *++d; *d= op; } return;
+
+    // Plot Char/Text using default text font
+    case 't': { char *p, r, c, *def;
+        while(--len) {
+          c= ((int)(f)&0xff00)? *f++: (char)(int)f; // stringptr or char
+          def= c*8 + (HIRESCHARSET-1);
+          p= ++d-fwdest; r= 8;
+          do {
+            *(p+=40)= *++def;
+          } while(--r);
+        } } break;
+
+    case 'T': // plot using proportional font
+  }
+  // TODO: edgecases of part bytes, before and after depend modm
+  // TODO: outside?
+  // pike: d= (s^m)|(d^~m)
+  // pike: d= (s^d)&m
+}
+
 void BitBlt(char op,
             char* dest, char mod,
-              char x,     char y, // if x,y==0,0 then dest used
-              char w,     char h, // if w,h==0,0 assume all?
+              int x,    int y, // if x,y==0,0 then dest used
+              char w,   char h, // if w,h==0,0 assume all?
             char* from, char mod,
-              char fx,    char fy // if fx,fy==0,0 then from used
+              int fx,   int fy // if fx,fy==0,0 then from used
 ) {
   // TODO: more ops!
   assert(op==BBCOPY);
@@ -270,7 +369,7 @@ void BitBlt(char op,
       dest= bltaddr(dest, x,  y,  dd);
       from= bltaddr(from, fx, fy, dd);
       if (dest<from) { // copy up
-        while(h--) memcpy(dest+=40, from+=40, w);
+        while(h--) memop(op, dest+=40, from+=40, w);
         return;
       } else { // copy down
         int x= (5*(h+2))*8; dest+= x; from++ x;
@@ -291,9 +390,13 @@ void BitBlt(char op,
 
  notsame:
   {
+    
+  }
+  // generic inbetween formats
+  {
     char * tmp= malloc((w+1)*h), * p;
     char dm= mod6[x], fm= mod6[fx], wm= mod6[w];
-    char dgw= (dm?1:0)+div6[dm+w+5], fgw= (fm?1:0)+div6[fm+w+5]; // ?
+    char dgw= div6[dm+w+5]+1, fgw= div6[fm+w+5]+1; // ?
     char i;
 
     p= tmp;
@@ -308,12 +411,12 @@ void BitBlt(char op,
     }
 
     // TODO: do bitshifting using fm
-    p= tmp;
-    i= h; while(i--) { shiftrow <<fm bits???}
+    //p= tmp;
+    //i= h; while(i--) { shiftrow <<fm bits???}
 
     // TODO: do bitshifting using dm
-    p= tmp;
-    i= h; while(i--) { shiftrow >>dm bits???}
+    //p= tmp;
+    //i= h; while(i--) { shiftrow >>dm bits???}
 
     // TODO: can't use fm-dm??? hmmmm.
 

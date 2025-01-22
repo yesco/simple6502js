@@ -820,11 +820,10 @@ void cputc(char c) {
       if (curdouble) *(d+= 40)= *ch | 64;
     } while(--i);
 
-    goto adjust; // simulate writing to screen
+  } else {
+    // print on text-screen
+    *curp= c^curinv;  ++curp;
   }
-
-  // print on text-screen
-  *curp= c^curinv;  ++curp;
 
  adjust:
   // wrap/adjust cursor position
