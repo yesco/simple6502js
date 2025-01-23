@@ -10,14 +10,14 @@
 // The terminal can either be "dumb" tty; basically only
 // honoring: \n \r \t ^L (clear) and scroll.
 
-//#define TTY // (- 10249 8261) = 1988 bytes for EXTENDED!
+#define TTY // (- 5703 3433) = 2270 bytes for EXTENDED EMACS terminal codes
 
-#define CONIO_INIT // if you want init_conioraw() to disable ORIC cursor
+//#define CONIO_INIT // if you want init_conioraw() to disable ORIC cursor
 
 // TODO: since cc65 uses weak beinding maybe not needed?
 
 // replaces printf so works with
-//#define CONIO_PRINTF  // (- 10258 7668) = 2590 bytes!
+//#define CONIO_PRINTF  // (- 10258 7668) = 3069 bytes!
 
 // Or be an Extended terminal implementing full-screen editing,
 // similar to ORIC. Most key-codes can be printed directly
@@ -29,7 +29,7 @@
 // Cursor keys works for moving around.
 //
 
-#define VT100 // (- 7668 7194)= 474 bytes
+//#define VT100 // (- 7668 7194)= 474 bytes
 
 // The terminal implements extra features, such as
 // a vt100-ignore mode for unkonwn codes.
@@ -171,6 +171,7 @@
 
 #include <ctype.h>
 #include <string.h> // memmmove
+#include <stdio.h>  // va_list
 
 // not needed?
 //#include <stdarg.h> 
@@ -257,6 +258,7 @@ int wait(int hs) {
 
 // exampel use: *SCREEN(X,Y)='A';
 #define SCREENXY(x, y) ((char*)(curscr+(5*(y))*8+(x)))
+//#define SCREENXY(x, y) ((char*)((5*(y))*8+(x)+curscr)) // more code
 
 char curx=0, cury=1, * curp=TEXTSCREEN, * curscr= TEXTSCREEN;
 char curinv=0, curdouble=0, curai=0, curcaps=0;
@@ -269,7 +271,7 @@ char cgetc();
 
 void gotoxy(char x, char y) {
   curx= x; cury= y;
-  cputc(0); // update pointer
+  curp= SCREENXY(curx, cury);
 }
 
 #ifndef TTY
@@ -353,8 +355,10 @@ void scrollup(char fromy) {
   char* p= SCREENXY(0, fromy);
   memmove(p, p+40, (28-fromy)*40);
   clearline(27);
-  if (cury>27) cury= 27;
+  if (cury>27) { cury= 27; curp-= 40; }
+#ifndef TTY
   cputc(0);
+#endif // TTY
 }
 
 // TODO: add new terminal controls
@@ -650,16 +654,17 @@ void bell() {
 
 #ifdef TTY
 // Minimal TTY terminal!
+// (0-7 text color, 16-23 bg color, goes straight through! as does hi-bit)
 void cputc(char c) {
   switch(c) {
   case 12  : clrscr(); return;
-  case '\r': curx= 0; return;
-  case '\n': curx= 0; ++cury; ++curp; break;
+  case '\r': gotoxy(0, cury); return;
+  case '\n': gotoxy(0, cury+1); return;
   case '\t': do { ++curp; } while (++curx & 0x7); break;
   default  : *curp= c; ++curx; ++curp; break;
   }
-  if (curx>40) ++cury;
-  if (cury>27) scrollup(1);
+  if (curx>=40) curx=0,++cury;
+  if (cury>=28) scrollup(1);
 }
 
 #else // TTY else EXTENDED
@@ -973,7 +978,9 @@ int puts(const char* s) {
     // + swap byteblit
   
     // + nowrap / wrap (autonl) using strchrnul find \n or eof instead
+#ifndef TTY
   case 0x12: c= strlen(s); gotoxy(curx+(40-c)/2, cury); goto next;
+#endif TTY
   default: putchar(c); goto next;
   }
 }
@@ -985,19 +992,18 @@ char* spr= NULL; size_t sprlen= 0;
 void putint(int n) {
   if (n<0) { putchar('-'); n= -n; }
   if (n>9) putint(n/10);
-  putint('0'+(n%10));
+  putchar('0'+(n%10));
 }
 
 #ifdef CONIO_PRINTF
+#include <stdio.h>  // va_list
 #include <stdlib.h> // malloc
-//#include <stdio.h>  // va_list
 int printf(const char* fmt, ...) {
   int n= 0;
   va_list argptr;
   va_start(argptr, fmt);
   do {
     n= spr? vsnprintf(spr, sprlen, fmt, argptr): 0;
-    //putchar('['); printnum(n); putchar(']');
     if (!n || n>sprlen) {
       sprlen= (n>sprlen)?n+30: 80;
       spr= realloc(spr, sprlen);
@@ -1275,6 +1281,18 @@ int T,nil,doapply1,print;
 
 // minimial... lol (if no other code -- Play/main.c == 2106 Bytes)
 void main() {
+  char c;
+  clrscr();
+
+  puts("FOOBAR fiefum"); putchar('!'); putint(666); cputc('?');
+
+  for(c=0; c<8; ++c) { putchar(c); putint(c); putchar(' '); putchar('\n'); }
+  for(c=16; c<16+8; ++c) { putchar(c); putint(c); putchar(' '); putchar('\n'); }
+
+  while(1) {
+    c=getchar();
+    putchar(c);
+  }
 }
 
 #endif // NOTHING
