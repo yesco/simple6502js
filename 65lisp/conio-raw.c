@@ -7,15 +7,30 @@
 // and keyboard routines for ORIC ATMOS. It's inteded to
 // be used under Loci!
 // 
-// The terminal implements full-screen editing, similar to ORIC.
-// Most key-codes can be printed directly putchar/cputc to
-// get cursor movements and editing!
+// The terminal can either be "dumb" tty; basically only
+// honoring: \n \r \t ^L (clear) and scroll.
+
+//#define TTY // (- 10249 8261) = 1988 bytes for EXTENDED!
+
+#define CONIO_INIT // if you want init_conioraw() to disable ORIC cursor
+
+// TODO: since cc65 uses weak beinding maybe not needed?
+
+// replaces printf so works with
+//#define CONIO_PRINTF  // (- 10258 7668) = 2590 bytes!
+
+// Or be an Extended terminal implementing full-screen editing,
+// similar to ORIC. Most key-codes can be printed directly
+// putchar/cputc to get cursor movements and editing!
 //
 // However, it has a twist - it impements an EMACSy
 // full-screen editor!
 //
 // Cursor keys works for moving around.
 //
+
+#define VT100 // (- 7668 7194)= 474 bytes
+
 // The terminal implements extra features, such as
 // a vt100-ignore mode for unkonwn codes.
 //
@@ -26,6 +41,19 @@
 //   H    - gotoxy
 //   J    - clear screen
 //
+
+// KEYS
+// ====
+// Keys are encoded capturing not only the expected ASCII-code;
+// such as CTRL+'A' gives the keycode that cgetc() returns.
+// FUNCT key adds 128 to the code, this is similar to ESC-x M-x or META-x
+
+// Needed for decoding ASCII keys (total (- 7654 6367)= 1287 bytes!)
+#define KEY_MAPPING		// (- 6946 6367) = 579 bytes 2*9*8=144B in tables, 
+#define KEY_POS			// (- 7160 6946) = 214 bytes
+#define EXTENDED_KEYS		// (- 7294 6946) = 348 bytes
+#define EXTENDED_DEBUG_KEY      // (- 7092 6946) = 146 bytes
+
 // KEYS
 // ====
 // Keys are encoded capturing not only the expected ASCII-code;
@@ -43,10 +71,11 @@
 
 // Extended terminal operations
 // ============================
-
+//
 // - extensive string macros to change color etc
 //
 // puts( RED BGWHITE "FOOBAR" YELLOW BGBLACK );
+//
 //
 // Cursor movement
 //
@@ -141,17 +170,19 @@
 // 29 = J :INVERSE VIDEO ON/OFF      = TODO:
 
 #include <ctype.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <assert.h>
+#include <string.h> // memmmove
 
-#define TIMER (*(unsigned int*)0x306)
+// not needed?
+//#include <stdarg.h> 
+//#include <assert.h>
+#define assert(a)
+
+
+// peek/poke all in one *MEM(4711)= 42;
+#define MEM(a) *((char*)a)
+
 
 // TextMode
-// TODO: how to solve graphics mode HIRESTTEXT?
-// TODO: use variable for TEXTSCREEN, allowing virtual screens!
 #define CHARSET    ((char*)0xB400) // $B400-B7FF
 #define CHARDEF(C) ((char*)CHARSET+(C)*8)
 #define ALTSET     ((char*)0xB800) // $B800-BB7F
@@ -159,17 +190,51 @@
 #define SCREENROWS 28
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
-//#define SCREENEND  (curp+SCREENSIZE) // TODO: remove...
+// TODO: remove... or use FOO() to indicate is macro not const
+//#define SCREENEND()  (curp+SCREENSIZE)
 
+
+// Minimal detection of TEXTMODE/HIRESMODE
+// (for "fun" we use actual screen switching code for indication)
 #define TEXTMODE  26 // and 24-39 (2x 60 Hz, 2x 50 Hz)
 #define HIRESMODE 30 // and 28-31 (2x 60 Hz, 2x 50 Hz)
 
+char curmode= TEXTMODE;
+
+
 // hundreths of second
+
+// TODO: make my own interrupt timer!
+#define TIMER (*(unsigned int*)0x306)
+
 unsigned int time() {
   // ORIC TIMER 100 interrupts/s,
   // TODO: my own? no ROM...
   return *(unsigned int*)0x276;
 }
+
+#ifdef CONIO_INIT
+
+// TODO: https://www.cc65.org/doc/ld65-5.html
+// Link it up to auto-init? need .s file?
+void init_conioraw() {
+  // ORIC BASIC ROMs remap interrupt vector to page 2...
+  if (MEM(0xFFFF)==0x02) {
+    // We're running under an ORIC BASIC ROM!
+
+    // status location is at #26A.
+    //  1 – cursor ON when set.
+    //  2 – screen ON when set.
+    //  4 – not used.
+    //  8 – keyboard click OFF when set.
+    // 16 – ESC has been pressed.
+    // 32 – columns 0 and 1 protected when set.
+    #define SCREENSTATE *((char*)0x26a)
+    SCREENSTATE= 0; //*(char*)0x026A= 0;
+  }
+}
+
+#endif // CONIO_INIT
 
 unsigned int kbhit();
 
@@ -190,12 +255,11 @@ int wait(int hs) {
   return (1-k)*r;
 }
 
-// *SCREEN(X,Y)='A';
+// exampel use: *SCREEN(X,Y)='A';
 #define SCREENXY(x, y) ((char*)(curscr+(5*(y))*8+(x)))
 
 char curx=0, cury=1, * curp=TEXTSCREEN, * curscr= TEXTSCREEN;
 char curinv=0, curdouble=0, curai=0, curcaps=0;
-char curmode= TEXTMODE;
 
 void cputc(char c);
 char cgetc();
@@ -205,9 +269,10 @@ char cgetc();
 
 void gotoxy(char x, char y) {
   curx= x; cury= y;
-  cputc(0);
+  cputc(0); // update pointer
 }
 
+#ifndef TTY
 char savex=0, savey=0;
 
 void savecursor() {
@@ -220,6 +285,9 @@ void restorecursor() {
 }
 
 char* cursaved= 0;
+
+#include <stdlib.h> // malloc
+
 void savescreen() {
   if (!cursaved) cursaved= malloc(SCREENSIZE);
   memmove(cursaved, curscr, SCREENSIZE);
@@ -227,16 +295,6 @@ void savescreen() {
 
 void restorescreen() {
   if (cursaved) memcpy(curscr, cursaved, SCREENSIZE);
-}
-
-// TODO: what's ORIC wherey() default? 0 or 1
-void clrscr() {
-  // Don't clear status line (/)
-  curp= curscr;
-  memset(curp+40, ' ', (SCREENROWS-1)*SCREENCOLS);
-  curx= 0; cury= 1;
-  cputc(0);
-  return;
 }
 
 void fill(char x, char y, char w, char h, char c) {
@@ -272,11 +330,22 @@ void ink(char c) {
 //void revers(char) {}
 void revers();
 
+#endif // !TTY
+
 void clearline(char y) {
   char* p= SCREENXY(0, y);
   memset(p, ' ', 40);
+#ifndef TTY
   p[0]= curpaper;
   p[1]= curink;
+#endif // !TTY
+}
+
+void clrscr() {
+  // Don't clear status line (/)
+  curp= curscr+40;
+  memset(curp, ' ', SCREENROWS*SCREENCOLS-40);
+  curx= 0; cury= 1;
 }
 
 // TODO: in curmode=HIRESMODE then scroll only last 3 lines!
@@ -310,12 +379,24 @@ void scrollup(char fromy) {
 // + insert column
 // + remove column
 
+// Cursor:      SAVE RESTORE NEXT HOME GOTOXY bx by
+// Page:        PAGESWAP n, PAGESAVE n PAGELOAD n
+// Status:      STATUS t, STATUS32 t
+// Format:      ENDINVERSE INVERSE CENTER
+// Repeat:      REPEAT n c (CTRL+'U')
+// Input:       WAIT10s WAIT3s WAITKEY WAIT n
+// Lines:       CLEARLINE INSLLINE REMLINE
+// Columns:     CLEARCOL INSCOL REMCOL
+// Bytes:       BFILL BCOPY B
+// Window:
+// Xperiment:   TOOGLEAI
+
 #define ESC      "\x1b" // currently not used (skip vt100!?)
 #define TAB      "\t"
 #define CR       "\r"
 #define NEWLINE  "\n"
 
-//#define BELL    "\x07"
+#define BELL    "\x07"
 
 // clear (32 chars) & write statusline...RESTORE
 #define STATUS   "\x18"
@@ -375,14 +456,17 @@ void scrollup(char fromy) {
 #define FULL       "\x7f"
 
 // Waiting (for key, or specified seconds)
-#define WAIT10s  "\x03" // WAIT 10 seconds or key
-#define WAIT3s   "\x04" // WAIT 3 seconds or key
-#define WAIT1s   "\x05" // WAIT 1 second or key
-#define WAITKEY  "\x06" // WAIT for key (ACK)
-//      TOGGLEAI        // waits after each character processed
+
+// TODO: defunct
+
+//#define WAIT10s  "\x03" // WAIT 10 seconds or key
+//#define WAIT3s   "\x04" // WAIT 3 seconds or key
+//#define WAIT1s   "\x05" // WAIT 1 second or key
+//#define WAITKEY  "\x06" // WAIT for key (ACK)
+////      TOGGLEAI        // waits after each character processed
 
 // Combined!
-#define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAITKEY STATUS RESTORE
+//#define ANYKEY  STATUS BLINK "Press any key to continue" NORMAL RESTORE WAITKEY STATUS RESTORE
 
 #define CTRL (1-'A')
 #define META 128
@@ -491,36 +575,41 @@ void scrollup(char fromy) {
 //        ghi
 #define NEXT     RESTORE KDOWN SAVE
 
+// Visual Bell (reverse twice)
 void bell() {
   char *saved= curp, t;
-  // ORIC: ping();
-  // TODO: research how to do directy AY-hardware sounds
-
-  // Visual Bell (reverse twice)
   char* end= curscr+SCREENSIZE;
   for(t=3; --t; ) {
     for(curp=curscr; ++curp<end; ) *curp ^= 128;
     //wait(10);
   }
-
   curp= saved;
 }
 
-// interal "raw" terminal
 
-// Basically, it implements EMACS style editing
-// on the screen!
-//
-// On ORIC you traditionally can edit the screen,
-// which is a rather unique function.
-//
-// But here we don't have the CTRL-A read character
-// under cursor and type nilwilly anywhere into
-// a hidden keyboard buffer!
-//
+// VT100 states
+#ifdef VT100
+  #define CURNPARAM 3
+  int curparam[CURNPARAM];
+  char curnparam= 0;
+  char curvt100= 0;
+#endif // VT100
 
+
+// Print character using internal "raw" terminal
+
+// On ORIC you can traditionally edit the screen,
+// just moving about with cursor keys. This is a rather
+// unique (?) function on home computers.
+//
+// Basically, that was implemented by having DEL/and
+// arrow keys emit same codes as those for moving about!
+//
+// Here, instead of ORIC-s control codes we implement
+// EMACS style editing on the screen!
+//
 // Emacs bindings implemented:
-//   (Free: CXYZ, TODO: HJK(L)MOQRSTW V
+//   (Free: CXYZ, TODO: HJK(L)MOQRSTWV
 //
 // CTRL-A : At the aabeginning of line
 // CTRL-B : Back one character
@@ -557,14 +646,23 @@ void bell() {
 //
 // RETURN : new line
 // CTRL-J : LF
-// CTRL-M ; CR
+// CTRL-M : CR
 
-// TODO: kputc? to take extended keycodes!
+#ifdef TTY
+// Minimal TTY terminal!
+void cputc(char c) {
+  switch(c) {
+  case 12  : clrscr(); return;
+  case '\r': curx= 0; return;
+  case '\n': curx= 0; ++cury; ++curp; break;
+  case '\t': do { ++curp; } while (++curx & 0x7); break;
+  default  : *curp= c; ++curx; ++curp; break;
+  }
+  if (curx>40) ++cury;
+  if (cury>27) scrollup(1);
+}
 
-#define CURNPARAM 3
-int curparam[CURNPARAM];
-char curnparam= 0;
-char curvt100= 0;
+#else // TTY else EXTENDED
 
 void cputc(char c) {
   // not printable ASCII
@@ -577,46 +675,43 @@ void cputc(char c) {
     //    can't                 L H     T VXZ
     // ESC-q reformat paragraph/fill
 
-    // control-codes
+    // -- control-codes
     switch(c) {
     case 0: break; // *is* UPDATE - recalc curp from curx,cury
     case 1: curx= 0; break;                 // ^A beginning of line
     case CTRL+'C': break;
     case CTRL+'D':                          // ^D del char forward
       memmove(curp, curp+1, 39-curx);
-      curp[39-curx]= ' '; break;            // TODO: cclearxy()
+      curp[39-curx]= ' '; return;           // TODO: cclearxy()
     case CTRL+'E': gotoxy(39,cury);         // ^E end of line
-      while(curp[-1]==' ') --curp,--curx;
-      break;
-    case CTRL+'G': bell(); break;           // ^G break/bell
+      while(curp[-1]==' ') --curp,--curx;  // TODO: BUG: if all spaces? goes prev line?
+      return;
+    case CTRL+'G': bell(); return;          // ^G break/bell
     case 127: if (curp>curscr)              // ^H -- \b
         // TODO: insert/overwrite
         memmove(curp-1, curp, 39-1-curx);
       curp[39-curx]= ' '; --curx; break;
 
-    case '\b':                                   // rubout?
-    case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <- 
+    case '\b':                                   // backspace
+    case CTRL+'B':case KEY_LEFT:  --curx; break; // ^B <-  \b
     case CTRL+'F':case KEY_RIGHT: ++curx; break; // ^F ->
-
     case CTRL+'N':case KEY_DOWN:  ++cury; break; // ^N DOWN
-      // TODO:???     case   11 on oric: CTRL+'K' ????
     case CTRL+'P':case KEY_UP:    --cury; break; // ^P up
-
     case FUNCT+'P':               cury=1; break; // Top of screen
     case FUNCT+'N':              cury=27; break; // Bot of screen
         
-    case   12: clrscr(); return;                 // ^L clear
+    case CTRL+'L': clrscr(); return;             // ^L clear
 
-    case CTRL+'O': break;
+    case CTRL+'O': break;                        // TODO: break line in 2
 
-    case '\t': curx= (curx+8)/8*8; break;        // ^I TAB // TODO: BUG: fill out w space!
+    case '\t': curx= (curx+8)/8*8; break;        // ^I TAB
     case '\n': curx= 0; ++cury; break;           // not key
-      // TODO: distinguish RETURN
     case '\r': curx= 0; break;                   // ^M
+    // TODO: distinguish RETURN                  // ^J ?
 
     case CTRL+'Q': break;                        // TODO: ^Q quote char
     case CTRL+'R':                               // TODO: ^R
-    case CTRL+'S': { char k, s[32]={0};          // ^S s
+    case CTRL+'S': { char k, s[32]={0};          // ^S s TODO: test
         char* end= curscr+SCREENSIZE;
         i= 0;
         do {
@@ -643,38 +738,36 @@ void cputc(char c) {
         cury= i % 40;
         break; }
 
-      // TODO: Not working?
     case CTRL+'T': curcaps = !curcaps; break;    // ^T toggle CAPS
 
+    case CTRL+'K': memset(curscr+40*cury, 32, 40);
+      scrollup(cury); break;                     // ^K: REMOVELINE
+      // TODO: use cclear()
+    //case CTRL+'O': scrolldown(1); break;     // ^O INSERTLINE
 
-      // TODO: use cclear()      // TODO: clear end of line
-      // TODO: hmmm... CLEARLINE?
-      // TDOO: same key as
-      //case CTRL+'K':                             // TODO: ^K CLEARLINE
-      //memset(curscr+40*cury, 32, 40);
-      //return;
-    case CTRL+'K': scrollup(cury); break;    // ^K: REMOVELINE
-      // TODO: use cclear()      // TODO: clear end of line
-      //case CTRL+'O': scrolldown(1); break;     // ^O INSERTLINE
+    // TODO: use hi-bit codes...
 
-      //case 0x10: curinv= 0; break;           // ENDINVERSE
-      //case 0x11: curinv= 128; break;         // INVERSE
+    // four hibit codes have no key mapping... 28 29 30 31
+    //
+    //case 0x9c: curinv= 0; break;           // ENDINVERSE
+    //case 0x9d: curinv= 128; break;         // INVERSE
+    //case 0x9e:                             // CENTER (see puts)
+    //case 0x9f: i+= 700;                    // WAIT10s
 
-      //case 0x12:                           // CENTER (see puts)
-      //case    3: i+= 700;                    // WAIT10s
-      //case    4: i+= 200;                    // WAIT3s
-      //case    5: i+= 100;                    // WAIT1s
-      //case    6:                             // WAITKEY
+      // 0xa0 == ' '
+      //case 0xa0: i+= 200;                    // WAIT3s
+      //case 0x85: i+= 100;                    // WAIT1s
+      //case 0x86:                             // WAITKEY
       //while(kbhit()) cgetc();
       //wait(-i); break;                     
 
 
       //case 0x14: curai= !curai; break;       // TOGGLEAI
 
-      //case 0x15: // NAK
-      //case 0x16: // SYN                    // TODO: search SYN '2'
-      //case 0x17: // ETB
-      //case 0x18: // CAN                    // TODO: stop!
+      //case 0x95: // NAK
+      //case 0x96: // SYN                    // TODO: search SYN '2'
+      //case 0x97: // ETB
+      //case 0x98: // CAN                    // TODO: stop!
 
     case CTRL+'U': // TODO: move code from StupidTerminal? ^U repeat
     case CTRL+'V': // ^V page down ?  next page?/screen
@@ -696,24 +789,16 @@ void cputc(char c) {
       savecursor(); gotoxy(32,0); return;
 
     // ESC TODO: ORIC attribute prefix
-    case 0x1b: curvt100= 1;                 // ESC: VT-100 mini-compatibility
+    case 0x1b:                                        // ESC: VT-100 mini-compatibility
+      #ifdef VT100
+        curvt100= 1;
+      #endif // VT100
+      return;         
 
     case 0x1c: break; // TODO: use
     case 0x1d: savecursor(); break;                   // SAVE
     case 0x1e: restorecursor(); break;                // RESTORE
     case 0x1f: restorecursor(); savey= ++cury; break; // NEXT
-
-      // Cursor:      SAVE RESTORE NEXT HOME GOTOXY bx by
-      // Page:        PAGESWAP n, PAGESAVE n PAGELOAD n
-      // Status:      STATUS t, STATUS32 t
-      // Format:      ENDINVERSE INVERSE CENTER
-      // Repeat:      REPEAT n c (CTRL+'U')
-      // Input:       WAIT10s WAIT3s WAITKEY WAIT n
-      // Lines:       CLEARLINE INSLLINE REMLINE
-      // Columns:     CLEARCOL INSCOL REMCOL
-      // Bytes:       BFILL BCOPY B
-      // Window:
-      // Xperiment:   TOOGLEAI
 
     default: 
       {
@@ -731,6 +816,7 @@ void cputc(char c) {
 
  print:
 
+#ifdef VT100
   // minimal vt100 simulation, TODO: vt52?
   // - https://espterm.github.io/docs/VT100%20escape%20codes.html
   if (curvt100) {
@@ -791,6 +877,7 @@ void cputc(char c) {
     
     return;
   }
+#endif // VT100
 
   // -- ACTUALLY PRINT
 
@@ -825,7 +912,6 @@ void cputc(char c) {
     *curp= c^curinv;  ++curp;
   }
 
- adjust:
   // wrap/adjust cursor position
   if (++curx>=40) { ++cury; curx=0; }
   if (cury>=28) scrollup(1);
@@ -835,8 +921,10 @@ void cputc(char c) {
   return;
 
 
+#ifdef VT100
  vtdone:
   curvt100= 0;
+#endif // VT100
 
  recalc:
 
@@ -852,6 +940,7 @@ void cputc(char c) {
 
   curp= SCREENXY(curx, cury);
 }
+#endif // TTY else
 
 //int putchar(int c) { cputc(c); return c; }
 #define putchar(c) (cputc(c),c)
@@ -892,8 +981,6 @@ int puts(const char* s) {
 
 char* spr= NULL; size_t sprlen= 0;
 
-#include <stdlib.h>
-
 // maybe faster than printf
 void putint(int n) {
   if (n<0) { putchar('-'); n= -n; }
@@ -901,6 +988,9 @@ void putint(int n) {
   putint('0'+(n%10));
 }
 
+#ifdef CONIO_PRINTF
+#include <stdlib.h> // malloc
+//#include <stdio.h>  // va_list
 int printf(const char* fmt, ...) {
   int n= 0;
   va_list argptr;
@@ -918,7 +1008,9 @@ int printf(const char* fmt, ...) {
   va_end(argptr);
   return n;
 }
+#endif // CONIO_PRINTF
 
+#ifdef KEY_MAPPING
 
 // TODO: replace with one 64B string?
 char* upperkeys[]= { // lol, bad name
@@ -945,12 +1037,18 @@ char* lowerkeys[]= {
   "yhge\0asw",
   "*l)?" KRSHIFT KRETURN "\0-"};
 
-// TODO: remove asm
+// TODO: remove asm, or just use asm? lol
 extern char gKey;
 extern void KeyboardRead();
 
-// peek/poke all in one *MEM(4711)= 42;
-#define MEM(a) *((char*)a)
+unsigned int unc= 0;
+char keybits[8]={0};
+
+int ungetchar(int c) {
+  return unc? 0: unc=c;
+}
+
+#endif // KEY_MAPPING
 
 // Reads hardware keyboard ROW using COLMASK
 // 
@@ -969,13 +1067,6 @@ char key(char row, char colmask) {
   MEM(0x030c)= 0xfd;
   MEM(0x030c)= 0xdd;
   return MEM(0x0300) & 8;
-}
-
-unsigned int unc= 0;
-char keybits[8]={0};
-
-int ungetchar(int c) {
-  return unc? 0: unc=c;
 }
 
 // upper byte
@@ -1002,6 +1093,8 @@ int ungetchar(int c) {
 
 #define RIGHTBIT  0b00000001
 
+#ifdef KEY_MAPPING
+
 static const char KEYMASK[]= {
   0xFE, 0xFD, 0xFB, 0xF7, 0xEF, 0xDF, 0xBF, 0x7F };
 
@@ -1009,6 +1102,8 @@ static const char KEYMASK[]= {
 // (stores key in unc)
 //
 // Returns: 0 - no key, or the character
+//
+// TODO: is kbhit() really returning int? or char? need new name?
 unsigned int kbhit() {
   char bits= 0;
   if (!unc) {
@@ -1023,6 +1118,7 @@ unsigned int kbhit() {
             ++v;
             k= upperkeys[row][col];
 
+          #ifdef EXTENDED_KEYS
             // TODO: test this once after all scannned!
             //   use the matrix(bits), Luke!
             if (k & 128) {
@@ -1040,18 +1136,19 @@ unsigned int kbhit() {
             else if (k==*KRETURN) bits|=RETURNmask;
             else if (k==*KESC)    bits|=ESCmask;
             else if (k==*KDEL)    bits|=DELmask;
-            
+          #endif // EXTENDED_KEYS  
             c=k,R=row,K=col; // last char overwrites
           }
         }
       }
       keybits[row]= v;
     }
-    asm("CLI");
+    asm("CLI"); // TODO: ???
 
     // decode ascii
     if (R!=8) {
 
+    #ifdef EXTENDED_KEYS
       // specific workaround for Oricutron that
       // dosn't recognize '" and \| keys1
       if (c==';' && (bits & CTRLmask))
@@ -1064,6 +1161,8 @@ unsigned int kbhit() {
         else if (!o) c= lowerkeys[R][K];
       }
       if (c<'A' && o==32) o=0,c= lowerkeys[R][K];
+    #endif // EXTENDED_KEYS
+
       c= c? o+c: 0;
       if (curcaps && isalpha(c) && c<128) c ^= 32; // switch lower/upper!
       unc= (bits<<8) | c;
@@ -1073,6 +1172,7 @@ unsigned int kbhit() {
   return unc;
 }
 
+#ifdef KEY_POS
 // Get the ORIC ATMOS keymatrix (row,col)-position
 // Searches keymatrix for characters 32-127
 //
@@ -1082,6 +1182,8 @@ char keypos(char c) {
   char row, col;
   for(row=0; row<8; ++row)
     for(col=0; col<8; ++col)
+      // TODO: this line compiles to many bytes!
+      // TODO: maybe just have array of bytes, loop over as such? memchr?
       if (c==upperkeys[row][col] || c==lowerkeys[row][col])
         return (row<<4) | col | 8;
   return 0;
@@ -1094,25 +1196,35 @@ char keypos(char c) {
 
 char keypressed(char keypos) {
   char c;
-  asm("SEI");
+  asm("SEI"); // TODO: ??
   c= key(keypos>>4, KEYMASK[keypos & 7]);
-  asm("CLI");
+  asm("CLI"); // TODO: ??
   return c;
 }
+#endif KEY_POS
 
+#ifdef EXTENDED_DEBUG_KEY
+
+// print key with F C S a(rrow) e(sc) d(el) r(eturn) - ALFA
+// F-A, C-A, FCS-A, Fa- arrow
 void printkey(unsigned int k) {
-  if (k & FUNCTBIT)  putchar('F');
-  if (k & CTRLBIT)   putchar('C');
-  if (k & SHIFTBIT)  putchar('S');
-  if (k & ARROWBIT)  putchar('a');
-  if (k & ESCBIT)    putchar('e');
-  if (k & DELBIT)    putchar('d');
-  if (k & RETURNBIT) putchar('r');
-  if (k & 0xff00)    putchar('-');
+  static char b;
+  b= k>>8;
+
+  if (b & FUNCTmask)  putchar('F');
+  if (b & CTRLmask)   putchar('C');
+  if (b & SHIFTmask)  putchar('S');
+  if (b & ARROWmask)  putchar('a');
+  if (b & ESCmask)    putchar('e');
+  if (b & DELmask)    putchar('d');
+  if (b & RETURNmask) putchar('r');
+  if (b & 0xff00)     putchar('-');
+
   k= (char)k;
   putchar((k&0x7f)<' '? k+64: k);
   //printf(" ($%04x)", k);
 }
+#endif // EXTENDED_DEBUG_KEY
 
 // Waits for keypress
 // Returns:
@@ -1153,17 +1265,136 @@ char cgetc() {
   return getchar();
 }
 
-#ifdef TEST
+#endif // KEY_MAPPING
+
+
+#ifdef NOTHING
 
 // Dummys for ./r script
 int T,nil,doapply1,print;
 
+// minimial... lol (if no other code -- Play/main.c == 2106 Bytes)
+void main() {
+}
 
+#endif // NOTHING
 
+#ifdef EMACSTERM
 
+void main() {
+  // StupidTerm to test out control keys...
 
+#define HIRESSCREEN ((char*)0xA000) // $A000-BF3F
+#define HIRESSIZE   8000
+#define HIRESEND    (HIRESSCREEN+HIRESSIZE)
 
+#define HIRESROWS   200
+#define HIRESCELLS  40
 
+#define HIRESTEXT   ((char*)0xBF68) // $BF68-BFDF
+#define HIRESTEXTSIZE 120
+#define HIRESTEXTEND (HIRESTEXT+HIRESTEXTSIZE)
+
+#define HIRESCHARSET ((char*)0x9800) // $9800-9BFF
+#define HIRESALTSET  ((char*(0x9C00) // $9C00-9FFF
+
+  // 1080 chars
+  char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
+
+  int u= -1, n;
+
+  // hires();
+  memcpy(HIRESCHARSET, CHARSET, 256*8); curmode= curscr[SCREENSIZE-1]= HIRESMODE;
+  // gclear();
+  memset(HIRESSCREEN, 64, HIRESSIZE);
+
+  gotoxy(0, 1);
+
+  paper(*YELLOW);
+  ink(*MAGNENTA);
+
+  // again?
+
+  puts(KESC "[20;13H*HERE!");
+
+  while(1) {
+    //printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
+    //wherey(), wherex());
+    //puts(STATUS32); printkey(k); puts(" " RESTORE);
+
+    // show cursor, wait for char
+    *curp ^= 128;
+    k=getchar();
+    *curp ^= 128;
+
+    // Terminal implementation code!
+    // TODO: why is it needed again?
+    // is keyboard mapping wrong?
+    // CTRL-M hmmm, CRRL-J, hmmm, RETURN
+    if (k & RETURNBIT) k= '\n';
+
+    if ((char)k==CTRL+'Z') {
+      char* saved;
+      Compressed* zip;
+      int i;
+      unsigned int C, rle;
+      curscr[SCREENSIZE+1]= 0; // lol // TODO: remove!
+      saved= strdup(TEXTSCREEN+40);
+      rle= RLE(TEXTSCREEN+40, SCREENSIZE-40);
+      gotoxy(32, 0); printf("RLE=%4d ", rle);
+
+      C= time();
+      //zip= compress(TEXTSCREEN+40, SCREENSIZE-40);
+      zip= compress(TEXTSCREEN+40, rle);
+      assert(zip);
+      C= C-time();
+      while((char)kbhit()!=CTRL+'C') {
+        int ol= strlen(saved), n= zip->len;
+        unsigned int T;
+        clrscr();
+        asm("CLI"); // TODO: ??
+        T= time();
+        decompress(zip, TEXTSCREEN+40);
+        unRLE(TEXTSCREEN+40, zip->origlen, SCREENSIZE-40);
+        //i = strprefix(TEXTSCREEN+40, saved);
+        //if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
+        printf(STATUS "=>%3d%% %4d/%4d z=%u hs dez=%u hs\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol, C, T-time());
+        wait(50);
+      }
+    }
+    if ((char)k==CTRL+'X') {
+      char i, j;
+      for(i=0; i<40; ++i) {
+        for(j=0; j<i; ++j) cputc(' ');
+        puts("Compresz");
+      }
+    }
+    if ((char)k==CTRL+'C') {
+      puts(sherlock);
+    } 
+
+    // repeat character/take argument
+    if ((char)k==CTRL+'U' && u<0) u*= 4;
+    else if (abs(u) > 1 && isdigit((char)k)) {
+      if (u<0) u=0;
+      u= 10*u + (char)k-'0';
+    } else {
+      // print char! (n-times?)
+      n= u<0? -u: u;
+      if (n>1080) n= SCREENSIZE;
+      do {
+        putchar(k);
+      } while(--n > 0);
+      u= -1;
+    }
+  }
+}
+
+#endif // EMACSTERM
+
+// TODO: ANYKEY etc are missing... need to remap, maybe to ESC?
+
+#ifdef TEST
 
 // useless test of conio-raw.c
 
@@ -1200,24 +1431,6 @@ void demo() {
 
 }
 
-// TODO: https://www.cc65.org/doc/ld65-5.html
-void init_conioraw() {
-  // ORIC BASIC ROMs remap interrupt vector to page 2...
-  if (MEM(0xFFFF)==0x02) {
-    // We're running under an ORIC BASIC ROM!
-
-    // status location is at #26A.
-    //  1 – cursor ON when set.
-    //  2 – screen ON when set.
-    //  4 – not used.
-    //  8 – keyboard click OFF when set.
-    // 16 – ESC has been pressed.
-    // 32 – columns 0 and 1 protected when set.
-    #define SCREENSTATE *((char*)0x26a)
-    SCREENSTATE= 0; //*(char*)0x026A= 0;
-  }
-}
-
 #define COMPRESS_PROGRESS
 #include "compress.c"
 
@@ -1232,114 +1445,8 @@ void main() {
 
   switch(2) {
 
-  case 2: {
-    // StupidTerm to test out control keys...
-
-#define HIRESSCREEN ((char*)0xA000) // $A000-BF3F
-#define HIRESSIZE   8000
-#define HIRESEND    (HIRESSCREEN+HIRESSIZE)
-
-#define HIRESROWS   200
-#define HIRESCELLS  40
-
-#define HIRESTEXT   ((char*)0xBF68) // $BF68-BFDF
-#define HIRESTEXTSIZE 120
-#define HIRESTEXTEND (HIRESTEXT+HIRESTEXTSIZE)
-
-#define HIRESCHARSET ((char*)0x9800) // $9800-9BFF
-#define HIRESALTSET  ((char*(0x9C00) // $9C00-9FFF
-
-    // 1080 chars
-    char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
-
-    int u= -1, n;
-
-    // hires();
-    memcpy(HIRESCHARSET, CHARSET, 256*8); curmode= curscr[SCREENSIZE-1]= HIRESMODE;
-    // gclear();
-    memset(HIRESSCREEN, 64, HIRESSIZE);
-
-    gotoxy(0, 1);
-
-    paper(*YELLOW);
-    ink(*MAGNENTA);
-
-    // again?
-
-    puts(KESC "[20;13H*HERE!");
-
-    while(1) {
-      //printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
-      //wherey(), wherex());
-      //puts(STATUS32); printkey(k); puts(" " RESTORE);
-
-      // show cursor, wait for char
-      *curp ^= 128;
-      k=getchar();
-      *curp ^= 128;
-
-      // Terminal implementation code!
-      // TODO: why is it needed again?
-      // is keyboard mapping wrong?
-      // CTRL-M hmmm, CRRL-J, hmmm, RETURN
-      if (k & RETURNBIT) k= '\n';
-
-      if ((char)k==CTRL+'Z') {
-        char* saved;
-        Compressed* zip;
-        int i;
-        unsigned int C, rle;
-        curscr[SCREENSIZE+1]= 0; // lol // TODO: remove!
-        saved= strdup(TEXTSCREEN+40);
-        rle= RLE(TEXTSCREEN+40, SCREENSIZE-40);
-        gotoxy(32, 0); printf("RLE=%4d ", rle);
-
-        C= time();
-        //zip= compress(TEXTSCREEN+40, SCREENSIZE-40);
-        zip= compress(TEXTSCREEN+40, rle);
-        assert(zip);
-        C= C-time();
-        while((char)kbhit()!=CTRL+'C') {
-          int ol= strlen(saved), n= zip->len;
-          unsigned int T;
-          clrscr();
-          asm("CLI");
-          T= time();
-          decompress(zip, TEXTSCREEN+40);
-          unRLE(TEXTSCREEN+40, zip->origlen, SCREENSIZE-40);
-          //i = strprefix(TEXTSCREEN+40, saved);
-          //if (i<=0) { gotoxy(10, 25); printf("DIFFER AT POSITION: %d\n", i); }
-          printf(STATUS "=>%3d%% %4d/%4d z=%u hs dez=%u hs\n\n" RESTORE, (int)((n*10050L)/ol/100), n, (int)ol, C, T-time());
-          wait(50);
-        }
-      }
-      if ((char)k==CTRL+'X') {
-        char i, j;
-        for(i=0; i<40; ++i) {
-          for(j=0; j<i; ++j) cputc(' ');
-          puts("Compresz");
-        }
-      }
-      if ((char)k==CTRL+'C') {
-        puts(sherlock);
-      } 
-
-      // repeat character/take argument
-      if ((char)k==CTRL+'U' && u<0) u*= 4;
-      else if (abs(u) > 1 && isdigit((char)k)) {
-        if (u<0) u=0;
-        u= 10*u + (char)k-'0';
-      } else {
-        // print char! (n-times?)
-        n= u<0? -u: u;
-        if (n>1080) n= SCREENSIZE;
-        do {
-          putchar(k);
-        } while(--n > 0);
-        u= -1;
-      }
-
-    } } break;
+  case 2:
+    stupidTerm(); break;
 
   case 1:
     // just scroll test
