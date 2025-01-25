@@ -85,6 +85,8 @@
   <option value="ink:6">cya (red)</option>
   <option value="ink:7">wht (blk)</option>
 </select>
+
+<button id="undo" value="undo" onclick="javascript:undo();">undo</button>
 <br/>
 
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
@@ -351,9 +353,26 @@ function drawbrush() {
   }
 }
 
-// TODO: redo this, no like...
+// UNDO/REDO
+
+var undoStack= [];
+
+function saveUndo() {
+  undoStack.push(new Uint8Array(cell));
+  dom("undo").textContent= "undo:"+undoStack.length;
+}
+
+function undo() {
+  if (!(undoStack.length)) return;
+  cell= undoStack.pop();
+  updatehires();
+  dom("undo").textContent= "undo:"+undoStack.length;
+}
+
+// TODO: change this, no like...
 
 canvas.addEventListener("mousedown", function (e) {
+  saveUndo();
   drawing = true;
   currentPos= startPos = getMousePos(canvas, e);
   changed(startPos);
