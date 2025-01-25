@@ -2,14 +2,70 @@
 <html>
 <body text="white" bgcolor="black">
 
-<h1>ORIC HIRES SCREEN</h1>
+<div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN</b></tt></div><br/>
+
+Size
+<select id="size">
+  <option value="1">1</option>
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="4">4</option>
+  <option value="5">5</option>
+  <option value="6">6</option>
+  <option value="7">7</option>
+  <option value="8">8</option>
+  <option value="cell">Cell</option>
+</select>
+
+<select id="brush">
+  <option value="pixel">Thin</option>
+  <option value="cursive">Cursive</option>
+  <option value="circle">Circle</option>
+  <option value="box">Box</option>
+</select>
+
+Draw
+<select id="shape">
+  <option value="path">Path</option>
+  <option value="line">Line</option>
+  <option value="circle">Circle</option>
+  <option value="disc">Disc</option>
+  <option value="square">Square</option>
+  <option value="rect">Rect</option>
+  <option value="box">Box</option>
+  <option value="image">Image</option>
+</select>
+
+Inverse
+<select id="inverse">
+  <option value="off">off</option>
+  <option value="on">on</option>
+</select>
+
+Cell
+<select id="cell">
+  <option value="-1">none</option>
+  <option value="64">black</option>
+  <option value="192">white</option>
+  <option value="127">yellow</option>
+  <option value="255">blue</option>
+</select>
+<br/>
 
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1;">
 Your browser does not support the HTML canvas tag.</canvas>
 
 <script>
+// TODO: create an overlay cell grid
+// - https://stackoverflow.com/questions/36216561/create-canvas-over-another-canvas
+// TODO: 
+
+function dom(name) {
+  return document.getElementById(name);
+}
+
 var w= 2, h= 2;
-var canvas = document.getElementById("myCanvas");
+var canvas = dom("myCanvas");
 var ctx = canvas.getContext("2d");
 
 var x= 0, y= 0;
@@ -132,6 +188,11 @@ cell[ci++]= 64+1+4+16;
 //for(i=100; i< 300; ++i) 
 //  cell[ci++]= 64+1+4+16;
 
+for(ci=0; ci<200*40; ci+= 40) {
+  cell[ci]= 0;
+  cell[ci+1]= 3;
+}
+
 updatehires();
 
 //////////////////////////////////////////////////////////////////////
@@ -152,15 +213,64 @@ function curset(ox, oy, f) {
   case 2: cell[ci] ^=  cm; break;
   case 3: return;
   }
-  partialupdate();
 }
 
 function changed(pos) {
   ox= Math.floor((pos.x+1)/2);
   oy= Math.floor((pos.y+1)/2);
-  curset(ox, oy, 1);
-  partialupdate();
+  var v= 0+dom("cell").value;
+  if (v>0) {
+    curset(ox, oy, 3);
+    cell[ci]= 0+v;
+    partialupdate();
+  } else 
+    drawbrush();
 }
+
+function drawbrush() {
+  var brush= dom("brush").value;
+  var size= 0+dom("size").value;
+
+  switch(brush) {
+
+  case "pixel":
+    curset(ox, oy, 1);
+    partialupdate();
+    break;
+
+  case "cursive":
+    for(var i=0; i<size; ++i) {
+      curset(ox-i, oy+i, 1);
+      partialupdate();
+    }
+    break;
+
+  case "circle":
+    var radius= size;
+    var w= radius, h= radius;
+    for(var r= -h; r<=h; ++r) {
+      for(var c= -w; c<=w; ++c) {
+        if (r*r+c*c<radius*radius)
+          curset(ox+c, oy+r, 1);
+      }
+      partialupdate();
+    }
+    break;
+
+  case "box":
+    var w= size, h= size;
+    for(var r= -h; r<=h; ++r) {
+      for(var c= -w; c<=w; ++c) {
+        curset(ox+c, oy+r, 1);
+      }
+      partialupdate();
+    }
+    break;
+
+  }
+}
+
+// TODO: redo this, no like...
 
 canvas.addEventListener("mousedown", function (e) {
   drawing = true;
@@ -244,6 +354,7 @@ document.body.addEventListener("touchmove", function (e) {
 //alert("all setup!");
 
 </script>
+
 </body>
 </html>
 
