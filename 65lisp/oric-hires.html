@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<body text="white" bgcolor="black">
+
+<h1>ORIC HIRES SCREEN</h1>
+
+<canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1;">
+Your browser does not support the HTML canvas tag.</canvas>
+
+<script>
+var w= 2, h= 2;
+var canvas = document.getElementById("myCanvas");
+var ctx = canvas.getContext("2d");
+
+var x= 0, y= 0;
+var colors= ["black", "red", "green", "yellow", "blue", "magnenta", "cyan", "white"];
+
+// store hires screen as array
+var cell= new Uint8Array(200*40);
+cell.fill(64);
+var ci= 0, bg= 0, fg= 7; // running data
+
+function nextcell() {
+  if (ci>= 240*40) return;
+
+  var v= cell[ci];
+  // colors reset every line
+  if (ci%40==0) { bg=0; fg=7; x= 0; }
+
+  var i= v&7;
+
+  // hibit is invert colors
+  var vl= v&127;
+
+  if (vl<32) { // attributes
+    //alert("vl= "+vl+" i="+i);
+    // change color
+    if (vl>= 0 && vl< 8) fg= i;
+    if (vl>=16 && vl<24) bg= i;
+
+    // draw current attr
+    var b= colors[(v&128)? 7-bg: bg];
+    //b= 'yellow'; // for debug set yellow
+    ctx.fillStyle= b;
+    ctx.fillRect(x, y, 6*w, h);
+    x+= 6*w;
+
+  } else { // pixels 32..63, 63..127
+
+    var b= colors[(v&128)? 7-bg: bg];
+    var f= colors[(v&128)? 7-fg: fg];
+
+    // draw 6 pixels
+    for(i=0; i<6; ++i) {
+      ctx.fillStyle= (v&1)? f: b;
+      ctx.fillRect(x, y, w, h);
+      v >>= 1; x+= w;
+    }
+
+  }
+
+  if (x>=240*w) { x=0; y+= h; }
+  ++ci;
+}
+
+function updatehires() {
+  x= 0; y= 0; ci= 0;
+  while(ci<240*40)
+    nextcell();
+}
+
+function partialupdate() {
+  // only need to update the row
+  // this will get right colors and effect
+  var oy= Math.floor(ci/40);
+  x= 0;
+  y= 2*oy;
+  ci= 40*oy;
+  for(var i=40; i--;) nextcell();
+}
+
+ctx.beginPath();
+//ctx.arc(25,25,15,0,2*Math.PI);
+//ctx.stroke();
+//ctx.fillStyle = "green";
+//ctx.fillRect(x+=30,y,w,h);
+//c.rect(x+=6, y, w, h);
+
+ci= 40*100+20;
+cell[ci++]= 1;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+ci+= 40*3;
+cell[ci++]= 2+16;
+//cell[ci+=40*3]= 2+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+ci+= 40*3;
+cell[ci++]= 3+16+128;
+//cell[ci+=40*3]= 2+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16+128;
+cell[ci++]= 64+1+4+16;
+ci+= 40*3;
+cell[ci++]= 3+16;
+//cell[ci+=40*3]= 2+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+cell[ci++]= 64+1+4+16;
+//for(i=100; i< 300; ++i) 
+//  cell[ci++]= 64+1+4+16;
+
+updatehires();
+
+//////////////////////////////////////////////////////////////////////
+// - https://bencentra.com/code/2014/12/05/html5-canvas-touch-events.html
+
+// Set up mouse events for drawing
+var drawing = false;
+var currentPos = { x:0, y:0 };
+var startPos = { x:0, y:0 };
+
+function changed(pos) {
+  ox= Math.floor((pos.x+1)/2);
+  oy= Math.floor((pos.y+1)/2);
+  ci= Math.floor(ox/6) + oy*40;
+  var cm= 1<<(ox%6);
+  cell[ci] |= cm;
+  partialupdate();
+  //updatehires();
+}
+
+canvas.addEventListener("mousedown", function (e) {
+  drawing = true;
+  currentPos= startPos = getMousePos(canvas, e);
+  changed(startPos);
+}, false);
+
+// good to draw a line, action at end?
+canvas.addEventListener("mouseup", function (e) {
+  drawing = false;
+}, false);
+  
+canvas.addEventListener("mousemove", function (e) {
+  currentPos = getMousePos(canvas, e);
+  changed(currentPos);
+}, false);
+
+// Get the position of the mouse relative to the canvas
+function getMousePos(canvasDom, mouseEvent) {
+  var rect = canvasDom.getBoundingClientRect();
+  return {
+    x: mouseEvent.clientX - rect.left,
+    y: mouseEvent.clientY - rect.top
+  };
+}
+
+
+// Set up touch events for mobile, etc
+canvas.addEventListener("touchstart", function (e) {
+  mousePos = getTouchPos(canvas, e);
+  //alert(mousePos);
+  var touch = e.touches[0];
+  var mouseEvent = new MouseEvent("mousedown", {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+}, false);
+
+canvas.addEventListener("touchend", function (e) {
+  var mouseEvent = new MouseEvent("mouseup", {});
+  canvas.dispatchEvent(mouseEvent);
+}, false);
+
+canvas.addEventListener("touchmove", function (e) {
+  var touch = e.touches[0];
+  var mouseEvent = new MouseEvent("mousemove", {
+    clientX: touch.clientX,
+    clientY: touch.clientY
+  });
+  canvas.dispatchEvent(mouseEvent);
+}, false);
+
+// Get the position of a touch relative to the canvas
+function getTouchPos(canvasDom, touchEvent) {
+  var rect = canvasDom.getBoundingClientRect();
+  return {
+    x: touchEvent.touches[0].clientX - rect.left,
+    y: touchEvent.touches[0].clientY - rect.top
+  };
+}
+
+// Prevent scrolling when touching the canvas
+document.body.addEventListener("touchstart", function (e) {
+  if (e.target == canvas) {
+    e.preventDefault();
+  }
+}, false);
+
+document.body.addEventListener("touchend", function (e) {
+  if (e.target == canvas) {
+    e.preventDefault();
+  }
+}, false);
+document.body.addEventListener("touchmove", function (e) {
+  if (e.target == canvas) {
+    e.preventDefault();
+  }
+}, false);
+
+//alert("all setup!");
+
+</script>
+</body>
+</html>
+
