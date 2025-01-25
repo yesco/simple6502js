@@ -14,6 +14,10 @@ Size
   <option value="6">6</option>
   <option value="7">7</option>
   <option value="8">8</option>
+  <option value="15">15</option>
+  <option value="20">20</option>
+  <option value="40">40</option>
+  <option value="50">50</option>
   <option value="cell">Cell</option>
 </select>
 
@@ -25,7 +29,14 @@ Size
 </select>
 
 Draw
-<select id="shape">
+<select id="draw">
+  <option value="dutts">Dutts</option>
+  <option value="spray:50">Spray 50%<x/option>
+  <option value="spray:25">Spray 25%</option>
+  <option value="spray:10">Spray 10%</option>
+  <option value="spray:5">Spray  5%</option>
+  <option value="spray:1">Spray  1%</option>
+
   <option value="path">Path</option>
   <option value="line">Line</option>
   <option value="circle">Circle</option>
@@ -230,18 +241,26 @@ function changed(pos) {
 function drawbrush() {
   var brush= dom("brush").value;
   var size= 0+dom("size").value;
-
+  var draw= dom("draw").value;
+  var spray= (draw.startsWith("spray:")?
+              draw.split("spray:")[1]:
+              100)/100.0;
+  
   switch(brush) {
 
   case "pixel":
-    curset(ox, oy, 1);
-    partialupdate();
+    if (Math.random()<=spray) {
+      curset(ox, oy, 1);
+      partialupdate();
+    }
     break;
 
   case "cursive":
     for(var i=0; i<size; ++i) {
-      curset(ox-i, oy+i, 1);
-      partialupdate();
+      if (Math.random()<=spray) {
+        curset(ox-i, oy+i, 1);
+        partialupdate();
+      }
     }
     break;
 
@@ -250,7 +269,8 @@ function drawbrush() {
     var w= radius, h= radius;
     for(var r= -h; r<=h; ++r) {
       for(var c= -w; c<=w; ++c) {
-        if (r*r+c*c<radius*radius)
+        if (r*r+c*c<radius*radius
+            && Math.random()<=spray)
           curset(ox+c, oy+r, 1);
       }
       partialupdate();
@@ -261,7 +281,8 @@ function drawbrush() {
     var w= size, h= size;
     for(var r= -h; r<=h; ++r) {
       for(var c= -w; c<=w; ++c) {
-        curset(ox+c, oy+r, 1);
+        if (Math.random()<=spray)
+          curset(ox+c, oy+r, 1);
       }
       partialupdate();
     }
