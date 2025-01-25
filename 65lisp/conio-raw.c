@@ -48,11 +48,14 @@
 // such as CTRL+'A' gives the keycode that cgetc() returns.
 // FUNCT key adds 128 to the code, this is similar to ESC-x M-x or META-x
 
+// minimal usable: TTY+KEY_MAPPING gives only uppercase, no CTRL, no SHIFT
+// TODO: fix so that KEY_MAPPING gives CTRL and SHIFT!
+
 // Needed for decoding ASCII keys (total (- 7654 6367)= 1287 bytes!)
 #define KEY_MAPPING		// (- 6946 6367) = 579 bytes 2*9*8=144B in tables, 
-#define KEY_POS			// (- 7160 6946) = 214 bytes
-#define EXTENDED_KEYS		// (- 7294 6946) = 348 bytes
-#define EXTENDED_DEBUG_KEY      // (- 7092 6946) = 146 bytes
+//#define KEY_POS			// (- 7160 6946) = 214 bytes
+//#define EXTENDED_KEYS		// (- 7294 6946) = 348 bytes
+//#define EXTENDED_DEBUG_KEY      // (- 7092 6946) = 146 bytes
 
 // KEYS
 // ====
