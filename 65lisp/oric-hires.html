@@ -79,7 +79,27 @@ function partialupdate() {
   for(var i=40; i--;) nextcell();
 }
 
-ctx.beginPath();
+// TODO: read image from data
+// from - https://stackoverflow.com/questions/667045/get-a-pixel-from-html-canvas
+
+function invert() {
+  // get CanvasPixelArray
+  var imgd = context.getImageData(x, y, width, height);
+  var pix = imgd.data;
+
+  // invert each pixel
+  for (var i = 0, n = pix.length; i < n; i += 4) {
+    pix[i  ] = 255 - pix[i  ]; // red
+    pix[i+1] = 255 - pix[i+1]; // green
+    pix[i+2] = 255 - pix[i+2]; // blue
+    // i+3 is alpha (the fourth element)
+  }
+
+  // Draw ImageData at (x,y)
+  context.putImageData(imgd, x, y);
+}
+
+//ctx.beginPath();
 //ctx.arc(25,25,15,0,2*Math.PI);
 //ctx.stroke();
 //ctx.fillStyle = "green";
@@ -122,14 +142,24 @@ var drawing = false;
 var currentPos = { x:0, y:0 };
 var startPos = { x:0, y:0 };
 
+function curset(ox, oy, f) {
+  ox= Math.floor(ox); oy= Math.floor(oy);
+  var cm= 1<<(ox%6);
+  ci= Math.floor(ox/6) + oy*40;
+  switch(f) {
+  case 0: cell[ci] &= ~cm; break;
+  case 1: cell[ci] |=  cm; break;
+  case 2: cell[ci] ^=  cm; break;
+  case 3: return;
+  }
+  partialupdate();
+}
+
 function changed(pos) {
   ox= Math.floor((pos.x+1)/2);
   oy= Math.floor((pos.y+1)/2);
-  ci= Math.floor(ox/6) + oy*40;
-  var cm= 1<<(ox%6);
-  cell[ci] |= cm;
+  curset(ox, oy, 1);
   partialupdate();
-  //updatehires();
 }
 
 canvas.addEventListener("mousedown", function (e) {
