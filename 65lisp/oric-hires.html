@@ -4,66 +4,74 @@
 
 <div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN</b></tt></div><br/>
 
-Size
 <select id="size">
-  <option value="1">1</option>
-  <option value="2">2</option>
-  <option value="3">3</option>
-  <option value="4">4</option>
-  <option value="5">5</option>
-  <option value="6">6</option>
-  <option value="7">7</option>
-  <option value="8">8</option>
-  <option value="15">15</option>
-  <option value="20">20</option>
-  <option value="40">40</option>
-  <option value="50">50</option>
-  <option value="cell">Cell</option>
+  <option value="1">1 px</option>
+  <option value="2">2 px</option>
+  <option value="3">3 px</option>
+  <option value="4">4 px</option>
+  <option value="5">5 px</option>
+  <option value="6">6 px</option>
+  <option value="7">7 px</option>
+  <option value="8">8 px</option>
+  <option value="15">15 px</option>
+  <option value="20">20 px</option>
+  <option value="40">40 px</option>
+  <option value="50">50 px</option>
+  <option value="cell">cell</option>
 </select>
 
 <select id="brush">
-  <option value="pixel">Thin</option>
-  <option value="cursive">Cursive</option>
-  <option value="circle">Circle</option>
-  <option value="box">Box</option>
+  <option value="pixel">thin</option>
+  <option value="flat">flat</option>
+  <option value="down">down</option>
+  <option value="cursive">cursive</option>
+  <!--option value="watercolor">watercolor</option-->
+  <option value="circle">circle</option>
+  <!--option value="chinese">chinese</option-->
+  <option value="box">box</option>
 </select>
 
-Draw
 <select id="draw">
-  <option value="dutts">Dutts</option>
-  <option value="spray:50">Spray 50%<x/option>
-  <option value="spray:25">Spray 25%</option>
-  <option value="spray:10">Spray 10%</option>
-  <option value="spray:5">Spray  5%</option>
-  <option value="spray:1">Spray  1%</option>
+  <option value="dutts">dutts</option>
+  <option value="spray:50">spray 50%<x/option>
+  <option value="spray:25">spray 25%</option>
+  <option value="spray:10">spray 10%</option>
+  <option value="spray:5">spray  5%</option>
+  <option value="spray:1">spray  1%</option>
 
-  <option value="path">Path</option>
-  <option value="line">Line</option>
-  <option value="circle">Circle</option>
-  <option value="disc">Disc</option>
-  <option value="square">Square</option>
-  <option value="rect">Rect</option>
-  <option value="box">Box</option>
-  <option value="image">Image</option>
+  <option value="path">path</option>
+  <option value="line">line</option>
+  <option value="circle">circle</option>
+  <option value="disc">disc</option>
+  <option value="square">square</option>
+  <option value="rect">rect</option>
+  <option value="box">box</option>
+  <option value="image">image</option>
 </select>
 
-Inverse
 <select id="inverse">
-  <option value="off">off</option>
-  <option value="on">on</option>
+  <option value="off">norm</option>
+  <option value="on">inv</option>
 </select>
 
-Cell
 <select id="cell">
-  <option value="-1">none</option>
-  <option value="64">black</option>
+  <option value="-1">color</option>
+  <option value="64" style="text-color:white; blackground-color:black;">black</option>
   <option value="192">white</option>
   <option value="127">yellow</option>
   <option value="255">blue</option>
 </select>
+
+<select id="action">
+  <option value="" selected>action</option>
+  <option value="save">save</option>
+  <option value="load">load</option>
+  <option value="clip">clip</option>
+  <option value="erase">erase</option>
+</select>
 <br/>
 
-<canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1;">
+<canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
 
 <script>
@@ -75,17 +83,43 @@ function dom(name) {
   return document.getElementById(name);
 }
 
-var w= 2, h= 2;
+var Daction= dom("action"), DactionDef= Daction.value;
+Daction.onchange= ()=> {
+  switch(Daction.value) {
+  case "erase": if (confirm("Erase image?")) {
+    resethires();
+    break;
+  }
+  case "save":
+  case "load":
+  case "clip":
+  default:
+    alert("action.Not.Implemented.Yet: "+ Daction.value); break;
+  }
+  Daction.value= DactionDef;
+}
+
+const w= 2, h= 2;
 var canvas = dom("myCanvas");
 var ctx = canvas.getContext("2d");
 
-var x= 0, y= 0;
-var colors= ["black", "red", "green", "yellow", "blue", "magnenta", "cyan", "white"];
+const colors= ["black", "red", "green", "yellow", "blue", "magnenta", "cyan", "white"];
 
 // store hires screen as array
 var cell= new Uint8Array(200*40);
 cell.fill(64);
-var ci= 0, bg= 0, fg= 7; // running data
+
+// running data state for graphics during update
+var x, y, ci, bg, fg;
+
+function resethires() {
+  ci=x=y= 0;
+  bg= 0; fg= 7;
+  cell.fill(64);
+  updatehires();
+}
+
+resethires();
 
 function nextcell() {
   if (ci>= 240*40) return;
@@ -173,39 +207,6 @@ function invert() {
 //ctx.fillRect(x+=30,y,w,h);
 //c.rect(x+=6, y, w, h);
 
-ci= 40*100+20;
-cell[ci++]= 1;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-ci+= 40*3;
-cell[ci++]= 2+16;
-//cell[ci+=40*3]= 2+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-ci+= 40*3;
-cell[ci++]= 3+16+128;
-//cell[ci+=40*3]= 2+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16+128;
-cell[ci++]= 64+1+4+16;
-ci+= 40*3;
-cell[ci++]= 3+16;
-//cell[ci+=40*3]= 2+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-cell[ci++]= 64+1+4+16;
-//for(i=100; i< 300; ++i) 
-//  cell[ci++]= 64+1+4+16;
-
-for(ci=0; ci<200*40; ci+= 40) {
-  cell[ci]= 0;
-  cell[ci+1]= 3;
-}
-
-updatehires();
-
 //////////////////////////////////////////////////////////////////////
 // - https://bencentra.com/code/2014/12/05/html5-canvas-touch-events.html
 
@@ -216,6 +217,10 @@ var startPos = { x:0, y:0 };
 
 function curset(ox, oy, f) {
   ox= Math.floor(ox); oy= Math.floor(oy);
+  if (ox<0 || oy<0 || ox>=240 || oy>=200) {
+    ci= -1;
+    return;
+  }
   var cm= 1<<(ox%6);
   ci= Math.floor(ox/6) + oy*40;
   switch(f) {
@@ -252,6 +257,22 @@ function drawbrush() {
     if (Math.random()<=spray) {
       curset(ox, oy, 1);
       partialupdate();
+    }
+    break;
+
+  case "flat":
+    for(var i=0; i<size; ++i) {
+      if (Math.random()<=spray) curset(ox-i, oy, 1);
+    }
+    partialupdate();
+    break;
+
+  case "down":
+    for(var i=0; i<size; ++i) {
+      if (Math.random()<=spray) {
+        curset(ox, oy+i, 1);
+        partialupdate();
+      }
     }
     break;
 
@@ -297,16 +318,19 @@ canvas.addEventListener("mousedown", function (e) {
   drawing = true;
   currentPos= startPos = getMousePos(canvas, e);
   changed(startPos);
+  return false;
 }, false);
 
 // good to draw a line, action at end?
 canvas.addEventListener("mouseup", function (e) {
   drawing = false;
+  return false;
 }, false);
   
 canvas.addEventListener("mousemove", function (e) {
   currentPos = getMousePos(canvas, e);
   changed(currentPos);
+  return false;
 }, false);
 
 // Get the position of the mouse relative to the canvas
@@ -329,6 +353,7 @@ canvas.addEventListener("touchstart", function (e) {
     clientY: touch.clientY
   });
   canvas.dispatchEvent(mouseEvent);
+  return false;
 }, false);
 
 canvas.addEventListener("touchend", function (e) {
@@ -343,6 +368,7 @@ canvas.addEventListener("touchmove", function (e) {
     clientY: touch.clientY
   });
   canvas.dispatchEvent(mouseEvent);
+  return false;
 }, false);
 
 // Get the position of a touch relative to the canvas
@@ -359,12 +385,14 @@ document.body.addEventListener("touchstart", function (e) {
   if (e.target == canvas) {
     e.preventDefault();
   }
+  return false;
 }, false);
 
 document.body.addEventListener("touchend", function (e) {
   if (e.target == canvas) {
     e.preventDefault();
   }
+  return false;
 }, false);
 document.body.addEventListener("touchmove", function (e) {
   if (e.target == canvas) {
