@@ -56,10 +56,10 @@
 
 <select id="cell">
   <option value="-1">color</option>
-  <option value="64" style="text-color:white; blackground-color:black;">black</option>
-  <option value="192">white</option>
-  <option value="127">yellow</option>
-  <option value="255">blue</option>
+  <option value="64">bgcol</option>
+  <option value="192">invbg</option>
+  <option value="127">fgcol</option>
+  <option value="255">invfg</option>
 </select>
 
 <select id="action">
@@ -68,6 +68,22 @@
   <option value="load">load</option>
   <option value="clip">clip</option>
   <option value="erase">erase</option>
+  <option value="paper:0">BLK (WHT)</option>
+  <option value="paper:1">RED (CYA)</option>
+  <option value="paper:2">GRN (MAG)</option>
+  <option value="paper:3">YEL (BLU)</option>
+  <option value="paper:4">BLU (YEL)</option>
+  <option value="paper:5">MAG (GRN)</option>
+  <option value="paper:6">CYA (RED)</option>
+  <option value="paper:7">WHT (BLK)</option>
+  <option value="ink:0">blk (wht)</option>
+  <option value="ink:1">red (cya)</option>
+  <option value="ink:2">grn (mag)</option>
+  <option value="ink:3">yel (blu)</option>
+  <option value="ink:4">blu (yel)</option>
+  <option value="ink:5">mag (grn)</option>
+  <option value="ink:6">cya (red)</option>
+  <option value="ink:7">wht (blk)</option>
 </select>
 <br/>
 
@@ -85,7 +101,8 @@ function dom(name) {
 
 var Daction= dom("action"), DactionDef= Daction.value;
 Daction.onchange= ()=> {
-  switch(Daction.value) {
+  var v= Daction.value;
+  switch(v) {
   case "erase": if (confirm("Erase image?")) {
     resethires();
     break;
@@ -94,6 +111,19 @@ Daction.onchange= ()=> {
   case "load":
   case "clip":
   default:
+
+    if (v.startsWith("ink:")) {
+      setpaperink(paper, v.split("ink:")[1]);
+      updatehires();
+      return;
+    }
+
+    if (v.startsWith("paper:")) {
+      setpaperink(v.split("paper:")[1], ink);
+      updatehires();
+      return;
+    }
+
     alert("action.Not.Implemented.Yet: "+ Daction.value); break;
   }
   Daction.value= DactionDef;
@@ -103,19 +133,28 @@ const w= 2, h= 2;
 var canvas = dom("myCanvas");
 var ctx = canvas.getContext("2d");
 
-const colors= ["black", "red", "green", "yellow", "blue", "magnenta", "cyan", "white"];
+const colors= ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
 
 // store hires screen as array
 var cell= new Uint8Array(200*40);
-cell.fill(64);
+var paper= 0, ink= 3;
 
 // running data state for graphics during update
 var x, y, ci, bg, fg;
+
+function setpaperink(p, i) {
+  paper= p; ink= i;
+  for(ci=0; ci<cell.length; ci+= 40) {
+    cell[ci]= paper; // if black, not needed!
+    cell[ci+1]= ink;
+  }
+}
 
 function resethires() {
   ci=x=y= 0;
   bg= 0; fg= 7;
   cell.fill(64);
+  setpaperink(paper, ink);
   updatehires();
 }
 
