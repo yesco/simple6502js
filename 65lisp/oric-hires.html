@@ -13,6 +13,10 @@
   <option value="6">6 px</option>
   <option value="7">7 px</option>
   <option value="8">8 px</option>
+  <option value="9">9 px</option>
+  <option value="10">10 px</option>
+  <option value="11">11 px</option>
+  <option value="12">12 px</option>
   <option value="15">15 px</option>
   <option value="20">20 px</option>
   <option value="40">40 px</option>
@@ -84,6 +88,14 @@
   <option value="ink:5">mag (grn)</option>
   <option value="ink:6">cya (red)</option>
   <option value="ink:7">wht (blk)</option>
+  <option value="draw:0">blk</option>
+  <option value="draw:1">red</option>
+  <option value="draw:2">grn</option>
+  <option value="draw:3">yel</option>
+  <option value="draw:4">blu</option>
+  <option value="draw:5">mag</option>
+  <option value="draw:6">cya</option>
+  <option value="draw:7">wht</option>
 </select>
 
 <button id="undo" value="undo" onclick="javascript:undo();">undo</button>
@@ -126,6 +138,12 @@ Daction.onchange= ()=> {
       return;
     }
 
+    if (v.startsWith("draw:")) {
+      drawink= v.split("draw:")[1];
+      //updatehires();
+      return;
+    }
+
     alert("action.Not.Implemented.Yet: "+ Daction.value); break;
   }
   Daction.value= DactionDef;
@@ -135,11 +153,13 @@ const w= 2, h= 2;
 var canvas = dom("myCanvas");
 var ctx = canvas.getContext("2d");
 
-const colors= ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"];
+//const colors= ["black", "red", "lime", "yellow", "blue", "magenta", "cyan", "white"];
+const colors= ["#000", "#f00", "#0f0", "#ff0", "#00f", "#f0f", "#0ff", "#fff"];
 
 // store hires screen as array
 var cell= new Uint8Array(200*40);
 var paper= 0, ink= 3;
+var drawink= 1;
 
 // running data state for graphics during update
 var x, y, ci, bg, fg;
@@ -155,7 +175,7 @@ function setpaperink(p, i) {
 function resethires() {
   ci=x=y= 0;
   bg= 0; fg= 7;
-  cell.fill(64);
+  cell.fill(ink);
   setpaperink(paper, ink);
   updatehires();
 }
@@ -264,11 +284,42 @@ function curset(ox, oy, f) {
   }
   var cm= 1<<(ox%6);
   ci= Math.floor(ox/6) + oy*40;
+
+  // don't set bits in paper attributes
+  var v= cell[ci]&127;
+  if (v>=16 && v<24) return;
+
+  // steal ink cell and make it ours!
+  if (v<8) cell[ci]= 64 | (cell[ci]&128);
+
   switch(f) {
   case 0: cell[ci] &= ~cm; break;
   case 1: cell[ci] |=  cm; break;
   case 2: cell[ci] ^=  cm; break;
   case 3: return;
+
+  // >=16: over-write color 
+  default:
+    if (f>=16) {
+      var i= ci-1;
+      do {
+        var c= cell[i]&127;
+        // override other ink, or pixels
+        if (c>=64 || c<8) {
+          cell[i]= f&7;
+          break;
+        }
+        // dont change background
+        --i;
+        if (i%40==0) break; // fail
+      } while(1);
+
+      // steal ink cell and make it ours!
+      if (v<8) cell[ci]= 64 | (cell[ci]&128);
+
+      // draw pixel
+      cell[ci] |= cm; break;
+    }
   }
 }
 
@@ -291,19 +342,22 @@ function drawbrush() {
   var spray= (draw.startsWith("spray:")?
               draw.split("spray:")[1]:
               100)/100.0;
+  var f= 16+drawink;
+  //var f= drawink==ink? 1: 16+drawink;
+  //var f= drawink+16;
   
   switch(brush) {
 
   case "pixel":
     if (Math.random()<=spray) {
-      curset(ox, oy, 1);
+      curset(ox, oy, f);
       partialupdate();
     }
     break;
 
   case "flat":
     for(var i=0; i<size; ++i) {
-      if (Math.random()<=spray) curset(ox-i, oy, 1);
+      if (Math.random()<=spray) curset(ox-i, oy, f);
     }
     partialupdate();
     break;
@@ -311,7 +365,7 @@ function drawbrush() {
   case "down":
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
-        curset(ox, oy+i, 1);
+        curset(ox, oy+i, f);
         partialupdate();
       }
     }
@@ -320,7 +374,7 @@ function drawbrush() {
   case "cursive":
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
-        curset(ox-i, oy+i, 1);
+        curset(ox-i, oy+i, f);
         partialupdate();
       }
     }
@@ -333,7 +387,7 @@ function drawbrush() {
       for(var c= -w; c<=w; ++c) {
         if (r*r+c*c<radius*radius
             && Math.random()<=spray)
-          curset(ox+c, oy+r, 1);
+          curset(ox+c, oy+r, f);
       }
       partialupdate();
     }
@@ -344,7 +398,7 @@ function drawbrush() {
     for(var r= -h; r<=h; ++r) {
       for(var c= -w; c<=w; ++c) {
         if (Math.random()<=spray)
-          curset(ox+c, oy+r, 1);
+          curset(ox+c, oy+r, f);
       }
       partialupdate();
     }
