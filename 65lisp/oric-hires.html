@@ -99,6 +99,18 @@
 </select>
 
 <script>
+// - read https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest_API/Sending_and_Receiving_Binary_Data
+
+/* - TODO: use? this seems to clip at 4K under chrome/android/termux, neither claim low limit, lol
+document.addEventListener('copy', function(e) {
+  var str = 'cucumber';
+  // You can ignore setting third parameter value
+  //e.clipboardData.setData('text', str, true);
+  e.clipboardData.setData("text", 'echo "'+btoa(cell)+'" | uudecode', true);
+  e.preventDefault();
+});
+*/
+
 function after(s, needle) {
   var r= s.split(needle);
   return r.length==2? r[1]: null;
@@ -134,7 +146,8 @@ function parseCommand(cmd) {
   }
 
   if (cmd.startsWith("undo")) {
-    undo(); undo();
+    undo(); undo(); // twice because we just added one
+    // TODO: redo(); ?
     return true;
   }
 
@@ -143,7 +156,61 @@ function parseCommand(cmd) {
     return true;
   }
 
-  // everything else is assuemd a color!
+  if (cmd.startsWith("tap")) {
+    // This will save:
+    // - header, filename
+    // - hires screen
+    // - 42 bytes garbage (?)
+    // - 3x40 chars of last 3 lines of text
+    //   this one contains, hires attributes to show hires img, once loaded
+    //
+    // TODO: however, since we're not in hires mode, charset is "befuddled"!
+
+    var header= new Uint8Array([
+      0x16, 0x16, 0x16, 0x16, 0x24, // sync
+      0x00, 0x00, // any, any
+      0x80, // 0x00=basic, 0x80=assembler/data
+      0x00, // 0x00=stop,  0x80=basic autostart, 0xc7=asm autostart
+
+      //0xbf, 0x3f, // end address  0xbf3f HI-LO! END (end hires) - only hires
+      0xbf, 0xdf, // end address    0xbfdf HI-LO! END (end hires+42+3 text lines)
+
+      0xa0, 0x00, // start address  0xa000 HI-LO! START
+
+      0x00]); // any
+    var filename= (param? param: "hires") + ".tap";
+    var lost= "------------------------------------------"; // 42 bytes junk
+    // These lines, unless we're in hires-mode, will display garbage!
+    var text= "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1ea"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\x1eb"
+    "cccccccccccccccccccccccccccccccccccccc\x1ec"; // last byte switches to hires!
+
+    var blob = new Blob([header, filename, "\x00", cell, lost, text], {
+      type: "binary",
+    });
+
+    // remove previous download link so we can use same name again!
+    var d= dom("download");
+    if (d) d.remove();
+
+    // This seems to be a bad hacky way to get a download, lol, autoclick?
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.id= "download";
+    a.download = filename;
+    a.href = url;
+    a.textContent = "Download "+ filename;
+    a.click();
+    //if the click() function dosen't work you can try using onclick() funcion like this
+    //a.onclick();
+    //document.getElementById("content").appendChild(a)
+
+    // clear input field
+    dom("input").value= "";
+    return true;
+  }
+
+  // everything else is tried as a color
   if (!isNaN(nf)) {
     drawink= nf;
     return true;
@@ -160,7 +227,7 @@ function parseCommand(cmd) {
 
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
-
+<br/>
 <input id="input" size=50 autocomplete=off autocorrect=off />
 
 <script>
@@ -327,6 +394,23 @@ var drawing = false;
 var currentPos = { x:0, y:0 };
 var startPos = { x:0, y:0 };
 
+// curset(ox, oy, f)
+//   ox, oy is "oric coordinates"
+//   f is 0=clear, 1=set, 2=xor, 3=move, 32+color= force color!
+//
+// TODO: combicolors, like brown? (red+yellow+blue!)
+
+// TODO: ansi-color 6x6x6 rgb mapping?
+// - https://en.m.wikipedia.org/wiki/ANSI_escape_code#8-bit
+//
+// ESC[38;5;⟨n⟩m Select foreground color
+//       where n is a number from the table below
+// ESC[48;5;⟨n⟩m Select background color
+//   0-  7:  standard colors (as in ESC [ 30–37 m)
+//   8- 15:  high intensity colors (as in ESC [ 90–97 m)
+//  16-231:  6 × 6 × 6 cube (216 colors): 16 + 36 × r + 6 × g + b (0 ≤ r, g, b ≤ 5)
+// 232-255:  grayscale from dark to light in 24 steps
+
 function curset(ox, oy, f) {
   ox= Math.floor(ox); oy= Math.floor(oy);
   if (ox<0 || oy<0 || ox>=240 || oy>=200) {
@@ -390,8 +474,8 @@ function drawbrush() {
   var brush= dom("brush").value;
   var size= 0+dom("size").value;
   var draw= dom("draw").value;
-  var spray= (draw.startsWith("spray:")?
-              draw.split("spray:")[1]:
+  var spray= (draw.startsWith("spray")?
+              0+after(draw, "spray"):
               100)/100.0;
   var f= 32+drawink;
   //var f= drawink==ink? 1: 16+drawink;
