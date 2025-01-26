@@ -113,7 +113,7 @@ document.addEventListener('copy', function(e) {
 
 function after(s, needle) {
   var r= s.split(needle);
-  return r.length==2? r[1]: null;
+  return r.length==2? r[1].trim(): null;
 }
 
 function parseCommand(cmd) {
