@@ -107,7 +107,8 @@ function after(s, needle) {
 function parseCommand(cmd) {
   saveUndo(); // TODO: if fail, remove?
 
-  var n= colornum(after(cmd, " "));
+  var param= after(cmd, " ");
+  var n= colornum(param);
   var nf= colornum(cmd);
 
   if (cmd.startsWith("draw ")) {
