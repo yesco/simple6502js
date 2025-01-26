@@ -99,6 +99,13 @@
 </select>
 
 <script>
+// catch error as we have no console....
+// window.onerror = function (event, souce, lineno, colon, error) { }
+body.onerror= function(e, src, ln, colon, err) {
+  alert('ERROR '+src+':'+ln+' - '+err);
+}
+
+
 // - read https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest_API/Sending_and_Receiving_Binary_Data
 
 /* - TODO: use? this seems to clip at 4K under chrome/android/termux, neither claim low limit, lol
@@ -160,6 +167,59 @@ function parseCommand(cmd) {
     load();
     return true;
   }
+
+  if (cmd.startsWith("import")) { try {
+    var img1 = new Image();
+
+    // -- load and draw image, then convert it to ORIC
+    img1.onload = function () {
+      ctx.drawImage(img1, 0, 0);
+
+      // -- "convert" image to cells!
+      var p= ctx.getImageData(0, 0, 240*w, 200*h);
+      var pix= p.data;
+
+      // each line, backwards!
+      ci= 0;
+      for(var r=0; r<200; ++r) {
+
+        for(var c=39; c>=0; --c) {
+          var x= [0,0,0, 0,0,0];
+          var or= 0;
+          for(var i=0; i<6; ++i) {
+            // TOOD: SHIT w*h pixels to process!
+            // TODO: do avg? 
+            // for now, just pick first, lol
+            or|= (x[i]= pixcolor(pix, w*4*(r*240*h+c*6+i)));
+          }
+
+          // calculate resulting cell
+          var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
+                   (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
+          var same= x.every( (z)=> (z==x[0]) );
+          // TODO: if same, maybe can consider other coding tech w attributes/inversion?
+          cell[ci+c]= v;
+        }
+
+        ci+= 40;
+      }
+
+      updatehires();
+      saveUndo();
+    };
+
+    // CORS BullShit...
+    // - https://stackoverflow.com/questions/22097747/how-to-fix-getimagedata-error-the-canvas-has-been-tainted-by-cross-origin-data
+    // - https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image
+    // TODO: make my webserver be a proxy?
+    //img1.crossOrigin = "Anonymous";
+    //img1.src = 'https://thespider.oric.org/pics/oric_logo_colour_codes.gif';
+    img1.src = 'oric_logo_colour_codes.gif';
+    // TODO: https://osdk.org/pics/magnetix_game.png
+    // - many twilite tricks!
+    return true;
+  } catch(e) { alert(e); } }
+
 
   if (cmd.startsWith("tap")) {
     // This will save:
@@ -240,12 +300,9 @@ CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
 <script>
 // -- https://developer.mozilla.org/en-US/docs/Web/API/File_API/Using_files_from_web_applications
 
-const Dfiles = dom('files');
-const Dload = dom('load');
+const Dfiles= dom('files'), Dload= dom('load');
 
-function load() {
-  Dfiles.click();
-}
+function load() { Dfiles.click(); }
 
 Dload.addEventListener('click', load, false);
 
@@ -424,6 +481,23 @@ function invert() {
 
   // Draw ImageData at (x,y)
   context.putImageData(imgd, x, y);
+}
+
+// return oric 0-7 color from rgb!
+// 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magnenta, 6=cyan, 7=white
+function pixcolor(pix, i) {
+  var r= pix[i+0], g= pix[i+1], b= pix[i+2], alpha= pix[i+3];
+  // simple!
+  // TODO: threshold?
+  return (r?1:0) + (g?2:0) + (b?4:0);
+}
+
+// - https://en.m.wikipedia.org/wiki/Grayscale
+// gray: 0--255:ish
+function pixgrayscale(pix, i) {
+  // x = 0.299r + 0.587g + 0.114b
+  var r= pix[i+0], g= pix[i+1], b= pix[i+2], alpha= pix[i+3];
+  return Math.floor(0.299*r + 0.587*g + 0.114*b);
 }
 
 //ctx.beginPath();
