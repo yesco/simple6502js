@@ -228,9 +228,49 @@ function parseCommand(cmd) {
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
 <br/>
-<input id="input" size=50 autocomplete=off autocorrect=off />
+<input type="file" id="files" multiple accept="*" style="display:none"/>
+<button id="load" type="button">Load</button>
+CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
 
 <script>
+// -- https://developer.mozilla.org/en-US/docs/Web/API/File_API/Using_files_from_web_applications
+
+const Dfiles = dom('files');
+const Dload = dom('load');
+
+Dload.addEventListener('click', (e) => {
+  Dfiles.click();
+}, false);
+
+
+Dfiles.addEventListener('change', async ()=>{
+  var files= Dfiles.files;
+  var f= files[0];
+  alert("File: "+f.name+' of '+f.size+' bytes');
+  const buffer = await f.arrayBuffer();
+  var b= new Uint8Array(buffer);
+  // TODO: push as an alternative image, with it's own stack?
+  saveUndo();
+  var start= 14;
+  // skip filename
+  while(b[start]) ++start;
+  ++start; // skip filename end \0
+
+  // read hires
+  var c= b.slice(start, 8000);
+  cell= c;
+  updatehires();
+
+}, false);
+
+/*
+Dfiles.addEventListener('change', async (event) => {
+  const buffer = await event.target.files[0].arrayBuffer()
+  var b= new Uint8Array(buffer);
+  alert(b.toString());
+}, false)
+*/
+
 // TODO: create an overlay cell grid
 // - https://stackoverflow.com/questions/36216561/create-canvas-over-another-canvas
 // TODO: 
