@@ -173,36 +173,23 @@ function parseCommand(cmd) {
 
     // -- load and draw image, then convert it to ORIC
     img1.onload = function () {
-      ctx.drawImage(img1, 0, 0);
+
+      // drawImage(image, dx, dy, dWidth, dHeight) // dw, dh is scaling!
+      //ctx.drawImage(img1, 0, 0);
+      var dw= img1.naturalWidth, dh= img1.naturalHeight;
+      var xy= dw/dh;
+      if (xy > 240/200) 
+        ctx.drawImage(img1, 0, 0, 240*w, 200*h/xy);
+      else
+        ctx.drawImage(img1, 0, 0, 240*w/xy, 200*h);
 
       // -- "convert" image to cells!
       var p= ctx.getImageData(0, 0, 240*w, 200*h);
       var pix= p.data;
 
-      // each line, backwards!
-      ci= 0;
-      for(var r=0; r<200; ++r) {
-
-        for(var c=39; c>=0; --c) {
-          var x= [0,0,0, 0,0,0];
-          var or= 0;
-          for(var i=0; i<6; ++i) {
-            // TOOD: SHIT w*h pixels to process!
-            // TODO: do avg? 
-            // for now, just pick first, lol
-            or|= (x[i]= pixcolor(pix, w*4*(r*240*h+c*6+i)));
-          }
-
-          // calculate resulting cell
-          var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
-                   (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
-          var same= x.every( (z)=> (z==x[0]) );
-          // TODO: if same, maybe can consider other coding tech w attributes/inversion?
-          cell[ci+c]= v;
-        }
-
-        ci+= 40;
-      }
+      //convertToOric(pix);
+      convertToOricJustAttributes(pix);
+      //convertToOricJustPixels(pix);
 
       updatehires();
       saveUndo();
@@ -214,7 +201,15 @@ function parseCommand(cmd) {
     // TODO: make my webserver be a proxy?
     //img1.crossOrigin = "Anonymous";
     //img1.src = 'https://thespider.oric.org/pics/oric_logo_colour_codes.gif';
-    img1.src = 'oric_logo_colour_codes.gif';
+
+    //img1.src = 'oric_logo_colour_codes.gif';
+
+    // - clean 
+    //img1.src= 'oric-logo-black-export.svg';
+    img1.src= 'oric-logo-white-export.svg';
+
+    // img1.src= '800px-Logo_Oric_Atmos.png’;
+
     // TODO: https://osdk.org/pics/magnetix_game.png
     // - many twilite tricks!
     return true;
@@ -283,6 +278,95 @@ function parseCommand(cmd) {
 
   // fail
   return false;
+}
+
+function convertToOric(pix){
+  // each line, backwards!
+  ci= 0;
+  for(var r=0; r<200; ++r) {
+
+    // useful info?
+    // a) how many different colors in the line?
+    // b) are they blobs/cartonish or all mixed/dithered?
+    // c) fine lines?
+
+    for(var c=39; c>=0; --c) {
+      var x= [0,0,0, 0,0,0];
+      var or= 0;
+      for(var i=0; i<6; ++i) {
+        // TODO: do avg? 
+        // for now, just pick first, lol
+        or|= (x[i]= pixcolor(pix, w*4*(r*240*h+c*6+i)));
+      }
+
+      // calculate resulting cell
+      var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
+               (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
+      var same= x.every( (z)=> (z==x[0]) );
+      // TODO: if same, maybe can consider other coding tech w attributes/inversion?
+      cell[ci+c]= v;
+    }
+
+    ci+= 40;
+  }
+}
+
+function convertToOricJustAttributes(pix){
+  // each line, backwards!
+  ci= 0;
+  for(var r=0; r<200; ++r) {
+
+    // useful info?
+    // a) how many different colors in the line?
+    // b) are they blobs/cartonish or all mixed/dithered?
+    // c) fine lines?
+
+    for(var c=39; c>=0; --c) {
+      var x= [0,0,0, 0,0,0];
+      var or= 0;
+      for(var i=0; i<6; ++i) {
+        // TODO: do avg? 
+        // for now, just pick first, lol
+        or|= (x[i]= pixdomcolor(pix, w*4*(r*240*h+c*6+i)));
+      }
+
+      // calculate resulting cell
+      var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
+               (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
+      var same= x.every( (z)=> (z==x[0]) );
+      // TODO: if same, maybe can consider other coding tech w attributes/inversion?
+      cell[ci+c]= or+16; // make (avg) color background for this cell
+    }
+
+    ci+= 40;
+  }
+}
+
+function convertToOricJustPixels(pix){
+  // each line, backwards!
+  ci= 0;
+  for(var r=0; r<200; ++r) {
+
+    for(var c=39; c>=0; --c) {
+      var x= [0,0,0, 0,0,0];
+      var or= 0;
+      for(var i=0; i<6; ++i) {
+        // TOOD: SHIT w*h pixels to process!
+        // TODO: do avg? 
+        // for now, just pick first, lol
+        or|= (x[i]= pixcolor(pix, w*4*(r*240*h+c*6+i)));
+      }
+
+      // calculate resulting cell
+      var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
+               (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
+      var same= x.every( (z)=> (z==x[0]) );
+      // TODO: if same, maybe can consider other coding tech w attributes/inversion?
+      cell[ci+c]= v;
+    }
+
+    ci+= 40;
+  }
 }
 
 </script>
@@ -490,6 +574,13 @@ function pixcolor(pix, i) {
   // simple!
   // TODO: threshold?
   return (r?1:0) + (g?2:0) + (b?4:0);
+}
+
+function pixdomcolor(pix, i) {
+  var r= pix[i+0], g= pix[i+1], b= pix[i+2], alpha= pix[i+3];
+  // simple!
+  // TODO: threshold?
+  return (r>127?1:0) + (g>127?2:0) + (b>127?4:0);
 }
 
 // - https://en.m.wikipedia.org/wiki/Grayscale
