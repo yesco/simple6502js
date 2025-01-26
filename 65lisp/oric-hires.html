@@ -156,6 +156,11 @@ function parseCommand(cmd) {
     return true;
   }
 
+  if (cmd.startsWith("load")) {
+    load();
+    return true;
+  }
+
   if (cmd.startsWith("tap")) {
     // This will save:
     // - header, filename
@@ -238,17 +243,19 @@ CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
 const Dfiles = dom('files');
 const Dload = dom('load');
 
-Dload.addEventListener('click', (e) => {
+function load() {
   Dfiles.click();
-}, false);
+}
 
+Dload.addEventListener('click', load, false);
 
 Dfiles.addEventListener('change', async ()=>{
   var files= Dfiles.files;
   var f= files[0];
-  alert("File: "+f.name+' of '+f.size+' bytes');
+  //alert("File: "+f.name+' of '+f.size+' bytes');
   const buffer = await f.arrayBuffer();
   var b= new Uint8Array(buffer);
+
   // TODO: push as an alternative image, with it's own stack?
   saveUndo();
   var start= 14;
