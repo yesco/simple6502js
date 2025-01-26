@@ -37,11 +37,11 @@
 
 <select id="draw">
   <option value="dutts">dutts</option>
-  <option value="spray:50">spray 50%<x/option>
-  <option value="spray:25">spray 25%</option>
-  <option value="spray:10">spray 10%</option>
-  <option value="spray:5">spray  5%</option>
-  <option value="spray:1">spray  1%</option>
+  <option value="spray 50">spray 50%<x/option>
+  <option value="spray 25">spray 25%</option>
+  <option value="spray 10">spray 10%</option>
+  <option value="spray 5">spray  5%</option>
+  <option value="spray 1">spray  1%</option>
 
   <option value="path">path</option>
   <option value="line">line</option>
@@ -72,37 +72,95 @@
   <option value="load">load</option>
   <option value="clip">clip</option>
   <option value="erase">erase</option>
-  <option value="paper:0">BLK (WHT)</option>
-  <option value="paper:1">RED (CYA)</option>
-  <option value="paper:2">GRN (MAG)</option>
-  <option value="paper:3">YEL (BLU)</option>
-  <option value="paper:4">BLU (YEL)</option>
-  <option value="paper:5">MAG (GRN)</option>
-  <option value="paper:6">CYA (RED)</option>
-  <option value="paper:7">WHT (BLK)</option>
-  <option value="ink:0">blk (wht)</option>
-  <option value="ink:1">red (cya)</option>
-  <option value="ink:2">grn (mag)</option>
-  <option value="ink:3">yel (blu)</option>
-  <option value="ink:4">blu (yel)</option>
-  <option value="ink:5">mag (grn)</option>
-  <option value="ink:6">cya (red)</option>
-  <option value="ink:7">wht (blk)</option>
-  <option value="draw:0">blk</option>
-  <option value="draw:1">red</option>
-  <option value="draw:2">grn</option>
-  <option value="draw:3">yel</option>
-  <option value="draw:4">blu</option>
-  <option value="draw:5">mag</option>
-  <option value="draw:6">cya</option>
-  <option value="draw:7">wht</option>
+  <option value="paper 0">BLK (WHT)</option>
+  <option value="paper 1">RED (CYA)</option>
+  <option value="paper 2">GRN (MAG)</option>
+  <option value="paper 3">YEL (BLU)</option>
+  <option value="paper 4">BLU (YEL)</option>
+  <option value="paper 5">MAG (GRN)</option>
+  <option value="paper 6">CYA (RED)</option>
+  <option value="paper 7">WHT (BLK)</option>
+  <option value="ink 0">blk (wht)</option>
+  <option value="ink 1">red (cya)</option>
+  <option value="ink 2">grn (mag)</option>
+  <option value="ink 3">yel (blu)</option>
+  <option value="ink 4">blu (yel)</option>
+  <option value="ink 5">mag (grn)</option>
+  <option value="ink 6">cya (red)</option>
+  <option value="ink 7">wht (blk)</option>
+  <option value="draw 0">blk</option>
+  <option value="draw 1">red</option>
+  <option value="draw 2">grn</option>
+  <option value="draw 3">yel</option>
+  <option value="draw 4">blu</option>
+  <option value="draw 5">mag</option>
+  <option value="draw 6">cya</option>
+  <option value="draw 7">wht</option>
 </select>
+
+<script>
+function after(s, needle) {
+  var r= s.split(needle);
+  return r.length==2? r[1]: null;
+}
+
+function parseCommand(cmd) {
+  saveUndo(); // TODO: if fail, remove?
+
+  var n= colornum(after(cmd, " "));
+  var nf= colornum(cmd);
+
+  if (cmd.startsWith("draw ")) {
+    drawink= n;
+    return true;
+  }
+  if (cmd.startsWith("paper ")) {
+    setpaperink(n, ink);
+    updatehires();
+    return true;
+  }
+  if (cmd.startsWith("ink ")) {
+    setpaperink(paper, n);
+    updatehires();
+    return true;
+  }
+
+//  alert("COMMAND: "+ cmd);
+
+  if (cmd.startsWith("erase")) {
+    resethires();
+    return true;
+  }
+
+  if (cmd.startsWith("undo")) {
+    undo(); undo();
+    return true;
+  }
+
+  if (cmd.startsWith("redraw")) {
+    updatehires();
+    return true;
+  }
+
+  // everything else is assuemd a color!
+  if (!isNaN(nf)) {
+    drawink= nf;
+    return true;
+  }
+
+  // fail
+  return false;
+}
+
+</script>
 
 <button id="undo" value="undo" onclick="javascript:undo();">undo</button>
 <br/>
 
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
+
+<input id="input" size=50 autocomplete=off autocorrect=off />
 
 <script>
 // TODO: create an overlay cell grid
@@ -114,38 +172,11 @@ function dom(name) {
 }
 
 var Daction= dom("action"), DactionDef= Daction.value;
+
 Daction.onchange= ()=> {
   var v= Daction.value;
-  switch(v) {
-  case "erase": if (confirm("Erase image?")) {
-    resethires();
-    break;
-  }
-  case "save":
-  case "load":
-  case "clip":
-  default:
-
-    if (v.startsWith("ink:")) {
-      setpaperink(paper, v.split("ink:")[1]);
-      updatehires();
-      return;
-    }
-
-    if (v.startsWith("paper:")) {
-      setpaperink(v.split("paper:")[1], ink);
-      updatehires();
-      return;
-    }
-
-    if (v.startsWith("draw:")) {
-      drawink= v.split("draw:")[1];
-      //updatehires();
-      return;
-    }
-
-    alert("action.Not.Implemented.Yet: "+ Daction.value); break;
-  }
+  if (parseCommand(v)) ;
+  else alert("action.Not.Implemented.Yet: "+ Daction.value);
   Daction.value= DactionDef;
 }
 
@@ -156,6 +187,23 @@ var ctx = canvas.getContext("2d");
 //const colors= ["black", "red", "lime", "yellow", "blue", "magenta", "cyan", "white"];
 const colors= ["#000", "#f00", "#0f0", "#ff0", "#00f", "#f0f", "#0ff", "#fff"];
 
+function colornum(t) {
+  if (t==null) return NaN;
+  var n= parseInt(t);
+  if (!isNaN(n)) return n;
+  // Simple!
+  t= t.trim().toLowerCase();
+  if (t.startsWith("g")) return 2; // Green
+  if (t.startsWith("w")) return 7; // White
+  if (t.startsWith("m")) return 5; // Magnenta
+  if (t.startsWith("c")) return 6; // Cyan
+  if (t.startsWith("y")) return 3; // Yellow
+  if (t.includes("k")) return 0; // blacK
+  if (t.includes("r")) return 1; // Red
+  if (t.includes("u")) return 4; // blUe
+  return NaN;
+}
+
 // store hires screen as array
 var cell= new Uint8Array(200*40);
 var paper= 0, ink= 3;
@@ -165,11 +213,13 @@ var drawink= 1;
 var x, y, ci, bg, fg;
 
 function setpaperink(p, i) {
+  //alert("set papper ink:"+p+" i:"+i);
   paper= p; ink= i;
   for(ci=0; ci<cell.length; ci+= 40) {
-    cell[ci]= paper; // if black, not needed!
+    cell[ci]  = paper+16;
     cell[ci+1]= ink;
   }
+  updatehires();
 }
 
 function resethires() {
@@ -287,7 +337,7 @@ function curset(ox, oy, f) {
 
   // don't set bits in paper attributes
   var v= cell[ci]&127;
-  if (v>=16 && v<24) return;
+  if (v>=32 && v<32+8) return;
 
   // steal ink cell and make it ours!
   if (v<8) cell[ci]= 64 | (cell[ci]&128);
@@ -298,9 +348,9 @@ function curset(ox, oy, f) {
   case 2: cell[ci] ^=  cm; break;
   case 3: return;
 
-  // >=16: over-write color 
+  // >=32: over-write color 
   default:
-    if (f>=16) {
+    if (f>=32) {
       var i= ci-1;
       do {
         var c= cell[i]&127;
@@ -311,7 +361,7 @@ function curset(ox, oy, f) {
         }
         // dont change background
         --i;
-        if (i%40==0) break; // fail
+        //if (i%40==0) break; // fail
       } while(1);
 
       // steal ink cell and make it ours!
@@ -342,7 +392,7 @@ function drawbrush() {
   var spray= (draw.startsWith("spray:")?
               draw.split("spray:")[1]:
               100)/100.0;
-  var f= 16+drawink;
+  var f= 32+drawink;
   //var f= drawink==ink? 1: 16+drawink;
   //var f= drawink+16;
   
@@ -513,6 +563,27 @@ document.body.addEventListener("touchmove", function (e) {
 }, false);
 
 //alert("all setup!");
+
+// KEYBOARD
+
+var Dinput= dom("input");
+
+document.body.onkeypress= function(e) {
+  Dinput.select();
+  Dinput.dispatchEvent(e);
+  return false;
+}
+
+Dinput.onsubmit= function(e) {
+  alert(Dinput.value);
+}
+
+Dinput.onchange= function() {
+  var cmd= Dinput.value;
+  parseCommand(cmd);
+  Dinput.value= "";
+  return false;
+}
 
 </script>
 
