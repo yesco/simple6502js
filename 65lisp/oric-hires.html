@@ -181,9 +181,9 @@ function parseCommand(cmd) {
     var filename= (param? param: "hires") + ".tap";
     var lost= "------------------------------------------"; // 42 bytes junk
     // These lines, unless we're in hires-mode, will display garbage!
-    var text= "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1ea"
-    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\x1eb"
-    "cccccccccccccccccccccccccccccccccccccc\x1ec"; // last byte switches to hires!
+    var text= "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1e"
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\x1e"
+    "ccccccccccccccccccccccccccccccccccccccc\x1e"; // last byte switches to hires!
 
     var blob = new Blob([header, filename, "\x00", cell, lost, text], {
       type: "binary",
@@ -332,9 +332,9 @@ function nextcell() {
 
     // draw 6 pixels
     for(i=0; i<6; ++i) {
-      ctx.fillStyle= (v&1)? f: b;
+      ctx.fillStyle= (v&32)? f: b;
       ctx.fillRect(x, y, w, h);
-      v >>= 1; x+= w;
+      v <<= 1; x+= w;
     }
 
   }
@@ -417,7 +417,7 @@ function curset(ox, oy, f) {
     ci= -1;
     return;
   }
-  var cm= 1<<(ox%6);
+  var cm= 32>>(ox%6);
   ci= Math.floor(ox/6) + oy*40;
 
   // don't set bits in paper attributes
@@ -437,7 +437,7 @@ function curset(ox, oy, f) {
   default:
     if (f>=32) {
       var i= ci-1;
-      do {
+      while(i%40!=0) {
         var c= cell[i]&127;
         // override other ink, or pixels
         if (c>=64 || c<8) {
@@ -447,7 +447,7 @@ function curset(ox, oy, f) {
         // dont change background
         --i;
         //if (i%40==0) break; // fail
-      } while(1);
+      }
 
       // steal ink cell and make it ours!
       if (v<8) cell[ci]= 64 | (cell[ci]&128);
