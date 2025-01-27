@@ -144,6 +144,15 @@ function after(s, needle) {
   return r.length==2? r[1].trim(): null;
 }
 
+function before(s, needle) {
+  var r= s.split(needle);
+  return r.length==2? r[0].trim(): s;
+}
+
+function isprefix(pre, s) {
+  return s.indexOf(pre)==0;
+}
+
 </script>
 
 <button id="undo" value="undo" onclick="javascript:undo();">undo</button>
@@ -178,20 +187,20 @@ function runCommand(cmd) {
   log('runCommand: '+cmd);
   saveUndo(); // TODO: if fail, remove?
 
-  var param= after(cmd, " ");
+  var param= after(cmd, ' ');
   var n= colornum(param);
-  var nf= colornum(cmd);
+  var nf= colornum(before(cmd, ' '));
 
   if (cmd.startsWith("draw ")) {
     drawink= n;
     return true;
   }
-  if (cmd.startsWith("paper ")) {
+  if (cmd.startsWith('paper ') || cmd.startsWith('bg ')) {
     setpaperink(n, ink);
     updatehires();
     return true;
   }
-  if (cmd.startsWith("ink ")) {
+  if (cmd.startsWith('ink ') || cmd.startsWith('fg ')) {
     setpaperink(paper, n);
     updatehires();
     return true;
@@ -322,11 +331,14 @@ function runCommand(cmd) {
 
   // everything else is tried as a color
   if (!isNaN(nf)) {
+    log("draw "+ nf);
     drawink= nf;
     return true;
   }
 
   // fail
+  alert("Unrecognized command: "+cmd);
+  Dinput.select();
   return false;
 }
 
@@ -501,18 +513,20 @@ const colors= ["#000", "#f00", "#0f0", "#ff0", "#00f", "#f0f", "#0ff", "#fff"];
 
 function colornum(t) {
   if (t==null) return NaN;
+  t= t.trim().toLowerCase();
   var n= parseInt(t);
   if (!isNaN(n)) return n;
-  // Simple!
-  t= t.trim().toLowerCase();
-  if (t.startsWith("g")) return 2; // Green
-  if (t.startsWith("w")) return 7; // White
-  if (t.startsWith("m")) return 5; // Magnenta
-  if (t.startsWith("c")) return 6; // Cyan
-  if (t.startsWith("y")) return 3; // Yellow
-  if (t.includes("k")) return 0; // blacK
-  if (t.includes("r")) return 1; // Red
-  if (t.includes("u")) return 4; // blUe
+
+  if (isprefix(t, 'green')) return 2;
+  if (isprefix(t, 'white')) return 7;
+  if (isprefix(t, 'magnenta')) return 5;
+  if (isprefix(t, 'cyan')) return 6;
+  if (isprefix(t, 'yellow')) return 3;
+
+  if (t=='black' || t=='k') return 3;
+  if (t=='red'   || t=='r') return 1;
+  if (t=='blue'  || t=='u') return 4;
+
   return NaN;
 }
 
