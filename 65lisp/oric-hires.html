@@ -2,7 +2,7 @@
 <html>
 <body text="white" bgcolor="black">
 
-<div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN (<a href='#man'>manual</a>)</b></tt></div><br/>
+<div style='text-align:center'><tt style="color:yellow"><b>ORIC PAINT (<a href='#man' style='color:white'>manual</a>)</b></tt></div><br/>
 <style>
   .cmd {
       width: 3em; height: 2em;
@@ -82,10 +82,12 @@
   <option value="square">square</option>
 </select>
 
+<!--TODO: rename to mode? unset, set, xor, move, spray.... -->
 <select id="draw">
   <option value="dutts">dutts</option>
   <option value="spray 50">spray 50%<x/option>
   <option value="spray 25">spray 25%</option>
+  <option value="spray 15">spray 15%</option>
   <option value="spray 10">spray 10%</option>
   <option value="spray 5">spray  5%</option>
   <option value="spray 1">spray  1%</option>
@@ -232,8 +234,16 @@ function runCommand(cmd) {
     return true;
   }
 
-  if (cmd.startsWith('brush ')) {
-    dom('brush').value= param;
+  if (cmd.startsWith('brush')) {
+    if (param) {
+      // TODO: brush circle 10? or just circle 10?
+      dom('brush').value= param;
+      if (dom('size').value=="1") dom('size').value= "8";
+    } else {
+      dom('brush').value= 'circle';
+      dom('size').value= '10';
+      dom('draw').value= 'spray 10';
+    }
     return true;
   }
 
@@ -569,7 +579,7 @@ function colornum(t) {
 // store hires screen as array
 var cell= new Uint8Array(200*40);
 var paper= 0, ink= 3;
-var drawink= 1;
+var drawink= 3; // yellow
 
 // running data state for graphics during update
 var x, y, ci, bg, fg;
@@ -801,8 +811,8 @@ function drawbrush() {
   var brush= dom("brush").value;
   var size= 0+dom("size").value;
   var draw= dom("draw").value;
-  var spray= (draw.startsWith("spray")?
-              0+after(draw, "spray"):
+  var spray= (draw.startsWith('spray')?
+              0+after(draw, 'spray'):
               100)/100.0;
   var f= 32+drawink;
   //var f= drawink==ink? 1: 16+drawink;
@@ -845,8 +855,9 @@ function drawbrush() {
   case 'circle':
     var radius= size;
     var w= radius, h= radius;
-    for(var r= -h; r<=h; ++r) {
-      for(var c= -w; c<=w; ++c) {
+    for(var r= -h; r<= +h; ++r) {
+      // draw from right to left, not to smear attributes
+      for(var c=+w; c>= -w; --c) {
         if (r*r+c*c<radius*radius
             && Math.random()<=spray)
           curset(ox+c, oy+r, f);
@@ -857,8 +868,8 @@ function drawbrush() {
 
   case 'square':
     var w= size, h= size;
-    for(var r= -h; r<=h; ++r) {
-      for(var c= -w; c<=w; ++c) {
+    for(var r= -h; r<= +h; ++r) {
+      for(var c= +w; c>= -w; --c) {
         if (Math.random()<=spray)
           curset(ox+c, oy+r, f);
       }
@@ -1058,7 +1069,11 @@ function step(state) {
 
 <h2>Brush</h2>
 
-<p>There are a number of different brushes. They can be selected by clicking on their buttons, or typing:
+<p>There are a number of different brushes.</p>
+
+<p>First, just try them out by selecting a <tt>brush</tt>, incidently, typing just <tt>brush</tt> will set a default: brush circle, size 10, spray 10%</p>
+
+<p>They can be selected by clicking on their shapes, or typing:
 <ul>
 <li><tt>brush thin</tt> - basically a single pixel set</li>
 <li><tt>brush line</tt> - a row of pixels</li>
@@ -1068,6 +1083,8 @@ function step(state) {
 <li><tt>brush square</tt> - a "square" brush, lol(?)</li>
 </ul>
 </p>
+
+<p><b>Note:</b> brushes draw and set attributes to the left, so less artifacts are given by drawing right-to-left! It's highly recommended to use in combination with <tt>spray 20</tt> to get better result.</p>
 
 <h2>Size</h2>
 
