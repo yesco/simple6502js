@@ -4,6 +4,27 @@
 
 <div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN</b></tt></div><br/>
 
+<style>
+  .color {
+      width: 3em; height: 2em;
+      display: inline-block;
+      text-align: center;
+      place-content: center;
+      font-weight: bold;
+      color: black;
+  }
+</style>
+
+<a id=0 class='color' style='background-color:#000; color: white; border: 2px solid white;'>0</a>
+<a id=1 class='color' style='background-color:#f00'>1</a>
+<a id=2 class='color' style='background-color:#0f0'>2</a>
+<a id=3 class='color' style='background-color:#ff0'>3</a>
+<a id=4 class='color' style='background-color:#00f'>4</a>
+<a id=5 class='color' style='background-color:#f0f'>5</a>
+<a id=6 class='color' style='background-color:#0ff'>6</a>
+<a id=7 class='color' style='background-color:#fff'>7</a>
+<br/>
+
 <select id="size">
   <option value="1">1 px</option>
   <option value="2">2 px</option>
@@ -123,7 +144,38 @@ function after(s, needle) {
   return r.length==2? r[1].trim(): null;
 }
 
-function parseCommand(cmd) {
+</script>
+
+<button id="undo" value="undo" onclick="javascript:undo();">undo</button>
+<br/>
+
+<canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
+Your browser does not support the HTML canvas tag.</canvas>
+<br/>
+<input type="file" id="files" multiple accept="*" style="display:none"/>
+<button id="load" type="button">Load</button>
+CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
+
+<h1>Debug:</h1>
+<textarea id='log' rows="100" width="80" style="width:100%;height:90%;align:right;"></textarea>
+
+<script>
+// two variants:
+// '#foo', or 'foo' => 1 dom element by id
+// '.class' => []
+
+function dom(name, optAction) {
+  if (!(name.match(/[ >.]/)))
+    return document.getElementById(name);
+  return Array.from(document.querySelectorAll(name));
+}
+
+function log(s) {
+  dom('log').value+= s+"\n";
+}
+
+function runCommand(cmd) {
+  log('runCommand: '+cmd);
   saveUndo(); // TODO: if fail, remove?
 
   var param= after(cmd, " ");
@@ -174,8 +226,7 @@ function parseCommand(cmd) {
     // -- load and draw image, then convert it to ORIC
     img1.onload = function () {
 
-      // drawImage(image, dx, dy, dWidth, dHeight) // dw, dh is scaling!
-      //ctx.drawImage(img1, 0, 0);
+      // scale image to maximize it, but keep proportions
       var dw= img1.naturalWidth, dh= img1.naturalHeight;
       var xy= dw/dh;
       if (xy > 240/200) 
@@ -187,8 +238,8 @@ function parseCommand(cmd) {
       var p= ctx.getImageData(0, 0, 240*w, 200*h);
       var pix= p.data;
 
-      //convertToOric(pix);
-      convertToOricJustAttributes(pix);
+      convertToOric(pix);
+      //convertToOricJustAttributes(pix);
       //convertToOricJustPixels(pix);
 
       updatehires();
@@ -205,7 +256,7 @@ function parseCommand(cmd) {
     //img1.src = 'oric_logo_colour_codes.gif';
 
     // - clean 
-    //img1.src= 'oric-logo-black-export.svg';
+    //img1.src= 'oric-logo-black-export.svg'; // not so good with atributes?
     img1.src= 'oric-logo-white-export.svg';
 
     // img1.src= '800px-Logo_Oric_Atmos.png’;
@@ -214,7 +265,6 @@ function parseCommand(cmd) {
     // - many twilite tricks!
     return true;
   } catch(e) { alert(e); } }
-
 
   if (cmd.startsWith("tap")) {
     // This will save:
@@ -289,29 +339,43 @@ function convertToOric(pix){
     // a) how many different colors in the line?
     // b) are they blobs/cartonish or all mixed/dithered?
     // c) fine lines?
+    var bg=0, fg=7;
+    var colfreq= [0,0,0,0, 0,0,0,0];
 
     for(var c=39; c>=0; --c) {
+
+      // extract 6 pixels
       var x= [0,0,0, 0,0,0];
       var or= 0;
       for(var i=0; i<6; ++i) {
-        // TODO: do avg? 
-        // for now, just pick first, lol
-        or|= (x[i]= pixcolor(pix, w*4*(r*240*h+c*6+i)));
+        var f= x[i]= pixdomcolor(pix, w*4*(r*240*h+c*6+i));
+        ++colfreq[f];
+        or|= f;
       }
 
-      // calculate resulting cell
+      // calculate resulting pixel cell
       var v= ( (x[0]?32:0) + (x[1]?16:0) + (x[2]?8:0) +
                (x[3]?4:0) + (x[4]?2:0) + (x[5]?1:0) + 64);
       var same= x.every( (z)=> (z==x[0]) );
-      // TODO: if same, maybe can consider other coding tech w attributes/inversion?
       cell[ci+c]= v;
     }
+
+    // find two most common colors
+    var mx= Array.from(colfreq).sort( (a,b) => b-a );
+    for(var i=7; i>=0; --i) {
+      if (colfreq[i]==mx[0]) bg= i;
+      if (colfreq[i]==mx[1]) fg= i;
+    }
+    cell[ci+0]= bg+16;
+    cell[ci+1]= fg;
+
+    log("row="+r+" bg="+bg+" fg="+fg+" freq="+colfreq.toString()+" max="+mx.toString());
 
     ci+= 40;
   }
 }
 
-function convertToOricJustAttributes(pix){
+function convertToOricJustAttributes(pix) {
   // each line, backwards!
   ci= 0;
   for(var r=0; r<200; ++r) {
@@ -369,19 +433,15 @@ function convertToOricJustPixels(pix){
   }
 }
 
-</script>
+function runLink(x) {
+  runCommand(this.innerText);
+}
 
-<button id="undo" value="undo" onclick="javascript:undo();">undo</button>
-<br/>
+// make all color elements clickable as commands!
+dom('.color').forEach( (x) => {
+  x.onclick= runLink;
+} );
 
-<canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
-Your browser does not support the HTML canvas tag.</canvas>
-<br/>
-<input type="file" id="files" multiple accept="*" style="display:none"/>
-<button id="load" type="button">Load</button>
-CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
-
-<script>
 // -- https://developer.mozilla.org/en-US/docs/Web/API/File_API/Using_files_from_web_applications
 
 const Dfiles= dom('files'), Dload= dom('load');
@@ -423,15 +483,11 @@ Dfiles.addEventListener('change', async (event) => {
 // - https://stackoverflow.com/questions/36216561/create-canvas-over-another-canvas
 // TODO: 
 
-function dom(name) {
-  return document.getElementById(name);
-}
-
 var Daction= dom("action"), DactionDef= Daction.value;
 
 Daction.onchange= ()=> {
   var v= Daction.value;
-  if (parseCommand(v)) ;
+  if (runCommand(v)) ;
   else alert("action.Not.Implemented.Yet: "+ Daction.value);
   Daction.value= DactionDef;
 }
@@ -877,7 +933,7 @@ Dinput.onsubmit= function(e) {
 
 Dinput.onchange= function() {
   var cmd= Dinput.value;
-  parseCommand(cmd);
+  runCommand(cmd);
   Dinput.value= "";
   return false;
 }
@@ -885,5 +941,55 @@ Dinput.onchange= function() {
 </script>
 
 </body>
+
+<script>
+function allsame(six) {
+}
+
+// sixrgb= [7, 3, 1, 0, 2 5];
+function encodesix(sixrgb) {
+  if (sixrgb.every( (v)=> (v==sixrgb[0]) )) return { all: sixrgb[0] };
+
+  // order by frequency, remove zeroes
+  var colfreq= {0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0};
+  sixrgb.forEach( (v) => ++colfreq[v] );
+
+  var mx= Array.from(colfreq).sort( (a,b) => b-a );
+  while(mx.length && !(mx[mx.length-1])) mx.pop();
+
+  // copy to modify, and tag with extra info
+  var r= Array.from(sixrgb); 
+  r.freq= colfreq;
+  r.
+
+  if (mx.length==1) { r.all= mx[0]; return r; }
+  //if (r= seqcols(sixrgb)) return r; // TODO: matters? yes if we want to ignore?
+  if (mx.length==2) { r.two= [mx[0], mx[1]]; return r; }
+  // lefties?
+  // rigthies?
+  //if (r= onedom(sixrgb)) return r; // TODO: matters?
+  r.freq= colfreq; return 
+}
+
+function step(state) {
+  let [cost, [sixpix, nextsix, ...rest], bg, fg, revcode]= state;
+}
+
+</script>
+
 </html>
 
+<!-- thinking about line attribute transitions:
+
+Observing  line by itself:
+
+aaa-aaa bbb-bbb ccc-ccc ddd-ddd = background attributes!
+aaa-aab bab-bba ...             = paper ink
+aaa-aaa aaa-aaa aaa-bbb bbb-bbb bbb-bbb bbb-ccc ccc-ccc = 
+Pa      Ib      aaa-bbb Pb      Ic      bbb-ccc ccc-ccc
+
+Ah, ir's a search-problem with many branches!
+- cost, or rather least error result based
+
+
+-->
