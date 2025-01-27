@@ -2,8 +2,7 @@
 <html>
 <body text="white" bgcolor="black">
 
-<div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN</b></tt></div><br/>
-
+<div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN (<a href='#man'>manual</a>)</b></tt></div><br/>
 <style>
   .cmd {
       width: 3em; height: 2em;
@@ -13,6 +12,10 @@
       font-weight: bold;
       color: black;
       background-color: white;
+  }
+  .sz {
+      width: 2em;
+      background-color: gray;
   }
 </style>
 
@@ -24,16 +27,16 @@
 <a class='cmd sel' title='brush square'>&#9632;</a>
 <br/>
 
-<a class='cmd sel' title='size 3'>3</a>
-<a class='cmd sel' title='size 6'>6</a>
-<a class='cmd sel' title='size 8'>8</a>
-<a class='cmd sel' title='size 10'>10</a>
-<a class='cmd sel' title='size 15'>15</a>
-<a class='cmd sel' title='size 20'>20</a>
-<a class='cmd sel' title='size 25'>25</a>
-<a class='cmd sel' title='size 30'>30</a>
-<a class='cmd sel' title='size 40'>40</a>
-<a class='cmd sel' title='size 50'>50</a>
+<a class='cmd sel sz' title='size 3'>3</a>
+<a class='cmd sel sz' title='size 6'>6</a>
+<a class='cmd sel sz' title='size 8'>8</a>
+<a class='cmd sel sz' title='size 10'>10</a>
+<a class='cmd sel sz' title='size 15'>15</a>
+<a class='cmd sel sz' title='size 20'>20</a>
+<a class='cmd sel sz' title='size 25'>25</a>
+<a class='cmd sel sz' title='size 30'>30</a>
+<a class='cmd sel sz' title='size 40'>40</a>
+<a class='cmd sel sz' title='size 50'>50</a>
 <br/>
 
 <a class='cmd sel' title='black' style='background-color:#000; color: white; border: 2px solid white;'>0</a>
@@ -306,7 +309,7 @@ function runCommand(cmd) {
     return true;
   } catch(e) { alert(e); } }
 
-  if (cmd.startsWith("tap")) {
+  if (cmd.startsWith("save") || cmd.startsWith("tap")) {
     // This will save:
     // - header, filename
     // - hires screen
@@ -1032,6 +1035,93 @@ function step(state) {
 }
 
 </script>
+
+<a name="man"></a>
+
+<h1>Manual</h1>
+
+<p>This is an ORIC HIRES SCREEN drawing program, it's web-based, but implements simple HIRES attribures non-blink/text/mix display of an HIRES screen.</p>
+
+<p>By making attributes effect directly clear while touch-drawing on the screen, hopefully, allowing users to paint relatively unlimited. The <tt>undo</tt>-facility makes it easy to go back.</p>
+
+<p>Features:
+<ul>
+<li>Unlimited <tt>undo</tt></li>
+<li><tt>load</tt> and <tt>save</tt>, <tt>tap</tt>-files</li>
+<li>free command line interaction, just type <tt>commands</tt> as seen</li>
+<li>limited GUI-interaction, these actually just as just textual commands!</li>
+<li><tt>paper blue</tt>, or <tt>ink red</tt> changes the first two columns</li>
+<li>unlimited color drawing (<tt>draw yellow</tt>)</li>
+<li>limited <tt>import</tt> facility of any web-image, for testing</li>
+</ul>
+</p>
+
+<h2>Brush</h2>
+
+<p>There are a number of different brushes. They can be sledcted by clicking on their buttons, or typing:
+<ul>
+<li><tt>brush thin</tt> - basically a single pixel set</li>
+<li><tt>brush line</tt> - a row of pixels</li>
+<li><tt>brush cursive</tt> - pretends to be an old school ink pen/caligraphy(?)</li>
+<li><tt>brush down</tt> - a bar of pixels</li>
+<li><tt>brush circle</tt> - a chinese round brush(?)</li>
+<li><tt>brush square</tt> - a "square" brush, lol(?)</li>
+</ul>
+</p>
+
+<h2>Size</h2>
+
+<p>Sizes of brushes, are in pixels wide, or radius, or square-"radious", given as <tt>size 1</tt>, <tt>size 3</tt>, ... up to <tt>size 50</tt>. However, you can specify whatever you like!</p>
+
+<h2>Spray</h2>
+
+<p>And, I guess it wouldn't be a paint-program if it didn't have brushes and <tt>spray</tt> command. This is explored more in detail in the section "Draw color". But it takes an argument of percentage, % of probability a pixel will set or not. This applies to all shapes of brushes.</p>
+
+<p><tt>spray 50</tt> is quite heavy, and using higher value will give you more attribute clashes. Like using a real brush, the more you move it around, the more it "paints", i.e. sets pixels.</p>
+
+<p><b>Note:</b> the more you pain, you'll notice that it creates more background color areas to the "left" of the what you're currently drawing. These are the ink-color attributes. This is at best a "shadow" and at worst an "artefact". ;-)</p>
+
+<h2>Colors</h2>
+
+<p>colors can be selected on the screen, or just written:
+<ul>
+<li><tt>paper blue</tt></li>
+<li><tt>ink white</tt></li>
+<li><tt>draw yellow</tt></li>
+</p>
+
+<ul>
+<li><tt>0</tt>, or <tt>k</tt> or <tt>black</tt></li>
+<li><tt>1</tt>, or <tt>r</tt> or <tt>red</tt></li>
+<li><tt>2</tt>, or <tt>g</tt> or <tt>green</tt></li>
+<li><tt>3</tt>, or <tt>y</tt> or <tt>yellow</tt></li>
+<li><tt>4</tt>, or <tt>u</tt> or <tt>blue</tt></li>
+<li><tt>5</tt>, or <tt>m</tt> or <tt>magnenta</tt></li>
+<li><tt>6</tt>, or <tt>c</tt> or <tt>cyan</tt></li>
+<li><tt>7</tt>, or <tt>w</tt> or <tt>white</tt></li>
+</ul>
+
+<h3>Draw color</h3>
+
+<p><tt>draw</tt> color is a new concept, in that it <b>allows</b>, and <i>assumes</i> unlimited color mixing. In practice, as we know ORIC is limited in this aspect. Nethertheless, a special version of "curset" taking an extended "fb" third parameter, apart from 0=unset, 1=set, 2=xor, 3=move, 32+color will set an attribute in a cell before this pixel! Yes, this will "harm" the previously draw picture, but by using clever drawing methods good results may be achieved.</p>
+
+<p>The prefered modes of drawing is <tt>thin</tt>, which is a single pixel set, or <tt>circle</tt> with <tt>size 10</tt> and <tt>spray</tt> with various fillness, like <tt>spray 20</tt> it randomly "curset"s 20% of the pixels. The more it moves the more pixels are being set, these are randomized thus giving interesting non-repeating patterns.</p>
+
+<p>With higher degree of of size/spray/brush-types the effects of setting attributes gets more noticable, creating "dark" background color zones, where attributes set the <tt>draw<?tt> color.</p>
+
+<h2>Files</h2>
+
+<p>You can <tt>load</tt> a tap-file, or <tt>save</tt> it with those commands. <tt>save filename</tt> will generate a file to be saved as "filename.tap" in the browser. This can then be loaded on an real ORIC, or in an emulator.</p>
+
+<h2>Import</h2>
+
+<p>There is a rudimentary command to <tt>import</tt> a given file, currently hard-coded. This currently stretches the image to maximize it's extent, keeping it's ratio intact. THen the image is resampled or converted to ORIC HIRES, currently it only have these experimential functions:
+<ul>
+<li>black-white</li>
+<li>background attributes, rought 6-pixel-cell encoding</li>
+<li>...</li>
+</ul>
+This implementation is constantly changing. For real better conversions I guess <b>libpipi</b> or <b>pict-conv</b> programs can be used.</p>
 
 </html>
 
