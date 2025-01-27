@@ -19,6 +19,9 @@
   }
 </style>
 
+<!-- TODO: fix-->
+<center>
+
 <a class='cmd sel' title='brush thin'>.</a>
 <a class='cmd sel' title='brush flat'>-</a>
 <a class='cmd sel' title='brush cursive'>/</a>
@@ -192,6 +195,8 @@ Your browser does not support the HTML canvas tag.</canvas>
 <input type="file" id="files" multiple accept="*" style="display:none"/>
 <button id="load" type="button">Load</button>
 CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
+
+</center>
 
 <h1>Debug:</h1>
 <textarea id='log' rows="100" width="80" style="width:100%;height:90%;align:right;"></textarea>
@@ -761,11 +766,41 @@ function curset(ox, oy, f) {
   case 2: cell[ci] ^=  cm; break;
   case 3: return;
 
-  // >=32: over-write color 
+  // >=32: over-write color
   default:
     if (f>=32) {
-      var i= ci-1;
 
+      // -- find ink to set after
+      // artifact: double shadow... lol
+
+      var i= ci+1;
+
+      // TODO: this doesn't work as good as you expect
+      //   as we're cursetting many in same row...
+      // TODO: only do on rightmost!
+      if (1 && f>=128) {
+        // Act on untainted image!
+        var oldcell= undoStack[undoStack.length-1];
+        var afterink= -1;
+
+        // find first left ink color, or beginning of screen
+        while((i%40)!=0) {
+          var c= oldcell[i]&127;
+          if (c<8) { afterink=c; break; }
+          --i;
+        }
+        // replicate that ink
+        // TODO: corner-cases
+        if ((oldcell[ci+1]&127)>=64 &&
+            afterink != -1 &&
+            afterink != f&7) {
+          var c= cell[ci+1]= afterink || (oldcell[ci+1]&128);
+          log('afterink: '+afterink);
+        }
+      }
+
+      // set current drawink before
+      i= ci-1; 
       while((i%40)!=0) {
         var c= cell[i]&127;
 
@@ -776,7 +811,6 @@ function curset(ox, oy, f) {
         }
         // dont change background
         --i;
-        //if (i%40==0) break; // fail
       }
 
       var v= cell[ci];
@@ -821,6 +855,7 @@ function drawbrush() {
   switch(brush) {
 
   case 'thin':
+    // TODO: do we want spray effect here?
     if (Math.random()<=spray) {
       curset(ox, oy, f);
       partialupdate();
@@ -828,25 +863,32 @@ function drawbrush() {
     break;
 
   case 'flat':
+    // TODO: do we want spray effect here?
+    var firstinrow= 128;
     for(var i=0; i<size; ++i) {
-      if (Math.random()<=spray) curset(ox-i, oy, f);
+      if (Math.random()<=spray) curset(ox-i, oy, f+firstinrow);
+      firstinrow= 0;
     }
     partialupdate();
     break;
 
   case 'down':
+    // TODO: do we want spray effect here?
+    var firstinrow= 128;
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
-        curset(ox, oy+i, f);
+        curset(ox, oy+i, f+firstinrow);
         partialupdate();
       }
     }
     break;
 
   case 'cursive':
+    // TODO: do we want spray effect here?
+    var firstinrow= 128;
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
-        curset(ox-i, oy+i, f);
+        curset(ox-i, oy+i, f+firstinrow);
         partialupdate();
       }
     }
@@ -857,10 +899,13 @@ function drawbrush() {
     var w= radius, h= radius;
     for(var r= -h; r<= +h; ++r) {
       // draw from right to left, not to smear attributes
+      var firstinrow= 128;
       for(var c=+w; c>= -w; --c) {
         if (r*r+c*c<radius*radius
-            && Math.random()<=spray)
-          curset(ox+c, oy+r, f);
+            && Math.random()<=spray) {
+          curset(ox+c, oy+r, f+firstinrow);
+          firstinrow= 0;
+        }
       }
       partialupdate();
     }
@@ -869,9 +914,12 @@ function drawbrush() {
   case 'square':
     var w= size, h= size;
     for(var r= -h; r<= +h; ++r) {
+      var firstinrow= 128;
       for(var c= +w; c>= -w; --c) {
-        if (Math.random()<=spray)
-          curset(ox+c, oy+r, f);
+        if (Math.random()<=spray) {
+          curset(ox+c, oy+r, f+firstinrow);
+          firstinrow= 0;
+        }
       }
       partialupdate();
     }
