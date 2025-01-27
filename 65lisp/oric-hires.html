@@ -1040,38 +1040,38 @@ function step(state) {
 
 <h1>Manual</h1>
 
-<p>This is an ORIC HIRES SCREEN drawing program, it's web-based, but implements simple HIRES attribures non-blink/text/mix display of an HIRES screen.</p>
+<p>This is an ORIC HIRES SCREEN drawing program, it's web-based, but implements simple HIRES attributes non-blink/text/mix display of an HIRES screen.</p>
 
 <p>By making attributes effect directly clear while touch-drawing on the screen, hopefully, allowing users to paint relatively unlimited. The <tt>undo</tt>-facility makes it easy to go back.</p>
 
 <p>Features:
 <ul>
 <li>Unlimited <tt>undo</tt></li>
-<li><tt>load</tt> and <tt>save</tt>, <tt>tap</tt>-files</li>
 <li>free command line interaction, just type <tt>commands</tt> as seen</li>
 <li>limited GUI-interaction, these actually just as just textual commands!</li>
 <li><tt>paper blue</tt>, or <tt>ink red</tt> changes the first two columns</li>
-<li>unlimited color drawing (<tt>draw yellow</tt>)</li>
+<li><b>unlimited color</b> drawing (<tt>draw yellow</tt>)</li>
+<li><tt>load</tt> and <tt>save</tt>, <tt>tap</tt>-files</li>
 <li>limited <tt>import</tt> facility of any web-image, for testing</li>
 </ul>
 </p>
 
 <h2>Brush</h2>
 
-<p>There are a number of different brushes. They can be sledcted by clicking on their buttons, or typing:
+<p>There are a number of different brushes. They can be selected by clicking on their buttons, or typing:
 <ul>
 <li><tt>brush thin</tt> - basically a single pixel set</li>
 <li><tt>brush line</tt> - a row of pixels</li>
-<li><tt>brush cursive</tt> - pretends to be an old school ink pen/caligraphy(?)</li>
+<li><tt>brush cursive</tt> - pretends to be an old school ink pen/calligraphy(?)</li>
 <li><tt>brush down</tt> - a bar of pixels</li>
-<li><tt>brush circle</tt> - a chinese round brush(?)</li>
+<li><tt>brush circle</tt> - a Chinese round brush(?)</li>
 <li><tt>brush square</tt> - a "square" brush, lol(?)</li>
 </ul>
 </p>
 
 <h2>Size</h2>
 
-<p>Sizes of brushes, are in pixels wide, or radius, or square-"radious", given as <tt>size 1</tt>, <tt>size 3</tt>, ... up to <tt>size 50</tt>. However, you can specify whatever you like!</p>
+<p>Sizes of brushes, are in pixels wide, or radius, or square-"radius", given as <tt>size 1</tt>, <tt>size 3</tt>, ... up to <tt>size 50</tt>. However, you can specify whatever you like!</p>
 
 <h2>Spray</h2>
 
@@ -1079,7 +1079,7 @@ function step(state) {
 
 <p><tt>spray 50</tt> is quite heavy, and using higher value will give you more attribute clashes. Like using a real brush, the more you move it around, the more it "paints", i.e. sets pixels.</p>
 
-<p><b>Note:</b> the more you pain, you'll notice that it creates more background color areas to the "left" of the what you're currently drawing. These are the ink-color attributes. This is at best a "shadow" and at worst an "artefact". ;-)</p>
+<p><b>Note:</b> the more you pain, you'll notice that it creates more background color areas to the "left" of the what you're currently drawing. These are the ink-color attributes. This is at best interpret-able as a "shadow" and at worst an "artifact". ;-)</p>
 
 <h2>Colors</h2>
 
@@ -1096,18 +1096,18 @@ function step(state) {
 <li><tt>2</tt>, or <tt>g</tt> or <tt>green</tt></li>
 <li><tt>3</tt>, or <tt>y</tt> or <tt>yellow</tt></li>
 <li><tt>4</tt>, or <tt>u</tt> or <tt>blue</tt></li>
-<li><tt>5</tt>, or <tt>m</tt> or <tt>magnenta</tt></li>
+<li><tt>5</tt>, or <tt>m</tt> or <tt>magenta</tt></li>
 <li><tt>6</tt>, or <tt>c</tt> or <tt>cyan</tt></li>
 <li><tt>7</tt>, or <tt>w</tt> or <tt>white</tt></li>
 </ul>
 
 <h3>Draw color</h3>
 
-<p><tt>draw</tt> color is a new concept, in that it <b>allows</b>, and <i>assumes</i> unlimited color mixing. In practice, as we know ORIC is limited in this aspect. Nethertheless, a special version of "curset" taking an extended "fb" third parameter, apart from 0=unset, 1=set, 2=xor, 3=move, 32+color will set an attribute in a cell before this pixel! Yes, this will "harm" the previously draw picture, but by using clever drawing methods good results may be achieved.</p>
+<p><tt>draw</tt> color is a new concept, in that it <b>allows</b>, and <i>assumes</i> unlimited color mixing. In practice, as we know ORIC is limited in this aspect. Nevertheless, a special version of "curset" taking an extended "fb" third parameter, apart from 0=unset, 1=set, 2=xor, 3=move, 32+color will set an attribute in a cell before this pixel! Yes, this will "harm" the previously draw picture, but by using clever drawing methods good results may be achieved.</p>
 
-<p>The prefered modes of drawing is <tt>thin</tt>, which is a single pixel set, or <tt>circle</tt> with <tt>size 10</tt> and <tt>spray</tt> with various fillness, like <tt>spray 20</tt> it randomly "curset"s 20% of the pixels. The more it moves the more pixels are being set, these are randomized thus giving interesting non-repeating patterns.</p>
+<p>The preferred modes of drawing is <tt>thin</tt>, which is a single pixel set, or <tt>circle</tt> with <tt>size 10</tt> and <tt>spray</tt> with various fullness, like <tt>spray 20</tt> it randomly "curset"s 20% of the pixels. The more it moves the more pixels are being set, these are randomized thus giving interesting non-repeating patterns.</p>
 
-<p>With higher degree of of size/spray/brush-types the effects of setting attributes gets more noticable, creating "dark" background color zones, where attributes set the <tt>draw<?tt> color.</p>
+<p>With higher degree of of size/spray/brush-types the effects of setting attributes gets more noticeable, creating "dark" background color zones, where attributes set the <tt>draw<?tt> color.</p>
 
 <h2>Files</h2>
 
@@ -1115,10 +1115,10 @@ function step(state) {
 
 <h2>Import</h2>
 
-<p>There is a rudimentary command to <tt>import</tt> a given file, currently hard-coded. This currently stretches the image to maximize it's extent, keeping it's ratio intact. THen the image is resampled or converted to ORIC HIRES, currently it only have these experimential functions:
+<p>There is a rudimentary command to <tt>import</tt> a given file, currently hard-coded. This currently stretches the image to maximize it's extent, keeping it's ratio intact. Then the image is resampled or converted to ORIC HIRES, currently it only have these experimental functions:
 <ul>
 <li>black-white</li>
-<li>background attributes, rought 6-pixel-cell encoding</li>
+<li>background attributes, rough 6-pixel-cell encoding</li>
 <li>...</li>
 </ul>
 This implementation is constantly changing. For real better conversions I guess <b>libpipi</b> or <b>pict-conv</b> programs can be used.</p>
