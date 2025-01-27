@@ -5,24 +5,33 @@
 <div style='text-align:center'><tt style="color:yellow"><b>ORIC HIRES SCREEN</b></tt></div><br/>
 
 <style>
-  .color {
+  .cmd {
       width: 3em; height: 2em;
       display: inline-block;
       text-align: center;
       place-content: center;
       font-weight: bold;
       color: black;
+      background-color: white;
   }
 </style>
 
-<a id=0 class='color' style='background-color:#000; color: white; border: 2px solid white;'>0</a>
-<a id=1 class='color' style='background-color:#f00'>1</a>
-<a id=2 class='color' style='background-color:#0f0'>2</a>
-<a id=3 class='color' style='background-color:#ff0'>3</a>
-<a id=4 class='color' style='background-color:#00f'>4</a>
-<a id=5 class='color' style='background-color:#f0f'>5</a>
-<a id=6 class='color' style='background-color:#0ff'>6</a>
-<a id=7 class='color' style='background-color:#fff'>7</a>
+<a class='cmd sel' title='black' style='background-color:#000; color: white; border: 2px solid white;'>0</a>
+<a class='cmd sel' title='red' style='background-color:#f00'>1</a>
+<a class='cmd sel' title='green' style='background-color:#0f0'>2</a>
+<a class='cmd sel' title='yellow' style='background-color:#ff0'>3</a>
+<a class='cmd sel' title='blue' style='background-color:#00f'>4</a>
+<a class='cmd sel' title='magnenta' style='background-color:#f0f'>5</a>
+<a class='cmd sel' title='cyan' style='background-color:#0ff'>6</a>
+<a class='cmd sel' title='white' style='background-color:#fff'>7</a>
+<br/>
+
+<a class='cmd sel' title='brush thin'>.</a>
+<a class='cmd sel' title='brush flat'>-</a>
+<a class='cmd sel' title='brush cursive'>/</a>
+<a class='cmd sel' title='brush down'>|</a>
+<a class='cmd sel' title='brush circle'>&#9679;</a>
+<a class='cmd sel' title='brush square'>&#9632;</a>
 <br/>
 
 <select id="size">
@@ -46,14 +55,14 @@
 </select>
 
 <select id="brush">
-  <option value="pixel">thin</option>
+  <option value="thin">thin</option>
   <option value="flat">flat</option>
   <option value="down">down</option>
   <option value="cursive">cursive</option>
   <!--option value="watercolor">watercolor</option-->
   <option value="circle">circle</option>
   <!--option value="chinese">chinese</option-->
-  <option value="box">box</option>
+  <option value="square">square</option>
 </select>
 
 <select id="draw">
@@ -155,7 +164,7 @@ function isprefix(pre, s) {
 
 </script>
 
-<button id="undo" value="undo" onclick="javascript:undo();">undo</button>
+<button id="undo" value="undo" onclick="javascript:undo();" style='font-weight:bold;'>undo</button>
 <br/>
 
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
@@ -206,7 +215,10 @@ function runCommand(cmd) {
     return true;
   }
 
-//  alert("COMMAND: "+ cmd);
+  if (cmd.startsWith('brush ')) {
+    dom('brush').value= param;
+    return true;
+  }
 
   if (cmd.startsWith("erase")) {
     resethires();
@@ -445,12 +457,14 @@ function convertToOricJustPixels(pix){
   }
 }
 
-function runLink(x) {
-  runCommand(this.innerText);
+// prefer alt as full command to parse than
+function runLink(e) {
+  //log('runLink: title='+this.title+' t='+this.innerText);
+  runCommand(this.title || this.innerText);
 }
 
 // make all color elements clickable as commands!
-dom('.color').forEach( (x) => {
+dom('.cmd').forEach( (x) => {
   x.onclick= runLink;
 } );
 
@@ -765,21 +779,21 @@ function drawbrush() {
   
   switch(brush) {
 
-  case "pixel":
+  case 'thin':
     if (Math.random()<=spray) {
       curset(ox, oy, f);
       partialupdate();
     }
     break;
 
-  case "flat":
+  case 'flat':
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) curset(ox-i, oy, f);
     }
     partialupdate();
     break;
 
-  case "down":
+  case 'down':
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
         curset(ox, oy+i, f);
@@ -788,7 +802,7 @@ function drawbrush() {
     }
     break;
 
-  case "cursive":
+  case 'cursive':
     for(var i=0; i<size; ++i) {
       if (Math.random()<=spray) {
         curset(ox-i, oy+i, f);
@@ -797,7 +811,7 @@ function drawbrush() {
     }
     break;
 
-  case "circle":
+  case 'circle':
     var radius= size;
     var w= radius, h= radius;
     for(var r= -h; r<=h; ++r) {
@@ -810,7 +824,7 @@ function drawbrush() {
     }
     break;
 
-  case "box":
+  case 'square':
     var w= size, h= size;
     for(var r= -h; r<=h; ++r) {
       for(var c= -w; c<=w; ++c) {
