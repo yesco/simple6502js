@@ -10,7 +10,17 @@
 // The terminal can either be "dumb" tty; basically only
 // honoring: \n \r \t ^L (clear) and scroll.
 
-#define TTY // (- 5703 3433) = 2270 bytes for EXTENDED EMACS terminal codes
+// Minimal! (don't change here, change define in your own includsion
+//#define TTY // (- 5703 3433) = 2270 bytes for EXTENDED EMACS terminal codes
+
+#ifndef TTY
+  #define CONIO_INIT
+  #define CONIO_PRINTF
+  #define KEY_MAPPING		// (- 6946 6367) = 579 bytes 2*9*8=144B in tables, 
+  #define KEY_POS			// (- 7160 6946) = 214 bytes
+  #define EXTENDED_KEYS		// (- 7294 6946) = 348 bytes
+  #define EXTENDED_DEBUG_KEY      // (- 7092 6946) = 146 bytes
+#endif
 
 //#define CONIO_INIT // if you want init_conioraw() to disable ORIC cursor
 
@@ -52,7 +62,7 @@
 // TODO: fix so that KEY_MAPPING gives CTRL and SHIFT!
 
 // Needed for decoding ASCII keys (total (- 7654 6367)= 1287 bytes!)
-#define KEY_MAPPING		// (- 6946 6367) = 579 bytes 2*9*8=144B in tables, 
+//#define KEY_MAPPING		// (- 6946 6367) = 579 bytes 2*9*8=144B in tables, 
 //#define KEY_POS			// (- 7160 6946) = 214 bytes
 //#define EXTENDED_KEYS		// (- 7294 6946) = 348 bytes
 //#define EXTENDED_DEBUG_KEY      // (- 7092 6946) = 146 bytes
@@ -179,7 +189,7 @@
 // not needed?
 //#include <stdarg.h> 
 //#include <assert.h>
-#define assert(a)
+//#define assert(a)
 
 
 // peek/poke all in one *MEM(4711)= 42;
@@ -1302,7 +1312,14 @@ void main() {
 
 #ifdef EMACSTERM
 
+#define COMPRESS_PROGRESS
+#include "compress.c"
+
+// Dummys for ./r script
+int T,nil,doapply1,print;
+
 void main() {
+
   // StupidTerm to test out control keys...
 
 #define HIRESSCREEN ((char*)0xA000) // $A000-BF3F
@@ -1322,21 +1339,24 @@ void main() {
   // 1080 chars
   char* sherlock= "THE COMPLETE SHERLOCK HOLMES Arthur Conan Doyle Table of contents A Study In Scarlet The Sign of the Four The Adventures of Sherlock Holmes A Scandal in Bohemia The Red-Headed League A Case of Identity The Boscombe Valley Mystery The Five Orange Pips The Man with the Twisted Lip The Adventure of the Blue Carbuncle The Adventure of the Speckled Band The Adventure of the Engineer's Thumb The Adventure of the Noble Bachelor The Adventure of the Beryl Coronet The Adventure of the Copper Beeches The Memoirs of Sherlock Holmes Silver Blaze The Yellow Face The Stock-Broker's Clerk The \"Gloria Scott\" The Musgrave Ritual The Reigate Squires The Crooked Man The Resident Patient The Greek Interpreter The Naval Treaty The Final Problem The Return of Sherlock Holmes The Adventure of the Empty House The Adventure of the Norwood Builder The Adventure of the Dancing Men The Adventure of the Solitary Cyclist The Adventure of the Priory School The Adventure of Black Peter The Adventure of Charles Augustus Milverton The Adventure of the Six Napoleons The Adventure of the Three Stor";
 
-  int u= -1, n;
+  int u= -1, n, k;
 
+  init_conioraw(); // turn of ORIC BASIC cursor...
+
+
+  #ifdef HIRES
   // hires();
   memcpy(HIRESCHARSET, CHARSET, 256*8); curmode= curscr[SCREENSIZE-1]= HIRESMODE;
   // gclear();
   memset(HIRESSCREEN, 64, HIRESSIZE);
+  #endif // HIRES
 
   gotoxy(0, 1);
 
   paper(*YELLOW);
   ink(*MAGNENTA);
 
-  // again?
-
-  puts(KESC "[20;13H*HERE!");
+  //puts(KESC "[20;13H*HERE!");
 
   while(1) {
     //printf(STATUS INVERSE "-OriMacs:-- *scratch*   L%2dc%2d " ENDINVERSE RESTORE,
@@ -1419,6 +1439,7 @@ void main() {
 
 // useless test of conio-raw.c
 
+#ifdef DEMO_BORKEN
 void demo() {
   int i;
 
@@ -1449,8 +1470,8 @@ void demo() {
   puts(RESTORE);
   i= 27;
   while(i--) printf(WAIT1s REMOVELINE);
-
 }
+#endif // DEMOBORKEN
 
 #define COMPRESS_PROGRESS
 #include "compress.c"
