@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <stdint.h>
+
 // HMMM
 typedef int16_t I;
 typedef uint16_t L;
@@ -33,22 +35,25 @@ void ddiv(dec *a, dec *b, dec *r) {
 }
 
 void dadd(dec *a, dec *b, dec *r) {
-  if (a->e < b->e) return dadd(b, a, r);
-  // a is biggest e
-  long m= a->m;
-  int e= a->e;
-  // TODO: neg
-  while(e > b->e) { e--; m*= 10; }
-  // now they have same exponent
-  dmake(m + b->m, e, r);
+  if (a->e < b->e) { dadd(b, a, r); return; }
+  else {
+    // a is biggest e
+    long m= a->m;
+    int e= a->e;
+    // TODO: neg
+    while(e > b->e) { e--; m*= 10; }
+    // now they have same exponent
+    dmake(m + b->m, e, r);
+  }
 }
 
 void dsub(dec *a, dec *b, dec *r) {
   long m= a->m;
   int e= 0; 
+  dec rb;
   // TODO: neg
   while(!(m & 0x7f000000)) { m*= 10; e--; }
-  dec rb= { .m= -b->m, .e= b->e };
+  rb= (struct dec){ .m= -b->m, .e= b->e };
   return dadd(a, &rb, r);
 }
 
