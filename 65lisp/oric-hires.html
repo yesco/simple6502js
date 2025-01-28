@@ -2,34 +2,52 @@
 <html>
 <body text="white" bgcolor="black">
 
-<div style='text-align:center'><tt style="color:yellow"><b>ORIC PAINT (<a href='#man' style='color:white'>manual</a>)</b></tt></div><br/>
+<div style='color:white'>
+  <tt <b>ORIC PAINT (<a href='#man' style='color:white'>manual</a>)</b></tt>
+  <tt style='position:absolute;right:0'>CAPS</tt><br/>
+</div>
+<br/>
+
+
 <style>
   .cmd {
-      width: 3em; height: 2em;
+      width: 1.8em; height: 2em;
       display: inline-block;
       text-align: center;
       place-content: center;
       font-weight: bold;
       color: black;
       background-color: white;
+      //margin: 1px;
   }
   .sz {
       width: 2em;
       background-color: gray;
+      color: white;
   }
 </style>
 
-<!-- TODO: fix-->
 <center>
 
-<a class='cmd sel' title='brush thin'>.</a>
-<a class='cmd sel' title='brush flat'>-</a>
-<a class='cmd sel' title='brush cursive'>/</a>
+<nobr style='text-align:top'>
+<a class='cmd sel' title='brush thin'>&#8901;</a>
+<a class='cmd sel' title='brush flat'>&#8213;</a>
+<a class='cmd sel' title='brush cursive'>&#9585;</a>
 <a class='cmd sel' title='brush down'>|</a>
-<a class='cmd sel' title='brush circle'>&#9679;</a>
-<a class='cmd sel' title='brush square'>&#9632;</a>
-<br/>
 
+<!-- &#9679; -->
+<a class='cmd sel' title='brush circle'>&#11044;</a>
+<!-- &#9632; -->
+<a class='cmd sel' title='brush square'>&#9724;</a>
+<tt>spray</tt>
+<a class='cmd sel' title='spray 5'>&#9617;</span></a>
+<a class='cmd sel' title='spray 10'>&#9618;</span></a>
+<a class='cmd sel' title='spray 25'>&#9619;</span></a>
+<a class='cmd sel' title='spray 100'>&#9607;</span></a>
+</nobr><br/>
+
+<nobr>
+<tt>size</tt>
 <a class='cmd sel sz' title='size 3'>3</a>
 <a class='cmd sel sz' title='size 6'>6</a>
 <a class='cmd sel sz' title='size 8'>8</a>
@@ -40,8 +58,13 @@
 <a class='cmd sel sz' title='size 30'>30</a>
 <a class='cmd sel sz' title='size 40'>40</a>
 <a class='cmd sel sz' title='size 50'>50</a>
-<br/>
+</nobr><br/>
 
+<!-- draw colors -->
+<nobr>
+<a class='cmd sel' title='set' style='background-color:gray; color: white;'>clr</a>
+<a class='cmd sel' title='clr' style='background-color:gray; color: white;'>set</a>
+<a class='cmd sel' title='xor' style='background-color:gray; color: white;'>xor</a>
 <a class='cmd sel' title='black' style='background-color:#000; color: white; border: 2px solid white;'>0</a>
 <a class='cmd sel' title='red' style='background-color:#f00'>1</a>
 <a class='cmd sel' title='green' style='background-color:#0f0'>2</a>
@@ -50,8 +73,13 @@
 <a class='cmd sel' title='magnenta' style='background-color:#f0f'>5</a>
 <a class='cmd sel' title='cyan' style='background-color:#0ff'>6</a>
 <a class='cmd sel' title='white' style='background-color:#fff'>7</a>
-<br/>
 
+<span style='width:2em;'>&nbsp;</span>
+<a class='cmd sel' title='undo' style='background-color:black; width:3em; color:white; border:1px solid white;'>&#9003; (<span id='undocount'></span>)</a>
+
+</nobr><br/>
+
+<nobr>
 <select id="size">
   <option value="1">1 px</option>
   <option value="2">2 px</option>
@@ -87,7 +115,7 @@
 
 <!--TODO: rename to mode? unset, set, xor, move, spray.... -->
 <select id="draw">
-  <option value="dutts">dutts</option>
+  <option value="spray 100">dutts</option>
   <option value="spray 50">spray 50%<x/option>
   <option value="spray 25">spray 25%</option>
   <option value="spray 15">spray 15%</option>
@@ -120,10 +148,19 @@
 
 <select id="action">
   <option value="" selected>action</option>
-  <option value="save">save</option>
   <option value="load">load</option>
-  <option value="clip">clip</option>
+  <option value="tap">tap</option>
+  <option value="xtap">xtap</option>
+  <option value="import">import</option>
   <option value="erase">erase</option>
+  <option value="draw 0">blk</option>
+  <option value="draw 1">red</option>
+  <option value="draw 2">grn</option>
+  <option value="draw 3">yel</option>
+  <option value="draw 4">blu</option>
+  <option value="draw 5">mag</option>
+  <option value="draw 6">cya</option>
+  <option value="draw 7">wht</option>
   <option value="paper 0">BLK (WHT)</option>
   <option value="paper 1">RED (CYA)</option>
   <option value="paper 2">GRN (MAG)</option>
@@ -140,15 +177,23 @@
   <option value="ink 5">mag (grn)</option>
   <option value="ink 6">cya (red)</option>
   <option value="ink 7">wht (blk)</option>
-  <option value="draw 0">blk</option>
-  <option value="draw 1">red</option>
-  <option value="draw 2">grn</option>
-  <option value="draw 3">yel</option>
-  <option value="draw 4">blu</option>
-  <option value="draw 5">mag</option>
-  <option value="draw 6">cya</option>
-  <option value="draw 7">wht</option>
 </select>
+</nobr>
+
+<!-- red big ring char &#11093;
+<a class='cmd sel' title='orange back arrow/undo?'>&#9664;</a>
+<a class='cmd sel' title='orange forward arrow/undo?'>&#9654;</a>
+<a class='cmd sel' title='erase left'>&#9003;</a>
+<a class='cmd sel' title='big red x/close'>&#10060;</a>
+<a class='cmd sel' title='counter-clock/redo?'>&#8634;</a>
+<a class='cmd sel' title='clock-wise arrow/undo?'>&#8635;</a>
+<a class='cmd sel' title='100'>&#128175;</a>
+<button value="undo" onclick="javascript:undo();" title="undo" tooltip='undo' style='font-weight:bold;'>&#9664;</button>
+
+
+-->
+
+<br/>
 
 <script>
 // catch error as we have no console....
@@ -186,15 +231,16 @@ function isprefix(pre, s) {
 
 </script>
 
-<button id="undo" value="undo" onclick="javascript:undo();" style='font-weight:bold;'>undo</button>
-<br/>
-
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
 <br/>
 <input type="file" id="files" multiple accept="*" style="display:none"/>
-<button id="load" type="button">Load</button>
-CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
+
+
+<nobr>
+  <button id="load" type="button">Load</button>
+  CMD: <input id="input" size=50 autocomplete=off autocorrect=off />
+</nobr>
 
 </center>
 
@@ -239,6 +285,11 @@ function runCommand(cmd) {
     return true;
   }
 
+  if (cmd.startsWith('spray')) {
+    dom('draw').value= cmd;
+    return true;
+  }
+
   if (cmd.startsWith('brush')) {
     if (param) {
       // TODO: brush circle 10? or just circle 10?
@@ -262,12 +313,14 @@ function runCommand(cmd) {
     return true;
   }
 
+  // TODO: redo?
   if (cmd.startsWith("undo")) {
-    undo(); undo(); // twice because we just added one
-    // TODO: redo(); ?
+    // twice because we just added one
+    undo(); undo();
     return true;
   }
 
+  // TODO: ctrl-L ?
   if (cmd.startsWith("redraw")) {
     updatehires();
     return true;
@@ -296,8 +349,8 @@ function runCommand(cmd) {
       var p= ctx.getImageData(0, 0, 240*w, 200*h);
       var pix= p.data;
 
-      convertToOric(pix);
-      //convertToOricJustAttributes(pix);
+      //convertToOric(pix);
+      convertToOricJustAttributes(pix);
       //convertToOricJustPixels(pix);
 
       updatehires();
@@ -378,10 +431,15 @@ function runCommand(cmd) {
     return true;
   }
 
+  // set clr xor - traditional drawing
+  if (cmd.startsWith('clr')) { drawink= 0; return true; }
+  if (cmd.startsWith('set')) { drawink= 1; return true; }
+  if (cmd.startsWith('xor')) { drawink= 2; return true; }
+
   // everything else is tried as a color
   if (!isNaN(nf)) {
     log("draw "+ nf);
-    drawink= nf;
+    drawink= 64+(nf&7);
     return true;
   }
 
@@ -581,10 +639,11 @@ function colornum(t) {
   return NaN;
 }
 
-// store hires screen as array
+// store hires screen as array of cells
 var cell= new Uint8Array(200*40);
-var paper= 0, ink= 3;
-var drawink= 3; // yellow
+var paper= 0, ink= colornum('red');
+const DRAWINK=64;
+var drawink= DRAWINK+colornum('yellow'); // draw ink is 0,1,2,3 or 128+colornum
 
 // running data state for graphics during update
 var x, y, ci, bg, fg;
@@ -755,7 +814,7 @@ function curset(ox, oy, f) {
 
   // don't set bits in paper attributes
   var v= cell[ci]&127;
-  if (v>=32 && v<32+8) return;
+  if (v>=16 && v<16+8) return;
 
   // steal ink cell and make it ours!
   if (v<8) cell[ci]= 64 | (cell[ci]&128);
@@ -766,9 +825,10 @@ function curset(ox, oy, f) {
   case 2: cell[ci] ^=  cm; break;
   case 3: return;
 
-  // >=32: over-write color
+  // >=DRAWINK over-write color
+  // TODO: interaction with 128?
   default:
-    if (f>=32) {
+    if (f>=DRAWINK) {
 
       // -- find ink to set after
       // artifact: double shadow... lol
@@ -778,6 +838,10 @@ function curset(ox, oy, f) {
       // TODO: this doesn't work as good as you expect
       //   as we're cursetting many in same row...
       // TODO: only do on rightmost!
+      //   tried, but funny, moving back in path creates
+      //   an "undraw" effect and gets back what you had before!
+      // TODO: do this after whole drawing motioned
+      //   happened, on whole picture line by line.
       if (1 && f>=128) {
         // Act on untainted image!
         var oldcell= undoStack[undoStack.length-1];
@@ -848,7 +912,7 @@ function drawbrush() {
   var spray= (draw.startsWith('spray')?
               0+after(draw, 'spray'):
               100)/100.0;
-  var f= 32+drawink;
+  var f= drawink;
   //var f= drawink==ink? 1: 16+drawink;
   //var f= drawink+16;
   
@@ -934,14 +998,14 @@ var undoStack= [];
 
 function saveUndo() {
   undoStack.push(new Uint8Array(cell));
-  dom("undo").textContent= "undo:"+undoStack.length;
+  dom('undocount').textContent= ''+undoStack.length;
 }
 
 function undo() {
   if (!(undoStack.length)) return;
   cell= undoStack.pop();
   updatehires();
-  dom("undo").textContent= "undo:"+undoStack.length;
+  dom('undocount').textContent= ''+undoStack.length;
 }
 
 // TODO: change this, no like...
@@ -1168,7 +1232,7 @@ function step(state) {
 
 <h3>Draw color</h3>
 
-<p><tt>draw</tt> color is a new concept, in that it <b>allows</b>, and <i>assumes</i> unlimited color mixing. In practice, as we know ORIC is limited in this aspect. Nevertheless, a special version of "curset" taking an extended "fb" third parameter, apart from 0=unset, 1=set, 2=xor, 3=move, 32+color will set an attribute in a cell before this pixel! Yes, this will "harm" the previously draw picture, but by using clever drawing methods good results may be achieved.</p>
+<p><tt>draw</tt> color is a new concept, in that it <b>allows</b>, and <i>assumes</i> unlimited color mixing. In practice, as we know ORIC is limited in this aspect. Nevertheless, a special version of "curset" taking an extended "fb" third parameter, apart from 0=unset, 1=set, 2=xor, 3=move, DRAWINK+color (64+color) will set an attribute in a cell before this pixel! Yes, this will "harm" the previously draw picture, but by using clever drawing methods good results may be achieved.</p>
 
 <p>The preferred modes of drawing is <tt>thin</tt>, which is a single pixel set, or <tt>circle</tt> with <tt>size 10</tt> and <tt>spray</tt> with various fullness, like <tt>spray 20</tt> it randomly "curset"s 20% of the pixels. The more it moves the more pixels are being set, these are randomized thus giving interesting non-repeating patterns.</p>
 
