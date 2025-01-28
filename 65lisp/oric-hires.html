@@ -231,6 +231,25 @@ function isprefix(pre, s) {
 
 </script>
 
+<style>
+.fadeout {
+  animation: fadeOut ease 2s forwards;
+  background-color: black;
+  color: white;
+  zoom: 3;
+  //mix-blend-mode: multiply;
+}
+
+@keyframes fadeOut {
+  0%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+</style>
+
+<div id="popover" class='fadeout' popover='manual' style='display: block; '>
+  Welcome to ORIC Paint!
+</div>
+
 <canvas id="myCanvas" width="480" height="400" style="border:3px solid #d3d3d3; zoom:1; touch-action: none;">
 Your browser does not support the HTML canvas tag.</canvas>
 <br/>
@@ -262,8 +281,18 @@ function log(s) {
   dom('log').value+= s+"\n";
 }
 
+var popover= dom('popover');
+
 function runCommand(cmd) {
+  // TODO: rewrite?
+  popover.classList.remove('fadeout');
+  popover.innerText= cmd;
+  popover.offsetWidth; // lol triggers reflow!
+  popover.classList.add('fadeout');
+  // popover.showModal(); doesn't do it?
+
   log('runCommand: '+cmd);
+
   saveUndo(); // TODO: if fail, remove?
 
   var param= after(cmd, ' ');
