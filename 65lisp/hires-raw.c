@@ -488,7 +488,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(6) {
+  switch(8) {
 
   case 11:
     // compress clear screen
@@ -588,7 +588,7 @@ void main() {
 
     DOTIMES(100, { printf("FOOBAR   "); } );
 
-    gotoxy(39, 1); DOTIMES(27, { *cursc=HIRESMODE; cursc+=40; } );
+    gotoxy(39, 1); DOTIMES(27, { *curscr=HIRESMODE; curscr+=40; } );
     { char* p= HIRESSCREEN;
       DOTIMES(200, { *p=curpaper; p+= 40; } );
     }

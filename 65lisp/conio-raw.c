@@ -131,7 +131,7 @@
 // - ink(c)
 // - gotoxy(x, y)
 // - cputc(c)
-// - putchar(c) - macro
+// - putchar(c) - macro - TODO: is that OK?
 // - wherex()
 // - wherey()
 // - revers() - TODO
