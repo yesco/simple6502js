@@ -406,28 +406,48 @@ function runCommand(cmd) {
     return true;
   } catch(e) { alert(e); } }
 
-  if (cmd.startsWith("save") || cmd.startsWith("tap")) {
+  var xtap= cmd.startsWith("xtap");
+  if (xtap || cmd.startsWith("tap")) {
     // This will save:
     // - header, filename
     // - hires screen
-    // - 42 bytes garbage (?)
+    // only for xtap
+    // - 42 bytes garbage (?) 
     // - 3x40 chars of last 3 lines of text
     //   this one contains, hires attributes to show hires img, once loaded
+    // TODO: maybe also include charset and
+    // TODO: a basic loader?
     //
     // TODO: however, since we're not in hires mode, charset is "befuddled"!
 
-    var header= new Uint8Array([
+    var header= (!xtap)?
+    new Uint8Array([
       0x16, 0x16, 0x16, 0x16, 0x24, // sync
       0x00, 0x00, // any, any
       0x80, // 0x00=basic, 0x80=assembler/data
       0x00, // 0x00=stop,  0x80=basic autostart, 0xc7=asm autostart
 
-      //0xbf, 0x3f, // end address  0xbf3f HI-LO! END (end hires) - only hires
-      0xbf, 0xdf, // end address    0xbfdf HI-LO! END (end hires+42+3 text lines)
-
+      0xbf, 0x3f, // end address    0xbf3f HI-LO!
       0xa0, 0x00, // start address  0xa000 HI-LO! START
 
-      0x00]); // any
+      0x00]) // any
+
+      :
+
+    // XTAP - xtended tap
+    // TODO: charset, basic loader, etc...
+    new Uint8Array([
+      0x16, 0x16, 0x16, 0x16, 0x24, // sync
+      0x00, 0x00, // any, any
+      0x80, // 0x00=basic, 0x80=assembler/data
+      0x00, // 0x00=stop,  0x80=basic autostart, 0xc7=asm autostart
+
+      0xbf, 0xdf, // end address    0xbfdf HI-LO! END (end hires+42+3 text lines)
+      0xa0, 0x00, // start address  0xa000 HI-LO! START
+
+      0x00]);
+
+    // TODO: picture part name?
     var filename= (param? param: "hires") + ".tap";
     var lost= "------------------------------------------"; // 42 bytes junk
     // These lines, unless we're in hires-mode, will display garbage!
@@ -435,9 +455,14 @@ function runCommand(cmd) {
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\x1e"
     "ccccccccccccccccccccccccccccccccccccccc\x1e"; // last byte switches to hires!
 
-    var blob = new Blob([header, filename, "\x00", cell, lost, text], {
-      type: "binary",
-    });
+    var blob = new Blob(
+      (!xtap)?
+        [header, filename, "\x00", cell, lost, text]
+          :
+        [header, filename, "\x00", cell, lost, text],
+      {
+        type: "binary",
+      });
 
     // remove previous download link so we can use same name again!
     var d= dom("download");
