@@ -1,3 +1,7 @@
+// LOGO alphabetical language
+
+// random reference
+// - https://www.calormen.com/jslogo/language.html#sec6
 #include "hires-raw.c"
 
 // right:

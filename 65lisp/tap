@@ -1,3 +1,14 @@
+# Create an ORIC ATMOS .tap-file
+# 1. compile
+# 2. filter errors and format for emacs to understand
+# 3. generate .s-file to view
+# 4. make an autostart copy
+# 5. "upload" it to assumed linked directory ORIC
+
+# Usage: ./tap progname
+#
+# configure this by creating a ORIC link to your download/upload directory
+
 OPTS=" -DPROGSIZE "
 
 echo "unix> ./tap $*"
@@ -22,6 +33,8 @@ echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 cl65 -vm -m $name.map $name.o
 
 ls -l $name.o $name.tap
+
+# make it autostart and copy to download directory
 
 cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$name.tap ; hexdump -C $name.tap | head -1 ; hexdump -C ORIC/$name.tap | head -1 ; ls -l $name.tap ORIC/$name.tap
 

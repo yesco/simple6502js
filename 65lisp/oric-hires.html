@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
-<body text="white" bgcolor="black">
+<body text="black" bgcolor="white">
 
-<div style='color:white'>
-  <tt <b>ORIC PAINT (<a href='#man' style='color:white'>manual</a>)</b></tt>
-  <tt style='position:absolute;right:0'>CAPS</tt><br/>
+<div style='background-color: black; color:white; font-weight: bold; height: 1.5em;'>
+  <tt>&nbsp;&nbsp;ORIC PAINT (<a href='#man' style='color:cyan'>manual</a>)</tt>
+  <tt style='position:absolute;right:0'>CAPS&nbsp;&nbsp;</tt><br/>
 </div>
 <br/>
 
@@ -289,7 +289,7 @@ function runCommand(cmd) {
   popover.innerText= cmd;
   popover.offsetWidth; // lol triggers reflow!
   popover.classList.add('fadeout');
-  // popover.showModal(); doesn't do it?
+  // popover.showModal(); //doesn' do it?
 
   log('runCommand: '+cmd);
 
@@ -378,7 +378,7 @@ function runCommand(cmd) {
       var p= ctx.getImageData(0, 0, 240*w, 200*h);
       var pix= p.data;
 
-      //convertToOric(pix);
+    //convertToOric(pix);
       convertToOricJustAttributes(pix);
       //convertToOricJustPixels(pix);
 
@@ -397,9 +397,11 @@ function runCommand(cmd) {
 
     // - clean 
     //img1.src= 'oric-logo-black-export.svg'; // not so good with atributes?
-    img1.src= 'oric-logo-white-export.svg';
+    //img1.src= 'oric-logo-white-export.svg';
 
     // img1.src= '800px-Logo_Oric_Atmos.png’;
+    //img1.src= 'oneps-00014.ppm';
+    img1.src= 'bbb.jpeg';
 
     // TODO: https://osdk.org/pics/magnetix_game.png
     // - many twilite tricks!
