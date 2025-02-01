@@ -338,6 +338,22 @@ void fx(char* sound) {
 
 #else
 
+// SPECIAL: 
+//
+//   Register 13!
+//
+//   Creating a binary with YM registers for each VBL is easy. However
+//   there is special *volume* envelope wave-form on the YM2149.
+//   The problem is writing to that register "restarts" the wave-form
+//   at beginning. That is, vou CAN'T access this register each VBL
+//   if the original play-routine does not. So, if the original player
+//   does not write to register 13 on VBL n, write 0xff value.
+//
+//   (So when YM.EXE read 0xff as reg13, the internal emulator register
+//    not updated).
+//
+// Note: this is only done in the "sfx" routine dumping to the chip
+
 void setAYreg(char r, char v) {
   *(char*)0x030f= r;       // Set the register
   *(char*)0x030c= 0xff;    //   toggle
@@ -354,10 +370,12 @@ void setAYword(char ch, unsigned int w) {
 
 void sfx(char* fourteenbytes) {
   char i=0;
-  for(; i<14; ++i) {
+  for(; i<13; ++i) {
     setAYreg(i, *fourteenbytes);
     ++fourteenbytes;
   }
+  // reg13: avoid reset envelope wave-form
+  if (*fourteenbytes!=0xff) setAYreg(13, *fourteenbytes);
 }
 
 #endif // BASIC_ROM
