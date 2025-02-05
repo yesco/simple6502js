@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include <stdint.h> // uint8_t, uint16_t, uint32_t
 
 // This visualizes compressing text/hires screen

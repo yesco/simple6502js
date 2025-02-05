@@ -354,6 +354,9 @@ void fx(char* sound) {
 //
 // Note: this is only done in the "sfx" routine dumping to the chip
 
+// -- other info
+// - https://ym2149.org/ym2149.org/w/YM2149.org
+
 void setAYreg(char r, char v) {
   *(char*)0x030f= r;       // Set the register
   *(char*)0x030c= 0xff;    //   toggle
