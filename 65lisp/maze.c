@@ -41,7 +41,7 @@ void main() {
         // draw one color
         j= ++n;
         while(--j!=0 && u<HIRES+HSIZE-40) *(u+= 40)= 16+(c&7);
-        ++c;
+        --c;
       }
       waitms(15);
     }
