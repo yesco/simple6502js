@@ -191,15 +191,15 @@ void main() {
   if (1) {
     //GenerateTables();  // Only need to do that once
     //memcpy((unsigned char*)0xa000,LabelPicture,8000);
+    memcpy(HIRESSCREEN, fillpict, HIRESSIZE);
     while(!kbhit()) {
       unsigned int T= time();
-      memcpy(HIRESSCREEN, fillpict, HIRESSIZE);
       //doke(630,0);
       //paint(120,100);
       xorfill(2);
 
       printf("xor Filling: %u hs", T-time());
-      wait(300);
+      //wait(100);
     }
     cgetc();
     gclear();
