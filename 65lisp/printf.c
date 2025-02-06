@@ -12,8 +12,10 @@
 
 // 3707 Bytes w original printf 4030...
 #ifndef FOO
-int cdecl printf(const char* fmt, ...) {
+int cdecl printf(const char* fm
+mt, ...) {
   int n= 0, *p= (int*)&fmt;
+  register char* fmt= fmmt;
   static char x[10];
 
   --fmt;
