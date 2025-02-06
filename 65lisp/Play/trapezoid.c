@@ -173,14 +173,16 @@ void main() {
   // init tables
   int i;
 
-  genxorcolumn();
+  unsigned int G, S= time();
+  genxorcolumn(); // 19 hs to generate!
+  G= time();
 
   // start drawing
 
   hires();
   
   c= 0;
-  gotoxy(0, 25);
+  gotoxy(0, 25); printf("genxorcolumn(): %d hs ", S-G);
 
   do {
     unsigned int C, W, F, M, T= time();
@@ -218,7 +220,7 @@ void main() {
     memcpy(other, HIRESSCREEN, HIRESSIZE);
     M= time();
 
-    gotoxy(0, 25); printf("all=%d hs, clear=%d wall=%d fill=%d M=%d ", T-F, T-C, C-W, W-F, F-M);
+    gotoxy(0, 26); printf("all=%d hs, clear=%d wall=%d fill=%d M=%d ", T-F, T-C, C-W, W-F, F-M);
     //wait(500);
   } while (1);
 }
