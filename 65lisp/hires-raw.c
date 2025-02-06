@@ -222,7 +222,7 @@ void drawSimple(int dx, int dy, char v) {
 void drawFast(int dx, int dy, char v) {
   register char* p;
   register char s, m, adx, ady;
-  char i;
+  register char i;
 
   adx= dx>=0? dx: -dx;
   ady= dy>=0? dy: -dy;

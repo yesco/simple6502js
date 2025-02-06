@@ -10,9 +10,11 @@
 #include <string.h>
 #include <ctype.h>
 
-// original: 4030 Bytes  (+ 1645) // so +400 gives you better one?
-// simple:   3575 Bytes  (+ 1200)
-// without:  2375 Bytes 
+// cl65 -Oir -t atmos -o printf.tap printf.c && ls -l printf.tap
+//
+// original: 2478 Bytes  (+ 1870) // so +160 gives you better one?
+// simple:   1962 Bytes  (+ 1701)
+// without:   611 Bytes 
 //
 //#define printf(a,b) puts(a)
 
