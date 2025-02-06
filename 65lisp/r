@@ -25,7 +25,7 @@ rm $name.s    2>/dev/null
 
 # generating .s too
 #cl65 -Cl -O -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
-cl65 -O $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
+#cl65 $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 
 # Optimize inline more - creates errornious code
 #cl65 -Oi $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null

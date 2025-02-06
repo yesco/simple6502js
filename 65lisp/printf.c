@@ -10,12 +10,16 @@
 #include <string.h>
 #include <ctype.h>
 
-// 3707 Bytes w original printf 4030...
+// original: 4030 Bytes  (+ 1645) // so +400 gives you better one?
+// simple:   3575 Bytes  (+ 1200)
+// without:  2375 Bytes 
+//
+//#define printf(a,b) puts(a)
+
 #ifndef FOO
-int cdecl printf(const char* fm
-mt, ...) {
-  int n= 0, *p= (int*)&fmt;
-  register char* fmt= fmmt;
+int cdecl printf(const char* fmmt, ...) {
+  register const char* fmt= fmmt; // saves 90B
+  int n= 0, *p= (int*)&fmmt;
   static char x[10];
 
   --fmt;
