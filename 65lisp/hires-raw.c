@@ -42,9 +42,56 @@
 // void curset(x, y, v);
 // char curget(x, y);
 
+
+// TODO: no effect on draw long line...
+//   however on many curset?
+char div6[240], mod6[240];
+char mask6[240];
+char* rowaddr[200];
+
+static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
+
+char shift6lo[256], shift6hi[256];
+#define SHIFT6(x) ((unsigned long)(shift6lo[(x) & 0xff] || shift6hi[((x)>>8) & 0xff]))
+
+unsigned long shift6(unsigned long l) {
+  char* b= (char*)l;
+  // return l>>6; slow
+  unsigned long r;
+  r= SHIFT6(b[0]);
+  r+= SHIFT6(b[1])<<8;
+  r+= SHIFT6(b[2])<<16;
+  r+= SHIFT6(b[2])<<24;
+  return r;
+}
+
+//    char q= div6[x]; // no time saving!?
+//    char mi= mod6[x]; // nah
+
+void init_hiresraw() {
+  int j;
+
+  if (div6[13]==2) return;
+
+  // init lookup table
+  for(j=0; j<240; ++j) {
+    div6[j]= j/6;
+    mod6[j]= j%6;
+    mask6[j]= PIXMASK[mod6[j]];
+    rowaddr[j]= HIRESSCREEN + 40*j;
+  }
+
+  for(j=0; j<256; ++j) {
+    shift6lo[j]= j>>6;
+    shift6hi[j]= (j>>2) & 0xfd;
+  }
+}
+
 extern char curmode; // defined in conio-raw.c
 
 void hires() {
+  init_hiresraw();
+
   if (curmode==TEXTMODE) {
     memcpy(HIRESCHARSET, CHARSET, 256*8); // incl ALTSET
     curmode= curscr[SCREENSIZE-1]= HIRESMODE;
@@ -83,32 +130,6 @@ void gfill(char row, char cell, char h, char w, char v) {
 void gclear() {
   memset(HIRESSCREEN, 64, HIRESSIZE);
 }
-
-static const char PIXMASK[]= { 32, 16, 8, 4, 2, 1 };
-
-// TODO: no effect on draw long line...
-//   however on many curset?
-char div6[240], mod6[240];
-char mask6[240];
-char* rowaddr[200];
-
-char shift6lo[256], shift6hi[256];
-#define SHIFT6(x) ((unsigned long)(shift6lo[(x) & 0xff] || shift6hi[((x)>>8) & 0xff]))
-
-unsigned long shift6(unsigned long l) {
-  char* b= (char*)l;
-  // return l>>6; slow
-  unsigned long r;
-  r= SHIFT6(b[0]);
-  r+= SHIFT6(b[1])<<8;
-  r+= SHIFT6(b[2])<<16;
-  r+= SHIFT6(b[2])<<24;
-  return r;
-}
-
-//    char q= div6[x]; // no time saving!?
-//    char mi= mod6[x]; // nah
-
 
 // TODO: rename
 static char gcurx, gcury, gmode;
@@ -462,18 +483,7 @@ void main() {
   int i,j;
   unsigned int t;
 
-  // init lookup table
-  for(j=0; j<240; ++j) {
-    div6[j]= j/6;
-    mod6[j]= j%6;
-    mask6[j]= PIXMASK[mod6[j]];
-    rowaddr[j]= HIRESSCREEN + 40*j;
-  }
-
-  for(j=0; j<256; ++j) {
-    shift6lo[j]= j>>6;
-    shift6hi[j]= (j>>2) & 0xfd;
-  }
+  init_hiresraw();
 
   //for(j=300; j; --j) printf("FOOBAR   ");
 

@@ -11,16 +11,15 @@ int sin[64]= {0,3,6,9,12,15,18,21,24,28,31,34,37,40,43,46,48,51,54,57,60,63,65,6
 
 // RETURNS: sin(x)*2^7, so you >>7 !
 // TODO: check!
-int sin128(int b) {
-  if (b<0)   return  sin128(-b);
+int sin128(char b) {
+  //if (b<0)   return  sin128(-b);
   if (b<64)  return  sin[b];        // < 90
-  if (b>255) return  sin128(b&255); // >360
   if (b>128) return -sin128(b-128); // >180
-             return  sin128(128-b); // > 90
+             return  sin128(127-b); // > 90
 }
 
 // see sin()
-int cos128(int b) { return sin128(64+b); }
+int cos128(int b) { return sin128(63-b); }
 
 char xorcolumn[2+200*(3+3+2)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
 
@@ -180,9 +179,27 @@ void main() {
   // start drawing
 
   hires();
-  
+  gclear();
+
   c= 0;
   gotoxy(0, 25); printf("genxorcolumn(): %d hs ", S-G);
+
+  // test sin/cos
+  if (1) {
+    char r= 100;
+    gmode= 1; // this doesn't fill the full circle! 0-64 isn't enough
+    while(r--!=0) {
+      char b= 0; signed char dx, dy;
+      do {
+        dx= (r*cos128(b))>>7; dy= (r*sin128(b))>>7;
+        gcurx= 120+dx; gcury= 100+dy; setpixel();
+        // 4 symmetries (actual 8 if use 0-32 (0-45 degress))
+        // gcurx= 120-dx; gcury= 100-dy; setpixel();
+        // gcurx= 120+dx; gcury= 100-dy; setpixel();
+        // gcurx= 120-dx; gcury= 100+dy; setpixel();
+      } while(++b);
+    }
+  }
 
   do {
     unsigned int C, W, F, M, T= time();
