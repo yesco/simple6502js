@@ -137,6 +137,7 @@ void xorfill(char m) {
       else
         for(r=0; r<200; ++r)
           *p= (v= (*(p+=40)^v)|64) & mask[r & maskmask];
+
     }
   } break;
 
@@ -165,6 +166,8 @@ char masksquare[]=       {0b011, 1+2+4 +64+128, 1+2+4 +64+128, 8+16+32 +64+128, 
 
 char other[HIRESSIZE];
 
+#include "fillpict.c"
+
 void main() {
   char c, h, b;
   int dx= 99, dy= 99;
@@ -186,9 +189,27 @@ void main() {
 
   // test sin/cos
   if (1) {
+    //GenerateTables();  // Only need to do that once
+    //memcpy((unsigned char*)0xa000,LabelPicture,8000);
+    while(!kbhit()) {
+      unsigned int T= time();
+      memcpy(HIRESSCREEN, fillpict, HIRESSIZE);
+      //doke(630,0);
+      //paint(120,100);
+      xorfill(2);
+
+      printf("xor Filling: %u hs", T-time());
+      wait(300);
+    }
+    cgetc();
+    gclear();
+  }
+
+
+  if (1) {
     char r= 100;
     gmode= 1; // this doesn't fill the full circle! 0-64 isn't enough
-    while(r--!=0) {
+    while(r--!=0 && !kbhit()) {
       char b= 0; signed char dx, dy;
       do {
         dx= (r*cos128(b))>>7; dy= (r*sin128(b))>>7;
