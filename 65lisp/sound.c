@@ -511,9 +511,10 @@ void play(char tonemap, char noisemap, char env, unsigned int env_period) {
 #include <string.h>
 #include <ctype.h>
 
+#ifdef TEST
+
 #include "conio-raw.c"
 
-#ifdef TEST
 
 //#include <conio.h>
 //void wait(unsigned int ms) { long w= ms*7L; while(--w); }

@@ -30,20 +30,28 @@ void main() {
     static char c,i,j,n, *u, *l, s;
     // TODO: draw fine line 
 
+    char cs= 1;
     s= 0;
     while(1) {
-      c= ++s;
-      u= HIRES+100*40;
-      // TODO: draw other way around, then only need update colors!
+      c= cs;
+      ++s;
+      u= HIRES+HSIZE;
       i= 100-1-1;
-      n= 1;
-      while(--i!=0) {
+      n= 14;
+
+      // first bar, varying start - "moving one pixel forward"
+      j= --n-s;
+      if (j<=1) { s= 1; ++cs; }
+      while(--j!=0) *(u-= 40)= 16+(c&7);
+
+      // rest
+      while(1) {
         // draw one color
-        j= ++n;
-        while(--j!=0 && u<HIRES+HSIZE-40) *(u+= 40)= 16+(c&7);
-        --c;
+        if (i==0 || (j= --n)<=1) break;
+        ++c;
+        while(--j!=0 && --i!=0) *(u-= 40)= 16+(c&7);
       }
-      waitms(15);
+      waitms(10);
     }
   }
 }
