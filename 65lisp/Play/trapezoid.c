@@ -3,73 +3,137 @@
 
 char T, nil, print, doapply1;
 
-void main() {
+// cos is 90' off, i.e., 64!
+//   sin(x)=cos(x-π/2) and cos(x)=sin(π/2+x) 
+// sin has symmtries...
+
+int sin[64]= {0,3,6,9,12,15,18,21,24,28,31,34,37,40,43,46,48,51,54,57,60,63,65,68,71,73,76,78,81,83,85,88,90,92,94,96,98,100,102,104,106,108,109,111,112,114,115,117,118,119,120,121,122,123,124,124,125,126,126,127,127,127,127,127};
+
+// RETURNS: sin(x)*2^7, so you >>7 !
+// TODO: check!
+int sin128(int b) {
+  if (b<0)   return  sin128(-b);
+  if (b<64)  return  sin[b];        // < 90
+  if (b>255) return  sin128(b&255); // >360
+  if (b>128) return -sin128(b-128); // >180
+             return  sin128(128-b); // > 90
+}
+
+// see sin()
+int cos128(int b) { return sin128(64+b); }
+
+char* colmask[40];
+
+void xorfill(char m) {
   static char r, c, v, *p;
+
+  switch(m) {
+
+  case 1: // xor every byte only (no fill)
+    for(c=0; c<40; ++c) {
+      p= HIRESSCREEN-40+c;
+      v= 0;
+      for(r=0; r<200; ++r) {
+        p+=40;
+        *p^= 63;
+      }
+    } break;
+
+  case 2: { // xor fill all screen
+    for(c=0; c<40; ++c) {
+      p= HIRESSCREEN-40+c;
+      v= 0;
+      for(r=0; r<200; ++r)
+        *p= v= (*(p+=40)^v)|64;
+#ifdef FOO
+    nexty:
+      asm("ldy #200");
+      asm("dey");
+      asm("bne nexty");
+#endif
+    }
+  } break;
+
+  case 3: { // xor fill with MASK all scree
+    char maskmask, *mask; 
+    for(c=0; c<40; ++c) {
+      v= 0;
+      p= HIRESSCREEN-40+c;
+
+      mask= colmask[c];
+      if (mask) { maskmask= *mask++; }
+      
+      if (!mask)
+        for(r=0; r<200; ++r)
+          *p= v= (*(p+=40)^v)|64;
+      else
+        for(r=0; r<200; ++r)
+          *p= (v= (*(p+=40)^v)|64) & mask[r & maskmask];
+    }
+  } break;
+
+  case 4: // xor fill limited area
+    for(c=40/6-1; c<=(40+180)/6+1; ++c) {
+      p= HIRESSCREEN + 50*40-40 + c;
+      v= 0;
+      for(r=50; r<150; ++r)
+        *p= v= (*(p+=40)^v)|64;
+    }
+    break;
+  }
+}
+
+void trap(char x1, char x2, char y1, char y2, int d, char* mask) {
+  char i, e= x2/6;
+  for(i=x1/6; i<=e; ++i) colmask[i]= mask;
+  gcurx= x1; gcury=  y1; draw(x2-x1,  +d, 1);
+  gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
+}
+
+char maskvertstripe[]=   {0b00,  1+4+16 +64+128}; // 1 => 0 bits
+char maskhorizstripe[]=  {0b01,  0 +64+128, 255}; // 2 => 1 bits
+char maskgray[]=         {0b01,  1+4+16 +64+128, 2+8+32 +64+128}; // 2 => 1 bit
+char masksquare[]=       {0b011, 1+2+4 +64+128, 1+2+4 +64+128, 8+16+32 +64+128, 8+16+32 +64+128}; // 4 => 2 bits!
+
+void main() {
+  char c, h, b;
   int dx= 99, dy= 99;
+
+  // init tables
+  int i;
 
   hires();
   gclear();
   
-  c= KEY_UP;
+  c= 0;
   do {
+    unsigned int C, W, F, T= time();
+
     gclear();
-    gcurx= 40; gcury=  50; draw(180,  15, 2);
-    gcurx= 40; gcury= 150; draw(180, -15, 2);
+    C= time();
+
+    //wall(40, 50, 150);
+    trap(0,    6*6-1, 70,       130, -20, maskgray);
+    trap(6*6, 30*6-1, 50,       150,  15, maskvertstripe);
+    trap(30*6,38*6-1, 50+15, 150-15, -30, masksquare);
+    trap(38*6,40*6-1, 50+15-30, 150-15+30, 0, maskhorizstripe);
+    W= time();
 
     /// xor down to fill! clevef simple!
-    switch(2) {
+    //xorfill(3);   	// 345 hs filling w masks
+    xorfill(2);   	// 188 hs filling
+    F= time();
 
-    case 1: // xor every byte only (no fill)
-      for(c=0; c<40; ++c) {
-        p= HIRESSCREEN-40+c;
-        v= 0;
-        for(r=0; r<200; ++r) {
-          p+=40;
-          *p^= 63;
-        }
-      } break;
-
-    case 2: { // xor fill all screen
-      char mask[]= {1+4+16 +64+128, 2+8+32 +64+128};
-      #define MASKMASK 0b01
-
-      for(c=0; c<40; ++c) {
-        p= HIRESSCREEN-40+c;
-        v= 0;
-        for(r=0; r<200; ++r)
-          *p= v= (*(p+=40)^v)|64;
-      }
-    } break;
-
-    case 3: { // xor fill with MASK all screen
-      char mask[]= {1+4+16 +64+128, 2+8+32 +64+128};
-      #define MASKMASK 0b01
-
-      for(c=0; c<40; ++c) {
-        p= HIRESSCREEN-40+c;
-        v= 0;
-        for(r=0; r<200; ++r)
-          *p= (v= (*(p+=40)^v)|64) & mask[r & MASKMASK];
-      }
-    } break;
-
-    case 4: // xor fill limited area
-      for(c=40/6-1; c<=(40+180)/6+1; ++c) {
-        p= HIRESSCREEN + 50*40-40 + c;
-        v= 0;
-        for(r=50; r<150; ++r)
-          *p= v= (*(p+=40)^v)|64;
-      }
-      break;
-    }
-
-    if (0)
     switch(c) {
-    case KEY_UP:     if (--dy<-99) { dy= -99; }  break;
-    case KEY_DOWN:   if (++dy> 99) { dy=  99; } break;
-    case KEY_LEFT:   if (--dx<-99) { dx= -99; }  break;
-    case KEY_RIGHT:  if (++dx> 99) { dx=  99; }    break;
+      // height change
+    case KEY_UP:     if (--h<-99) h= -99; break;
+    case KEY_DOWN:   if (++h>+99) h= +99; break;
+      // angle change
+    case KEY_LEFT:   ++b; break;
+    case KEY_RIGHT:  --b; break;
     }
-    //gotoxy(0, 25); printf("dx %d dy %d\n", dx, dy);
+    
+    gotoxy(0, 25); printf("all=%d hs, clear=%d wall=%d fill=%d ", T-F, T-C, C-W, W-F);
+    wait(500);
   } while (1);
 }
