@@ -25,7 +25,8 @@ int cos128(int b) { return sin128(64+b); }
 char* colmask[40];
 
 void xorfill(char m) {
-  static char r, c, v, *p;
+  static char r, c, v;
+  register char* p;
 
   switch(m) {
 
@@ -43,14 +44,45 @@ void xorfill(char m) {
     for(c=0; c<40; ++c) {
       p= HIRESSCREEN-40+c;
       v= 0;
+      if (0) {
+
       for(r=0; r<200; ++r)
         *p= v= (*(p+=40)^v)|64;
-#ifdef FOO
-    nexty:
+      } else {
+
+      // x = 0 // B2 C2
+      asm("ldx #0");
+      // y= 200 // B2 C2
       asm("ldy #200");
+
+    nexty: // C43 (+ 18 12 8 5 ) (* 43 200) (/ 1000000.0 (* 8600 40)) = 2.9 frame-rate, lol...
+      // we
+
+
+      // p+= 40; // B10 C18+4
+      asm("clc");
+      asm("lda %v", p);
+      asm("adc #40");
+      asm("sta %v", p);
+      asm("bcc %g", noinc);
+      asm("inc %v+1", p);
+    noinc:
+
+      // a=(*p^x)|64; // 9B C12
+      asm("txa");
+      asm("ldx #0");
+      // TODO: addressing using y 1 cycle cheaper, total savings: 1+1=2, lol
+      asm("eor (%v,x)", p);
+      asm("ora #64");
+
+      // x= *p= a // 3B C8
+      asm("sta (%v,x)", p);
+      asm("tax");
+
+      // end? // 3B C5
       asm("dey");
-      asm("bne nexty");
-#endif
+      asm("bne %g", nexty);
+      }
     }
   } break;
 
@@ -106,6 +138,8 @@ void main() {
   gclear();
   
   c= 0;
+  gotoxy(0, 25);
+
   do {
     unsigned int C, W, F, T= time();
 
@@ -121,7 +155,10 @@ void main() {
 
     /// xor down to fill! clevef simple!
     //xorfill(3);   	// 345 hs filling w masks
-    xorfill(2);   	// 188 hs filling
+    xorfill(2);   	// 188 hs filling 37 hs w ASM? lol
+    // all: 62hs => 1.61 frame-rate, lol
+    // (C overhead... just 40x column => 34hs, so 3hs overhead/loop columns, 10%)
+    // ASM: 5.08x faster! (for simple xorfill(2)
     F= time();
 
     switch(c) {
