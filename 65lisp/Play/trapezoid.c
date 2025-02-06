@@ -22,6 +22,37 @@ int sin128(int b) {
 // see sin()
 int cos128(int b) { return sin128(64+b); }
 
+char xorcolumn[2+200*(3+3+2)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
+
+void genxorcolumn() {
+  int i=0, r= (int)HIRESSCREEN;
+  char * p= xorcolumn-1;
+
+  // lda #$00
+  *++p= 0xa9;
+  *++p- 0x00;
+
+  for(i=0; i<200; ++i) {
+    // eor absy
+    *++p= 0x59;
+    *++p= r;
+    *++p= r/256;
+    // ora #64
+    *++p= 0x09;
+    *++p= 64;
+    // sta absy
+    *++p= 0x99;
+    *++p= r;
+    *++p= r/256;
+
+    r+= 40;
+  }
+
+  // rts
+  *++p= 0x60;
+  assert(p+1==xorcolumn+sizeof(xorcolumn));
+}
+
 char* colmask[40];
 
 void xorfill(char m) {
@@ -44,7 +75,12 @@ void xorfill(char m) {
     for(c=0; c<40; ++c) {
       p= HIRESSCREEN-40+c;
       v= 0;
-      if (0) {
+      if (1) {
+
+        asm("ldy %v", c);
+        asm("jsr %v", xorcolumn);
+
+      } else if (0) {
 
       for(r=0; r<200; ++r)
         *p= v= (*(p+=40)^v)|64;
@@ -72,6 +108,7 @@ void xorfill(char m) {
       asm("txa");
       asm("ldx #0");
       // TODO: addressing using y 1 cycle cheaper, total savings: 1+1=2, lol
+      // if using y, can use table for row start, y stay "fixed", but where to store "v"?
       asm("eor (%v,x)", p);
       asm("ora #64");
 
@@ -127,6 +164,8 @@ char maskhorizstripe[]=  {0b01,  0 +64+128, 255}; // 2 => 1 bits
 char maskgray[]=         {0b01,  1+4+16 +64+128, 2+8+32 +64+128}; // 2 => 1 bit
 char masksquare[]=       {0b011, 1+2+4 +64+128, 1+2+4 +64+128, 8+16+32 +64+128, 8+16+32 +64+128}; // 4 => 2 bits!
 
+char other[HIRESSIZE];
+
 void main() {
   char c, h, b;
   int dx= 99, dy= 99;
@@ -134,14 +173,17 @@ void main() {
   // init tables
   int i;
 
+  genxorcolumn();
+
+  // start drawing
+
   hires();
-  gclear();
   
   c= 0;
   gotoxy(0, 25);
 
   do {
-    unsigned int C, W, F, T= time();
+    unsigned int C, W, F, M, T= time();
 
     gclear();
     C= time();
@@ -159,6 +201,9 @@ void main() {
     // all: 62hs => 1.61 frame-rate, lol
     // (C overhead... just 40x column => 34hs, so 3hs overhead/loop columns, 10%)
     // ASM: 5.08x faster! (for simple xorfill(2)
+    //
+    // xorcolumn => 35 hs Clear=7 Walls=18 Fill=10 M=15, (/ 1 0.35)= 2.86 frames/s
+    //   (/ 34 10.0) = 3.4x faster (/ 188 10.0) = 18.8x FASTER than C!
     F= time();
 
     switch(c) {
@@ -169,8 +214,11 @@ void main() {
     case KEY_LEFT:   ++b; break;
     case KEY_RIGHT:  --b; break;
     }
-    
-    gotoxy(0, 25); printf("all=%d hs, clear=%d wall=%d fill=%d ", T-F, T-C, C-W, W-F);
-    wait(500);
+
+    memcpy(other, HIRESSCREEN, HIRESSIZE);
+    M= time();
+
+    gotoxy(0, 25); printf("all=%d hs, clear=%d wall=%d fill=%d M=%d ", T-F, T-C, C-W, W-F, F-M);
+    //wait(500);
   } while (1);
 }
