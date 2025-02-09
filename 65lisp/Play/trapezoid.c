@@ -7,76 +7,85 @@ char T, nil, print, doapply1;
 // oric style textures 6x6, 6 rows of 6 cells
 // - repeated, fixed horizontal by row number (%6)
 // - hi bits 64+128 need to be set (as it's anded)
-char textures[][6]= {
+char textures[11][6]= {
   // wall textures 0-7 (+1 in map)
+#define EAGLE 1
   { // 0: eagle - lol
-    0xb11001000,
-    0xb11010100,
-    0xb11001000,
-    0xb11111111,
-    0xb11011100,
-    0xb11110000,
+    0b11110010,
+    0b11001010,
+    0b11111110,
+    0b11101000,
+    0b11101110,
+    0b11000000,
   },
+#define REDBRICK 2
   { // 1: redbrick
-    0xb11000001,
-    0xb11111111,
-    0xb11001000,
-    0xb11001000,
-    0xb11111111,
-    0xb11001001,
+    0b11000001,
+    0b11111111,
+    0b11001000,
+    0b11001000,
+    0b11111111,
+    0b11001001,
   },
+#define PURPLESTONE 3
   { // 2: purplestone
-    0xb11011010,
-    0xb11011101,
-    0xb11110100,
-    0xb11011011,
-    0xb11101101,
-    0xb11111101,
+    0b11011010,
+    0b11011101,
+    0b11110100,
+    0b11011011,
+    0b11101101,
+    0b11111101,
   },
+#define GREYSTONE 4
   { // 3: greystone
-    0xb11101010,
-    0xb11010101,
-    0xb11101010,
-    0xb11010101,
-    0xb11101010,
-    0xb11010101,
+    0b11101010,
+    0b11010101,
+    0b11101010,
+    0b11010101,
+    0b11101010,
+    0b11010101,
   },
+#define BLUESTONE 5
   { // 4: bluestone
-    0xb11110110,
-    0xb11010111,
-    0xb11101101,
-    0xb11100111,
-    0xb11011101,
-    0xb11110110,
+    0b11110110,
+    0b11010111,
+    0b11101101,
+    0b11100111,
+    0b11011101,
+    0b11110110,
   },
+#define MOSSY 6
   { // 5: mossy
-    0xb11001001,
-    0xb11100010,
-    0xb11011010,
-    0xb10100100,
-    0xb11101000,
-    0xb11000010,
+    0b11001001,
+    0b11100010,
+    0b11011010,
+    0b10100100,
+    0b11101000,
+    0b11000010,
   },
+#define WOOD 7
   { // 6: wood
-    0xb11110000,
-    0xb11011110,
-    0xb11000000,
-    0xb11001100,
-    0xb11110010,
-    0xb11000001,
+    0b11110000,
+    0b11011110,
+    0b11000000,
+    0b11001100,
+    0b11110010,
+    0b11000001,
   },
+#define COLORSTONE 8
   { // 7: colorstone
-    0xb11100001,
-    0xb11010110,
-    0xb11000100,
-    0xb11001010,
-    0xb11010010,
-    0xb11010100,
+    0b11100001,
+    0b11010110,
+    0b11000100,
+    0b11001010,
+    0b11010010,
+    0b11010100,
    },
 
   // sprite textures 8-10 (+1 in list)
   // TODO: these need to be bigger!
   // TODO: flexible sizes... wx, wy
+#define GREENLIGHT 9
   { //  8: green light
     0b11001100,
     0b11011110,
@@ -85,6 +94,7 @@ char textures[][6]= {
     0b11000000,
     0b11000000,
   },
+#define PILLAR 10
   { //  9: pillars
     0b11011110,
     0b11001100,
@@ -93,6 +103,7 @@ char textures[][6]= {
     0b11001100,
     0b11011110,
   },
+#define BARREL 11
   { // 10: barrels
     0b11001100,
     0b11010010,
@@ -259,6 +270,7 @@ void genxorcolumn() {
 #define TEXTURE ((char*)0x80)
 
 // pointer to texture for each column
+// TODO:: remove, old method
 char* colmask[40];
 
 // actually, it only clears half!
@@ -482,12 +494,13 @@ void xorfill(char m) {
   }
 }
 
-void trap(char x1, char x2, char y1, char y2, int d, char* mask) {
+// Draws a trapezoid, with parallel x-sides
+void trap(char x1, char x2, char y1, char y2, int d, char texture) {
+//void trap(char x1, char x2, char y1, char y2, int d, char* texture) {
   char i, e= x2/6;
-  for(i=x1/6; i<=e; ++i) colmask[i]= mask;
-  memcpy(TEXTURE, mask+1, 6);
+  //for(i=x1/6; i<=e; ++i) colmask[i]= mask;
+  memcpy(TEXTURE, ((char*)textures)+6*(texture-1), 6);
   gcurx= x1; gcury=  y1; drawFill(x2-x1,  +d, 1);
-  //gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
 }
 
 char maskvertstripe[]= {
@@ -559,13 +572,15 @@ void main() {
     C= time();
 
     //wall(40, 50, 150);
-    trap(x+0,    x+6*6-1, 70,       130, -20, maskgray);
-    trap(x+6*6, x+30*6-1, 50,       150,  15, maskdiag);
-    //trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, masksquare);
-    //trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, maskhorizstripe);
+    trap(x+0,    x+6*6-1, 70,       130, -20, GREYSTONE);
+    trap(x+6*6, x+30*6-1, 50,       150,  15, REDBRICK);
+//    trap(x+0,    x+6*6-1, 70,       130, -20, maskgray);
+//    trap(x+6*6, x+30*6-1, 50,       150,  15, maskdiag);
+//    trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, PURPLESTONE);
+//    trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, BLUESTONE);
     W= time();
 
-    x+= 3;
+    x+= 6;
     if (x>70) x= 0;
 
     /// xor down to fill! clevef simple!
