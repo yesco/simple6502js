@@ -23,6 +23,18 @@ int cos128(int b) { return sin128(63-b); }
 
 char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
 
+void clearcol(char q) {
+  // TODO: asm, or clever get it in...
+  static char r, *p; // 109 cs-> 60 cs
+  p= HIRESSCREEN+q-40;
+  r= 200;
+
+  return;
+  // TODO: in C this is superslow...
+  while(--r!=0) *(p+= 40)= 64;
+  // while(--r>=0) *(p+= 40)= 64; // basic overflow error
+}
+
 void drawFill(int dx, int dy, char v) {
   register char* p;
   register char s, m, adx, ady;
@@ -49,6 +61,7 @@ void drawFill(int dx, int dy, char v) {
       s= 0;
       p= HIRESSCREEN+40*gcury+q;
       *p= 64;
+      clearcol(q);
 
       while(--i) {
 
@@ -71,6 +84,7 @@ void drawFill(int dx, int dy, char v) {
           asm("jsr %v", xorcolumn);
           m=1;
           *--p= 64; --q;
+          clearcol(q);
           // TODO: clear up
         }
       }
@@ -91,6 +105,7 @@ void drawFill(int dx, int dy, char v) {
       s= 0;
       p= HIRESSCREEN+(5*gcury)*8+q;
       *p= 64;
+      clearcol(q);
 
       while(--i) {
 
@@ -104,6 +119,7 @@ void drawFill(int dx, int dy, char v) {
               asm("jsr %v", xorcolumn);
               m=1;
               *--p= 64; --q;
+              clearcol(q);
             }
           } else {
             if (!(m>>=1)) {
@@ -111,6 +127,7 @@ void drawFill(int dx, int dy, char v) {
               asm("jsr %v", xorcolumn);
               m=32;
               *++p= 64; ++q;
+              clearcol(q);
             }
           }
           // TODO: clear up
@@ -319,7 +336,7 @@ void main() {
   do {
     unsigned int C, W, F, M, T= time();
 
-    gclear();
+    //gclear();
     C= time();
 
     //wall(40, 50, 150);
