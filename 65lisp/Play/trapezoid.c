@@ -23,6 +23,114 @@ int cos128(int b) { return sin128(63-b); }
 
 char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
 
+// From ../hires-raw.c
+// modified when change column (+1) to fill it
+void drawFill(int dx, int dy, char v) {
+  register char* p;
+  register char s, m, adx, ady;
+  register char i;
+
+  adx= dx>=0? dx: -dx;
+  ady= dy>=0? dy: -dy;
+
+  gmode= v;
+
+  if (adx>ady) {
+    if (dx<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+    gcury+= dy;
+    gcurx+= dx;
+    {
+      // inline curset
+      // TODO: too much duplication - make macro!
+      char q= gcurx/6;
+      char mi= gcurx-q*6;
+
+      i= adx+1;
+      m= PIXMASK[mi];
+      s= 0;
+      p= HIRESSCREEN+40*gcury+q;
+      *p= 64; // columns not overlapping per walls?
+
+      while(--i) {
+
+        // adjust y
+        if ((s+= ady) > adx) {
+          s-=adx;
+          if (dy>=0) {
+            if ((p-= 40)<HIRESSCREEN) break;
+            *p= 64;
+          } else {            
+            if ((p+= 40)>=HIRESEND) break;
+            *p= 64;
+          }
+        }
+
+        // plot it
+        *p |= m;  break;
+
+        // step x, wrap around bit
+        if ((m<<=1)==64) {
+          // TODO: start at right line?
+          asm("ldy %v", q);
+          asm("jsr %v", xorcolumn);
+          m=1;
+          *--p= 64; --q;
+        }
+      }
+    }
+  } else { // dy >= dx
+    if (dy<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+    gcury+= dy;
+    gcurx+= dx;
+    {
+      // inline curset
+      // TODO: too much duplication - make macro!
+      char q= gcurx/6;
+      char mi= gcurx-q*6;
+      i= ady+1;
+      m= PIXMASK[mi];
+      s= 0;
+      p= HIRESSCREEN+(5*gcury)*8+q;
+      *p= 64;
+
+      while(--i) {
+
+        // adjust x
+        if ((s+= adx) > ady) {
+          s-=ady;
+          // step x, wrap around bit
+          if (dx>=0) {
+            if ((m<<=1)==64) {
+              // TODO: start at right line?
+              asm("ldy %v", q);
+              asm("jsr %v", xorcolumn);
+
+              m=1;
+              *--p= 64; --q;
+            }
+          } else {
+            if (!(m>>=1)) {
+              // TODO: start at right line?
+              asm("ldy %v", q);
+              asm("jsr %v", xorcolumn);
+
+              m=32;
+              *++p= 64; ++q;
+            }
+          }
+        }
+
+        // plot it
+        *p |= m;  break;
+
+        // step y
+        p-= 40;
+        if (p<HIRESSCREEN) break;
+      }
+    }
+  }
+}
+
 void genxorcolumn() {
   int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
   char * p= xorcolumn-1;
