@@ -22,8 +22,12 @@ int sin128(char b) {
 int cos128(int b) { return sin128(63-b); }
 
 char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
+char clrcolumn[2+100*3+1];
 
-void clearcol(char q) {
+// actually, it only clears half!
+#define clearcol(q) do { asm("ldy %v", q); asm("jsr %v", clrcolumn); } while(0)
+
+void clearcolC(char q) {
   // TODO: asm, or clever get it in...
   static char r, *p; // 109 cs-> 60 cs
   p= HIRESSCREEN+q-40;
@@ -149,6 +153,11 @@ void drawFill(int dx, int dy, char v) {
 void genxorcolumn() {
   int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
   char * p= xorcolumn-1;
+  char * c= clrcolumn-1;
+
+  // lda #$40
+  *++c= 0xa9;
+  *++c= 0x40;
 
   // lda #$00
   *++p= 0xa9;
@@ -159,6 +168,11 @@ void genxorcolumn() {
   // TODO: however, texture would be symmetrical of middle
   //   and possibly misaligned...
   for(i=0; i<100; ++i) {
+    // sta absy nextline
+    *++c= 0x99;
+    *++c= r;
+    *++c= r/256;
+
     // eor absy
     *++p= 0x59;
     *++p= r;
@@ -179,6 +193,8 @@ void genxorcolumn() {
   }
 
   // rts
+  *++c= 0x60;
+
   *++p= 0x60;
 
   assert(p+1==xorcolumn+sizeof(xorcolumn));
