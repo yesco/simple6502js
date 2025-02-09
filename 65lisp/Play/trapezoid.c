@@ -23,8 +23,6 @@ int cos128(int b) { return sin128(63-b); }
 
 char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
 
-// From ../hires-raw.c
-// modified when change column (+1) to fill it
 void drawFill(int dx, int dy, char v) {
   register char* p;
   register char s, m, adx, ady;
@@ -42,14 +40,15 @@ void drawFill(int dx, int dy, char v) {
     {
       // inline curset
       // TODO: too much duplication - make macro!
-      char q= gcurx/6;
-      char mi= gcurx-q*6;
+      static char q, mi;
+      q= div6[gcurx];
+      mi= mod6[gcurx];
 
       i= adx+1;
       m= PIXMASK[mi];
       s= 0;
       p= HIRESSCREEN+40*gcury+q;
-      *p= 64; // columns not overlapping per walls?
+      *p= 64;
 
       while(--i) {
 
@@ -58,23 +57,21 @@ void drawFill(int dx, int dy, char v) {
           s-=adx;
           if (dy>=0) {
             if ((p-= 40)<HIRESSCREEN) break;
-            *p= 64;
           } else {            
             if ((p+= 40)>=HIRESEND) break;
-            *p= 64;
           }
+          *p= 64;
         }
 
-        // plot it
-        *p |= m;  break;
+        *p |= m;
 
         // step x, wrap around bit
         if ((m<<=1)==64) {
-          // TODO: start at right line?
           asm("ldy %v", q);
           asm("jsr %v", xorcolumn);
           m=1;
           *--p= 64; --q;
+          // TODO: clear up
         }
       }
     }
@@ -85,8 +82,10 @@ void drawFill(int dx, int dy, char v) {
     {
       // inline curset
       // TODO: too much duplication - make macro!
-      char q= gcurx/6;
-      char mi= gcurx-q*6;
+      static char q, mi;
+      q= div6[gcurx];
+      mi= mod6[gcurx];
+
       i= ady+1;
       m= PIXMASK[mi];
       s= 0;
@@ -101,31 +100,30 @@ void drawFill(int dx, int dy, char v) {
           // step x, wrap around bit
           if (dx>=0) {
             if ((m<<=1)==64) {
-              // TODO: start at right line?
               asm("ldy %v", q);
               asm("jsr %v", xorcolumn);
-
               m=1;
               *--p= 64; --q;
             }
           } else {
             if (!(m>>=1)) {
-              // TODO: start at right line?
               asm("ldy %v", q);
               asm("jsr %v", xorcolumn);
-
               m=32;
               *++p= 64; ++q;
             }
           }
+          // TODO: clear up
         }
 
         // plot it
-        *p |= m;  break;
+        *p |= m;
 
         // step y
         p-= 40;
         if (p<HIRESSCREEN) break;
+        *p= 64;
+
       }
     }
   }
@@ -165,6 +163,7 @@ void genxorcolumn() {
 
   // rts
   *++p= 0x60;
+
   assert(p+1==xorcolumn+sizeof(xorcolumn));
 }
 
@@ -271,7 +270,7 @@ void xorfill(char m) {
 void trap(char x1, char x2, char y1, char y2, int d, char* mask) {
   char i, e= x2/6;
   for(i=x1/6; i<=e; ++i) colmask[i]= mask;
-  gcurx= x1; gcury=  y1; draw(x2-x1,  +d, 1);
+  gcurx= x1; gcury=  y1; drawFill(x2-x1,  +d, 1);
   //gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
 }
 
@@ -301,7 +300,7 @@ void main() {
   c= 0;
   gotoxy(0, 25); printf("genxorcolumn(): %d hs ", S-G);
 
-  if (1) {
+  if (0) {
     char r= 100;
     gmode= 1; // this doesn't fill the full circle! 0-64 isn't enough
     while(r--!=0 && !kbhit()) {
@@ -332,7 +331,7 @@ void main() {
 
     /// xor down to fill! clevef simple!
     //xorfill(3);   	// 345 hs filling w masks
-    xorfill(2);   	// 188 hs filling 37 hs w ASM? lol
+    //xorfill(2);   	// 188 hs filling 37 hs w ASM? lol
     // all: 62hs => 1.61 frame-rate, lol
     // (C overhead... just 40x column => 34hs, so 3hs overhead/loop columns, 10%)
     // ASM: 5.08x faster! (for simple xorfill(2)
