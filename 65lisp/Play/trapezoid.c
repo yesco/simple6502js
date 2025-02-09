@@ -21,17 +21,21 @@ int sin128(char b) {
 // see sin()
 int cos128(int b) { return sin128(63-b); }
 
-char xorcolumn[2+200*(3+3+2)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
+char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
 
 void genxorcolumn() {
-  int i=0, r= (int)HIRESSCREEN;
+  int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
   char * p= xorcolumn-1;
 
   // lda #$00
   *++p= 0xa9;
   *++p- 0x00;
 
-  for(i=0; i<200; ++i) {
+  // do half, write mirrored on line 100 !
+  // (save half effort and only needd to draw 1 line)
+  // TODO: however, texture would be symmetrical of middle
+  //   and possibly misaligned...
+  for(i=0; i<100; ++i) {
     // eor absy
     *++p= 0x59;
     *++p= r;
@@ -39,12 +43,16 @@ void genxorcolumn() {
     // ora #64
     *++p= 0x09;
     *++p= 64;
-    // sta absy
+    // sta absy nextline
     *++p= 0x99;
     *++p= r;
     *++p= r/256;
+    // sta absy 120-nextline
+    *++p= 0x99;
+    *++p= rr;
+    *++p= rr/256;
 
-    r+= 40;
+    r+= 40; rr-= 40;
   }
 
   // rts
@@ -156,7 +164,7 @@ void trap(char x1, char x2, char y1, char y2, int d, char* mask) {
   char i, e= x2/6;
   for(i=x1/6; i<=e; ++i) colmask[i]= mask;
   gcurx= x1; gcury=  y1; draw(x2-x1,  +d, 1);
-  gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
+  //gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
 }
 
 char maskvertstripe[]=   {0b00,  1+4+16 +64+128}; // 1 => 0 bits
