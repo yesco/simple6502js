@@ -164,9 +164,7 @@ char maskhorizstripe[]=  {0b01,  0 +64+128, 255}; // 2 => 1 bits
 char maskgray[]=         {0b01,  1+4+16 +64+128, 2+8+32 +64+128}; // 2 => 1 bit
 char masksquare[]=       {0b011, 1+2+4 +64+128, 1+2+4 +64+128, 8+16+32 +64+128, 8+16+32 +64+128}; // 4 => 2 bits!
 
-char other[HIRESSIZE];
-
-#include "fillpict.c"
+//char other[HIRESSIZE];
 
 void main() {
   char c, h, b;
@@ -186,25 +184,6 @@ void main() {
 
   c= 0;
   gotoxy(0, 25); printf("genxorcolumn(): %d hs ", S-G);
-
-  // test sin/cos
-  if (1) {
-    //GenerateTables();  // Only need to do that once
-    //memcpy((unsigned char*)0xa000,LabelPicture,8000);
-    memcpy(HIRESSCREEN, fillpict, HIRESSIZE);
-    while(!kbhit()) {
-      unsigned int T= time();
-      //doke(630,0);
-      //paint(120,100);
-      xorfill(2);
-
-      printf("xor Filling: %u hs", T-time());
-      //wait(100);
-    }
-    cgetc();
-    gclear();
-  }
-
 
   if (1) {
     char r= 100;
@@ -255,7 +234,7 @@ void main() {
     case KEY_RIGHT:  --b; break;
     }
 
-    memcpy(other, HIRESSCREEN, HIRESSIZE);
+    //memcpy(other, HIRESSCREEN, HIRESSIZE);
     M= time();
 
     gotoxy(0, 26); printf("all=%d hs, clear=%d wall=%d fill=%d M=%d ", T-F, T-C, C-W, W-F, F-M);
