@@ -533,7 +533,8 @@ void main() {
   char c, h, b;
   int dx= 99, dy= 99;
   char x= 0;
-
+  int f= 0;
+  unsigned int START;
   // init tables
   int i;
 
@@ -565,6 +566,7 @@ void main() {
     }
   }
 
+  START= time();
   do {
     unsigned int C, W, F, M, T= time();
 
@@ -574,24 +576,11 @@ void main() {
     //wall(40, 50, 150);
     trap(x+0,    x+6*6-1, 70,       130, -20, GREYSTONE);
     trap(x+6*6, x+30*6-1, 50,       150,  15, REDBRICK);
-//    trap(x+0,    x+6*6-1, 70,       130, -20, maskgray);
-//    trap(x+6*6, x+30*6-1, 50,       150,  15, maskdiag);
-//    trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, PURPLESTONE);
-//    trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, BLUESTONE);
-    W= time();
-
-    x+= 6;
+    trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, PURPLESTONE);
+    trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, BLUESTONE);
+    //x+= 6;
     if (x>70) x= 0;
 
-    /// xor down to fill! clevef simple!
-    //xorfill(3);   	// 345 hs filling w masks
-    //xorfill(2);   	// 188 hs filling 37 hs w ASM? lol
-    // all: 62hs => 1.61 frame-rate, lol
-    // (C overhead... just 40x column => 34hs, so 3hs overhead/loop columns, 10%)
-    // ASM: 5.08x faster! (for simple xorfill(2)
-    //
-    // xorcolumn => 35 hs Clear=7 Walls=18 Fill=10 M=15, (/ 1 0.35)= 2.86 frames/s
-    //   (/ 34 10.0) = 3.4x faster (/ 188 10.0) = 18.8x FASTER than C!
     F= time();
 
     switch(c) {
@@ -606,7 +595,10 @@ void main() {
     //memcpy(other, HIRESSCREEN, HIRESSIZE);
     M= time();
 
-    gotoxy(0, 26); printf("all=%d hs, clear=%d wall=%d fill=%d M=%d ", T-F, T-C, C-W, W-F, F-M);
+    ++f;
+    gotoxy(0, 26); printf("all=%d cs fpcs=%ld f=%d t=%d ",
+                          T-F, f*10000L/(START-F), f, START-F);
+                          
     //wait(500);
   } while (1);
 }
