@@ -21,23 +21,85 @@ int sin128(char b) {
 // see sin()
 int cos128(int b) { return sin128(63-b); }
 
-char xorcolumn[2+100*(3+2+3+3)+1]; // (+ 2 (* 200 (+ 3 3 2)) 1)= 1603 bytes!
+char xorcolumn[2+100*(3+2+3+2+2+3+3)+1]; // big. fast. lol
 char clrcolumn[2+100*3+1];
 
-// actually, it only clears half!
-#define clearcol(q) do { asm("ldy %v", q); asm("jsr %v", clrcolumn); } while(0)
+void genxorcolumn() {
+  int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
+  char * p= xorcolumn-1;
+  char * c= clrcolumn-1;
 
-void clearcolC(char q) {
-  // TODO: asm, or clever get it in...
-  static char r, *p; // 109 cs-> 60 cs
-  p= HIRESSCREEN+q-40;
-  r= 200;
+  // lda #$40
+  *++c= 0xa9;
+  *++c= 0x40;
 
-  return;
-  // TODO: in C this is superslow...
-  while(--r!=0) *(p+= 40)= 64;
-  // while(--r>=0) *(p+= 40)= 64; // basic overflow error
+  // lda #$00
+  *++p= 0xa9;
+  *++p- 0x00;
+
+  // do half, write mirrored on line 100 !
+  // (save half effort and only needd to draw 1 line)
+  // TODO: however, texture would be symmetrical of middle
+  //   and possibly misaligned...
+  for(i=0; i<100; ++i) {
+    // sta absy nextline
+    *++c= 0x99;
+    *++c= r;
+    *++c= r/256;
+
+    // eor absy
+    *++p= 0x59;
+    *++p= r;
+    *++p= r/256;
+    // ora #64
+    *++p= 0x09;
+    *++p= 64;
+    // tax - save non-textured byte
+    *++p= 0xaa;
+    // andz $texture! 6x6
+    *++p= 0x25;
+    *++p= 0x80+(i%6);
+    // sta absy nextline
+    *++p= 0x99;
+    *++p= r;
+    *++p= r/256;
+    // ---  maybe not mirror texture??? lol
+    // txa - restore non-textured byte
+    *++p= 0x8a;
+    // andz $texture! 6x6
+    *++p= 0x25;
+    *++p= 0x80+(5-(i+4)%6);
+    // sta absy 120-nextline
+    *++p= 0x99;
+    *++p= rr;
+    *++p= rr/256;
+    // txa - restore non-textured byte
+    *++p= 0x8a;
+
+    r+= 40; rr-= 40;
+  }
+
+  // rts
+  *++c= 0x60;
+
+  *++p= 0x60;
+
+  assert(p+1==xorcolumn+sizeof(xorcolumn));
 }
+
+
+// TODO: allocate... lol
+#define TEXTURE ((char*)0x80)
+
+// pointer to texture for each column
+char* colmask[40];
+
+// actually, it only clears half!
+#define clearcol(q) do { \
+  asm("ldy %v", q); \
+  asm("jsr %v", clrcolumn); \
+} while(0)
+
 
 void drawFill(int dx, int dy, char v) {
   register char* p;
@@ -150,58 +212,6 @@ void drawFill(int dx, int dy, char v) {
   }
 }
 
-void genxorcolumn() {
-  int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
-  char * p= xorcolumn-1;
-  char * c= clrcolumn-1;
-
-  // lda #$40
-  *++c= 0xa9;
-  *++c= 0x40;
-
-  // lda #$00
-  *++p= 0xa9;
-  *++p- 0x00;
-
-  // do half, write mirrored on line 100 !
-  // (save half effort and only needd to draw 1 line)
-  // TODO: however, texture would be symmetrical of middle
-  //   and possibly misaligned...
-  for(i=0; i<100; ++i) {
-    // sta absy nextline
-    *++c= 0x99;
-    *++c= r;
-    *++c= r/256;
-
-    // eor absy
-    *++p= 0x59;
-    *++p= r;
-    *++p= r/256;
-    // ora #64
-    *++p= 0x09;
-    *++p= 64;
-    // sta absy nextline
-    *++p= 0x99;
-    *++p= r;
-    *++p= r/256;
-    // sta absy 120-nextline
-    *++p= 0x99;
-    *++p= rr;
-    *++p= rr/256;
-
-    r+= 40; rr-= 40;
-  }
-
-  // rts
-  *++c= 0x60;
-
-  *++p= 0x60;
-
-  assert(p+1==xorcolumn+sizeof(xorcolumn));
-}
-
-char* colmask[40];
-
 void xorfill(char m) {
   static char r, c, v;
   register char* p;
@@ -303,20 +313,41 @@ void xorfill(char m) {
 void trap(char x1, char x2, char y1, char y2, int d, char* mask) {
   char i, e= x2/6;
   for(i=x1/6; i<=e; ++i) colmask[i]= mask;
+  memcpy(TEXTURE, mask+1, 6);
   gcurx= x1; gcury=  y1; drawFill(x2-x1,  +d, 1);
   //gcurx= x1; gcury=  y2; draw(x2-x1,  -d, 1);
 }
 
-char maskvertstripe[]=   {0b00,  1+4+16 +64+128}; // 1 => 0 bits
-char maskhorizstripe[]=  {0b01,  0 +64+128, 255}; // 2 => 1 bits
-char maskgray[]=         {0b01,  1+4+16 +64+128, 2+8+32 +64+128}; // 2 => 1 bit
-char masksquare[]=       {0b011, 1+2+4 +64+128, 1+2+4 +64+128, 8+16+32 +64+128, 8+16+32 +64+128}; // 4 => 2 bits!
+char maskvertstripe[]= {
+  0b00,
+  1+4+16 +64+128, 1+4+16 +64+128,
+  1+4+16 +64+128, 1+4+16 +64+128,
+  1+4+16 +64+128, 1+4+16 +64+128};
+char maskhorizstripe[]= {
+  0b01,
+  0 +64+128, 255,
+  0 +64+128, 255,
+  0 +64+128, 255};
+char maskgray[]= {
+  0b01,
+  1+4+16 +64+128, 2+8+32 +64+128,
+  1+4+16 +64+128, 2+8+32 +64+128,
+  1+4+16 +64+128, 2+8+32 +64+128};
+char masksquare[]= {
+  0b011,
+  1+2+4 +64+128, 1+2+4 +64+128, 1+2+4 +64+128,
+  8+16+32 +64+128, 8+16+32 +64+128, 8+16+32 +64+128};
+char maskdiag[]= {
+  0b011,
+  1 +64+128, 2 +64+128, 4 +64+128,
+  8 +64+128, 16 +64+128, 32 +64+128};
 
 //char other[HIRESSIZE];
 
 void main() {
   char c, h, b;
   int dx= 99, dy= 99;
+  char x= 0;
 
   // init tables
   int i;
@@ -356,11 +387,14 @@ void main() {
     C= time();
 
     //wall(40, 50, 150);
-    trap(0,    6*6-1, 70,       130, -20, maskgray);
-    trap(6*6, 30*6-1, 50,       150,  15, maskvertstripe);
-    trap(30*6,38*6-1, 50+15, 150-15, -30, masksquare);
-    trap(38*6,40*6-1, 50+15-30, 150-15+30, 0, maskhorizstripe);
+    trap(x+0,    x+6*6-1, 70,       130, -20, maskgray);
+    trap(x+6*6, x+30*6-1, 50,       150,  15, maskdiag);
+    //trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, masksquare);
+    //trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, maskhorizstripe);
     W= time();
+
+    x+= 3;
+    if (x>70) x= 0;
 
     /// xor down to fill! clevef simple!
     //xorfill(3);   	// 345 hs filling w masks
