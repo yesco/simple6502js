@@ -529,6 +529,21 @@ char maskdiag[]= {
 
 //char other[HIRESSIZE];
 
+signed char sgn(int x) { return x<0? -1: !x? 0: +1; }
+
+void drawmap(unsigned int x, unsigned int y, int dx, int dy) {
+  char px= x/(256*8), py= y/(256*8);
+  char r, c;
+  for(r=0; r<WY; ++r) {
+    for(c=0; c<WX; ++c) {
+      char m= map[r][c];
+      if (m) { gotoxy(c,r); putchar(m? m+'0': ' '); }
+      if (r==px && c==py) { gotoxy(c,r); putchar(0xff); }
+    }
+  }
+}
+
+
 char wx, wy;
 
 // Using a ray from (x,y) in direction (dx,dy) find
@@ -536,7 +551,7 @@ char wx, wy;
 // TODO: or could be sprite?
 //
 // Requires enclosed map space, otherwise no terminate.
-unsigned int hitxraycast(int x, int y, int dx, int dy) {
+unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
   signed char sx= 1, sy= 1;
   char ax= dx, ay= dy;
   int s; // TODO: signed char ? or char
@@ -571,6 +586,52 @@ unsigned int hitxraycast(int x, int y, int dx, int dy) {
 
 // fast inverse square root
 // - https://en.m.wikipedia.org/wiki/Fast_inverse_square_root
+
+
+
+void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
+  char c;
+  int rx, ry;
+  int d, wh;
+  char* p;
+  char i;
+  char va= a+64; // 90d left from forward
+  va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
+
+  for(c= 0; c<40; ++c) {
+    //HIRESSCREEN[c] ^= 128;
+
+    rx= (sx*cos128(va)-sy*sin128(va))>>7;
+    ry= (sx*sin128(va)+sy*cos128(va))>>7;
+
+    //gotoxy(c, 1+(c%15)); printf("%d:%d,%d", va, rx, ry);
+
+    // find wall
+    if (hitxraycast(x, y, sx, sy)) {
+      d= wx-sx/(256*8);
+    } else {
+      d= wy-sy/(256*8);
+      // TODO: make "darker"
+    }
+    if (d<0) d= -d;
+    ++d; // never 0, lol
+    gotoxy(c, 0); putchar('a'+d);
+    
+    // draw slice of wall
+    wh= 99/d; // TODO: costly - find cheaper/table
+    p = HIRESSCREEN+(100-1-wh)*40+c;
+    i= 2*wh;
+    if (1) {
+      *p^= 64+63;
+      p+= wh*2*40;
+      *p^= 64+63;
+    } else {
+      while(--i!=0) *(p+=40)= 64+63;
+    }
+    // rotate right a "slice" step
+    --va; // lol, not so precise... 1
+  }
+}
 
 
 void main() {
@@ -613,10 +674,11 @@ void main() {
 
   // raycasting
   if (1) {
-    int speed= 256*8;
+    int sp= 8;
+    int speed= 256*sp;
     char a= 64; // angle 90d
-    int x= 120*256, y= 100*256, h= 0; // player pos
-    int dx= 0, dy= -speed; // step at speed, 90d
+    unsigned x= 4*256*sp, y= 16*256*sp, h= 0; // player pos
+    int dx= 0, dy= -sp; // step at speed, 90d
 
     // screen
     int sd= 2*256; // distance
@@ -635,83 +697,57 @@ void main() {
     int d;
     char k;
     char* p;
+    char m= 0;
 
     while (1) {
-      // draw direction
-      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
-
       // Done
       F= T-time();
       ++f; fT+= F;
       gotoxy(0, 25); printf(
-"%d cs fpcs=%ld (%ld)\t"
-"x%dy%d\tdx%dy%d\tc%dr%d\tw%dy%d\td%d h%d ",
+"%d cs h/s=%4ld (%4ld) "
+"(%3u,%3u) w(%2d,%2d) d%2d h%3d \ta=%3d (%+3d,%+3d)   ",
 F, 10000L/F, f*100000L/fT,
-x, y, dx, dy, x/(256*8), y/(256*8), wx, wy, d, wh,
+x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 0);
 
       // draw direction
-      gcurx= x/273; gcury= y/327; draw(10*dx/speed, 10*dy/speed, 2);
-      k= cgetc();
-      gcurx= x/273; gcury= y/327; draw(10*dx/speed, 10*dy/speed, 2);
-      gclear();
+      k= 0;
+      do {
+        // draw direction
+        { char px= x/(256*8/6), py= y/(256*8/8);
+          gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
+        }
+        if (k) break;
+        k= cgetc();
+      } while(1);
 
       T= time();
-      // undraw direction
-      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
 
       // -- Draw frame
       // left most side of view
       // (forward to "screen" and 90d left forward again)
-      sx= x-dy; // TODO: use dw?
-      sy= dy+dx; 
+      sx= -(dy>>5); // TODO: use dw? speed>>6 => 64
+      sy= (dy>>5)+(dx>>5);
 
       // draw 40 columns screen
-      va= a+64; // 90d left from forward
-      va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
-
-      for(c= 0; c<40; ++c) {
-        //HIRESSCREEN[c] ^= 128;
-
-        rx= (sx*cos128(va))>>7 - (sy*sin128(va))>7;
-        ry= (sx*sin128(va))>>7 + (sy*cos128(va))>7;
-
-        // find wall
-        if (hitxraycast(x, y, sx, sy)) {
-          d= wx-sx/(256*8);
-        } else {
-          d= wy-sy/(256*8);
-          // TODO: make "darker"
-        }
-        if (d<0) d= -d;
-        ++d; // never 0, lol
-
-        // draw slice of wall
-        wh= 99/d; // TODO: costly - find cheaper/table
-        p = HIRESSCREEN+(100-1-wh)*40+c;
-        i= 2*wh;
-        if (1) {
-          *p= 64+63;
-          p+= wh*2*40;
-          *p= 64+63;
-        } else {
-          while(--i!=0) *(p+=40)= 64+63;
-        }
-        // rotate right a "slice" step
-        --va; // lol, not so precise... 1
+      if (!m) {
+        gclear();
+        drawwalls(a, x, y, sx, sy);
       }
-      
 
       // Movement
       switch(k) {
+      case 'm': case ' ':
+        if (m= 1-m) { gclear(); drawmap(x, y, dx, dy); } break;
+
         // forward backward
       case KEY_UP:     x+= dx; y+= dy; break;
       case KEY_DOWN:   x-= dx; y-= dy; break;
         // angle change
       case KEY_LEFT:   a+= 16*2; // lol
       case KEY_RIGHT:  a-= 16;
-        dx=  (speed*cos128(a))>>7;
-        dy= -(speed*sin128(a))>>7;
+        dx=  sp*cos128(a);
+        dy= -sp*sin128(a);
         break;
       }
     } // while(1)
