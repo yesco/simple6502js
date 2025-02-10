@@ -10,7 +10,7 @@
 // void hires()
 // void text()
 // void gclear()
-// void gfill(row, cell, height, width, value)
+// void gfill(c, r, w, h, v)
 // 
 
 #include <string.h>
@@ -34,7 +34,7 @@
 #define HIRESALTSET  ((char*(0x9C00) // $9C00-9FFF
 
 // TODO:
-// void gfill(r, c, h, w, v);
+// void gfill(c, r, w, h, v);
 // void circle(x, y, r, v);
 // void line(x, y, xt, ty);
 // void draw(w, h);
@@ -116,10 +116,10 @@ void text() {
   }
 }
 
-void gfill(char row, char cell, char h, char w, char v) {
+void gfill(char c, char r, char w, char h, char v) {
   // TODO: adjust so not out of screen?
   // TODO: can share with lores?
-  char* p= HIRESSCREEN+40*row+cell;
+  char* p= HIRESSCREEN+40*r+c;
   for(; h; --h) {
     //for(cell= w; cell; --cell) p[cell]=v; // 619hs
     memset(p, v, w); // 100x 10x10 takes 337hs !
@@ -489,7 +489,7 @@ void main() {
 
   hires();
   gclear();
-  gfill(60, 15, 10*6, 10, 64+63);
+  gfill(15, 60, 10, 10*6, 64+63);
 
   gclear();
   // turn off, cursor keeps inverting random bit on text screen!

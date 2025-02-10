@@ -557,26 +557,32 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
   int s; // TODO: signed char ? or char
   char hitx= 1;
 
+  char i, *p;
+
   wx= x/(256*8); // TODO: WX?
   wy= y/(256*8); // TODO: WY ?
 
   if (dx<0) { ax= -ax; sx= -sx; }
   if (dy<0) { ay= -ay; sy= -sy; }
 
+  p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
+
   if (ay<=ax) {
     s= -ax;
 
-    while(!map[wx][wy]) {
+    while(!map[wy][wx]) {
       if ((s+= ay)>0) { s-= ax; wy+= sy; hitx= 1; }
       else { wx+= sx; hitx= 0; }
+      p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
     }
 
   } else {
-    s= -dy;
+    s= -ay;
 
-    while(!map[wx][wy]) {
+    while(!map[wy][wx]) {
       if ((s+= ax)>0) { s-= ay; wx+= sx; hitx= 0; }
       else { wy+= sy; hitx= 1; }
+      p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
     }
 
   }
@@ -587,6 +593,32 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
 // fast inverse square root
 // - https://en.m.wikipedia.org/wiki/Fast_inverse_square_root
 
+// TODO: this is duplicataion of drawwalls
+void hitwall(unsigned int x, unsigned int y, char a, int sx, int sy) {
+  int rx, ry;
+  int d;
+  char wh;
+
+  rx= (sx*cos128(a)-sy*sin128(a))>>7;
+  ry= (sx*sin128(a)+sy*cos128(a))>>7;
+
+  // find wall
+  if (hitxraycast(x, y, sx, sy)) {
+    d= wx-sx/(256*8);
+  } else {
+    d= wy-sy/(256*8);
+    // TODO: make "darker"
+  }
+  if (d<0) d= -d;
+  ++d; // never 0, lol
+  wh= 99/d; // TODO: costly - find cheaper/table
+
+  gfill(30, 3*6, 10, 3*6, 64); 
+  gotoxy(30, 3); printf("%d: %d '%c' ", map[wy][wx], d, 'a'+d);
+  gotoxy(30, 4); printf("(%d,%d)  ", wx, wy);
+  gotoxy(30, 5); printf("h=%d ", wh);
+
+}
 
 
 void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
@@ -710,13 +742,17 @@ F, 10000L/F, f*100000L/fT,
 x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 0);
 
+
       // draw direction
       k= 0;
+      // tricky loop to do before and after cgetc!
       do {
         // draw direction
         { char px= x/(256*8/6), py= y/(256*8/8);
           gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
         }
+        if (m) hitwall(x, y, a, sx, sy);
+
         if (k) break;
         k= cgetc();
       } while(1);
@@ -732,7 +768,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       // draw 40 columns screen
       if (!m) {
         gclear();
-        drawwalls(a, x, y, sx, sy);
+        drawwalls(x, y, a, sx, sy);
       }
 
       // Movement
