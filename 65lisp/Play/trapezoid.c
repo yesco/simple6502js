@@ -748,6 +748,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         { char px= x/(256*8/6), py= y/(256*8/8);
           gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
         }
+        // TODO: uses dx,dy but need sistance from sx, sy?
         if (m) hitwall(x, y, dx, dy);
 
         if (k) break;
@@ -762,16 +763,12 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       sx= -(dy>>5); // TODO: use dw? speed>>6 => 64
       sy= (dy>>5)+(dx>>5);
 
-      // draw 40 columns screen
-      if (!m) {
-        gclear();
-        drawwalls(x, y, a, sx, sy);
-      }
-
       // Movement
       switch(k) {
       case 'm': case ' ':
-        if (m= 1-m) { gclear(); drawmap(x, y, dx, dy); } break;
+        gclear();
+        if (m= 1-m) drawmap(x, y, dx, dy);
+        break;
 
         // forward backward
       case KEY_UP:     x+= dx; y+= dy; break;
@@ -783,7 +780,14 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         dy= -sp*sin128(a);
         break;
       }
+
+      // draw 40 columns screen
+      if (!m) {
+        drawwalls(x, y, a, sx, sy);
+      }
+
     } // while(1)
+
 
   }
 
