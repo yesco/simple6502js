@@ -542,8 +542,8 @@ unsigned int hitxraycast(int x, int y, int dx, int dy) {
   int s; // TODO: signed char ? or char
   char hitx= 1;
 
-  wx= x/256;
-  wy= y/256;
+  wx= x/(256*8); // TODO: WX?
+  wy= y/(256*8); // TODO: WY ?
 
   if (dx<0) { ax= -ax; sx= -sx; }
   if (dy<0) { ay= -ay; sy= -sy; }
@@ -613,7 +613,7 @@ void main() {
 
   // raycasting
   if (1) {
-    int speed= 16;
+    int speed= 256*8;
     char a= 64; // angle 90d
     int x= 120*256, y= 100*256, h= 0; // player pos
     int dx= 0, dy= -speed; // step at speed, 90d
@@ -631,8 +631,10 @@ void main() {
     unsigned int wall;
 
     unsigned int F, T, fT= 0;
-    char c, wh;
+    char c, wh=42;
     int d;
+    char k;
+    char* p;
 
     while (1) {
       // draw direction
@@ -641,9 +643,18 @@ void main() {
       // Done
       F= T-time();
       ++f; fT+= F;
-      gotoxy(0, 26); printf("ray=%d cs fpcs=%ld (%ld) f=%d t=%d ",
-                            F, 10000L/F, f*100000L/fT, f, fT);
-      c= cgetc();
+      gotoxy(0, 25); printf(
+"%d cs fpcs=%ld (%ld)\t"
+"x%dy%d\tdx%dy%d\tc%dr%d\tw%dy%d\td%d h%d ",
+F, 10000L/F, f*100000L/fT,
+x, y, dx, dy, x/(256*8), y/(256*8), wx, wy, d, wh,
+0);
+
+      // draw direction
+      gcurx= x/273; gcury= y/327; draw(10*dx/speed, 10*dy/speed, 2);
+      k= cgetc();
+      gcurx= x/273; gcury= y/327; draw(10*dx/speed, 10*dy/speed, 2);
+      gclear();
 
       T= time();
       // undraw direction
@@ -660,16 +671,16 @@ void main() {
       va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
 
       for(c= 0; c<40; ++c) {
-        HIRESSCREEN[c] ^= 128;
+        //HIRESSCREEN[c] ^= 128;
 
         rx= (sx*cos128(va))>>7 - (sy*sin128(va))>7;
         ry= (sx*sin128(va))>>7 + (sy*cos128(va))>7;
 
         // find wall
         if (hitxraycast(x, y, sx, sy)) {
-          d= wx-sx;
+          d= wx-sx/(256*8);
         } else {
-          d= wy-sy;
+          d= wy-sy/(256*8);
           // TODO: make "darker"
         }
         if (d<0) d= -d;
@@ -677,18 +688,22 @@ void main() {
 
         // draw slice of wall
         wh= 99/d; // TODO: costly - find cheaper/table
-        for(i= 100-wh; i<100+wh; ++i) {
-          // TODO: for now just set cell
-          gcurx= c*6; gcury= i; gmode= 2; setpixel();
+        p = HIRESSCREEN+(100-1-wh)*40+c;
+        i= 2*wh;
+        if (1) {
+          *p= 64+63;
+          p+= wh*2*40;
+          *p= 64+63;
+        } else {
+          while(--i!=0) *(p+=40)= 64+63;
         }
-        
         // rotate right a "slice" step
         --va; // lol, not so precise... 1
       }
       
 
       // Movement
-      switch(c) {
+      switch(k) {
         // forward backward
       case KEY_UP:     x+= dx; y+= dy; break;
       case KEY_DOWN:   x-= dx; y-= dy; break;
