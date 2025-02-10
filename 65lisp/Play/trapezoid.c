@@ -550,6 +550,7 @@ void main() {
   c= 0;
   gotoxy(0, 25); printf("genxorcolumn(): %d hs ", S-G);
 
+  // sin cos test
   if (0) {
     char r= 100;
     gmode= 1; // this doesn't fill the full circle! 0-64 isn't enough
@@ -566,6 +567,49 @@ void main() {
     }
   }
 
+  if (1) {
+    char a= 64; // angle 90d
+    int speed= 256;
+    int x= 120*256, y= 100*256, h= 0; // player pos
+    int dx= 0, dy= -speed; // step at speed, 90d
+
+    unsigned int F, T, fT= 0;
+    char c;
+
+    while (1) {
+      // draw direction
+      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
+
+      // Done
+      F= T-time();
+      ++f; fT+= F;
+      gotoxy(0, 26); printf("all=%d cs fpcs=%ld (%ld) f=%d t=%d ",
+                            F, 10000L/F, f*100000L/fT, f, fT);
+      c= cgetc();
+
+      T= time();
+      // undraw direction
+      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
+
+      // Draw frame
+      gcurx= x/256; gcury= y/256; gmode= 1; setpixel();
+
+      // Movement
+      switch(c) {
+        // forward backward
+      case KEY_UP:     x+= dx; y+= dy; break;
+      case KEY_DOWN:   x-= dx; y-= dy; break;
+        // angle change
+      case KEY_LEFT:   a+= 16*2; // lol
+      case KEY_RIGHT:  a-= 16;
+        dx=  (speed*cos128(a))>>7;
+        dy= -(speed*sin128(a))>>7;
+        break;
+      }
+    }
+
+  }
+
   START= time();
   do {
     unsigned int C, W, F, M, T= time();
@@ -573,24 +617,16 @@ void main() {
     //gclear();
     C= time();
 
-    //wall(40, 50, 150);
+    // -- frame rate 3.47 fps for all 4 walls w texture
     trap(x+0,    x+6*6-1, 70,       130, -20, GREYSTONE);
     trap(x+6*6, x+30*6-1, 50,       150,  15, REDBRICK);
     trap(x+30*6,x+38*6-1, 50+15, 150-15, -30, PURPLESTONE);
     trap(x+38*6,x+40*6-1, 50+15-30, 150-15+30, 0, BLUESTONE);
+
     //x+= 6;
     if (x>70) x= 0;
 
     F= time();
-
-    switch(c) {
-      // height change
-    case KEY_UP:     if (--h<-99) h= -99; break;
-    case KEY_DOWN:   if (++h>+99) h= +99; break;
-      // angle change
-    case KEY_LEFT:   ++b; break;
-    case KEY_RIGHT:  --b; break;
-    }
 
     //memcpy(other, HIRESSCREEN, HIRESSIZE);
     M= time();
