@@ -594,13 +594,10 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
 // - https://en.m.wikipedia.org/wiki/Fast_inverse_square_root
 
 // TODO: this is duplicataion of drawwalls
-void hitwall(unsigned int x, unsigned int y, char a, int sx, int sy) {
+void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
   int rx, ry;
   int d;
   char wh;
-
-  rx= (sx*cos128(a)-sy*sin128(a))>>7;
-  ry= (sx*sin128(a)+sy*cos128(a))>>7;
 
   // find wall
   if (hitxraycast(x, y, sx, sy)) {
@@ -638,8 +635,8 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
 
     //gotoxy(c, 1+(c%15)); printf("%d:%d,%d", va, rx, ry);
 
-    // find wall
-    if (hitxraycast(x, y, sx, sy)) {
+    // find wall, distance from screen(!)
+    if (hitxraycast(x, y, rx, ry)) {
       d= wx-sx/(256*8);
     } else {
       d= wy-sy/(256*8);
@@ -751,7 +748,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         { char px= x/(256*8/6), py= y/(256*8/8);
           gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
         }
-        if (m) hitwall(x, y, a, sx, sy);
+        if (m) hitwall(x, y, dx, dy);
 
         if (k) break;
         k= cgetc();
