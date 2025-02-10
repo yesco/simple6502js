@@ -543,6 +543,12 @@ void drawmap(unsigned int x, unsigned int y, int dx, int dy) {
   }
 }
 
+void ginvchar(char x, char y) {
+  char i, * p= HIRESSCREEN+40*y*8+x;
+  for(i=0; i<8; ++i) *(p+=40) ^= 128;
+}
+
+char mapmode= 0;
 
 char wx, wy;
 
@@ -565,7 +571,7 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
   if (dx<0) { ax= -ax; sx= -sx; }
   if (dy<0) { ay= -ay; sy= -sy; }
 
-  p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
+  if (mapmode) ginvchar(wx, wy);
 
   if (ay<=ax) {
     s= -ax;
@@ -573,7 +579,8 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
     while(!map[wy][wx]) {
       if ((s+= ay)>0) { s-= ax; wy+= sy; hitx= 1; }
       else { wx+= sx; hitx= 0; }
-      p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
+
+      if (mapmode) ginvchar(wx, wy);
     }
 
   } else {
@@ -582,7 +589,8 @@ unsigned int hitxraycast(unsigned int x, unsigned int y, int dx, int dy) {
     while(!map[wy][wx]) {
       if ((s+= ax)>0) { s-= ay; wx+= sx; hitx= 0; }
       else { wy+= sy; hitx= 1; }
-      p= HIRESSCREEN+40*wy*8+wx; for(i=0; i<8; ++i) *(p+=40) ^= 128;
+
+      if (mapmode) ginvchar(wx, wy);
     }
 
   }
@@ -726,7 +734,6 @@ void main() {
     int d;
     char k;
     char* p;
-    char m= 0;
 
     while (1) {
       // Done
@@ -749,7 +756,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
           gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
         }
         // TODO: uses dx,dy but need sistance from sx, sy?
-        if (m) hitwall(x, y, dx, dy);
+        if (mapmode) hitwall(x, y, dx, dy);
 
         if (k) break;
         k= cgetc();
@@ -767,7 +774,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       switch(k) {
       case 'm': case ' ':
         gclear();
-        if (m= 1-m) drawmap(x, y, dx, dy);
+        if (mapmode= 1-mapmode) drawmap(x, y, dx, dy);
         break;
 
         // forward backward
@@ -782,7 +789,8 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       }
 
       // draw 40 columns screen
-      if (!m) {
+      if (!mapmode) {
+        gclear();
         drawwalls(x, y, a, sx, sy);
       }
 
