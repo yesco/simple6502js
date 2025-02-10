@@ -114,12 +114,12 @@ char textures[11][6]= {
   },
 };
   
-// map and sprites from
+// map and sprites coordinates from
 // - https://lodev.org/cgtutor/raycasting.html 
 // (no other code from there)
 #define WX 24
 #define WY 24
-char worldMap[WY][WX] = {
+char map[WY][WX] = {
   {8,8,8,8,8,8,8,8,8,8,8,4,4,6,4,4,6,4,6,4,4,4,6,4},
   {8,0,0,0,0,0,0,0,0,0,8,4,0,0,0,0,0,0,0,0,0,0,0,4},
   {8,0,3,3,0,0,0,0,0,8,8,4,0,0,0,0,0,0,0,0,0,0,0,6},
@@ -529,6 +529,50 @@ char maskdiag[]= {
 
 //char other[HIRESSIZE];
 
+char wx, wy;
+
+// Using a ray from (x,y) in direction (dx,dy) find
+// first wall hit.
+// TODO: or could be sprite?
+//
+// Requires enclosed map space, otherwise no terminate.
+unsigned int hitxraycast(int x, int y, int dx, int dy) {
+  signed char sx= 1, sy= 1;
+  char ax= dx, ay= dy;
+  int s; // TODO: signed char ? or char
+  char hitx= 1;
+
+  wx= x/256;
+  wy= y/256;
+
+  if (dx<0) { ax= -ax; sx= -sx; }
+  if (dy<0) { ay= -ay; sy= -sy; }
+
+  if (ay<=ax) {
+    s= -ax;
+
+    while(!map[wx][wy]) {
+      if ((s+= ay)>0) { s-= ax; wy+= sy; hitx= 1; }
+      else { wx+= sx; hitx= 0; }
+    }
+
+  } else {
+    s= -dy;
+
+    while(!map[wx][wy]) {
+      if ((s+= ax)>0) { s-= ay; wx+= sx; hitx= 0; }
+      else { wy+= sy; hitx= 1; }
+    }
+
+  }
+
+  return hitx;
+}
+
+// fast inverse square root
+// - https://en.m.wikipedia.org/wiki/Fast_inverse_square_root
+
+
 void main() {
   char c, h, b;
   int dx= 99, dy= 99;
@@ -567,6 +611,99 @@ void main() {
     }
   }
 
+  // raycasting
+  if (1) {
+    int speed= 16;
+    char a= 64; // angle 90d
+    int x= 120*256, y= 100*256, h= 0; // player pos
+    int dx= 0, dy= -speed; // step at speed, 90d
+
+    // screen
+    int sd= 2*256; // distance
+    int sw= 64; // -sw..+sw
+    int sx, sy;
+    char va;
+
+    // temp
+    int rx, ry;
+
+    // wall
+    unsigned int wall;
+
+    unsigned int F, T, fT= 0;
+    char c, wh;
+    int d;
+
+    while (1) {
+      // draw direction
+      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
+
+      // Done
+      F= T-time();
+      ++f; fT+= F;
+      gotoxy(0, 26); printf("ray=%d cs fpcs=%ld (%ld) f=%d t=%d ",
+                            F, 10000L/F, f*100000L/fT, f, fT);
+      c= cgetc();
+
+      T= time();
+      // undraw direction
+      gcurx= speed/10; gcury= speed/10; draw(dx/10, dy/10, 2);
+
+      // -- Draw frame
+      // left most side of view
+      // (forward to "screen" and 90d left forward again)
+      sx= x-dy; // TODO: use dw?
+      sy= dy+dx; 
+
+      // draw 40 columns screen
+      va= a+64; // 90d left from forward
+      va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
+
+      for(c= 0; c<40; ++c) {
+        HIRESSCREEN[c] ^= 128;
+
+        rx= (sx*cos128(va))>>7 - (sy*sin128(va))>7;
+        ry= (sx*sin128(va))>>7 + (sy*cos128(va))>7;
+
+        // find wall
+        if (hitxraycast(x, y, sx, sy)) {
+          d= wx-sx;
+        } else {
+          d= wy-sy;
+          // TODO: make "darker"
+        }
+        if (d<0) d= -d;
+        ++d; // never 0, lol
+
+        // draw slice of wall
+        wh= 99/d; // TODO: costly - find cheaper/table
+        for(i= 100-wh; i<100+wh; ++i) {
+          // TODO: for now just set cell
+          gcurx= c*6; gcury= i; gmode= 2; setpixel();
+        }
+        
+        // rotate right a "slice" step
+        --va; // lol, not so precise... 1
+      }
+      
+
+      // Movement
+      switch(c) {
+        // forward backward
+      case KEY_UP:     x+= dx; y+= dy; break;
+      case KEY_DOWN:   x-= dx; y-= dy; break;
+        // angle change
+      case KEY_LEFT:   a+= 16*2; // lol
+      case KEY_RIGHT:  a-= 16;
+        dx=  (speed*cos128(a))>>7;
+        dy= -(speed*sin128(a))>>7;
+        break;
+      }
+    } // while(1)
+
+  }
+
+  // walking and turning
   if (1) {
     char a= 64; // angle 90d
     int speed= 256;
@@ -606,7 +743,7 @@ void main() {
         dy= -(speed*sin128(a))>>7;
         break;
       }
-    }
+    } // while(1)
 
   }
 
