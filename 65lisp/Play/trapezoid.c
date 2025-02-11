@@ -548,7 +548,7 @@ void ginvchar(char x, char y) {
   for(i=0; i<8; ++i) *(p+=40) ^= 128;
 }
 
-char mapmode= 0;
+char mapmode= 0, debug= 1;
 
 char wx, wy;
 
@@ -653,26 +653,34 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     }
     if (d<0) d= -d;
     ++d; // never 0, lol
-    gotoxy(c, 0); putchar('a'+d);
+    if (debug) {
+      gotoxy(c, 0); putchar('a'+d);
     
-    gotoxy(c, 2); putchar('A'+wx);
-    gotoxy(c, 3); putchar('B'+wy);
+      gotoxy(c, 2); putchar('A'+wx);
+      gotoxy(c, 3); putchar('B'+wy);
 
-    gotoxy(c, 5); putchar('0'+map[wy][wx]);
+      gotoxy(c, 5); putchar('0'+map[wy][wx]);
+    }
 
     // draw slice of wall
     //wh= 99/d; // TODO: costly - find cheaper/table
+    // TODO: simplify
     wh= 100-d*5; // 0..23
     p = HIRESSCREEN+(100-1-wh)*40+c;
-    i= 2*wh;
-    if (1) {
-      *p^= 64+63;
-      p+= wh*2*40;
-      *p^= 64+63;
-    } else {
-      while(--i!=0) *(p+=40)= 64+63;
+    // draw if not too far away
+    if (wh>0) {
+      if (0) {
+        *p^= 64+63;
+        p+= wh*2*40;
+        *p^= 64+63;
+      } else {
+        // full wall
+        char i= 2*wh;
+        while(--i>0) *(p+=40)^= 63; // xor
+      }
     }
-    // rotate right a "slice" step
+    
+    // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
     --va; // lol, not so precise... 1
   }
 }
@@ -779,6 +787,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 
       // Movement
       switch(k) {
+      case 'd': debug= 1-debug; break;
       case 'm': case ' ':
         gclear();
         if (mapmode= 1-mapmode) drawmap(x, y, dx, dy);
