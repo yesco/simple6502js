@@ -810,6 +810,67 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 
       // Movement
       switch(k) {
+      case 'b': // benchmark!
+        // 11273 cs # 256 = 2.27 fps        44 cs/f
+        //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
+        //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
+        f= 0;
+        T= time();
+        a= 0;
+        drawwalls(x, y, a, sx, sy);
+        do {
+          if (0) {
+            drawwalls(x, y, a, sx, sy);
+          } else {
+            // 3577 cs #256 => 7.15
+            // TODO: my own scroll/column copy, should be 640 cs!
+            memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1);
+            // draw first column, others already there!
+            {
+              static char c; // static so can call asm...
+              static int d, wh;
+              static char* p;
+              static char i;
+              static char va;
+              // 90d left from forward + center viewport width 40/256*360= 56.25d!
+              va= a+(64+(64-40*1)/2); 
+              // find wall, distance from screen(!)
+              if (hitxraycast(x, y, cos128(va), sin128(va))) {
+                d= wx-sx/(256*8);
+              } else {
+                d= wy-sy/(256*8);
+                // TODO: make "darker"
+              }
+              if (d<0) d= -d;
+              ++d; // never 0, lol
+
+              // draw slice of wall
+              wh= 100-d*8; // 0..23
+              p = HIRESSCREEN+(100-1-wh)*40+c;
+              // draw if not too far away
+              clearcol(c);
+              if (render && wh>0) { // TODO: wh get's negative for 'g' and won't show?
+                //TODO:
+                //if (newwall==lastwall) {
+                //*p^= 64+63;
+                //} else {
+                //*p^= 64+31;
+                *p^= 64+31;
+                // set texture - inline?
+                memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
+              }
+              asm("ldy %v", c);
+              asm("jsr %v", xorcolumn);
+            }
+          }
+          ++a; ++f;
+        } while (a);
+        F= T-time();
+        gotoxy(0, 25);
+        printf("BENCH: %d cs #%d %d cs/f %ld cfps                  ",
+               F, f, F/f, f*10000L/F);
+        cgetc();
+        break;
       case 'd': debug= 1-debug; break;
       case 'r': render= 1-render; break;
       case 'm': case ' ':
@@ -821,10 +882,10 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       case KEY_UP:     x+= dx; y+= dy; break;
       case KEY_DOWN:   x-= dx; y-= dy; break;
         // angle change
-      case KEY_LEFT:   a+= 16*2; // lol
-      case KEY_RIGHT:  a-= 16;
-        dx=  asp*cos128(a);
-        dy= -asp*sin128(a);
+      case KEY_LEFT:   a+= asp*2; // lol
+      case KEY_RIGHT:  a-= asp;
+        dx=  sp*cos128(a);
+        dy= -sp*sin128(a);
         break;
       }
 
