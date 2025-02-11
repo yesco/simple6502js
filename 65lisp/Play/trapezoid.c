@@ -631,26 +631,30 @@ void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
 
 }
 
-
+// 130 cs - draw w gclear, fill loop
+//  87 cs - draw w clrcolumn, xorcolumn
+//  53 cs - simplified rx,ry sin/cos!
+//  43 cs - only test once for kbhit!
+//  41 cs - simplify, but always clear,xorcolumn
 void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   static int lastwall; // to draw a "blacK" line between walls
-  int newwall;
+  static int newwall;
+
   static char c; // static so can call asm...
-  int rx, ry;
-  int d, wh;
-  char* p;
-  char i;
-  char va= a+64; // 90d left from forward
-  va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
+  static char rx, ry;
+  static int d, wh;
+  static char* p;
+  static char i;
+  static char va;
+  va= a+(64+(64-40*1)/2); // 90d left from forward + center viewport width 40/256*360= 56.25d!
 
   lastwall= 0;
   for(c= 0; c<40; ++c) {
-    if (c>10 && kbhit()) break; // respond faster!
     //HIRESSCREEN[c] ^= 128;
 
-    rx= (sx*cos128(va)-sy*sin128(va))>>7;
-    ry= (sx*sin128(va)+sy*cos128(va))>>7;
-
+    // only used for direction! no need scale!
+    rx= cos128(va);
+    ry= sin128(va);
     //gotoxy(c, 1+(c%15)); printf("%d:%d,%d", va, rx, ry);
 
     // find wall, distance from screen(!)
@@ -669,38 +673,23 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     // draw slice of wall
     //wh= 99/d; // TODO: costly - find cheaper/table
     // TODO: simplify
-    wh= 100-d*5; // 0..23
+    wh= 100-d*8; // 0..23
     p = HIRESSCREEN+(100-1-wh)*40+c;
     // draw if not too far away
     clearcol(c);
-    if (render & wh>0) { // TODO: wh get's negative for 'g' and won't show?
-      if (1) {
-        if (newwall==lastwall) {
-          *p^= 64+63;
-          p+= wh*2*40;
-          //*p^= 64+63;
-        } else {
-          *p^= 64+31;
-          p+= wh*2*40;
-          //*p^= 64+31;
-
-          // set texture
-          // (assume there is always a wall)
-          //memset(TEXTURE, 64+
-          memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
-          //memset(TEXTURE, &textures[map[wy][wx]-1], 6); // somehow wrong?
-        }
-        asm("ldy %v", c);
-        asm("jsr %v", xorcolumn);
+    if (render && wh>0) { // TODO: wh get's negative for 'g' and won't show?
+      if (newwall==lastwall) {
+        *p^= 64+63;
+        //*p^= 64+63;
       } else {
-        // full wall
-        char i= 2*wh;
-        if (newwall==lastwall) 
-          while(--i>0) *(p+=40)^= 63; // xor
-        else
-          while(--i>0) *(p+=40)^= 31; // xor
+        *p^= 64+31;
+        
+        // set texture
+        memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
       }
     }
+    asm("ldy %v", c);
+    asm("jsr %v", xorcolumn);
     
     if (debug) {
       gotoxy(c, 0); putchar('a'+d);
@@ -715,6 +704,8 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
 
     // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
     --va; // lol, not so precise... 1
+
+    if (c==10 && kbhit()) break; // respond faster!
   }
 }
 
