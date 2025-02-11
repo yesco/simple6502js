@@ -636,6 +636,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
 
   for(c= 0; c<40; ++c) {
+    if (kbhit()) break; // respond faster!
     //HIRESSCREEN[c] ^= 128;
 
     rx= (sx*cos128(va)-sy*sin128(va))>>7;
@@ -654,8 +655,14 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     ++d; // never 0, lol
     gotoxy(c, 0); putchar('a'+d);
     
+    gotoxy(c, 2); putchar('A'+wx);
+    gotoxy(c, 3); putchar('B'+wy);
+
+    gotoxy(c, 5); putchar('0'+map[wy][wx]);
+
     // draw slice of wall
-    wh= 99/d; // TODO: costly - find cheaper/table
+    //wh= 99/d; // TODO: costly - find cheaper/table
+    wh= 100-d*5; // 0..23
     p = HIRESSCREEN+(100-1-wh)*40+c;
     i= 2*wh;
     if (1) {
