@@ -548,7 +548,7 @@ void ginvchar(char x, char y) {
   for(i=0; i<8; ++i) *(p+=40) ^= 128;
 }
 
-char mapmode= 0, debug= 1;
+char mapmode= 0, debug= 0;
 
 char wx, wy;
 
@@ -618,7 +618,7 @@ void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
   ++d; // never 0, lol
   wh= 99/d; // TODO: costly - find cheaper/table
 
-  gfill(30, 3*6, 10, 3*6, 64); 
+  //gfill(30, 3*6, 10, 3*6, 64);  // not needed as char current overwrite, not xor
   gotoxy(30, 3); printf("%d: %d '%c' ", map[wy][wx], d, 'a'+d);
   gotoxy(30, 4); printf("(%d,%d)  ", wx, wy);
   gotoxy(30, 5); printf("h=%d ", wh);
@@ -629,7 +629,7 @@ void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
 void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   static int lastwall; // to draw a "blacK" line between walls
   int newwall;
-  char c;
+  static char c; // static so can call asm...
   int rx, ry;
   int d, wh;
   char* p;
@@ -656,15 +656,8 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     }
     if (d<0) d= -d;
     ++d; // never 0, lol
-    if (debug) {
-      gotoxy(c, 0); putchar('a'+d);
-    
-      gotoxy(c, 2); putchar('0'+wx);
-      gotoxy(c, 3); putchar('0'+wy);
 
-      gotoxy(c, 5); putchar('0'+map[wy][wx]);
-    }
-
+    // for detecting change in walls and draw black line
     newwall= (wy<<8) + wx;
 
     // draw slice of wall
@@ -673,17 +666,26 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     wh= 100-d*5; // 0..23
     p = HIRESSCREEN+(100-1-wh)*40+c;
     // draw if not too far away
-    if (wh>0) {
-      if (0) {
+    clearcol(c);
+    if (1 || wh>0) { // TODO: wh get's negative for 'g' and won't show?
+      if (1) {
         if (newwall==lastwall) {
           *p^= 64+63;
           p+= wh*2*40;
-          *p^= 64+63;
+          //*p^= 64+63;
         } else {
           *p^= 64+31;
           p+= wh*2*40;
-          *p^= 64+31;
+          //*p^= 64+31;
+
+          // set texture
+          // (assume there is always a wall)
+          //memset(TEXTURE, 64+
+          memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
+          //memset(TEXTURE, &textures[map[wy][wx]-1], 6); // somehow wrong?
         }
+        asm("ldy %v", c);
+        asm("jsr %v", xorcolumn);
       } else {
         // full wall
         char i= 2*wh;
@@ -694,6 +696,15 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
       }
     }
     
+    if (debug) {
+      gotoxy(c, 0); putchar('a'+d);
+    
+      gotoxy(c, 2); putchar('0'+wx);
+      gotoxy(c, 3); putchar('0'+wy);
+
+      gotoxy(c, 5); putchar('0'+map[wy][wx]);
+    }
+
     lastwall= newwall;
 
     // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
@@ -771,22 +782,20 @@ void main() {
       F= T-time();
       ++f; fT+= F;
       gotoxy(0, 25); printf(
-"%d cs h/s=%4ld (%4ld) "
+"%d cs c/s=%4ld (%4ld) "
 "(%3u,%3u) w(%2d,%2d) d%2d h%3d \ta=%3d (%+3d,%+3d)   ",
 F, 10000L/F, f*100000L/fT,
 x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 0);
 
-
-      // draw direction
+      // draw direction ("cursor")
       k= 0;
-      // tricky loop to do before and after cgetc!
-      do {
+      do { // tricky loop to draw/cgetc/undraw
         // draw direction
         { char px= x/(256*8/6), py= y/(256*8/8);
           gcurx= px; gcury= py; draw(dx>>5, dy>>5, 2);
         }
-        // TODO: uses dx,dy but need sistance from sx, sy?
+        // TODO: uses dx,dy but need distance from sx, sy?
         if (mapmode) hitwall(x, y, dx, dy);
 
         if (k) break;
@@ -822,7 +831,6 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 
       // draw 40 columns screen
       if (!mapmode) {
-        gclear();
         drawwalls(x, y, a, sx, sy);
       }
 
