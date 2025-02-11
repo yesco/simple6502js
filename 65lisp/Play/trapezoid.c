@@ -830,13 +830,15 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
 
       // Movement
       switch(k) {
-      case 'b': // benchmark!
+      case 'b': { // benchmark!
         // 11273 cs # 256 = 2.27 fps        44 cs/f
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
         //  2543 cs # 256 =10.06 fps         9 cs/f
         //  2327 cs # 256 =11.00 fps         9 cs/f
         //  ^sei 8.5% faster (after drawwalls, handtimed)
+        static newwall, lastwall;
+
         f= 0;
         T= time();
         a= 0;
@@ -878,23 +880,29 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
               if (d<0) d= -d;
               ++d; // never 0, lol
 
-              // draw slice of wall
+              // for detecting change in walls and draw black line
+              newwall= (wy<<8) + wx;
+
+              // draw a column-slice of wall
               wh= 100-d*8; // 0..23
               p = HIRESSCREEN+(100-1-wh)*40+c;
-              // draw if not too far away
+
               clearcol(c);
               if (render && wh>0) { // TODO: wh get's negative for 'g' and won't show?
                 //TODO:
-                //if (newwall==lastwall) {
-                //*p^= 64+63;
-                //} else {
-                //*p^= 64+31;
-                *p^= 64+31;
-                // set texture - inline?
-                memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
+                if (newwall==lastwall) {
+                  *p^= 64+63;
+                } else {
+                  // left side black line - since scroll right... lol
+                  *p^= 64+62;
+                  // set texture - inline?
+                  memcpy(TEXTURE, ((char*)textures)+6*(map[wy][wx]-1), 6);
+                }
               }
               asm("ldy %v", c);
               asm("jsr %v", xorcolumn);
+
+              lastwall= newwall;
             }
           }
           ++a; ++f;
@@ -904,7 +912,8 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         printf("BENCH: %d cs #%d %d cs/f %ld cfps                  ",
                F, f, F/f, f*10000L/F);
         cgetc();
-        break;
+      } break;
+
       case 'd': debug= 1-debug; break;
       case 'r': render= 1-render; break;
       case 'm': case ' ':
