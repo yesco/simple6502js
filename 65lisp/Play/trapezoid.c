@@ -627,6 +627,8 @@ void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
 
 
 void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
+  static int lastwall; // to draw a "blacK" line between walls
+  int newwall;
   char c;
   int rx, ry;
   int d, wh;
@@ -635,6 +637,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   char va= a+64; // 90d left from forward
   va+= (64-40*1)/2; // center viewport width 40/256*360= 56.25d!
 
+  lastwall= 0;
   for(c= 0; c<40; ++c) {
     if (kbhit()) break; // respond faster!
     //HIRESSCREEN[c] ^= 128;
@@ -656,11 +659,13 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     if (debug) {
       gotoxy(c, 0); putchar('a'+d);
     
-      gotoxy(c, 2); putchar('A'+wx);
-      gotoxy(c, 3); putchar('B'+wy);
+      gotoxy(c, 2); putchar('0'+wx);
+      gotoxy(c, 3); putchar('0'+wy);
 
       gotoxy(c, 5); putchar('0'+map[wy][wx]);
     }
+
+    newwall= (wy<<8) + wx;
 
     // draw slice of wall
     //wh= 99/d; // TODO: costly - find cheaper/table
@@ -670,16 +675,27 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     // draw if not too far away
     if (wh>0) {
       if (0) {
-        *p^= 64+63;
-        p+= wh*2*40;
-        *p^= 64+63;
+        if (newwall==lastwall) {
+          *p^= 64+63;
+          p+= wh*2*40;
+          *p^= 64+63;
+        } else {
+          *p^= 64+31;
+          p+= wh*2*40;
+          *p^= 64+31;
+        }
       } else {
         // full wall
         char i= 2*wh;
-        while(--i>0) *(p+=40)^= 63; // xor
+        if (newwall==lastwall) 
+          while(--i>0) *(p+=40)^= 63; // xor
+        else
+          while(--i>0) *(p+=40)^= 31; // xor
       }
     }
     
+    lastwall= newwall;
+
     // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
     --va; // lol, not so precise... 1
   }
