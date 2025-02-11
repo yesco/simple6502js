@@ -1,3 +1,9 @@
+// DOONE
+//
+// Not DOOM?
+//
+// trying to do simple 3D rendering on 2D doom-style
+
 #define MAIN
 #include "../hires-raw.c"
 
