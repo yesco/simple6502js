@@ -554,7 +554,7 @@ void ginvchar(char x, char y) {
   for(i=0; i<8; ++i) *(p+=40) ^= 128;
 }
 
-char mapmode= 0, debug= 0;
+char mapmode= 0, debug= 0, render= 1;
 
 char wx, wy;
 
@@ -673,7 +673,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     p = HIRESSCREEN+(100-1-wh)*40+c;
     // draw if not too far away
     clearcol(c);
-    if (1 || wh>0) { // TODO: wh get's negative for 'g' and won't show?
+    if (render & wh>0) { // TODO: wh get's negative for 'g' and won't show?
       if (1) {
         if (newwall==lastwall) {
           *p^= 64+63;
@@ -759,6 +759,7 @@ void main() {
 
   // raycasting
   if (1) {
+    int asp= 1;
     int sp= 8;
     int speed= 256*sp;
     char a= 64; // angle 90d
@@ -819,6 +820,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       // Movement
       switch(k) {
       case 'd': debug= 1-debug; break;
+      case 'r': render= 1-render; break;
       case 'm': case ' ':
         gclear();
         if (mapmode= 1-mapmode) drawmap(x, y, dx, dy);
@@ -830,8 +832,8 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         // angle change
       case KEY_LEFT:   a+= 16*2; // lol
       case KEY_RIGHT:  a-= 16;
-        dx=  sp*cos128(a);
-        dy= -sp*sin128(a);
+        dx=  asp*cos128(a);
+        dy= -asp*sin128(a);
         break;
       }
 
