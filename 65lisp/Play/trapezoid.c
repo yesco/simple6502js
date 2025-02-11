@@ -645,7 +645,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
 
   lastwall= 0;
   for(c= 0; c<40; ++c) {
-    if (kbhit()) break; // respond faster!
+    if (c>10 && kbhit()) break; // respond faster!
     //HIRESSCREEN[c] ^= 128;
 
     rx= (sx*cos128(va)-sy*sin128(va))>>7;
