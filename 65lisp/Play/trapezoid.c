@@ -205,13 +205,16 @@ int sin128(char b) {
 // see sin()
 int cos128(int b) { return sin128(63-b); }
 
+// 1803 + 303 + 1201
 char xorcolumn[2+100*(3+2+3+2+2+3+3)+1]; // big. fast. lol
-char clrcolumn[2+100*3+1];
+char clrcolumn[2+100*3+1];   // y
+char cpycolumn[200*(3+3)+1]; // x->y
 
 void genxorcolumn() {
   int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
   char * p= xorcolumn-1;
   char * c= clrcolumn-1;
+  char * cp= cpycolumn-1;
 
   // lda #$40
   *++c= 0xa9;
@@ -263,10 +266,27 @@ void genxorcolumn() {
     r+= 40; rr-= 40;
   }
 
+  r= (int)HIRESSCREEN;
+  for(i=0; i<200; i++) {
+    // lda absx 
+    *++cp= 0xbd;
+    *++cp= r;
+    *++cp= r/256;
+
+    // sta absy
+    *++cp= 0x99;
+    *++cp= r;
+    *++cp= r/256;
+
+    r+= 40;
+  }
+
   // rts
   *++c= 0x60;
 
   *++p= 0x60;
+
+  *++cp= 0x60;
 
   assert(p+1==xorcolumn+sizeof(xorcolumn));
 }
@@ -814,17 +834,31 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         // 11273 cs # 256 = 2.27 fps        44 cs/f
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
+        //  2543 cs # 256 =10.06 fps         9 cs/f
+        //  2327 cs # 256 =11.00 fps         9 cs/f
+        //  ^sei 8.5% faster (after drawwalls, handtimed)
         f= 0;
         T= time();
         a= 0;
         drawwalls(x, y, a, sx, sy);
+        asm("sei");
         do {
           if (0) {
             drawwalls(x, y, a, sx, sy);
           } else {
             // 3577 cs #256 => 7.15
             // TODO: my own scroll/column copy, should be 640 cs!
-            memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1);
+            if (0) {
+              memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1); 
+            } else {
+              static char f, t;
+              for(f=38; f--;) {
+                t= f+1;
+                asm("ldx %v", f);
+                asm("ldy %v", t);
+                asm("jsr %v", cpycolumn);
+              }
+            }
             // draw first column, others already there!
             {
               static char c; // static so can call asm...
