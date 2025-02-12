@@ -15,9 +15,118 @@ char T, nil, print, doapply1;
 // - hi bits 64+128 need to be set (as it's anded)
 char textures[11][6]= {
   // wall textures 0-7 (+1 in map)
+#define MATRIX
+#ifdef MATRIX
+
+#define EAGLE 1
+  { // 0: matrix
+    0b11111111,
+    0b11001001,
+    0b11001000,
+    0b11111111,
+    0b11001000,
+    0b11001000,
+  },
+#define REDBRICK 2
+  { // 1: redbrick
+    0b11000001,
+    0b11001001,
+    0b11001000,
+    0b11001000,
+    0b11000000,
+    0b11100000,
+  },
+#define PURPLESTONE 3
+  { // 2: purplestone
+    0b11101010,
+    0b11101000,
+    0b11101001,
+    0b11001011,
+    0b11101110,
+    0b11100110,
+  },
+#define GREYSTONE 4
+  { // 3: greystone
+    0b11000100,
+    0b11010100,
+    0b11100010,
+    0b11100010,
+    0b11001010,
+    0b11001000,
+  },
+#define BLUESTONE 5
+  { // 4: bluestone
+    0b11000000,
+    0b11001100,
+    0b11001100,
+    0b11001000,
+    0b11001000,
+    0b11000001,
+  },
+#define MOSSY 6
+  { // 5: mossy
+    0b11010000,
+    0b11010010,
+    0b11010010,
+    0b11100100,
+    0b11001000,
+    0b11010000,
+  },
+#define WOOD 7
+  { // 6: wood
+    0b11000100,
+    0b11010100,
+    0b11010000,
+    0b11010001,
+    0b11010001,
+    0b11000001,
+  },
+#define COLORSTONE 8
+  { // 7: colorstone
+    0b11100000,
+    0b11100100,
+    0b11001100,
+    0b11001100,
+    0b11001010,
+    0b11001100,
+   },
+
+  // sprite textures 8-10 (+1 in list)
+  // TODO: these need to be bigger!
+  // TODO: flexible sizes... wx, wy
+#define GREENLIGHT 9
+  { //  8: green light
+    0b11001100,
+    0b11011110,
+    0b11111111,
+    0b11001000,
+    0b11000000,
+    0b11000000,
+  },
+#define PILLAR 10
+  { //  9: pillars
+    0b11011110,
+    0b11001100,
+    0b11001100,
+    0b11001100,
+    0b11001100,
+    0b11011110,
+  },
+#define BARREL 11
+  { // 10: barrels
+    0b11001100,
+    0b11010010,
+    0b11110011,
+    0b11111111,
+    0b11111111,
+    0b11011110,
+  },
+
+#else
+
 #define EAGLE 1
   { // 0: eagle - lol
-    0b11110010,
+    0b11111010,
     0b11001010,
     0b11111110,
     0b11101000,
@@ -118,6 +227,8 @@ char textures[11][6]= {
     0b11111111,
     0b11011110,
   },
+
+#endif // MATRIX
 };
   
 // map and sprites coordinates from
