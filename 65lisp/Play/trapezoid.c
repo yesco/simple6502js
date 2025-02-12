@@ -840,6 +840,40 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   }
 }
 
+// graphics horizontal scroll
+//   -D: move D columns right
+//   +d: move D columns left
+void ghoriscroll(signed char direction) {
+  // scroll
+  if (0) {
+    if (direction>0)
+      memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1); 
+    else
+      memmove(HIRESSCREEN, HIRESSCREEN+1, HIRESSIZE-1); 
+  } else {
+    // asm 65% faster!
+    static char f, t; // for speed, use tmp1, tmp2, tmp3...?
+
+    if (direction>0) {
+      // scroll right
+      f= 39-direction;
+      for(t=39; --f,--t;) {
+        asm("ldx %v", f);
+        asm("ldy %v", t);
+        asm("jsr %v", cpycolumn);
+      }
+    } else {
+      // scroll left
+      f= direction;
+      for(t=0; ++f,++t<40;) {
+        f= f-direction;
+        asm("ldx %v", f);
+        asm("ldy %v", t);
+        asm("jsr %v", cpycolumn);
+      }
+    }
+  }
+}
 
 void main() {
   char c, h, b;
@@ -949,7 +983,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         // 11273 cs # 256 = 2.27 fps        44 cs/f
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
-        //  2543 cs # 256 =10.06 fps         9 cs/f
+        //  2543 cs # 256 =10.06 fps         9 cs/f (asm)
         //  2327 cs # 256 =11.00 fps         9 cs/f
         //  ^sei 8.5% faster (after drawwalls, handtimed)
         //    43 cs # 256+40 (no scroll) (/ 430000 (+ 256 40)) = 1.452 ms/column
@@ -968,21 +1002,8 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
             drawwalls(x, y, a, sx, sy);
           } else {
             // -- incremental draw (scrool+draw 0 col)
+            ghoriscroll(+1);
 
-            // scroll
-            if (0) {
-              // 3577 cs #256 => 7.15
-              memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1); 
-            } else {
-              static char f, t;
-              //if (0) // test only draw
-              for(f=39; --f;) {
-                t= f+1;
-                asm("ldx %v", f);
-                asm("ldy %v", t);
-                asm("jsr %v", cpycolumn);
-              }
-            }
             // draw first column, others already there!
             {
               static char c; // static so can call asm...
