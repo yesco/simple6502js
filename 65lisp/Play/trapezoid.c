@@ -321,8 +321,8 @@ int cos128(int b) { return sin128(63-b); }
 // = 1803 bytes, can jump to middle (2+18*row)
 char xorcolumn[2+100*(3+2+3+2+2+3+3)+1]; // big. fast. lol
 
-// graphics clear top half column regY
-// = 303 bytes, can jump to middle (2+3*row)
+// graphics clear top half column regY, middle to top
+// = 303 bytes, can jump to middle (2+3*(99-row))
 char clrcolumn[2+100*3+1];
 
 // graphics copy whole column regX to regY
@@ -332,6 +332,7 @@ char cpycolumn[200*(3+3)+1];
 // generate various graphical speedups
 void genxorcolumn() {
   int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
+  int cr= (int)HIRESSCREEN+99*40; // clr upwards
   char * p= xorcolumn-1;
   char * c= clrcolumn-1;
   char * cp= cpycolumn-1;
@@ -349,10 +350,14 @@ void genxorcolumn() {
   // TODO: however, texture would be symmetrical of middle
   //   and possibly misaligned...
   for(i=0; i<100; ++i) {
-    // sta absy nextline
-    *++c= 0x99;
-    *++c= r;
-    *++c= r/256;
+    // if just for debugging drawing full screen
+    //if (i!=99)
+    {
+      // sta absy nextline
+      *++c= 0x99;
+      *++c= cr;
+      *++c= cr/256;
+    }
 
     // eor absy
     *++p= 0x59;
@@ -383,7 +388,7 @@ void genxorcolumn() {
     // txa - restore non-textured byte
     *++p= 0x8a;
 
-    r+= 40; rr-= 40;
+    r+= 40; rr-= 40; cr-= 40;
   }
 
   r= (int)HIRESSCREEN;
@@ -810,9 +815,11 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   va= a+(64+(64-40*1)/2); // 90d left from forward + center viewport width 40/256*360= 56.25d!
 
   lastwall= 0;
+
   //for(cc= 1; cc<40; ++cc) { c= randcol[cc];
-  for(c= 1; c<40; ++c) { ++va;
-    //HIRESSCREEN[c] ^= 128;
+//  for(c= 1; c<40; ++c) { ++va;
+//  for(cc= 1; cc<40; ++cc) { c= 1+((c+7)%39); // ok
+  for(cc= 1; cc<40; ++cc) { c= 1+((c+24)%39); // 39=3*11 must share no prime? erh?
 
     // find wall, distance from screen(!)
     if (hitxraycast(x, y, cos128(va+c), sin128(va+c))) {
@@ -862,7 +869,10 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
     //--va; // lol, not so precise... 1
 
-    if (c==10 && kbhit()) break; // respond faster!
+    //if (c==10 && kbhit()) break; // respond faster!
+
+    // show completeness; flip bit here, as not to clear it, lol
+    HIRESSCREEN[c] ^= 128;
   }
 }
 
@@ -1009,6 +1019,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         // 11273 cs # 256 = 2.27 fps        44 cs/f
         // 11051            2.31 fps        (optimized)
         // 11223            2.28 fps        43 (random order!)
+        // 11924            2.14            46    c= 1+((c+34)%39) ordered distributed order
         //  /- incremental draw (scroll+one column)
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
