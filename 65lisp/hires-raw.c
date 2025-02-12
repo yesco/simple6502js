@@ -278,11 +278,13 @@ void drawFast(int dx, int dy, char v) {
         }
 
         // plot it
-        switch(gmode) { // about 10% overhead
-        case 0: *p &= ~m; break;
-        case 1: *p |= m;  break;
-        case 2: *p ^= m;  break;
-        }
+        if (*p & 64) {
+          switch(gmode) { // about 10% overhead
+          case 0: *p &= ~m; break;
+          case 1: *p |= m;  break;
+          case 2: *p ^= m;  break;
+          }
+        } // or steal ink attributes?
 
         // step x, wrap around bit
         if ((m<<=1)==64) m=1,--p;
