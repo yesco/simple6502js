@@ -776,6 +776,26 @@ void hitwall(unsigned int x, unsigned int y, int sx, int sy) {
 //  53 cs - simplified rx,ry sin/cos!
 //  43 cs - only test once for kbhit!
 //  41 cs - simplify, but always clear,xorcolumn
+
+// in order
+//char randcol[]= {-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39};
+
+// random, hand-picked, "balanced" order
+char randcol[]= {
+  -1,
+  1,20,39,
+  10,30,
+  5,35,15,25,
+  3,32,12,22,
+  8,38,18,28,
+  2,37,17,27,
+  23,13,33,
+  7,36,14,26,
+  34,6,24,16,
+  9,11,16,19,
+  21,29,31};
+
+
 void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   static int lastwall; // to draw a "blacK" line between walls
   static int newwall;
@@ -785,20 +805,17 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   static int d, wh;
   static char* p;
   static char i;
+  static char cc;
   static char va;
   va= a+(64+(64-40*1)/2); // 90d left from forward + center viewport width 40/256*360= 56.25d!
 
   lastwall= 0;
-  for(c= 1; c<40; ++c) {
+  for(cc= 1; cc<40; ++cc) {
+    c= randcol[cc];
     //HIRESSCREEN[c] ^= 128;
 
-    // only used for direction! no need scale!
-    rx= cos128(va);
-    ry= sin128(va);
-    //gotoxy(c, 1+(c%15)); printf("%d:%d,%d", va, rx, ry);
-
     // find wall, distance from screen(!)
-    if (hitxraycast(x, y, rx, ry)) {
+    if (hitxraycast(x, y, cos128(va+c), sin128(va+c))) {
       d= wx-sx/(256*8);
     } else {
       d= wy-sy/(256*8);
@@ -843,7 +860,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
     lastwall= newwall;
 
     // rotate right a "slice" step 1/256th turn! -> 40=> 56.25d!
-    --va; // lol, not so precise... 1
+    //--va; // lol, not so precise... 1
 
     if (c==10 && kbhit()) break; // respond faster!
   }
@@ -990,6 +1007,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       switch(k) {
       case 'b': { // benchmark!
         // 11273 cs # 256 = 2.27 fps        44 cs/f
+        // 11223            2.28 fps        43 (random order!)
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
         //  2543 cs # 256 =10.06 fps         9 cs/f (asm)
@@ -1003,11 +1021,12 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         a= 0;
         drawwalls(x, y, a, sx, sy); // (drawwalls calls kbhit-enables)
 
-        asm("sei"); // 8.5% faster!
+        // TODO: for production enable!
+        //asm("sei"); // 8.5% faster!
 
         do {
           // draw all
-          if (0) {
+          if (1) {
             drawwalls(x, y, a, sx, sy);
           } else {
             // -- incremental draw (scrool+draw 0 col)
