@@ -51,8 +51,8 @@ char textures[11][6]= {
   },
 #define GREYSTONE 4
   { // 3: greystone
-    0b11100100,
-    0b11100100,
+    0b11001100,
+    0b11010100,
     0b11111110,
     0b11000100,
     0b11000100,
@@ -62,9 +62,9 @@ char textures[11][6]= {
   { // 4: bluestone
     0b11111110,
     0b11100000,
-    0b11111100,
-    0b11000010,
-    0b11111100,
+    0b11111000,
+    0b11000100,
+    0b11111000,
     0b11000000,
   },
 #define MOSSY 6
@@ -80,7 +80,7 @@ char textures[11][6]= {
   { // 6: wood
     0b11111110,
     0b11000010,
-    0b11001110,
+    0b11000100,
     0b11001000,
     0b11010000,
     0b11000000,
@@ -90,9 +90,9 @@ char textures[11][6]= {
     0b11011100,
     0b11100010,
     0b11011100,
-    0b11111110,
-    0b11000010,
+    0b11100010,
     0b11011100,
+    0b11000000,
    },
 
   // sprite textures 8-10 (+1 in list)
@@ -346,16 +346,19 @@ char textures[11][6]= {
 };
 
 
+// -- MAPS
+
 #define WX 24
 #define WY 24
   
+
+#define _ 0
+
 #define TESTIX
 
 #ifdef TESTIX
 #define STARTX 4
 #define STARTY 4
-
-#define _ 0
 
 char map[WY][WX] = {
   {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
