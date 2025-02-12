@@ -837,23 +837,30 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
         //  2543 cs # 256 =10.06 fps         9 cs/f
         //  2327 cs # 256 =11.00 fps         9 cs/f
         //  ^sei 8.5% faster (after drawwalls, handtimed)
+        //    43 cs # 256+40 (no scroll) (/ 430000 (+ 256 40)) = 1.452 ms/column
         static newwall, lastwall;
 
         f= 0;
         T= time();
         a= 0;
-        drawwalls(x, y, a, sx, sy);
-        asm("sei");
+        drawwalls(x, y, a, sx, sy); // (drawwalls calls kbhit-enables)
+
+        asm("sei"); // 8.5% faster!
+
         do {
+          // draw all
           if (0) {
             drawwalls(x, y, a, sx, sy);
           } else {
-            // 3577 cs #256 => 7.15
-            // TODO: my own scroll/column copy, should be 640 cs!
+            // -- incremental draw (scrool+draw 0 col)
+
+            // scroll
             if (0) {
+              // 3577 cs #256 => 7.15
               memmove(HIRESSCREEN+1, HIRESSCREEN, HIRESSIZE-1); 
             } else {
               static char f, t;
+              //if (0) // test only draw
               for(f=38; f--;) {
                 t= f+1;
                 asm("ldx %v", f);
