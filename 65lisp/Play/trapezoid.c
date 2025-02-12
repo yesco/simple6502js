@@ -810,8 +810,8 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   va= a+(64+(64-40*1)/2); // 90d left from forward + center viewport width 40/256*360= 56.25d!
 
   lastwall= 0;
-  for(cc= 1; cc<40; ++cc) {
-    c= randcol[cc];
+  //for(cc= 1; cc<40; ++cc) { c= randcol[cc];
+  for(c= 1; c<40; ++c) { ++va;
     //HIRESSCREEN[c] ^= 128;
 
     // find wall, distance from screen(!)
@@ -1007,10 +1007,12 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
       switch(k) {
       case 'b': { // benchmark!
         // 11273 cs # 256 = 2.27 fps        44 cs/f
+        // 11051            2.31 fps        (optimized)
         // 11223            2.28 fps        43 (random order!)
+        //  /- incremental draw (scroll+one column)
         //  3577 cs # 256 = 7.15 fps memcpy 13 cs/f    0
         //  3945 cs # 256 = 6.48 fps drawc0 15 cs/f +368 cs/256 f
-        //  2543 cs # 256 =10.06 fps         9 cs/f (asm)
+        //  2543 cs # 256 =10.06 fps         9 cs/f (asm scroll)
         //  2327 cs # 256 =11.00 fps         9 cs/f
         //  ^sei 8.5% faster (after drawwalls, handtimed)
         //    43 cs # 256+40 (no scroll) (/ 430000 (+ 256 40)) = 1.452 ms/column
