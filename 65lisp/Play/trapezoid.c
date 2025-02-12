@@ -669,7 +669,7 @@ void drawwalls(unsigned int x, unsigned int y, char a, int sx, int sy) {
   va= a+(64+(64-40*1)/2); // 90d left from forward + center viewport width 40/256*360= 56.25d!
 
   lastwall= 0;
-  for(c= 0; c<40; ++c) {
+  for(c= 1; c<40; ++c) {
     //HIRESSCREEN[c] ^= 128;
 
     // only used for direction! no need scale!
@@ -795,6 +795,10 @@ void main() {
     char k;
     char* p;
 
+    // matrix - green!
+    gfill(0,0, 1,200, 2); // green
+
+    // main-loop
     while (1) {
       // Done
       F= T-time();
@@ -861,7 +865,7 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
             } else {
               static char f, t;
               //if (0) // test only draw
-              for(f=38; f--;) {
+              for(f=39; --f;) {
                 t= f+1;
                 asm("ldx %v", f);
                 asm("ldy %v", t);
@@ -875,8 +879,10 @@ x/(256*8), y/(256*8), wx, wy, d, wh, a, dx, dy,
               static char* p;
               static char i;
               static char va;
+              c= 1;
+
               // 90d left from forward + center viewport width 40/256*360= 56.25d!
-              va= a+(64+(64-40*1)/2); 
+              va= a+(64+(64-40*1)/2) + 1; // + 1 for avoid first column
               // find wall, distance from screen(!)
               if (hitxraycast(x, y, cos128(va), sin128(va))) {
                 d= wx-sx/(256*8);
