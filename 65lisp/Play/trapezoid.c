@@ -316,11 +316,20 @@ int sin128(char b) {
 // see sin()
 int cos128(int b) { return sin128(63-b); }
 
-// 1803 + 303 + 1201
+// graphics xor-fill top half column regY, mirroring at middle,
+// while applying cell texture from 0x80..+6
+// = 1803 bytes, can jump to middle (2+18*row)
 char xorcolumn[2+100*(3+2+3+2+2+3+3)+1]; // big. fast. lol
-char clrcolumn[2+100*3+1];   // y
-char cpycolumn[200*(3+3)+1]; // x->y
 
+// graphics clear top half column regY
+// = 303 bytes, can jump to middle (2+3*row)
+char clrcolumn[2+100*3+1];
+
+// graphics copy whole column regX to regY
+// = 1201 bytes, can jump to middle (6*row)
+char cpycolumn[200*(3+3)+1];
+
+// generate various graphical speedups
 void genxorcolumn() {
   int i=0, r= (int)HIRESSCREEN, rr= (int)HIRESSCREEN+HIRESSIZE-40;
   char * p= xorcolumn-1;
