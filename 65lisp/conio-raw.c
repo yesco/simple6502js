@@ -252,6 +252,12 @@ void init_conioraw() {
 
 unsigned int kbhit();
 
+// approximate...
+void waitms(long w) {
+  w <<= 3;
+  while(--w>=0);
+}
+
 // wait HS hectoseconds
 //   0: wait till key pressed
 // -HS: wait till HS or key pressed, whichever first
