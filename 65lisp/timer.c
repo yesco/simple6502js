@@ -31,17 +31,23 @@ void interTimer() {
 
   // (- 65536 59595)
 
+  // (- 65535 1012)
+
+//  asm("pha");
+
   asm("clc");
   asm("lda %v+0", countTime);
 //  asm("adc #$0b");
 //  asm("adc #$ff"); // 25/5082
-  asm("adc #$06"); // 25/7127
+//  asm("adc #$06"); // 25/7127
+  asm("adc #$0b");  // 25/13xxx !
   asm("sta %v+0", countTime);
 
   asm("lda %v+1", countTime);
 //  asm("adc #$fc");
+   asm("adc #$fc");  // 25/13xxx !
 //  asm("adc #$ff");// 25/5082
-  asm("adc #$fc"); // 25/7127
+//  asm("adc #$fc"); // 25/7127
   asm("sta %v+1", countTime);
 
   asm("lda %v+2", countTime);
@@ -51,7 +57,9 @@ void interTimer() {
   asm("lda %v+3", countTime);
   asm("adc #0");
   asm("sta %v+3", countTime);
-  //asm("rti");
+
+//  asm("pla");
+//  asm("rti");
 }
 
 void rti() {
@@ -71,7 +79,14 @@ void init_timer() {
     // We're running under an ORIC BASIC ROM!
   }
 
-  *(int*)0x228= (int)rti;
+  // TODO: not doing anyhting????? wtf
+  //*(int*)0x228= (int)rti; // NMI
+  //*(int*)0x245= (int)rti;
+  //*(int*)0x245= (int)interTimer;
+
+  // 25/8215 - better if patch in my own, but...
+  // how is oric interrupts still being called?
+  //*(int*)0x228= (int)interTimer;
 
   TIMER= TIMER_START;
   // TODO: Research - what does it do on ROM-only?
@@ -188,7 +203,7 @@ void main() {
 
   // TODO: disable all basic interrupts!
 
-  printf("Hello Interrupt! %u => %u\n", TIMER, TIMER_START);
+  printf("Hello Interrupt! %u => %u %4X\n", TIMER, TIMER_START, *(int*)(0xffff-1-2));
   init_timer();
 
   printf("Hello Interrupt!\n");

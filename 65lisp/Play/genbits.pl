@@ -7,4 +7,9 @@ for $i (0..255) {
     $d= $b;
     $d=~ s/0/_/ge;
     print sprintf("#define B_$d     %3d\n", $i);
+    # for "sprites"
+    if ($i<64) {
+        $d=~ s/^..//;
+        print sprintf("#define    _$d     %3d,\n", $i+64);
+    }
 }
