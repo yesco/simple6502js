@@ -159,6 +159,11 @@ void b(char x, char y) {
 }
 
 #define N 7
+//#define N 4
+//#define N 16
+//#define N 1
+//#define N 2
+
 sprite sploc[N];
 
 void spmove(char* sp) {
@@ -199,8 +204,22 @@ void spmove(char* sp) {
 // 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
 // 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
 // 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
-//
+// N=1:   915cs 109sp/s 10939cfps 
+// N=2:   914cs 109sp/s  5481cfps
+// N=4:   928cs 108sp/s  2704cfps
+// N=7:                  1507cfps
+// N=16:                  608cfps
+
 // = (/ (* 11 16 1001 100) 751.0)
+
+// FPS= 105/N !!! these are large 66x16=1056px sprites!
+
+//                          w     h  N
+// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
+
+// vic 64: 8 sprites 24x21
+// ORIC: 8 sprites 24x24
+// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 void main() {
   char i;
   unsigned int T;
@@ -210,8 +229,8 @@ void main() {
 
   for(i=0; i<N; ++i) {
     sprite* s= sploc+i;
-    s->x= i*25;
-    s->y= i*25;
+    s->x= 130/N*i;
+    s->y= 180/N*i;
     //s->dx= +1;
     s->dx= 0;
     s->dy= +i*11/10+1;
@@ -225,7 +244,7 @@ void main() {
     if (0) { // cost 10%?
       unsigned int X= T-time();
       gotoxy(0,25);
-      printf("%d: %ucs %ldsp/s %ldcfps  ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X);
+      printf("%d: %ucs %ldsp/s %ldcfps  ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X);
     }
   }
 
@@ -234,7 +253,7 @@ void main() {
     long bytes= ndraw*enterprise[0]*enterprise[1];
     gotoxy(0,25);
     // TODO: Bps is all wrong? why?
-    printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X, bytes*100L/X);
+    printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X, bytes*100L/X);
   }
 }
 
