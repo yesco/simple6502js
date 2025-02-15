@@ -195,7 +195,8 @@ void spmove(char* sp) {
 //       1627cs -Oi but memcpy still not inlined...
 // 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
 // 1001:  978cs 102sp/s 1462cfps 18374 Bps (gfill: asm for memset)
-// = (/ (* 102 11 16 1001) 978.0)
+// 1001   966cs 103sp/s 1480cfps 18784 Bps (gfill: all asm)
+// = (/ (* 103 11 16 1001) 966.0)
 void main() {
   char i;
   unsigned int T;
