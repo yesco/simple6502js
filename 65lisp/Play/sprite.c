@@ -94,11 +94,11 @@ int ndraw= 0;
 
 void drawsprite(char x, char y, char* sp) {
   static char w, h, *l;
-  w= *sp; h= *++sp;
+  w= *sp; h= sp[1];
   l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
 
   // TODO: clipping?
-  sp-= w-1;
+  sp+= -w+2;
   do {
     memcpy(l+= 40, sp+= w, w);
   } while(--h);
