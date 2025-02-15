@@ -127,23 +127,24 @@ void drawsprite(char x, char y, char* sp_) {
 }
 
 void erasesprite(sprite* s, char* sp) {
-  char w= *sp, h= *++sp;
   // TODO: clipping?
 
   // clever
 #ifndef FOO
-  if (s->dy > 0) {
-    gfill(div6[s->x], s->y, w, s->dy, 64);
-  } else if (s->dy < 0) {
-    h-= s->dy-1;
-    gfill(div6[s->x], s->y+h, w, -s->dy, 64);
+  if (s->dx==0) {
+    if (s->dy > 0) {
+      gfill(div6[s->x], s->y, *sp, s->dy, 64);
+    } else if (s->dy < 0) {
+      gfill(div6[s->x], s->y+s->dy+1+sp[1], *sp, -s->dy, 64);
+    }
 #else
- if (0) {
+  if (0) {
 #endif
   // TODO:
-  //} else if (s->dx >= 6) { 
+  //} else if (s->dx >= 6) {  /// and s->dy
   //} else if (-s->dx >= 6) {
   } else {
+    char w= *sp, h= *++sp;
     // clear all - flickers
     gfill(div6[s->x], s->y, w, h, 64);
   }
@@ -197,8 +198,9 @@ void spmove(char* sp) {
 // 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
 // 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
 // 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
+// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
 //
-// = (/ (* 11 16 1001 100) 952.0)
+// = (/ (* 11 16 1001 100) 751.0)
 void main() {
   char i;
   unsigned int T;
@@ -212,7 +214,7 @@ void main() {
     s->y= i*25;
     //s->dx= +1;
     s->dx= 0;
-    s->dy= +i*13/10+1;
+    s->dy= +i*11/10+1;
     b(s->x, s->y);
   }
 
