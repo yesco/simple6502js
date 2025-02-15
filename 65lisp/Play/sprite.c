@@ -194,9 +194,11 @@ void spmove(char* sp) {
 //       1689 rowaddr used only initially
 //       1627cs -Oi but memcpy still not inlined...
 // 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
-// 1001:  978cs 102sp/s 1462cfps 18374 Bps (gfill: asm for memset)
-// 1001   966cs 103sp/s 1480cfps 18784 Bps (gfill: all asm)
-// = (/ (* 103 11 16 1001) 966.0)
+// 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
+// 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
+// 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
+//
+// = (/ (* 11 16 1001 100) 952.0)
 void main() {
   char i;
   unsigned int T;
@@ -218,17 +220,18 @@ void main() {
   while (ndraw<=1000) {
     spmove(enterprise);
 
-    if (0) {
-      unsigned X= T-time();
+    if (0) { // cost 10%?
+      unsigned int X= T-time();
       gotoxy(0,25);
       printf("%d: %ucs %ldsp/s %ldcfps  ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X);
     }
   }
 
   if (1) {
-    unsigned X= T-time();
+    unsigned int X= T-time();
     long bytes= ndraw*enterprise[0]*enterprise[1];
     gotoxy(0,25);
+    // TODO: Bps is all wrong? why?
     printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X, bytes*100L/X);
   }
 }
