@@ -92,16 +92,36 @@ int ndraw= 0;
 //
 // see main for new bench using 1001 updates
 
-void drawsprite(char x, char y, char* sp) {
+void drawsprite(char x, char y, char* sp_) {
   static char w, h, *l;
+  static char* sp;
+  sp= sp_;
   w= *sp; h= sp[1];
   //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
   l= rowaddr[y] + div6[x] - 40;
 
   // TODO: clipping?
   sp+= -w+2;
+  *(int*)0x90= sp;
+  *(int*)0x92= l;
   do {
-    memcpy(l+= 40, sp+= w, w);
+    *(int*)0x92+= 40;
+    *(int*)0x90+= w;
+
+    if (0) {
+      //memcpy(l+= 40, sp+= w, w);
+      memcpy(*(int*)0x92, *(int*)0x90, w);
+    } else {
+      asm("ldy #0");
+      asm("ldx %v", w);
+    next:
+      asm("lda ($90),y"); // a= sp[y];
+      asm("sta ($92),y"); // l[y]= a;
+      //
+      asm("iny");
+      asm("dex");
+      asm("bne %g", next);
+    }
   } while(--h);
 }
 
@@ -171,6 +191,8 @@ void spmove(char* sp) {
 // 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
 // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
 //       1689 rowaddr used only initially
+//       1627cs -Oi but memcpy still not inlined...
+// 1001: 1127cs 88sp/s 1268cfps 13756 Bps (asm memcpy)
 void main() {
   char i;
   unsigned int T;
