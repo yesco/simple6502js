@@ -95,7 +95,8 @@ int ndraw= 0;
 void drawsprite(char x, char y, char* sp) {
   static char w, h, *l;
   w= *sp; h= sp[1];
-  l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
+  //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
+  l= rowaddr[y] + div6[x] - 40;
 
   // TODO: clipping?
   sp+= -w+2;
@@ -163,12 +164,13 @@ void spmove(char* sp) {
 // N=7 1001 1836 cs 54 hsp/s 778 hfps
 // N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
 
-// - bigger than ever... 11x16
+// - bigger than ever... 11*6 x 16 sprite N=7 sprites
+//
 // 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
 // 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
 // 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
 // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
-
+//       1689 rowaddr used only initially
 void main() {
   char i;
   unsigned int T;
