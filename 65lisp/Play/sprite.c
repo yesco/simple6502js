@@ -112,6 +112,7 @@ void drawsprite(char x, char y, char* sp_) {
       //memcpy(l+= 40, sp+= w, w);
       memcpy(*(int*)0x92, *(int*)0x90, w);
     } else {
+      // specialized memcpy (w<256)
       asm("ldy #0");
       asm("ldx %v", w);
     next:
@@ -192,7 +193,9 @@ void spmove(char* sp) {
 // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
 //       1689 rowaddr used only initially
 //       1627cs -Oi but memcpy still not inlined...
-// 1001: 1127cs 88sp/s 1268cfps 13756 Bps (asm memcpy)
+// 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
+// 1001:  978cs 102sp/s 1462cfps 18374 Bps (gfill: asm for memset)
+// = (/ (* 102 11 16 1001) 978.0)
 void main() {
   char i;
   unsigned int T;

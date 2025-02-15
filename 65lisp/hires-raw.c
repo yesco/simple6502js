@@ -119,10 +119,25 @@ void text() {
 void gfill(char c, char r, char w, char h, char v) {
   // TODO: adjust so not out of screen?
   // TODO: can share with lores?
+  static char ww;
   char* p= HIRESSCREEN+(5*(r-1))*8+c;
+  ww= w;
+
+  *(int*)0x90= p-1;
+
   for(; h; --h) {
     //for(cell= w; cell; --cell) p[cell]=v; // 619hs
-    memset(p+= 40, v, w); // 100x 10x10 takes 337hs !
+    //memset(p+= 40, v, w); // 100x 10x10 takes 337hs !
+
+    *(int*)0x90+= 40;
+    // specialized memset (w<256)
+    asm("lda #$40");
+    asm("ldy %v", ww);
+  next:
+    asm("sta ($90),y"); // l[y]= 0x40;
+    //
+    asm("dey");
+    asm("bne %g", next);
   }
 }
 
