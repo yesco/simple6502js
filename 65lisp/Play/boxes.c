@@ -158,6 +158,9 @@ void spmove(char* sp) {
   }
 }
 
+// N=7 1001 1836 cs 54 hsp/s 778 hfps
+// N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
+
 void main() {
   char i;
   unsigned int T;
@@ -179,11 +182,18 @@ void main() {
   while (ndraw<=1000) {
     spmove(enterprise);
 
-    if (1) {
+    if (0) {
       unsigned X= T-time();
       gotoxy(0,25);
-      printf("%d: %u cs ... %ld hsp/s\n", ndraw, X, ndraw*100L/X);
+      printf("%d: %ucs %ldsp/s %ldcfps  ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X);
     }
+  }
+
+  if (1) {
+    unsigned X= T-time();
+    long bytes= ndraw*enterprise[0]*enterprise[1];
+    gotoxy(0,25);
+    printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/7/X, bytes*100L/X);
   }
 }
 
