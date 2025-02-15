@@ -7,6 +7,7 @@ char T,nil,doapply1,print;
 
 #include "../bits.h"
 
+// - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
 char enterprise[]= {
   11, 16,
   _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______
@@ -88,9 +89,13 @@ int ndraw= 0;
 // 113 cs - NO ERASE!
 // 127 cs - clever Y-erase
 // 154 cs - 11 x 16 before 6 x 15 (/ (* 11.0 16) (* 6.0 15)) = 2x!
+//
+// see main for new bench using 1001 updates
+
 void drawsprite(char x, char y, char* sp) {
-  char w= *sp, h= *++sp,
-    * l= HIRESSCREEN + (5*(y-1))*8 + div6[x], * p= l;
+  static char w, h, *l;
+  w= *sp; h= *++sp;
+  l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
 
   // TODO: clipping?
   sp-= w-1;
@@ -101,16 +106,18 @@ void drawsprite(char x, char y, char* sp) {
 
 void erasesprite(sprite* s, char* sp) {
   char w= *sp, h= *++sp;
-//  ,   * l= HIRESSCREEN + (5*(s->y-1))*8 + div6[s->x];
-
   // TODO: clipping?
 
   // clever
+#ifndef FOO
   if (s->dy > 0) {
     gfill(div6[s->x], s->y, w, s->dy, 64);
   } else if (s->dy < 0) {
     h-= s->dy-1;
     gfill(div6[s->x], s->y+h, w, -s->dy, 64);
+#else
+ if (0) {
+#endif
   // TODO:
   //} else if (s->dx >= 6) { 
   //} else if (-s->dx >= 6) {
@@ -128,11 +135,6 @@ void b(char x, char y) {
   drawsprite(x, y, enterprise);
 }
 
-void erase(sprite* s) {
-  //b(x, y);
-  erasesprite(s, enterprise);
-}
-
 #define N 7
 sprite sploc[N];
 
@@ -144,7 +146,7 @@ void spmove(char* sp) {
     if (!s->dx && !s->dy) continue;
 
     // undraw
-    erase(s);
+    erasesprite(s, enterprise);
 
     // move
   rex:
@@ -160,6 +162,12 @@ void spmove(char* sp) {
 
 // N=7 1001 1836 cs 54 hsp/s 778 hfps
 // N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
+
+// - bigger than ever... 11x16
+// 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
+// 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
+// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
+// 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
 
 void main() {
   char i;
