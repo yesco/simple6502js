@@ -1,11 +1,71 @@
 // Bouncy boxes in graphics
 
+// "Tomorrow, tomorrow, tomorrow".... story girl boy...
+// creating movie, diable, fictional RPG gmae inside the novel
 #define MAIN
 #include "../hires-raw.c"
 
 char T,nil,doapply1,print;
 
 #include "../bits.h"
+
+char disc[]= {
+  24/6, 24,
+//123456 123456 123456 123456
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xx___ ___xx_ ______
+  ______ x_____ _____x ______
+  _____x ______ ______ x_____
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  _____x ______ ______ x_____
+  ______ x_____ _____x ______
+  ______ _xx___ ___xx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+  42,
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xxxxx xxxxx_ ______
+  ______ xxxxxx xxxxxx ______
+  _____x xxxxxx xxxxxx x_____
+  ____xx xxxxxx xxxxxx xx____
+  ____xx xxxxxx xxxxxx xx____
+  ___xxx xxxxxx xxxxxx xxx___
+  ___xxx xxxxxx xxxxxx xxx___
+  ___xxx xxxxxx xxxxxx xxx___
+
+  ___xxx xxxxxx xxxxxx xxx___
+  ___xxx xxxxxx xxxxxx xxx___
+  ___xxx xxxxxx xxxxxx xxx___
+  ____xx xxxxxx xxxxxx xx____
+  ____xx xxxxxx xxxxxx xx____
+  _____x xxxxxx xxxxxx x_____
+  ______ xxxxxx xxxxxx ______
+  ______ _xxxxx xxxxx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+};
 
 // - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
 char enterprise[]= {
@@ -77,11 +137,13 @@ void box(char x, char y, char w, char h) {
 typedef struct sprite {
   int x, y;
   signed char dx, dy;
+  char* sprite;
+  char* mask;
 } sprite;
 
 int ndraw= 0;
 
-// 409 cs/100
+// 409 cs/100 fps? 1.ffps
 // 192 cs - memcpy, memset
 // 191 cs - sp+= 40 inline
 // 201 cs - gfill instead of memset... 5%
@@ -92,13 +154,13 @@ int ndraw= 0;
 //
 // see main for new bench using 1001 updates
 
-void drawsprite(char x, char y, char* sp_) {
+void drawsprite(sprite* s) {
   static char w, h, *l;
   static char* sp;
-  sp= sp_;
+  sp= s->sprite;
   w= *sp; h= sp[1];
   //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
-  l= rowaddr[y] + div6[x] - 40;
+  l= rowaddr[s->y] + div6[s->x] - 40;
 
   // TODO: clipping?
   sp+= -w+2;
@@ -153,9 +215,7 @@ void erasesprite(sprite* s, char* sp) {
 #define Z 37
 
 void b(char x, char y) {
-  ++ndraw;
-  //box(x, y, Z, Z);
-  drawsprite(x, y, enterprise);
+  box(x, y, Z, Z);
 }
 
 #define N 7
@@ -174,7 +234,7 @@ void spmove(char* sp) {
     if (!s->dx && !s->dy) continue;
 
     // undraw
-    erasesprite(s, enterprise);
+    erasesprite(s, s->sprite);
 
     // move
   rex:
@@ -183,8 +243,9 @@ void spmove(char* sp) {
     if ((s->y+= s->dy) + sp[1] >=200 || s->y < 0) { s->dy= -s->dy; goto rey; }
 
     // draw
-    b(s->x, s->y);
-
+    ++ndraw;
+    drawsprite(s);
+    //b(s->x, s->y);
   }
 }
 
@@ -204,6 +265,8 @@ void spmove(char* sp) {
 // 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
 // 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
 // 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
+// 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
+
 // N=1:   915cs 109sp/s 10939cfps 
 // N=2:   914cs 109sp/s  5481cfps
 // N=4:   928cs 108sp/s  2704cfps
@@ -234,7 +297,13 @@ void main() {
     //s->dx= +1;
     s->dx= 0;
     s->dy= +i*11/10+1;
-    b(s->x, s->y);
+    s->sprite= enterprise;
+    {
+      int markpos= 2+s->sprite[0]*s->sprite[1];
+      s->mask= (42==s->sprite[markpos])?
+        s->sprite+markpos: NULL;
+    }
+    drawsprite(s);
   }
 
   T= time();

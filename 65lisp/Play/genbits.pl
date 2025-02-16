@@ -11,5 +11,7 @@ for $i (0..255) {
     if ($i<64) {
         $d=~ s/^..//;
         print sprintf("#define    _$d     %3d,\n", $i+64);
+        $d=~ s/1/x/g;
+        print sprintf("#define     $d     %3d,\n", $i+64);
     }
 }
