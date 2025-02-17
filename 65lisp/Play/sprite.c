@@ -9,10 +9,24 @@ char T,nil,doapply1,print;
 
 #include "../bits.h"
 
+//#define WIDER
+//  7.39fps loss of fps -30% fps
+// 10.62fps - normal xor
+
+// TALLER
+//  6.13fps ever more costly: -42% fps
+// 10.62fps - normal xor
+
+#define BIGG
+
 char disc[]= {
+
+#ifdef BIGG 
+
+#ifdef WIDER
   24/6*2, 24,
 //123456 123456 123456 123456
-  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ _____x
   ______ ______ ______ ______ ______ ______ ______ ______
   ______ ______ ______ ______ ______ ______ ______ ______
   ______ ___xxx xxx___ ______ ______ ______ ______ ______
@@ -39,9 +53,9 @@ char disc[]= {
 
 // - bitmask
 //123456 123456 123456 123456
-  77,
-//  42,
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxx_
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
@@ -66,7 +80,177 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+#else // WIDER else TALLER
+  24/6, 24*2,
+//123456 123456 123456 123456
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xx___ ___xx_ ______
+  ______ x_____ _____x ______
+  _____x ______ ______ x_____
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  _____x ______ ______ x_____
+  ______ x_____ _____x ______
+  ______ _xx___ ___xx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+#endif // WIDER
+#else // BIGG else ...
+  24/6, 24,
+//123456 123456 123456 123456
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xx___ ___xx_ ______
+  ______ x_____ _____x ______
+  _____x ______ ______ x_____
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  _____x ______ ______ x_____
+  ______ x_____ _____x ______
+  ______ _xx___ ___xx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+#endif BIGG
 };
+
+
 
 // - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
 char enterprise[]= {
@@ -138,7 +322,7 @@ void box(char x, char y, char w, char h) {
 typedef struct sprite {
   int x, y;
   signed char dx, dy;
-  char* sprite;
+  char* bitmap;
   char* mask;
 } sprite;
 
@@ -158,7 +342,7 @@ int ndraw= 0;
 void drawsprite(sprite* s) {
   static char w, h, *l;
   static char * sp, * msk;
-  sp= s->sprite;
+  sp= s->bitmap;
   msk= s->mask;
   w= *sp; h= sp[1];
   //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
@@ -173,15 +357,18 @@ void drawsprite(sprite* s) {
     asm("ldy #0");
     asm("ldx %v", w);
   next:
-    if (msk) {
+    //if (msk) {
       asm("lda ($92),y"); // a = l[y];
       // TODO: two variants?
-      asm("and ($94),y"); // a&= mask[y];
-      asm("eor ($90),y"); // a|= sp[y];
-      //asm("ora #$40");
-    } else {
-      asm("lda ($90),y"); // a = sp[y];
-    }
+      //asm("and ($94),y"); // a&= mask[y];
+      asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
+      //asm("ora ($90),y"); // a|= sp[y];
+      // TODO: shouldn't need this... lol
+      // TODO: if and reset the bit eor would set it?
+      asm("ora #$40");
+  //} else {
+      //asm("lda ($90),y"); // a = sp[y];
+  //}
     asm("sta ($92),y"); // l[y]= a;
     //
     asm("iny");
@@ -196,9 +383,14 @@ void drawsprite(sprite* s) {
   } while(--h);
 }
 
-void erasesprite(sprite* s, char* sp) {
+void erasesprite(sprite* s) {
+  char* sp= s->bitmap;
+  drawsprite(s);
+
+  return;
   // TODO: clipping?
 
+  // TODO: this doesn't handle overlapping. mask?
   // clever
 #ifdef FOO
   if (s->dx==0) {
@@ -247,8 +439,8 @@ void spmove(char* sp) {
     // undraw
     // TODO: undraw in opposite order...lol
     // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
-    //erasesprite(s, s->sprite);
-    drawsprite(s);
+
+    erasesprite(s);
 
     // move
   rex:
@@ -311,11 +503,11 @@ void main() {
     //s->dx= +1;
     s->dx= 0;
     s->dy= +i*11/10+1;
-    s->sprite= disc; // enterprise;
+    s->bitmap= disc; // enterprise;
     {
-      int markpos= 2+s->sprite[0]*s->sprite[1];
-      s->mask= (42==s->sprite[markpos])?
-        s->sprite+markpos+1: NULL;
+      int markpos= 2+ s->bitmap[0] * s->bitmap[1];
+      s->mask= (42==s->bitmap[markpos])?
+        s->bitmap+markpos+1: NULL;
     }
     drawsprite(s);
   }
