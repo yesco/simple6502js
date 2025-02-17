@@ -10,61 +10,62 @@ char T,nil,doapply1,print;
 #include "../bits.h"
 
 char disc[]= {
-  24/6, 24,
+  24/6*2, 24,
 //123456 123456 123456 123456
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ___xxx xxx___ ______
-  ______ _xx___ ___xx_ ______
-  ______ x_____ _____x ______
-  _____x ______ ______ x_____
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  _____x ______ ______ x_____
-  ______ x_____ _____x ______
-  ______ _xx___ ___xx_ ______
-  ______ ___xxx xxx___ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ___xxx xxx___ ______ ______ ______ ______ ______
+  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
+  ______ x_____ _____x ______ ______ ______ ______ ______
+  _____x ______ ______ x_____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  _____x ______ ______ x_____ ______ ______ ______ ______
+  ______ x_____ _____x ______ ______ ______ ______ ______
+  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
+  ______ ___xxx xxx___ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
 
 // - bitmask
 //123456 123456 123456 123456
-  42,
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ___xxx xxx___ ______
-  ______ _xxxxx xxxxx_ ______
-  ______ xxxxxx xxxxxx ______
-  _____x xxxxxx xxxxxx x_____
-  ____xx xxxxxx xxxxxx xx____
-  ____xx xxxxxx xxxxxx xx____
-  ___xxx xxxxxx xxxxxx xxx___
-  ___xxx xxxxxx xxxxxx xxx___
-  ___xxx xxxxxx xxxxxx xxx___
+  77,
+//  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
 
-  ___xxx xxxxxx xxxxxx xxx___
-  ___xxx xxxxxx xxxxxx xxx___
-  ___xxx xxxxxx xxxxxx xxx___
-  ____xx xxxxxx xxxxxx xx____
-  ____xx xxxxxx xxxxxx xx____
-  _____x xxxxxx xxxxxx x_____
-  ______ xxxxxx xxxxxx ______
-  ______ _xxxxx xxxxx_ ______
-  ______ ___xxx xxx___ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
 };
 
 // - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
@@ -156,35 +157,42 @@ int ndraw= 0;
 
 void drawsprite(sprite* s) {
   static char w, h, *l;
-  static char* sp;
+  static char * sp, * msk;
   sp= s->sprite;
+  msk= s->mask;
   w= *sp; h= sp[1];
   //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
-  l= rowaddr[s->y] + div6[s->x] - 40;
+  l= rowaddr[s->y] + div6[s->x];
 
   // TODO: clipping?
-  sp+= -w+2;
-  *(int*)0x90= sp;
+  *(int*)0x90= sp+2;
   *(int*)0x92= l;
+  *(int*)0x94= msk;
   do {
+    // specialized memcpy (w<256)
+    asm("ldy #0");
+    asm("ldx %v", w);
+  next:
+    if (msk) {
+      asm("lda ($92),y"); // a = l[y];
+      // TODO: two variants?
+      asm("and ($94),y"); // a&= mask[y];
+      asm("eor ($90),y"); // a|= sp[y];
+      //asm("ora #$40");
+    } else {
+      asm("lda ($90),y"); // a = sp[y];
+    }
+    asm("sta ($92),y"); // l[y]= a;
+    //
+    asm("iny");
+    asm("dex");
+    asm("bne %g", next);
+    
+    // step
     *(int*)0x92+= 40;
     *(int*)0x90+= w;
+    *(int*)0x94+= w;
 
-    if (0) {
-      //memcpy(l+= 40, sp+= w, w);
-      memcpy(*(int*)0x92, *(int*)0x90, w);
-    } else {
-      // specialized memcpy (w<256)
-      asm("ldy #0");
-      asm("ldx %v", w);
-    next:
-      asm("lda ($90),y"); // a= sp[y];
-      asm("sta ($92),y"); // l[y]= a;
-      //
-      asm("iny");
-      asm("dex");
-      asm("bne %g", next);
-    }
   } while(--h);
 }
 
@@ -192,7 +200,7 @@ void erasesprite(sprite* s, char* sp) {
   // TODO: clipping?
 
   // clever
-#ifndef FOO
+#ifdef FOO
   if (s->dx==0) {
     if (s->dy > 0) {
       gfill(div6[s->x], s->y, *sp, s->dy, 64);
@@ -228,13 +236,19 @@ sprite sploc[N];
 
 void spmove(char* sp) {
   char i;
+
+//  gclear();
+
   for(i=0; i<N; ++i) {
     sprite* s= sploc+i;
 
     if (!s->dx && !s->dy) continue;
 
     // undraw
-    erasesprite(s, s->sprite);
+    // TODO: undraw in opposite order...lol
+    // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
+    //erasesprite(s, s->sprite);
+    drawsprite(s);
 
     // move
   rex:
@@ -257,7 +271,7 @@ void spmove(char* sp) {
 // 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
 // 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
 // 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
-// 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
+ // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
 //       1689 rowaddr used only initially
 //       1627cs -Oi but memcpy still not inlined...
 // 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
@@ -292,16 +306,16 @@ void main() {
 
   for(i=0; i<N; ++i) {
     sprite* s= sploc+i;
-    s->x= 130/N*i;
+    s->x= 130-130/N*i;
     s->y= 180/N*i;
     //s->dx= +1;
     s->dx= 0;
     s->dy= +i*11/10+1;
-    s->sprite= enterprise;
+    s->sprite= disc; // enterprise;
     {
       int markpos= 2+s->sprite[0]*s->sprite[1];
       s->mask= (42==s->sprite[markpos])?
-        s->sprite+markpos: NULL;
+        s->sprite+markpos+1: NULL;
     }
     drawsprite(s);
   }
