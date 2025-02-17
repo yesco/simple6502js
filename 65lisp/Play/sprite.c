@@ -9,15 +9,18 @@ char T,nil,doapply1,print;
 
 #include "../bits.h"
 
+//#define BIGG
+
 //#define WIDER
 //  7.39fps loss of fps -30% fps
+//  8.29fps w drawsprite loop in asm
 // 10.62fps - normal xor
+// 12.73fps !- normal xor w drawsprite loop in asm!
 
 // TALLER
 //  6.13fps ever more costly: -42% fps
+//  7.57fps w - drawsprite loop in asm!
 // 10.62fps - normal xor
-
-#define BIGG
 
 char disc[]= {
 
@@ -345,13 +348,15 @@ void drawsprite(sprite* s) {
   sp= s->bitmap;
   msk= s->mask;
   w= *sp; h= sp[1];
-  //l= HIRESSCREEN + (5*(y-1))*8 + div6[x];
+
+  if (0) {
   l= rowaddr[s->y] + div6[s->x];
 
   // TODO: clipping?
   *(int*)0x90= sp+2;
   *(int*)0x92= l;
   *(int*)0x94= msk;
+
   do {
     // specialized memcpy (w<256)
     asm("ldy #0");
@@ -379,8 +384,60 @@ void drawsprite(sprite* s) {
     *(int*)0x92+= 40;
     *(int*)0x90+= w;
     *(int*)0x94+= w;
-
   } while(--h);
+
+  } else {
+    // new optimization
+    static char ww;
+    static char hh;
+
+    ww= 40-w; hh= h;
+
+  l= rowaddr[s->y] + div6[s->x];
+
+  // TODO: clipping?
+  *(int*)0x90= sp+2;
+  *(int*)0x92= l;
+  *(int*)0x94= msk;
+
+  asm("ldy #0");
+  asm("clc"); // set it for once top!
+
+  nextrow:
+
+  // specialized memcpy (w<256)
+  asm("ldx %v", w);
+
+  nextcell:
+  asm("lda ($92),y"); // a = l[y];
+  //asm("and ($94),y"); // a&= mask[y];
+  asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
+  //asm("ora ($90),y"); // a|= sp[y];
+  asm("ora #$40");
+  // OLD overwrite! - very fast!
+  //asm("lda ($90),y"); // a = sp[y];
+  asm("sta ($92),y"); // l[y]= a;
+  //
+  asm("iny");
+  asm("dex");
+  asm("bne %g", nextcell);
+    
+  // *(int*)0x92+= 40-w (= ww);
+  asm("clc"); // set it for once top!
+  asm("lda $92");
+  asm("adc %v", ww);
+  asm("sta $92");
+
+  asm("bcc %g", nott);
+  asm("inc $93");
+  asm("clc"); // make it always clear!
+  nott:
+
+  // ... while(--h);
+  asm("dec %v", hh);
+  asm("bne %g", nextrow);
+
+  }
 }
 
 void erasesprite(sprite* s) {
@@ -472,6 +529,7 @@ void spmove(char* sp) {
 // 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
 // 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
 // 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
+// 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
 
 // N=1:   915cs 109sp/s 10939cfps 
 // N=2:   914cs 109sp/s  5481cfps
@@ -503,7 +561,8 @@ void main() {
     //s->dx= +1;
     s->dx= 0;
     s->dy= +i*11/10+1;
-    s->bitmap= disc; // enterprise;
+    // s->bitmap= disc;
+    s->bitmap= enterprise;
     {
       int markpos= 2+ s->bitmap[0] * s->bitmap[1];
       s->mask= (42==s->bitmap[markpos])?
