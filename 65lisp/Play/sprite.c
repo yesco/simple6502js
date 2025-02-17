@@ -362,7 +362,7 @@ void drawsprite(sprite* s) {
     asm("ldy #0");
     asm("ldx %v", w);
   next:
-    //if (msk) {
+    if (0) {
       asm("lda ($92),y"); // a = l[y];
       // TODO: two variants?
       //asm("and ($94),y"); // a&= mask[y];
@@ -371,10 +371,13 @@ void drawsprite(sprite* s) {
       // TODO: shouldn't need this... lol
       // TODO: if and reset the bit eor would set it?
       asm("ora #$40");
-  //} else {
-      //asm("lda ($90),y"); // a = sp[y];
-  //}
-    asm("sta ($92),y"); // l[y]= a;
+      asm("sta ($92),y"); // l[y]= a;
+    } else {
+      asm("lda ($90),y"); // a = sp[y];
+      asm("sta ($92),y"); // l[y]= a;
+    }
+
+
     //
     asm("iny");
     asm("dex");
@@ -409,6 +412,9 @@ void drawsprite(sprite* s) {
   asm("ldx %v", w);
 
   nextcell:
+
+    if (0) {
+
   asm("lda ($92),y"); // a = l[y];
   //asm("and ($94),y"); // a&= mask[y];
   asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
@@ -417,11 +423,18 @@ void drawsprite(sprite* s) {
   // OLD overwrite! - very fast!
   //asm("lda ($90),y"); // a = sp[y];
   asm("sta ($92),y"); // l[y]= a;
+    
+    } else {
+      // old style overwrite
+      asm("lda ($90),y"); // a = sp[y];
+      asm("sta ($92),y"); // l[y]= a;
+    }
+
   //
   asm("iny");
   asm("dex");
   asm("bne %g", nextcell);
-    
+
   // *(int*)0x92+= 40-w (= ww);
   asm("clc"); // set it for once top!
   asm("lda $92");
@@ -442,14 +455,14 @@ void drawsprite(sprite* s) {
 
 void erasesprite(sprite* s) {
   char* sp= s->bitmap;
-  drawsprite(s);
+  // for xor
+  //drawsprite(s); return;
 
-  return;
   // TODO: clipping?
 
   // TODO: this doesn't handle overlapping. mask?
   // clever
-#ifdef FOO
+#ifndef NOTCLEVER
   if (s->dx==0) {
     if (s->dy > 0) {
       gfill(div6[s->x], s->y, *sp, s->dy, 64);
@@ -530,6 +543,9 @@ void spmove(char* sp) {
 // 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
 // 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
 // 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
+// 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
+// ---- TODO: ^^^----- why is it slower? erasesprite flicker
+// 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
 
 // N=1:   915cs 109sp/s 10939cfps 
 // N=2:   914cs 109sp/s  5481cfps
