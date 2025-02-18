@@ -295,30 +295,38 @@ void drawFast(int dx, int dy, char v) {
       m= PIXMASK[mi];
       s= 0;
       p= HIRESSCREEN+40*gcury+q;
+      v= *p;
 
       while(--i) {
+        static char v;
 
         // adjust y
         if ((s+= ady) > adx) {
+          *p= v;
           s-=adx;
           if (dy>=0) {
             if ((p-= 40)<HIRESSCREEN) break;
           } else {            
             if ((p+= 40)>=HIRESEND) break;
           }
+          v= *p;
         }
 
         // plot it
         if (*p & 64) {
           switch(gmode) { // about 10% overhead
-          case 0: *p &= ~m; break;
-          case 1: *p |= m;  break;
-          case 2: *p ^= m;  break;
+          case 0: v &= ~m; break;
+          case 1: v |= m;  break;
+          case 2: v ^= m;  break;
           }
         } // or steal ink attributes?
 
         // step x, wrap around bit
-        if ((m<<=1)==64) m=1,--p;
+        if ((m<<=1)==64) {
+          *p= v;
+          m=1,--p;
+          v= *p;
+        }
       }
     }
   } else { // dy >= dx
@@ -526,12 +534,12 @@ void main() {
 
   gclear();
   // turn off, cursor keeps inverting random bit on text screen!
-  asm("SEI"); 
+  //asm("SEI"); 
 
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(8) {
+  switch(6) {
 
   case 11:
     // compress clear screen
@@ -602,9 +610,11 @@ void main() {
   case 6: 
     // square turning
     //
-    // BASIC: 7.47s, DLFAT: 3.75s
+    // BASIC: 7.47s, DFLAT: 3.75s
     // me ... 4.64s with bounds check, pure C!
     //    ( 4.40?s if hardcode xor)
+    // me: 3.87s!
+    //     2.97 if using static cache v for adx>ady
     #define M (200-1)
     for(j=0; j<=M; j+= 10) {
       gcurx= j;   gcury=0;   draw(M-j, j,   2);
@@ -713,7 +723,8 @@ void main() {
       }
     }
   }
-  gotoxy(25,25); printf(" TIME %d hs", t-time());
+  gotoxy(25,25); printf(" TIME %d hs ", t-time());
+  cgetc();
   hirescompress();
 
   //text();
