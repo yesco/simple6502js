@@ -76,7 +76,9 @@ void init_hiresraw() {
   // init lookup table
   for(j=0; j<240; ++j) {
     div6[j]= j/6;
+    // TODO: remove one?
     mod6[j]= j%6;
+    // TODO: remove?
     mask6[j]= PIXMASK[mod6[j]];
     rowaddr[j]= HIRESSCREEN + 40*j;
   }
@@ -331,23 +333,89 @@ void drawFast(int dx, int dy, char v) {
 
     // TODO: test...
     p= rowaddr[gcury] + div6[gcurx] - 40;
-    m= mod6[gcurx];
+    m= PIXMASK[mod6[gcurx]];
 
     // TODO: asm
     switch(gmode) {
     case 0: 
       m= (~m) | 64;
-      while(--ady!=0) *(p+=40) &= m;
+      // while(--ady!=0) *(p+=40) &= m;
+      {
+        asm("ldy #0");
+        asm("clc");
+        asm("ldx %v", ady); // < 256
+      clrnext:
+        // p += 40
+        asm("clc");
+        asm("lda %v", p);
+        asm("adc #40");
+        asm("sta %v", p);
+        asm("bcc %g", clrnoinc);
+        asm("inc %v+1", p);
+        asm("clc");
+      clrnoinc:
+
+        asm("lda (%v),y", p);
+        asm("and %v", m);
+        asm("sta (%v),y", p);
+        
+        asm("dex");
+        asm("bne %g", clrnext);
+      }
       return;
     case 1:
       m|= 64;
-      while(--ady!=0) *(p+=40) |= m;
+      // while(--ady!=0) *(p+=40) |= m; // 40B
+      { // 26B !
+        // 980->220cs!
+        asm("ldy #0");
+        asm("clc");
+        asm("ldx %v", ady); // < 256
+      next:
+        // p += 40
+        asm("clc");
+        asm("lda %v", p);
+        asm("adc #40");
+        asm("sta %v", p);
+        asm("bcc %g", noinc);
+        asm("inc %v+1", p);
+        asm("clc");
+      noinc:
+
+        asm("lda (%v),y", p);
+        asm("ora %v", m);
+        asm("sta (%v),y", p);
+        
+        asm("dex");
+        asm("bne %g", next);
+      }
       return;
     case 2:
-      while(--ady!=0) *(p+=40) ^= m;
+      //while(--ady!=0) *(p+=40) ^= m;
+      {
+        asm("ldy #0");
+        asm("clc");
+        asm("ldx %v", ady); // < 256
+      eornext:
+        // p += 40
+        asm("clc");
+        asm("lda %v", p);
+        asm("adc #40");
+        asm("sta %v", p);
+        asm("bcc %g", eornoinc);
+        asm("inc %v+1", p);
+        asm("clc");
+      eornoinc:
+
+        asm("lda (%v),y", p);
+        asm("eor %v", m); // only difference!
+        asm("sta (%v),y", p);
+        
+        asm("dex");
+        asm("bne %g", eornext);
+      }
       return;
     }
-
     return;
 
   } else if (adx>ady) {
@@ -801,14 +869,25 @@ void main() {
     }
 
   case 12: 
-    // fill screen by lines L\
-    // 259 cs using old lines, ragged right? lol BUG
-    //  63 cs for j>= 11
-    for(j=0; j<200; ++j) {
-      // w >= 11  works
-      //if (j>=11) { gcurx= 0; gcury=j; draw(j, 0, 1); }
-      { gcurx= j; gcury=0; draw(0, 199, 1); }
+    // fill screen by lines L\ 
+    if (0) {
+      // - horizontal
+      // 259 cs using old lines, ragged right? lol BUG
+      //  63 cs for j>= 11
+      for(j=0; j<200; ++j) {
+        // w >= 11  works
+        if (j>=11) { gcurx= 0; gcury=j; draw(j, 0, 1); }
+      }
+    } else {
+      // - vertial
+      // 1289 pixel by pixel old drawFast()
+      //  984 cs with vert opt
+      //  220 cs with asm 
+      for(j=0; j<240; ++j) {
+        { gcurx= j; gcury=0; draw(0, 199, 1); }
+      }
     }
+
     if (0) {
       gcurx= 0, gcury= 0; gmode= 2; setpixel();
       gcurx= 0, gcury= 1; gmode= 2; setpixel();
