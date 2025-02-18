@@ -282,28 +282,29 @@ void drawFast(int dx, int dy, char v) {
 
   gmode= v;
 
-  if (!ady) {
+  if (!ady && adx>=11) {
+    // TODO: still need to debug ?
     if (dx<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
 
-    i= div6[gcurx];
+    i= div6[gcurx+5];
+    s= div6[gcurx+adx];
 
     switch(gmode) {
-    case 0: gfill(i, gcury, div6[adx], 1, 64); break;
-    case 1: gfill(i, gcury, div6[adx], 1, 64+63); break;
+    case 0: gfill(i, gcury, s-i, 1, 64); break;
+    case 1: gfill(i, gcury, s-i, 1, 64+63); break;
     case 2: 
       p= rowaddr[gcury]+i+1;
-      m= div6[gcurx+adx];
-      while(m>=i+1) {
+      while(s>=i+1) {
         *p ^= 63;
         ++p;
-        --m;
+        --s;
       }
     }
       
 
     // start
-    p= rowaddr[gcury]+i;
-    m= 2<<mod6[gcurx];
+    p= rowaddr[gcury]+div6[gcurx-1];;
+    m= (2<<(5-mod6[gcurx-1]))-1;
     switch(gmode) {
     case 0: *p &= ~m; break;
     case 1: *p |=  m; break;
@@ -312,22 +313,41 @@ void drawFast(int dx, int dy, char v) {
 
     // end
     p= rowaddr[gcury]+div6[gcurx+adx];
-    m= 2<<mod6[gcurx+adx];
+    m= (2<<(5-mod6[gcurx+adx]))-1;
     switch(gmode) {
-    case 0: *p &=  m; break;
-    case 1: *p |= ~m; break;
-    case 2: *p |= ~m; break;
+    case 0: *p &= (m|64); break; // TODO:
+    case 1: *p |= (~m)&63; break;
+    case 2: *p ^= ~m; *p |= 64; break; // TODO:
     }
 
     return;
 
   } else if (!adx) {
-
     if (dy<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
 
-    if (gcurx>=240 || gcury>=200) return;
+    if (gcurx>=240 || gcury>=200 || !ady) return;
 
-    gfill(div6[gcurx], gcury, 1, ady, mod6[gcurx]+64);
+    // TODO: clip if gcury+ady>200 
+
+    // TODO: test...
+    p= rowaddr[gcury] + div6[gcurx] - 40;
+    m= mod6[gcurx];
+
+    // TODO: asm
+    switch(gmode) {
+    case 0: 
+      m= (~m) | 64;
+      while(--ady!=0) *(p+=40) &= m;
+      return;
+    case 1:
+      m|= 64;
+      while(--ady!=0) *(p+=40) |= m;
+      return;
+    case 2:
+      while(--ady!=0) *(p+=40) ^= m;
+      return;
+    }
+
     return;
 
   } else if (adx>ady) {
@@ -384,6 +404,7 @@ void drawFast(int dx, int dy, char v) {
       }
     }
   } else { // dy >= dx
+    // TODO: if adx small, correct?
     if (dy<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
     gcury+= dy;
     gcurx+= dx;
@@ -593,7 +614,7 @@ void main() {
   gotoxy(10, 25); printf("Start...");
   t= time();
 
-  switch(6) {
+  switch(12) {
 
   case 11:
     // compress clear screen
@@ -778,7 +799,28 @@ void main() {
         if (y>200-25-3) y= 200-25-3;
       }
     }
+
+  case 12: 
+    // fill screen by lines L\
+    // 259 cs using old lines, ragged right? lol BUG
+    //  63 cs for j>= 11
+    for(j=0; j<200; ++j) {
+      // w >= 11  works
+      //if (j>=11) { gcurx= 0; gcury=j; draw(j, 0, 1); }
+      { gcurx= j; gcury=0; draw(0, 199, 1); }
+    }
+    if (0) {
+      gcurx= 0, gcury= 0; gmode= 2; setpixel();
+      gcurx= 0, gcury= 1; gmode= 2; setpixel();
+      gcurx= 0, gcury= 2; gmode= 2; setpixel();
+      gcurx= 0, gcury= 3; gmode= 2; setpixel();
+      gcurx= 0, gcury= 4; gmode= 2; setpixel();
+    }
+
+    break;
+
   }
+
   gotoxy(25,25); printf(" TIME %d hs ", t-time());
   cgetc();
   hirescompress();
