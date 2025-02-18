@@ -274,7 +274,7 @@ void drawSimple(int dx, int dy, char v) {
 void drawFast(int dx, int dy, char v) {
   register char* p;
   register char s, m, adx, ady;
-  //register char i;
+  //register char i; // doesn't fit!
   static char i;
 
   adx= dx>=0? dx: -dx;
@@ -282,7 +282,55 @@ void drawFast(int dx, int dy, char v) {
 
   gmode= v;
 
-  if (adx>ady) {
+  if (!ady) {
+    if (dx<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+
+    i= div6[gcurx];
+
+    switch(gmode) {
+    case 0: gfill(i, gcury, div6[adx], 1, 64); break;
+    case 1: gfill(i, gcury, div6[adx], 1, 64+63); break;
+    case 2: 
+      p= rowaddr[gcury]+i+1;
+      m= div6[gcurx+adx];
+      while(m>=i+1) {
+        *p ^= 63;
+        ++p;
+        --m;
+      }
+    }
+      
+
+    // start
+    p= rowaddr[gcury]+i;
+    m= 2<<mod6[gcurx];
+    switch(gmode) {
+    case 0: *p &= ~m; break;
+    case 1: *p |=  m; break;
+    case 2: *p ^=  m; break;
+    }
+
+    // end
+    p= rowaddr[gcury]+div6[gcurx+adx];
+    m= 2<<mod6[gcurx+adx];
+    switch(gmode) {
+    case 0: *p &=  m; break;
+    case 1: *p |= ~m; break;
+    case 2: *p |= ~m; break;
+    }
+
+    return;
+
+  } else if (!adx) {
+
+    if (dy<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
+
+    if (gcurx>=240 || gcury>=200) return;
+
+    gfill(div6[gcurx], gcury, 1, ady, mod6[gcurx]+64);
+    return;
+
+  } else if (adx>ady) {
     if (dx<0) { gcurx+= dx; dx= -dx; gcury+= dy; dy= -dy; }
     gcury+= dy;
     gcurx+= dx;
@@ -622,6 +670,7 @@ void main() {
     // me: 3.87s!
     //     2.97 if using static cache v for adx>ady
     //     2.87 w p[q] = using ASM: would be faster!
+    //     2.75 w hline/vline gfill
     #define M (200-1)
     for(j=0; j<=M; j+= 10) {
       gcurx= j;   gcury=0;   draw(M-j, j,   2);
