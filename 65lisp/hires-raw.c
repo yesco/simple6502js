@@ -274,7 +274,8 @@ void drawSimple(int dx, int dy, char v) {
 void drawFast(int dx, int dy, char v) {
   register char* p;
   register char s, m, adx, ady;
-  register char i;
+  //register char i;
+  static char i;
 
   adx= dx>=0? dx: -dx;
   ady= dy>=0? dy: -dy;
@@ -288,32 +289,35 @@ void drawFast(int dx, int dy, char v) {
     {
       // inline curset
       // TODO: too much duplication - make macro!
-      char q= gcurx/6;
-      char mi= gcurx-q*6;
+      static char q;
+      static char mi;
+      q= gcurx/6;
+      mi= gcurx-q*6;
 
       i= adx+1;
       m= PIXMASK[mi];
       s= 0;
-      p= HIRESSCREEN+40*gcury+q;
-      v= *p;
+      //p= HIRESSCREEN+40*gcury+q;
+      p= HIRESSCREEN+40*gcury;
+      v= p[q];
 
       while(--i) {
         static char v;
 
         // adjust y
         if ((s+= ady) > adx) {
-          *p= v;
+          p[q]= v;
           s-=adx;
           if (dy>=0) {
             if ((p-= 40)<HIRESSCREEN) break;
           } else {            
             if ((p+= 40)>=HIRESEND) break;
           }
-          v= *p;
+          v= p[q];
         }
 
         // plot it
-        if (*p & 64) {
+        if (v & 64) {
           switch(gmode) { // about 10% overhead
           case 0: v &= ~m; break;
           case 1: v |= m;  break;
@@ -323,9 +327,11 @@ void drawFast(int dx, int dy, char v) {
 
         // step x, wrap around bit
         if ((m<<=1)==64) {
-          *p= v;
-          m=1,--p;
-          v= *p;
+          p[q]= v;
+          m=1;
+          //--p;
+          --q;
+          v= p[q];
         }
       }
     }
@@ -615,6 +621,7 @@ void main() {
     //    ( 4.40?s if hardcode xor)
     // me: 3.87s!
     //     2.97 if using static cache v for adx>ady
+    //     2.87 w p[q] = using ASM: would be faster!
     #define M (200-1)
     for(j=0; j<=M; j+= 10) {
       gcurx= j;   gcury=0;   draw(M-j, j,   2);
