@@ -323,11 +323,63 @@ void box(char x, char y, char w, char h) {
 }
 
 typedef struct sprite {
+  // TODO: higher resolution than this
   int x, y;
-  signed char dx, dy;
+  signed char dx, dy; // this could be subpixel/frame
   char* bitmap;
   char* mask;
+  // TODO: 
+  char bitmaps[6];
+  char z; // z order
 } sprite;
+
+char spritecollision(sprite* a, sprite* b) {
+  if (a->x > b->x) return -spritecollision(b, a);
+  {
+    int ax1= a->x, ax2= ax1 + a->bitmap[0]*6;
+    int ay1= a->y, ay2= ay1 + a->bitmap[1];
+
+    int bx1= b->x, bx2= bx1 + b->bitmap[0]*6;
+    int by1= b->y, by2= by1 + b->bitmap[1];
+
+    char r;
+
+    // we know: ax1 < bx1
+
+    // no collision if a << b
+    if (ax2 <= bx1) return 0;
+
+    // we know: x-overlaps
+    //
+    // Possiblities:
+    //             00000          00000
+    //                    1111111  
+    //      55555    77   1111111
+    //  ....55555....77...1111111
+    //  .............77...1111111
+    //  .............77......
+    //  .....44444...77......     0000
+    //  .....44444...77...8888888
+    //  .............77...8888888
+    //  .............77......
+    //  .............77......
+    //  ....666......77....222222
+    //      666      77    222222
+    //          000                00000
+    //
+    //
+    if (by2 <= ay1) return 0; // above
+    if (ay2 <= by1) return 0; // below
+    r= 0;
+    // TODO: near overlap? adjacent/touch?
+
+    // overlapping
+    if (by1 <= ay1) r+= 1; // upper & 1
+    if (by2 >= ay2) r+= 2; // lower & 2
+    if (bx2 <= ax2) r+= 4; // inner & 4
+    return r? r: 8;        // right & 8
+  }
+}
 
 int ndraw= 0;
 
