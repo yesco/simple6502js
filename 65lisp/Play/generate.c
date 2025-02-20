@@ -25,15 +25,27 @@ void grass(char rnd, char col, char base, char height) {
   baseline-= base+height;
 }
 
+void xorpixfillup(char x, char y) {
+  char *p= rowaddr[y]+div6[x], m= PIXMASK[mod6[x]];
+  // up: find first pixel
+  while(!(*(p-=40) & m));
+  if (p<HIRESSCREEN) return;
+  // set till next pixel
+  while(!(*p-=40) & m) *p|= m;
+}
+
+char x2topy[240]= {0};
+
 void mountain(char rnd, char col, char base, char height, char steps) {
-  char x, top= baseline-base-height-1, h= height/2;
+  char x, top= baseline-base-height-1, h= height/2, ty;
   signed char r= 0;
-  int y= baseline-h, t= 1;;
+  int y= baseline-h, t= 1;
 
   gfill(0, 0, 1, baseline+1, col);
 
   srand(rnd);
   x= 12;
+  gmode= 1;
   while(x<239) {
     if (--t < 2) {
       r= (rand()%height) - h;
@@ -54,7 +66,12 @@ void mountain(char rnd, char col, char base, char height, char steps) {
     if (y>baseline) y= baseline;
     if (y<top) y= top;
 
-    gcurx= x; gcury= y; gmode= 1; setpixel();
+    gcurx= x;
+    ty= x2topy[x]; // ++
+    if (ty) {
+      gcury= ty+1; draw(0, y-ty, 1);
+    } else { gcury= y; setpixel(); }
+    x2topy[x]= y;
     //printf("%d: %d %d\n", col, t, r);
   }
 
@@ -97,7 +114,11 @@ void main() {
   // - grass in water pixels?
   // - water - blue
   // - water - black
+
+  // init
   n= 0;
+  memset(x2topy, 0, sizeof(x2topy));
+
   // draw laysers bottom up
   grass(++n, 2, 2, 3);           baseline-= 10;
   grass(++n, 3, 2, 1+2+8);       baseline-= 10;
