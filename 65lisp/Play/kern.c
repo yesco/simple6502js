@@ -1,11 +1,12 @@
 #define MAIN
 #include "../hires-raw.c"
 
-char glastchar= 0;
+char glastchar= 0, * glastch= 0;
 
 #define GFONTHEIGHT 8
 #define GFONTWIDTH 6 // TODO: varying later
-#define GSPACEWIDTH 6
+//#define GSPACEWIDTH 3
+#define GSPACEWIDTH 2
 
 // plot char on hires screen
 void gputc(char c) {
@@ -25,7 +26,8 @@ void gputc(char c) {
 
     if (c==32 || glastchar==32) { // space
       if (c==32 && gcurx==0) return;
-      if ((gcurx>240-2*GFONTWIDTH)) gputc('\n');
+      //if ((gcurx>240-2*GFONTWIDTH)) gputc('\n');
+      if ((gcurx>240-2*6)) gputc('\n');
       else if (c==32) {
         // TODO: actually clear some pixels?
         gcurx+= GSPACEWIDTH;
@@ -33,29 +35,61 @@ void gputc(char c) {
     }
     if (c==32) break;
     else { // printable char
-      char * ch= c*8 + (HIRESCHARSET-1);
+      char * ch= c*8 + (HIRESCHARSET-1), * tch, * gch;
       char i= 8;
       char m, * d;
-      
-      // is there room enought?
-      if ((gcurx+GFONTWIDTH)>240) {
+      char n,lc,w= 0;
+
+      // pixel kern
+      i= 8; tch= ch; gch= glastch;
+      do {
+        c= *++tch;
+        lc= *++gch;
+        n= 2; // 2 waster pixels
+        do {
+          /// shift till overlap
+          if ((c<<8) & (lc<<n)) break;
+          ++n;
+        } while(n<8);
+        w= n>w? n: w;
+      } while(--i);
+      w-= 2;
+      //c= '0'+w; //putchar('0'+w);
+      w= 5;
+      //w= 6;
+
+      glastch= ch;
+
+      // is there room enough?
+      if ((gcurx+=w)>240) {
         // break word, add '-' (must have space!)
         //gputc('-'); // TODO: have space for this?
         gputc('\n'); // TODO: remove recrusion?
       }
 
-      d= (gcury*5)*8 + div6[gcurx] + (HIRESSCREEN - 40);
-      m= mod6[gcurx];
+      d= (gcury*5)*8 + div6[gcurx+1] + (HIRESSCREEN - 40);
+      m= 5-mod6[gcurx+1];
       
       // plot actual char
+      i= 8;
       do {
-        *(d+= 40)= *++ch | 64;
+        if (1 || gcurx) {
+          char s= m + 5-w;
+          unsigned int x= (*++ch)<<s;
+
+          *(d+= 40) |= (x&63) | 64;
+          if (x>63) d[-1] |= ((x>>6)&63) | 64;
+          // This may wrap backwards... (prev line/i.e. right side
+          if (x>63*64) d[-2] |= ((x>>12)&63) | 64;
+        } else {
+          *(d+= 40)= *++ch | 64 | (i==1?63:0);
+        }
         //if (curdouble) *(d+= 40)= *ch | 64;
       } while(--i);
       
       // TODO: basically same "is there room enough"
       // but this one acutally moves forward
-      if ((gcurx+=GFONTWIDTH)>=240) gputc('\n');
+      //if ((gcurx+=w)>=240) gputc('\n');
 
     } break;
   }
