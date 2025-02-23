@@ -12,7 +12,7 @@ char glastchar= 0, * glastch= 0;
 #define GFONTHEIGHT 8
 #define GFONTWIDTH 6 // TODO: varying later
 //#define GSPACEWIDTH 3
-#define GSPACEWIDTH 2
+#define GSPACEWIDTH 1
 
 // plot char on hires screen
 void gputc(char c) {
@@ -44,33 +44,36 @@ void gputc(char c) {
       char * ch= c*8 + (HIRESCHARSET-1), * tch, * gch;
       char i= 8;
       char m, * d;
-      char s,n,lc,k= 8;
-      unsigned int x;
+      char s,n,k= 12;
+      unsigned int x, lc;
 
       // pixel kern
       i= 8; tch= ch; gch= glastch;
       do {
-        x= (*++tch)<<6;
-        lc= *++gch;
+        x= (*++gch)<<6;
+        lc= *++tch;
         n= 0;
         do {
           /// shift till overlap
-          if (x & lc) break;
           lc <<= 1;
+          if (x & lc) break;
           ++n;
         } while(n<12);
         k= n<k? n: k;
       } while(--i);
 
       if (k) --k;
-      if (k) --k;
+      //if (k) --k;
 
       //w= 6-w; // almost good , but incorrect, lol
       //if (k==8) k= 0;
 
-      putchar(glastchar);
-      putchar(c);
-      putchar('0'+k);
+      // debug kern
+      if (0) {
+        putchar(glastchar);
+        putchar(c);
+        putchar('0'+k);
+      }
 
       //if (w>6) w=6;
       //if (w==0) w=6;
@@ -140,7 +143,8 @@ void main() {
   //char * s= "||||||||||||||||||||||||||||||||||||||||" "0123456789012345678901234567890123456789"  "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii" "........................................" SHERLOCK;
   //char * s= BARS;
   //char * s= "xxx|||iii///...,,,ThThTwTwTiTiTjTjTaTaTmnmnTnT.T,TAVAW";
-
+  //char * s= "OLOLMEMEtututiofofofTiTiTjTjfafifi" SHERLOCK;
+  //char * s= "tuturereTjTfafifi";
   char * p= s;
 
   printf("bytes = %d %d \n", sizeof(FONT), 8*96);
