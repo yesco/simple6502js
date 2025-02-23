@@ -25,7 +25,7 @@ void gputc(char c) {
     if (c>=128) c&= 127; // TODO: inverse? or extra!
 
     if (c==32 || glastchar==32) { // space
-      if (c==32 && gcurx==0) return;
+      if (c==32 && gcurx==0) { glastchar= c; glastch= 127*8+ (HIRESCHARSET-1); return; }
       //if ((gcurx>240-2*GFONTWIDTH)) gputc('\n');
       if ((gcurx>240-2*6)) gputc('\n');
       else if (c==32) {
@@ -33,12 +33,12 @@ void gputc(char c) {
         gcurx+= GSPACEWIDTH;
       }
     }
-    if (c==32) break;
+    if (c==32) { glastch= 127*8+(HIRESCHARSET-1); break; }
     else { // printable char
       char * ch= c*8 + (HIRESCHARSET-1), * tch, * gch;
       char i= 8;
       char m, * d;
-      char n,lc,w= 8;
+      char s,n,lc,k= 8;
       unsigned int x;
 
       // pixel kern
@@ -46,19 +46,27 @@ void gputc(char c) {
       do {
         x= (*++tch)<<8;
         lc= *++gch;
-        n= 2; // 2 waster pixels
+        n= 3;
         do {
           /// shift till overlap
           if (x & (lc<<n)) break;
           ++n;
         } while(n<8);
-        w= n<w? n: w;
+        k= n-3<k? n-3: k;
       } while(--i);
+
+      if (k) --k;
       //w= 6-w; // almost good , but incorrect, lol
-      w= 10-w;
-      if (w>6) w=6;
-      if (w==0) w=6;
-      w=5;
+      if (k==8) k= 0;
+
+      putchar(glastchar);
+      putchar(c);
+      putchar('0'+k);
+
+      //if (w>6) w=6;
+      //if (w==0) w=6;
+      //w=6;
+      //w=5;
       //cputc('0'+w);
       //w=2; // 121 chars per line of '|'
       //cputc('0'+w);
@@ -69,22 +77,24 @@ void gputc(char c) {
 
       glastch= ch;
 
+      if (gcurx<k) k= 0; else gcurx-= k;
+
       // is there room enough?
-      if ((gcurx+=w)>240) {
+      if (gcurx+6>240) {
         // break word, add '-' (must have space!)
         //gputc('-'); // TODO: have space for this?
         gputc('\n'); // TODO: remove recrusion?
       }
 
-      d= (gcury*5)*8 + div6[gcurx+1] + (HIRESSCREEN - 40);
-      m= 5-mod6[gcurx+1];
+      d= (gcury*5)*8 + div6[gcurx] + (HIRESSCREEN - 40);
+      m= 5-mod6[gcurx];
       
       // plot actual char
       i= 8;
+      s= m + k;
       do {
         if (1 || gcurx) {
-          char s= m + 5-w;
-          unsigned int x= (*++ch)<<s;
+          x= (*++ch)<<s;
 
           *(d+= 40) |= (x&63) | 64;
           if (x>63) d[-1] |= ((x>>6)&63) | 64;
@@ -98,7 +108,7 @@ void gputc(char c) {
       
       // TODO: basically same "is there room enough"
       // but this one acutally moves forward
-      //if ((gcurx+=w)>=240) gputc('\n');
+      if ((gcurx+=6)>=240) gputc('\n');
 
     } break;
   }
@@ -116,10 +126,11 @@ char T,nil,doapply1,print;
 void main() {
   char lasty;
   //char * s= SHERLOCK;
-  char * s= "||||||||||||||||||||||||||||||||||||||||" "0123456789012345678901234567890123456789"  "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii" "........................................" SHERLOCK;
+  //char * s= "||||||||||||||||||||||||||||||||||||||||" "0123456789012345678901234567890123456789"  "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii" "........................................" SHERLOCK;
   //char * s= BARS;
+  char * s= "xxx|||iii///...,,,ThThTwTwTiTiTjTjTaTaTmnmnTnT.T,TAVAW";
 
-  char *p= s;
+  char * p= s;
 
   hires();
   gclear();
@@ -133,6 +144,6 @@ void main() {
   } while(*p && gcury>=lasty); // end at wrap-around
 
   gotoxy(0,27);
-  printf("\nWrote %d characters %d chars per line.  ", p-s, (p-s)/25);
+  printf("Wrote %d characters %d chars per line.  ", p-s, (p-s)/25);
   while(1);
 }
