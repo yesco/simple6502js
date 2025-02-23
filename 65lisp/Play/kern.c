@@ -54,8 +54,9 @@ void gputc(char c) {
         w= n>w? n: w;
       } while(--i);
       w-= 2;
+      w=4;
       //c= '0'+w; //putchar('0'+w);
-      w= 5;
+      //w= 5;
       //w= 6;
 
       glastch= ch;
