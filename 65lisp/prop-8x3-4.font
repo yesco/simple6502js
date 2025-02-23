@@ -11,6 +11,24 @@
 #define xx_ 6,
 #define xxx 7,
 
+#define ____ 0,
+#define ___x 1,
+#define __x_ 2,
+#define __xx 3,
+#define _x__ 4,
+#define _x_x 5,
+#define _xx_ 6,
+#define _xxx 7,
+
+#define x___ 8,
+#define x__x 9,
+#define x_x_ 10,
+#define x_xx 11,
+#define xx__ 12,
+#define xx_x 13,
+#define xxx_ 14,
+#define xxxx 15,
+
 // ' '
 ___
 ___
@@ -32,9 +50,9 @@ _x_
 ___
 
 // '"'
+x_x
+x_x
 ___
-x_x
-x_x
 ___
 ___
 ___
@@ -149,7 +167,7 @@ ___
 ___
 ___
 ___
-xxx
+xx_
 ___
 ___
 ___
@@ -482,15 +500,25 @@ x_x
 x_x
 ___
 
+// // 'N'
+// x_x
+// x_x
+// xxx
+// xxx
+// xxx
+// x_x
+// x_x
+// ___
+
 // 'N'
-x_x
-x_x
-xxx
-xxx
-xxx
-x_x
-x_x
-___
+x__x
+x__x
+xx_x
+xxxx
+x_xx
+x__x
+x__x
+____
 
 // 'O'
 _x_
@@ -560,7 +588,7 @@ x_x
 x_x
 x_x
 x_x
-_x_
+xxx
 ___
 
 // 'V'
@@ -576,11 +604,11 @@ ___
 // 'W'
 x_x
 x_x
+x_x
 xxx
 xxx
 xxx
-xxx
-_x_
+x_x
 ___
 
 
@@ -686,7 +714,7 @@ ___
 // 'a'
 ___
 ___
-xxx
+xx_
 __x
 xxx
 x_x
@@ -706,11 +734,11 @@ ___
 // 'c'
 ___
 ___
-_xx
+_x_
 x__
 x__
 x__
-_xx
+_x_
 ___
 
 // 'd'
@@ -816,15 +844,25 @@ x_x
 x_x
 ___
 
+// // 'n'
+// ____
+// ____
+// x_xx
+// xx_x
+// x__x
+// x__x
+// x__x
+// ____
+
 // 'n'
 ___
-x__
-x_x
-xxx
-xxx
-x_x
-x_x
 ___
+x_x
+xxx
+x_x
+x_x
+x_x
+____
 
 // 'o'
 ___
@@ -877,14 +915,14 @@ xx_
 ___
 
 // 't'
-x__
-x__
-xx_
-x__
-x__
-x_x
-_x_
-___
+_x__
+_x__
+xxx_
+_x__
+_x__
+_x_x
+__x_
+____
 
 // 'u'
 ___

@@ -50,20 +50,23 @@ void gputc(char c) {
       // pixel kern
       i= 8; tch= ch; gch= glastch;
       do {
-        x= (*++tch)<<8;
+        x= (*++tch)<<6;
         lc= *++gch;
-        n= 3;
+        n= 0;
         do {
           /// shift till overlap
-          if (x & (lc<<n)) break;
+          if (x & lc) break;
+          lc <<= 1;
           ++n;
-        } while(n<8);
-        k= n-3<k? n-3: k;
+        } while(n<12);
+        k= n<k? n: k;
       } while(--i);
 
       if (k) --k;
+      if (k) --k;
+
       //w= 6-w; // almost good , but incorrect, lol
-      if (k==8) k= 0;
+      //if (k==8) k= 0;
 
       putchar(glastchar);
       putchar(c);
