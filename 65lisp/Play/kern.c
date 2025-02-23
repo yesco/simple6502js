@@ -80,7 +80,7 @@ void gputc(char c) {
       if (gcurx<k) k= 0; else gcurx-= k;
 
       // is there room enough?
-      if (gcurx+6>240) {
+      if ((gcurx+=6)>240) {
         // break word, add '-' (must have space!)
         //gputc('-'); // TODO: have space for this?
         gputc('\n'); // TODO: remove recrusion?
@@ -91,7 +91,8 @@ void gputc(char c) {
       
       // plot actual char
       i= 8;
-      s= m + k;
+      //s= m + k;
+      s= m;
       do {
         if (1 || gcurx) {
           x= (*++ch)<<s;
@@ -108,7 +109,7 @@ void gputc(char c) {
       
       // TODO: basically same "is there room enough"
       // but this one acutally moves forward
-      if ((gcurx+=6)>=240) gputc('\n');
+      //if ((gcurx+=6)>=240) gputc('\n');
 
     } break;
   }
