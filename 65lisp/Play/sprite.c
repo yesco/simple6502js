@@ -1,4 +1,4 @@
-// Bouncy boxes in graphics
+// Bouncy spites in hires graphics
 
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
 // creating movie, diable, fictional RPG gmae inside the novel
@@ -8,6 +8,9 @@
 char T,nil,doapply1,print;
 
 #include "../bits.h"
+
+// To scroll sideways need one empty cell to the right
+#define SCROLLABLE
 
 //#define BIGG
 
@@ -194,6 +197,66 @@ char disc[]= {
 
 #endif // WIDER
 #else // BIGG else ...
+#ifdef SCROLLABLE
+  // Notice empty column to the right,
+  // this is so dimensions are same when scrolled
+  // copies to be made
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ xxxxxx ______ ______
+  ____xx ______ xx____ ______
+  ___x__ ______ __x___ ______
+  __x___ ______ ___x__ ______
+  _x____ ______ ____x_ ______
+  _x____ ______ ____x_ ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  _x____ ______ ____x_ ______
+  _x____ ______ ____x_ ______
+  __x___ ______ ___x__ ______
+  ___x__ ______ __x___ ______
+  ____xx ______ xx____ ______
+  ______ xxxxxx ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42, // indicator of bitmask following
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ xxxxxx xxxxxx
+  xxxx__ ______ __xxxx xxxxxx
+  xxx___ ______ ___xxx xxxxxx
+  xx____ ______ ____xx xxxxxx
+  x_____ ______ _____x xxxxxx
+  x_____ ______ _____x xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  x_____ ______ _____x xxxxxx
+  x_____ ______ _____x xxxxxx
+  xx____ ______ ____xx xxxxxx
+  xxx___ ______ ___xxx xxxxxx
+  xxxx__ ______ __xxxx xxxxxx
+  xxxxxx ______ xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+#else // SCROLLABLE
+
   24/6, 24,
 //123456 123456 123456 123456
   ______ ______ ______ ______
@@ -250,6 +313,8 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
+#endif SCROLLABLE
+
 #endif BIGG
 };
 
@@ -326,8 +391,15 @@ typedef struct sprite {
   // TODO: higher resolution than this
   int x, y;
   signed char dx, dy; // this could be subpixel/frame
+
+  // current (TODO: remove?)
   char* bitmap;
   char* mask;
+
+  // TODO: move out?
+  char* shbitmap[6];
+  char* shmask[6];
+
   // TODO: 
   char bitmaps[6];
   char z; // z order
@@ -577,6 +649,22 @@ void spmove(char* sp) {
   }
 }
 
+// shift one step right
+void spriteshift(char* bm, char w, char h) {
+  char j, * p= bm;
+  unsigned int v= 0;
+  //while(*p) { // lol, can do!
+  do {
+    v= 0; j= w;
+    do {
+      v<<= 6;
+      v|= *p & 63;
+      *p= ((v >> 1) & 63)| 64;
+      ++p;
+    } while(--j);
+  } while(--h);
+}
+
 // N=7 1001 1836 cs 54 hsp/s 778 hfps
 // N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
 
@@ -622,25 +710,74 @@ void main() {
   hires();
   gclear();
 
+  // init sprites
   for(i=0; i<N; ++i) {
     sprite* s= sploc+i;
+
+    // position
     s->x= 130-130/N*i;
     s->y= 180/N*i;
-    //s->dx= +1;
-    s->dx= 0;
+
+    s->dx= +1;
+    //s->dx= 0;
     s->dy= +i*11/10+1;
-    // s->bitmap= disc;
+
     s->bitmap= enterprise;
+
+    // - have mask?
     {
       int markpos= 2+ s->bitmap[0] * s->bitmap[1];
       s->mask= (42==s->bitmap[markpos])?
         s->bitmap+markpos+1: NULL;
     }
+
+    // - create scrollable copies
+    s->shbitmap[0]= s->bitmap;
+    s->shmask[0]= s->mask;
+
+    if (1)
+    { char j; int bytes= s->bitmap[0] * s->bitmap[1] + 3;
+      for(j=1; j<6; ++j) {
+        char* nw= malloc(bytes);
+        memcpy(nw, s->shbitmap[j-1], bytes);
+        spriteshift(nw+2, s->bitmap[0], s->bitmap[1]);
+        s->shbitmap[j]= nw;
+
+        // TODO: make mask also use +2...
+        if (s->mask) {
+          nw= malloc(bytes);
+          memcpy(nw, s->shmask[j-1], bytes);
+          //spriteshift(nw, s->bitmap[0], s->bitmap[1]);
+          s->shmask[j]= nw;
+        } else {
+          s->shmask[j]= NULL;
+        }
+      }
+    }
+
+    // show
+    if (1)
+    { char j;
+      for(j=0; j<6; ++j) {
+        s->bitmap= s->shbitmap[j];
+        s->mask= s->shmask[j];
+        if (s->bitmap) {
+          drawsprite(s);
+          cgetc();
+          erasesprite(s);
+        }
+      }
+      if (s->shbitmap[0]) {
+        s->bitmap= s->shbitmap[0];
+        s->mask= s->shmask[0];
+      }
+    }
+
     drawsprite(s);
   }
 
   T= time();
-  while (ndraw<=1000) {
+  while(ndraw<=1000) {
     spmove(enterprise);
 
     if (0) { // cost 10%?

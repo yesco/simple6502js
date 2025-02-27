@@ -97,5 +97,8 @@ void main() {
   // at end of screen
   *(char*)0xbfdf= TEXTMODE+128;
 
-  while(1);
+  while(1) {
+    memmove(altset, altset+1, 96*8-1);
+    wait(7);
+  }
 }
