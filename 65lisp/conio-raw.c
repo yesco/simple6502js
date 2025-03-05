@@ -204,7 +204,7 @@
 #define SCREENROWS 28
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
-#define TEXTLAST   (TEXTSCREEN+SCREENSIZE-1)
+#define SCREENLAST (TEXTSCREEN+SCREENSIZE-1)
 
 // TODO: remove... or use FOO() to indicate is macro not const
 //#define SCREENEND()  (curp+SCREENSIZE)
@@ -283,6 +283,8 @@ int wait(int hs) {
 
 char curx=0, cury=1, * curp=TEXTSCREEN, * curscr= TEXTSCREEN;
 char curinv=0, curdouble=0, curai=0, curcaps=0;
+
+#define TOGGLECURSOR() do { *curp ^= 128; } while(0)
 
 void cputc(char c);
 char cgetc();
@@ -1313,6 +1315,85 @@ char cgetc() {
 
 #endif // KEY_MAPPING
 
+// for debugging, lol
+#define DID(c) *SCREENLAST=(c)
+
+// Edits a (given) line using emacs-style editing.
+//
+// Prints the PROMPT, if given. Then edits a char* line
+// pointed to by *LNP. It works a bit like readline combined
+// with getline. The string edited is *SZP-1 and is malloced
+// if not given in *LNP.
+//
+// Commands:
+//   RETURN/LF: ends input
+//   CTRL-C   : *eof* (aborts) => -1
+//   BS/DELETE: deletes last character
+//   CTRL-L   : reprints prompt and string on a new line
+// 
+// Note: unlike getline(), size is never increased
+//
+// LNP: pointer to variable (pointing to char* memory) to edit,
+//      or *pointer* to a variable being NULL, in which case
+//      memory is malloced and user must later free().
+// SZP: pointer to unsigned int of size allocated. This is the maxiumum
+//      limit+1 of the string. (default: if 0, it is set to *SZP= 41)
+
+// Returns: length of string [0, *SZ-1]
+//          -1 if EOF/CTRL-C
+//          -2 if LNP or SZP are NULL
+int editline(char* prompt, char** lnp, unsigned int* szp) {
+  char key, * ln;
+  if (!lnp || !szp) return -2;
+  if (!*szp) *szp= 41;
+  if (!lnp || !*lnp || !*szp)
+    *lnp= calloc(*szp, 1);
+  ln= *lnp;
+
+ redraw:
+  if (prompt) puts(prompt);
+  puts(ln);
+
+  do {
+    TOGGLECURSOR();
+    key= cgetc();
+    TOGGLECURSOR();
+
+    switch(key) {
+
+    // EOF
+    case CTRL+'C': return -1;
+
+    // RETURN
+    case 10: case 13:
+      return strlen(ln);
+
+    // BS/DELETE
+    case 8: case 127:
+      if (*ln) {
+        putchar(8); putchar(' '); putchar(8);
+        ln[strlen(ln)-1]= 0;
+      }
+      break;
+
+    // Redraw
+    case CTRL+'L': putchar('\n'); goto redraw;
+
+    // char
+    default: {
+      int z= strlen(ln);
+      if (z+1 < *szp) {
+        ln[z+0]= key;
+        ln[z+1]= 0;
+        putchar(key);
+      }
+    } break;
+
+    }
+  } while(1);
+}
+
+#undef DID
 
 #ifdef getlines_FOO
 // Returns: an mallocated string
@@ -1520,6 +1601,8 @@ void demo() {
 #define COMPRESS_PROGRESS
 #include "compress.c"
 
+// Dummys for ./r script
+int T,nil,doapply1,print;
 
 void main() {
   unsigned int i= 1, k= 0;
@@ -1529,10 +1612,21 @@ void main() {
   savescreen();
   clrscr();
 
-  switch(2) {
+  switch(4) {
 
-  case 2:
-    stupidTerm(); break;
+  case 4:
+    {
+      char *ln= NULL;
+      unsigned int lnz= 0;
+      int r;
+      printf("start getline\n");
+      //ln= calloc(lnz= 3, 1);
+      while((r= editline("prompt> ", &ln, &lnz))>=0) {
+        printf("\n=> %d >%s< #%d\n", r, ln, lnz);
+      }
+      free(ln);
+      printf("end getline\n");
+    }
 
   case 1:
     // just scroll test
@@ -1542,6 +1636,9 @@ void main() {
     } break;
 
   case 3: {
+    // panning around
+    // TODO: make a function
+    // TODO: use the asm from...  somewhere...
     // TODO: use these to implement scroll in cputc()
     char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
     char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
@@ -1565,7 +1662,6 @@ void main() {
 
     // pan-around w wrap
     while(1) {
-
       switch(cgetc()) {
       case KEY_DOWN:
           asm("SEI");
@@ -1623,7 +1719,7 @@ void main() {
     } } break;
 
       // demo
-  default: demo(); break;
+  //default: demo(); break;
 
   }
 
