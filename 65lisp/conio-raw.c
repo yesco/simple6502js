@@ -204,6 +204,8 @@
 #define SCREENROWS 28
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
+#define TEXTLAST   (TEXTSCREEN+SCREENSIZE-1)
+
 // TODO: remove... or use FOO() to indicate is macro not const
 //#define SCREENEND()  (curp+SCREENSIZE)
 
@@ -329,7 +331,8 @@ void fill(char x, char y, char w, char h, char c) {
   }
 }
 
-char curpaper= 0, curink =7;
+// 255= Not set
+char curpaper=255, curink =255;
 
 void paper(char c) {
   curpaper= c & 7;
@@ -357,8 +360,8 @@ void clearline(char y) {
   char* p= SCREENXY(0, y);
   memset(p, ' ', 40);
 #ifndef TTY
-  p[0]= curpaper;
-  p[1]= curink;
+  if (curpaper<8) p[0]= curpaper | 16;
+  if (curink<8) p[1]= curink;
 #endif // !TTY
 }
 
@@ -676,11 +679,15 @@ void bell() {
 // (0-7 text color, 16-23 bg color, goes straight through! as does hi-bit)
 void cputc(char c) {
   switch(c) {
+  case 0   : gotoxy(curx, cury); return; // recalc pointer
+  case 8   : if (curx) --curx; return;
   case 12  : clrscr(); return;
   case '\r': gotoxy(0, cury); return;
   case '\n': gotoxy(0, cury+1); return;
   case '\t': do { ++curp; } while (++curx & 0x7); break;
-  default  : *curp= c; ++curx; ++curp; break;
+  default  :
+    if (c&128 && c<128+32) c&= 127; // ORIC attributes
+    *curp= c; ++curx; ++curp; break;
   }
   if (curx>=40) curx=0,++cury;
   if (cury>=28) scrollup(1);
@@ -999,7 +1006,7 @@ int puts(const char* s) {
     // + nowrap / wrap (autonl) using strchrnul find \n or eof instead
 #ifndef TTY
   case 0x12: c= strlen(s); gotoxy(curx+(40-c)/2, cury); goto next;
-#endif TTY
+#endif // TTY
   default: putchar(c); goto next;
   }
 }
@@ -1014,9 +1021,23 @@ void putint(int n) {
   putchar('0'+(n%10));
 }
 
+void put1hex(char c) {
+  putchar("0123456789abcdef"[c&0xf]);
+}
+
+void put2hex(char c) {
+  put1hex(c/16); put1hex(c);
+}
+
+void puthex(unsigned long n) {
+  if (n>=16) puthex(n/16);
+  put1hex(n);
+}
+
 #ifdef CONIO_PRINTF
 #include <stdio.h>  // va_list
 #include <stdlib.h> // malloc
+#include <stdarg.h> // va_list
 int printf(const char* fmt, ...) {
   int n= 0;
   va_list argptr;
@@ -1070,7 +1091,7 @@ unsigned int unc= 0;
 char keybits[8]={0};
 
 int ungetchar(int c) {
-  return unc? 0: unc=c;
+  return unc? 0: (unc=c);
 }
 
 #endif // KEY_MAPPING
@@ -1226,7 +1247,7 @@ char keypressed(char keypos) {
   asm("CLI"); // TODO: ??
   return c;
 }
-#endif KEY_POS
+#endif // KEY_POS
 
 #ifdef EXTENDED_DEBUG_KEY
 
@@ -1292,6 +1313,23 @@ char cgetc() {
 
 #endif // KEY_MAPPING
 
+
+#ifdef getlines_FOO
+// Returns: an mallocated string
+//          or NULL on end of file
+char* readline (const char *prompt) {
+  return NULL;
+}
+
+char* fgets(char* s, int size, FILE *stream) {
+}
+
+ssize_t getline(char** lineptr, size_t* n, FILE* stream) {
+//}
+
+ssize_t getdelim(char** lineptr, size_t* n, int delim, FILE* stream) {
+}
+#endif // getlines_FOO
 
 #ifdef NOTHING
 
