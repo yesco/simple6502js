@@ -469,11 +469,13 @@ int ndraw= 0;
 void drawsprite(sprite* s) {
   static char w, h, *l;
   static char * sp, * msk;
-  sp= s->bitmap;
-  msk= s->mask;
+  static char m;
+  m= mod6[s->x];
+  sp= s->shbitmap[m];
+  msk= s->shmask[m];
   w= *sp; h= sp[1];
 
-  if (0) {
+  if (0) { // old asm
   l= rowaddr[s->y] + div6[s->x];
 
   // TODO: clipping?
@@ -513,7 +515,7 @@ void drawsprite(sprite* s) {
     *(int*)0x94+= w;
   } while(--h);
 
-  } else {
+  } else { // new asm
     // new optimization
     static char ww;
     static char hh;
@@ -687,6 +689,9 @@ void spriteshift(char* bm, char w, char h) {
 // ---- TODO: ^^^----- why is it slower? erasesprite flicker
 // 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
 
+// 1001: 1176cs   85sp/s 1215cfps (not moving x)
+// 1001: 1169cs   85sp/s 1223cfps (smooth moving x)
+
 // N=1:   915cs 109sp/s 10939cfps 
 // N=2:   914cs 109sp/s  5481cfps
 // N=4:   928cs 108sp/s  2704cfps
@@ -763,7 +768,7 @@ void main() {
         s->mask= s->shmask[j];
         if (s->bitmap) {
           drawsprite(s);
-          cgetc();
+          //cgetc();
           erasesprite(s);
         }
       }
