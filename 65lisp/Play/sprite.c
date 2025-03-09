@@ -475,73 +475,31 @@ void drawsprite(sprite* s) {
   msk= s->shmask[m];
   w= *sp; h= sp[1];
 
-  if (0) { // old asm
-  l= rowaddr[s->y] + div6[s->x];
-
-  // TODO: if l is unchanged then no need
-  //   erase  as we will overdraw!
-
-  // TODO: clipping?
-  *(int*)0x90= sp+2;
-  *(int*)0x92= l;
-  *(int*)0x94= msk;
-
-  do {
-    // specialized memcpy (w<256)
-    asm("ldy #0");
-    asm("ldx %v", w);
-  next:
-    if (0) {
-      asm("lda ($92),y"); // a = l[y];
-      // TODO: two variants?
-      //asm("and ($94),y"); // a&= mask[y];
-      asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
-      //asm("ora ($90),y"); // a|= sp[y];
-      // TODO: shouldn't need this... lol
-      // TODO: if and reset the bit eor would set it?
-      asm("ora #$40");
-      asm("sta ($92),y"); // l[y]= a;
-    } else {
-      asm("lda ($90),y"); // a = sp[y];
-      asm("sta ($92),y"); // l[y]= a;
-    }
-
-
-    //
-    asm("iny");
-    asm("dex");
-    asm("bne %g", next);
-    
-    // step
-    *(int*)0x92+= 40;
-    *(int*)0x90+= w;
-    *(int*)0x94+= w;
-  } while(--h);
-
-  } else { // new asm
+  {
     // new optimization
     static char ww;
     static char hh;
 
     ww= 40-w; hh= h;
 
-  l= rowaddr[s->y] + div6[s->x];
+    l= rowaddr[s->y] + div6[s->x];
 
-  // TODO: clipping?
-  *(int*)0x90= sp+2;
-  *(int*)0x92= l;
-  *(int*)0x94= msk;
+    // TODO: clipping?
+    *(int*)0x90= sp+2;
+    *(int*)0x92= l;
+    *(int*)0x94= msk;
 
-  asm("ldy #0");
-  asm("clc"); // set it for once top!
+    asm("ldy #0");
+    asm("clc"); // set it for once top!
 
   nextrow:
 
-  // specialized memcpy (w<256)
-  asm("ldx %v", w);
+    // specialized memcpy (w<256)
+    asm("ldx %v", w);
 
   nextcell:
 
+    // TODO: make two variants at top for sh->mask
     if (0) {
 
   asm("lda ($92),y"); // a = l[y];
@@ -628,44 +586,6 @@ void erasesprite(sprite* s, int newx, signed char dy) {
     }
   }
 
-void olderasesprite(sprite* s) {
-  char* sp= s->bitmap;
-  // for xor
-  //drawsprite(s); return;
-
-  // TODO: clipping?
-
-  // TODO: this doesn't handle overlapping. mask?
-
-#ifndef NOTCLEVER
-  // clever
-  if (s->dx == 0) {
-    if (s->dy > 0) {
-      // clear below
-      gfill(div6[s->x], s->y, *sp, s->dy, 64);
-      return;
-    } else if (s->dy < 0) {
-      // clear above
-      gfill(div6[s->x], s->y+s->dy+1+sp[1], *sp, -s->dy, 64);
-      return;
-    } else return; // not moved!
-  }
-
-  // Otherwise clear all
-#else
-#endif
-  // TODO:
-  //} else if (s->dx >= 6) {  /// and s->dy
-  //} else if (-s->dx >= 6) {
-
-    {
-      char w= *sp, h= *++sp;
-      // clear all - flickers
-      gfill(div6[s->x], s->y, w, h, 64);
-      return;
-    }
-  }
-
 #define Z 37
 
 void b(char x, char y) {
@@ -694,23 +614,7 @@ void spmove(char* sp) {
     // TODO: undraw in opposite order...lol
     // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
 
-    if (0) {
-      // 1171cs  85sp/s 1221cfps 3851Bps
-      //  980cs 102sp/s 1459cfps 4602Bps
-      olderasesprite(s);
-
-      // update pos
-    rex:
-      if ((s->x+= s->dx) + 6*sp[0] >=240 || s->x < 0) { s->dx= -s->dx; goto rex; }
-    rey:
-      if ((s->y+= s->dy) + sp[1] >=200 || s->y < 0) { s->dy= -s->dy; goto rey; }
-
-      // draw
-      ++ndraw;
-      drawsprite(s);
-
-    } else {
-      // TODO: still not correct - leaves trace
+    {
       // TODO: movesprite();
 
       // update pos
@@ -752,61 +656,16 @@ void spriteshift(char* bm, char w, char h) {
   } while(--h);
 }
 
-// N=7 1001 1836 cs 54 hsp/s 778 hfps
-// N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
-
-// - bigger than ever... 11*6 x 16 sprite N=7 sprites
-//
-// 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
-// 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
-// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
- // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
-//       1689 rowaddr used only initially
-//       1627cs -Oi but memcpy still not inlined...
-// 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
-// 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
-// 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
-// 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
-// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
-// 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
-// 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
-// 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
-// ---- TODO: ^^^----- why is it slower? erasesprite flicker
-// 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
-
-// 1001: 1176cs   85sp/s 1215cfps (not moving x)
-// 1001: 1169cs   85sp/s 1223cfps (smooth moving x)
-
-// N=1:   915cs 109sp/s 10939cfps 
-// N=2:   914cs 109sp/s  5481cfps
-// N=4:   928cs 108sp/s  2704cfps
-// N=7:                  1507cfps
-// N=16:                  608cfps
-
-// = (/ (* 11 16 1001 100) 751.0)
-
-// FPS= 105/N !!! these are large 66x16=1056px sprites!
-
-//                          w     h  N
-// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
-
-// vic 64: 8 sprites 24x21
-// ORIC: 8 sprites 24x24
-// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
-void main() {
+void initsprites(char n) {
   char i;
-  unsigned int T;
-
-  hires();
-  gclear();
 
   // init sprites
-  for(i=0; i<N; ++i) {
+  for(i=0; i<n; ++i) {
     sprite* s= sploc+i;
 
     // position
-    s->x= 130-130/N*i;
-    s->y= 180/N*i;
+    s->x= 130-130/n*i;
+    s->y= 180/n*i;
 
     s->dx= +1;
     //s->dx= 0;
@@ -865,6 +724,57 @@ void main() {
 
     drawsprite(s);
   }
+}
+
+// N=7 1001 1836 cs 54 hsp/s 778 hfps
+// N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
+
+// - bigger than ever... 11*6 x 16 sprite N=7 sprites
+//
+// 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
+// 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
+// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
+ // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
+//       1689 rowaddr used only initially
+//       1627cs -Oi but memcpy still not inlined...
+// 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
+// 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
+// 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
+// 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
+// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
+// 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
+// 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
+// 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
+// ---- TODO: ^^^----- why is it slower? erasesprite flicker
+// 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
+
+// 1001: 1176cs   85sp/s 1215cfps (not moving x)
+// 1001: 1169cs   85sp/s 1223cfps (smooth moving x)
+
+// N=1:   915cs 109sp/s 10939cfps 
+// N=2:   914cs 109sp/s  5481cfps
+// N=4:   928cs 108sp/s  2704cfps
+// N=7:                  1507cfps
+// N=16:                  608cfps
+
+// = (/ (* 11 16 1001 100) 751.0)
+
+// FPS= 105/N !!! these are large 66x16=1056px sprites!
+
+//                          w     h  N
+// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
+
+// vic 64: 8 sprites 24x21
+// ORIC: 8 sprites 24x24
+// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
+void main() {
+  char i;
+  unsigned int T;
+
+  hires();
+  gclear();
+
+  initsprites(N);
 
   T= time();
   while(ndraw<=1000) {
