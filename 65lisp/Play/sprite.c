@@ -540,51 +540,48 @@ void drawsprite(sprite* s) {
   }
 }
 
+// TODO: move into "movesprite()"
 void erasesprite(sprite* s, int newx, signed char dy) {
-  char* sp= s->bitmap;
-  // for xor
+  static char xdiv;
+  static char* sp;
+  xdiv=div6[s->x];
+  sp= s->bitmap;
+
+  // for xor, lol
   //drawsprite(s); return;
 
+  // TODO: this doesn't handle overlapping. mask?
   // TODO: clipping?
 
-  // TODO: this doesn't handle overlapping. mask?
-
-#ifndef NOTCLEVER
   // clever
-  if (s->dx == 0
-      // TODO: for some reason this leaves a trace beghind
-      // why? It says same cells? i.e. just move up/down
-      //   85 ->  101 sp/s
+  if (s->dx == 0 || div6[newx]==xdiv) {
+    // same x, or same cell (in height)
 
-      || div6[newx]==div6[s->x]
-
-      ) {
+    // - clear vertically only
+    if (!dy) return; // not moved!
     if (dy > 0) {
       // clear below
-      gfill(div6[s->x], s->y, *sp, dy, 64);
+      gfill(xdiv, s->y, *sp, dy, 64);
       return;
-    } else if (dy < 0) {
+    } else {
       // clear above
-      // BUG: gfill(div6[s->x], s->y+dy+1+sp[1], *sp, -dy, 64);
-      gfill(div6[s->x], s->y+dy+sp[1], *sp, -dy, 64);
-      return;
-    } else return; // not moved!
-  }
-
-  // Otherwise clear all
-#else
-#endif
-  // TODO:
-  //} else if (s->dx >= 6) {  /// and s->dy
-  //} else if (-s->dx >= 6) {
-
-    {
-      char w= *sp, h= *++sp;
-      // clear all - flickers
-      gfill(div6[s->x], s->y, w, h, 64);
+      gfill(xdiv, s->y+dy+sp[1], *sp, -dy, 64);
       return;
     }
   }
+  // TODO: small move left/right
+  //} else if one cell to the left
+  //} else if one cell to the right
+
+  // Otherwise: fallthrough:
+
+  // -- clear all (flickers little)
+  {
+    char w= *sp, h= *++sp;
+    gfill(xdiv, s->y, w, h, 64);
+    return;
+  }
+}
 
 #define Z 37
 
@@ -748,8 +745,14 @@ void initsprites(char n) {
 // ---- TODO: ^^^----- why is it slower? erasesprite flicker
 // 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
 
-// 1001: 1176cs   85sp/s 1215cfps (not moving x)
-// 1001: 1169cs   85sp/s 1223cfps (smooth moving x)
+// 1001: 1176cs  85sp/s 1215cfps (not moving x)
+// 1001: 1169cs  85sp/s 1223cfps (smooth moving x)
+//       1171cs  85sp/s 1221cfps 
+//        980cs 102sp/s 1459cfps (erasesprite cell opt)
+// 1001:  971cs 103sp/s 1472cfps 
+// 1001:  961cs 104sp/s 1488cfps (statics in erasesp)
+
+
 
 // N=1:   915cs 109sp/s 10939cfps 
 // N=2:   914cs 109sp/s  5481cfps
