@@ -607,7 +607,8 @@ void erasesprite(sprite* s, int newx, signed char dy) {
       return;
     } else if (dy < 0) {
       // clear above
-      gfill(div6[s->x], s->y+dy+1+sp[1], *sp, -dy, 64);
+      // BUG: gfill(div6[s->x], s->y+dy+1+sp[1], *sp, -dy, 64);
+      gfill(div6[s->x], s->y+dy+sp[1], *sp, -dy, 64);
       return;
     } else return; // not moved!
   }
@@ -694,8 +695,8 @@ void spmove(char* sp) {
     // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
 
     if (0) {
-      // 1171cs  85sp/s 1221cfps 3851ps
-      //  980cs 102sp/s 1459cfps 4602Bps - wrong!
+      // 1171cs  85sp/s 1221cfps 3851Bps
+      //  980cs 102sp/s 1459cfps 4602Bps
       olderasesprite(s);
 
       // update pos
