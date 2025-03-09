@@ -665,13 +665,28 @@ void b(char x, char y) {
 
 sprite sploc[N];
 
-void spmove(char* sp) {
-  char i;
+char spxloc[40], spyloc[25];
 
-//  gclear();
+void spmove() {
+  char i, j, k, c, cx, cy, *px, *py;
+  static int newx, newy;
+  sprite* s;
+  char* sp;
+  char spbit= 1;
+
+  // clear sprite locations
+  assert(N<8);
+
+  memset(spxloc, 0, sizeof(spxloc));
+  memset(spyloc, 0, sizeof(spyloc));
+  gfill(0, 190, 40, 8, 64);
+  gfill(div6[230], 0, 2, 200, 64);
+
+  gotoxy(0, 25);
 
   for(i=0; i<N; ++i) {
-    sprite* s= sploc+i;
+    s= sploc+i;
+    sp= s->bitmap;
 
     if (!s->dx && !s->dy) continue;
 
@@ -679,30 +694,73 @@ void spmove(char* sp) {
     // TODO: undraw in opposite order...lol
     // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
 
-    {
-      // TODO: movesprite();
+    // TODO: movesprite();
+    
+    // update pos
+    newx= s->x; newy= s->y;
 
-      // update pos
-      static int newx, newy;
-      newx= s->x; newy= s->y;
+  rex2:
+    if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) { s->dx= -s->dx; goto rex2; }
+  rex3:
+    if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) { s->dy= - s->dy; goto rex3; }
 
-    rex2:
-      if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) { s->dx= -s->dx; goto rex2; }
-    rex3:
-      if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) { s->dy= - s->dy; goto rex3; }
+    erasesprite(s, newx, newy - s->y);
 
-      erasesprite(s, newx, newy - s->y);
+    // move
+    s->x= newx;
+    s->y= newy;
 
-      // move
-      s->x= newx;
-      s->y= newy;
+    // draw
+    ++ndraw;
+    drawsprite(s);
+      
+    // collision?
+    if (1) {
+      // mark where the sprite is
+      px= spxloc+div6[newx];
+      py= spyloc+(newy>>3);
+      cx= 0;
+      k= sp[0];
+      for(j=0; j<k; ++j) {
+        cx |= (*px |= spbit); ++px;
+        gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
+      }
+      cy= 0;
+      k= sp[1]/8+1;
+      for(j=0; j<k; ++j) {
+        cy |= (*py |= spbit); ++py;
+        gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
+      }
+      
+      //for(j=0; j<=i; ++j) {
+      // 3856cs - 4x overhead!
+      //c= spritecollision(s, sploc+i); 
 
-      // draw
-      ++ndraw;
-      drawsprite(s);
+      c= cx&cy&~spbit;
+      //printf(" %02xv%02x=%02x", cx, cy, c);
+      gcurx= 230+i; gcury= j;
+      gmode= !!c;
+      setpixel();
+      //if (gmode) cgetc();
+
+    } // collision
+    spbit<<= 1;
+  } // next sprite
+  
+  if (1)
+  for(i=0; i<40; ++i) {
+    for(j=0; j<25; ++j) {
+      c= spxloc[i] & spyloc[j];
+      // more than one bit set?
+      if (c&(c-1)) {
+        px= HIRESSCREEN+j*8*40+i;
+        for(k=0; k<8; ++k) {
+          *px ^= 128; px+= 40;
+        }
+      }
     }
-
   }
+  cgetc();
 }
 
 // shift one step right
@@ -732,8 +790,9 @@ void initsprites(char n) {
     s->x= 130-130/n*i;
     s->y= 180/n*i;
 
-    s->dx= +1;
     //s->dx= 0;
+    s->dx= +1;
+
     s->dy= +i*11/10+1;
 
     s->bitmap= enterprise;
@@ -843,12 +902,14 @@ void main() {
 
   hires();
   gclear();
+  gfill(0, 0, 1, 200, 0+16);
+  gfill(1, 0, 1, 200, 0+2);
 
   initsprites(N);
 
   T= time();
   while(ndraw<=1000) {
-    spmove(enterprise);
+    spmove();
 
     if (0) { // cost 10%?
       unsigned int X= T-time();
