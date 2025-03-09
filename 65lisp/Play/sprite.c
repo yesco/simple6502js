@@ -405,6 +405,50 @@ typedef struct sprite {
   char z; // z order
 } sprite;
 
+// Possible ideas:
+// - https://chipmunk-physics.net/release/ChipmunkLatest-Docs/#CollisionDetection
+// - https://en.m.wikipedia.org/wiki/Collision_detection
+
+// TODO: detect when drawing! (if not 64 then clash?)
+//   (requires restore?)
+// TODO: use a single pixel detector(?)
+//
+// TODO: make decision of detection only
+//   (assign bit i to sprite only if required)
+// TODO: type of sprites, id of sprite
+// TODO: detect fine bitmap clash (shifted AND?)
+// TODO: detect center of "gravity" collision/distance
+// TODO: calculate pixel center of gravity position
+// TODO: use callback on sprites "overlap()"
+// TODO: pixelbased bounding box to refine overlap
+// TODO: and pixels/mask
+// TODO: add Z-dimension, further filters it out
+// TODO: more than 8 objects?
+// TODO: pixel object collision detect (cent of grav?)
+// TODO: grid datastructure (expensive)
+
+// Bitmap on X and Y colission detection
+//
+// main idea:
+// - not a grid
+// - just 8 sprites - 1 byte col and row
+//   40 cols + 25 rows (basically text-screen!)
+// - just a bitmap for X/6 and Y/8 extent of sprite
+// - sprite bit i is set in Xmap and Ymap
+//   for all it's X and Y cell locations
+// - updated "every cycle" (all redrawn?)
+// - when updating a sprite
+//   a) OR the bitmaps for all X positions
+//   b) OR the bitmaps for all Y positions
+//   c) AND those two resulting bitmaps
+//   d) if more than one bit set (in both)
+//      then there is a:
+//          BOUDNING BOX COLLISION!
+//   e) dispatch a a finer checker on either
+//      objects (callbacks?)
+char spxloc[40], spyloc[25];
+
+// This one i O(n^2)
 char spritecollision(sprite* a, sprite* b) {
   if (a->x > b->x) return -spritecollision(b, a);
   {
@@ -665,7 +709,8 @@ void b(char x, char y) {
 
 sprite sploc[N];
 
-char spxloc[40], spyloc[25];
+//#define DISPCOLL 1
+#define DISPCOLL 0
 
 void spmove() {
   char i, j, k, c, cx, cy, *px, *py;
@@ -679,8 +724,10 @@ void spmove() {
 
   memset(spxloc, 0, sizeof(spxloc));
   memset(spyloc, 0, sizeof(spyloc));
-  gfill(0, 190, 40, 8, 64);
-  gfill(div6[230], 0, 2, 200, 64);
+  if (DISPCOLL) {
+    gfill(0, 190, 40, 8, 64);
+    gfill(div6[230], 0, 2, 200, 64);
+  }
 
   gotoxy(0, 25);
 
@@ -699,10 +746,15 @@ void spmove() {
     // update pos
     newx= s->x; newy= s->y;
 
+    // this faster than while? lol
   rex2:
-    if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) { s->dx= -s->dx; goto rex2; }
+    if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) {
+      s->dx= -s->dx; goto rex2;
+    }
   rex3:
-    if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) { s->dy= - s->dy; goto rex3; }
+    if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) {
+      s->dy= - s->dy; goto rex3;
+    }
 
     erasesprite(s, newx, newy - s->y);
 
@@ -723,44 +775,55 @@ void spmove() {
       k= sp[0];
       for(j=0; j<k; ++j) {
         cx |= (*px |= spbit); ++px;
-        gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
+        if (DISPCOLL) {
+          gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
+        }
       }
       cy= 0;
       k= sp[1]/8+1;
       for(j=0; j<k; ++j) {
         cy |= (*py |= spbit); ++py;
-        gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
+        if (DISPCOLL) {
+          gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
+        }
       }
       
       //for(j=0; j<=i; ++j) {
       // 3856cs - 4x overhead!
       //c= spritecollision(s, sploc+i); 
 
-      c= cx&cy&~spbit;
-      //printf(" %02xv%02x=%02x", cx, cy, c);
-      gcurx= 230+i; gcury= j;
-      gmode= !!c;
-      setpixel();
-      //if (gmode) cgetc();
+      c= cx&cy;
+      // more than one bit set
+      if (c&(c-1)) {
+        k= 1;
+        for(j=0; j<8; ++j) {
+          if (c & k) putchar('0'+j);
+          k<<= 1;
+        }
+        putchar(' ');
+      }
 
     } // collision
+
     spbit<<= 1;
   } // next sprite
   
-  if (1)
-  for(i=0; i<40; ++i) {
-    for(j=0; j<25; ++j) {
-      c= spxloc[i] & spyloc[j];
-      // more than one bit set?
-      if (c&(c-1)) {
-        px= HIRESSCREEN+j*8*40+i;
-        for(k=0; k<8; ++k) {
-          *px ^= 128; px+= 40;
+  if (DISPCOLL)
+    for(i=0; i<40; ++i) {
+      for(j=0; j<25; ++j) {
+        c= spxloc[i] & spyloc[j];
+        // more than one bit set?
+        if (c&(c-1)) {
+          px= HIRESSCREEN+j*8*40+i;
+          for(k=0; k<8; ++k) {
+            *px ^= 128; px+= 40;
+          }
         }
       }
     }
-  }
-  cgetc();
+
+  putchar('|');
+  //cgetc();
 }
 
 // shift one step right
