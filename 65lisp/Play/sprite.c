@@ -478,6 +478,9 @@ void drawsprite(sprite* s) {
   if (0) { // old asm
   l= rowaddr[s->y] + div6[s->x];
 
+  // TODO: if l is unchanged then no need
+  //   erase  as we will overdraw!
+
   // TODO: clipping?
   *(int*)0x90= sp+2;
   *(int*)0x92= l;
@@ -579,7 +582,7 @@ void drawsprite(sprite* s) {
   }
 }
 
-void erasesprite(sprite* s) {
+void erasesprite(sprite* s, int newx, signed char dy) {
   char* sp= s->bitmap;
   // for xor
   //drawsprite(s); return;
@@ -587,26 +590,80 @@ void erasesprite(sprite* s) {
   // TODO: clipping?
 
   // TODO: this doesn't handle overlapping. mask?
-  // clever
+
 #ifndef NOTCLEVER
-  if (s->dx==0) {
-    if (s->dy > 0) {
-      gfill(div6[s->x], s->y, *sp, s->dy, 64);
-    } else if (s->dy < 0) {
-      gfill(div6[s->x], s->y+s->dy+1+sp[1], *sp, -s->dy, 64);
-    }
+  // clever
+  if (s->dx == 0
+      // TODO: for some reason this leaves a trace beghind
+      // why? It says same cells? i.e. just move up/down
+      //   85 ->  101 sp/s
+
+      || div6[newx]==div6[s->x]
+
+      ) {
+    if (dy > 0) {
+      // clear below
+      gfill(div6[s->x], s->y, *sp, dy, 64);
+      return;
+    } else if (dy < 0) {
+      // clear above
+      gfill(div6[s->x], s->y+dy+1+sp[1], *sp, -dy, 64);
+      return;
+    } else return; // not moved!
+  }
+
+  // Otherwise clear all
 #else
-  if (0) {
 #endif
   // TODO:
   //} else if (s->dx >= 6) {  /// and s->dy
   //} else if (-s->dx >= 6) {
-  } else {
-    char w= *sp, h= *++sp;
-    // clear all - flickers
-    gfill(div6[s->x], s->y, w, h, 64);
+
+    {
+      char w= *sp, h= *++sp;
+      // clear all - flickers
+      gfill(div6[s->x], s->y, w, h, 64);
+      return;
+    }
   }
-}
+
+void olderasesprite(sprite* s) {
+  char* sp= s->bitmap;
+  // for xor
+  //drawsprite(s); return;
+
+  // TODO: clipping?
+
+  // TODO: this doesn't handle overlapping. mask?
+
+#ifndef NOTCLEVER
+  // clever
+  if (s->dx == 0) {
+    if (s->dy > 0) {
+      // clear below
+      gfill(div6[s->x], s->y, *sp, s->dy, 64);
+      return;
+    } else if (s->dy < 0) {
+      // clear above
+      gfill(div6[s->x], s->y+s->dy+1+sp[1], *sp, -s->dy, 64);
+      return;
+    } else return; // not moved!
+  }
+
+  // Otherwise clear all
+#else
+#endif
+  // TODO:
+  //} else if (s->dx >= 6) {  /// and s->dy
+  //} else if (-s->dx >= 6) {
+
+    {
+      char w= *sp, h= *++sp;
+      // clear all - flickers
+      gfill(div6[s->x], s->y, w, h, 64);
+      return;
+    }
+  }
 
 #define Z 37
 
@@ -636,18 +693,45 @@ void spmove(char* sp) {
     // TODO: undraw in opposite order...lol
     // TODO: or, have "backing" snapwhot 8000bytes to pull bytes from...
 
-    erasesprite(s);
+    if (0) {
+      // 1171cs  85sp/s 1221cfps 3851ps
+      //  980cs 102sp/s 1459cfps 4602Bps - wrong!
+      olderasesprite(s);
 
-    // move
-  rex:
-    if ((s->x+= s->dx) + 6*sp[0] >=240 || s->x < 0) { s->dx= -s->dx; goto rex; }
-  rey:
-    if ((s->y+= s->dy) + sp[1] >=200 || s->y < 0) { s->dy= -s->dy; goto rey; }
+      // update pos
+    rex:
+      if ((s->x+= s->dx) + 6*sp[0] >=240 || s->x < 0) { s->dx= -s->dx; goto rex; }
+    rey:
+      if ((s->y+= s->dy) + sp[1] >=200 || s->y < 0) { s->dy= -s->dy; goto rey; }
 
-    // draw
-    ++ndraw;
-    drawsprite(s);
-    //b(s->x, s->y);
+      // draw
+      ++ndraw;
+      drawsprite(s);
+
+    } else {
+      // TODO: still not correct - leaves trace
+      // TODO: movesprite();
+
+      // update pos
+      static int newx, newy;
+      newx= s->x; newy= s->y;
+
+    rex2:
+      if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) { s->dx= -s->dx; goto rex2; }
+    rex3:
+      if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) { s->dy= - s->dy; goto rex3; }
+
+      erasesprite(s, newx, newy - s->y);
+
+      // move
+      s->x= newx;
+      s->y= newy;
+
+      // draw
+      ++ndraw;
+      drawsprite(s);
+    }
+
   }
 }
 
@@ -767,9 +851,9 @@ void main() {
         s->bitmap= s->shbitmap[j];
         s->mask= s->shmask[j];
         if (s->bitmap) {
-          drawsprite(s);
+          //drawsprite(s);
           //cgetc();
-          erasesprite(s);
+          //erasesprite(s);
         }
       }
       if (s->shbitmap[0]) {
