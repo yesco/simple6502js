@@ -712,6 +712,8 @@ sprite sploc[N];
 //#define DISPCOLL 1
 #define DISPCOLL 0
 
+int colls= 0;
+
 void spmove() {
   char i, j, k, c, cx, cy, *px, *py;
   static int newx, newy;
@@ -768,13 +770,24 @@ void spmove() {
       
     // collision?
     if (1) {
+      // disabled:  990cs
+      //  enabled: 1760cs !!!
+      //           1679cs (w print, sp[0] or k moved out)
+      // 
+      // doubles the cost - same as drawing sprite!
+      // (can we put it inside the spritedraw?)
+      // 
       // mark where the sprite is
+      // (cheaper than boundary checking but still
+      //  expensive)
+      // TODO: make it incremental
+      //   (together with erasesprite "clever" opt)
       px= spxloc+div6[newx];
       py= spyloc+(newy>>3);
       cx= 0;
       k= sp[0];
       for(j=0; j<k; ++j) {
-        cx |= (*px |= spbit); ++px;
+        cx |= (px[j] |= spbit);
         if (DISPCOLL) {
           gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
         }
@@ -782,7 +795,7 @@ void spmove() {
       cy= 0;
       k= sp[1]/8+1;
       for(j=0; j<k; ++j) {
-        cy |= (*py |= spbit); ++py;
+        cy |= (py[j] |= spbit);
         if (DISPCOLL) {
           gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
         }
@@ -795,10 +808,17 @@ void spmove() {
       c= cx&cy;
       // more than one bit set
       if (c&(c-1)) {
-        k= 1;
-        for(j=0; j<8; ++j) {
-          if (c & k) putchar('0'+j);
-          k<<= 1;
+        if (0) { // no print to see overhead
+          //   print: 1640cs
+          // noprint: 1654cs(?) (wow low overhead!)
+          k= 1;
+          for(j=0; j<8; ++j) {
+            if (c & k) {
+              putchar('0'+j);
+              ++colls;
+            }
+            k<<= 1;
+          }
         }
         putchar(' ');
       }
@@ -822,7 +842,7 @@ void spmove() {
       }
     }
 
-  putchar('|');
+  putchar('<');
   //cgetc();
 }
 
@@ -987,6 +1007,7 @@ void main() {
     gotoxy(0,25);
     // TODO: Bps is all wrong? why?
     printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X, bytes*100L/X);
+    printf(" COLLS=%d (should be 673)", colls);
   }
 }
 
