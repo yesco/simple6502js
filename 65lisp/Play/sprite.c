@@ -486,53 +486,126 @@ void drawsprite(sprite* s) {
   *(int*)0x92= l;    // loop this many lines
   *(int*)0x94= msk;  // mask byte data
 
-  asm("ldy #0"); // y= sprite byte data index
-  asm("clc"); // set it for once top!
+  // -- ASM: a memcpy w strides, lol (w<256)
+  // (be careful to change!)
 
- nextrow:
-  // a memcpy w strides, lol (w<256)
+  switch(0) {
 
-  asm("ldx %v", w); // x= w bytes width
+  case 0:
+    // - old style overwrite - very fast
 
- nextcell:
-  
-  // TODO: make 3 variants at top for sh->mask
-if (0) {
+    asm("ldy #0"); // y= sprite byte data index
+    asm("clc");    // set it for once top!
 
-  // -- xor and one more variant with mask
-  asm("lda ($92),y"); // a = l[y];
-  //asm("and ($94),y"); // a&= mask[y];
-  asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
-  //asm("ora ($90),y"); // a|= sp[y];
-  asm("ora #$40");
-  asm("sta ($92),y"); // l[y]= a;
+  nextrow0:
+    asm("ldx %v", w); // x= w bytes width
 
-} else {
+  nextcell0:
+    // draw
+    asm("lda ($90),y"); // a = sp[y];
+    asm("sta ($92),y"); // l[y]= a;
 
-  // old style overwrite - very fast
-  asm("lda ($90),y"); // a = sp[y];
-  asm("sta ($92),y"); // l[y]= a;
+    // step
+    asm("iny"); // ++y next byte
+    asm("dex"); // --x nextcell
+    asm("bne %g", nextcell0);
 
-}
+    // step line
+    // *(int*)0x92+= 40-w (= ww);
+    asm("clc"); // TODO: set it for once at top!
+    asm("lda $92");
+    asm("adc %v", ww);
+    asm("sta $92");
+    asm("bcc %g", nott0);
 
-  asm("iny"); // ++y next byte
-  asm("dex"); // --x nextcell
-  asm("bne %g", nextcell);
+    asm("inc $93");
+    asm("clc"); // make it always clear!
+  nott0:
 
-  // *(int*)0x92+= 40-w (= ww);
-  asm("clc"); // TODO: set it for once at top!
-  asm("lda $92");
-  asm("adc %v", ww);
-  asm("sta $92");
-  asm("bcc %g", nott);
+    // ... while(--h); // more lines
+    asm("dec %v", hh);
+    asm("bne %g", nextrow0);
+    break;
 
-  asm("inc $93");
-  asm("clc"); // make it always clear!
- nott:
+  case 1:
+    // - xor draw/undraw (doesn't disturb backgr)
 
-  // ... while(--h); // more lines
-  asm("dec %v", hh);
-  asm("bne %g", nextrow);
+    asm("ldy #0"); // y= sprite byte data index
+    asm("clc"); // set it for once top!
+
+  nextrow1:
+    asm("ldx %v", w); // x= w bytes width
+
+  nextcell1:
+    // draw
+    asm("lda ($92),y"); // a = l[y];
+    asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
+    asm("ora #$40");
+    asm("sta ($92),y"); // l[y]= a;
+
+    // step
+    asm("iny"); // ++y next byte
+    asm("dex"); // --x nextcell
+    asm("bne %g", nextcell1);
+
+    // step line
+    // *(int*)0x92+= 40-w (= ww);
+    asm("clc"); // TODO: set it for once at top!
+    asm("lda $92");
+    asm("adc %v", ww);
+    asm("sta $92");
+    asm("bcc %g", nott1);
+
+    asm("inc $93");
+    asm("clc"); // make it always clear!
+  nott1:
+
+    // ... while(--h); // more lines
+    asm("dec %v", hh);
+    asm("bne %g", nextrow1);
+    break;
+
+  case 2:
+    // - draw w mask - expensive!
+
+    asm("ldy #0"); // y= sprite byte data index
+    asm("clc"); // set it for once top!
+
+  nextrow2:
+    asm("ldx %v", w); // x= w bytes width
+
+  nextcell2:
+    // draw
+    asm("lda ($92),y"); // a = l[y];
+    asm("and ($94),y"); // a&= mask[y];
+    asm("ora ($90),y"); // a|= sp[y];
+    asm("ora #$40");
+    asm("sta ($92),y"); // l[y]= a;
+
+    // step
+    asm("iny"); // ++y next byte
+    asm("dex"); // --x nextcell
+    asm("bne %g", nextcell2);
+
+    // step line
+    // *(int*)0x92+= 40-w (= ww);
+    asm("clc"); // TODO: set it for once at top!
+    asm("lda $92");
+    asm("adc %v", ww);
+    asm("sta $92");
+    asm("bcc %g", nott2);
+
+    asm("inc $93");
+    asm("clc"); // make it always clear!
+  nott2:
+
+    // ... while(--h); // more lines
+    asm("dec %v", hh);
+    asm("bne %g", nextrow2);
+    break;
+
+  }
+
 }
 
 // TODO: move into "movesprite()"
@@ -766,7 +839,6 @@ void initsprites(char n) {
 // ORIC: 8 sprites 24x24
 // (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 void main() {
-  char i;
   unsigned int T;
 
   hires();
