@@ -470,74 +470,69 @@ void drawsprite(sprite* s) {
   static char w, h, *l;
   static char * sp, * msk;
   static char m;
+  static char ww;
+  static char hh;
+
   m= mod6[s->x];
   sp= s->shbitmap[m];
   msk= s->shmask[m];
   w= *sp; h= sp[1];
 
-  {
-    // new optimization
-    static char ww;
-    static char hh;
+  ww= 40-w; hh= h;
+  l= rowaddr[s->y] + div6[s->x];
 
-    ww= 40-w; hh= h;
+  // TODO: clipping?
+  *(int*)0x90= sp+2; // sprite byte data
+  *(int*)0x92= l;    // loop this many lines
+  *(int*)0x94= msk;  // mask byte data
 
-    l= rowaddr[s->y] + div6[s->x];
+  asm("ldy #0"); // y= sprite byte data index
+  asm("clc"); // set it for once top!
 
-    // TODO: clipping?
-    *(int*)0x90= sp+2;
-    *(int*)0x92= l;
-    *(int*)0x94= msk;
+ nextrow:
+  // a memcpy w strides, lol (w<256)
 
-    asm("ldy #0");
-    asm("clc"); // set it for once top!
+  asm("ldx %v", w); // x= w bytes width
 
-  nextrow:
+ nextcell:
+  
+  // TODO: make 3 variants at top for sh->mask
+if (0) {
 
-    // specialized memcpy (w<256)
-    asm("ldx %v", w);
-
-  nextcell:
-
-    // TODO: make two variants at top for sh->mask
-    if (0) {
-
+  // -- xor and one more variant with mask
   asm("lda ($92),y"); // a = l[y];
   //asm("and ($94),y"); // a&= mask[y];
   asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
   //asm("ora ($90),y"); // a|= sp[y];
   asm("ora #$40");
-  // OLD overwrite! - very fast!
-  //asm("lda ($90),y"); // a = sp[y];
   asm("sta ($92),y"); // l[y]= a;
-    
-    } else {
-      // old style overwrite
-      asm("lda ($90),y"); // a = sp[y];
-      asm("sta ($92),y"); // l[y]= a;
-    }
 
-  //
-  asm("iny");
-  asm("dex");
+} else {
+
+  // old style overwrite - very fast
+  asm("lda ($90),y"); // a = sp[y];
+  asm("sta ($92),y"); // l[y]= a;
+
+}
+
+  asm("iny"); // ++y next byte
+  asm("dex"); // --x nextcell
   asm("bne %g", nextcell);
 
   // *(int*)0x92+= 40-w (= ww);
-  asm("clc"); // set it for once top!
+  asm("clc"); // TODO: set it for once at top!
   asm("lda $92");
   asm("adc %v", ww);
   asm("sta $92");
-
   asm("bcc %g", nott);
+
   asm("inc $93");
   asm("clc"); // make it always clear!
-  nott:
+ nott:
 
-  // ... while(--h);
+  // ... while(--h); // more lines
   asm("dec %v", hh);
   asm("bne %g", nextrow);
-
-  }
 }
 
 // TODO: move into "movesprite()"
