@@ -1190,9 +1190,9 @@ void initsprites(char n) {
 
     #ifdef COLORATTR
       switch(i%4) {
-      case 0: s->bitmap= oric_thin_color; break;
+      case 0: s->bitmap= c64_color; break;
       case 1: s->bitmap= sinclair_color; break;
-      case 2: s->bitmap= c64_color; break;
+      case 2: s->bitmap= oric_thin_color; break;
       case 3: s->bitmap= color_enterprise; break;
       }
     #else
@@ -1363,6 +1363,7 @@ void main() {
 
 
   T= time();
+ again:
   while(ndraw<=1000) {
     spmove();
 
@@ -1383,5 +1384,9 @@ void main() {
     printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X, bytes*100L/X);
     printf(" COLLS=%d (should be 673)", colls);
   }
+
+  cgetc();
+  ndraw= -32766;
+  goto again;
 }
 
