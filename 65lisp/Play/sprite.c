@@ -562,7 +562,7 @@ int ndraw= 0;
 //
 // see main for new bench using 1001 updates
 
-void drawsprite(sprite* s) {
+void drawsprite(register sprite* s) {
   static char w, h, *l;
   static char * sp, * msk;
   static char m;
@@ -570,7 +570,7 @@ void drawsprite(sprite* s) {
   static char hh;
 
   m= mod6[s->x];
-  sp= s->shbitmap[m];
+  sp=  s->shbitmap[m];
   msk= s->shmask[m];
   w= *sp; h= sp[1];
 
@@ -579,7 +579,7 @@ void drawsprite(sprite* s) {
 
   // TODO: clipping?
   *(int*)0x90= sp+2; // sprite byte data
-  *(int*)0x92= l;    // loop this many lines
+  *(int*)0x92= l;    // screen address + y offset
   *(int*)0x94= msk;  // mask byte data
 
   // -- ASM: a memcpy w strides, lol (w<256)
@@ -740,6 +740,11 @@ void drawsprite(sprite* s) {
 // graphics Pixel fill
 // (copied modifyed from hires-raw.c/gfill)
 // (don't change attributes/hibit)
+
+// TODO: specialize for spriteerase
+//       a) don't want to load fillvalue v all the time
+//       b) to go next line step 40-w like drawsprite
+//       c) count using var not register
 void gpfill(char c, char r, char w, char h, char v) {
   // TODO: adjust so not out of screen?
   // TODO: can share with lores?
@@ -777,7 +782,7 @@ void gpfill(char c, char r, char w, char h, char v) {
 #endif // PROTECT_6BIT
 
     // TODO: move X to var?
-    asm("lda %v", vv);
+    asm("lda %v", vv); // TODO: this slows down...
     asm("sta ($90),y"); // l[y]= 0x40;
   skip:
 
@@ -858,11 +863,11 @@ sprite sploc[N];
 int colls= 0;
 
 void spmove() {
-  char i, j, k, c, cx, cy, *px, *py;
+  static char i, j, k, c, cx, cy, *px, *py;
   static int newx, newy;
-  sprite* s;
-  char* sp;
-  char spbit= 1;
+  register sprite* s;
+  register char* sp;
+  static char spbit= 1;
 
   // clear sprite locations
   assert(N<8);
@@ -1129,6 +1134,8 @@ void initsprites(char n) {
 // 1001: 1213cs  82sp/s 1178cfps (protect hibit: 25% no fore)
 // 1001: 1252cs  79sp/s 1142cfps (protect 6bit: 27% w fore)
 // 1001: 1272cs  78sp/s 1124cfps (protect 6bit: 31% no fore)
+// 1001: 1283cs  84sp/s 1208cfps (7.5% faster! -"- register sprite, static)
+
 //(/ 1272 973.0)
 
 
