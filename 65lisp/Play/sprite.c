@@ -5,6 +5,7 @@
 // * N sprites
 
 #define N 7
+//#define N 1
 
 // * higher number sprite is above lower numbers
 //   (drawing order low-high)
@@ -23,15 +24,19 @@
 //    6) 6th bit==0 (== not normal pixels)
 //       ??% speed-loss (w OVERWRITE)a
 
-#define PROTECT_6BIT
+//#define PROTECT_6BIT
 
 // - 3 methods of update (TODO: definable/sprite)
 //    w) OVERWRITE (bitblt)
 //       Use: when background empty
-//            (ink) color attributes ok
 //            many small (?)
 //            non-overlapping sprites (otherwise flickrs)
 //            all sprites moving (fast)
+//            (ink) color attributes ok
+//               (don't mix with protect?)
+
+#define COLORATTR
+
 //    x) XORWRITE (and undraw, 2x cost basically)
 //       Use: preserve background (inverts sprite pixels)
 //            sprites moves occasionally
@@ -409,6 +414,34 @@ char enterprise[]= {
 */
 };
 
+#define _BLACK_  0,
+#define _RED___  1,
+#define _GREEN_  2,
+#define _YELLOW  3,
+#define _BLUE__  4,
+#define _MAGN__  5,
+#define _CYAN__  6,
+#define _WHITE_  7,
+
+char color_enterprise[]= {
+  13, 16,
+  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______ ______
+  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ ______1 _1_____ _______ ______
+  _MAGN__ __11111 _111111 _111111 _111111 _111111 _11____ _______ _______ ____111 _111___ _______ ______
+  _MAGN__ ___1111 _111111 _111111 _111111 _111111 _11____ _______ _______ _111111 _111111 _______ ______
+  _MAGN__ _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
+  _YELLOW _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
+  _YELLOW _______ _______ _______ _______ _11____ _____11 _11111_ _______ _111111 _111111 _______ ______
+  _YELLOW _______ _______ _______ _______ _11____ ___1111 _111___ _______ ____111 _1111__ _______ ______
+  _GREEN_ _______ _______ _______ _______ _111111 _111111 _11____ _______ ______1 _11____ _______ ______
+  _GREEN_  _______ _______ _______ ____111 _111111 _111111 _111___ _______ _______ _1_____ _______ ______
+  _CYAN__ _______ _______ _______ ____111 _111111 _111111 _111_1_ _______ _______ _______ _______ ______
+  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _11111_ _______ _______ _______ _______ ______
+  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _111111 _1_____ _______ _______ _______ ______
+  _BLUE__ _______ _______ _______ _______ _111111 _111111 _11111_ _______ _______ _______ _______ ______
+  _BLUE__ _______ _______ _______ _______ __11111 _111111 _111_1_ _______ _______ _______ _______ ______
+  _BLUE__  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______ ______
+};
 
 char BITSRIGHT[]= { 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
 // TODO: 7... lol
@@ -1004,6 +1037,11 @@ void spriteshift(char* bm, char w, char h) {
   //while(*p) { // lol, can do!
   do {
     v= 0; j= w;
+
+    #ifdef COLORATTR
+      ++p; --j;
+    #endif // COLORATTR
+
     do {
       v<<= 6;
       v|= *p & 63;
@@ -1029,7 +1067,11 @@ void initsprites(char n) {
 
     s->dy= +i*11/10+1;
 
-    s->bitmap= enterprise;
+    #ifdef COLORATTR
+      s->bitmap= color_enterprise;
+    #else
+      s->bitmap= enterprise;
+    #endif // COLORATTR
 
     // - have mask?
     {
@@ -1135,6 +1177,8 @@ void initsprites(char n) {
 // 1001: 1252cs  79sp/s 1142cfps (protect 6bit: 27% w fore)
 // 1001: 1272cs  78sp/s 1124cfps (protect 6bit: 31% no fore)
 // 1001: 1283cs  84sp/s 1208cfps (7.5% faster! -"- register sprite, static)
+// 1001: 1028cs  97sp/s 1391cfps (COLORATTR enterprise, 2 cols more)
+// 1001:  903cs 107sp/s 1537cfps (no protect, no color)
 
 //(/ 1272 973.0)
 
