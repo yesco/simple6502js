@@ -2,11 +2,26 @@
 
 // This is a prototype of ORIC ATMOS hires sprites.
 //
-// - N sprites
-// - 8 sprites collision detection
-// - optinal protected foreground (sprites "behind")
+// = N sprites
+
+#define N 7
+
+// * 8 sprites collision detection
+
+// #define COLLISION
+
+// * optional protected foreground (sprites "behind")
 //    7) inverse hi-bit set = don't overwrite
+//       23-25% speed-loss w OVERWRITE (OVERWRITE)
+//       faster w more foreground!
+
+//#define PROTECT_HIBIT
+
 //    6) 6th bit==0 (== not normal pixels)
+//       ??% speed-loss (w OVERWRITE)a
+
+#define PROTECT_6BIT
+
 // - 3 methods of update (TODO: definable/sprite)
 //    w) OVERWRITE (bitblt)
 //       Use: when background empty
@@ -475,6 +490,9 @@ typedef struct sprite {
 //          BOUDNING BOX COLLISION!
 //   e) dispatch a a finer checker on either
 //      objects (callbacks?)
+
+#ifdef COLLISION
+
 char spxloc[40], spyloc[25];
 
 // This one i O(n^2) use bits method instead?
@@ -526,6 +544,8 @@ char spritecollision(sprite* a, sprite* b) {
   }
 }
 
+#endif //COLLISION
+
 int ndraw= 0;
 
 // 409 cs/100 fps? 1.ffps
@@ -574,6 +594,19 @@ void drawsprite(sprite* s) {
     asm("ldx %v", w); // x= w bytes width
 
   nextcell0:
+
+#ifdef PROTECT_HIBIT    
+    // skip if hibit set
+    asm("lda ($92),y"); // a= l[y]
+    asm("bmi %g", skip0);
+#endif // PROTECT_HIBIT
+#ifdef PROTECT_6BIT
+    // skip if hibit set
+    asm("lda ($92),y"); // a= l[y]
+    asm("rol");         // M= a&6bit lol
+    asm("bpl %g", skip0);
+#endif // PROTECT_6BIT
+
     // draw
     asm("lda ($90),y"); // a = sp[y];
     asm("sta ($92),y"); // l[y]= a;
@@ -701,6 +734,70 @@ void drawsprite(sprite* s) {
 
 }
 
+// graphics Pixel fill
+// (copied modifyed from hires-raw.c/gfill)
+// (don't change attributes/hibit)
+void gpfill(char c, char r, char w, char h, char v) {
+  // TODO: adjust so not out of screen?
+  // TODO: can share with lores?
+  static char ww, hh, vv;
+
+  if (r>= 200) return;
+  //char* p= HIRESSCREEN+(5*r)*8+c;
+  ww= w; hh= h; vv= v;
+
+  *(int*)0x90= rowaddr[r]+c -1; // -1 because y=w
+
+  asm("ldx %v", hh);
+
+ nextrow:
+  //for(; h; --h) {
+    //for(cell= w; cell; --cell) p[cell]=v; // 619hs
+    //memset(p+= 40, v, w); // 100x 10x10 takes 337hs !
+
+    // specialized memset (w<256)
+    asm("lda %v", vv);
+    asm("ldy %v", ww);
+
+  next:
+
+#ifdef PROTECT_HIBIT    
+    // skip if hibit set
+    asm("lda ($90),y"); // a= l[y]
+    asm("bmi %g", skip);
+#endif // PROTECT_HIBIT
+#ifdef PROTECT_6BIT
+    // skip if hibit set
+    asm("lda ($90),y"); // a= l[y]
+    asm("rol");         // M= a&6bit lol
+    asm("bpl %g", skip);
+#endif // PROTECT_6BIT
+
+    // TODO: move X to var?
+    asm("lda %v", vv);
+    asm("sta ($90),y"); // l[y]= 0x40;
+  skip:
+
+    // next col
+    asm("dey");
+    asm("bne %g", next);
+
+    // p+= 40;
+    // *(int*)0x90+= 40;
+    asm("clc");
+    asm("lda #40");
+    asm("adc $90");
+    asm("sta $90");
+    asm("lda $91");
+    asm("adc #00");
+    asm("sta $91");
+    
+    // while(--h);
+    asm("dex");
+    asm("bne %g", nextrow);
+}
+
+
 // TODO: move into "movesprite()"
 void erasesprite(sprite* s, int newx, signed char dy) {
   static char xdiv;
@@ -722,11 +819,11 @@ void erasesprite(sprite* s, int newx, signed char dy) {
     if (!dy) return; // not moved!
     if (dy > 0) {
       // clear below
-      gfill(xdiv, s->y, *sp, dy, 64);
+      gpfill(xdiv, s->y, *sp, dy, 64);
       return;
     } else {
       // clear above
-      gfill(xdiv, s->y+dy+sp[1], *sp, -dy, 64);
+      gpfill(xdiv, s->y+dy+sp[1], *sp, -dy, 64);
       return;
     }
   }
@@ -739,7 +836,7 @@ void erasesprite(sprite* s, int newx, signed char dy) {
   // -- clear all (flickers little)
   {
     char w= *sp, h= *++sp;
-    gfill(xdiv, s->y, w, h, 64);
+    gpfill(xdiv, s->y, w, h, 64);
     return;
   }
 }
@@ -749,12 +846,6 @@ void erasesprite(sprite* s, int newx, signed char dy) {
 void b(char x, char y) {
   box(x, y, Z, Z);
 }
-
-#define N 7
-//#define N 4
-//#define N 16
-//#define N 1
-//#define N 2
 
 sprite sploc[N];
 
@@ -773,12 +864,14 @@ void spmove() {
   // clear sprite locations
   assert(N<8);
 
+#ifdef COLLISION
   memset(spxloc, 0, sizeof(spxloc));
   memset(spyloc, 0, sizeof(spyloc));
   if (DISPCOLL) {
     gfill(0, 190, 40, 8, 64);
     gfill(div6[230], 0, 2, 200, 64);
   }
+#endif // COLLISION
 
   gotoxy(0, 25);
 
@@ -817,66 +910,67 @@ void spmove() {
     ++ndraw;
     drawsprite(s);
       
+#ifdef COLLISION
     // collision?
-    if (1) {
-      // disabled:  990cs
-      //  enabled: 1760cs !!!
-      //           1679cs (w print, sp[0] or k moved out)
-      // 
-      // doubles the cost - same as drawing sprite!
-      // (can we put it inside the spritedraw?)
-      // 
-      // mark where the sprite is
-      // (cheaper than boundary checking but still
-      //  expensive)
-      // TODO: make it incremental
-      //   (together with erasesprite "clever" opt)
-      px= spxloc+div6[newx];
-      py= spyloc+(newy>>3);
-      cx= 0;
-      k= sp[0];
-      for(j=0; j<k; ++j) {
-        cx |= (px[j] |= spbit);
-        if (DISPCOLL) {
-          gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
-        }
+    // disabled:  990cs
+    //  enabled: 1760cs !!!
+    //           1679cs (w print, sp[0] or k moved out)
+    // 
+    // doubles the cost - same as drawing sprite!
+    // (can we put it inside the spritedraw?)
+    // 
+    // mark where the sprite is
+    // (cheaper than boundary checking but still
+    //  expensive)
+    // TODO: make it incremental
+    //   (together with erasesprite "clever" opt)
+    px= spxloc+div6[newx];
+    py= spyloc+(newy>>3);
+    cx= 0;
+    k= sp[0];
+    for(j=0; j<k; ++j) {
+      cx |= (px[j] |= spbit);
+      if (DISPCOLL) {
+        gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
       }
-      cy= 0;
-      k= sp[1]/8+1;
-      for(j=0; j<k; ++j) {
-        cy |= (py[j] |= spbit);
-        if (DISPCOLL) {
-          gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
-        }
+    }
+    cy= 0;
+    k= sp[1]/8+1;
+    for(j=0; j<k; ++j) {
+      cy |= (py[j] |= spbit);
+      if (DISPCOLL) {
+        gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
       }
+    }
       
-      //for(j=0; j<=i; ++j) {
-      // 3856cs - 4x overhead!
-      //c= spritecollision(s, sploc+i); 
+    //for(j=0; j<=i; ++j) {
+    // 3856cs - 4x overhead!
+    //c= spritecollision(s, sploc+i); 
 
-      c= cx&cy;
-      // more than one bit set
-      if (c&(c-1)) {
-        if (1) { // no print to see overhead
-          //   print: 1640cs
-          // noprint: 1654cs(?) (wow low overhead!)
-          k= 1;
-          for(j=0; j<8; ++j) {
-            if (c & k) {
-              putchar('0'+j);
-              ++colls;
-            }
-            k<<= 1;
+    c= cx&cy;
+    // more than one bit set
+    if (c&(c-1)) {
+      if (1) { // no print to see overhead
+        //   print: 1640cs
+        // noprint: 1654cs(?) (wow low overhead!)
+        k= 1;
+        for(j=0; j<8; ++j) {
+          if (c & k) {
+            putchar('0'+j);
+            ++colls;
           }
+          k<<= 1;
         }
-        putchar('.');
       }
+      putchar('.');
+    }
 
-    } // collision
+#endif // COLLISION
 
     spbit<<= 1;
   } // next sprite
   
+#ifdef COLLISION  
   if (DISPCOLL)
     for(i=0; i<40; ++i) {
       for(j=0; j<25; ++j) {
@@ -892,7 +986,7 @@ void spmove() {
     }
 
   putchar('<');
-  //cgetc();
+#endif COLLISION
 }
 
 // shift one step right
@@ -982,6 +1076,22 @@ void initsprites(char n) {
   }
 }
 
+// N=1:   915cs 109sp/s 10939cfps 
+// N=2:   914cs 109sp/s  5481cfps
+// N=4:   928cs 108sp/s  2704cfps
+// N=7:                  1507cfps
+// N=16:                  608cfps
+
+// = (/ (* 11 16 1001 100) 751.0)
+
+// FPS= 105/N !!! these are large 66x16=1056px sprites!
+
+//                          w     h  N
+// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
+
+// vic 64: 8 sprites 24x21
+
+
 // N=7 1001 1836 cs 54 hsp/s 778 hfps
 // N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
 
@@ -1010,23 +1120,19 @@ void initsprites(char n) {
 //        980cs 102sp/s 1459cfps (erasesprite cell opt)
 // 1001:  971cs 103sp/s 1472cfps 
 // 1001:  961cs 104sp/s 1488cfps (statics in erasesp)
+// 1001:  973cs 102sp/s 1469cfps (no protect)
+
+// 1001: 1193cs  83sp/s 1198cfps (protect hibit, 23% w fore!)
+// 1001: 1213cs  82sp/s 1178cfps (protect hibit: 25% no fore)
+// 1001: 1252cs  79sp/s 1142cfps (protect 6bit: 27% w fore)
+// 1001: 1272cs  78sp/s 1124cfps (protect 6bit: 31% no fore)
+//(/ 1272 973.0)
 
 
+// collision: TODO: optimize
+// 1001: 
 
-// N=1:   915cs 109sp/s 10939cfps 
-// N=2:   914cs 109sp/s  5481cfps
-// N=4:   928cs 108sp/s  2704cfps
-// N=7:                  1507cfps
-// N=16:                  608cfps
 
-// = (/ (* 11 16 1001 100) 751.0)
-
-// FPS= 105/N !!! these are large 66x16=1056px sprites!
-
-//                          w     h  N
-// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
-
-// vic 64: 8 sprites 24x21
 // ORIC: 8 sprites 24x24
 // (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 void main() {
@@ -1034,8 +1140,33 @@ void main() {
 
   hires();
   gclear();
-  gfill(0, 0, 1, 200, 0+16);
-  gfill(1, 0, 1, 200, 0+2);
+
+  // colors
+  // TODO: protect columns(?)
+  gfill(0, 0, 1, 200, 0+16+128);
+  gfill(1, 0, 1, 200, 0+2 +128);
+
+#ifdef PROTECT_HIBIT
+#if 1
+  // horiz
+  gpfill( 2,  0,  38,  6, 128+1+4+16+64);
+  gpfill( 2, 194, 38,  6, 128+1+4+16+64);
+  // vert
+  gpfill(30,  0,  1, 200, 128+1+4+16+64);
+  gpfill(10,  0,  1, 200, 128+1+4+16+64);
+#endif
+#endif // PROTECT_HIBIT
+
+#ifdef PROTECT_6BIT
+#if 1
+  // horiz
+  gpfill( 2,  0,  38,  6, 1+4+16+32);
+  gpfill( 2, 194, 38,  6, 1+4+16+32);
+  // vert
+  gpfill(30,  0,  1, 200, 128+1+4+16+32);
+  gpfill(10,  0,  1, 200, 128+1+4+16+32);
+#endif
+#endif // PROTECT_6BIT
 
   initsprites(N);
 

@@ -139,6 +139,7 @@ void gfill(char c, char r, char w, char h, char v) {
     // specialized memset (w<256)
     asm("lda %v", vv);
     asm("ldy %v", ww);
+
   next:
     asm("sta ($90),y"); // l[y]= 0x40;
     //
