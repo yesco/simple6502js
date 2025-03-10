@@ -127,7 +127,7 @@ void gfill(char c, char r, char w, char h, char v) {
   //char* p= HIRESSCREEN+(5*r)*8+c;
   ww= w; hh= h; vv= v;
 
-  *(int*)0x90= rowaddr[r]+c -1; // -1 because y=w
+  *(int*)0x90= (int)rowaddr[r]+c -1; // -1 because y=w
 
   asm("ldx %v", hh);
 

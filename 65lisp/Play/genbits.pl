@@ -3,15 +3,24 @@ print "\n";
 print "#define _ 0\n";
 
 for $i (0..255) {
+    print "\n";
     $b= sprintf("%08b", $i);
     $d= $b;
     $d=~ s/0/_/ge;
     print sprintf("#define B_$d     %3d\n", $i);
     # for "sprites"
     if ($i<64) {
+        # old style _123456 _111111
         $d=~ s/^..//;
         print sprintf("#define    _$d     %3d,\n", $i+64);
+
+        # new style 123467 xxxxxx
         $d=~ s/1/x/g;
         print sprintf("#define     $d     %3d,\n", $i+64);
+
+        $d=~ s/_/I/g;
+        if ($d=~ /I/) {
+            print sprintf("#define     $d     %3d,\n", $i+64+128);
+        }
     }
 }
