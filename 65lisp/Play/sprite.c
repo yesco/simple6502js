@@ -1,7 +1,36 @@
 // Bouncy spites in hires graphics
 
+// This is a prototype of ORIC ATMOS hires sprites.
+//
+// - N sprites
+// - 8 sprites collision detection
+// - optinal protected foreground (sprites "behind")
+//    7) inverse hi-bit set = don't overwrite
+//    6) 6th bit==0 (== not normal pixels)
+// - 3 methods of update (TODO: definable/sprite)
+//    w) OVERWRITE (bitblt)
+//       Use: when background empty
+//            (ink) color attributes ok
+//            many small (?)
+//            non-overlapping sprites (otherwise flickrs)
+//            all sprites moving (fast)
+//    x) XORWRITE (and undraw, 2x cost basically)
+//       Use: preserve background (inverts sprite pixels)
+//            sprites moves occasionally
+//            no color attributes
+//          TODO: clever update: merge old+new
+//    m) MASKWRITE (using mask, 4x?)
+//       Use: using mask for precision-sprites
+//            few detailed (main character?)
+//            perfect overlap w other sprites
+//            can be transparent
+//            preserves background
+//          TODO: save background
+//          TODO: color attributes
+
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
-// creating movie, diable, fictional RPG gmae inside the novel
+// creating movie, diable, fictional RPG gmae inside the novel - erh???
+
 #define MAIN
 #include "../hires-raw.c"
 
@@ -448,7 +477,7 @@ typedef struct sprite {
 //      objects (callbacks?)
 char spxloc[40], spyloc[25];
 
-// This one i O(n^2)
+// This one i O(n^2) use bits method instead?
 char spritecollision(sprite* a, sprite* b) {
   if (a->x > b->x) return -spritecollision(b, a);
   {
@@ -548,6 +577,7 @@ void drawsprite(sprite* s) {
     // draw
     asm("lda ($90),y"); // a = sp[y];
     asm("sta ($92),y"); // l[y]= a;
+  skip0:
 
     // step
     asm("iny"); // ++y next byte
@@ -581,11 +611,14 @@ void drawsprite(sprite* s) {
     asm("ldx %v", w); // x= w bytes width
 
   nextcell1:
-    // draw
+    // load screen value
     asm("lda ($92),y"); // a = l[y];
+
+    // draw
     asm("eor ($90),y"); // a^= sp[y]; // draw+undraw
     asm("ora #$40");
     asm("sta ($92),y"); // l[y]= a;
+  skip1:
 
     // step
     asm("iny"); // ++y next byte
@@ -619,12 +652,28 @@ void drawsprite(sprite* s) {
     asm("ldx %v", w); // x= w bytes width
 
   nextcell2:
-    // draw
+    // load current screen value
     asm("lda ($92),y"); // a = l[y];
+
+    // skips "foreground"
+    if (0) {
+      // skip inverted cells
+      // (case 0): 1837cs - 1680 = 157cs 16% overhead
+      asm("bmi %g", skip2);
+    } else {
+      // skip anything w bit 6 == zero
+      // (case 0): 1881cs - 1680 = 201cs 21% overhead
+      //  [0,63] (and +128) = non-normal pixels
+      asm("rol");
+      asm("bpl %g", skip2);
+    }
+
+    // draw
     asm("and ($94),y"); // a&= mask[y];
     asm("ora ($90),y"); // a|= sp[y];
     asm("ora #$40");
     asm("sta ($92),y"); // l[y]= a;
+  skip2:
 
     // step
     asm("iny"); // ++y next byte
@@ -808,7 +857,7 @@ void spmove() {
       c= cx&cy;
       // more than one bit set
       if (c&(c-1)) {
-        if (0) { // no print to see overhead
+        if (1) { // no print to see overhead
           //   print: 1640cs
           // noprint: 1654cs(?) (wow low overhead!)
           k= 1;
@@ -820,7 +869,7 @@ void spmove() {
             k<<= 1;
           }
         }
-        putchar(' ');
+        putchar('.');
       }
 
     } // collision
@@ -993,6 +1042,8 @@ void main() {
   T= time();
   while(ndraw<=1000) {
     spmove();
+
+//cgetc();
 
     if (0) { // cost 10%?
       unsigned int X= T-time();
