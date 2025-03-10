@@ -2,9 +2,12 @@
 
 // This is a prototype of ORIC ATMOS hires sprites.
 //
-// = N sprites
+// * N sprites
 
 #define N 7
+
+// * higher number sprite is above lower numbers
+//   (drawing order low-high)
 
 // * 8 sprites collision detection
 
