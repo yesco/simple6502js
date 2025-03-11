@@ -71,7 +71,33 @@
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
 // creating movie, diable, fictional RPG gmae inside the novel - erh???
 
+// = 859cs ALL
+// = 823cs ALL (LDA savings, etc) 342pM
+// =  45cs movement (not calling erase/draw)
+// = 103cs not calling gpfill/drawsprite: just if if if
+// = 286cs not calling drawsprite
+// = 580cs not calling erasesprite
+// =  69cs not calling gpfill+draw (non-drawing stuff)
+// GPFILL macro calling not correct (messes memory)
+// (= 311cs GPFILL() 15cs savings... 5%?)
+// (= 272cs GPFILL()+no LDA - 39cs savings! 12%ish)
+// = 241cs erasesprite
+//    24cs   passing parameters to erasesprite!
+//   217cs   gpfill asm cost
+// = 537cs drawsprite (-erasesprite) - 486pM
+
+// = 754cs   gpfill+drawsprite (useful drawing work!)
+
+// (- 823 754)
+
+// enable to benchmark non-drawing admin/movement stuff
+#define SPRITE_NODRAW
+
 // <<< END_DOC, END_DEF
+
+
+
+
 
 #ifndef MAIN
   #define MAIN
@@ -439,13 +465,27 @@ void drawsprite(register sprite* s) {
 //       a) don't want to load fillvalue v all the time
 //       b) to go next line step 40-w like drawsprite
 //       c) count using var not register
+
+static char ww, hh, vv;
+
+// TODO: remove, or fix, 5% overhead by calling!
+#if 0
+#define GPFILL(c,r,w,h,v) \
+  do { if (r<200) { \
+    ww=(w); hh=(h); vv=(v); gpfill(); } \
+    *(int*)0x90= rowaddr[r]+(c) -1; \
+  } while(0)
+#else
+#define GPFILL(c,r,w,h,v) gpfill(c,r,w,h,v)
+#endif
+
 void gpfill(char c, char r, char w, char h, char v) {
+//void gpfill() {
   // TODO: adjust so not out of screen?
   // TODO: can share with lores?
-  static char ww, hh, vv;
+  //static char ww, hh, vv;
 
   if (r>= 200) return;
-  //char* p= HIRESSCREEN+(5*r)*8+c;
   ww= w; hh= h; vv= v;
 
   *(int*)0x90= rowaddr[r]+c -1; // -1 because y=w
@@ -467,16 +507,18 @@ void gpfill(char c, char r, char w, char h, char v) {
     // skip if hibit set
     asm("lda ($90),y"); // a= l[y]
     asm("bmi %g", skip);
+    // TOOD: maybe reuse X?
+    asm("lda %v", vv); // TODO: this slows down...
 #endif // PROTECT_HIBIT
 #ifdef PROTECT_6BIT
     // skip if hibit set
     asm("lda ($90),y"); // a= l[y]
     asm("rol");         // M= a&6bit lol
     asm("bpl %g", skip);
+    // TOOD: maybe reuse X?
+    asm("lda %v", vv); // TODO: this slows down...
 #endif // PROTECT_6BIT
 
-    // TODO: move X to var?
-    asm("lda %v", vv); // TODO: this slows down...
     asm("sta ($90),y"); // l[y]= 0x40;
   skip:
 
@@ -501,11 +543,11 @@ void gpfill(char c, char r, char w, char h, char v) {
 
 
 // TODO: move into "movesprite()"
-void erasesprite(sprite* s, int newx, signed char dy) {
+// TODO: pass "64" as parameter (col attr f foreground!)
+void erasesprite(register sprite* s, int newx, signed char dy) {
   static char xdiv;
-  static char* sp;
-  xdiv=div6[s->x];
-  sp= s->bitmap;
+
+  xdiv=div6[s->x]; // 6cs
 
   // for xor, lol
   //drawsprite(s); return;
@@ -514,18 +556,19 @@ void erasesprite(sprite* s, int newx, signed char dy) {
   // TODO: clipping?
 
   // clever
-  if (s->dx == 0 || div6[newx]==xdiv) {
+  if (!(char)s->dx || div6[newx]==xdiv) {
     // same x, or same cell (in height)
 
     // - clear vertically only
-    if (!dy) return; // not moved!
     if (dy > 0) {
       // clear below
-      gpfill(xdiv, s->y, *sp, dy, 64);
+      GPFILL(xdiv, s->y, s->w, dy, 64);
       return;
+    } else if (!(char)dy) {
+      return; // not moved!
     } else {
       // clear above
-      gpfill(xdiv, s->y+dy+sp[1], *sp, -dy, 64);
+      GPFILL(xdiv, s->y+dy + s->h, s->w, -dy, 64);
       return;
     }
   }
@@ -536,11 +579,7 @@ void erasesprite(sprite* s, int newx, signed char dy) {
   // Otherwise: fallthrough:
 
   // -- clear all (flickers little)
-  {
-    char w= *sp, h= *++sp;
-    gpfill(xdiv, s->y, w, h, 64);
-    return;
-  }
+  GPFILL(xdiv, s->y, s->w, s->h, 64);
 }
 
 #define Z 37
@@ -599,7 +638,6 @@ void spritetick() {
     // this faster than while? lol
   rex2:
     if ((newx+= s->dx) + s->wx >= SPRITE_XMAX || newx < SPRITE_XMIN) {
-      putchar('.');
       s->dx= -s->dx; goto rex2;
     }
 
@@ -616,7 +654,6 @@ void spritetick() {
 
   rex3:
     if ((newy+= s->dy) + s->h >= SPRITE_YMAX || newy < SPRITE_YMIN) {
-      putchar('/');
       s->dy= - s->dy; goto rex3;
     }
     z= s->ymax; zz= s->ymin;
@@ -625,6 +662,7 @@ void spritetick() {
     //newy+= (char)s->dy;
     //newy+= s->dy;
 
+    // TODO: passing parameters is expensive
     erasesprite(s, newx, newy - s->y);
 
     // move
@@ -1315,9 +1353,9 @@ void init() {
     case 3: s= defsprite(i, color_enterprise); break;
     }
 #else
-    //s= defsprite(i, oric_thin);
+    s= defsprite(i, oric_thin);
     // TODO: ifdef SPRITE_BENCH
-    s= defsprite(i, enterprise);
+    //s= defsprite(i, enterprise);
 #endif // COLORATTR
 
   }
@@ -1342,20 +1380,23 @@ void init() {
 // N=7 1001 1836 cs 54 hsp/s 778 hfps
 // N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
 
+// ----ENTERPRISE sprite----
 // - bigger than ever... 11*6 x 16 sprite N=7 sprites
 //
 // 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
 // 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
-// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
- // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
-//       1689 rowaddr used only initially
+// (1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%))
+// 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
+//       1689cs rowaddr used only initially
 //       1627cs -Oi but memcpy still not inlined...
 // 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
 // 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
 // 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
 // 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
-// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
+// (1001: 751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead))
 // 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
+
+// == xor and other
 // 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
 // 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
 // ---- TODO: ^^^----- why is it slower? erasesprite flicker
@@ -1377,12 +1418,19 @@ void init() {
 // 1001: 1028cs  97sp/s 1391cfps (COLORATTR enterprise, 2 cols more)
 // 1001:  903cs 107sp/s 1537cfps (no protect, no color)
 // 1001:  732cs 136sp/s 1953cfps 13635Bps (218pM) bytes-698 = 21.8% of optimal copy N=7 (oric,sinclari,c64,enterprise)
-// 1001:  575cs 174sp/s 2486cfps  9400Bps (150pM) bytes= 378 (7x thin_oric)
+// (1001:  575cs 174sp/s 2486cfps  9400Bps (150pM) bytes= 378 (7x oric_thin))
 
 // 1001:  987cs 101sp/s 1448cfps 17849Bps (285pM) bytes=1232 (7x enterprise)
 // 1001:  946cs 105sp/s 1511cfps 18623Bps (297pM) (removed gotoxy, sploc+i => ++s;
 // 1001:  923cs 108sp/s 1549cfps 19087Bps (305pM) (enterprise, wx)
 // 1001:  883cs 113sp/s 1619cfps 19951Bps (319pM) (enterprise, -Oirs, ) (/ 923 883.0) 4.5% faster
+// 1001:  823cs 121sp/s 1737cfps 21406Bps (342pM) 6.8% faster
+// ---- 3.0x faster than when we begin!!!
+// (      754cs ... gfill+drawsprite "usefull" memory work 400pM)
+// (1001: 435cs 230sp/s  3287cfps 12426Bps (198pM) oric_thin)
+//  was 565cs - 24% faster now!
+
+// TODO: minimal sprite but super-many! (8x66 pixel sprite?)
 
 // ORIC: 8 sprites 24x24
 // (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
