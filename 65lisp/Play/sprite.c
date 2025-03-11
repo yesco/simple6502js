@@ -36,7 +36,7 @@
 //            (ink) color attributes ok
 //               (don't mix with protect?)
 
-#define COLORATTR
+//#define COLORATTR
 
 //    x) XORWRITE (and undraw, 2x cost basically)
 //       Use: preserve background (inverts sprite pixels)
@@ -56,16 +56,16 @@
 //
 
 // protect 2 color attr columns
-#define SPRITE_MINX 2*6
-#define SPRITE_MAXX 239
+#define SPRITE_XMIN 2*6
+#define SPRITE_XMAX 239
 
-#define SPRITE_MINY 0
-#define SPRITE_MAXY 199
+#define SPRITE_YMIN 0
+#define SPRITE_YMAX 199
 
 #if defined(PROTECT_HIBIT) || defined(PROTECT_6BIT)
   // unprotect the color columns as they are protected otherwise
-  #undef  SPRITE_MINX
-  #define SPRITE_MINX 0
+  #undef  SPRITE_XMIN
+  #define SPRITE_XMIN 0
 #endif
 
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
@@ -127,6 +127,11 @@ typedef struct sprite {
   signed char dx, dy; // this could be subpixel/frame
 
   char w, h;
+
+  // opt
+  char xmax, ymax;
+  char xmin, ymin;
+  char wx;
 
   // current (TODO: remove?)
   char* bitmap;
@@ -191,10 +196,10 @@ char spxloc[40], spyloc[25];
 char spritecollision(sprite* a, sprite* b) {
   if (a->x > b->x) return -spritecollision(b, a);
   {
-    int ax1= a->x, ax2= ax1 + a->bitmap[0]*6;
+    int ax1= a->x, ax2= ax1 + a->wx;
     int ay1= a->y, ay2= ay1 + a->bitmap[1];
 
-    int bx1= b->x, bx2= bx1 + b->bitmap[0]*6;
+    int bx1= b->x, bx2= bx1 + b->wx;
     int by1= b->y, by2= by1 + b->bitmap[1];
 
     char r;
@@ -551,32 +556,36 @@ sprite sploc[Nsprites];
 
 int colls= 0;
 
-void spmove() {
-  static char i, j, k, c, cx, cy, *px, *py;
-  static int newx, newy;
+void spritetick() {
+  static char i, j, k, c, cx, cy, *px, *py, z, zz;
+  //static int newx, newy;//
+  static char newx, newy;
   register sprite* s;
   register char* sp;
   static char spbit= 1;
 
-  // clear sprite locations
-  assert(Nsprites<8);
+  s= sploc;
 
 #ifdef COLLISION
+  // clear sprite locations
   memset(spxloc, 0, sizeof(spxloc));
   memset(spyloc, 0, sizeof(spyloc));
   if (DISPCOLL) {
     gfill(0, 190, 40, 8, 64);
     gfill(div6[230], 0, 2, 200, 64);
   }
+
+  // for debug
+  gotoxy(0, 25);
 #endif // COLLISION
 
-  gotoxy(0, 25);
-
   for(i=0; i<Nsprites; ++i) {
-    s= sploc+i;
     sp= s->bitmap;
 
-    if (!s->dx && !s->dy) continue;
+    // cc65 doesn't generate good code! 10cs better...
+    //if (!(z=s->dx) && !(z=s->dy)) continue; // adding z makes it better!
+    if (!(char)s->dx && !(char)s->dy) continue; // same as casting char (signed problem)
+    //if (0==s->dx && 0==s->dy) continue; // jsr ldaix lol
 
     // undraw
     // TODO: undraw in opposite order...lol
@@ -589,13 +598,32 @@ void spmove() {
 
     // this faster than while? lol
   rex2:
-    if ((newx+= s->dx) + 6*sp[0] >= SPRITE_MAXX || newx < SPRITE_MINX) {
+    if ((newx+= s->dx) + s->wx >= SPRITE_XMAX || newx < SPRITE_XMIN) {
+      putchar('.');
       s->dx= -s->dx; goto rex2;
     }
+
+    // inmaterial time difference...
+    //z= s->xmax; zz= s->xmin;
+    //if (newx >= z || newx < SPRITE_XMIN) s->dx= -s->dx; // slower!
+    //if (newx >= z || newx < SPRITE_XMIN) s->dx= (((char)s->dx)^255)+1;
+    //if (newx >= z || newx < zz) 
+
+//    if (z >= zz) s->dx= -s->dx;
+//    if (newx < SPRITE_XMIN) s->dx= -s->dx;
+    //newx+= (char)s->dx;
+    //newx+= s->dx;
+
   rex3:
-    if ((newy+= s->dy) + sp[1] >= SPRITE_MAXY || newy < SPRITE_MINY) {
+    if ((newy+= s->dy) + s->h >= SPRITE_YMAX || newy < SPRITE_YMIN) {
+      putchar('/');
       s->dy= - s->dy; goto rex3;
     }
+    z= s->ymax; zz= s->ymin;
+    //if (newy >= zz || newy < SPRITE_YMIN) s->dy= - s->dy;
+    //if (newy >= z || newy < zz) s->dy= (((char)s->dy)^255)+1;
+    //newy+= (char)s->dy;
+    //newy+= s->dy;
 
     erasesprite(s, newx, newy - s->y);
 
@@ -664,6 +692,8 @@ void spmove() {
 
 #endif // COLLISION
 
+    ++s;
+
     spbit<<= 1;
   } // next sprite
   
@@ -708,7 +738,7 @@ void spriteshift(char* bm, char w, char h) {
 }
 
 // default show position (lines them up!)
-char spritex= SPRITE_MINX, spritey= SPRITE_MINY;
+char spritex= SPRITE_XMIN, spritey= SPRITE_YMIN;
 
 sprite* defsprite(char i, char* bitmap) {
   sprite* s= sploc+i;
@@ -722,17 +752,24 @@ sprite* defsprite(char i, char* bitmap) {
   s->bitmap= bitmap;
   s->w= w;
   s->h= h;
+  s->wx= w*6;
 
   // (default) position
-  if (spritex+size >= SPRITE_MAXX) { spritex= SPRITE_MINX; spritey+= 40; } 
+  if (spritex + s->wx >= SPRITE_XMAX) { spritex= SPRITE_XMIN; spritey+= 40; } 
   s->x= spritex;
   s->y= spritey;
 
-  spritex+= w*6;
+  spritex+= s->wx;
 
   // intial speed
   s->dx= +1+i/2;
   s->dy= +i*11/10+1;
+
+  // TODO: every time dx, dy is updated need update this
+  s->xmax= SPRITE_XMAX - s->wx + s->dx;
+  s->ymax= SPRITE_YMAX - s->h  + s->dy;
+  s->xmin= SPRITE_XMIN + s->dx;
+  s->ymin= SPRITE_YMIN + s->dy;
 
   // - have mask?
   {
@@ -740,6 +777,9 @@ sprite* defsprite(char i, char* bitmap) {
     s->mask= (42==bitmap[markpos])?
       s->bitmap+markpos+1: NULL;
   }
+
+  // TODO: move out to own structure (?)
+  //   and only do once per sprite bitmap
 
   // - create x scrollable copies
   s->shbitmap[0]= s->bitmap;
@@ -785,70 +825,6 @@ sprite* defsprite(char i, char* bitmap) {
 
   return s;
 }
-
-// N=1:   915cs 109sp/s 10939cfps 
-// N=2:   914cs 109sp/s  5481cfps
-// N=4:   928cs 108sp/s  2704cfps
-// N=7:                  1507cfps
-// N=16:                  608cfps
-
-// = (/ (* 11 16 1001 100) 751.0)
-
-// FPS= 105/N !!! these are large 66x16=1056px sprites!
-
-//                          w     h  N
-// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
-
-// vic 64: 8 sprites 24x21
-
-
-// N=7 1001 1836 cs 54 hsp/s 778 hfps
-// N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
-
-// - bigger than ever... 11*6 x 16 sprite N=7 sprites
-//
-// 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
-// 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
-// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
- // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
-//       1689 rowaddr used only initially
-//       1627cs -Oi but memcpy still not inlined...
-// 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
-// 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
-// 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
-// 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
-// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
-// 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
-// 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
-// 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
-// ---- TODO: ^^^----- why is it slower? erasesprite flicker
-// 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
-
-// 1001: 1176cs  85sp/s 1215cfps (not moving x)
-// 1001: 1169cs  85sp/s 1223cfps (smooth moving x)
-//       1171cs  85sp/s 1221cfps 
-//        980cs 102sp/s 1459cfps (erasesprite cell opt)
-// 1001:  971cs 103sp/s 1472cfps 
-// 1001:  961cs 104sp/s 1488cfps (statics in erasesp)
-// 1001:  973cs 102sp/s 1469cfps (no protect)
-
-// 1001: 1193cs  83sp/s 1198cfps (protect hibit, 23% w fore!)
-// 1001: 1213cs  82sp/s 1178cfps (protect hibit: 25% no fore)
-// 1001: 1252cs  79sp/s 1142cfps (protect 6bit: 27% w fore)
-// 1001: 1272cs  78sp/s 1124cfps (protect 6bit: 31% no fore)
-// 1001: 1283cs  84sp/s 1208cfps (7.5% faster! -"- register sprite, static)
-// 1001: 1028cs  97sp/s 1391cfps (COLORATTR enterprise, 2 cols more)
-// 1001:  903cs 107sp/s 1537cfps (no protect, no color)
-
-//(/ 1272 973.0)
-
-
-// collision: TODO: optimize
-// 1001: 
-
-
-// ORIC: 8 sprites 24x24
-// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 
 #ifdef MAIN
 
@@ -1339,12 +1315,77 @@ void init() {
     case 3: s= defsprite(i, color_enterprise); break;
     }
 #else
-    s->bitmap= enterprise;
-    s->bitmap= oric_thin;
+    //s= defsprite(i, oric_thin);
+    // TODO: ifdef SPRITE_BENCH
+    s= defsprite(i, enterprise);
 #endif // COLORATTR
 
   }
 }
+
+// N=1:   915cs 109sp/s 10939cfps 
+// N=2:   914cs 109sp/s  5481cfps
+// N=4:   928cs 108sp/s  2704cfps
+// N=7:                  1507cfps
+// N=16:                  608cfps
+
+// = (/ (* 11 16 1001 100) 751.0)
+
+// FPS= 105/N !!! these are large 66x16=1056px sprites!
+
+//                          w     h  N
+// (/ (* 105.0 1056) (* (* 11 6) 16) 7) = 15.0 fps
+
+// vic 64: 8 sprites 24x21
+
+
+// N=7 1001 1836 cs 54 hsp/s 778 hfps
+// N=7 1001 1446 cs 69 hsp/s 988 hfps - no erase... (-21%)
+
+// - bigger than ever... 11*6 x 16 sprite N=7 sprites
+//
+// 1001: 2442cs 40sp/s 585cfps - full clear (flicker)
+// 1001: 1835cs 54sp/s 779cfps - clever clear (+ 390cs)
+// 1001: 1445cs 69sp/s 989cfps - no clear (traces) (21%)
+ // 1001: 1699cs 58sp/s 841cfps - drawsprite static vars
+//       1689 rowaddr used only initially
+//       1627cs -Oi but memcpy still not inlined...
+// 1001: 1127cs  88sp/s 1268cfps 13756 Bps (asm memcpy)
+// 1001:  978cs 102sp/s 1462cfps 18013 Bps (gfill: asm for memset)
+// 1001:  966cs 103sp/s 1480cfps 18237 Bps (gfill: all asm)
+// 1001:  952cs 105sp/s 1502cfps 18505 Bps (gfill: value)
+// 1001:  751cs 133sp/s 1904cfps 23458 Bps (erase: 27% overhead)
+// 1001:  946cs 105sp/s 1511cfps (sprite s pass around)
+// 1001: 1599cs  67sp/s  894cfps (xor, i.e. 2x drawsprite, asm)
+// 1001: 1270cs  78sp/s 1125cfps (old style, erasesprite, +new asm drawsprite)
+// ---- TODO: ^^^----- why is it slower? erasesprite flicker
+// 1001:  914cs 109sp/s 1564cfps (eraseclever, asm:drawsrpite) +3.5fps!
+
+// 1001: 1176cs  85sp/s 1215cfps (not moving x)
+// 1001: 1169cs  85sp/s 1223cfps (smooth moving x)
+//       1171cs  85sp/s 1221cfps 
+//        980cs 102sp/s 1459cfps (erasesprite cell opt)
+// 1001:  971cs 103sp/s 1472cfps 
+// 1001:  961cs 104sp/s 1488cfps (statics in erasesp)
+// 1001:  973cs 102sp/s 1469cfps (no protect)
+
+// 1001: 1193cs  83sp/s 1198cfps (protect hibit, 23% w fore!)
+// 1001: 1213cs  82sp/s 1178cfps (protect hibit: 25% no fore)
+// 1001: 1252cs  79sp/s 1142cfps (protect 6bit: 27% w fore)
+// 1001: 1272cs  78sp/s 1124cfps (protect 6bit: 31% no fore)
+// 1001: 1283cs  84sp/s 1208cfps (7.5% faster! -"- register sprite, static)
+// 1001: 1028cs  97sp/s 1391cfps (COLORATTR enterprise, 2 cols more)
+// 1001:  903cs 107sp/s 1537cfps (no protect, no color)
+// 1001:  732cs 136sp/s 1953cfps 13635Bps (218pM) bytes-698 = 21.8% of optimal copy N=7 (oric,sinclari,c64,enterprise)
+// 1001:  575cs 174sp/s 2486cfps  9400Bps (150pM) bytes= 378 (7x thin_oric)
+
+// 1001:  987cs 101sp/s 1448cfps 17849Bps (285pM) bytes=1232 (7x enterprise)
+// 1001:  946cs 105sp/s 1511cfps 18623Bps (297pM) (removed gotoxy, sploc+i => ++s;
+// 1001:  923cs 108sp/s 1549cfps 19087Bps (305pM) (enterprise, wx)
+// 1001:  883cs 113sp/s 1619cfps 19951Bps (319pM) (enterprise, -Oirs, ) (/ 923 883.0) 4.5% faster
+
+// ORIC: 8 sprites 24x24
+// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 
 void main() {
   unsigned int T;
@@ -1394,7 +1435,7 @@ void main() {
   T= time();
  again:
   while(ndraw<=1000) {
-    spmove();
+    spritetick();
 
 //cgetc();
 
@@ -1405,16 +1446,19 @@ void main() {
     char i;
     unsigned int X= T-time();
     long bytes= 0;
-    long optimalBps= 1000000L/15; // copy 1 byte 15c=5+5+2+3 (lda(),y;sta(),y,inx,bne)
+    long optimalBps= 1000000L/16; // copy 1 byte 16c=5+6+2+3 (lda(),y;sta(),y;inx;bne)
+    long Bps;
+
     for(i=0; i<Nsprites; ++i) {
       sprite* s= sploc+i;
       bytes+= (s->w * s->h) * (s->mask? 2: 1); // TODO: multiply 2 for xor
     }
+    Bps= ndraw*100L*bytes/Nsprites/X;
 
     gotoxy(0,25);
     // TODO: Bps is all wrong? why?
-    printf("%d: %ucs %ldsp/s %ldcfps %ldBps bytes=%ld COLLS=%d (673) ",
-           ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, ndraw*100L*bytes/X, bytes, colls);
+    printf("%d: %ucs %ldsp/s %ldcfps %ldBps (%dpM) bytes=%ld COLLS=%d (673) ",
+           ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, Bps, (int)(Bps*1000/optimalBps), bytes, colls);
   }
 
   cgetc();
