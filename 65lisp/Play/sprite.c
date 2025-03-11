@@ -1,12 +1,12 @@
-// Bouncy spites in hires graphics
+// Sprite.c - ORIC hires graphic sprites
 
-// This is a prototype of ORIC ATMOS hires sprites.
+// (C) 2025 jsk@yesco.org
 //
-// * N sprites
+// Read doc+settings below:
 
-#define N 7
-//#define N 10
-//#define N 1
+#define Nsprites 7
+//#define Nsprites 10
+//#define Nsprites 1
 
 // * higher number sprite is above lower numbers
 //   (drawing order low-high)
@@ -52,15 +52,34 @@
 //          TODO: save background
 //          TODO: color attributes
 
+// * canvas default bouncy border:
+//
+
+// protect 2 color attr columns
+#define SPRITE_MINX 2*6
+#define SPRITE_MAXX 239
+
+#define SPRITE_MINY 0
+#define SPRITE_MAXY 199
+
+#if defined(PROTECT_HIBIT) || defined(PROTECT_6BIT)
+  // unprotect the color columns as they are protected otherwise
+  #undef  SPRITE_MINX
+  #define SPRITE_MINX 0
+#endif
+
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
 // creating movie, diable, fictional RPG gmae inside the novel - erh???
 
-#define MAIN
-#include "../hires-raw.c"
+// <<< END_DOC, END_DEF
 
-char T,nil,doapply1,print;
+#ifndef MAIN
+  #define MAIN
+#endif
 
-#include "../bits.h"
+// for debugging/module testing
+// TODO: move to MAIN (?)
+#include "../hires-raw.c" // using hires(); gclear(); gfill()?
 
 // To scroll sideways need one empty cell to the right
 #define SCROLLABLE
@@ -77,492 +96,6 @@ char T,nil,doapply1,print;
 //  6.13fps ever more costly: -42% fps
 //  7.57fps w - drawsprite loop in asm!
 // 10.62fps - normal xor
-
-// ----------------------------- SPRITES
-
-#define _BLACK  0,
-#define _RED__  1,
-#define _GREEN  2,
-#define _YELLO  3,
-#define _BLUE_  4,
-#define _MAGN_  5,
-#define _CYAN_  6,
-#define _WHITE  7,
-
-#define IBLACK  128+0,
-#define IRED__  128+1,
-#define IGREEN  128+2,
-#define IYELLO  128+3,
-#define IBLUE_  128+4,
-#define IMAGN_  128+5,
-#define ICYAN_  128+6,
-#define IWHITE  128+7,
-
-
-char oric_thin[]= {
-  6, 9,
-__xxxx x_x_xx xxxx__ _x___x xxxx__ ______
-_x____ _x__x_ ____x_ _x__x_ ____x_ ______
-x_____ x_x_x_ _____x _x_x__ ______ ______
-x____x __x_x_ ____x_ _x_x__ ______ ______
-x___x_ __x_xx xxxx__ _x_x__ ______ ______
-x__x__ __x_x_ xx____ _x_x__ ______ ______
-_xx___ _x__x_ __xx__ _x__x_ ____x_ ______
-_xxxxx x___x_ ____xx _x___x xxxx__ ______
-xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-66
-};
-
-/*
-// TODO: cannot have colors in the middle...
-char oric_thin_color[]= {
-  7, 10,
-_WHITE __xxxx x___xx xxxx__ _xx___ xxxxx_ ______
-_RED__ ______ xx____ _WHITE _xx__x _____x ______
-_WHITE x_____ __x_xx _____x _xx_x_ ______ ______
-_RED__ ____xx _WHITE ____x_ _xx_x_ ______ ______
-_WHITE x_____ __x_xx xxxx__ _xx_x_ ______ ______
-_RED__ ___xx_ _WHITE xx____ _xx_x_ ______ ______
-_WHITE x_____ __x_xx _xxx__ _xx_x_ ______ ______
-_RED__ _xx___ _WHITE __xxx_ _xx__x _____x ______
-_WHITE xxxxxx x___xx ____xx _xx___ xxxxx_ ______
-_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-66
-};
-*/
-
-char oric_thin_color[]= {
-  7, 12,
-_WHITE __xxxx x___xx xxxx__ _xx___ xxxxx_ ______
-_RED__ _____x xxxx__ ______ ______ ______ ______
-_WHITE xx____ _xx_xx ___xx_ _xx_xx ____xx ______
-_RED__ ____xx xx____ ______ ______ ______ ______
-_WHITE xx____ _xx_xx xxxx__ _xx_xx ______ ______
-_RED__ ___xxx x_____ ______ ______ ______ ______
-_WHITE xx____ _xx_xx _xxx__ _xx_xx ____xx ______
-_RED__ __xxxx ______ ______ ______ ______ ______
-_WHITE _xxxxx xx__xx ___xxx _xx___ xxxxx_ ______
-_RED__ _xxx__ ______ ______ ______ ______ ______
-_RED__ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-66
-};
-
-char oric_wide_color[]= {
-  9, 12,
-_CYAN_ __xxxx IIIIxx __xxxx IWHITE ___xx_ ___xxx xxxxx_ ______
-_RED__ ______ ___xx_ _WHITE ______ x__xx_ _xx___ _____x ______
-_WHITE xx____ ______ x_xx__ ______ x__xx_ _xx___ ______ ______
-_RED__ ______ _xx___ _WHITE ______ x__xx_ _xx___ ______ ______
-_WHITE xx____ ______ x_xxxx xxxxxx ___xx_ _xx___ ______ ______
-_RED__ _____x x_____ _WHITE _xx___ ___xx_ _xx___ ______ ______
-_WHITE xx____ ______ x_xx__ __xx__ ___xx_ _xx___ ______ ______
-_RED__ ___xxx _WHITE x_xx__ ___xx_ ___xx_ _xx___ ______ ______
-_WHITE x_____ ______ x_xx__ ____xx ___xx_ _xx___ _____x ______
-_CYAN_ IxxIII IWHITE x_xx__ _____x x__xx_ __xxxx xxxxx_ ______
-_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
-66
-};
-
-
-char sinclair_color[]= {
-  10, 7,
-_WHITE ______ _x____ ______ ______ ___x__ ______ _x____ ______ ______
-_WHITE ______ ______ ______ ______ ___x__ ______ ______ ______ ______
-_WHITE xxxxxx x_x_xx xxxxxx _xxxxx xx_x_x xxxxxx _x_xxx xxxx__ ______
-_YELLO x_____ __x_x_ _____x _x____ ___x__ _____x _x_x__ ______ ______
-_YELLO xxxxxx x_x_x_ _____x _x____ ___x_x xxxxxx _x_x__ ______ ______
-_GREEN ______ x_x_x_ _____x _x____ ___x_x _____x _x_x__ ______ ______
-_CYAN_ xxxxxx x_x_x_ _____x _xxxxx xx_x_x xxxxxx _x_x__ ______ ______
-66
-};
-
-char c64_color[]= {
-  7, 13,
-_CYAN_ ______ xxxxxx xx____ ______ ______ ______
-_CYAN_ ____xx xxxxxx xx____ ______ ______ ______
-_CYAN_ __xxxx xxxxxx xx____ xxxxx_ ____xx ______
-_CYAN_ _xxxxx ______ _____x _____x ___x_x ______
-_CYAN_ xxxx__ ______ _____x ______ __x__x ______
-_CYAN_ xxxx__ ______ _____x ______ __x__x ______
-_CYAN_ ______ ______ _____x xxxxx_ _xxxxx ______
-_RED__ xxxx__ ______ _____x _____x _xxxxx ______
-_RED__ xxxx__ ______ _____x _____x _xxxxx ______
-_RED__ xxxx__ ______ _____x _____x ____x_ ______
-_RED__ __xxxx xxxxxx xx____ xxxxx_ ____x_ ______
-_RED__ ____xx xxxxxx xx____ ______ ______ ______
-_RED__ ______ xxxxxx xx____ ______ ______ ______
-66
-};
-
-char disc[]= {
-
-#ifdef BIGG 
-
-#ifdef WIDER
-  24/6*2, 24,
-//123456 123456 123456 123456
-  ______ ______ ______ ______ ______ ______ ______ _____x
-  ______ ______ ______ ______ ______ ______ ______ ______
-  ______ ______ ______ ______ ______ ______ ______ ______
-  ______ ___xxx xxx___ ______ ______ ______ ______ ______
-  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
-  ______ x_____ _____x ______ ______ ______ ______ ______
-  _____x ______ ______ x_____ ______ ______ ______ ______
-  ____x_ ______ ______ _x____ ______ ______ ______ ______
-  ____x_ ______ ______ _x____ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ___x__ ______ ______ __x___ ______ ______ ______ ______
-  ____x_ ______ ______ _x____ ______ ______ ______ ______
-  ____x_ ______ ______ _x____ ______ ______ ______ ______
-  _____x ______ ______ x_____ ______ ______ ______ ______
-  ______ x_____ _____x ______ ______ ______ ______ ______
-  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
-  ______ ___xxx xxx___ ______ ______ ______ ______ ______
-  ______ ______ ______ ______ ______ ______ ______ ______
-  ______ ______ ______ ______ ______ ______ ______ ______
-  ______ ______ ______ ______ ______ ______ ______ ______
-
-// - bitmask
-//123456 123456 123456 123456
-//  77,
-  42,
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxx_
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
-#else // WIDER else TALLER
-  24/6, 24*2,
-//123456 123456 123456 123456
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ___xxx xxx___ ______
-  ______ _xx___ ___xx_ ______
-  ______ x_____ _____x ______
-  _____x ______ ______ x_____
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  _____x ______ ______ x_____
-  ______ x_____ _____x ______
-  ______ _xx___ ___xx_ ______
-  ______ ___xxx xxx___ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-
-
-// - bitmask
-//123456 123456 123456 123456
-//  77,
-  42,
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx
-  xxxxxx x_____ _____x xxxxxx
-  xxxxxx ______ ______ xxxxxx
-  xxxxx_ ______ ______ _xxxxx
-  xxxx__ ______ ______ __xxxx
-  xxxx__ ______ ______ __xxxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxxx__ ______ ______ __xxxx
-  xxxx__ ______ ______ __xxxx
-  xxxxx_ ______ ______ _xxxxx
-  xxxxxx ______ ______ xxxxxx
-  xxxxxx x_____ _____x xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-
-#endif // WIDER
-#else // BIGG else ...
-#ifdef SCROLLABLE
-  // Notice empty column to the right,
-  // this is so dimensions are same when scrolled
-  // copies to be made
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ xxxxxx ______ ______
-  ____xx ______ xx____ ______
-  ___x__ ______ __x___ ______
-  __x___ ______ ___x__ ______
-  _x____ ______ ____x_ ______
-  _x____ ______ ____x_ ______
-  x_____ ______ _____x ______
-  x_____ ______ _____x ______
-  x_____ ______ _____x ______
-  x_____ ______ _____x ______
-  x_____ ______ _____x ______
-  x_____ ______ _____x ______
-  _x____ ______ ____x_ ______
-  _x____ ______ ____x_ ______
-  __x___ ______ ___x__ ______
-  ___x__ ______ __x___ ______
-  ____xx ______ xx____ ______
-  ______ xxxxxx ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-
-// - bitmask
-//123456 123456 123456 123456
-//  77,
-  42, // indicator of bitmask following
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx ______ xxxxxx xxxxxx
-  xxxx__ ______ __xxxx xxxxxx
-  xxx___ ______ ___xxx xxxxxx
-  xx____ ______ ____xx xxxxxx
-  x_____ ______ _____x xxxxxx
-  x_____ ______ _____x xxxxxx
-  ______ ______ ______ xxxxxx
-  ______ ______ ______ xxxxxx
-  ______ ______ ______ xxxxxx
-  ______ ______ ______ xxxxxx
-  ______ ______ ______ xxxxxx
-  ______ ______ ______ xxxxxx
-  x_____ ______ _____x xxxxxx
-  x_____ ______ _____x xxxxxx
-  xx____ ______ ____xx xxxxxx
-  xxx___ ______ ___xxx xxxxxx
-  xxxx__ ______ __xxxx xxxxxx
-  xxxxxx ______ xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-
-#else // SCROLLABLE
-
-  24/6, 24,
-//123456 123456 123456 123456
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ___xxx xxx___ ______
-  ______ _xx___ ___xx_ ______
-  ______ x_____ _____x ______
-  _____x ______ ______ x_____
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ___x__ ______ ______ __x___
-  ____x_ ______ ______ _x____
-  ____x_ ______ ______ _x____
-  _____x ______ ______ x_____
-  ______ x_____ _____x ______
-  ______ _xx___ ___xx_ ______
-  ______ ___xxx xxx___ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-  ______ ______ ______ ______
-
-// - bitmask
-//123456 123456 123456 123456
-//  77,
-  42,
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx
-  xxxxxx x_____ _____x xxxxxx
-  xxxxxx ______ ______ xxxxxx
-  xxxxx_ ______ ______ _xxxxx
-  xxxx__ ______ ______ __xxxx
-  xxxx__ ______ ______ __xxxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxx___ ______ ______ ___xxx
-  xxxx__ ______ ______ __xxxx
-  xxxx__ ______ ______ __xxxx
-  xxxxx_ ______ ______ _xxxxx
-  xxxxxx ______ ______ xxxxxx
-  xxxxxx x_____ _____x xxxxxx
-  xxxxxx xxx___ ___xxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-  xxxxxx xxxxxx xxxxxx xxxxxx
-#endif SCROLLABLE
-
-#endif BIGG
-};
-
-
-
-// - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
-char enterprise[]= {
-  11, 16,
-  _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______
-  _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ ______1 _1_____ _______
-  __11111 _111111 _111111 _111111 _111111 _11____ _______ _______ ____111 _111___ _______
-  ___1111 _111111 _111111 _111111 _111111 _11____ _______ _______ _111111 _111111 _______
-  _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__
-  _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__
-  _______ _______ _______ _______ _11____ _____11 _11111_ _______ _111111 _111111 _______
-  _______ _______ _______ _______ _11____ ___1111 _111___ _______ ____111 _1111__ _______
-  _______ _______ _______ _______ _111111 _111111 _11____ _______ ______1 _11____ _______
-  _______ _______ _______ ____111 _111111 _111111 _111___ _______ _______ _1_____ _______
-  _______ _______ _______ ____111 _111111 _111111 _111_1_ _______ _______ _______ _______
-  _______ _______ _______ ___1111 _111111 _111111 _11111_ _______ _______ _______ _______
-  _______ _______ _______ ___1111 _111111 _111111 _111111 _1_____ _______ _______ _______
-  _______ _______ _______ _______ _111111 _111111 _11111_ _______ _______ _______ _______
-  _______ _______ _______ _______ __11111 _111111 _111_1_ _______ _______ _______ _______
-  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______
-
-/*
-  // nice but very narrow... not good proportions
-
-  6, 15,
-  xxxxxx xxxxxx xxxxxx x_____ ______ ______
-  _xxxxx xxxxxx xxxxxx xx____ __xx__ ______
-  __xxxx xxxxxx xxxxxx x_____ xxxxx_ ______
-  ______ ______ xx____ ___xxx xxxxxx xxxxxx
-  ______ ______ xx____ ___xxx xxxxxx xxxxxx
-  ______ ______ xx____ __xxxx x__xxx xxx___
-  ______ ______ xx____ _xxxxx ____xx x_____
-  ______ ______ xxxxxx xxxxx_ _____x x_____
-  ______ ___xxx xxxxxx xxxxxx x_____ ______
-  ______ ___xxx xxxxxx xxxxxx x_x___ ______
-  ______ __xxxx xxxxxx xxxxxx xxxx__ ______
-  ______ __xxxx xxxxxx xxxxxx x_x___ ______
-  ______ ______ xxxxxx xxxxxx x_____ ______
-  ______ ______ _xxxxx xxxxxx ______ ______
-  ______ ______ ___xxx xxxxx_ ______ ______
-*/
-};
-
-// TODO: change from _111111 to xxxxxx
-//    and _BLACK_ to _BLACK
-#define _BLACK_  0,
-#define _RED___  1,
-#define _GREEN_  2,
-#define _YELLOW  3,
-#define _BLUE__  4,
-#define _MAGN__  5,
-#define _CYAN__  6,
-#define _WHITE_  7,
-
-char color_enterprise[]= {
-  13, 16,
-  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______ ______
-  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ ______1 _1_____ _______ ______
-  _MAGN__ __11111 _111111 _111111 _111111 _111111 _11____ _______ _______ ____111 _111___ _______ ______
-  _MAGN__ ___1111 _111111 _111111 _111111 _111111 _11____ _______ _______ _111111 _111111 _______ ______
-  _MAGN__ _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
-  _YELLOW _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
-  _YELLOW _______ _______ _______ _______ _11____ _____11 _11111_ _______ _111111 _111111 _______ ______
-  _YELLOW _______ _______ _______ _______ _11____ ___1111 _111___ _______ ____111 _1111__ _______ ______
-  _GREEN_ _______ _______ _______ _______ _111111 _111111 _11____ _______ ______1 _11____ _______ ______
-  _GREEN_  _______ _______ _______ ____111 _111111 _111111 _111___ _______ _______ _1_____ _______ ______
-  _CYAN__ _______ _______ _______ ____111 _111111 _111111 _111_1_ _______ _______ _______ _______ ______
-  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _11111_ _______ _______ _______ _______ ______
-  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _111111 _1_____ _______ _______ _______ ______
-  _BLUE__ _______ _______ _______ _______ _111111 _111111 _11111_ _______ _______ _______ _______ ______
-  _BLUE__ _______ _______ _______ _______ __11111 _111111 _111_1_ _______ _______ _______ _______ ______
-  _BLUE__  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______ ______
-};
 
 char BITSRIGHT[]= { 0x3f, 0x1f, 0x0f, 0x07, 0x03, 0x01};
 // TODO: 7... lol
@@ -592,6 +125,8 @@ typedef struct sprite {
   // TODO: higher resolution than this
   int x, y;
   signed char dx, dy; // this could be subpixel/frame
+
+  char w, h;
 
   // current (TODO: remove?)
   char* bitmap;
@@ -1009,7 +544,7 @@ void b(char x, char y) {
   box(x, y, Z, Z);
 }
 
-sprite sploc[N];
+sprite sploc[Nsprites];
 
 //#define DISPCOLL 1
 #define DISPCOLL 0
@@ -1024,7 +559,7 @@ void spmove() {
   static char spbit= 1;
 
   // clear sprite locations
-  assert(N<8);
+  assert(Nsprites<8);
 
 #ifdef COLLISION
   memset(spxloc, 0, sizeof(spxloc));
@@ -1037,7 +572,7 @@ void spmove() {
 
   gotoxy(0, 25);
 
-  for(i=0; i<N; ++i) {
+  for(i=0; i<Nsprites; ++i) {
     s= sploc+i;
     sp= s->bitmap;
 
@@ -1054,11 +589,11 @@ void spmove() {
 
     // this faster than while? lol
   rex2:
-    if ((newx+= s->dx) + 6*sp[0] >= 240 || newx < 0) {
+    if ((newx+= s->dx) + 6*sp[0] >= SPRITE_MAXX || newx < SPRITE_MINX) {
       s->dx= -s->dx; goto rex2;
     }
   rex3:
-    if ((newy+= s->dy) + sp[1] >= 200 || newy < 0) {
+    if ((newy+= s->dy) + sp[1] >= SPRITE_MAXY || newy < SPRITE_MINY) {
       s->dy= - s->dy; goto rex3;
     }
 
@@ -1172,76 +707,71 @@ void spriteshift(char* bm, char w, char h) {
   } while(--h);
 }
 
-void initsprites(char n) {
-  char i;
+// default show position (lines them up!)
+char spritex= SPRITE_MINX, spritey= SPRITE_MINY;
 
-  // init sprites
-  for(i=0; i<n; ++i) {
-    sprite* s= sploc+i;
+sprite* defsprite(char i, char* bitmap) {
+  sprite* s= sploc+i;
+  char w= bitmap[0], h= bitmap[1];
+  int size= w*h;
 
-    // position
-    s->x= 130-130/n*i;
-    s->y= 180/n*i;
+  char j;
 
-    //s->dx= 0;
-    s->dx= +1;
+  // init sprite
+  memset(s, 0, sizeof(*s));
+  s->bitmap= bitmap;
+  s->w= w;
+  s->h= h;
 
-    s->dy= +i*11/10+1;
+  // (default) position
+  if (spritex+size >= SPRITE_MAXX) { spritex= SPRITE_MINX; spritey+= 40; } 
+  s->x= spritex;
+  s->y= spritey;
 
-    #ifdef COLORATTR
-      switch(i%4) {
-      case 0: s->bitmap= c64_color; break;
-      case 1: s->bitmap= sinclair_color; break;
-      case 2: s->bitmap= oric_thin_color; break;
-      case 3: s->bitmap= color_enterprise; break;
+  spritex+= w*6;
+
+  // intial speed
+  s->dx= +1+i/2;
+  s->dy= +i*11/10+1;
+
+  // - have mask?
+  {
+    int markpos= size + 2;
+    s->mask= (42==bitmap[markpos])?
+      s->bitmap+markpos+1: NULL;
+  }
+
+  // - create x scrollable copies
+  s->shbitmap[0]= s->bitmap;
+  s->shmask[0]= s->mask;
+
+  // TODO: very slow (1s?), optimize
+  { int bytes= size + 3;
+    for(j=1; j<6; ++j) {
+      // create a copy, scroll 1 pixel
+      // TODO: refactor
+      char* nw= malloc(bytes);
+      memcpy(nw, s->shbitmap[j-1], bytes);
+      spriteshift(nw+2, s->bitmap[0], s->bitmap[1]);
+      s->shbitmap[j]= nw;
+
+      // TODO: make mask also use +2...
+      if (s->mask) {
+        // TODO: refactor
+        nw= malloc(bytes);
+        memcpy(nw, s->shmask[j-1], bytes);
+        spriteshift(nw, s->bitmap[0], s->bitmap[1]);
+        s->shmask[j]= nw;
+      } else {
+        s->shmask[j]= NULL;
       }
-    #else
-      s->bitmap= enterprise;
-      s->bitmap= oric_thin;
-    #endif // COLORATTR
-
-    // - have mask?
-    {
-      int markpos= 2+ s->bitmap[0] * s->bitmap[1];
-      s->mask= (42==s->bitmap[markpos])?
-        s->bitmap+markpos+1: NULL;
     }
 
-    // - create scrollable copies
-    s->shbitmap[0]= s->bitmap;
-    s->shmask[0]= s->mask;
-
-    if (1)
-    { char j; int bytes= s->bitmap[0] * s->bitmap[1] + 3;
-      for(j=1; j<6; ++j) {
-        char* nw= malloc(bytes);
-        memcpy(nw, s->shbitmap[j-1], bytes);
-        spriteshift(nw+2, s->bitmap[0], s->bitmap[1]);
-        s->shbitmap[j]= nw;
-
-        // TODO: make mask also use +2...
-        if (s->mask) {
-          nw= malloc(bytes);
-          memcpy(nw, s->shmask[j-1], bytes);
-          //spriteshift(nw, s->bitmap[0], s->bitmap[1]);
-          s->shmask[j]= nw;
-        } else {
-          s->shmask[j]= NULL;
-        }
-      }
-    }
-
-    // show
-    if (1)
-    { char j;
+    // debug show
+    if (0) {
       for(j=0; j<6; ++j) {
         s->bitmap= s->shbitmap[j];
         s->mask= s->shmask[j];
-        if (s->bitmap) {
-          //drawsprite(s);
-          //cgetc();
-          //erasesprite(s);
-        }
       }
       if (s->shbitmap[0]) {
         s->bitmap= s->shbitmap[0];
@@ -1249,8 +779,11 @@ void initsprites(char n) {
       }
     }
 
+    // TODO: maybe require enable? or use default flag?
     drawsprite(s);
   }
+
+  return s;
 }
 
 // N=1:   915cs 109sp/s 10939cfps 
@@ -1316,6 +849,503 @@ void initsprites(char n) {
 
 // ORIC: 8 sprites 24x24
 // (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
+
+#ifdef MAIN
+
+// dummy
+char T,nil,doapply1,print;
+
+
+// ----------------------------- SPRITES
+#include "../bits.h"
+
+char oric_thin[]= {
+  6, 9,
+__xxxx x_x_xx xxxx__ _x___x xxxx__ ______
+_x____ _x__x_ ____x_ _x__x_ ____x_ ______
+x_____ x_x_x_ _____x _x_x__ ______ ______
+x____x __x_x_ ____x_ _x_x__ ______ ______
+x___x_ __x_xx xxxx__ _x_x__ ______ ______
+x__x__ __x_x_ xx____ _x_x__ ______ ______
+_xx___ _x__x_ __xx__ _x__x_ ____x_ ______
+_xxxxx x___x_ ____xx _x___x xxxx__ ______
+xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+66
+};
+
+/*
+// TODO: cannot have colors in the middle...
+char oric_thin_color[]= {
+  7, 10,
+_WHITE __xxxx x___xx xxxx__ _xx___ xxxxx_ ______
+_RED__ ______ xx____ _WHITE _xx__x _____x ______
+_WHITE x_____ __x_xx _____x _xx_x_ ______ ______
+_RED__ ____xx _WHITE ____x_ _xx_x_ ______ ______
+_WHITE x_____ __x_xx xxxx__ _xx_x_ ______ ______
+_RED__ ___xx_ _WHITE xx____ _xx_x_ ______ ______
+_WHITE x_____ __x_xx _xxx__ _xx_x_ ______ ______
+_RED__ _xx___ _WHITE __xxx_ _xx__x _____x ______
+_WHITE xxxxxx x___xx ____xx _xx___ xxxxx_ ______
+_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+66
+};
+*/
+
+char oric_thin_color[]= {
+  7, 12,
+_WHITE __xxxx x___xx xxxx__ _xx___ xxxxx_ ______
+_RED__ _____x xxxx__ ______ ______ ______ ______
+_WHITE xx____ _xx_xx ___xx_ _xx_xx ____xx ______
+_RED__ ____xx xx____ ______ ______ ______ ______
+_WHITE xx____ _xx_xx xxxx__ _xx_xx ______ ______
+_RED__ ___xxx x_____ ______ ______ ______ ______
+_WHITE xx____ _xx_xx _xxx__ _xx_xx ____xx ______
+_RED__ __xxxx ______ ______ ______ ______ ______
+_WHITE _xxxxx xx__xx ___xxx _xx___ xxxxx_ ______
+_RED__ _xxx__ ______ ______ ______ ______ ______
+_RED__ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+66
+};
+
+// TODO: cannot have inline attributes because of shift
+char oric_wide_color[]= {
+  9, 12,
+_CYAN_ __xxxx IIIIxx __xxxx IWHITE ___xx_ ___xxx xxxxx_ ______
+_RED__ ______ ___xx_ _WHITE ______ x__xx_ _xx___ _____x ______
+_WHITE xx____ ______ x_xx__ ______ x__xx_ _xx___ ______ ______
+_RED__ ______ _xx___ _WHITE ______ x__xx_ _xx___ ______ ______
+_WHITE xx____ ______ x_xxxx xxxxxx ___xx_ _xx___ ______ ______
+_RED__ _____x x_____ _WHITE _xx___ ___xx_ _xx___ ______ ______
+_WHITE xx____ ______ x_xx__ __xx__ ___xx_ _xx___ ______ ______
+_RED__ ___xxx _WHITE x_xx__ ___xx_ ___xx_ _xx___ ______ ______
+_WHITE x_____ ______ x_xx__ ____xx ___xx_ _xx___ _____x ______
+_CYAN_ IxxIII IWHITE x_xx__ _____x x__xx_ __xxxx xxxxx_ ______
+_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+_RED__ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+66
+};
+
+
+char sinclair_color[]= {
+  10, 7,
+_WHITE ______ _x____ ______ ______ ___x__ ______ _x____ ______ ______
+_WHITE ______ ______ ______ ______ ___x__ ______ ______ ______ ______
+_WHITE xxxxxx x_x_xx xxxxxx _xxxxx xx_x_x xxxxxx _x_xxx xxxx__ ______
+_YELLO x_____ __x_x_ _____x _x____ ___x__ _____x _x_x__ ______ ______
+_YELLO xxxxxx x_x_x_ _____x _x____ ___x_x xxxxxx _x_x__ ______ ______
+_GREEN ______ x_x_x_ _____x _x____ ___x_x _____x _x_x__ ______ ______
+_CYAN_ xxxxxx x_x_x_ _____x _xxxxx xx_x_x xxxxxx _x_x__ ______ ______
+66
+};
+
+char c64_color[]= {
+  7, 13,
+_CYAN_ ______ xxxxxx xx____ ______ ______ ______
+_CYAN_ ____xx xxxxxx xx____ ______ ______ ______
+_CYAN_ __xxxx xxxxxx xx____ xxxx__ ____xx ______
+_CYAN_ _xxxxx ______ _____x ____x_ ___x_x ______
+_CYAN_ xxxx__ ______ _____x ______ __x__x ______
+_CYAN_ xxxx__ ______ _____x ______ _xx__x ______
+_CYAN_ ______ ______ _____x xxxx__ xxxxxx ______
+_RED__ xxxx__ ______ _____x ____x_ xxxxxx ______
+_RED__ xxxx__ ______ _____x ____x_ xxxxxx ______
+_RED__ xxxx__ ______ _____x ____x_ ____x_ ______
+_RED__ __xxxx xxxxxx xx____ xxxx__ ____x_ ______
+_RED__ ____xx xxxxxx xx____ ______ ______ ______
+_RED__ ______ xxxxxx xx____ ______ ______ ______
+66
+};
+
+char disc[]= {
+
+#ifdef BIGG 
+
+#ifdef WIDER
+  24/6*2, 24,
+//123456 123456 123456 123456
+  ______ ______ ______ ______ ______ ______ ______ _____x
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ___xxx xxx___ ______ ______ ______ ______ ______
+  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
+  ______ x_____ _____x ______ ______ ______ ______ ______
+  _____x ______ ______ x_____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ___x__ ______ ______ __x___ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  ____x_ ______ ______ _x____ ______ ______ ______ ______
+  _____x ______ ______ x_____ ______ ______ ______ ______
+  ______ x_____ _____x ______ ______ ______ ______ ______
+  ______ _xx___ ___xx_ ______ ______ ______ ______ ______
+  ______ ___xxx xxx___ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+  ______ ______ ______ ______ ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxx_
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxx___ ______ ______ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxx__ ______ ______ __xxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxx_ ______ ______ _xxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ ______ xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+#else // WIDER else TALLER
+  24/6, 24*2,
+//123456 123456 123456 123456
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xx___ ___xx_ ______
+  ______ x_____ _____x ______
+  _____x ______ ______ x_____
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  _____x ______ ______ x_____
+  ______ x_____ _____x ______
+  ______ _xx___ ___xx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+#endif // WIDER
+#else // BIGG else ...
+#ifdef SCROLLABLE
+  // Notice empty column to the right,
+  // this is so dimensions are same when scrolled
+  // copies to be made
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ xxxxxx ______ ______
+  ____xx ______ xx____ ______
+  ___x__ ______ __x___ ______
+  __x___ ______ ___x__ ______
+  _x____ ______ ____x_ ______
+  _x____ ______ ____x_ ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  x_____ ______ _____x ______
+  _x____ ______ ____x_ ______
+  _x____ ______ ____x_ ______
+  __x___ ______ ___x__ ______
+  ___x__ ______ __x___ ______
+  ____xx ______ xx____ ______
+  ______ xxxxxx ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42, // indicator of bitmask following
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx ______ xxxxxx xxxxxx
+  xxxx__ ______ __xxxx xxxxxx
+  xxx___ ______ ___xxx xxxxxx
+  xx____ ______ ____xx xxxxxx
+  x_____ ______ _____x xxxxxx
+  x_____ ______ _____x xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  ______ ______ ______ xxxxxx
+  x_____ ______ _____x xxxxxx
+  x_____ ______ _____x xxxxxx
+  xx____ ______ ____xx xxxxxx
+  xxx___ ______ ___xxx xxxxxx
+  xxxx__ ______ __xxxx xxxxxx
+  xxxxxx ______ xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+
+#else // SCROLLABLE
+
+  24/6, 24,
+//123456 123456 123456 123456
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ___xxx xxx___ ______
+  ______ _xx___ ___xx_ ______
+  ______ x_____ _____x ______
+  _____x ______ ______ x_____
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ___x__ ______ ______ __x___
+  ____x_ ______ ______ _x____
+  ____x_ ______ ______ _x____
+  _____x ______ ______ x_____
+  ______ x_____ _____x ______
+  ______ _xx___ ___xx_ ______
+  ______ ___xxx xxx___ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+  ______ ______ ______ ______
+
+// - bitmask
+//123456 123456 123456 123456
+//  77,
+  42,
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxx___ ______ ______ ___xxx
+  xxxx__ ______ ______ __xxxx
+  xxxx__ ______ ______ __xxxx
+  xxxxx_ ______ ______ _xxxxx
+  xxxxxx ______ ______ xxxxxx
+  xxxxxx x_____ _____x xxxxxx
+  xxxxxx xxx___ ___xxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+  xxxxxx xxxxxx xxxxxx xxxxxx
+#endif SCROLLABLE
+
+#endif BIGG
+};
+
+
+
+// - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
+char enterprise[]= {
+  11, 16,
+  _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______
+  _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ ______1 _1_____ _______
+  __11111 _111111 _111111 _111111 _111111 _11____ _______ _______ ____111 _111___ _______
+  ___1111 _111111 _111111 _111111 _111111 _11____ _______ _______ _111111 _111111 _______
+  _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__
+  _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__
+  _______ _______ _______ _______ _11____ _____11 _11111_ _______ _111111 _111111 _______
+  _______ _______ _______ _______ _11____ ___1111 _111___ _______ ____111 _1111__ _______
+  _______ _______ _______ _______ _111111 _111111 _11____ _______ ______1 _11____ _______
+  _______ _______ _______ ____111 _111111 _111111 _111___ _______ _______ _1_____ _______
+  _______ _______ _______ ____111 _111111 _111111 _111_1_ _______ _______ _______ _______
+  _______ _______ _______ ___1111 _111111 _111111 _11111_ _______ _______ _______ _______
+  _______ _______ _______ ___1111 _111111 _111111 _111111 _1_____ _______ _______ _______
+  _______ _______ _______ _______ _111111 _111111 _11111_ _______ _______ _______ _______
+  _______ _______ _______ _______ __11111 _111111 _111_1_ _______ _______ _______ _______
+  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______
+
+/*
+  // nice but very narrow... not good proportions
+
+  6, 15,
+  xxxxxx xxxxxx xxxxxx x_____ ______ ______
+  _xxxxx xxxxxx xxxxxx xx____ __xx__ ______
+  __xxxx xxxxxx xxxxxx x_____ xxxxx_ ______
+  ______ ______ xx____ ___xxx xxxxxx xxxxxx
+  ______ ______ xx____ ___xxx xxxxxx xxxxxx
+  ______ ______ xx____ __xxxx x__xxx xxx___
+  ______ ______ xx____ _xxxxx ____xx x_____
+  ______ ______ xxxxxx xxxxx_ _____x x_____
+  ______ ___xxx xxxxxx xxxxxx x_____ ______
+  ______ ___xxx xxxxxx xxxxxx x_x___ ______
+  ______ __xxxx xxxxxx xxxxxx xxxx__ ______
+  ______ __xxxx xxxxxx xxxxxx x_x___ ______
+  ______ ______ xxxxxx xxxxxx x_____ ______
+  ______ ______ _xxxxx xxxxxx ______ ______
+  ______ ______ ___xxx xxxxx_ ______ ______
+*/
+};
+
+// TODO: change from _111111 to xxxxxx
+//    and _BLACK_ to _BLACK
+#define _BLACK_  0,
+#define _RED___  1,
+#define _GREEN_  2,
+#define _YELLOW  3,
+#define _BLUE__  4,
+#define _MAGN__  5,
+#define _CYAN__  6,
+#define _WHITE_  7,
+
+char color_enterprise[]= {
+  13, 16,
+  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ _______ _______ _______ ______
+  _RED___ _111111 _111111 _111111 _111111 _111111 _1_____ _______ _______ ______1 _1_____ _______ ______
+  _MAGN__ __11111 _111111 _111111 _111111 _111111 _11____ _______ _______ ____111 _111___ _______ ______
+  _MAGN__ ___1111 _111111 _111111 _111111 _111111 _11____ _______ _______ _111111 _111111 _______ ______
+  _MAGN__ _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
+  _YELLOW _______ _______ _______ _______ _11____ _______ _111111 _111111 _111111 _111111 _1111__ ______
+  _YELLOW _______ _______ _______ _______ _11____ _____11 _11111_ _______ _111111 _111111 _______ ______
+  _YELLOW _______ _______ _______ _______ _11____ ___1111 _111___ _______ ____111 _1111__ _______ ______
+  _GREEN_ _______ _______ _______ _______ _111111 _111111 _11____ _______ ______1 _11____ _______ ______
+  _GREEN_  _______ _______ _______ ____111 _111111 _111111 _111___ _______ _______ _1_____ _______ ______
+  _CYAN__ _______ _______ _______ ____111 _111111 _111111 _111_1_ _______ _______ _______ _______ ______
+  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _11111_ _______ _______ _______ _______ ______
+  _CYAN__ _______ _______ _______ ___1111 _111111 _111111 _111111 _1_____ _______ _______ _______ ______
+  _BLUE__ _______ _______ _______ _______ _111111 _111111 _11111_ _______ _______ _______ _______ ______
+  _BLUE__ _______ _______ _______ _______ __11111 _111111 _111_1_ _______ _______ _______ _______ ______
+  _BLUE__  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______ ______
+};
+
+void init() {
+  char i;
+  sprite* s;
+
+  for(i=0; i<Nsprites; ++i) {
+
+#ifdef COLORATTR
+    switch(i%4) {
+    case 0: s= defsprite(i, c64_color); break;
+    case 1: s= defsprite(i, sinclair_color); break;
+    case 2: s= defsprite(i, oric_thin_color); break;
+    case 3: s= defsprite(i, color_enterprise); break;
+    }
+#else
+    s->bitmap= enterprise;
+    s->bitmap= oric_thin;
+#endif // COLORATTR
+
+  }
+}
+
 void main() {
   unsigned int T;
 
@@ -1338,29 +1368,28 @@ void main() {
 
 #ifdef PROTECT_HIBIT
 #if 1
-  // horiz
-  gpfill( 2,  0,  38,  6, 128+1+4+16+64);
-  gpfill( 2, 194, 38,  6, 128+1+4+16+64);
   // vert
   gpfill(30,  0,  1, 200, 128+1+4+16+64);
   gpfill(10,  0,  1, 200, 128+1+4+16+64);
+  // horiz
+  gpfill( 2,  0,  38,  6, 128+1+4+16+64);
+  gpfill( 2, 194, 38,  6, 128+1+4+16+64);
 #endif
 #endif // PROTECT_HIBIT
 
 #ifdef PROTECT_6BIT
 #if 1
-  // horiz
-  gpfill( 2,  0,  38,  6, 1+4+16+32);
-  gpfill( 2, 194, 38,  6, 1+4+16+32);
   // vert
   gpfill(30,  0,  1, 200, 128+1+4+16+32);
   gpfill(10,  0,  1, 200, 128+1+4+16+32);
+  // horiz
+  gpfill( 2,  0,  38,  6, 1+4+16+32);
+  gpfill( 2, 194, 38,  6, 1+4+16+32);
 #endif
 #endif // PROTECT_6BIT
 
 
-  initsprites(N);
-
+  init();
 
   T= time();
  again:
@@ -1369,20 +1398,23 @@ void main() {
 
 //cgetc();
 
-    if (0) { // cost 10%?
-      unsigned int X= T-time();
-      gotoxy(0,25);
-      printf("%d: %ucs %ldsp/s %ldcfps  ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X);
-    }
   }
 
+  // "bench" report speed Nsprites=7, sprites= enterprise
   if (1) {
+    char i;
     unsigned int X= T-time();
-    long bytes= ndraw*enterprise[0]*enterprise[1];
+    long bytes= 0;
+    long optimalBps= 1000000L/15; // copy 1 byte 15c=5+5+2+3 (lda(),y;sta(),y,inx,bne)
+    for(i=0; i<Nsprites; ++i) {
+      sprite* s= sploc+i;
+      bytes+= (s->w * s->h) * (s->mask? 2: 1); // TODO: multiply 2 for xor
+    }
+
     gotoxy(0,25);
     // TODO: Bps is all wrong? why?
-    printf("%d: %ucs %ldsp/s %ldcfps %ldBps ", ndraw, X, ndraw*100L/X, ndraw*10000L/N/X, bytes*100L/X);
-    printf(" COLLS=%d (should be 673)", colls);
+    printf("%d: %ucs %ldsp/s %ldcfps %ldBps bytes=%ld COLLS=%d (673) ",
+           ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, ndraw*100L*bytes/X, bytes, colls);
   }
 
   cgetc();
@@ -1390,3 +1422,4 @@ void main() {
   goto again;
 }
 
+#endif // MAIN
