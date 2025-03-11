@@ -1353,9 +1353,9 @@ void init() {
     case 3: s= defsprite(i, color_enterprise); break;
     }
 #else
-    s= defsprite(i, oric_thin);
+    //s= defsprite(i, oric_thin);
     // TODO: ifdef SPRITE_BENCH
-    //s= defsprite(i, enterprise);
+    s= defsprite(i, enterprise);
 #endif // COLORATTR
 
   }
