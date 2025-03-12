@@ -79,7 +79,7 @@
 // Sprites are automatically lined up and given dx,dy and drawn
 // Good for testing etc
 //
-//#ifdef SPRITE_PLACE
+#define SPRITE_PLACE
 
 
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
@@ -312,6 +312,11 @@ void drawsprite(register sprite* s) {
   *(int*)0x90= (int)sp+2;   // sprite byte data
   *(int*)0x92= (int)l;      // screen address + y offset
   *(int*)0x94= (int)msk+2;  // mask byte data
+#ifdef SPRITE_SAVE
+  // TODO: too conplicated w partial clear?
+  // and always undraw redraw when move is flicker... :-(
+  *(int*)0x96= (int)(s->sav)+2;  // save under sprite
+#endif // SPRITE_SAVE
 
   // -- ASM: a memcpy w strides, lol (w<256)
   // (be careful to change!)
@@ -340,6 +345,11 @@ void drawsprite(register sprite* s) {
     asm("rol");         // M= a&6bit lol
     asm("bpl %g", skip0);
 #endif // PROTECT_6BIT
+#ifdef SPRITE_SAVE
+    // TODO: if combined with protect put there!
+    asm("lda ($92),y");  // a= l[y]
+    asm("sta ($96),y)"); // save it
+#endif // SPRITE_SAVE
 
     // draw
     asm("lda ($90),y"); // a = sp[y];
@@ -1427,6 +1437,88 @@ char color_enterprise[]= {
   _BLUE__  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______ ______
 };
 
+  // lineup for oric shoot'em up!
+sprite * oric, * spectrum, * c64;
+
+void init_oric() {
+  oric    = defsprite(0, oric_thin_color, NULL, 0);
+  spectrum= defsprite(1, c64_color,       NULL, 1);
+  c64     = defsprite(2, sinclair_color,  NULL, 2);
+}
+
+char L= 30;
+
+void draw_paddle(char up, char draw) {
+  if (up) {
+    gfill(20, 100-L, 1, 2*L+1, draw);
+  } else {
+    gfill(20-div6[L], 100-3, div6[2*L]+1, 2*3, draw);
+  }
+}
+
+void xpaddle(char a) {
+  char x, y, m= a&63;
+  switch(((a-32+256)/64)&3) {
+  case 0: x= 64;   y= m;    break;
+  case 1: x= 64-m; y= 64;   break;
+  case 2: x= -64;  y= 64-m; break;
+  case 3: x= m-64; y= m-64; break;
+  }
+  x/= 4; y/= 4;
+  gcurx= 120; gcury= 100; draw(x, y, 2);
+}
+
+void paddle(char x, char y) {
+  gcurx= 120; gcury= 100; draw(x-120, y-100, 2);
+}
+
+void main_oric() {
+  char up= 0;
+  char a= 0;
+  char k;
+  char x= 120, y= 100;
+  char S= 10;
+
+  char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
+  char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
+
+  hires(); gclear();
+
+  init_oric(); 
+
+#if 0
+  // move to random position
+  oric->x = 12+(rand()%(240-30-7*6));
+  oric->y =  0+(rand()%(200-30-10));
+  while(!(oric->dx= rand()%8 -4));
+  while(!(oric->dy= rand()%8 -4));
+  drawsprite(oric);
+#endif
+
+  paddle(x, y);
+
+  while(1) {
+
+    spritetick();
+
+    // user action
+    //if (k= kbhit()) k= cgetc();
+    
+    // erase
+    paddle(x, y);
+
+    if (keypressed(ku)) if ((y-= S) <30)  y=  30;
+    if (keypressed(kd)) if ((y+= S) >170) y= 170;
+    if (keypressed(kr)) if ((x+= S) >210) x= 210;
+    if (keypressed(kl)) if ((x-= S) <30)  x=  30;
+
+    gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
+
+    // draw
+    paddle(x, y);
+  }
+}
+
 void init() {
   char i;
   sprite* s;
@@ -1553,6 +1645,8 @@ void init() {
 void main() {
   unsigned int T;
 
+  main_oric();
+
   hires();
   gclear();
 
@@ -1591,7 +1685,6 @@ void main() {
   gpfill( 2, 194, 38,  6, 1+4+16+32);
 #endif
 #endif // PROTECT_6BIT
-
 
   init();
 

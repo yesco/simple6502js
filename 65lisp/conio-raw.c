@@ -1422,6 +1422,10 @@ void main() {
   char c;
   clrscr();
 
+  main_oric();
+
+  exit(1);
+
   puts("FOOBAR fiefum"); putchar('!'); putint(666); cputc('?');
 
   for(c=0; c<8; ++c) { putchar(c); putint(c); putchar(' '); putchar('\n'); }
