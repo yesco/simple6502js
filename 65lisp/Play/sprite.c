@@ -4,8 +4,9 @@
 //
 // Read doc+settings below:
 
-#define Nsprites 7
-//#define Nsprites 10
+//#define Nsprites 7
+#define Nsprites 20
+//#define Nsprites 8
 //#define Nsprites 1
 
 // * higher number sprite is above lower numbers
@@ -36,7 +37,7 @@
 //            (ink) color attributes ok
 //               (don't mix with protect?)
 
-//#define COLORATTR
+#define COLORATTR
 
 //    x) XORWRITE (and undraw, 2x cost basically)
 //       Use: preserve background (inverts sprite pixels)
@@ -51,6 +52,13 @@
 //            preserves background
 //          TODO: save background
 //          TODO: color attributes
+//    z) COMPRESEDWRITE (interpreted w skips)
+//       Use: sparse bitmaps, irregular shapes
+//            animations (can mix?)
+//       ???Format: 0x08 n - skip n cells
+//               0x09 n - forward n cells
+//               0x10 n - down n cells
+//               0x11 h - up
 
 // * canvas default bouncy border:
 //
@@ -67,6 +75,12 @@
   #undef  SPRITE_XMIN
   #define SPRITE_XMIN 0
 #endif
+
+// Sprites are automatically lined up and given dx,dy and drawn
+// Good for testing etc
+//
+//#ifdef SPRITE_PLACE
+
 
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
 // creating movie, diable, fictional RPG gmae inside the novel - erh???
@@ -89,9 +103,6 @@
 // = 754cs   gpfill+drawsprite (useful drawing work!)
 
 // (- 823 754)
-
-// enable to benchmark non-drawing admin/movement stuff
-#define SPRITE_NODRAW
 
 // <<< END_DOC, END_DEF
 
@@ -298,9 +309,9 @@ void drawsprite(register sprite* s) {
   l= rowaddr[s->y] + div6[s->x];
 
   // TODO: clipping?
-  *(int*)0x90= sp+2; // sprite byte data
-  *(int*)0x92= l;    // screen address + y offset
-  *(int*)0x94= msk;  // mask byte data
+  *(int*)0x90= (int)sp+2;   // sprite byte data
+  *(int*)0x92= (int)l;      // screen address + y offset
+  *(int*)0x94= (int)msk+2;  // mask byte data
 
   // -- ASM: a memcpy w strides, lol (w<256)
   // (be careful to change!)
@@ -411,6 +422,8 @@ void drawsprite(register sprite* s) {
     // load current screen value
     asm("lda ($92),y"); // a = l[y];
 
+// TODO: #ifdef PROTECT_HIBIT     (see case 0)
+
     // skips "foreground"
     if (0) {
       // skip inverted cells
@@ -488,7 +501,7 @@ void gpfill(char c, char r, char w, char h, char v) {
   if (r>= 200) return;
   ww= w; hh= h; vv= v;
 
-  *(int*)0x90= rowaddr[r]+c -1; // -1 because y=w
+  *(int*)0x90= (int)rowaddr[r]+c -1; // -1 because y=w
 
   asm("ldx %v", hh);
 
@@ -755,53 +768,87 @@ void spritetick() {
 }
 
 // shift one step right
-void spriteshift(char* bm, char w, char h) {
-  char j, * p= bm;
+// TODO: very slow (1s?), optimize
+char* spriteshift(sprite* s, char* bm) {
+  char j, w= s->w, h= s->h;
+  unsigned int size= w * h + 3; // space for w,h,42
+  char * nw= malloc(size), * p= nw+2;
   unsigned int v= 0;
-  //while(*p) { // lol, can do!
+
+  assert(nw);
+  memcpy(nw, bm, size);
+
+  //while(*p) { // lol, can do?
   do {
     v= 0; j= w;
 
     #ifdef COLORATTR
+      // keep first "column" of sprite fixed (is attribute)
       ++p; --j;
     #endif // COLORATTR
 
+    // shift line of pixel cells
     do {
       v<<= 6;
       v|= *p & 63;
-      *p= ((v >> 1) & 63)| 64;
+      *p= ((v >> 1) & 63)| 64; // TODO: ((char)v) ?
       ++p;
     } while(--j);
   } while(--h);
+
+  return nw;
+}
+
+void shiftbitmaps(sprite* s) {
+  char j;
+
+  // - create x scrollable copies
+  s->shbitmap[0]= s->bitmap;
+  s->shmask[0]= s->mask;
+
+  for(j=1; j<6; ++j) {
+    // create a copy, scroll 1 pixel
+    s->shbitmap[j]=          spriteshift(s, s->shbitmap[j-1]);
+    s->shmask  [j]= s->mask? spriteshift(s, s->shmask  [j-1]): NULL;
+  }
 }
 
 // default show position (lines them up!)
 char spritex= SPRITE_XMIN, spritey= SPRITE_YMIN;
 
-sprite* defsprite(char i, char* bitmap) {
-  sprite* s= sploc+i;
-  char w= bitmap[0], h= bitmap[1];
-  int size= w*h;
+// define sprite nr I from BITMAP and MASK, if COPYFROM sprite number is given
+// and isn't same as I, use that as template. Set COPYFROM 255 if not used. LOL
 
+// Result: returns sprite* for modification (TODO: bad?)
+
+sprite* defsprite(char i, char* bitmap, char* mask, char copyfrom) {
+  sprite* s= sploc+i;
   char j;
 
-  // init sprite
-  memset(s, 0, sizeof(*s));
-  s->bitmap= bitmap;
-  s->w= w;
-  s->h= h;
-  s->wx= w*6;
+  // - init sprite fields
+  if (copyfrom!=255 && copyfrom!=i) {
+    memcpy(s, sploc+copyfrom, sizeof(*s));
+  } else {
+    memset(s, 0, sizeof(*s));
+    s->bitmap= bitmap;
+    s->mask= mask;
+    s->w= bitmap[0];
+    s->h= bitmap[1];
+    s->wx= s->w * 6;
+  }
 
+#ifdef SPRITE_PLACE
+  //TODO: if not set, may be illegal pos? loop probelm in update/move
   // (default) position
   if (spritex + s->wx >= SPRITE_XMAX) { spritex= SPRITE_XMIN; spritey+= 40; } 
   s->x= spritex;
-  s->y= spritey;
-
   spritex+= s->wx;
+  s->y= spritey;
 
   // intial speed
   s->dx= +1+i/2;
   s->dy= +i*11/10+1;
+#endif // SPRITE_PLACE
 
   // TODO: every time dx, dy is updated need update this
   s->xmax= SPRITE_XMAX - s->wx + s->dx;
@@ -809,57 +856,11 @@ sprite* defsprite(char i, char* bitmap) {
   s->xmin= SPRITE_XMIN + s->dx;
   s->ymin= SPRITE_YMIN + s->dy;
 
-  // - have mask?
-  {
-    int markpos= size + 2;
-    s->mask= (42==bitmap[markpos])?
-      s->bitmap+markpos+1: NULL;
-  }
+  if (!s->shbitmap[1])
+    shiftbitmaps(s);
 
-  // TODO: move out to own structure (?)
-  //   and only do once per sprite bitmap
-
-  // - create x scrollable copies
-  s->shbitmap[0]= s->bitmap;
-  s->shmask[0]= s->mask;
-
-  // TODO: very slow (1s?), optimize
-  { int bytes= size + 3;
-    for(j=1; j<6; ++j) {
-      // create a copy, scroll 1 pixel
-      // TODO: refactor
-      char* nw= malloc(bytes);
-      memcpy(nw, s->shbitmap[j-1], bytes);
-      spriteshift(nw+2, s->bitmap[0], s->bitmap[1]);
-      s->shbitmap[j]= nw;
-
-      // TODO: make mask also use +2...
-      if (s->mask) {
-        // TODO: refactor
-        nw= malloc(bytes);
-        memcpy(nw, s->shmask[j-1], bytes);
-        spriteshift(nw, s->bitmap[0], s->bitmap[1]);
-        s->shmask[j]= nw;
-      } else {
-        s->shmask[j]= NULL;
-      }
-    }
-
-    // debug show
-    if (0) {
-      for(j=0; j<6; ++j) {
-        s->bitmap= s->shbitmap[j];
-        s->mask= s->shmask[j];
-      }
-      if (s->shbitmap[0]) {
-        s->bitmap= s->shbitmap[0];
-        s->mask= s->shmask[0];
-      }
-    }
-
-    // TODO: maybe require enable? or use default flag?
-    drawsprite(s);
-  }
+  // TODO: maybe require enable? or use default flag?
+  drawsprite(s);
 
   return s;
 }
@@ -872,6 +873,84 @@ char T,nil,doapply1,print;
 
 // ----------------------------- SPRITES
 #include "../bits.h"
+
+char pineapple_color[]= {
+  6, 6+2*(4+2*3)+1,
+_GREEN x_x__x x__xx_ _x__x_ x_x__x ______
+_GREEN _x_x_x xx_xx_ x___xx _x__x_ ______
+_GREEN _x__xx xx_xx_ x__xx_ x_xx__ ______
+_GREEN ___xxx xxx_x_ x_xx_x xx____ ______
+_GREEN ____x_ _xxx_x xx_x_x xx____ ______
+_GREEN _____x xx_xxx _x_xxx x_____ ______
+
+_YELLO _____x xxxxxx xxxxxx x_____ ______
+_RED__ ____x_ _x__x_ _x__x_ _x____ ______
+_YELLO ___x_x x_xx_x x_xx_x x_x___ ______
+_RED__ ___x_x ___x__ x__x__ x__x__ ______
+
+_YELLO __xx_x x_xx_x x_xx_x x_xxx_ ______
+_RED__ __x_x_ __x__x __x__x __x_x_ ______
+_YELLO _xx_xx x_xx_x x_xx_x x_x_xx ______
+
+_RED__ _x_x__ _x__x_ _x__x_ _x_x_x ______
+_YELLO _xx_xx x_xx_x x_xx_x x_x_xx ______
+_RED__ x_x___ x__x__ x__x__ x_x_xx ______
+
+
+_YELLO xx_xxx _xx_xx _xx_xx _x_xxx ______
+
+
+_RED__ x_x___ x__x__ x__x__ x_x_xx ______
+_YELLO _xx_xx x_xx_x x_xx_x x_x_xx ______
+_RED__ _x_x__ _x__x_ _x__x_ _x_x_x ______
+
+_YELLO _xx_xx x_xx_x x_xx_x x_x_xx ______
+_RED__ __x_x_ __x__x __x__x __x_x_ ______
+_YELLO __xx_x x_xx_x x_xx_x x_xxx_ ______
+
+_RED__ ___x_x ___x__ x__x__ x__x__ ______
+_YELLO ___x_x x_xx_x x_xx_x x_x___ ______
+_RED__ ____x_ _x__x_ _x__x_ _x____ ______
+_YELLO _____x xxxxxx xxxxxx x_____ ______
+};
+
+char mini_pineapple_color[]= {
+  4, 3+2*5+1,
+_GREEN x_x__x x_x__x ______
+_GREEN ___xx_ xx_x__ ______
+_GREEN ____xx _xx___ ______
+
+_YELLO _____x x_____ ______
+_RED__ ___xx_ _xx___ ______
+_YELLO _xx_xx x_xx__ ______
+_RED__ _x_x__ _x__x_ ______
+_YELLO xx_xxx _x_xxx ______
+
+_RED__ x_x___ x_x_xx ______
+
+_YELLO xx_xxx _x_xxx ______
+_RED__ _x_x__ _x__x_ ______
+_YELLO _xx_xx x_xx__ ______
+_RED__ ___xx_ _xx___ ______
+_YELLO _____x x_____ ______
+
+};
+
+char micro_pineapple_color[]= {
+  2, 8,
+
+_GREEN x_xx_x
+_RED__ __xx__
+_YELLO _x_xx_
+_RED__ x_x_xx
+
+_YELLO xx_x_x
+_RED__ xx_x_x
+_YELLO _x_xx_
+_RED__ __xx__
+
+};
+
 
 char oric_thin[]= {
   6, 9,
@@ -971,11 +1050,10 @@ _RED__ ______ xxxxxx xx____ ______ ______ ______
 66
 };
 
-char disc[]= {
-
 #ifdef BIGG 
 
 #ifdef WIDER
+char disc[]= {
   24/6*2, 24,
 //123456 123456 123456 123456
   ______ ______ ______ ______ ______ ______ ______ _____x
@@ -1002,11 +1080,11 @@ char disc[]= {
   ______ ______ ______ ______ ______ ______ ______ ______
   ______ ______ ______ ______ ______ ______ ______ ______
   ______ ______ ______ ______ ______ ______ ______ ______
+};
 
-// - bitmask
-//123456 123456 123456 123456
-//  77,
-  42,
+char disc_mask[]= {
+  24/6*2, 24,
+  
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxx_
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
@@ -1032,7 +1110,11 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx
+};
+
 #else // WIDER else TALLER
+
+char disc[]= {
   24/6, 24*2,
 //123456 123456 123456 123456
   ______ ______ ______ ______
@@ -1084,12 +1166,11 @@ char disc[]= {
   ______ ______ ______ ______
   ______ ______ ______ ______
   ______ ______ ______ ______
+};
 
-
-// - bitmask
+char* disc_mask= {
+  24/6, 24*2,
 //123456 123456 123456 123456
-//  77,
-  42,
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
@@ -1140,13 +1221,17 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
+};
 
 #endif // WIDER
 #else // BIGG else ...
 #ifdef SCROLLABLE
+
   // Notice empty column to the right,
   // this is so dimensions are same when scrolled
   // copies to be made
+char disc[]= {
+  24/6, 24,
   ______ ______ ______ ______
   ______ ______ ______ ______
   ______ xxxxxx ______ ______
@@ -1171,11 +1256,13 @@ char disc[]= {
   ______ ______ ______ ______
   ______ ______ ______ ______
   ______ ______ ______ ______
+};
 
+char disc_mask[]= {
 // - bitmask
 //123456 123456 123456 123456
 //  77,
-  42, // indicator of bitmask following
+  24/6, 24,
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
@@ -1200,9 +1287,11 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
+};
 
 #else // SCROLLABLE
 
+char disc[]= {
   24/6, 24,
 //123456 123456 123456 123456
   ______ ______ ______ ______
@@ -1229,11 +1318,12 @@ char disc[]= {
   ______ ______ ______ ______
   ______ ______ ______ ______
   ______ ______ ______ ______
+};
 
+char disc_mask[]= {
 // - bitmask
+  24/6, 24,
 //123456 123456 123456 123456
-//  77,
-  42,
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
@@ -1259,12 +1349,10 @@ char disc[]= {
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
   xxxxxx xxxxxx xxxxxx xxxxxx
+};
 #endif SCROLLABLE
 
 #endif BIGG
-};
-
-
 
 // - https://shop.startrek.com/products/star-trek-the-original-series-beverage-containment-system-personalized-travel-mug
 char enterprise[]= {
@@ -1346,16 +1434,43 @@ void init() {
   for(i=0; i<Nsprites; ++i) {
 
 #ifdef COLORATTR
-    switch(i%4) {
-    case 0: s= defsprite(i, c64_color); break;
-    case 1: s= defsprite(i, sinclair_color); break;
-    case 2: s= defsprite(i, oric_thin_color); break;
-    case 3: s= defsprite(i, color_enterprise); break;
+    if (1) {
+      if (0) {
+        s= defsprite(i, pineapple_color, NULL, 0);
+      } else if (0) {
+        s= defsprite(i, mini_pineapple_color, NULL, 0);
+        while((s->x= SPRITE_XMIN+rand()&127) > SPRITE_XMAX);
+        while((s->y= SPRITE_YMIN+rand()&127) > SPRITE_YMAX);
+        s->dx= rand()&7-4;
+        s->dy= rand()&7-4;
+        drawsprite(s);
+      } else {
+        s= defsprite(i, micro_pineapple_color, NULL, 0);
+        s->dx= 0;
+        s->dy= (rand()&3)+1;
+  s->xmax= SPRITE_XMAX - s->wx + s->dx - 6;
+  s->ymax= SPRITE_YMAX - s->h  + s->dy - 8;
+  s->xmin= SPRITE_XMIN + s->dx + 6*2;
+  s->ymin= SPRITE_YMIN + s->dy + 6;
+        while((s->x= s->xmin+6+(rand()&127)) > s->xmax);  s->x-= mod6[s->x];
+        while((s->y= s->ymin+(rand()&127)) > s->ymax);
+        drawsprite(s);
+      }    
+    } else {
+      // lineup for oric shoot'em up!
+      switch(i%4) {
+      case 0: s= defsprite(i, c64_color, NULL, 0); break;
+      case 1: s= defsprite(i, sinclair_color, NULL, 1); break;
+      case 2: s= defsprite(i, oric_thin_color, NULL, 2); break;
+      case 3: s= defsprite(i, color_enterprise, NULL, 3); break;
+      }
     }
 #else
-    //s= defsprite(i, oric_thin);
+    // - All same
+    //s= defsprite(i, oric_thin, NULL, 0);
     // TODO: ifdef SPRITE_BENCH
-    s= defsprite(i, enterprise);
+    s= defsprite(i, enterprise, NULL, 0);
+    //s= defsprite(i, disc, disc_mask, 0);
 #endif // COLORATTR
 
   }
