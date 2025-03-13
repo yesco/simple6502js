@@ -214,7 +214,6 @@ void animate_explosion() {
 int main() {
     animate_explosion();
     return 0;
-}#include <stdint.h>
 
 // Oric Atmos memory locations
 #define HIRES_BASE 0xA000  // HIRES screen memory start
@@ -472,4 +471,3 @@ int main() {
     return 0;
 }
 #include <stdint.h>
-

@@ -4,7 +4,9 @@
 //
 // Read doc+settings below:
 
-#define Nsprites 8
+//#define Nsprites 7
+//#define Nsprites 8
+#define Nsprites 9
 //#define Nsprites 1
 
 // * higher number sprite is above lower numbers
@@ -907,9 +909,11 @@ SCREENLAST[-1]= 'd';
     memset(s, 0, sizeof(*s));
     s->bitmap= bitmap;
     s->mask= mask;
-    s->w= bitmap[0];
-    s->h= bitmap[1];
-    s->wx= s->w * 6;
+    if (bitmap) {
+      s->w= bitmap[0];
+      s->h= bitmap[1];
+      s->wx= s->w * 6;
+    }
 SCREENLAST[-1]= 'e';
   }
 SCREENLAST[-1]= 'f';
@@ -939,7 +943,7 @@ SCREENLAST[-1]= 'i';
   s->ymin= SPRITE_YMIN + s->dy;
 
 SCREENLAST[-1]= 'j';
-  if (!s->shbitmap[1])
+  if (bitmap && !s->shbitmap[1])
     shiftbitmaps(s);
 
 SCREENLAST[-1]= 'k';
@@ -950,10 +954,21 @@ SCREENLAST[-1]= 'k';
 SCREENLAST[-1]= 'l';
 // cgetc();
 SCREENLAST[-1]= 'm';
-  drawsprite(s);
+  if (bitmap) drawsprite(s);
 SCREENLAST[-1]= 'n';
 // cgetc();
 SCREENLAST[-1]= 'x';
+  return s;
+}
+
+sprite* defsequence(char i, char copyfrom, char** bitmaps) {
+  sprite* s= defsprite(i, copyfrom, NULL, NULL);
+
+  memcpy(s->shbitmap, bitmaps, sizeof(s->shbitmap));
+  s->w= bitmaps[0][0];
+  s->h= bitmaps[0][1];
+  s->wx= s->w * 6;
+
   return s;
 }
 
@@ -1183,6 +1198,7 @@ COL_AA xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
 COL_BB _xxxxx xxxxxx xxxxxx x_____ _xxxxx ______
 };
 
+#include "sprite-explosion.c"
 
 
 
@@ -1591,17 +1607,23 @@ void paddle(char x, char y) {
   gcurx= 120; gcury= 100; draw(x-120, y-100, 2);
 }
 
-sprite * oric, * spectrum, * c64, * boot;
+sprite *oric, *spectrum, *c64, *boot, *explode;
 
-
+//#define KLEN 30 // kick
+#define KLEN 20 // kick gives 4 areas
+//#define KLEN 18 // 
+//#define KLEN 8
 void kick(signed char dx, signed char dy) {
   char i;
+  
   // stop sprites, enable boot
   for(i=0; i<Nsprites; ++i) sploc[i].status= -sploc[i].status;
   
   // "kick" - boot out
   spritespeed(boot, dx, dy);
-  for(i=0; i<30; ++i) {
+  for(i=0; i<KLEN; ++i) {
+    spritespeed(boot, boot->dx+dx, boot->dy+dy);
+    //spritespeed(boot, boot->dx*2, boot->dy*2);
     spritetick();
     //gotoxy(0,25); printf("%d %d %d %d   ", i, boot->status, boot->x, boot->y);
     //wait(10);
@@ -1610,8 +1632,8 @@ void kick(signed char dx, signed char dy) {
   // TODO: what it hit: change their vectors!
 
   // boot back
-  spritespeed(boot, -dx, -dy);
-  for(i=0; i<30; ++i) spritetick();
+  //spritespeed(boot, -dx, -dy);
+  //for(i=0; i<KLEN; ++i) spritetick();
 
   spritespeed(boot, 0, 0);
 
@@ -1637,10 +1659,13 @@ void main_oric() {
             defsprite(5, 2, NULL, NULL);
             defsprite(6, 0, NULL, NULL);
 
-  boot    = defsprite(7, 7, boot_color, NULL);
-  placesprite(boot, 120, 100);
-  spritespeed(boot, 0, 0);
-  boot->status= -boot->status;
+  explode = defsequence(7, 7, explosion);
+    spritespeed(explode, 1, 0);
+
+  boot    = defsprite(8, 8, boot_color, NULL);
+    placesprite(boot, 120 - boot->wx/2, 100 - boot->h/2);
+    spritespeed(boot, 0, 0);
+    boot->status= -boot->status;
 
   while(1) {
 
