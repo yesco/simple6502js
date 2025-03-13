@@ -4,9 +4,7 @@
 //
 // Read doc+settings below:
 
-//#define Nsprites 7
-#define Nsprites 20
-//#define Nsprites 8
+#define Nsprites 7
 //#define Nsprites 1
 
 // * higher number sprite is above lower numbers
@@ -823,33 +821,71 @@ void shiftbitmaps(sprite* s) {
   }
 }
 
+// for self-moving sprites: don't change s->dx, s->dy
+// directly, call this
+// TODO: maybe this isn't needed.... maybe overhead so small
+// to do dynamic test?
+void spritespeed(sprite* s, signed char dx, signed char dy) {
+  s->dx= dx;
+  s->dy= dy;
+
+  dx= dx<0? -dx: dx;
+  dy= dy<0? -dy: dy;
+
+  s->xmin= SPRITE_XMIN + dx;
+  s->ymin= SPRITE_YMIN + dy;
+  s->xmax= SPRITE_XMAX - dx - s->wx;
+  s->ymax= SPRITE_YMAX - dy - s->h;
+}
+
+void spriteplacerandom(register sprite* s) {
+  erasesprite(s, 0, 0); // TODO: if not drawn...
+
+  s->x = s->xmin + rand() % (s->xmax - s->xmin);
+  s->y = s->ymin + rand() % (s->ymax - s->ymin);
+
+  //while(!(oric->dx= rand()%8 -4));
+  //while(!(oric->dy= rand()%8 -4));
+
+  drawsprite(s);
+}
+
 // default show position (lines them up!)
-char spritex= SPRITE_XMIN, spritey= SPRITE_YMIN;
+char spritex= SPRITE_XMIN+12, spritey= SPRITE_YMIN;
 
-// define sprite nr I from BITMAP and MASK, if COPYFROM sprite number is given
-// and isn't same as I, use that as template. Set COPYFROM 255 if not used. LOL
+// Define no I sprite from COPYFROM (if <I) or use BITMAP and MASK.
+// Basically, any sprite with lower number can be used as template.
+// Set COPYFROM to I when defining.
 
-// Result: returns sprite* for modification (TODO: bad?)
+// Result: returns sprite* for modification
 
-sprite* defsprite(char i, char* bitmap, char* mask, char copyfrom) {
+sprite* defsprite(char i, char copyfrom, char* bitmap, char* mask) {
   sprite* s= sploc+i;
   char j;
 
+SCREENLAST[-1]= 'a';
+
   // - init sprite fields
-  if (copyfrom!=255 && copyfrom!=i) {
+  if (copyfrom < i) {
+SCREENLAST[-1]= 'b';
     memcpy(s, sploc+copyfrom, sizeof(*s));
+SCREENLAST[-1]= 'c';
   } else {
+SCREENLAST[-1]= 'd';
     memset(s, 0, sizeof(*s));
     s->bitmap= bitmap;
     s->mask= mask;
     s->w= bitmap[0];
     s->h= bitmap[1];
     s->wx= s->w * 6;
+SCREENLAST[-1]= 'e';
   }
+SCREENLAST[-1]= 'f';
 
 #ifdef SPRITE_PLACE
   //TODO: if not set, may be illegal pos? loop probelm in update/move
   // (default) position
+SCREENLAST[-1]= 'g';
   if (spritex + s->wx >= SPRITE_XMAX) { spritex= SPRITE_XMIN; spritey+= 40; } 
   s->x= spritex;
   spritex+= s->wx;
@@ -858,7 +894,9 @@ sprite* defsprite(char i, char* bitmap, char* mask, char copyfrom) {
   // intial speed
   s->dx= +1+i/2;
   s->dy= +i*11/10+1;
+SCREENLAST[-1]= 'h';
 #endif // SPRITE_PLACE
+SCREENLAST[-1]= 'i';
 
   // TODO: every time dx, dy is updated need update this
   s->xmax= SPRITE_XMAX - s->wx + s->dx;
@@ -866,12 +904,22 @@ sprite* defsprite(char i, char* bitmap, char* mask, char copyfrom) {
   s->xmin= SPRITE_XMIN + s->dx;
   s->ymin= SPRITE_YMIN + s->dy;
 
+SCREENLAST[-1]= 'j';
   if (!s->shbitmap[1])
     shiftbitmaps(s);
 
+SCREENLAST[-1]= 'k';
   // TODO: maybe require enable? or use default flag?
+// TODO: printf messes up memory?
+// NULL pointer allocate?
+// gotoxy(0,25);printf("%d: (%d,%d)   ", i, s->x, s->y);
+SCREENLAST[-1]= 'l';
+// cgetc();
+SCREENLAST[-1]= 'm';
   drawsprite(s);
-
+SCREENLAST[-1]= 'n';
+// cgetc();
+SCREENLAST[-1]= 'x';
   return s;
 }
 
@@ -1060,6 +1108,51 @@ _RED__ ______ xxxxxx xx____ ______ ______ ______
 66
 };
 
+char boot_color[]= {
+  7, 32,
+// AIC!
+#define COL_AA _RED__
+//#define COL_BB _MAGN_
+#define COL_BB _YELLO
+
+COL_AA ______ ______ ___xxx xxxxxx xxxx__ ______
+COL_BB ______ ______ __xxx_ ______ __xxx_ ______
+COL_AA ______ ______ __xx__ ______ ___xx_ ______
+COL_BB ______ ______ __xxx_ ______ __xxx_ ______
+COL_AA ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_BB ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_AA ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_BB ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_AA ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_BB ______ ______ ___xxx xxxxxx xxxxx_ ______
+COL_AA ______ ______ ____xx xxxxxx xxxxx_ ______
+COL_BB ______ ______ ____xx xxxxxx xxxxx_ ______
+COL_AA ______ ______ ____xx xxxxxx xxxxx_ ______
+COL_BB ______ ______ ____xx xxxxxx xxxxx_ ______
+COL_AA ______ ______ ____xx xxxxxx xxxxx_ ______
+COL_BB ______ ______ _____x xxxxxx xxx_x_ ______
+COL_AA ______ ______ _____x xxxxxx xx_xx_ ______
+COL_BB ______ ______ _____x xxxxxx x_xxx_ ______
+COL_AA ______ ______ _____x _xxxxx _xxxx_ ______
+COL_BB ______ ______ _____x x_xxx_ xxxxx_ ______
+COL_AA ______ ______ _____x xx_x_x xxxxx_ ______
+COL_BB ______ ______ ______ xxx_xx xxxxx_ ______
+COL_AA ______ ______ ______ xxxxxx xxxxx_ ______
+COL_BB ______ ______ ______ xxxxxx xxxxx_ ______
+COL_AA ______ ______ ______ xxxxxx xxxxx_ ______
+COL_BB ______ ______ ______ xxxxxx xxxxx_ ______
+COL_AA ______ ______ _____x xxxxxx xxxx__ ______
+COL_BB ______ ______ xxxxxx xxxxxx xxxx__ ______
+COL_AA _xxx__ xxxxxx xxxxxx xxxxxx xxxx__ ______
+COL_BB xxxxxx xxxxxx xxxxxx xxxxxx xxxxx_ ______
+COL_AA xxxxxx xxxxxx xxxxxx xxxxxx xxxxxx ______
+COL_BB _xxxxx xxxxxx xxxxxx x_____ _xxxxx ______
+};
+
+
+
+
+// ==================== SPRITE TEST ==================
 #ifdef BIGG 
 
 #ifdef WIDER
@@ -1437,15 +1530,7 @@ char color_enterprise[]= {
   _BLUE__  _______ _______ _______ _______ ____111 _111111 _111___ _______ _______ _______ _______ ______
 };
 
-  // lineup for oric shoot'em up!
-sprite * oric, * spectrum, * c64;
-
-void init_oric() {
-  oric    = defsprite(0, oric_thin_color, NULL, 0);
-  spectrum= defsprite(1, c64_color,       NULL, 1);
-  c64     = defsprite(2, sinclair_color,  NULL, 2);
-}
-
+// lineup for oric shoot'em up!
 char L= 30;
 
 void draw_paddle(char up, char draw) {
@@ -1472,52 +1557,58 @@ void paddle(char x, char y) {
   gcurx= 120; gcury= 100; draw(x-120, y-100, 2);
 }
 
-void main_oric() {
-  char up= 0;
-  char a= 0;
-  char k;
-  char x= 120, y= 100;
-  char S= 10;
+sprite * oric, * spectrum, * c64, * boot;
 
+void main_oric() {
   char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
   char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
 
+  char i;
+
+  // draw screen
   hires(); gclear();
 
-  init_oric(); 
-
-#if 0
-  // move to random position
-  oric->x = 12+(rand()%(240-30-7*6));
-  oric->y =  0+(rand()%(200-30-10));
-  while(!(oric->dx= rand()%8 -4));
-  while(!(oric->dy= rand()%8 -4));
-  drawsprite(oric);
-#endif
-
-  paddle(x, y);
+  // init sprites
+  oric    = defsprite(0, 0, oric_thin_color, NULL);
+  spectrum= defsprite(1, 1, sinclair_color, NULL);
+  c64     = defsprite(2, 2, c64_color, NULL);
+            defsprite(3, 0, NULL, NULL);
+            defsprite(4, 1, NULL, NULL);
+            defsprite(5, 2, NULL, NULL);
+  boot    = defsprite(6, 6, boot_color, NULL);
 
   while(1) {
 
     spritetick();
 
-    // user action
-    //if (k= kbhit()) k= cgetc();
-    
-    // erase
-    paddle(x, y);
+    // kick boot ?
+    if (keypressed(ku)) spritespeed(boot, 0, -1);
+    if (keypressed(kd)) spritespeed(boot, 0, +1);
+    if (keypressed(kr)) spritespeed(boot, +1, 0);
+    if (keypressed(kl)) spritespeed(boot, -1, 0);
+*SCREENLAST= 'D';
 
-    if (keypressed(ku)) if ((y-= S) <30)  y=  30;
-    if (keypressed(kd)) if ((y+= S) >170) y= 170;
-    if (keypressed(kr)) if ((x+= S) >210) x= 210;
-    if (keypressed(kl)) if ((x-= S) <30)  x=  30;
+#if 0      
+      // stop world?
+      i= 30;
+      // out
+      do {
+        erasesprite(boot, );
+        drawsprite(boot);
+      } while (--i);
+      // back
+      boot->dx= -x; boot->dy= -y;
+      do {
+        erasesprite(boot);
+        drawsprite(boot);
+      } while (--i);
+#endif
 
-    gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
+    }
 
-    // draw
-    paddle(x, y);
-  }
+    //gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
 }
+
 
 void init() {
   char i;
@@ -1528,16 +1619,16 @@ void init() {
 #ifdef COLORATTR
     if (1) {
       if (0) {
-        s= defsprite(i, pineapple_color, NULL, 0);
+        s= defsprite(i, 0, pineapple_color, NULL);
       } else if (0) {
-        s= defsprite(i, mini_pineapple_color, NULL, 0);
+        s= defsprite(i, 0, mini_pineapple_color, NULL);
         while((s->x= SPRITE_XMIN+rand()&127) > SPRITE_XMAX);
         while((s->y= SPRITE_YMIN+rand()&127) > SPRITE_YMAX);
         s->dx= rand()&7-4;
         s->dy= rand()&7-4;
         drawsprite(s);
       } else {
-        s= defsprite(i, micro_pineapple_color, NULL, 0);
+        s= defsprite(i, 0, micro_pineapple_color, NULL);
         s->dx= 0;
         s->dy= (rand()&3)+1;
   s->xmax= SPRITE_XMAX - s->wx + s->dx - 6;
@@ -1551,18 +1642,18 @@ void init() {
     } else {
       // lineup for oric shoot'em up!
       switch(i%4) {
-      case 0: s= defsprite(i, c64_color, NULL, 0); break;
-      case 1: s= defsprite(i, sinclair_color, NULL, 1); break;
-      case 2: s= defsprite(i, oric_thin_color, NULL, 2); break;
-      case 3: s= defsprite(i, color_enterprise, NULL, 3); break;
+      case 0: s= defsprite(i, 0, c64_color, NULL); break;
+      case 1: s= defsprite(i, 1, sinclair_color, NULL); break;
+      case 2: s= defsprite(i, 2, oric_thin_color, NULL); break;
+      case 3: s= defsprite(i, 3, color_enterprise, NULL); break;
       }
     }
 #else
     // - All same
-    //s= defsprite(i, oric_thin, NULL, 0);
+    //s= defsprite(i, 0, oric_thin, NULL);
     // TODO: ifdef SPRITE_BENCH
-    s= defsprite(i, enterprise, NULL, 0);
-    //s= defsprite(i, disc, disc_mask, 0);
+    s= defsprite(i, 0, enterprise, NULL);
+    //s= defsprite(i, 0, disc, disc_mask);
 #endif // COLORATTR
 
   }
@@ -1692,8 +1783,6 @@ void main() {
  again:
   while(ndraw<=1000) {
     spritetick();
-
-//cgetc();
 
   }
 
