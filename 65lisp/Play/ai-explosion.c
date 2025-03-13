@@ -1,10 +1,11 @@
 #include <stdint.h>
-#include <oric.h>  // Oric-specific header from cc65
-#include <peekpoke.h>  // For direct memory access
+#include <peekpoke.h>  // For PEEK and POKE
 
-// Oric Atmos HIRES screen memory starts at 0xA000
-#define HIRES_BASE 0xA000
+// Oric Atmos memory locations
+#define HIRES_BASE 0xA000  // HIRES screen memory start
 #define TEXT_BASE  0xBB80  // Text area at bottom
+#define MODE_REG   0x026A  // Mode register (HIRES/TEXT)
+#define KEY_REG    0x0208  // Keyboard status register
 
 // Oric color codes (foreground in attribute byte)
 uint8_t colors[] = {
@@ -25,11 +26,14 @@ void delay(uint16_t cycles) {
     }
 }
 
-// Set HIRES mode
+// Set HIRES mode and clear screen
 void init_hires() {
-    POKE(0x26A, 0x80);  // Enable HIRES mode
-    POKE(HIRES_BASE, 0x18);  // Clear attribute byte for first line
-    memset((void*)HIRES_BASE, 0, 8000);  // Clear HIRES screen (8KB)
+    POKE(MODE_REG, 0x80);  // Enable HIRES mode (bit 7 high)
+    POKE(HIRES_BASE, 0x18);  // Default attribute byte for first line
+    uint16_t i;
+    for (i = 0; i < 8000; i++) {  // Clear 8KB of HIRES memory
+        POKE(HIRES_BASE + i, 0);
+    }
 }
 
 // Plot a pixel in HIRES mode (simplified, no bounds checking)
@@ -84,7 +88,10 @@ void animate_explosion() {
 
     while (1) {
         // Clear screen (black)
-        memset((void*)HIRES_BASE, 0, 8000);
+        uint16_t i;
+        for (i = 0; i < 8000; i++) {
+            POKE(HIRES_BASE + i, 0);
+        }
 
         // Draw explosion
         draw_circle(center_x, center_y, radius, colors[color_idx]);
@@ -99,14 +106,14 @@ void animate_explosion() {
         // Simple delay for animation (tuned for 1 MHz CPU)
         delay(5000);
 
-        // Check for keypress to exit (e.g., ESC)
-        if (PEEK(0x208) != 0) {  // Keyboard register
+        // Check for keypress to exit (basic keyboard check)
+        if (PEEK(KEY_REG) != 0) {
             break;
         }
     }
 
     // Return to text mode
-    POKE(0x26A, 0x00);
+    POKE(MODE_REG, 0x00);
 }
 
 int main() {
