@@ -345,7 +345,7 @@ void init_hires() {
 }
 
 // Draw 24x24 sprite using precomputed data
-void draw_sprite(uint16_t screen_addr, uint8_t sprite_idx, uint8_t color) {
+void old_draw_sprite(uint16_t screen_addr, uint8_t sprite_idx, uint8_t color) {
     uint8_t row;
     volatile uint8_t* screen;
     uint8_t col;
@@ -361,6 +361,46 @@ void draw_sprite(uint16_t screen_addr, uint8_t sprite_idx, uint8_t color) {
         }
         screen += 40;  // Next row (40 bytes per line)
     }
+}
+
+// Draw 24x24 sprite using precomputed data with assembly-optimized loops
+void draw_sprite(uint16_t screen_addr, uint8_t sprite_idx, uint8_t color) {
+    uint8_t row;
+    volatile uint8_t* screen;
+    uint8_t col;
+
+    screen = (volatile uint8_t*)screen_addr;
+
+    __asm__ volatile (
+        "ldx #$00          ; X = row counter (0 to 23)\n"
+        "loop_row:\n"
+        "ldy #$00          ; Y = column counter (0 to 3)\n"
+        "loop_col:\n"
+        "lda %v,x          ; Load color array base\n"
+        "clc\n"
+        "adc %v            ; Add color index\n"
+        "tax\n"
+        "lda %v,x          ; Load color value\n"
+        "ora #$10          ; OR with foreground bit\n"
+        "sta (%v),y        ; Store attribute at screen + col*2\n"
+        "lda %v,x          ; Load sprite pixel data for this row and col\n"
+        "sta (%v),y        ; Store pixel data at screen + col*2 + 1\n"
+        "iny\n"
+        "iny               ; Move to next block (2 bytes per block)\n"
+        "cpy #$08          ; Compare Y with 8 (4 blocks * 2 bytes)\n"
+        "bne loop_col      ; Branch if not done\n"
+        "ldy #$00          ; Reset Y for next row\n"
+        "txa               ; Transfer X to A for row increment\n"
+        "clc\n"
+        "adc #$08          ; Move to next row in sprite data (8 bytes per row)\n"
+        "tax               ; Put back in X\n"
+        "inx               ; Increment row counter\n"
+        "cpx #$18          ; Compare with 24 (24 rows)\n"
+        "bne loop_row      ; Branch if not done\n"
+        : /* outputs */
+        : "r" (colors), "r" (color), "r" (explosion_sprites[sprite_idx]), "r" (screen)
+        : "x", "y", "a" /* clobbers */
+    );
 }
 
 // Main explosion animation
@@ -431,3 +471,5 @@ int main() {
     animate_explosion();
     return 0;
 }
+#include <stdint.h>
+
