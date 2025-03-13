@@ -4,7 +4,7 @@
 //
 // Read doc+settings below:
 
-#define Nsprites 7
+#define Nsprites 8
 //#define Nsprites 1
 
 // * higher number sprite is above lower numbers
@@ -156,28 +156,52 @@ void box(char x, char y, char w, char h) {
   } while(--h);
 }
 
+// sprite.status
+#define SP_OFF 0
+#define SP_ON  128
+
+// TODO: make property[Nsprites] = faster!
 typedef struct sprite {
+  // possible states
+  // - (unallocated)
+  // -   0 = off (hidden)
+  // -   1 = on (shown)
+  // - 129 = moving (have dx, dy)
+  signed char status;
+
   // TODO: higher resolution than this
+  // alt 1) higher resolution x,y,dx,dy
+  //        could have simulated time!
+  // alt 2) instead of dx,dy have tx,ty (ticks!)
+  //        every tick just --tx,--ty
+  //        if 0, reset and update x,y (w dxdy)
+  // alt 3) like now
+
+  // TODO: char? faster
+  // TODO: x=y=0 == disabled? or 255? or .enabled
   int x, y;
-  signed char dx, dy; // this could be subpixel/frame
+  // this could be subpixel/frame
+  signed char dx, dy;
 
   char w, h;
 
   // opt
+  char wx;
+  // TODO: how much do these save during moving?
   char xmax, ymax;
   char xmin, ymin;
-  char wx;
+
 
   // current (TODO: remove?)
   char* bitmap;
   char* mask;
 
+  // shifted bitmaps/masks
   // TODO: move out?
   char* shbitmap[6];
   char* shmask[6];
 
   // TODO: 
-  char bitmaps[6];
   char z; // z order
 } sprite;
 
@@ -640,6 +664,9 @@ void spritetick() {
 #endif // COLLISION
 
   for(i=0; i<Nsprites; ++i) {
+    // sprite not active, or temporary disabled
+    if (s->status < 0) { ++s; continue; }
+
     sp= s->bitmap;
 
     // cc65 doesn't generate good code! 10cs better...
@@ -838,16 +865,20 @@ void spritespeed(sprite* s, signed char dx, signed char dy) {
   s->ymax= SPRITE_YMAX - dy - s->h;
 }
 
-void spriteplacerandom(register sprite* s) {
+void placesprite(register sprite* s, char x, char y) {
   erasesprite(s, 0, 0); // TODO: if not drawn...
-
-  s->x = s->xmin + rand() % (s->xmax - s->xmin);
-  s->y = s->ymin + rand() % (s->ymax - s->ymin);
+  s->x= x; s->y= y;
 
   //while(!(oric->dx= rand()%8 -4));
   //while(!(oric->dy= rand()%8 -4));
 
   drawsprite(s);
+}
+
+void placespriterandom(sprite* s) {
+  placesprite(s,
+    s->xmin + rand() % (s->xmax - s->xmin),
+    s->ymin + rand() % (s->ymax - s->ymin) );
 }
 
 // default show position (lines them up!)
@@ -883,6 +914,8 @@ SCREENLAST[-1]= 'e';
 SCREENLAST[-1]= 'f';
 
 #ifdef SPRITE_PLACE
+  s->status= 1;
+
   //TODO: if not set, may be illegal pos? loop probelm in update/move
   // (default) position
 SCREENLAST[-1]= 'g';
@@ -1559,6 +1592,32 @@ void paddle(char x, char y) {
 
 sprite * oric, * spectrum, * c64, * boot;
 
+
+void kick(signed char dx, signed char dy) {
+  char i;
+  // stop sprites, enable boot
+  for(i=0; i<Nsprites; ++i) sploc[i].status= -sploc[i].status;
+  
+  // "kick" - boot out
+  spritespeed(boot, dx, dy);
+  for(i=0; i<30; ++i) {
+    spritetick();
+    //gotoxy(0,25); printf("%d %d %d %d   ", i, boot->status, boot->x, boot->y);
+    //wait(10);
+  }
+
+  // TODO: what it hit: change their vectors!
+
+  // boot back
+  spritespeed(boot, -dx, -dy);
+  for(i=0; i<30; ++i) spritetick();
+
+  spritespeed(boot, 0, 0);
+
+  // restore movement, stop boot
+  for(i=0; i<Nsprites; ++i) sploc[i].status= -sploc[i].status;
+}
+
 void main_oric() {
   char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
   char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
@@ -1575,38 +1634,35 @@ void main_oric() {
             defsprite(3, 0, NULL, NULL);
             defsprite(4, 1, NULL, NULL);
             defsprite(5, 2, NULL, NULL);
-  boot    = defsprite(6, 6, boot_color, NULL);
+            defsprite(6, 0, NULL, NULL);
+
+  boot    = defsprite(7, 7, boot_color, NULL);
+  placesprite(boot, 120, 100);
+  spritespeed(boot, 0, 0);
+  boot->status= -boot->status;
 
   while(1) {
 
     spritetick();
+    // Make it on top, it's disabled so we draw it
+    // need this as it's not moving? lol
+    drawsprite(boot);
 
+    if (0) {
+    if (keypressed(ku)) spritespeed(boot, boot->dx, boot->dy-1);
+    if (keypressed(kd)) spritespeed(boot, boot->dx, boot->dy+1);
+    if (keypressed(kr)) spritespeed(boot, boot->dx+1, boot->dy);
+    if (keypressed(kl)) spritespeed(boot, boot->dx-1, boot->dy);
+    } else {
     // kick boot ?
-    if (keypressed(ku)) spritespeed(boot, 0, -1);
-    if (keypressed(kd)) spritespeed(boot, 0, +1);
-    if (keypressed(kr)) spritespeed(boot, +1, 0);
-    if (keypressed(kl)) spritespeed(boot, -1, 0);
+    if (keypressed(ku)) kick(0, -1);
+    if (keypressed(kd)) kick(0, +1);
+    if (keypressed(kr)) kick(+1, 0);
+    if (keypressed(kl)) kick(-1, 0);
 *SCREENLAST= 'D';
-
-#if 0      
-      // stop world?
-      i= 30;
-      // out
-      do {
-        erasesprite(boot, );
-        drawsprite(boot);
-      } while (--i);
-      // back
-      boot->dx= -x; boot->dy= -y;
-      do {
-        erasesprite(boot);
-        drawsprite(boot);
-      } while (--i);
-#endif
-
     }
-
     //gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
+  }
 }
 
 
