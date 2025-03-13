@@ -665,6 +665,7 @@ void spritetick() {
 
   for(i=0; i<Nsprites; ++i) {
     // sprite not active, or temporary disabled
+    //if (s->status < 0) { ++s; continue; }
     if (s->status < 0) { ++s; continue; }
 
     sp= s->bitmap;
