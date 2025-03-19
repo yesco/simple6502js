@@ -648,8 +648,9 @@ void spritetick() {
   //static int newx, newy;//
   static char newx, newy;
   register sprite* s;
-//  register char* sp;
-  static char spbit= 1;
+  static char spbit;
+
+  spbit= 1;
 
   s= sploc;
 
@@ -668,10 +669,7 @@ void spritetick() {
 
   for(i=0; i<Nsprites; ++i) {
     // sprite not active, or temporary disabled
-    //if (s->status < 0) { ++s; continue; }
     if (s->status < 0) { ++s; continue; }
-
-    //sp= s->bitmap;
 
     // cc65 doesn't generate good code! 10cs better...
     //if (!(z=s->dx) && !(z=s->dy)) continue; // adding z makes it better!
@@ -739,16 +737,14 @@ void spritetick() {
     //  expensive)
     // TODO: make it incremental
     //   (together with erasesprite "clever" opt)
-    k= s->w;
-    //cx= 0;
+    px= spxloc+div6[newx];
+    cx= 0;
 
+    k= s->w;
     if (1) {
 
-      px= spxloc+div6[newx] -1;
-      *(int*)0x80= px; // 2 bytes
-      cx= 0;
+      *(int*)0x80= px-1; // 2 bytes
 
-      if (1) {
       asm("ldy %v", k);      // k
     nextx:
       asm("lda %v", spbit);  // a= spbit
@@ -759,27 +755,7 @@ void spritetick() {
       asm("dey");            // --k
       asm("bne %g", nextx);  // if (k==0) goto nexty
 
-      } else {
-
-        char y= k;
-        char a= spbit;
-
-        char* ppx;; //*(int*)0x80= px; // 2 bytes
-        px= spxloc+div6[newx] -1;
-        ppx= px;
-
-      nextx2:
-        //a|= (*(char**)0x80)[y];
-        a|= ppx[y];
-        //(*(char**)0x80)[y]= a;
-        ppx[y]= a;
-        --y;
-        if (y!=0) goto nextx2;
-        cx= a;
-      }
-
     } else {
-      px= spxloc+div6[newx];
 
       for(j=0; j<k; ++j) {
         cx |= (px[j] |= spbit);
@@ -787,12 +763,16 @@ void spritetick() {
           gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
         }
       }
+
     }
 
     py= spyloc+(newy>>3);
+    cy= 0;
 
     k= s->h/8+1;
     if (1) {
+
+      *(int*)0x80= py-1; // 2 bytes, -1 for k is 1 bigger
 
       asm("ldy %v", k);      // k
     nexty:
@@ -805,7 +785,6 @@ void spritetick() {
       asm("bne %g", nexty);  // if (k==0) goto nexty
 
     } else {
-      cy= 0;
 
       for(j=0; j<k; ++j) {
         cy |= (py[j] |= spbit);
@@ -813,15 +792,29 @@ void spritetick() {
           gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
         }
       }
+
     }
       
     //for(j=0; j<=i; ++j) {
     // 3856cs - 4x overhead!
     //c= spritecollision(s, sploc+i); 
 
-    c= cx&cy;
+    if (0 &&  (cx|cy) != spbit )
+    {
+      gotoxy(0,25);
+      printf("sp.i=%d spbit=%02x x=%d y=%d: cx=%02x cy=%02x   \n",
+             i, spbit, newx, newy, cx, cy);
+      cgetc();
+    }
+
+    // Any collisions?
+    c= cx & cy;
+
     // more than one bit set
     if (c&(c-1)) {
+      static hit;
+      hit= 0;
+
       if (1) { // no print to see overhead
         //   print: 1640cs
         // noprint: 1654cs(?) (wow low overhead!)
@@ -841,7 +834,9 @@ void spritetick() {
 
     ++s;
 
+    // TODO: any above >7 cannot detect collision!
     spbit<<= 1;
+
   } // next sprite
   
 #ifdef COLLISION  
@@ -1703,7 +1698,6 @@ void kick(signed char dx, signed char dy) {
 // "bench" report speed Nsprites=7, sprites= enterprise
 void report(unsigned int ndraw, unsigned int T) {
   char i;
-  unsigned int X= T-time();
   long bytes= 0;
   long optimalBps= 1000000L/16; // copy 1 byte 16c=5+6+2+3 (lda(),y;sta(),y;inx;bne)
   long Bps;
@@ -1712,19 +1706,19 @@ void report(unsigned int ndraw, unsigned int T) {
     sprite* s= sploc+i;
     bytes+= (s->w * s->h) * (s->mask? 2: 1); // TODO: multiply 2 for xor
   }
-  Bps= ndraw*100L*bytes/Nsprites/X;
+  Bps= ndraw*100L*bytes/Nsprites/T;
 
   gotoxy(0,25);
   // TODO: Bps is all wrong? why?
   printf("%d: %ucs %ldsp/s %ldcfps %ldBps (%dpM) bytes=%ld COLLS=%d (673) ",
-         ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, Bps, (int)(Bps*1000/optimalBps), bytes, colls);
-
+         ndraw, T, ndraw*100L/T, ndraw*10000L/Nsprites/T, Bps, (int)(Bps*1000/optimalBps), bytes, colls);
   cgetc();
 }
 
 // 1008: 650cs 155sp/s 1723cfps 15817Bps (253pM) 918B
 // 1008:1004cs 100sp/s 1115cfps 10240Bps (163pM) - COLLISION, expensive +55%
-// 1008: 716cs 140sp/s 1564cfps 14359Bps ( 229pM) - COLLISION asm +10%
+// 1008: 716cs 140sp/s 1564cfps 14359Bps (229pM) - COLLISION asm +10%
+// 1008: 735cs 137sp/s 1523cfps 13988Bps (223pM) - COLLISION COLLS=272 
 void oric_main() {
   char ku= keypos(KEY_UP),   kd= keypos(KEY_DOWN);
   char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
@@ -1783,7 +1777,7 @@ void oric_main() {
     //gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
   }
 
-  report(ndraw, T);
+  report(ndraw, T-time());
 
   ndraw= -32766;
   goto again;
@@ -1966,7 +1960,7 @@ void main() {
     spritetick();
   }
 
-  report(ndraw, T);
+  report(ndraw, T-time());
 
   ndraw= -32766;
   goto again;
