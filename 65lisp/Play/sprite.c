@@ -13,6 +13,7 @@
 //   (drawing order low-high)
 
 // * 8 sprites collision detection
+//   - about 10% (?) overhead (bitsetting)
 
 #define COLLISION
 
@@ -745,18 +746,19 @@ void spritetick() {
 
       px= spxloc+div6[newx] -1;
       *(int*)0x80= px; // 2 bytes
+      cx= 0;
 
       if (1) {
       asm("ldy %v", k);      // k
-      asm("lda %v", spbit);  // a= spbit
     nextx:
-      // TODO: not correct...
+      asm("lda %v", spbit);  // a= spbit
       asm("ora ($80),y");    // a|= px[y]
       asm("sta ($80),y");    // px[y]= a
+      asm("ora %v", cx);     // a|= cx
+      asm("sta %v", cx);     // cx= a
       asm("dey");            // --k
       asm("bne %g", nextx);  // if (k==0) goto nexty
 
-      asm("sta %v", cx);     // cx= a;
       } else {
 
         char y= k;
@@ -793,16 +795,14 @@ void spritetick() {
     if (1) {
 
       asm("ldy %v", k);      // k
-      asm("lda %v", spbit);  // a= spbit
     nexty:
-      // TODO: not correct...
+      asm("lda %v", spbit);  // a= spbit
       asm("ora ($80),y");    // a|= py[y]
       asm("sta ($80),y");    // py[y]= a
+      asm("ora %v", cy);     // a|= cy
+      asm("sta %v", cy);     // cy= a
       asm("dey");            // --k
       asm("bne %g", nexty);  // if (k==0) goto nexty
-
-      asm("sta %v", cy);     // cy= a;
-
 
     } else {
       cy= 0;
@@ -1724,6 +1724,7 @@ void report(unsigned int ndraw, unsigned int T) {
 
 // 1008: 650cs 155sp/s 1723cfps 15817Bps (253pM) 918B
 // 1008:1004cs 100sp/s 1115cfps 10240Bps (163pM) - COLLISION, expensive +55%
+// 1008: 716cs 140sp/s 1564cfps 14359Bps ( 229pM) - COLLISION asm +10%
 void oric_main() {
   char ku= keypos(KEY_UP),   kd= keypos(KEY_DOWN);
   char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
