@@ -1,0 +1,115 @@
+;
+; zz= s->xmax;
+;
+	ldy     #$08
+	lda     (regbank+4),y
+	sta     L09FD
+;
+; if (newx >= zz || newx < SPRITE_XMIN) s->dx= -s->dx;
+;
+	lda     L09FE
+	cmp     L09FD
+	bcs     L1041
+	cmp     #$0C
+	bcs     L1042
+
+L1041:	lda     regbank+4
+	ldx     regbank+4+1
+	jsr     pushax
+	lda     regbank+4
+	ldx     regbank+4+1
+	ldy     #$04
+	jsr     ldaidx
+	eor     #$FF
+	clc
+	adc     #$01
+	jsr     staspidx
+;
+; if (newx >= zz || newx < SPRITE_XMIN) s->dx= (char)((char)(s->dx^255))+1;
+;
+L1042:	lda     L09FE
+	cmp     L09FD
+	bcs     L1043
+	cmp     #$0C
+	bcs     L1045
+
+L1043:	lda     regbank+4
+	ldx     regbank+4+1
+	jsr     pushax
+	lda     regbank+4
+	ldx     regbank+4+1
+	ldy     #$04
+	jsr     ldaidx
+	eor     #$FF
+	clc
+	adc     #$01
+	cmp     #$80
+	jsr     staspidx
+;
+; if (newx >= zz || newx < SPRITE_XMIN) s->dx= (((char)s->dx)^255)+1;
+;
+L1045:	lda     L09FE
+	cmp     L09FD
+	bcs     L1046
+	cmp     #$0C
+	bcs     L0A28
+
+L1046:	ldy     #$04
+	lda     (regbank+4),y
+	eor     #$FF
+	clc
+	adc     #$01
+	cmp     #$80
+	sta     (regbank+4),y
+
+
+
+// signed char status
+
+rewrite to:
+
+
+ldy #0
+lda (regbank+4),y
+bpl skip
+
+...
+
+skip:
+
+;
+; if (s->status < 0) { ++s; continue; }
+;
+	lda     regbank+4
+	ldx     regbank+4+1
+	ldy     #$00
+	jsr     ldaidx
+	asl     a
+	bcc     L0A00
+
+...
+	lda     #$2B
+	clc
+	adc     regbank+4
+	sta     regbank+4
+	jcc     L1417
+	inc     regbank+4+1
+	jmp     L1417
+
+;;; JSK: no matter what you do, it'll never
+;; use bpl bmi ???
+
+;
+; if ((char)(s->status)>=128) { ++s; continue; }
+;
+	ldy     #$00
+	lda     (regbank+4),y
+	cmp     #$80
+	bcc     L0A00
+	lda     #$2B
+	clc
+	adc     regbank+4
+	sta     regbank+4
+	jcc     L1418
+	inc     regbank+4+1
+	jmp     L1418
