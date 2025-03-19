@@ -14,7 +14,7 @@
 
 // * 8 sprites collision detection
 
-// #define COLLISION
+#define COLLISION
 
 // * optional protected foreground (sprites "behind")
 //    7) inverse hi-bit set = don't overwrite
@@ -304,7 +304,7 @@ char spritecollision(sprite* a, sprite* b) {
 
 #endif //COLLISION
 
-int ndraw= 0;
+unsigned int ndraw= 0;
 
 // 409 cs/100 fps? 1.ffps
 // 192 cs - memcpy, memset
@@ -1641,37 +1641,70 @@ void kick(signed char dx, signed char dy) {
   for(i=0; i<Nsprites; ++i) sploc[i].status= -sploc[i].status;
 }
 
-void main_oric() {
-  char ku= keypos(KEY_UP), kd= keypos(KEY_DOWN);
-  char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
-
+// "bench" report speed Nsprites=7, sprites= enterprise
+void report(unsigned int ndraw, unsigned int T) {
   char i;
+  unsigned int X= T-time();
+  long bytes= 0;
+  long optimalBps= 1000000L/16; // copy 1 byte 16c=5+6+2+3 (lda(),y;sta(),y;inx;bne)
+  long Bps;
+
+  for(i=0; i<Nsprites; ++i) {
+    sprite* s= sploc+i;
+    bytes+= (s->w * s->h) * (s->mask? 2: 1); // TODO: multiply 2 for xor
+  }
+  Bps= ndraw*100L*bytes/Nsprites/X;
+
+  gotoxy(0,25);
+  // TODO: Bps is all wrong? why?
+  printf("%d: %ucs %ldsp/s %ldcfps %ldBps (%dpM) bytes=%ld COLLS=%d (673) ",
+         ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, Bps, (int)(Bps*1000/optimalBps), bytes, colls);
+
+  cgetc();
+}
+
+// 1008: 650cs 155sp/s 1723cfps 15817Bps (253pM) 918B
+// 1008:1004cs 100sp/s 1115cfps 10240Bps (163pM) - COLLISION, expensive +55%
+void oric_main() {
+  char ku= keypos(KEY_UP),   kd= keypos(KEY_DOWN);
+  char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
+  char i;
+  unsigned int T;
 
   // draw screen
   hires(); gclear();
 
-  // init sprites
+  // - init sprites
   oric    = defsprite(0, 0, oric_thin_color, NULL);
   spectrum= defsprite(1, 1, sinclair_color, NULL);
   c64     = defsprite(2, 2, c64_color, NULL);
-            defsprite(3, 0, NULL, NULL);
-            defsprite(4, 1, NULL, NULL);
-            defsprite(5, 2, NULL, NULL);
-            defsprite(6, 0, NULL, NULL);
+  // duplicates
+            defsprite(3, 0, NULL, NULL); // oric
+            defsprite(4, 1, NULL, NULL); // spec
+            defsprite(5, 2, NULL, NULL); // c64
+            defsprite(6, 0, NULL, NULL); // oric
 
-  explode = defsequence(7, 7, explosion);
-    spritespeed(explode, 1, 0);
-
-  boot    = defsprite(8, 8, boot_color, NULL);
+  boot    = defsprite(7, 7, boot_color, NULL); {
     placesprite(boot, 120 - boot->wx/2, 100 - boot->h/2);
     spritespeed(boot, 0, 0);
     boot->status= -boot->status;
+  }
 
-  while(1) {
+  explode = defsequence(8, 8, explosion); {
+    spritespeed(explode, 1, 0);
+  }
+
+  // main loop
+
+  T= time();
+
+ again:
+  while(ndraw<=1000) {
+//  while(1) {
 
     spritetick();
-    // Make it on top, it's disabled so we draw it
-    // need this as it's not moving? lol
+    // Make it on top, if disabled/not moving; it's not drawn.
+    // TODO: change that? redraw all at overlap?
     drawsprite(boot);
 
     if (0) {
@@ -1689,6 +1722,12 @@ void main_oric() {
     }
     //gotoxy(0, 25); printf("(%3d %3d) - ", x, y);
   }
+
+  report(ndraw, T);
+
+  ndraw= -32766;
+  goto again;
+
 }
 
 
@@ -1818,7 +1857,7 @@ void init() {
 void main() {
   unsigned int T;
 
-  main_oric();
+  oric_main();
 
   hires();
   gclear();
@@ -1865,30 +1904,10 @@ void main() {
  again:
   while(ndraw<=1000) {
     spritetick();
-
   }
 
-  // "bench" report speed Nsprites=7, sprites= enterprise
-  if (1) {
-    char i;
-    unsigned int X= T-time();
-    long bytes= 0;
-    long optimalBps= 1000000L/16; // copy 1 byte 16c=5+6+2+3 (lda(),y;sta(),y;inx;bne)
-    long Bps;
+  report(ndraw, T);
 
-    for(i=0; i<Nsprites; ++i) {
-      sprite* s= sploc+i;
-      bytes+= (s->w * s->h) * (s->mask? 2: 1); // TODO: multiply 2 for xor
-    }
-    Bps= ndraw*100L*bytes/Nsprites/X;
-
-    gotoxy(0,25);
-    // TODO: Bps is all wrong? why?
-    printf("%d: %ucs %ldsp/s %ldcfps %ldBps (%dpM) bytes=%ld COLLS=%d (673) ",
-           ndraw, X, ndraw*100L/X, ndraw*10000L/Nsprites/X, Bps, (int)(Bps*1000/optimalBps), bytes, colls);
-  }
-
-  cgetc();
   ndraw= -32766;
   goto again;
 }
