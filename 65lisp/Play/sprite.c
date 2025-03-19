@@ -3,11 +3,39 @@
 // (C) 2025 jsk@yesco.org
 //
 // Read doc+settings below:
+//
+// TODO: minimal sprite but super-many! (8x66 pixel sprite?)
+//
+// ORIC: 8 sprites 24x24
+// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
 
-//#define Nsprites 7
-//#define Nsprites 8
+//
+// Do Benchmark test
+
+//#define BENCH
+
+#ifdef BENCH
+
+  #define Nsprites 7
+
+  #define SPRITE_XMIN 2*6
+  #define SPRITE_XMAX 239
+
+  #define SPRITE_YMIN 0
+  #define SPRITE_YMAX 199
+
+  #define SPRITE_PLACE
+
+#else
+
+// TODO: move it out to another file
+#define ORICGAME
+
+// Number of sprites that can be defined/used
+
+#ifdef ORICGAME
 #define Nsprites 9
-//#define Nsprites 1
+#endif ORICGGAME
 
 // * higher number sprite is above lower numbers
 //   (drawing order low-high)
@@ -86,6 +114,11 @@
 // "Tomorrow, tomorrow, tomorrow".... story girl boy...
 // creating movie, diable, fictional RPG gmae inside the novel - erh???
 
+#endif // BENCH
+
+
+// old bench...
+
 // = 859cs ALL
 // = 823cs ALL (LDA savings, etc) 342pM
 // =  45cs movement (not calling erase/draw)
@@ -100,7 +133,6 @@
 //    24cs   passing parameters to erasesprite!
 //   217cs   gpfill asm cost
 // = 537cs drawsprite (-erasesprite) - 486pM
-
 // = 754cs   gpfill+drawsprite (useful drawing work!)
 
 // (- 823 754)
@@ -305,7 +337,7 @@ char spritecollision(sprite* a, sprite* b) {
 
 #endif //COLLISION
 
-unsigned int ndraw= 0;
+int ndraw= 0;
 
 // 409 cs/100 fps? 1.ffps
 // 192 cs - memcpy, memset
@@ -333,10 +365,17 @@ void drawsprite(register sprite* s) {
   ww= 40-w; hh= h;
   l= rowaddr[s->y] + div6[s->x];
 
+  ++ndraw;
+
   // TODO: clipping?
+
+  // copy to zp for asm
+  // TODO: allocate them! lol
+
   *(int*)0x90= (int)sp+2;   // sprite byte data
   *(int*)0x92= (int)l;      // screen address + y offset
   *(int*)0x94= (int)msk+2;  // mask byte data
+
 #ifdef SPRITE_SAVE
   // TODO: too conplicated w partial clear?
   // and always undraw redraw when move is flicker... :-(
@@ -720,7 +759,6 @@ void spritetick() {
     s->y= newy;
 
     // draw
-    ++ndraw;
     drawsprite(s);
       
 #ifdef COLLISION
@@ -1124,6 +1162,10 @@ void report(unsigned int ndraw, unsigned int T) {
 // 1008:1004cs 100sp/s 1115cfps 10240Bps (163pM) - COLLISION, expensive +55%
 // 1008: 716cs 140sp/s 1564cfps 14359Bps (229pM) - COLLISION asm +10%
 // 1008: 735cs 137sp/s 1523cfps 13988Bps (223pM) - COLLISION COLLS=272 
+// -- adjusted valuie N=9 but didn't count drawsprite boot
+//    (moved ++ndraw into drawsprite, so was missing one count!)
+// 1008: 646cs 155sp/s 1726cfps 15852Bps (253pM) 918B - COLLISION
+// 1008  569cs 176sp/s 1960cfps 17997Bps (287pM) 918B - no coll...
 void oric_main() {
   char ku= keypos(KEY_UP),   kd= keypos(KEY_DOWN);
   char kl= keypos(KEY_LEFT), kr= keypos(KEY_RIGHT);
@@ -1196,7 +1238,7 @@ void oric_main() {
 #include "sprite-pineapple.c"
 #include "sprite-test.c"
 
-// used for benchmark main()
+// used for benchmark main
 #include "sprite-enterprise.c"
 
 void init() {
@@ -1313,19 +1355,20 @@ void init() {
 // 1001:  883cs 113sp/s 1619cfps 19951Bps (319pM) (enterprise, -Oirs, ) (/ 923 883.0) 4.5% faster
 // 1001:  823cs 121sp/s 1737cfps 21406Bps (342pM) 6.8% faster
 // ---- 3.0x faster than when we begin!!!
-// (      754cs ... gfill+drawsprite "usefull" memory work 400pM)
-// (1001: 435cs 230sp/s  3287cfps 12426Bps (198pM) oric_thin)
-//  was 565cs - 24% faster now!
 
-// TODO: minimal sprite but super-many! (8x66 pixel sprite?)
+// useful work:
+//   (      754cs ... gfill+drawsprite "usefull" memory work 400pM)
+//   (1001: 435cs 230sp/s  3287cfps 12426Bps (198pM) oric_thin)
+// was 565cs - 24% faster now!
 
-// ORIC: 8 sprites 24x24
-// (/ (* 105.0 1056) (* (* 4 6) 24) 8) = 24.0 fps!
+// 1001:  816cs 122sp/s 1752cfps 21590Bps (345pM) bytes=1232
 
 void main() {
   unsigned int T;
 
+#ifdef ORICGAME
   oric_main();
+#endif // ORIGGAME
 
   hires();
   gclear();

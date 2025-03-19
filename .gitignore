@@ -1,3 +1,16 @@
+# special: exclude NON- foo.bar (no dot inside)
+65lisp/Play/**
+!65lisp/Play/*.*
+
+65lisp/*
+!65lisp/Play
+!65lisp/*.*
+
+
+
+
+*.i
+
 *~
 \#*\#
 .*
@@ -11,6 +24,8 @@ fish
 
 fil.*
 fil
+fil2
+fil2.*
 
 a.out
 *.o
@@ -20,7 +35,6 @@ a.out
 *.out
 *.tap
 *.x
-
 
 
 
