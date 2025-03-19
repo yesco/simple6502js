@@ -14,9 +14,13 @@ fil
 
 a.out
 *.o
-#*.s
+*.s
 *.log
 *.map
 *.out
 *.tap
+*.x
+
+
+
 
