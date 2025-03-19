@@ -647,7 +647,7 @@ void spritetick() {
   //static int newx, newy;//
   static char newx, newy;
   register sprite* s;
-  register char* sp;
+//  register char* sp;
   static char spbit= 1;
 
   s= sploc;
@@ -670,7 +670,7 @@ void spritetick() {
     //if (s->status < 0) { ++s; continue; }
     if (s->status < 0) { ++s; continue; }
 
-    sp= s->bitmap;
+    //sp= s->bitmap;
 
     // cc65 doesn't generate good code! 10cs better...
     //if (!(z=s->dx) && !(z=s->dy)) continue; // adding z makes it better!
@@ -738,22 +738,80 @@ void spritetick() {
     //  expensive)
     // TODO: make it incremental
     //   (together with erasesprite "clever" opt)
-    px= spxloc+div6[newx];
-    py= spyloc+(newy>>3);
-    cx= 0;
-    k= sp[0];
-    for(j=0; j<k; ++j) {
-      cx |= (px[j] |= spbit);
-      if (DISPCOLL) {
-        gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
+    k= s->w;
+    //cx= 0;
+
+    if (1) {
+
+      px= spxloc+div6[newx] -1;
+      *(int*)0x80= px; // 2 bytes
+
+      if (1) {
+      asm("ldy %v", k);      // k
+      asm("lda %v", spbit);  // a= spbit
+    nextx:
+      // TODO: not correct...
+      asm("ora ($80),y");    // a|= px[y]
+      asm("sta ($80),y");    // px[y]= a
+      asm("dey");            // --k
+      asm("bne %g", nextx);  // if (k==0) goto nexty
+
+      asm("sta %v", cx);     // cx= a;
+      } else {
+
+        char y= k;
+        char a= spbit;
+
+        char* ppx;; //*(int*)0x80= px; // 2 bytes
+        px= spxloc+div6[newx] -1;
+        ppx= px;
+
+      nextx2:
+        //a|= (*(char**)0x80)[y];
+        a|= ppx[y];
+        //(*(char**)0x80)[y]= a;
+        ppx[y]= a;
+        --y;
+        if (y!=0) goto nextx2;
+        cx= a;
+      }
+
+    } else {
+      px= spxloc+div6[newx];
+
+      for(j=0; j<k; ++j) {
+        cx |= (px[j] |= spbit);
+        if (DISPCOLL) {
+          gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
+        }
       }
     }
-    cy= 0;
-    k= sp[1]/8+1;
-    for(j=0; j<k; ++j) {
-      cy |= (py[j] |= spbit);
-      if (DISPCOLL) {
-        gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
+
+    py= spyloc+(newy>>3);
+
+    k= s->h/8+1;
+    if (1) {
+
+      asm("ldy %v", k);      // k
+      asm("lda %v", spbit);  // a= spbit
+    nexty:
+      // TODO: not correct...
+      asm("ora ($80),y");    // a|= py[y]
+      asm("sta ($80),y");    // py[y]= a
+      asm("dey");            // --k
+      asm("bne %g", nexty);  // if (k==0) goto nexty
+
+      asm("sta %v", cy);     // cy= a;
+
+
+    } else {
+      cy= 0;
+
+      for(j=0; j<k; ++j) {
+        cy |= (py[j] |= spbit);
+        if (DISPCOLL) {
+          gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
+        }
       }
     }
       
@@ -965,6 +1023,7 @@ sprite* defsequence(char i, char copyfrom, char** bitmaps) {
   sprite* s= defsprite(i, copyfrom, NULL, NULL);
 
   memcpy(s->shbitmap, bitmaps, sizeof(s->shbitmap));
+  s->bitmap= s->shbitmap[0]; // TODO: remove s->bitmap? redundant?
   s->w= bitmaps[0][0];
   s->h= bitmaps[0][1];
   s->wx= s->w * 6;
