@@ -45,6 +45,21 @@
 
 #define COLLISION
 
+//   - sprite bounce when colliding
+//     ("physics: exchange direction and speed")
+
+#define COLLBOUNCE
+
+//     user defined and will be called
+//        void collision(sprite* s, char i); 
+
+//#define COLLFUNC
+
+
+//        display collision cells by inverse (slow 2x overhead)
+
+//#define DISPCOLL
+
 // * optional protected foreground (sprites "behind")
 //    7) inverse hi-bit set = don't overwrite
 //       23-25% speed-loss w OVERWRITE (OVERWRITE)
@@ -58,12 +73,15 @@
 //#define PROTECT_6BIT
 
 // - 3 methods of update (TODO: definable/sprite)
-//    w) OVERWRITE (bitblt)
+//
+//    w) DEFAULT: OVERWRITE (bitblt/byteblit)
 //       Use: when background empty
-//            many small (?)
+//            pixel movement
+//            many sprites (>6)
+//            fast movements
 //            non-overlapping sprites (otherwise flickrs)
-//            all sprites moving (fast)
-//            (ink) color attributes ok
+//            all sprites undraw/redraw in order
+//            ink color attributes ok
 //               (don't mix with protect?)
 
 #define COLORATTR
@@ -72,22 +90,40 @@
 //       Use: preserve background (inverts sprite pixels)
 //            sprites moves occasionally
 //            no color attributes
-//          TODO: clever update: merge old+new
+//          TODO: clever update: merge old+new for direction
+//
 //    m) MASKWRITE (using mask, 4x?)
 //       Use: using mask for precision-sprites
 //            few detailed (main character?)
 //            perfect overlap w other sprites
 //            can be transparent
 //            preserves background
-//          TODO: save background
-//          TODO: color attributes
-//    z) COMPRESEDWRITE (interpreted w skips)
+//             a) use backbuffer for background, use to restore
+//             b) save as draw (overlap, needs redraw reverse order)
+//
+//    z) TODO: COMPRESEDWRITE (interpreted w skips)
 //       Use: sparse bitmaps, irregular shapes
 //            animations (can mix?)
-//       ???Format: 0x08 n - skip n cells
-//               0x09 n - forward n cells
-//               0x10 n - down n cells
-//               0x11 h - up
+//       ???Format:
+//             BYTE COPY:
+//               0--7 - background color
+//               16--23 - ink color
+//              (32--63 - repeat last N-30)
+//               64--127 - pixels
+//
+//             SKIP/COMPRESS
+//               128+ 0 - quote next char
+//               128+ 1--31 - repeat last N= C-128+1 (2..32+2-1)
+//               128+ 32--127 - skip N= C-128-32+1
+//
+//             CONTROL (?)
+//                8 n - back n cells
+//                9 n - forward n cells
+//               10 n - down n cells
+//               11 n - up
+//               12 - home
+//               13 - "newline"
+//               14 - 
 
 // * canvas default bouncy border:
 //
@@ -677,9 +713,6 @@ void b(char x, char y) {
 
 sprite sploc[Nsprites];
 
-//#define DISPCOLL 1
-#define DISPCOLL 0
-
 int colls= 0;
 
 void spritetick() {
@@ -697,10 +730,10 @@ void spritetick() {
   // clear sprite locations
   memset(spxloc, 0, sizeof(spxloc));
   memset(spyloc, 0, sizeof(spyloc));
-  if (DISPCOLL) {
-    gfill(0, 190, 40, 8, 64);
-    gfill(div6[230], 0, 2, 200, 64);
-  }
+#ifdef DISPCOLL
+  gfill(0, 190, 40, 8, 64);
+  gfill(div6[230], 0, 2, 200, 64);
+#endif // DISPCOLL
 
   // for debug
   gotoxy(0, 25);
@@ -797,9 +830,9 @@ void spritetick() {
 
       for(j=0; j<k; ++j) {
         cx |= (px[j] |= spbit);
-        if (DISPCOLL) {
+#ifdef DISPCOLL        
           gcurx= newx+6*j; gcury= 190+i; gmode= 1; setpixel();
-        }
+#endif // DISPCOLL
       }
 
     }
@@ -826,26 +859,17 @@ void spritetick() {
 
       for(j=0; j<k; ++j) {
         cy |= (py[j] |= spbit);
-        if (DISPCOLL) {
+#ifdef DISPCOLL
           gcurx= 230+i; gcury= newy+j; gmode= 1; setpixel();
-        }
+#endif // DISPCOLL
       }
 
     }
       
-    //for(j=0; j<=i; ++j) {
     // 3856cs - 4x overhead!
-    //c= spritecollision(s, sploc+i); 
+    // for(j=0; j<=i; ++j) c= spritecollision(s, sploc+i); 
 
-    if (0 &&  (cx|cy) != spbit )
-    {
-      gotoxy(0,25);
-      printf("sp.i=%d spbit=%02x x=%d y=%d: cx=%02x cy=%02x   \n",
-             i, spbit, newx, newy, cx, cy);
-      cgetc();
-    }
-
-    // Any collisions?
+    // - Any collisions?
     c= cx & cy;
 
     // more than one bit set
@@ -861,6 +885,22 @@ void spritetick() {
           if (c & k) {
             putchar('0'+j);
             ++colls;
+
+#ifdef COLLFUNC
+            if (j!=i) collision(s, i);
+#endif // COLLFUNC
+
+#ifdef COLLBOUNCE
+            {
+              sprite* o= sploc+j;
+              int t;
+
+              // all reverse speed and direction
+              t= s->dx; s->dx= o->dx; o->dx= t;
+              t= s->dy; s->dy= o->dy; o->dy= t;
+            }
+#endif // COLLBOUNCE
+
           }
           k<<= 1;
         }
@@ -877,23 +917,24 @@ void spritetick() {
 
   } // next sprite
   
-#ifdef COLLISION  
-  if (DISPCOLL)
-    for(i=0; i<40; ++i) {
-      for(j=0; j<25; ++j) {
-        c= spxloc[i] & spyloc[j];
-        // more than one bit set?
-        if (c&(c-1)) {
-          px= HIRESSCREEN+j*8*40+i;
-          for(k=0; k<8; ++k) {
-            *px ^= 128; px+= 40;
-          }
+// Hilites all cells by inverse if colliding
+#ifdef DISPCOLL
+  for(i=0; i<40; ++i) {
+    for(j=0; j<25; ++j) {
+      c= spxloc[i] & spyloc[j];
+      // more than one bit set?
+      if (c&(c-1)) {
+        px= HIRESSCREEN+j*8*40+i;
+        for(k=0; k<8; ++k) {
+          *px ^= 128; px+= 40;
         }
       }
     }
-
+  }
   putchar('<');
-#endif COLLISION
+
+#endif // DISPCOLL
+
 }
 
 // shift one step right
@@ -989,7 +1030,6 @@ sprite* defsprite(char i, char copyfrom, char* bitmap, char* mask) {
   char j;
 
 SCREENLAST[-1]= 'a';
-
   // - init sprite fields
   if (copyfrom < i) {
 SCREENLAST[-1]= 'b';
@@ -1003,6 +1043,7 @@ SCREENLAST[-1]= 'd';
     if (bitmap) {
       s->w= bitmap[0];
       s->h= bitmap[1];
+      assert(s->w * s->h < 256); // max size for asm
       s->wx= s->w * 6;
     }
 SCREENLAST[-1]= 'e';
