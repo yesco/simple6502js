@@ -254,6 +254,7 @@ typedef struct sprite {
   // this could be subpixel/frame
   signed char dx, dy;
 
+  // sizes in bytes/cells width, and lines h
   char w, h;
 
   // opt
@@ -262,6 +263,10 @@ typedef struct sprite {
   char xmax, ymax;
   char xmin, ymin;
 
+#ifdef SPRITESAVE
+  // saved background
+  char* bg; // same size as bitmap
+#endif // SPRITESAVE
 
   // current (TODO: remove?)
   char* bitmap;
@@ -669,8 +674,11 @@ void gpfill(char c, char r, char w, char h, char v) {
 // TODO: pass "64" as parameter (col attr f foreground!)
 void erasesprite(register sprite* s, int newx, signed char dy) {
   static char xdiv;
+  static signed char d;
 
   xdiv=div6[s->x]; // 6cs
+
+  // 1609cfps -> 1753cs, saves some
 
   // for xor, lol
   //drawsprite(s); return;
@@ -678,8 +686,8 @@ void erasesprite(register sprite* s, int newx, signed char dy) {
   // TODO: this doesn't handle overlapping. mask?
   // TODO: clipping?
 
-  // clever
-  if (!(char)s->dx || div6[newx]==xdiv) {
+  // clever, no change in cell column (clear above/below)
+  if (!(char)s->dx || !(d=(div6[newx] - xdiv))) {
     // same x, or same cell (in height)
 
     // - clear vertically only
@@ -689,15 +697,31 @@ void erasesprite(register sprite* s, int newx, signed char dy) {
       return;
     } else if (!(char)dy) {
       return; // not moved!
-    } else {
+    } else { // dy < 0
       // clear above
       GPFILL(xdiv, s->y+dy + s->h, s->w, -dy, 64);
       return;
     }
   }
-  // TODO: small move left/right
-  //} else if one cell to the left
-  //} else if one cell to the right
+  // TODO: move cells left/right
+
+  // more general case requires two function calls
+  // it appears to be more expensive than just one...
+
+#ifdef URK
+  // it appears two function calls is more expensive than one!
+  // if not there 1753cfps -> 1649cfps if enabled... lol
+  if (!dy && d > 0) { // move right
+    if (d < s->w) { // short move right
+      GPFILL(xdiv, s->y, d, s->h, 64);
+    }
+  } else { // d < 0
+//    if (-d < s->w) { // short move left
+//      GPFILL(xdiv, s->y+s->w+d, -d, dy, 64);
+//      return;
+//    }
+  }
+#endif
 
   // Otherwise: fallthrough:
 
