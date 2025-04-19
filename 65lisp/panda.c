@@ -46,16 +46,16 @@ void op(char c, char* cmd) {
     is[nv]= 1;
     ++cmd;
     for(*p= v[nv-2]; *p <= end; ++(*p)) {
+      nv= snv;
       //lastlast= slastlast; lastop= slast;
       lastop= 0; lastlast= 0;
       //printf("--------- %d (..%d): c=%c lastop=%c cmd=\"%s\"\n", *p, end, c?c:'?', lastop, cmd);
       panda(cmd);
-      nv= snv;
     }
 
     // backtrack... (fail)
+    nv= snv;
     is[nv]= 0;
-    --nv;
     lastlast= '_';
     lastop= 0;
     return;
@@ -82,6 +82,7 @@ void panda(char* cmd) {
 
   --cmd;
  next:
+  if (lastlast=='_') return;
   //printf("\n%% P: '%c' %d\n", cmd[1], cmd[1]);
 
   switch(c= *++cmd) {
@@ -100,7 +101,6 @@ void panda(char* cmd) {
 
     // is an op - delay
     op(c, cmd);
-    if (lastlast=='_') return;
     goto next;
   }
 }
@@ -108,8 +108,9 @@ void panda(char* cmd) {
 //int main(int argc, char** argv) {
 int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
-
-  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
+//  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
+//  char* cmd= "1_2, 4_5";
+  char* cmd= "1_9, 1_9";
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
