@@ -117,6 +117,27 @@ void panda(char* cmd) {
   }
 }
 
+// TODO: aggregators
+// - NO fish
+// - SUM all
+// - PRODUCT all
+// - WHERE ... (implied)
+// - THOSE THAT / IF
+
+// n is even iff n mod 2 is 0
+// n is odd iff not even
+// n is even if it mode 2 is 0
+// sum all number from 1 to 100
+//
+// b divides a iff a mod b is 0
+// 3 is a factor of 6 iff 3 divides 6
+// the factors of the number 6 divides it (cannot)
+// 42 is a prime iff it has no factors
+// is 42 a prime?
+// 42 prime
+// 42 factors => 2 7 3
+
+
 //int main(int argc, char** argv) {
 int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
