@@ -43,7 +43,7 @@ void op(char c, char* cmd) {
     int end= v[nv], * p= v+ ++nv, snv= nv;
     int slastlast= lastlast, slast= lastop;
     if (!cmd || !*cmd) return;
-    is[nv]= 1;
+    //is[nv]= 1;
     ++cmd;
     for(*p= v[nv-2]; *p <= end; ++(*p)) {
       nv= snv;
@@ -54,8 +54,8 @@ void op(char c, char* cmd) {
     }
 
     // backtrack... (fail)
-    nv= snv;
-    is[nv]= 0;
+    nv= snv-1;
+    //is[nv]= 0;
     lastlast= '_';
     lastop= 0;
     return;
@@ -110,7 +110,7 @@ int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
 //  char* cmd= "1_2, 4_5";
-  char* cmd= "1_9, 1_9";
+  char* cmd= "1_9 + 9, 1_9 + 8";
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
