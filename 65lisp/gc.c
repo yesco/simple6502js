@@ -92,6 +92,9 @@ void gc() {
   sweep();
 }
 
+// dummy
+char doapply1;
+
 int main() {//int argc, char** argv) {
   long bench= 3000;
   long i;

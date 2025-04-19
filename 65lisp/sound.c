@@ -466,6 +466,10 @@ void freq(char ch, unsigned int hz, char vol) {
 // could use C0..B0 ? double... now misses out one level?
 unsigned int hpitch[]= {1911, 1804, 1703, 1607, 1517, 1432, 1351, 1276, 1204, 1136, 1073, 1012}; 
 
+// ch:   1-3
+// oct:  0-6
+// note: 1-12
+// vol:  0-15
 void music(char ch, char oct, char note, char vol) {
   // loop for >> but do we want this many tables?
   sound(ch, hpitch[note-1] >> (oct), vol); // oct-1 ??
