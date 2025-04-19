@@ -17,7 +17,8 @@ void result() {
   char i;
   printf("=> ");
   for(i= 1; i<=nv; ++i) {
-    if (is[i]) printf("%7d ", v[i]);
+    //if (is[i]) printf("%7d ", v[i]);
+    if (is[i]) printf("%d ", v[i]);
   }
   putchar('\n');
 }
@@ -40,10 +41,13 @@ void op(char c, char* cmd) {
     // .. 1_10 == 1..10
   case '_': { 
     int end= v[nv], * p= v+ ++nv, snv= nv;
-    if (!cmd) return;
+    int slastlast= lastlast, slast= lastop;
+    if (!cmd || !*cmd) return;
     is[nv]= 1;
     ++cmd;
     for(*p= v[nv-2]; *p <= end; ++(*p)) {
+      //lastlast= slastlast; lastop= slast;
+      lastop= 0; lastlast= 0;
       //printf("--------- %d (..%d): c=%c lastop=%c cmd=\"%s\"\n", *p, end, c?c:'?', lastop, cmd);
       panda(cmd);
       nv= snv;
@@ -52,7 +56,7 @@ void op(char c, char* cmd) {
     // backtrack... (fail)
     is[nv]= 0;
     --nv;
-    lastlast= lastop;
+    lastlast= '_';
     lastop= 0;
     return;
   }
@@ -89,7 +93,10 @@ void panda(char* cmd) {
 
   default:
     // TODO: remove op(0) ?
-    if (c>='0' && c<='9') { v[++nv]= c-'0'; op(0, cmd); goto next; }
+    if (c>='0' && c<='9') { v[++nv]= c-'0';
+      // removed and crashes!
+      op(0, cmd);
+      goto next; }
 
     // is an op - delay
     op(c, cmd);
@@ -100,7 +107,10 @@ void panda(char* cmd) {
 
 //int main(int argc, char** argv) {
 int main(void) {
-  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
+//  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
+
+  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
+
   printf("Panda> %s\n", cmd);
   panda(cmd);
   //printf("AFTER PANDA\n");
