@@ -77,6 +77,7 @@ void op(char c, char* cmd) {
 // make parser to output objectlog?
 void panda(char* cmd) {
   char c;
+  // TOOD: set/reset (string) stack-heap
 
   //printf("%% panda> %s\n", cmd);
 
@@ -91,6 +92,17 @@ void panda(char* cmd) {
   case ';': op(0, cmd); is[nv]= 1; goto next; // TODO: no space
   case ',': op(0, cmd); is[nv]= 1; goto next; // TODO: tab?
   case ' ': goto next; // TODO: space/formatted (?)
+
+    // print string 
+    // TODO: accumulate/set as output value
+#ifdef FOO
+    // TODO: NOT CORRECT!
+  case '"': case '\'': {
+    char q= c;
+    while((c=*++cmd) && c!=q) putchar(c);
+    goto next;
+  }
+#endif
 
   default:
     // TODO: remove op(0) ?
@@ -111,6 +123,8 @@ int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
 //  char* cmd= "1_2, 4_5";
   char* cmd= "1_9 + 9, 1_9 + 8";
+//  char* cmd= "1_9, 1_9";
+//  char* cmd= "1_9, '*', 1_9"; // TODO: wrong, need "heap"
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
