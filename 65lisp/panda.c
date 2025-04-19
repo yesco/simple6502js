@@ -51,9 +51,9 @@ void panda(char* cmd) {
 
   switch(c= *++cmd) {
   case 0: op(c); printf("DONE\n"); result(); return;
-  case ';': goto next; // TODO: no space
+  case ';': is[nv]= 1; op(0); goto next; // TODO: no space
   case ',': is[nv]= 1; op(0); goto next; // TODO: tab?
-  case ' ': goto next; // TODO: space/formatted
+  case ' ': goto next; // TODO: space/formatted (?)
 
   default:
     if (c>='0' && c<='9') { v[++nv]= c-'0'; op(0); goto next; }
