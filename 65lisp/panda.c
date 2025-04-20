@@ -5,13 +5,13 @@
 #include <stdio.h>
 
 // save computrons
-#define RESULT() ++nres
-//#define RESULT() result()
+//#define RESULT() ++nres
+#define RESULT() result()
 
 
 // - printint very costly...
-#define DOPRINT(a) 
-//define DOPRINT(a) a
+//#define DOPRINT(a) 
+#define DOPRINT(a) a
 
 // dummy
 char nil, T, print, doapply1;
@@ -22,6 +22,22 @@ char lastop= 0, lastlast= 0;
 int nv= 0, v[NV]= {0}, nres= 0;
 long sum[NV]= {0};
 char is[NV]= {0}, isum[NV]={0};
+
+// var: $1..$9
+// TODO: $a $b... named (how to assign? "as $a" ?)
+int var(char n) {
+  char i= 0;
+  if (n>='0' && n<='9') n-= '0';
+  if (n<31) {
+    while(n) {
+      while(i<NV && !is[++i]);
+      --n;
+      if (i>=NV) return -1;
+    }
+    printf(" [var n=%d, i=%d =>%d] ", n, i, v[i]);
+    return v[i];
+  }
+}
 
 // already this costly
 void result() {
@@ -128,6 +144,9 @@ void panda(char* cmd) {
   }
 #endif
 
+    // pos ref
+  case '$': v[++nv]= var(*++cmd); goto next;
+
   default:
     // TODO: remove op(0) ?
     if (c>='0' && c<='9') { v[++nv]= c-'0';
@@ -167,9 +186,11 @@ int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9, 8";
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
 //  char* cmd= "1_2, 4_5";
-  char* cmd= "1_9 + 9, 1_9 + 8";
+//  char* cmd= "1_9 + 9, 1_9 + 8";
 //  char* cmd= "1_9, 1_9";
 //  char* cmd= "1_9, '*', 1_9"; // TODO: wrong, need "heap"
+
+  char* cmd= "9, $1, $1+$2, $3, 8, $1, $3";
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
