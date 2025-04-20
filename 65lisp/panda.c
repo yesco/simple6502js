@@ -4,21 +4,45 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// save computrons
+#define RESULT() ++nres
+//#define RESULT() result()
+
+
+// - printint very costly...
+#define DOPRINT(a) 
+//define DOPRINT(a) a
+
 // dummy
 char nil, T, print, doapply1;
 
 #define NV 16
 
 char lastop= 0, lastlast= 0;
-int nv= 0, v[NV]= {0};
-char is[NV]= {0};
+int nv= 0, v[NV]= {0}, nres= 0;
+long sum[NV]= {0};
+char is[NV]= {0}, isum[NV]={0};
 
+// already this costly
 void result() {
   char i;
-  printf("=> ");
+  ++nres;
+  DOPRINT(printf("=> "));
   for(i= 1; i<=nv; ++i) {
-    //if (is[i]) printf("%7d ", v[i]);
-    if (is[i]) printf("%d ", v[i]);
+    if (!is[i]) continue;
+    DOPRINT(printf("%d ", v[i]));
+    isum[i]= 1;
+    sum[i]+= v[i];
+  }
+  putchar('\n');
+}
+
+void printsum() {
+  char i;
+  printf("SUM[%d]=> ", nres);
+  for(i= 1; i<=NV; ++i) {
+    if (!isum[i]) continue;
+    printf("%ld ", sum[i]);
   }
   putchar('\n');
 }
@@ -87,7 +111,7 @@ void panda(char* cmd) {
   //printf("\n%% P: '%c' %d\n", cmd[1], cmd[1]);
 
   switch(c= *++cmd) {
-  case 0:   is[nv]= 1; op(0, cmd); result(); return;
+  case 0:   is[nv]= 1; op(0, cmd); RESULT(); return;
     // formatting
   case ';': op(0, cmd); is[nv]= 1; goto next; // TODO: no space
   case ',': op(0, cmd); is[nv]= 1; goto next; // TODO: tab?
@@ -149,10 +173,8 @@ int main(void) {
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
-  //printf("AFTER PANDA\n");
-  putchar('\n');
 
-  putchar('\n');
+  printsum();
 
   return 42;
 }
