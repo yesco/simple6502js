@@ -5,8 +5,8 @@
 #include <stdio.h>
 
 // save computrons
-//#define RESULT() ++nres
-#define RESULT() result()
+#define RESULT() ++nres
+//#define RESULT() result()
 
 
 // - printint very costly...
@@ -188,10 +188,12 @@ int main(void) {
 //  char* cmd= "1, 2, 3 + 4, 5 s, 6 + 7, 1 _ 9 + 1, 8";
 //  char* cmd= "1_2, 4_5";
 //  char* cmd= "1_9 + 9, 1_9 + 8";
+//  char* cmd= "1_9 + 9, 1_9 + 8, 1_9 + 7";
+  char* cmd= "1_9 + 9, 1_9 + 8, 1_9 + 7, 1_9";
 //  char* cmd= "1_9, 1_9";
 //  char* cmd= "1_9, '*', 1_9"; // TODO: wrong, need "heap"
 
-  char* cmd= "9, $1, $1+$2, $3, 8, $1, $3";
+//  char* cmd= "9, $1, $1+$2, $3, 8, $1, $3";
 
   printf("Panda> %s\n", cmd);
   panda(cmd);
