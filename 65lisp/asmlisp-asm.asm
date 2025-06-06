@@ -2,6 +2,8 @@
 .export _scrmova
 .export _printz, _printzptr
 
+.export _test, _hello, _helloN
+
 ;; TODO: not working in ca65, too old?
 
 ;.feature string_escape
@@ -11,9 +13,13 @@
 curscr: .res 2
 leftx:  .res 1
 lefty:  .res 1
-newlineadjust:  .res 1
+        ;;  TODO: do something clever to remove this?
+newlineadjust:  .res 1          ; or use tmp1?
+
+;;; used as (non-modifiable) arguments
 
 ptr:    .res 2
+
 
 
 
@@ -50,9 +56,15 @@ ptr:    .res 2
 ;;; keeps leftx, lefty updated, at end updates curscr
 ;;; 
 ;;; special characters recognized:
-;;; \n - newline (wraps around to top, too)
+;;; #10=\n - newline (wraps around to top, too)
+;;;           (TODO: should newline clear end of line?)
+;;; TODO: \m - move to first col
+;;; TODO: #12 = CTRL-L clear screen
+;;; TODO: #30 = "home"ax
+;;; TODO: skip attributes on screen? (unless wrap?)
+;;; TODO: hibit (&7f<32 print as attribute, otherwise inverse)
 
-;;; Note: AX is trashed
+;;; Note: AX is trashed (it's stored in ptr!)
 
 _printz:      
         sta ptr
@@ -136,12 +148,17 @@ _scrmova:
 
 ;hello:  .asciiz "2 Hello AsmLisp!",10,""
 
-hello:   .byte "3 Hello AsmLisp!",10,0
-helloN:   .byte "4 Hello AsmLisp!",10,0
+_hello:   .byte "3 Hello AsmLisp!",10,0
+_helloN:   .byte "4 Hello AsmLisp!",10,0
 
 
 .proc _initlisp
         jsr _initscr
+        rts
+.endproc
+
+;;; 123 bytes
+.proc _test
 
         ;; an A was written by c-code
 
@@ -156,8 +173,8 @@ helloN:   .byte "4 Hello AsmLisp!",10,0
         jsr _scrmova
 
         ;; write string x 17
-        lda #<hello
-        ldx #>hello
+        lda #<_hello
+        ldx #>_hello
         jsr _printz
         jsr _printzptr
         jsr _printzptr
@@ -178,16 +195,16 @@ helloN:   .byte "4 Hello AsmLisp!",10,0
         jsr _printzptr
 
         ;; 13 x helloN
-        lda #<helloN
-        ldx #>helloN
+        lda #<_helloN
+        ldx #>_helloN
         jsr _printz
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
         
-        lda #<helloN
-        ldx #>helloN
+        lda #<_helloN
+        ldx #>_helloN
         jsr _printz
         jsr _printzptr
         jsr _printzptr
@@ -206,4 +223,3 @@ helloN:   .byte "4 Hello AsmLisp!",10,0
         rts
 .endproc
 
-        

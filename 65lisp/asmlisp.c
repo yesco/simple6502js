@@ -13,7 +13,10 @@ extern void initlisp();
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
 #define SCREENLAST (TEXTSCREEN+SCREENSIZE-1)
 
-// empty main: 284 Bytes
+// empty main: 284 Bytes (C overhead)
+
+// 423 bytes w printz (=109 Bytes only!)
+
 void main() {
   //printf("Hello World!\n");
   
