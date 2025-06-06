@@ -11,20 +11,29 @@
 curscr: .res 2
 leftx:  .res 1
 lefty:  .res 1
+newlineadjust:  .res 1
+
 ptr:    .res 2
 
 
 
 .code
 
+;;; =========================================================
+;;; Implements a "mini-terminal" printing strings
+
+;;; _initscr, with leftx and lefty, keeping leftx in X
+;;; doesn't modify register Y
 .proc _initscr
         lda #$80
         sta curscr
         lda #$BB
         sta curscr+1
 
-        lda #40
-        sta leftx
+        ;; important X must contain leftx when exit
+        ldx #40
+        stx leftx
+
         lda #28
         sta lefty
 
@@ -33,6 +42,15 @@ ptr:    .res 2
 
 ;;; printz: Prints an ASCIIZ zero terminated string
 ;;; identified by address in AX.
+;;; 
+;;; optimized to print strings upto 256 chars
+;;; (putchar might call this one with wrapper, lol)
+;;; 
+;;; wraps around at end of screen
+;;; keeps leftx, lefty updated, at end updates curscr
+;;; 
+;;; special characters recognized:
+;;; \n - newline (wraps around to top, too)
 
 ;;; Note: AX is trashed
 
@@ -49,6 +67,7 @@ _printz:
 
 _printzptr:        
         ldy #00
+        sty newlineadjust
         ldx leftx
 
 @next:   
@@ -67,12 +86,24 @@ _printzptr:
         ldx #40
         dec lefty
         bne @next
-        ;; rows overflow - wrap! (or scroll?)
+        ;; rows overflow - wrap! (TODO: or scroll?)
         jsr _initscr
+
+        ;; adjust address to make Y work
+        ;; (todo: redo with reverse subtraction curscr -= Y)
+        lda curscr
+        sec
+        sbc newlineadjust
+        sta curscr
+        lda curscr+1
+        sbc #0
+        sta curscr+1
+
         jmp @next
         
 ;;; handle special chars
 @newline:
+        sty newlineadjust
         iny
 
         ;; skip rest of line
@@ -88,7 +119,7 @@ _printzptr:
         ;; neither newline char, lol!
         ;; could advance ptr, but then no reuse
         ;; advance str pointer
-        dey
+        dey                     
         tya
 
 _scrmova:
@@ -106,6 +137,7 @@ _scrmova:
 ;hello:  .asciiz "2 Hello AsmLisp!",10,""
 
 hello:   .byte "3 Hello AsmLisp!",10,0
+helloN:   .byte "4 Hello AsmLisp!",10,0
 
 
 .proc _initlisp
@@ -123,10 +155,46 @@ hello:   .byte "3 Hello AsmLisp!",10,0
         lda #02
         jsr _scrmova
 
-        ;; write string x 2
+        ;; write string x 17
         lda #<hello
         ldx #>hello
         jsr _printz
+        jsr _printzptr
+        jsr _printzptr
+
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+
+        ;; 13 x helloN
+        lda #<helloN
+        ldx #>helloN
+        jsr _printz
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+        
+        lda #<helloN
+        ldx #>helloN
+        jsr _printz
+        jsr _printzptr
+        jsr _printzptr
+        jsr _printzptr
+
+        jsr _printzptr
+        jsr _printzptr
         jsr _printzptr
         jsr _printzptr
 
