@@ -1,3 +1,4 @@
+.export _nil
 .export _initlisp, _initscr
 .export _scrmova
 .export _printz, _printzptr
@@ -21,9 +22,28 @@ newlineadjust:  .res 1          ; or use tmp1?
 ptr:    .res 2
 
 
+;;; various special data items, constants
+;;; - ATOMS
+.align 2
+.res 1
+
+;;; _nil atom at address 5 (4+1 == atom)
+;;; TODO: create segment to reserve memory?
+
+_nil:   .res 4
+
+;;; ----------------------------------------
+
 
 
 .code
+
+;;; various special data items, constants
+;;; - ATOMS
+.align 2
+.res 1
+
+_t:     .word _t, _nil
 
 ;;; =========================================================
 ;;; Implements a "mini-terminal" printing strings
@@ -148,12 +168,26 @@ _scrmova:
 
 ;hello:  .asciiz "2 Hello AsmLisp!",10,""
 
-_hello:   .byte "3 Hello AsmLisp!",10,0
-_helloN:   .byte "4 Hello AsmLisp!",10,0
+_hello:	   .byte "4 Hello AsmLisp!",10,0
+_helloN:   .byte "5 Hello AsmLisp!",10,0
 
 
 .proc _initlisp
+
         jsr _initscr
+        
+        ;; store _nil as car and cdr of _nil
+        lda #<_nil
+        sta _nil
+        sta _nil+2
+
+        lda #>_nil
+        sta _nil +1
+        sta _nil+2 +1
+
+        ;; TODO: move to main?
+        jsr _test
+
         rts
 .endproc
 
