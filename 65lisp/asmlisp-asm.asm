@@ -199,6 +199,113 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         rts
 .endproc
 
+;;; lisptype, set flag depending on type of AX (retained):
+;;;    Z = Null, Nil
+;;;    C = Cons
+;;;    N = Number, lol
+;;;    V = Atom
+
+.proc _lisptype                 ; 30 bytes: 20-34c
+        tay
+        clv
+        clc
+
+        lsr
+        bcs notnum
+        ;;; Number => N
+        tya
+        ldy #$ff
+        rts                     ; 20c Number
+
+notnum: 
+        lsr                     ; 13c
+        bcs iscons
+
+        ;;; Atom
+        tya
+        cmp #<_nil
+        bne isatom
+        cpx #>_nil
+        bne isatom
+
+        ;; Null => Z
+        ldy #0
+        rts                     ; 33c Zero/Null
+
+isatom: 
+        ;; sev  - hack to set V flag
+        clc
+        lda #$39                ; $40
+        adc #$39                ; $40 : sets N,V!
+        tya
+        ldy #1
+        clc
+        ;;  - test!
+
+        rts                     ; 39-43c Vatom, lol
+
+iscons:
+	;;; Cons
+        sec
+        tya
+        ldy #1
+        rts		        ; 27c
+.endproc
+
+
+;;;  TODO: inline macro? 3B
+.proc _isnumSetC                ; 12c 3B+1
+        tay
+        lsr
+        tya
+        rts                     ; C= 0 if Number!
+.endproc
+
+
+;; not inline...
+.proc _isconsSetC               ; 14-19c 14B
+        tay
+        lsr
+        bcs maybecons
+                                ; C= 0
+ret:    
+        tya
+        rts                     ; 14c
+
+maybecons:      
+        lsr
+        adc #1                  ; low bit 1 if partity (1+1+1)
+        lsr                     ; C= 1 if cons!
+        tya
+        rts                     ; 19c
+.endproc
+
+
+;;;  TODO: inline macro? 6B
+.proc isnullSetN                ; 11-12c 6B+1
+        cmp #<_nil               
+        bne ret                 ; if Z=0 => not Null
+        cpx #>_nil               ; if Z=1 => is Null!
+ret:    
+        rts
+
+.endproc
+
+
+;;; TODO: inline macro? 8B
+.proc isatomSetC                ; 15-18c 8B+1
+        tay
+        lsr
+        bne ret
+        adc #0
+        lsr
+ret:    
+        tya
+        rts
+.endproc
+
+
+
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
 ;;;   ATOM => assoc(env, x)
@@ -210,7 +317,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         ;; NIL => NIL
         cmp #<_nil
         bne testnum
-        cmp #>_nil
+        cpx #>_nil
         beq ret
 
 testnum:        
