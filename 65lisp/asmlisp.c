@@ -15,7 +15,11 @@ extern void initlisp();
 
 // empty main: 284 Bytes (C overhead)
 
-// 423 bytes w printz (=109 Bytes only!)
+// 423 bytes w printz (- 423 284 30)= 109
+
+// (- 495 423) = 72 bytes for test 28*3 etc...
+
+// 618 bytes w _nil,_t,_eval (- 618 423 72 109) = 14 bytes(?)
 
 void main() {
   //printf("Hello World!\n");

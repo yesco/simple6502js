@@ -1,3 +1,6 @@
+.import incsp2, incsp4, incsp6, incsp8
+.import addysp
+
 .export _nil
 .export _initlisp, _initscr
 .export _scrmova
@@ -43,7 +46,8 @@ _nil:   .res 4
 .align 2
 .res 1
 
-_t:     .word _t, _nil
+_t:     .word _t, _nil, _eval
+        .byte "T", 0
 
 ;;; =========================================================
 ;;; Implements a "mini-terminal" printing strings
@@ -185,11 +189,79 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         sta _nil +1
         sta _nil+2 +1
 
+        ; TODO: store address of "evalsecond"
+        ; (nil (+ 3 4) (+ 4 5)) => 9 !
+
+
         ;; TODO: move to main?
         jsr _test
 
         rts
 .endproc
+
+;;; eval(env, x) -> val
+;;;   NUM => NUM
+;;;   ATOM => assoc(env, x)
+;;;      result => return it
+;;;    else
+;;;      global value lookup (= car)
+
+.proc _eval
+        ;; NIL => NIL
+        cmp #<_nil
+        bne testnum
+        cmp #>_nil
+        beq ret
+
+testnum:        
+        ;; TODO: if _nil==$01 then can test!
+        lsr
+        bcs notnum
+        ;; NUMBER
+        rol
+
+ret:    jmp incsp2
+
+notnum: 
+        ror
+        bcs iscons
+
+        ;; ATOM => lookup var in env/global
+        ; jmp _getval
+
+iscons:
+        ;; CONS => APPLY!
+        ; jsr pushax (dup x)
+
+        ;; get global val
+        ; jsr _car
+again:  
+        ;; TODO: test is atom/function/closure
+        ;; TODO: if not then
+        ;;         jsr AX=eval(env, AX)
+        ;;         jmp again
+
+        ;; AX contains ptr to "atom/func"
+        ;;    w JSR addr
+
+;;; now, basically eval falls through to
+;;;   apply(env, x, AX)
+
+apply:  
+        clc
+        ;; skip over cdr; point to addr
+        adc #04
+        bcc go
+        inx
+
+go:     
+        ;; Note: args are not evaluated
+
+        ;; AX(env,args)
+        ; jmp callax              
+
+.endproc
+
 
 ;;; 123 bytes
 .proc _test
