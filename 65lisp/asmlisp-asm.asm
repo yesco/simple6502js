@@ -33,13 +33,14 @@ savey:  .res 1
 
 ;;; various special data items, constants
 ;;; - ATOMS
-.align 2
+.align 4                        ; meaing: 4 or 2^4
 .res 1
 
 ;;; _nil atom at address 5 (4+1 == atom)
 ;;; TODO: create segment to reserve memory?
 
-_nil:   .res 4
+_nil:   .res 6
+        .byte "nil", 0
 
 ;;; ----------------------------------------
 
@@ -52,7 +53,7 @@ _nil:   .res 4
 .align 2
 .res 1
 
-_t:     .word _t, _nil, _eval
+_T:     .word _T, _nil, _eval
         .byte "T", 0
 
 ;;; =========================================================
@@ -348,27 +349,27 @@ notnum:
         bcs iscons
 
         ;;; Atom
+        ;; sev  - hack to set V flag
+        clc
+        lda #$40                ; $40
+        adc #$40                ; $40 : sets N,V!
+        tya
+        ldy #1                  ; clears N
+        clc
+
+        rts
+
+        ;; TODO: NULL?
         tya
         cmp #<_nil
-        bne isatom
+        bne end
         cpx #>_nil
-        bne isatom
+        bne end
 
         ;; Null => Z
         ldy #0
-        rts                     ; 33c Zero/Null
-
-isatom: 
-        ;; sev  - hack to set V flag
-        clc
-        lda #$39                ; $40
-        adc #$39                ; $40 : sets N,V!
-        tya
-        ldy #1
-        clc
-        ;;  - test!
-
-        rts                     ; 39-43c Vatom, lol
+end:    
+        rts                     ; 33c Zero/Null and Vatom
 
 iscons:
 	;;; Cons
@@ -515,6 +516,16 @@ go:
         rts
 .endproc
 
+.proc _printatom
+        ;; add 6 offset to point to name
+        clc
+        adc #6
+        bcc noinc
+        inx
+noinc:  
+        jmp _printz
+.endproc
+
 .proc _print
         pha
         tay
@@ -522,9 +533,28 @@ go:
         pha
         tya
 
+        jsr _type
+
+        bmi isnum
+        bcs iscons
+        bvs issym
+
+        ;; TODO: error?
+        jmp ret
+
+isnum:  
         jsr _div2
         jsr _printd
+        jmp ret
 
+issym:  
+        jsr _printatom
+        jmp ret
+
+iscons: 
+        jsr _printh
+
+ret:    
         pla
         tax
         pla
@@ -544,6 +574,16 @@ go:
         lda #>_nil
         sta _nil +1
         sta _nil+2 +1
+
+        ;;  write 'nil'
+        lda #110
+        sta _nil+6
+        lda #105
+        sta _nil+7
+        lda #108
+        sta _nil+8
+        lda #0
+        sta _nil+9
 
         ; TODO: store address of "evalsecond"
         ; (nil (+ 3 4) (+ 4 5)) => 9 !
@@ -616,31 +656,51 @@ go:
         jsr _printd
         jsr _printd
 
-        ;; test type
-        lda #<thetypeis
-        ldx #>thetypeis
-        jsr _printz
+        ;;; test type
+
+        ;; Number
         lda #<(2*4711)
         ldx #>(2*4711)
         jsr _print
-        
-        jsr _type
-        bmi isnum
-        beq isnull
-        bvs issym
-        bcs iscons
+        jsr _print
+        jsr _print
+        jsr _testtype
 
-isnum:  lda #64+14              ; 'N'
-        jmp _putchar
+        ;; Atom
+        lda #<_T
+        ldx #>_T
+;;; TODO: somehow value gets lost in _print ???
+        jsr _print
 
-isnull: lda #64+25              ; 'Z'
-        jmp _putchar
+        lda #<_nil
+        ldx #>_nil
+        jsr _print
 
-issym:  lda #64+18               ; 'S'
-        jmp _putchar
+        lda #<_T
+        ldx #>_T
+        jsr _print
 
-iscons: lda #64+3               ; 'C'
-        jmp _putchar
+        lda #<_T
+        ldx #>_T
+        jsr _print
+
+        lda #<_T
+        ldx #>_T
+        jsr _testtype
+        lda #<_T
+        ldx #>_T
+        jsr _testtype
+
+        lda #<_nil
+        ldx #>_nil
+        jsr _testtype
+        lda #<_nil
+        ldx #>_nil
+        jsr _testtype
+
+        lda #<_nil
+        ldx #>_nil
+        jsr _print
 
         rts
 .endproc
@@ -651,6 +711,33 @@ _hello:	   .byte "4 Hello AsmLisp!",10,0
 _helloN:   .byte "5 Hello AsmLisp!",10,0
 
 thetypeis: .byte "The value and type is: ",0
+
+.proc _testtype
+        jsr _print
+
+        jsr _type
+        bmi isnum
+        beq isnull
+        bvs issym
+        bcs iscons
+        
+nomatch:        
+        lda #63                 ; '?'
+        jmp _putchar
+
+isnum:  lda #64+14              ; 'N'
+        jmp _putchar
+
+isnull: lda #64+25              ; 'Z'
+        jmp _putchar
+
+issym:  lda #83                 ; 'S'
+        jmp _putchar
+
+iscons: lda #64+3               ; 'C'
+        jmp _putchar
+
+.endproc
 
 ;;; 123 bytes
 .proc _test
