@@ -348,27 +348,25 @@ notnum:
         lsr                     ; 13c
         bcs iscons
 
+isatom: 
         ;;; Atom
-        ;; sev  - hack to set V flag
-        clc
-        lda #$40                ; $40
-        adc #$40                ; $40 : sets N,V!
-        tya
-        ldy #1                  ; clears N
-        clc
 
-        rts
-
-        ;; TODO: NULL?
-        tya
-        cmp #<_nil
-        bne end
+        ;; NULL?
+        cpy #<_nil
+        bne notnull
         cpx #>_nil
-        bne end
-
-        ;; Null => Z
-        ldy #0
+        bne notnull
+        ;; is null
+        lda #64+2               ; V+N
+        jmp end
+notnull:        
+        lda #64                 ; V
 end:    
+        ;; "SEV" (+ "SEZ")
+        pha
+        tya
+        plp
+
         rts                     ; 33c Zero/Null and Vatom
 
 iscons:
@@ -715,6 +713,17 @@ thetypeis: .byte "The value and type is: ",0
 .proc _testtype
         jsr _print
 
+        pha
+        txa
+        pha
+        
+        lda #58                 ; ':'
+        jsr _putchar
+
+        pla
+        tax
+        pla
+
         jsr _type
         bmi isnum
         beq isnull
@@ -725,11 +734,11 @@ nomatch:
         lda #63                 ; '?'
         jmp _putchar
 
-isnum:  lda #64+14              ; 'N'
+isnum:  lda #78                 ; 'N'
         jmp _putchar
 
-isnull: lda #64+25              ; 'Z'
-        jmp _putchar
+isnull: lda #90                 ; 'Z'
+        jsr _putchar
 
 issym:  lda #83                 ; 'S'
         jmp _putchar
