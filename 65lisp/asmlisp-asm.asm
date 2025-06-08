@@ -6,7 +6,7 @@
 .export _scrmova
 .export _printz, _printzptr
 
-.export _test, _hello, _helloN
+.export _test
 
 ;; TODO: not working in ca65, too old?
 
@@ -324,106 +324,14 @@ under10:
         rts
 .endproc
 
-;hello:  .asciiz "2 Hello AsmLisp!",10,""
 
-_hello:	   .byte "4 Hello AsmLisp!",10,0
-_helloN:   .byte "5 Hello AsmLisp!",10,0
-
-
-.proc _initlisp
-
-        jsr _initscr
-        
-        ;; store _nil as car and cdr of _nil
-        lda #<_nil
-        sta _nil
-        sta _nil+2
-
-        lda #>_nil
-        sta _nil +1
-        sta _nil+2 +1
-
-        ; TODO: store address of "evalsecond"
-        ; (nil (+ 3 4) (+ 4 5)) => 9 !
-
-
-        ;; TODO: move to main?
-        jsr _test
-
-        ;; test hex
-        ldx #$be
-        lda #$ef
-        jsr _printh
-        jsr _printh
-
-        ldx #$12
-        lda #$34
-        jsr _printh
-        jsr _printh
-
-        ;; test putchar
-        lda #67
-        jsr _putchar
-        lda #66
-        jsr _putchar
-        lda #65
-        jsr _putchar
-
-        ;; TEST push delayed putchar
-        ;; (this is clever hack to reverse chars)
-        ;; (these will print AFTER rts of this routine!)
-        lda #(65+32)
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        lda #66+32
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        lda #67+32
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        ;; test dec
-        ldx #$10                ; 4321 dec
-        lda #$e1
-        jsr _printd
-        jsr _printd
-
-        ldx #$dd                ; 56789 dec
-        lda #$d5
-        jsr _printd
-        jsr _printd
-
-        ldx #$be                ; 48879 dec
-        lda #$ef
-        jsr _printd
-        jsr _printd
-
-        ldx #$12                ; 4660 dec
-        lda #$34
-        jsr _printd
-        jsr _printd
-
-        rts
-.endproc
-
-;;; lisptype, set flag depending on type of AX (retained):
-;;;    Z = Null, Nil
-;;;    C = Cons
+;;; typeNZVC, set flag depending on type of AX (retained):
 ;;;    N = Number, lol
+;;;    Z = Null, Nil
 ;;;    V = Atom
+;;;    C = Cons
 
-.proc _lisptype                 ; 30 bytes: 20-34c
+.proc _type                 ; 30 bytes: 20-34c
         tay
         clv
         clc
@@ -587,6 +495,162 @@ go:
 
 .endproc
 
+.proc _mul2
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+        rts
+.endproc
+
+.proc _div2
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+.endproc
+
+.proc _print
+        pha
+        tay
+        txa
+        pha
+        tya
+
+        jsr _div2
+        jsr _printd
+
+        pla
+        tax
+        pla
+        
+        rts
+.endproc
+
+.proc _initlisp
+
+        jsr _initscr
+        
+        ;; store _nil as car and cdr of _nil
+        lda #<_nil
+        sta _nil
+        sta _nil+2
+
+        lda #>_nil
+        sta _nil +1
+        sta _nil+2 +1
+
+        ; TODO: store address of "evalsecond"
+        ; (nil (+ 3 4) (+ 4 5)) => 9 !
+
+
+        ;; TODO: move to main?
+        jsr _test
+
+        ;; test hex
+        ldx #$be
+        lda #$ef
+        jsr _printh
+        jsr _printh
+
+        ldx #$12
+        lda #$34
+        jsr _printh
+        jsr _printh
+
+        ;; test putchar
+        lda #67
+        jsr _putchar
+        lda #66
+        jsr _putchar
+        lda #65
+        jsr _putchar
+
+        ;; TEST push delayed putchar
+        ;; (this is clever hack to reverse chars)
+        ;; (these will print AFTER rts of this routine!)
+        lda #(65+32)
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        lda #66+32
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        lda #67+32
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        ;; test dec
+        ldx #$10                ; 4321 dec
+        lda #$e1
+        jsr _printd
+        jsr _printd
+
+        ldx #$dd                ; 56789 dec
+        lda #$d5
+        jsr _printd
+        jsr _printd
+
+        ldx #$be                ; 48879 dec
+        lda #$ef
+        jsr _printd
+        jsr _printd
+
+        ldx #$12                ; 4660 dec
+        lda #$34
+        jsr _printd
+        jsr _printd
+
+        ;; test type
+        lda #<thetypeis
+        ldx #>thetypeis
+        jsr _printz
+        lda #<(2*4711)
+        ldx #>(2*4711)
+        jsr _print
+        
+        jsr _type
+        bmi isnum
+        beq isnull
+        bvs issym
+        bcs iscons
+
+isnum:  lda #64+14              ; 'N'
+        jmp _putchar
+
+isnull: lda #64+25              ; 'Z'
+        jmp _putchar
+
+issym:  lda #64+18               ; 'S'
+        jmp _putchar
+
+iscons: lda #64+3               ; 'C'
+        jmp _putchar
+
+        rts
+.endproc
+
+;hello:  .asciiz "2 Hello AsmLisp!",10,""
+
+_hello:	   .byte "4 Hello AsmLisp!",10,0
+_helloN:   .byte "5 Hello AsmLisp!",10,0
+
+thetypeis: .byte "The value and type is: ",0
 
 ;;; 123 bytes
 .proc _test
