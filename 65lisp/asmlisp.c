@@ -21,6 +21,8 @@ extern void initlisp();
 
 // 618 bytes w _nil,_t,_eval (- 618 423 72 109) = 14 bytes(?)
 
+// 741 bytes printh (- 741 690) = 51 bytes for printhex
+
 void main() {
   //printf("Hello World!\n");
   

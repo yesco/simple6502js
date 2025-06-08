@@ -22,7 +22,9 @@ newlineadjust:  .res 1          ; or use tmp1?
 
 ;;; used as (non-modifiable) arguments
 
-ptr:    .res 2
+ptr1:   .res 2
+ptr2:   .res 2
+ptr3:   .res 2
 
 
 ;;; various special data items, constants
@@ -70,7 +72,33 @@ _t:     .word _t, _nil, _eval
         rts
 .endproc
 
-;;; printz: Prints an ASCIIZ zero terminated string
+.proc newline
+        lda #10
+        jmp _putchar
+.endproc
+
+.proc putspc
+        lda #32
+        pha
+.endproc
+
+plaputchar:    
+        pla
+
+;;; _putchar A on screen, move position forward
+;;; trashes A,X,Y,ptr1,ptr2
+.proc _putchar
+        ;; save char in 2 byte asciiz buffer end with 0
+        sta ptr2
+        lda #0
+        sta ptr2+1
+
+        lda #<(ptr2)
+        ldx #>(ptr2+1)
+        ;; fallthrough to _printz
+.endproc
+
+;;; _printz: Prints an ASCIIZ zero terminated string
 ;;; identified by address in AX.
 ;;; 
 ;;; optimized to print strings upto 256 chars
@@ -88,14 +116,13 @@ _t:     .word _t, _nil, _eval
 ;;; TODO: skip attributes on screen? (unless wrap?)
 ;;; TODO: hibit (&7f<32 print as attribute, otherwise inverse)
 
-;;; Note: AX is trashed (it's stored in ptr!)
-
+;;; Note: AX is trashed (it's stored in ptr1!)
 _printz:      
-        sta ptr
-        stx ptr+1
+        sta ptr1
+        stx ptr1+1
 
 ;;; printzptr: Prints an ASCIIZ zero terminated string
-;;; identified by address in ptr
+;;; identified by address in ptr1
 
 ;;; Note: can be used to print the last string printed!
 
@@ -107,7 +134,7 @@ _printzptr:
         ldx leftx
 
 @next:   
-        lda (ptr),y
+        lda (ptr1),y
         beq @end
         cmp #10
         beq @newline
@@ -139,10 +166,11 @@ _printzptr:
         
 ;;; handle special chars
 @newline:
-        sty newlineadjust
         iny
+        sty newlineadjust
 
         ;; skip rest of line
+        dex
         txa
         jsr _scrmova
         jmp @nextline
@@ -151,11 +179,8 @@ _printzptr:
 @end:    
         stx leftx
 
-        ;; TODO: not correct at overflow...
-        ;; neither newline char, lol!
-        ;; could advance ptr, but then no reuse
-        ;; advance str pointer
-        dey                     
+        ;; move forwade
+        ;dey                     ; ???
         tya
 
 _scrmova:
@@ -169,6 +194,117 @@ _scrmova:
         rts
 
 
+
+;;; print one hex digit from A lower 4 bits at position Y
+;;; (doesn't trash X)
+.proc _print1h
+        and #15
+        clc
+        adc #48                 ; '0'
+        cmp #58                 ; '9'+1
+        bcc print
+        ;; >'9' => 'A'-'F'
+        adc #6                  ; 'A'-'9'+1-1 (carry set)
+print:  
+        sta (curscr),y
+        iny
+        rts
+.endproc
+
+;;; _printd print a decimal value from AX
+;;; 35B - this is a very "minimal" sized routine
+;;;       slow, one loop per bit/16
+;;; 
+;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
+;;;       (not include time to print digits)
+;;; 
+;;; Based on DecPrint 6502 by Mike B 7/7/2017
+;;; Optimized by J. Brooks & qkubma 7/8/2017
+;;; This implementation by jsk@yesco.org 2025-06-08
+
+.proc _printd
+        sta ptr1
+        stx ptr1+1
+        
+digit:  
+        lda #0
+        tay
+        ldx #16
+
+div10:  
+        cmp #10/2
+        bcc under10
+        sbc #10/2
+        iny
+under10:        
+        rol ptr1
+        rol ptr1+1
+        rol
+
+        dex
+        bne div10
+
+        ;; make 0-9 to '0'-'9'
+        clc
+        adc #48
+
+        ;; push delayed putchar
+        ;; (this is clever hack to reverse digits!)
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        dey
+        bpl digit
+
+        ;; restore AX
+        lda ptr1
+        ldx ptr1+1
+
+        rts
+.endproc
+        
+
+.proc _print2h
+        pha
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr _print1h
+        pla
+        jsr _print1h
+        rts
+.endproc
+        
+;;; print hex from AX (retained) Y=5
+.proc _printh
+        pha
+
+        ;; print '$'
+        pha
+        ldy #0
+        lda #$24                ; '$'
+        sta (curscr),y
+        iny
+
+        ;; print hi-byte
+        txa
+        jsr _print2h
+        pla
+        ;; print lo-byte
+        jsr _print2h
+
+        ;; move cursor forward Y (=5)
+        tya
+        jsr _scrmova
+
+        pla
+
+        rts
+.endproc
 
 ;hello:  .asciiz "2 Hello AsmLisp!",10,""
 
@@ -195,6 +331,69 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
         ;; TODO: move to main?
         jsr _test
+
+        ;; test hex
+        ldx #$be
+        lda #$ef
+        jsr _printh
+        jsr _printh
+
+        ldx #$12
+        lda #$34
+        jsr _printh
+        jsr _printh
+
+        ;; test putchar
+        lda #67
+        jsr _putchar
+        lda #66
+        jsr _putchar
+        lda #65
+        jsr _putchar
+
+        ;; TEST push delayed putchar
+        ;; (this is clever hack to reverse digits!)
+        lda #(65+32)
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        lda #66+32
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        lda #67+32
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        ;; test dec
+        ldx #$10                ; 4321 dec
+        lda #$e1
+        jsr _printd
+        ; jsr _printd
+
+        ldx #$dd                ; 56789 dec
+        lda #$d5
+        jsr _printd
+        ; jsr _printd
+
+        ldx #$be                ; 48879 dec
+        lda #$ef
+        jsr _printd
+        ; jsr _printd
+
+        ldx #$12                ; 4660 dec
+        lda #$34
+        jsr _printd
+        ; jsr _printd
 
         rts
 .endproc
