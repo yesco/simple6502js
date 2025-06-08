@@ -26,6 +26,10 @@ ptr1:   .res 2
 ptr2:   .res 2
 ptr3:   .res 2
 
+;;; be careful saving (as may trash other save!)
+savea:  .res 1
+savex:  .res 1
+savey:  .res 1
 
 ;;; various special data items, constants
 ;;; - ATOMS
@@ -211,9 +215,25 @@ print:
         rts
 .endproc
 
-;;; _printd print a decimal value from AX
+;;; _printds print a decimal value from AX (retained, Y trashed)
+.proc _printd
+        ;; save ax
+        sta savea
+        stx savex
+
+        jsr _voidprintd
+
+        ;; restore ax
+        ldx savex
+        lda savea
+
+        rts
+.endproc
+
+;;; _voidprintd print a decimal value from AX (+Y trashed)
 ;;; 35B - this is a very "minimal" sized routine
 ;;;       slow, one loop per bit/16
+;;;       (+ 3B for store AX)
 ;;; 
 ;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
 ;;;       (not include time to print digits)
@@ -222,10 +242,12 @@ print:
 ;;; Optimized by J. Brooks & qkubma 7/8/2017
 ;;; This implementation by jsk@yesco.org 2025-06-08
 
-.proc _printd
+.proc _voidprintd
         sta ptr1
         stx ptr1+1
         
+_voidprintptr1d:
+
 digit:  
         lda #0
         tay
@@ -258,10 +280,6 @@ under10:
 
         dey
         bpl digit
-
-        ;; restore AX
-        lda ptr1
-        ldx ptr1+1
 
         rts
 .endproc
@@ -352,7 +370,8 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         jsr _putchar
 
         ;; TEST push delayed putchar
-        ;; (this is clever hack to reverse digits!)
+        ;; (this is clever hack to reverse chars)
+        ;; (these will print AFTER rts of this routine!)
         lda #(65+32)
         pha
         lda #>(plaputchar-1)
@@ -378,22 +397,22 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         ldx #$10                ; 4321 dec
         lda #$e1
         jsr _printd
-        ; jsr _printd
+        jsr _printd
 
         ldx #$dd                ; 56789 dec
         lda #$d5
         jsr _printd
-        ; jsr _printd
+        jsr _printd
 
         ldx #$be                ; 48879 dec
         lda #$ef
         jsr _printd
-        ; jsr _printd
+        jsr _printd
 
         ldx #$12                ; 4660 dec
         lda #$34
         jsr _printd
-        ; jsr _printd
+        jsr _printd
 
         rts
 .endproc
