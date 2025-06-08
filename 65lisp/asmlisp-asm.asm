@@ -332,20 +332,19 @@ under10:
 ;;;    V = Atom
 ;;;    C = Cons
 
-.proc _type                 ; 30 bytes: 20-34c
+.proc _type                     ; 34 bytes: 18-38c
         tay
         clv
-        clc
 
         lsr
         bcs notnum
         ;;; Number => N
         tya
         ldy #$ff
-        rts                     ; 20c Number
+        rts                     ; 18c Number
 
 notnum: 
-        lsr                     ; 13c
+        lsr                     ; 9c
         bcs iscons
 
 isatom: 
@@ -358,7 +357,7 @@ isatom:
         bne notnull
         ;; is null
         lda #64+2               ; V+N
-        jmp end
+        bne end                 ; is jmp end (N=0)
 notnull:        
         lda #64                 ; V
 end:    
@@ -367,14 +366,14 @@ end:
         tya
         plp
 
-        rts                     ; 33c Zero/Null and Vatom
+        rts                     ; 38c Vatom (+ maybe Zull)
 
 iscons:
 	;;; Cons
         sec
         tya
         ldy #1
-        rts		        ; 27c
+        rts		        ; 24c
 .endproc
 
 
