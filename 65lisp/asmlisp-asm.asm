@@ -216,6 +216,77 @@ print:
         rts
 .endproc
 
+;;; div16/16 - 40 Bytes
+;;; - http://forum.6502.org/viewtopic.php?f=2&t=6258
+
+;;; div16/8 divide ptr1 16-bits by ptr2 8-bits, result in ptr1
+;;; 
+;;; by strat @ nesdev forum ; 21B
+;;; 
+;;; out: A: remainder; X: 0; Y: unchanged
+
+.proc div16
+  ldx #16
+  lda #0
+
+@divloop:
+  asl ptr1
+  rol ptr1+1
+  rol a
+
+  cmp ptr2
+  bcc @no_sub
+  sbc ptr2
+  inc ptr1
+@no_sub:
+  dex
+  bne @divloop
+
+  rts
+.endproc
+
+;;; 16div16 => 16 ??? works?
+;;; jsk 37B
+.proc div1616
+  ldx #16
+  lda #0
+
+@divloop:
+  asl ptr1
+  rol ptr1+1
+  rol a
+
+  ;; hi-byte cmp
+  tay
+  lda ptr1+1
+  cmp ptr2+1        
+  bcc @no_sub                   ; one off?
+  tya
+
+  ;; lo-byte cmp
+  cmp ptr2
+  bcc @no_sub
+
+  ;; lo-byte sub
+  sbc ptr2
+  inc ptr1
+
+  ;; hi-byte sub
+  tay
+  lda ptr1+1
+  sbc ptr2+1
+  sta ptr1+1
+  tya
+  
+@no_sub:
+  dex
+  bne @divloop
+
+  rts
+.endproc
+
+
+
 ;;; _printds print a decimal value from AX (retained, Y trashed)
 .proc _printd
         ;; save ax
