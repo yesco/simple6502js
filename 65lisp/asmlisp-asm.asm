@@ -16,7 +16,8 @@
 ;;; - assumes prexisting "bios": getch putch
 ;;; - only SYMBOLS and CONS
 ;;; - reader and writer (no editor, or backspace)
-;;; - only LAMBDA ATOM CONS CAR CDR EQ COND PRINT READ EVAL (APPLY?)
+;;; - T NIL QUOTE READ PRINT COND CONS CAR CDR (41)
+;;;     ?LAMBDA ?EVAL ?APPLY (16)
 ;;; - no GC (or minimal "reset")
 
 
@@ -35,11 +36,7 @@
 ;;;  613      bytes - ORICON
 ;;;  683 bytes - NUMBERS
 ;;;  900 bytes - TEST + ORICON
-;;; 1168 bytes - NUMBERS + ORICON + TEST
-
-;;;  183 bytes - MINIMAL
-;;;       initlisp 29, _T 8
-;;;       _type 30
+;;; ;;;       _type 30  just "BIT bit2"
 ;;;         isnum 4, iscons 14, isnull 6, isatom 9 (33)
 ;;;       print 35, printatom 8,
 ;;;       eval 30 
