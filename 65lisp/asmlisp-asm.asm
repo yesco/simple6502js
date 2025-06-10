@@ -1,12 +1,32 @@
+;;; enable numbers
+NUMBERS=1
+
+;;; enable tests (So far depends on ORICON)
+;TEST=1
+
+;;; enable ORICON(sole, code for printing)
+;ORICON=1
+
+
+
+
 .import incsp2, incsp4, incsp6, incsp8
 .import addysp
 
 .export _nil
-.export _initlisp, _initscr
+.export _initlisp
+
+.ifdef ORICON
+
+.export _initscr
 .export _scrmova
 .export _printz, _printzptr
 
+.endif ; ORICON
+
+.ifdef TEST
 .export _test
+.endif
 
 ;; TODO: not working in ca65, too old?
 
@@ -14,11 +34,13 @@
 
 .zeropage
 
+.ifdef ORICON
 curscr: .res 2
 leftx:  .res 1
 lefty:  .res 1
         ;;  TODO: do something clever to remove this?
 newlineadjust:  .res 1          ; or use tmp1?
+.endif ; ORICON
 
 ;;; used as (non-modifiable) arguments
 
@@ -56,6 +78,7 @@ _nil:   .res 6
 _T:     .word _T, _nil, _eval
         .byte "T", 0
 
+.ifdef ORICON
 ;;; =========================================================
 ;;; Implements a "mini-terminal" printing strings
 
@@ -198,7 +221,26 @@ _scrmova:
 
         rts
 
+.else ; ORICON
 
+;;; TODO: use builtin getchar/putchar from oric
+
+plaputchar:     
+        pla
+        ;; fall-through
+
+
+.proc putchar
+        rts
+.endproc
+
+.proc _printz
+        rts
+.endproc
+
+.endif ; ORICON
+
+.ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
 ;;; (doesn't trash X)
@@ -211,7 +253,9 @@ _scrmova:
         ;; >'9' => 'A'-'F'
         adc #6                  ; 'A'-'9'+1-1 (carry set)
 print:  
+.ifdef ORICON
         sta (curscr),y
+.endif ; ORICON
         iny
         rts
 .endproc
@@ -287,7 +331,7 @@ print:
 
 
 
-;;; _printds print a decimal value from AX (retained, Y trashed)
+;;; _printd print a decimal value from AX (retained, Y trashed)
 .proc _printd
         ;; save ax
         sta savea
@@ -377,7 +421,9 @@ under10:
         pha
         ldy #0
         lda #$24                ; '$'
+.ifdef ORICON
         sta (curscr),y
+.endif ; ORICON
         iny
 
         ;; print hi-byte
@@ -389,13 +435,15 @@ under10:
 
         ;; move cursor forward Y (=5)
         tya
+.ifdef ORICON
         jsr _scrmova
-
+.endif ; ORICON
         pla
 
         rts
 .endproc
 
+.endif                          ; NUMBERS
 
 ;;; typeNZVC, set flag depending on type of AX (retained):
 ;;;    N = Number, lol
@@ -448,6 +496,8 @@ iscons:
 .endproc
 
 
+.ifdef NUMBERS
+
 ;;;  TODO: inline macro? 3B
 .proc _isnumSetC                ; 12c 3B+1
         tay
@@ -456,6 +506,75 @@ iscons:
         rts                     ; C= 0 if Number!
 .endproc
 
+.proc _mul2
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+        rts
+.endproc
+
+.proc _div2
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+.endproc
+
+.ifdef TEST
+.proc testnums
+        ;; test hex
+        ldx #$be
+        lda #$ef
+        jsr _printh
+        jsr _printh
+
+        ldx #$12
+        lda #$34
+        jsr _printh
+        jsr _printh
+
+        ;; test dec
+        ldx #$10                ; 4321 dec
+        lda #$e1
+        jsr _printd
+        jsr _printd
+
+        ldx #$dd                ; 56789 dec
+        lda #$d5
+        jsr _printd
+        jsr _printd
+
+        ldx #$be                ; 48879 dec
+        lda #$ef
+        jsr _printd
+        jsr _printd
+
+        ldx #$12                ; 4660 dec
+        lda #$34
+        jsr _printd
+        jsr _printd
+
+        ;;; test type
+
+        ;; Number
+        lda #<(2*4711)
+        ldx #>(2*4711)
+        jsr _print
+        jsr _print
+        jsr _print
+        jsr _testtype
+
+        rts
+.endproc
+.endif ; TEST
+
+.endif ; NUMBERS
 
 ;; not inline...
 .proc _isconsSetC               ; 14-19c 14B
@@ -564,25 +683,6 @@ go:
 
 .endproc
 
-.proc _mul2
-        asl
-        tay
-        txa
-        rol
-        tax
-        tya
-        rts
-.endproc
-
-.proc _div2
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-        rts
-.endproc
 
 .proc _printatom
         ;; add 6 offset to point to name
@@ -603,24 +703,30 @@ noinc:
 
         jsr _type
 
+.ifdef NUMBERS
         bmi isnum
+.endif ; NUMBERS
         bcs iscons
         bvs issym
 
         ;; TODO: error?
         jmp ret
 
+.ifdef NUMBERS
 isnum:  
         jsr _div2
         jsr _printd
         jmp ret
+.endif
 
 issym:  
         jsr _printatom
         jmp ret
 
 iscons: 
-        jsr _printh
+        ;; TODO: write it
+        rts
+        ;jsr _printh
 
 ret:    
         pla
@@ -632,7 +738,9 @@ ret:
 
 .proc _initlisp
 
+.ifdef ORICON        
         jsr _initscr
+.endif ; ORICON
         
         ;; store _nil as car and cdr of _nil
         lda #<_nil
@@ -658,82 +766,18 @@ ret:
 
 
         ;; TODO: move to main?
+.ifdef TEST
         jsr _test
+.endif ; TEST
 
-        ;; test hex
-        ldx #$be
-        lda #$ef
-        jsr _printh
-        jsr _printh
+        rts
+.endproc
 
-        ldx #$12
-        lda #$34
-        jsr _printh
-        jsr _printh
+thetypeis: .byte "The value and type is: ",0
 
-        ;; test putchar
-        lda #67
-        jsr _putchar
-        lda #66
-        jsr _putchar
-        lda #65
-        jsr _putchar
+.ifdef TEST
 
-        ;; TEST push delayed putchar
-        ;; (this is clever hack to reverse chars)
-        ;; (these will print AFTER rts of this routine!)
-        lda #(65+32)
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        lda #66+32
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        lda #67+32
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        ;; test dec
-        ldx #$10                ; 4321 dec
-        lda #$e1
-        jsr _printd
-        jsr _printd
-
-        ldx #$dd                ; 56789 dec
-        lda #$d5
-        jsr _printd
-        jsr _printd
-
-        ldx #$be                ; 48879 dec
-        lda #$ef
-        jsr _printd
-        jsr _printd
-
-        ldx #$12                ; 4660 dec
-        lda #$34
-        jsr _printd
-        jsr _printd
-
-        ;;; test type
-
-        ;; Number
-        lda #<(2*4711)
-        ldx #>(2*4711)
-        jsr _print
-        jsr _print
-        jsr _print
-        jsr _testtype
-
+.proc testatoms
         ;; Atom
         lda #<_T
         ldx #>_T
@@ -752,33 +796,8 @@ ret:
         ldx #>_T
         jsr _print
 
-        lda #<_T
-        ldx #>_T
-        jsr _testtype
-        lda #<_T
-        ldx #>_T
-        jsr _testtype
-
-        lda #<_nil
-        ldx #>_nil
-        jsr _testtype
-        lda #<_nil
-        ldx #>_nil
-        jsr _testtype
-
-        lda #<_nil
-        ldx #>_nil
-        jsr _print
-
         rts
 .endproc
-
-;hello:  .asciiz "2 Hello AsmLisp!",10,""
-
-_hello:	   .byte "4 Hello AsmLisp!",10,0
-_helloN:   .byte "5 Hello AsmLisp!",10,0
-
-thetypeis: .byte "The value and type is: ",0
 
 .proc _testtype
         jsr _print
@@ -818,8 +837,30 @@ iscons: lda #64+3               ; 'C'
 
 .endproc
 
-;;; 123 bytes
+
 .proc _test
+        ;jsr _testprint
+
+        jsr _mul2
+
+.ifdef NUMBERS
+        jsr testnums
+.endif
+        jsr testatoms
+
+        jsr testtypefunc
+
+        rts
+.endproc
+
+
+;;; 123 bytes
+;hello:  .asciiz "2 Hello AsmLisp!",10,""
+
+_hello:	   .byte "4 Hello AsmLisp!",10,0
+_helloN:   .byte "5 Hello AsmLisp!",10,0
+
+.proc _testprint
 
         ;; an A was written by c-code
 
@@ -884,3 +925,27 @@ iscons: lda #64+3               ; 'C'
         rts
 .endproc
 
+
+.proc testtypefunc
+        lda #<_T
+        ldx #>_T
+        jsr _testtype
+        lda #<_T
+        ldx #>_T
+        jsr _testtype
+
+        lda #<_nil
+        ldx #>_nil
+        jsr _testtype
+        lda #<_nil
+        ldx #>_nil
+        jsr _testtype
+
+        lda #<_nil
+        ldx #>_nil
+        jsr _print
+
+        rts
+.endproc
+
+.endif ; TEST
