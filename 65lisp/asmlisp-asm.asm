@@ -1,3 +1,26 @@
+;;; "SectorLisp for 6502" asmlisp-asm.asm (+ asmlisp.c)
+;;; 
+;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
+
+;;; This is an attempt to write a pure assembly minimal
+;;; lisp for 6502, similar to SectorLisp that was
+;;; only 436 bytes, smaller than the SectoForth at 512
+;;; bytes.
+;;; 
+;;; There is a z80/6502 milliforth is 336/328 bytes.
+;;; 
+;;; can we create a minimal 6502 lisp?
+
+;;; SectorLisp limitations:
+;;; - 512 bytes "bootable"
+;;; - assumes prexisting "bios": getch putch
+;;; - only SYMBOLS and CONS
+;;; - reader and writer (no editor, or backspace)
+;;; - only LAMBDA ATOM CONS CAR CDR EQ COND PRINT READ EVAL (APPLY?)
+;;; - no GC (or minimal "reset")
+
+
+
 ;;; enable these 3 lines for NOTHING
 ;.export _initlisp
 ;_initlisp:      rts
@@ -967,3 +990,73 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endproc
 
 .endif ; TEST
+
+
+;;; LISP:
+;;;   SectorForth: 	512 bytes
+;;;   SectorLisp:  	436 bytes
+;;;   z80 milliforth:	336 bytes
+;;;   6502 milliforth:  328 bytes !
+;;; 
+;;; - https://github.com/agsb/milliForth-6502
+;;;   * no: line editor, bs, cancel, low ascii
+;;;         stacks overflow, underflow checks
+;;;   primitives: s@ + nand @ ! 0# exit key emit
+;;;   internals: spush spull rpull rpush
+;;;     copyfrom copyinto (heap code) incr decr add etc
+;;;     cold warm quit token skip scan getline
+;;;     parse find compile execute
+;;;     unnest next nest unnest pick jump
+;;;   externals: getch putch byes
+;;;   ext: 2/ exec $(jmp to ipt) 
+;;;   optional: bye abort .S .R . words dump
+;;;;
+;;; 6502 asmlisp - "SECTORLISP for 6502"
+;;; (goal < 512 bytes, not care speed)
+;;; 
+;;; - = function planned
+;;; * = function in SectorLisp
+;;; # = number function / optional
+;;; 
+;;; [42] bytes neeeded but is "bios" (getchar/putchar)
+;;; (42) bytes needed for optinoal (numbers)
+;;;
+;;;   - _type		29 (6)		29
+;;;   * atom (== !iscons)
+;;;   - prin1
+;;;     - prinz         [75]
+;;;     - putchar       [10]
+;;;     N printd        (12)
+;;;       - voidprintd  (38+1)	 	
+;;;     - initscr       (17)
+;;;     * print         28 (11)         67 (79) [85]
+;;;       * print cons/list (TODO)
+;;;   * eq
+;;;   * read
+;;;     * readatom       15             82
+;;;     * readlist
+;;;       * quote
+;;;     # readnum       (38)              
+;;;       # mul16       (33)                (150)  
+;;;   * cons (grow down?)
+;;;   * car
+;;;   * cdr
+;;;   * lambda
+;;;   * eval            35              117        [85]
+;;;     - assoc
+;;;   * cond / if
+;;;
+;;; STACK (TODO: use limited 256 byte? or 80B in zp?)
+;;;   - pushax
+;;;   - popax
+;;;   - incsp2
+;;;   - incsp4
+;;;
+;;;   # plus (+)
+;;;
+;;; GOODIES
+;;;   - def
+;;;   - apply
+;;;   - and
+;;;   - or
+;;;   - list
