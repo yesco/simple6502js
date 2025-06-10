@@ -1,14 +1,35 @@
+;;; enable these 3 lines for NOTHING
+;.export _initlisp
+;_initlisp:      rts
+;.end
+
+
+;;; START
+;;; 
+;;; .TAP delta
+;;;  294      bytes - NOTHING
+;;;  477  183 bytes - MINIMAL
+;;;  613      bytes - ORICON
+;;;  683 bytes - NUMBERS
+;;;  900 bytes - TEST + ORICON
+;;; 1168 bytes - NUMBERS + ORICON + TEST
+
+;;;  183 bytes - MINIMAL
+;;;       initlisp 29, _T 8
+;;;       _type 30
+;;;         isnum 4, iscons 14, isnull 6, isatom 9 (33)
+;;;       print 35, printatom 8,
+;;;       eval 30 
+;;;    == 173  (+ 30 14 6 9 30 8 35 29 8 4) 
+
 ;;; enable numbers
-NUMBERS=1
+;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
 ;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;ORICON=1
-
-
-
 
 .import incsp2, incsp4, incsp6, incsp8
 .import addysp
@@ -725,7 +746,6 @@ issym:
 
 iscons: 
         ;; TODO: write it
-        rts
         ;jsr _printh
 
 ret:    
@@ -773,9 +793,9 @@ ret:
         rts
 .endproc
 
-thetypeis: .byte "The value and type is: ",0
-
 .ifdef TEST
+
+thetypeis: .byte "The value and type is: ",0
 
 .proc testatoms
         ;; Atom
@@ -839,9 +859,7 @@ iscons: lda #64+3               ; 'C'
 
 
 .proc _test
-        ;jsr _testprint
-
-        jsr _mul2
+        jsr _testprint
 
 .ifdef NUMBERS
         jsr testnums
