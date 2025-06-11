@@ -221,34 +221,32 @@ cYr:
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
 
-;;; A is trashed
-.proc setnewcar
+;;; set car on new cons (A is trashed)
+setnewcar:      
         ldy #0
-        sta (lowcons),y
-        iny
-        txa
-        sta (lowcons),y
-        rts
-.endproc
+        jmp setnewcYr
 
-;;; A is trashed
-.proc setnewcdr
+setnewcdr:      
         ldy #2
+setnewcYr:      
         sta (lowcons),y
         iny
         txa
         sta (lowcons),y
         rts
-.endproc
+
 
 ;;; newcons -> AX address of new cons
 .proc newcons
+        ;; save current cons to return in AX
         lda lowcons
         pha
         lda lowcons+1
         pha
 
-        ;; lowcons-= 4 ;; 1B 13-14c
+        ;; lowcons-= 4
+        ;; 11B 13-14c
+;;; TODO: 7B::: ldy #4 ; ldx #lowcons ; jsr subwy
         sec
         lda lowcons
         sbc #04
@@ -256,11 +254,11 @@ cYr:
         bcs nodec
         dec lowcons+1
 nodec:  
-
-        POP
-
-        rts
 .endproc
+
+popret: 
+        POP
+        rts
 
 ;;; cons(car, cdr)
 .proc cons
@@ -1113,9 +1111,9 @@ iscons:
         jsr _putchar
 
 ret:    
-        POP
-        
-        rts
+        jmp popret
+;        POP
+;        rts
 .endproc
 
 
@@ -1158,9 +1156,9 @@ ret:
         stx locidx
 
         ;; memory mgt
-        lda #<(TOPMEM-4)
+        lda #<(TOPMEM-4-1)
         sta lowcons
-        lda #>(TOPMEM-4)
+        lda #>(TOPMEM-4-1)
         sta lowcons+1
 
 ;;; TODO: move _T here and any selfeval symbol
@@ -1261,7 +1259,6 @@ iscons: lda #'C'
 
         jsr testatoms
         jsr testtypefunc
-        jsr testcons
 
         jsr testbind
 
@@ -1433,20 +1430,40 @@ afterfoo3:
 tcons:      .word _T, _T
 
 .proc testcons
+        lda #10
+        jsr _putchar
+
         SETAX tcons
         jsr _print
 
         lda #'c'
         jsr _putchar
 
-.ifnblank
-        SETAX _T
+        ;; make new cons
+        SETAX tcons
         jsr setnewcar
-        SETAX _T
+
+        SETAX tcons
+        jsr setnewcdr
+
+        jsr newcons
+        jsr _print              
+        DUP
+
+        lda #10
+        jsr _putchar
+
+        POP
+        DUP
+        jsr setnewcar
+        POP
         jsr setnewcdr
         jsr newcons
         jsr _print
-.endif
+
+        lda #10
+        jsr _putchar
+        
         rts
 .endproc
 
