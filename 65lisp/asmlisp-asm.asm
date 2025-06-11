@@ -73,6 +73,61 @@ TEST=1
 
 ;;; --------------------------------------------------
 
+;;; Functions f(AX) => AX
+
+car:    
+        sta ptr1
+        stx ptr1+1
+
+.proc carptr1       
+        ldy #1
+        lda (ptr1),y
+        tax
+        dey
+        lda (ptr1),y
+        rts
+.endproc
+
+
+cdr:    
+        sta ptr1
+        stx ptr1+1
+
+.proc cdrptr1
+        ldy #3
+        lda (ptr1),y
+        tax
+        dey
+        lda (ptr1),y
+        rts
+.endproc
+
+
+;;; _print
+
+;;; push A,X on R-stack
+.macro PUSH
+        pha
+        txa
+        pha
+.endmacro
+
+.macro POP
+        pla
+        tax
+        pla
+.endmacro
+
+.macro DUP
+        tay
+        pha
+        txa
+        pha
+        tya
+.endmacro
+
+;;; --------------------------------------------------
+
 ;; TODO: not working in ca65, too old?
 
 ;.feature string_escape
@@ -348,7 +403,7 @@ end:
 ;;; - ATOMS
 ;;; TODO: any evaluate to self, put in ZP?
 ;;;       (easier test in eval!)
-.align 2
+.align 4
 .res 1
 
 _T:     .word _T, _nil, _eval
@@ -804,12 +859,7 @@ go:
 
 ;;; 76B (very big)
 .proc _print
-        ;; push ax on rstack (retained)
-        tay
-        pha
-        txa
-        pha
-        tya
+        DUP
 
 .ifdef NUMBERS
         bit BITNOTINT
@@ -860,9 +910,7 @@ iscons:
         jsr _putchar
 
         ;; print cdr
-        pla
-        tax
-        pla
+        POP
 
         jsr _print
 
@@ -871,9 +919,7 @@ iscons:
         jsr _putchar
 
 ret:    
-        pla
-        tax
-        pla
+        POP
         
         rts
 .endproc
