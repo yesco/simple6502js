@@ -150,19 +150,24 @@ cYr:
 
 ;;; _print
 
-;;; push A,X on R-stack
+;;; push A,X on R-stack (AX trashed, use DUP?)
+;;; (cc65: jsr pushax takes 39c!)
+;;; 3B 7c
 .macro PUSH
         pha
         txa
         pha
 .endmacro
 
+;;; 3B 6C
 .macro POP
         pla
         tax
         pla
 .endmacro
 
+;;; DUP AX onto stack (AX retained)
+;;; 5B
 .macro DUP
         tay
         pha
@@ -179,7 +184,7 @@ cYr:
 .endmacro
 
 ;;; ARG(n) n n=0 is prev arg, n=1 prev arg
-;;; 6B 8c
+;;; 12B 14c
 .macro ARG n
         ARGSETY                 ; probably needed always
         YARGN n
@@ -191,6 +196,9 @@ cYr:
 .endmacro
 
 ;;; arg number Y
+;;; 
+;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
+
 ;;; 5B 36c
 .macro arg n
         ldy #(n*2)
