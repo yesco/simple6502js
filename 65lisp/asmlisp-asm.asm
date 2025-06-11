@@ -118,7 +118,7 @@ _nil:   .res 6
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
 
-.macro LDAX val
+.macro SETAX val
         lda #<val
         ldx #>val
 .endmacro
@@ -1157,12 +1157,10 @@ iscons: lda #'C'
 
         jsr testbind
 
-        ;; crazy idea using continuation and stack
+        ;; crazy idea: continuation for stack
         ;; for parameter passing
-        ;; 
         ;; 6B, 6c overhead
-        ;; (if rest of code is written at "jmp afterfoo"
-        ;;  then save 3B 3c!)
+        ;; (3B 3c if rest of code inlined)
 
         ;; foo(_T, tcons, _nil) 
         jsr callfoo
@@ -1172,15 +1170,36 @@ iscons: lda #'C'
 callfoo:    
         ;; one parameter 4+3=7 bytes
         ;; (could be lda pha lda sta = 6)
-        LDAX _T
+        SETAX _T
         PUSH
 
-        LDAX tcons
+        SETAX tcons
         PUSH
         ;; last parameter in AX
-        LDAX _nil
+        SETAX _nil
         jmp foo
 afterfoo:
+
+
+        ;; foo(_T, tcons, _nil) 
+        jmp afterfoo2
+callfoo2:    
+        ;; one parameter 4+3=7 bytes
+        ;; (could be lda pha lda sta = 6)
+        SETAX _T
+        PUSH
+
+        SETAX tcons
+        PUSH
+        ;; last parameter in AX
+        SETAX _nil
+        jmp foo
+afterfoo2:
+        jsr callfoo2
+        ;; comes here after callfoo!!!
+        ;; return result in AX
+
+
 
         lda #'!'
         jsr _putchar
@@ -1203,7 +1222,7 @@ afterfoo:
 tcons:      .word _T, _T
 
 .proc testcons
-        LDAX tcons
+        SETAX tcons
         jsr _print
         rts
 .endproc
@@ -1217,18 +1236,18 @@ tcons:      .word _T, _T
         eor #'0'
         jsr _putchar
 
-        LDAX _T
+        SETAX _T
         jsr getvalue
         jsr _print
 
         lda #'X'
         jsr _putchar
 
-        LDAX tcons
+        SETAX tcons
         sta ptr1
         stx ptr1+1
 
-        LDAX _T
+        SETAX _T
 
         jsr bind
 
@@ -1239,7 +1258,7 @@ tcons:      .word _T, _T
         lda #'y'
         jsr _putchar
 
-        LDAX _T
+        SETAX _T
         jsr getvalue
         jsr _print
 
@@ -1291,7 +1310,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endif ; ORICON
 
         ;; write string x 17
-        LDAX _hello
+        SETAX _hello
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1314,7 +1333,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endif ; ORICON
 
         ;; 13 x helloN
-        LDAX _helloN
+        SETAX _helloN
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1323,7 +1342,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         jsr _printzptr
 .endif ; ORICON
         
-        LDAX _helloN
+        SETAX _helloN
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1346,17 +1365,17 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
 
 .proc testtypefunc
-        LDAX _T
+        SETAX _T
         jsr _testtype
-        LDAX _T
-        jsr _testtype
-
-        LDAX _nil
-        jsr _testtype
-        LDAX _nil
+        SETAX _T
         jsr _testtype
 
-        LDAX _nil
+        SETAX _nil
+        jsr _testtype
+        SETAX _nil
+        jsr _testtype
+
+        SETAX _nil
         jsr _print
 
         rts
