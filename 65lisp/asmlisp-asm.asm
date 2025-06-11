@@ -25,30 +25,29 @@
 ;;; START
 ;;; 
 ;;; .TAP delta
-;;;  319          bytes - NOTHING (search)
-;;;  502 +183     bytes - MINIMAL (- 502 319)
+;;;  320          bytes - NOTHING (search)
+;;;  493 +173     bytes - MINIMAL (- 493 320)
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
-;;;  681 +179 362 bytes - NUMBERS (- 681 502)
+;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 183 bytes:
-;;;       _type 30  just "BIT bit2"
-;;;         isnum 4, iscons 14, isnull 6, isatom 9 (33)
-;;;       print 35, printatom 8,
-;;;       eval 30 
-;;;    == 173  (+ 30 14 6 9 30 8 35 29 8 4) 
+;;; 195 bytes:
+;;;       initlisp nil 37, T 10,
+;;;       print 76, printz 17, eval 30 
+;;;    == 170  (+ 37 10 76 17 30)
 
 ;;; enable numbers
-NUMBERS=1
+;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
 ;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
+;;; TODO: debug, not working well get ERROR 800. lol
 ;ORICON=1
 
 .import incsp2, incsp4, incsp6, incsp8
-.import addysp
+;.import addysp
 
 .export _nil
 .export _initlisp
@@ -89,6 +88,10 @@ ptr3:   .res 2
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
+
+;;; used to detect type using BIT & beq
+BITNOTINT: .res 1
+BITISCONS: .res 1
 
 ;;; various special data items, constants
 ;;; - ATOMS
@@ -174,7 +177,11 @@ plaputchar:
 ;;; TODO: hibit (&7f<32 print as attribute, otherwise inverse)
 
 ;;; Note: AX is trashed (it's stored in ptr1!)
+PRINTZ  = 1
+
 _printz:      
+        ldy #0
+_printzY:       
         sta ptr1
         stx ptr1+1
 
@@ -186,8 +193,8 @@ _printz:
 ;; init screen state
 
 _printzptr:        
-        ldy #00
-        sty newlineadjust
+        lda #00
+        sta newlineadjust
         ldx leftx
 
 @next:   
@@ -250,6 +257,11 @@ _scrmova:
 
         rts
 
+.proc _getchar
+        lda #65+32+25-3         ; 'x'
+        rts
+.endproc
+
 .else ; ORICON
 
 ;;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
@@ -290,19 +302,21 @@ notnl:
 .endif ; ORICON
 
 ;;; enable these 3 lines for NOTHING
-;.export _initlisp            
+;.export _initlisp        
 ;_initlisp:      rts            
 ;.end
 
 
-;;; _putz prints zstring at AX
+;;; _printz prints zstring at AX
 ;;; (no newline added that puts does)
+;;; 
+;;; 17B
+.ifndef PRINTZ
 _printz:  
         ldy #0
 
 ;;; _printzY prints zstring from AX starting at offset Y
 ;;; (no newline added that puts does)
-.ifnblank
 .proc _printzY
         sta ptr1
         stx ptr1+1
@@ -315,7 +329,7 @@ next:
 end:    
         rts
 .endproc
-.endif
+.endif ; PRINTZ
 
 ;;; ===================================
 ;;; LISP:
@@ -541,6 +555,7 @@ under10:
 ;;;    V = Atom
 ;;;    C = Cons
 
+.ifnblank
 .proc _type                     ; 34 bytes: 18-38c
         tay
         clv
@@ -584,18 +599,12 @@ iscons:
         ldy #1
         rts		        ; 24c
 .endproc
-
+.endif
 
 .ifdef NUMBERS
 
-;;;  TODO: inline macro? 3B
-.proc _isnumSetC                ; 12c 3B+1
-        tay
-        lsr
-        tya
-        rts                     ; C= 0 if Number!
-.endproc
-
+;;; TODO: see mul10
+.ifnblank
 .proc _mul2
         asl
         tay
@@ -605,6 +614,7 @@ iscons:
         tya
         rts
 .endproc
+.endif
 
 .proc _div2
         tay
@@ -666,6 +676,15 @@ iscons:
 
 .endif ; NUMBERS
 
+.ifnblank ; TODO: not used - remove, or update with BIT and make macro?
+
+.proc _isnumSetC                ; 12c 3B+1
+        tay
+        lsr
+        tya
+        rts                     ; C= 0 if Number!
+.endproc
+
 ;; not inline...
 .proc _isconsSetC               ; 14-19c 14B
         tay
@@ -708,7 +727,7 @@ ret:
         rts
 .endproc
 
-
+.endif ; blank
 
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
@@ -774,16 +793,7 @@ go:
 .endproc
 
 
-.proc _printatom
-        ;; add 6 offset to point to name
-        clc
-        adc #6
-        bcc noinc
-        inx
-noinc:  
-        jmp _printz
-.endproc
-
+.ifnblank
 .proc _print
         pha
         tay
@@ -810,7 +820,8 @@ isnum:
 .endif
 
 issym:  
-        jsr _printatom
+        ldy #6
+        jsr _printzY
         jmp ret
 
 iscons: 
@@ -825,20 +836,103 @@ ret:
         rts
 .endproc
 
+.else ; _print
+
+;;; 76B (very big)
+.proc _print
+        tay
+        pha
+        txa
+        pha
+        tya
+
+.ifdef NUMBERS
+        bit BITNOTINT
+        bne notint
+isnum:  
+        jsr _div2
+        jsr _printd
+        jmp ret
+.endif ; NUMBERS
+
+notint: 
+        bit BITISCONS
+        bne iscons
+issym:  
+        ldy #6
+        jsr _printzY
+        jmp ret
+
+iscons: 
+        pha
+        lda #40
+        jsr _putchar
+        pla
+
+        ;; ptr2= CDR(ptr1)
+        ;; TODO: reverse mem [CDR,CAR]
+        ldy #2
+        lda (ptr2),y ; a
+        pha
+        iny
+        lda (ptr2),y ; x
+        pha
+
+        ;; ptr2= CAR(ptr1)
+        ldy #1
+        lda (ptr2),y ; x
+        tax
+        dey
+        lda (ptr2),y ; a
+
+        jsr _print
+
+        ;; '.'
+        lda #46
+        jsr _putchar
+
+        ;; print cdr
+        pla
+        tax
+        pla
+
+        jsr _print
+
+        ;; ')'
+        lda #41
+        jsr _putchar
+
+ret:    
+        pla
+        tax
+        pla
+        
+        rts
+.endproc
+
+.endif ; _print
+
 .proc _initlisp
 
 .ifdef ORICON        
         jsr _initscr
 .endif ; ORICON
         
+        ;; type BITs
+        lda #01
+        sta BITNOTINT
+        lda #02
+        sta BITISCONS
+
         ;; store _nil as car and cdr of _nil
+.assert .hibyte(_nil) = 0, error
         lda #<_nil
         sta _nil
-        sta _nil+2
+        ; sta _nil+2 ; do below
 
         lda #>_nil
         sta _nil +1
-        sta _nil+2 +1
+        ; sta _nil+2 +1 ; do below
 
         ;;  write 'nil'
         lda #110
@@ -847,13 +941,18 @@ ret:
         sta _nil+7
         lda #108
         sta _nil+8
+
         lda #0
         sta _nil+9
+        sta _nil+2
+        sta _nil+2 +1
+
+;;; TODO: move _T here and any selfeval symbol
 
         ; TODO: store address of "evalsecond"
         ; (nil (+ 3 4) (+ 4 5)) => 9 !
 
-
+.ifdef TEST
         lda #65+25
         jsr _putchar
         lda #65+24
@@ -862,6 +961,7 @@ ret:
         jsr _putchar
         jsr _getchar
         jsr _putchar
+.endif ; TEST
 
         ;; TODO: move to main?
 .ifdef TEST
@@ -911,7 +1011,7 @@ thetypeis: .byte "The value and type is: ",0
         tax
         pla
 
-        jsr _type
+;        jsr _type
         bmi isnum
         beq isnull
         bvs issym
@@ -958,6 +1058,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
 .proc _testprint
 
+.ifdef ORICON
         ;; an A was written by c-code
 
         ;; write a B directly
@@ -969,11 +1070,13 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         dec leftx
         lda #02
         jsr _scrmova
+.endif ; ORICON
 
         ;; write string x 17
         lda #<_hello
         ldx #>_hello
         jsr _printz
+.ifdef ORICON
         jsr _printzptr
         jsr _printzptr
 
@@ -991,19 +1094,23 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
+.endif ; ORICON
 
         ;; 13 x helloN
         lda #<_helloN
         ldx #>_helloN
         jsr _printz
+.ifdef ORICON
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
+.endif ; ORICON
         
         lda #<_helloN
         ldx #>_helloN
         jsr _printz
+.ifdef ORICON
         jsr _printzptr
         jsr _printzptr
         jsr _printzptr
@@ -1017,6 +1124,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         lda #67
         ldy #00
         sta (curscr),y
+.endif ; ORICON
 
         rts
 .endproc
