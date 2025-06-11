@@ -28,22 +28,24 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
-;;;  551 +231     bytes - MINIMAL (- 551 320)
+;;; 1629 +231     bytes - MINIMAL (- 551 320)
 ;;;     this was with _eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 195 bytes:
+;;; 285 bytes (- 1629 1024 320)
 ;;;       initlisp nil 37, T 10,
-;;;       print 76, printz 17, eval 30 
-;;;    == 170  (+ 37 10 76 17 30)
+;;;       print 76, printz 17, eval 30
+;;;       getvalue 38, bind 19,
+;;;       setnewcar setnewcdr 14, newcons 21, cons 12, rev 12
+;;;    == 286 (+ 37 10 76 17 30 38 19 14 21 12 12)
 
 ;;; enable numbers
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -237,6 +239,8 @@ setnewcYr:
 
 
 ;;; newcons -> AX address of new cons
+;;; 
+;;; 21B
 .proc newcons
         ;; save current cons to return in AX
         lda lowcons
@@ -277,6 +281,8 @@ popret:
 .endproc
 
 ;;; ----------------------------------------
+
+;;; TODO: this doesn't need to be here in the binrary?
 
 ;;; locals
 locidlo:        .res 256
@@ -941,6 +947,7 @@ isnum:
 .endproc ; _eval
 
 ;;; 38B 39++ found
+;;; TODO: make smaller! assoc cheaper?
 .proc getvalue
         sta savex
         ;; search locals
@@ -971,8 +978,10 @@ found:
         rts
 .endproc
 
-;; bind AX symbol name with stacked value
-;; -> AX (A garbled)
+;;; bind AX symbol name with stacked value
+;;; -> AX (A garbled)
+;;; 
+;;; 19B
 .proc bind
         dec locidx
         ldy locidx
@@ -1167,6 +1176,7 @@ ret:
         ; (nil (+ 3 4) (+ 4 5)) => 9 !
 
         ;; TODO: move to main?
+
 .ifdef TEST
         jsr _test
 .endif ; TEST
@@ -1650,6 +1660,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 ;;; 6502 asmlisp - "SECTORLISP for 6502"
 ;;; (goal < 512 bytes, not care speed)
 ;;; 
+;;; ! = done
 ;;; - = function planned
 ;;; * = function in SectorLisp
 ;;; # = number function / optional
@@ -1657,9 +1668,9 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 ;;; [42] bytes neeeded but is "bios" (getchar/putchar)
 ;;; (42) bytes needed for optinoal (numbers)
 ;;;
-;;;   - _type		29 (6)		29
+;;; x - _type		29 (6)		29
 ;;;   * atom (== !iscons)
-;;;   - prin1
+;;; ! * prin1
 ;;;     - prinz         [75]
 ;;;     - putchar       [10]
 ;;;     N printd        (12)
@@ -1674,9 +1685,9 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 ;;;       * quote
 ;;;     # readnum       (38)              
 ;;;       # mul16       (33)                (150)  
-;;;   * cons (grow down?)
-;;;   * car
-;;;   * cdr
+;;; ! * cons (grow down?)
+;;; ! * car
+;;; ! * cdr
 ;;;   * lambda
 ;;;   * eval            35              117        [85]
 ;;;     - assoc
