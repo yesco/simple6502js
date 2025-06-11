@@ -42,7 +42,7 @@
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -330,7 +330,7 @@ _scrmova:
         rts
 
 .proc _getchar
-        lda #65+32+25-3         ; 'x'
+        lda #'x'
         rts
 .endproc
 
@@ -424,11 +424,12 @@ _T:     .word _T, _nil, _eval
 ;;; (doesn't trash X)
 .proc _print1h
         and #15
-        ora #48                 ; '0'
-        cmp #58                 ; '9'+1
+        ora #'0'
+        cmp #('9'+1)
         bcc print
         ;; >'9' => 'A'-'F'
-        adc #6                  ; 'A'-'9'+1-1 (carry set)
+        adc #('A'-'9'-1)
+
 print:  
 .ifdef ORICON
         sta (curscr),y
@@ -860,7 +861,7 @@ notfound:
         ;; TODO: if closer to car could beq there!
         jmp car
 found:  
-        lda #65
+        lda #'A'
         jsr _putchar
 
         ;; get value
@@ -1100,13 +1101,14 @@ thetypeis: .byte "The value and type is: ",0
         txa
         pha
         
-        lda #58                 ; ':'
+        lda #':'
         jsr _putchar
 
         pla
         tax
         pla
 
+;;; TODO: fix
 ;        jsr _type
         bmi isnum
         beq isnull
@@ -1114,19 +1116,19 @@ thetypeis: .byte "The value and type is: ",0
         bcs iscons
         
 nomatch:        
-        lda #63                 ; '?'
+        lda #'?'
         jmp _putchar
 
-isnum:  lda #78                 ; 'N'
+isnum:  lda #'N'
         jmp _putchar
 
-isnull: lda #90                 ; 'Z'
+isnull: lda #'Z'
         jsr _putchar
 
-issym:  lda #83                 ; 'S'
+issym:  lda #'S'
         jmp _putchar
 
-iscons: lda #64+3               ; 'C'
+iscons: lda #'C'
         jmp _putchar
 
 .endproc
@@ -1134,11 +1136,11 @@ iscons: lda #64+3               ; 'C'
 
 .proc _test
         ;; test putchar getchar
-        lda #65+25
+        lda #'Z'
         jsr _putchar
-        lda #65+24
+        lda #'X'
         jsr _putchar
-        lda #65+23
+        lda #'Y'
         jsr _putchar
         jsr _getchar
         jsr _putchar
@@ -1155,6 +1157,44 @@ iscons: lda #64+3               ; 'C'
 
         jsr testbind
 
+        ;; crazy idea using continuation and stack
+        ;; for parameter passing
+        ;; 
+        ;; 6B, 6c overhead
+        ;; (if rest of code is written at "jmp afterfoo"
+        ;;  then save 3B 3c!)
+
+        ;; foo(_T, tcons, _nil) 
+        jsr callfoo
+        ;; comes here after callfoo!!!
+        ;; return result in AX
+        jmp afterfoo
+callfoo:    
+        ;; one parameter 4+3=7 bytes
+        ;; (could be lda pha lda sta = 6)
+        LDAX _T
+        PUSH
+
+        LDAX tcons
+        PUSH
+        ;; last parameter in AX
+        LDAX _nil
+        jmp foo
+afterfoo:
+
+        lda #'!'
+        jsr _putchar
+
+        rts
+.endproc
+
+;;; foo(a,b,c) prints c, b, a
+.proc foo
+        jsr _print
+        POP
+        jsr _print
+        POP
+        jsr _print
         rts
 .endproc
 
@@ -1170,18 +1210,18 @@ tcons:      .word _T, _T
 
 
 .proc testbind
-        lda #64+2               ; 'D'
+        lda #'D'
         jsr _putchar
 
         lda locidx
-        eor #48
+        eor #'0'
         jsr _putchar
 
         LDAX _T
         jsr getvalue
         jsr _print
 
-        lda #64+24               ; 'X'
+        lda #'X'
         jsr _putchar
 
         LDAX tcons
@@ -1193,10 +1233,10 @@ tcons:      .word _T, _T
         jsr bind
 
         lda locidx
-        eor #48
+        eor #'0'
         jsr _putchar
 
-        lda #64+32+25               ; 'y'
+        lda #'y'
         jsr _putchar
 
         LDAX _T
@@ -1204,7 +1244,7 @@ tcons:      .word _T, _T
         jsr _print
 
         lda #$ff                ; 'O' == $ff ^ 48
-        eor #48
+        eor #'0'
         jsr _putchar
 
         ldy #$ff
@@ -1213,7 +1253,7 @@ tcons:      .word _T, _T
         lda loclo,y
         jsr _print
 
-        lda #64+32+24               ; 'x'
+        lda #'x'
         jsr _putchar
 
         ldy #$ff
@@ -1222,7 +1262,7 @@ tcons:      .word _T, _T
         lda locidlo,y
         jsr _print
 
-        lda #64+25               ; 'Y'
+        lda #'Y'
         jsr _putchar
 
         rts
@@ -1240,7 +1280,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         ;; an A was written by c-code
 
         ;; write a B directly
-        lda #66
+        lda #'B'
         sta $BB81
 
 	;; move 2 char forward to keep AB on screen
@@ -1296,7 +1336,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         jsr _printzptr
 
         ;; write a C indirectly at current pos
-        lda #67
+        lda #'C'
         ldy #00
         sta (curscr),y
 .endif ; ORICON
