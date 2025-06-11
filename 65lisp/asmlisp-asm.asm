@@ -40,7 +40,7 @@
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -63,6 +63,15 @@
 .ifdef TEST
 .export _test
 .endif
+
+;;; --------------------------------------------------
+
+.macro LDAX val
+        lda #<val
+        ldx #>val
+.endmacro
+
+;;; --------------------------------------------------
 
 ;; TODO: not working in ca65, too old?
 
@@ -793,53 +802,9 @@ go:
 .endproc
 
 
-.ifnblank
-.proc _print
-        pha
-        tay
-        txa
-        pha
-        tya
-
-        jsr _type
-
-.ifdef NUMBERS
-        bmi isnum
-.endif ; NUMBERS
-        bcs iscons
-        bvs issym
-
-        ;; TODO: error?
-        jmp ret
-
-.ifdef NUMBERS
-isnum:  
-        jsr _div2
-        jsr _printd
-        jmp ret
-.endif
-
-issym:  
-        ldy #6
-        jsr _printzY
-        jmp ret
-
-iscons: 
-        ;; TODO: write it
-        ;jsr _printh
-
-ret:    
-        pla
-        tax
-        pla
-        
-        rts
-.endproc
-
-.else ; _print
-
 ;;; 76B (very big)
 .proc _print
+        ;; push ax on rstack (retained)
         tay
         pha
         txa
@@ -859,18 +824,21 @@ notint:
         bit BITISCONS
         bne iscons
 issym:  
+        ;; TODO: struct?
         ldy #6
         jsr _printzY
         jmp ret
 
 iscons: 
-        pha
+        ;; ptr2= ax
+        sta ptr2
+        stx ptr2+1
+
+        ;; '('
         lda #40
         jsr _putchar
-        pla
 
-        ;; ptr2= CDR(ptr1)
-        ;; TODO: reverse mem [CDR,CAR]
+        ;; push CDR(ptr1)
         ldy #2
         lda (ptr2),y ; a
         pha
@@ -910,7 +878,6 @@ ret:
         rts
 .endproc
 
-.endif ; _print
 
 .proc _initlisp
 
@@ -1046,9 +1013,19 @@ iscons: lda #64+3               ; 'C'
 
         jsr testtypefunc
 
+        jsr testcons
         rts
 .endproc
 
+.align 4
+.res 3
+tcons:      .word _T, _T
+
+.proc testcons
+        LDAX tcons
+        jsr _print
+        rts
+.endproc
 
 ;;; 123 bytes
 ;hello:  .asciiz "2 Hello AsmLisp!",10,""
@@ -1073,8 +1050,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endif ; ORICON
 
         ;; write string x 17
-        lda #<_hello
-        ldx #>_hello
+        LDAX _hello
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1097,8 +1073,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endif ; ORICON
 
         ;; 13 x helloN
-        lda #<_helloN
-        ldx #>_helloN
+        LDAX _helloN
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1107,8 +1082,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
         jsr _printzptr
 .endif ; ORICON
         
-        lda #<_helloN
-        ldx #>_helloN
+        LDAX _helloN
         jsr _printz
 .ifdef ORICON
         jsr _printzptr
@@ -1131,22 +1105,17 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
 
 .proc testtypefunc
-        lda #<_T
-        ldx #>_T
+        LDAX _T
         jsr _testtype
-        lda #<_T
-        ldx #>_T
+        LDAX _T
         jsr _testtype
 
-        lda #<_nil
-        ldx #>_nil
+        LDAX _nil
         jsr _testtype
-        lda #<_nil
-        ldx #>_nil
+        LDAX _nil
         jsr _testtype
 
-        lda #<_nil
-        ldx #>_nil
+        LDAX _nil
         jsr _print
 
         rts
