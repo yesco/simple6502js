@@ -22,28 +22,24 @@
 
 
 
-;;; enable these 3 lines for NOTHING
-;.export _initlisp
-;_initlisp:      rts
-;.end
-
-
 ;;; START
 ;;; 
 ;;; .TAP delta
-;;;  294      bytes - NOTHING
-;;;  477  183 bytes - MINIMAL
-;;;  613      bytes - ORICON
-;;;  683 bytes - NUMBERS
-;;;  900 bytes - TEST + ORICON
-;;; ;;;       _type 30  just "BIT bit2"
+;;;  319          bytes - NOTHING (search)
+;;;  502 +183     bytes - MINIMAL (- 502 319)
+;;;  613          bytes - ORICON  (raw ORIC, no ROM)
+;;;  681 +179 362 bytes - NUMBERS (- 681 502)
+;;;  900          bytes - TEST + ORICON
+
+;;; 183 bytes:
+;;;       _type 30  just "BIT bit2"
 ;;;         isnum 4, iscons 14, isnull 6, isatom 9 (33)
 ;;;       print 35, printatom 8,
 ;;;       eval 30 
 ;;;    == 173  (+ 30 14 6 9 30 8 35 29 8 4) 
 
 ;;; enable numbers
-;NUMBERS=1
+NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
 ;TEST=1
@@ -110,14 +106,6 @@ _nil:   .res 6
 
 
 .code
-
-;;; various special data items, constants
-;;; - ATOMS
-.align 2
-.res 1
-
-_T:     .word _T, _nil, _eval
-        .byte "T", 0
 
 .ifdef ORICON
 ;;; =========================================================
@@ -264,22 +252,85 @@ _scrmova:
 
 .else ; ORICON
 
-;;; TODO: use builtin getchar/putchar from oric
+;;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
 
-plaputchar:     
-        pla
-        ;; fall-through
-
-
-.proc putchar
+;;; input char from keyboard
+;;;
+;;; 10B
+.proc _getchar      
+        jsr $023B               ; ORIC ATMOS only
+        bpl _getchar            ; no char - loop
+        tax
+        ;; TODO: optional?
+        jsr $0238               ; echo char
         rts
 .endproc
 
-.proc _printz
-        rts
+;;; platputchar used to delay print A
+;;; (search usage in printd)
+plaputchar:    
+        pla
+
+;;; _putchar(c) print char from A
+;;; 
+;;; 12B
+.proc _putchar
+        ;; '\n' -> '\n\r' = CRLF
+        cmp #$0A                ; '\n'
+        bne notnl
+        pha
+        ldx #$0D                ; '\r'
+        jsr $0238
+        pla
+notnl:  
+        tax
+        jmp $0238
 .endproc
 
 .endif ; ORICON
+
+;;; enable these 3 lines for NOTHING
+;.export _initlisp            
+;_initlisp:      rts            
+;.end
+
+
+;;; _putz prints zstring at AX
+;;; (no newline added that puts does)
+_printz:  
+        ldy #0
+
+;;; _printzY prints zstring from AX starting at offset Y
+;;; (no newline added that puts does)
+.ifnblank
+.proc _printzY
+        sta ptr1
+        stx ptr1+1
+next:
+        lda (ptr1),y
+        beq end
+        jsr _putchar
+        iny
+        bne next
+end:    
+        rts
+.endproc
+.endif
+
+;;; ===================================
+;;; LISP:
+
+ 
+;;; various special data items, constants
+;;; - ATOMS
+;;; TODO: any evaluate to self, put in ZP?
+;;;       (easier test in eval!)
+.align 2
+.res 1
+
+_T:     .word _T, _nil, _eval
+        .byte "T", 0
+
 
 .ifdef NUMBERS
 
@@ -287,8 +338,7 @@ plaputchar:
 ;;; (doesn't trash X)
 .proc _print1h
         and #15
-        clc
-        adc #48                 ; '0'
+        ora #48                 ; '0'
         cmp #58                 ; '9'+1
         bcc print
         ;; >'9' => 'A'-'F'
@@ -424,8 +474,7 @@ under10:
         bne div10
 
         ;; make 0-9 to '0'-'9'
-        clc
-        adc #48
+        ora #48                 ; '0'
 
         ;; push delayed putchar
         ;; (this is clever hack to reverse digits!)
@@ -804,6 +853,15 @@ ret:
         ; TODO: store address of "evalsecond"
         ; (nil (+ 3 4) (+ 4 5)) => 9 !
 
+
+        lda #65+25
+        jsr _putchar
+        lda #65+24
+        jsr _putchar
+        lda #65+23
+        jsr _putchar
+        jsr _getchar
+        jsr _putchar
 
         ;; TODO: move to main?
 .ifdef TEST
