@@ -27,6 +27,8 @@
 ;;; .TAP delta
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
+;;;  551 +231     bytes - MINIMAL (- 551 320)
+;;;     this was with _eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
@@ -40,7 +42,7 @@
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -66,14 +68,60 @@ TEST=1
 
 ;;; --------------------------------------------------
 
+;; TODO: not working in ca65, too old?
+
+;.feature string_escape
+
+.zeropage
+
+.ifdef ORICON
+curscr: .res 2
+leftx:  .res 1
+lefty:  .res 1
+        ;;  TODO: do something clever to remove this?
+newlineadjust:  .res 1          ; or use tmp1?
+.endif ; ORICON
+
+;;; used as (non-modifiable) arguments
+
+ptr1:   .res 2
+ptr2:   .res 2
+ptr3:   .res 2
+
+;;; be careful saving (as may trash other save!)
+savea:  .res 1
+savex:  .res 1
+savey:  .res 1
+
+;;; used to detect type using BIT & beq
+BITNOTINT: .res 1
+BITISCONS: .res 1
+
+;;; locals
+locidx:  .res 1
+
+;;; various special data items, constants
+;;; - ATOMS
+.align 4                        ; meaing: 4 or 2^4
+.res 1
+
+;;; _nil atom at address 5 (4+1 == atom)
+;;; TODO: create segment to reserve memory?
+
+_nil:   .res 6
+        .byte "nil", 0
+
+
+
+.code
+
+;;; --------------------------------------------------
+;;; Functions f(AX) => AX
+
 .macro LDAX val
         lda #<val
         ldx #>val
 .endmacro
-
-;;; --------------------------------------------------
-
-;;; Functions f(AX) => AX
 
 car:    
         sta ptr1
@@ -126,53 +174,13 @@ cdr:
         tya
 .endmacro
 
-;;; --------------------------------------------------
-
-;; TODO: not working in ca65, too old?
-
-;.feature string_escape
-
-.zeropage
-
-.ifdef ORICON
-curscr: .res 2
-leftx:  .res 1
-lefty:  .res 1
-        ;;  TODO: do something clever to remove this?
-newlineadjust:  .res 1          ; or use tmp1?
-.endif ; ORICON
-
-;;; used as (non-modifiable) arguments
-
-ptr1:   .res 2
-ptr2:   .res 2
-ptr3:   .res 2
-
-;;; be careful saving (as may trash other save!)
-savea:  .res 1
-savex:  .res 1
-savey:  .res 1
-
-;;; used to detect type using BIT & beq
-BITNOTINT: .res 1
-BITISCONS: .res 1
-
-;;; various special data items, constants
-;;; - ATOMS
-.align 4                        ; meaing: 4 or 2^4
-.res 1
-
-;;; _nil atom at address 5 (4+1 == atom)
-;;; TODO: create segment to reserve memory?
-
-_nil:   .res 6
-        .byte "nil", 0
-
 ;;; ----------------------------------------
 
-
-
-.code
+;;; locals
+locidlo:        .res 256
+locidhi:        .res 256
+loclo:          .res 256
+lochi:          .res 256
 
 .ifdef ORICON
 ;;; =========================================================
@@ -800,6 +808,89 @@ ret:
 ;;;    else
 ;;;      global value lookup (= car)
 
+.ifblank
+
+.proc _eval
+.ifdef NUMBERS
+        bit BITNOTINT
+        beq isnum
+isnotnum:       
+        bit BITISCONS
+        beq issym
+iscons: 
+        ;; APPLY
+        ;; get function
+        ;; (expr is saved in ptr1!)
+        jsr car
+        
+        rts
+
+issym:  
+        ;; test if it's in ZP then it's self eval
+        ;; (nil/T)
+        cpx #0
+        bne getvalue
+
+isself: 
+isnum:  
+        rts
+.endif
+.endproc ; _eval
+
+.proc getvalue
+        sta savex
+        ;; search locals
+        ldy locidx
+again:  
+        beq notfound
+        cmp locidlo,y
+        bne next
+
+        ;; no cpx mmm,y
+        txa
+        cmp locidhi,y
+        beq found
+        lda savex
+next:   
+        iny
+        jmp again
+
+notfound:       
+        ;; global (always have value of symbol)
+        ;; TODO: if closer to car could beq there!
+        jmp car
+found:  
+        lda #65
+        jsr _putchar
+
+        ;; get value
+        lda loclo,y
+        ldx lochi,y
+
+        rts
+.endproc
+
+;; bind AX symbol name with stacked value
+;; -> AX (A garbled)
+.proc bind
+        dec locidx
+        ldy locidx
+        
+        sta locidlo,y
+        txa
+        sta locidhi,y
+
+        ;; TODO: or it's stored in ptr1/2?
+        lda ptr1
+        sta loclo,y
+        lda ptr1+1
+        sta lochi,y
+
+        rts
+.endproc
+
+.else ; blank
+
 .proc _eval
         ;; NIL => NIL
         cmp #<_nil
@@ -855,7 +946,7 @@ go:
         ; jmp callax              
 
 .endproc
-
+.endif
 
 ;;; 76B (very big)
 .proc _print
@@ -955,26 +1046,18 @@ ret:
         lda #108
         sta _nil+8
 
-        lda #0
-        sta _nil+9
-        sta _nil+2
-        sta _nil+2 +1
+        ;; init 0
+        ldx #0
+        stx _nil+9
+        stx _nil+2
+        stx _nil+2 +1
+
+        stx locidx
 
 ;;; TODO: move _T here and any selfeval symbol
 
         ; TODO: store address of "evalsecond"
         ; (nil (+ 3 4) (+ 4 5)) => 9 !
-
-.ifdef TEST
-        lda #65+25
-        jsr _putchar
-        lda #65+24
-        jsr _putchar
-        lda #65+23
-        jsr _putchar
-        jsr _getchar
-        jsr _putchar
-.endif ; TEST
 
         ;; TODO: move to main?
 .ifdef TEST
@@ -1050,16 +1133,28 @@ iscons: lda #64+3               ; 'C'
 
 
 .proc _test
+        ;; test putchar getchar
+        lda #65+25
+        jsr _putchar
+        lda #65+24
+        jsr _putchar
+        lda #65+23
+        jsr _putchar
+        jsr _getchar
+        jsr _putchar
+
         jsr _testprint
 
 .ifdef NUMBERS
         jsr testnums
 .endif
+
         jsr testatoms
-
         jsr testtypefunc
-
         jsr testcons
+
+        jsr testbind
+
         rts
 .endproc
 
@@ -1070,6 +1165,66 @@ tcons:      .word _T, _T
 .proc testcons
         LDAX tcons
         jsr _print
+        rts
+.endproc
+
+
+.proc testbind
+        lda #64+2               ; 'D'
+        jsr _putchar
+
+        lda locidx
+        eor #48
+        jsr _putchar
+
+        LDAX _T
+        jsr getvalue
+        jsr _print
+
+        lda #64+24               ; 'X'
+        jsr _putchar
+
+        LDAX tcons
+        sta ptr1
+        stx ptr1+1
+
+        LDAX _T
+
+        jsr bind
+
+        lda locidx
+        eor #48
+        jsr _putchar
+
+        lda #64+32+25               ; 'y'
+        jsr _putchar
+
+        LDAX _T
+        jsr getvalue
+        jsr _print
+
+        lda #$ff                ; 'O' == $ff ^ 48
+        eor #48
+        jsr _putchar
+
+        ldy #$ff
+        lda lochi,y
+        tax
+        lda loclo,y
+        jsr _print
+
+        lda #64+32+24               ; 'x'
+        jsr _putchar
+
+        ldy #$ff
+        lda locidhi,y
+        tax
+        lda locidlo,y
+        jsr _print
+
+        lda #64+25               ; 'Y'
+        jsr _putchar
+
         rts
 .endproc
 
