@@ -20,7 +20,8 @@
 ;;;     ?LAMBDA ?EVAL ?APPLY (16)
 ;;; - no GC (or minimal "reset")
 
-
+;;; ORIC: charset in hires-mode starts here
+TOPMEM	= $9800
 
 ;;; START
 ;;; 
@@ -100,6 +101,9 @@ BITISCONS: .res 1
 ;;; locals
 locidx:  .res 1
 
+;;; memory
+lowcons: .res 2
+
 ;;; various special data items, constants
 ;;; - ATOMS
 .align 4                        ; meaing: 4 or 2^4
@@ -123,26 +127,19 @@ _nil:   .res 6
         ldx #>val
 .endmacro
 
-car:    
-        sta ptr1
-        stx ptr1+1
-
-.proc carptr1       
-        ldy #1
-        lda (ptr1),y
-        tax
-        dey
-        lda (ptr1),y
-        rts
-.endproc
-
-
 cdr:    
+        ldy #3
+        jmp cYr
+
+;;; car(AX) -> AX
+car:    
+        ldy #1
+cYr:    
         sta ptr1
         stx ptr1+1
 
-.proc cdrptr1
-        ldy #3
+;;; cYr(ptr1) -> AX
+.proc ptr1cYr
         lda (ptr1),y
         tax
         dey
@@ -173,6 +170,105 @@ cdr:
         pha
         tya
 .endmacro
+
+;;; 3B 6c
+.macro ARGSETY
+        tsx
+        txa
+        tay
+.endmacro
+
+;;; ARG(n) n n=0 is prev arg, n=1 prev arg
+;;; 6B 8c
+.macro ARG n
+        ARGSETY                 ; probably needed always
+        YARGN n
+.endmacro
+
+.macro YARGN n
+        lda $102+(n*2),y
+        ldx $101+(n*2),y
+.endmacro
+
+;;; arg number Y
+;;; 5B 36c
+.macro arg n
+        ldy #(n*2)
+        jsr yarg
+.endmacro
+
+;;; 25c
+.proc yarg
+        sty savey
+        tsx
+        txa
+        clc
+        adc savey
+        tay
+        lda $104,y
+        ldx $103,y
+        rts
+.endproc
+
+;;; --------------------------------------------------
+;;; Functions f(AX) => AX
+
+;;; A is trashed
+.proc setnewcar
+        ldy #0
+        sta (lowcons),y
+        iny
+        txa
+        sta (lowcons),y
+        rts
+.endproc
+
+;;; A is trashed
+.proc setnewcdr
+        ldy #2
+        sta (lowcons),y
+        iny
+        txa
+        sta (lowcons),y
+        rts
+.endproc
+
+;;; newcons -> AX address of new cons
+.proc newcons
+        lda lowcons
+        pha
+        lda lowcons+1
+        pha
+
+        ;; lowcons-= 4 ;; 1B 13-14c
+        sec
+        lda lowcons
+        sbc #04
+        sta lowcons
+        bcs nodec
+        dec lowcons+1
+nodec:  
+
+        POP
+
+        rts
+.endproc
+
+;;; cons(car, cdr)
+.proc cons
+        jsr setnewcdr
+        POP
+        jsr setnewcar
+        jmp newcons
+.endproc
+
+;;; revcons(cdr, car)
+.proc revcons
+        jsr setnewcar
+        POP
+        jsr setnewcdr
+        jmp newcons
+.endproc
 
 ;;; ----------------------------------------
 
@@ -838,6 +934,7 @@ isnum:
 .endif
 .endproc ; _eval
 
+;;; 38B 39++ found
 .proc getvalue
         sta savex
         ;; search locals
@@ -861,9 +958,6 @@ notfound:
         ;; TODO: if closer to car could beq there!
         jmp car
 found:  
-        lda #'A'
-        jsr _putchar
-
         ;; get value
         lda loclo,y
         ldx lochi,y
@@ -1055,6 +1149,12 @@ ret:
 
         stx locidx
 
+        ;; memory mgt
+        lda #<(TOPMEM-4)
+        sta lowcons
+        lda #>(TOPMEM-4)
+        sta lowcons+1
+
 ;;; TODO: move _T here and any selfeval symbol
 
         ; TODO: store address of "evalsecond"
@@ -1162,6 +1262,9 @@ iscons: lda #'C'
         ;; 6B, 6c overhead
         ;; (3B 3c if rest of code inlined)
 
+        lda #10
+        jsr _putchar
+
         ;; foo(_T, tcons, _nil) 
         jsr callfoo
         ;; comes here after callfoo!!!
@@ -1180,8 +1283,10 @@ callfoo:
         jmp foo
 afterfoo:
 
+        lda #10
+        jsr _putchar
 
-        ;; foo(_T, tcons, _nil) 
+        ;; foo2(_T, tcons, _nil) 
         jmp afterfoo2
 callfoo2:    
         ;; one parameter 4+3=7 bytes
@@ -1193,29 +1298,127 @@ callfoo2:
         PUSH
         ;; last parameter in AX
         SETAX _nil
-        jmp foo
+        jmp foo2
 afterfoo2:
         jsr callfoo2
         ;; comes here after callfoo!!!
         ;; return result in AX
 
+        lda #10
+        jsr _putchar
+
+        ;; foo3(_T, tcons, _nil) 
+        jmp afterfoo3
+callfoo3:    
+        ;; one parameter 4+3=7 bytes
+        ;; (could be lda pha lda sta = 6)
+        SETAX _T
+        PUSH
+
+        SETAX tcons
+        PUSH
+        ;; last parameter in AX
+        SETAX _nil
+        jmp foo3
+afterfoo3:
+        jsr callfoo3
+        ;; comes here after callfoo!!!
+        ;; return result in AX
+
+        lda #10
+        jsr _putchar
 
 
         lda #'!'
         jsr _putchar
 
+        jsr testcons
+
         rts
 .endproc
 
 ;;; foo(a,b,c) prints c, b, a
+;;; 19B
 .proc foo
         jsr _print
         POP
         jsr _print
         POP
         jsr _print
+
         rts
 .endproc
+
+;;; 31B
+.proc foo2
+        PUSH
+
+        lda #'/'
+        jsr _putchar
+
+        ARG 0
+        jsr _print
+
+        lda #'/'
+        jsr _putchar
+
+        ARG 1
+        jsr _print
+
+        lda #'/'
+        jsr _putchar
+
+        ARG 2
+        jsr _print
+
+        lda #'/'
+        jsr _putchar
+
+        ARG 1
+        jsr _print
+
+        ;; TODO:
+        POP
+        POP
+        POP
+        rts
+.endproc
+
+;;; 31B
+.proc foo3
+        PUSH
+
+        lda #'+'
+        jsr _putchar
+
+        arg 0
+        jsr _print
+
+        lda #'+'
+        jsr _putchar
+
+        arg 1
+        jsr _print
+
+        lda #'+'
+        jsr _putchar
+
+        arg 2
+        jsr _print
+
+        lda #'+'
+        jsr _putchar
+
+        arg 1
+        jsr _print
+
+        ;; TODO:
+        POP
+        POP
+        POP
+        rts
+.endproc
+
 
 .align 4
 .res 3
@@ -1224,6 +1427,18 @@ tcons:      .word _T, _T
 .proc testcons
         SETAX tcons
         jsr _print
+
+        lda #'c'
+        jsr _putchar
+
+.ifnblank
+        SETAX _T
+        jsr setnewcar
+        SETAX _T
+        jsr setnewcdr
+        jsr newcons
+        jsr _print
+.endif
         rts
 .endproc
 
@@ -1262,6 +1477,7 @@ tcons:      .word _T, _T
         jsr getvalue
         jsr _print
 
+.ifblank
         lda #$ff                ; 'O' == $ff ^ 48
         eor #'0'
         jsr _putchar
@@ -1274,12 +1490,15 @@ tcons:      .word _T, _T
 
         lda #'x'
         jsr _putchar
+.endif
 
+.ifblank
         ldy #$ff
         lda locidhi,y
         tax
         lda locidlo,y
         jsr _print
+.endif
 
         lda #'Y'
         jsr _putchar
