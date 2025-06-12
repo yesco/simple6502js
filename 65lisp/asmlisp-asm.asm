@@ -29,7 +29,7 @@ TOPMEM	= $9800
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
 ;;;  631 +231     bytes - MINIMAL (- 551 320)
-;;;     this was with _eval and getval & bind + 58B?
+;;;     this was with eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
@@ -43,10 +43,12 @@ TOPMEM	= $9800
 ;;;    == 305 (+ 37 10 76 17 30 38 19 14 21 12 12 19 20)
 
 ;;; enable numbers
-;NUMBERS=1
+;
+NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+;
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -62,7 +64,7 @@ TOPMEM	= $9800
 
 .export _initscr
 .export _scrmova
-.export _printz, _printzptr
+.export printz, printzptr
 
 .endif ; ORICON
 
@@ -136,10 +138,32 @@ lochi:          .res 256
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
 
-.macro SETAX val
+.macro SET val
         lda #<val
         ldx #>val
 .endmacro
+
+.macro SETNUM num
+        SET (num)*2
+.endmacro
+
+;;; putchar (leaves char in A)
+.macro putc c
+        lda #(c)
+        jsr putchar
+.endmacro
+
+;;; for debugging only 'no change registers A'
+.macro PUTC c
+        pha
+        putc c
+        pla
+.endmacro
+
+.macro NEWLINE
+        PUTC 10
+.endmacro
+
 
 .align 2
 cdr:    
@@ -164,7 +188,7 @@ cYr:
 .endproc
 
 
-;;; _print
+;;; print
 
 ;;; push A,X on R-stack (AX trashed, use DUP?)
 ;;; (cc65: jsr pushax takes 39c!)
@@ -321,22 +345,12 @@ popret:
         rts
 .endproc
 
-.proc newline
-        lda #10
-        jmp _putchar
-.endproc
-
-.proc putspc
-        lda #32
-        pha
-.endproc
-
 plaputchar:    
         pla
 
-;;; _putchar A on screen, move position forward
+;;; putchar A on screen, move position forward
 ;;; trashes A,X,Y,ptr1,ptr2
-.proc _putchar
+.proc putchar
         ;; save char in 2 byte asciiz buffer end with 0
         sta ptr2
         lda #0
@@ -344,10 +358,10 @@ plaputchar:
 
         lda #<(ptr2)
         ldx #>(ptr2+1)
-        ;; fallthrough to _printz
+        ;; fallthrough to printz
 .endproc
 
-;;; _printz: Prints an ASCIIZ zero terminated string
+;;; printz: Prints an ASCIIZ zero terminated string
 ;;; identified by address in AX.
 ;;; 
 ;;; optimized to print strings upto 256 chars
@@ -368,9 +382,9 @@ plaputchar:
 ;;; Note: AX is trashed (it's stored in ptr1!)
 PRINTZ  = 1
 
-_printz:      
+printz:      
         ldy #0
-_printzY:       
+printzY:       
         sta ptr1
         stx ptr1+1
 
@@ -381,7 +395,7 @@ _printzY:
 
 ;; init screen state
 
-_printzptr:        
+printzptr:        
         lda #00
         sta newlineadjust
         ldx leftx
@@ -446,7 +460,7 @@ _scrmova:
 
         rts
 
-.proc _getchar
+.proc getchar
         lda #'x'
         rts
 .endproc
@@ -458,9 +472,9 @@ _scrmova:
 ;;; input char from keyboard
 ;;;
 ;;; 10B
-.proc _getchar      
+.proc getchar      
         jsr $023B               ; ORIC ATMOS only
-        bpl _getchar            ; no char - loop
+        bpl getchar             ; no char - loop
         tax
         ;; TODO: optional?
         jsr $0238               ; echo char
@@ -472,10 +486,10 @@ _scrmova:
 plaputchar:    
         pla
 
-;;; _putchar(c) print char from A
+;;; putchar(c) print char from A
 ;;; 
 ;;; 12B
-.proc _putchar
+.proc putchar
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
         bne notnl
@@ -496,23 +510,23 @@ notnl:
 ;.end
 
 
-;;; _printz prints zstring at AX
+;;; printz prints zstring at AX
 ;;; (no newline added that puts does)
 ;;; 
 ;;; 17B
 .ifndef PRINTZ
-_printz:  
+printz:  
         ldy #0
 
-;;; _printzY prints zstring from AX starting at offset Y
+;;; printzY prints zstring from AX starting at offset Y
 ;;; (no newline added that puts does)
-.proc _printzY
+.proc printzY
         sta ptr1
         stx ptr1+1
 next:
         lda (ptr1),y
         beq end
-        jsr _putchar
+        jsr putchar
         iny
         bne next
 end:    
@@ -531,24 +545,29 @@ end:
 .align 4
 .res 1
 
-_T:     .word _T, _nil, _eval
+_T:     .word _T, _nil, eval
         .byte "T", 0
 
 .align 4
 .res 1
-_car:   .word car, _T, _eval
+_car:   .word car, _T, eval
         .byte "car", 0
 
 .align 4
 .res 1
-_cdr:   .word cdr, _T, _eval
+_cdr:   .word cdr, _car, eval
         .byte "cdr", 0
+
+.align 4
+.res 1
+_print: .word print, _cdr, eval
+        .byte "print", 0
 
 .ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
 ;;; (doesn't trash X)
-.proc _print1h
+.proc print1h
         and #15
         ora #'0'
         cmp #('9'+1)
@@ -635,8 +654,8 @@ print:
 
 
 
-;;; _printd print a decimal value from AX (retained, Y trashed)
-.proc _printd
+;;; printd print a decimal value from AX (retained, Y trashed)
+.proc printd
         ;; save ax
         sta savea
         stx savex
@@ -704,20 +723,20 @@ under10:
 .endproc
         
 
-.proc _print2h
+.proc print2h
         pha
         lsr
         lsr
         lsr
         lsr
-        jsr _print1h
+        jsr print1h
         pla
-        jsr _print1h
+        jsr print1h
         rts
 .endproc
         
 ;;; print hex from AX (retained) Y=5
-.proc _printh
+.proc printh
         pha
 
         ;; print '$'
@@ -731,10 +750,10 @@ under10:
 
         ;; print hi-byte
         txa
-        jsr _print2h
+        jsr print2h
         pla
         ;; print lo-byte
-        jsr _print2h
+        jsr print2h
 
         ;; move cursor forward Y (=5)
         tya
@@ -830,43 +849,43 @@ iscons:
         ;; test hex
         ldx #$be
         lda #$ef
-        jsr _printh
-        jsr _printh
+        jsr printh
+        jsr printh
 
         ldx #$12
         lda #$34
-        jsr _printh
-        jsr _printh
+        jsr printh
+        jsr printh
 
         ;; test dec
         ldx #$10                ; 4321 dec
         lda #$e1
-        jsr _printd
-        jsr _printd
+        jsr printd
+        jsr printd
 
         ldx #$dd                ; 56789 dec
         lda #$d5
-        jsr _printd
-        jsr _printd
+        jsr printd
+        jsr printd
 
         ldx #$be                ; 48879 dec
         lda #$ef
-        jsr _printd
-        jsr _printd
+        jsr printd
+        jsr printd
 
         ldx #$12                ; 4660 dec
         lda #$34
-        jsr _printd
-        jsr _printd
+        jsr printd
+        jsr printd
 
         ;;; test type
 
         ;; Number
         lda #<(2*4711)
         ldx #>(2*4711)
-        jsr _print
-        jsr _print
-        jsr _print
+        jsr print
+        jsr print
+        jsr print
         jsr _testtype
 
         rts
@@ -937,7 +956,7 @@ ret:
 
 .ifblank
 
-.proc _eval
+.proc eval
 .ifdef NUMBERS
         bit BITNOTINT
         beq isnum
@@ -949,6 +968,28 @@ iscons:
         ;; get function
         ;; (expr is saved in ptr1!)
         jsr car
+        bit BITNOTINT
+        bne evalnotnum
+        ;; have even address==num == machine code
+        sta call+1
+        stx call+2
+        ;; TODO: Z set if zero page atom called
+        ;;   use this for non-eval: cond? ...
+        ;;   how about user defined?
+
+        ;; prepare one parameter in AX (rest on stack)
+        ; AX= car(ptr1) 
+        lda #1                  ; 1 dey 0 == car
+        jsr ptr1cYr
+        ;; TODO: jsr eval
+        ;;       may need to push ptr1?
+
+        ;; indirect call to atom address!
+call:   jmp ($0000)
+
+evalnotnum:     
+        ;; TODO: function = cons == lambda?
+
         
         rts
 
@@ -962,7 +1003,7 @@ isself:
 isnum:  
         rts
 .endif
-.endproc ; _eval
+.endproc ; eval
 
 ;;; 38B 39++ found
 ;;; TODO: make smaller! assoc cheaper?
@@ -1019,7 +1060,7 @@ found:
 
 .else ; blank
 
-.proc _eval
+.proc eval
         ;; NIL => NIL
         cmp #<_nil
         bne testnum
@@ -1077,7 +1118,8 @@ go:
 .endif
 
 ;;; 76B (very big)
-.proc _print
+.align 2
+.proc print
         DUP
 
 .ifdef NUMBERS
@@ -1085,7 +1127,7 @@ go:
         bne notint
 isnum:  
         jsr _div2
-        jsr _printd
+        jsr printd
         jmp ret
 .endif ; NUMBERS
 
@@ -1095,7 +1137,7 @@ notint:
 issym:  
         ;; TODO: struct?
         ldy #6
-        jsr _printzY
+        jsr printzY
         jmp ret
 
 iscons: 
@@ -1103,9 +1145,7 @@ iscons:
         sta ptr2
         stx ptr2+1
 
-        ;; '('
-        lda #40
-        jsr _putchar
+        putc '('
 
         ;; push CDR(ptr1)
         ldy #2
@@ -1122,20 +1162,16 @@ iscons:
         dey
         lda (ptr2),y ; a
 
-        jsr _print
+        jsr print
 
-        ;; '.'
-        lda #46
-        jsr _putchar
+        putc '.'
 
         ;; print cdr
         POP
 
-        jsr _print
+        jsr print
 
-        ;; ')'
-        lda #41
-        jsr _putchar
+        putc ')'
 
 ret:    
         jmp popret
@@ -1210,33 +1246,32 @@ thetypeis: .byte "The value and type is: ",0
         ;; Atom
         lda #<_T
         ldx #>_T
-;;; TODO: somehow value gets lost in _print ???
-        jsr _print
+;;; TODO: somehow value gets lost in print ???
+        jsr print
 
         lda #<_nil
         ldx #>_nil
-        jsr _print
+        jsr print
 
         lda #<_T
         ldx #>_T
-        jsr _print
+        jsr print
 
         lda #<_T
         ldx #>_T
-        jsr _print
+        jsr print
 
         rts
 .endproc
 
 .proc _testtype
-        jsr _print
+        jsr print
 
         pha
         txa
         pha
         
-        lda #':'
-        jsr _putchar
+        putc ':'
 
         pla
         tax
@@ -1251,19 +1286,19 @@ thetypeis: .byte "The value and type is: ",0
         
 nomatch:        
         lda #'?'
-        jmp _putchar
+        jmp putchar
 
 isnum:  lda #'N'
-        jmp _putchar
+        jmp putchar
 
 isnull: lda #'Z'
-        jsr _putchar
+        jsr putchar
 
 issym:  lda #'S'
-        jmp _putchar
+        jmp putchar
 
 iscons: lda #'C'
-        jmp _putchar
+        jmp putchar
 
 .endproc
 
@@ -1271,13 +1306,13 @@ iscons: lda #'C'
 .proc _test
         ;; test putchar getchar
         lda #'Z'
-        jsr _putchar
+        jsr putchar
         lda #'X'
-        jsr _putchar
+        jsr putchar
         lda #'Y'
-        jsr _putchar
-        jsr _getchar
-        jsr _putchar
+        jsr putchar
+        jsr getchar
+        jsr putchar
 
         jsr _testprint
 
@@ -1300,25 +1335,51 @@ iscons: lda #'C'
 .endproc
 
 .proc testeval
-        SETAX _nil
-        jsr _print
-        jsr _eval
-        jsr _print
+        SET _nil
+        jsr print
+        jsr eval
+        jsr print
 
-        SETAX _T
-        jsr _print
-        jsr _eval
-        jsr _print
+        SET _T
+        jsr print
+        jsr eval
+        jsr print
 
-        SETAX _car
-        jsr _print
-        jsr _eval
-        jsr _print
+        SET _car
+        jsr print
+        jsr eval
+        jsr print
 
-        SETAX _cdr
-        jsr _print
-        jsr _eval
-        jsr _print
+        SET _cdr
+        jsr print
+        jsr eval
+        jsr print
+
+        SET _print
+        jsr print
+        jsr eval
+        jsr print
+
+        SETNUM 4711
+        jsr setnewcar
+        SET _nil
+        jsr setnewcdr
+        jsr newcons
+        jsr print
+        
+        PUTC '/'
+
+        jmp call1x
+call1: 
+        PUSH
+        SET print
+        jmp revcons
+
+call1x: jsr call1
+
+        jsr print
+
+        PUTC '!'
 
         rts
 .endproc
@@ -1329,8 +1390,7 @@ iscons: lda #'C'
         ;; 6B, 6c overhead
         ;; (3B 3c if rest of code inlined)
 
-        lda #10
-        jsr _putchar
+        NEWLINE
 
         ;; foo(_T, tcons, _nil) 
         jsr callfoo
@@ -1340,64 +1400,59 @@ iscons: lda #'C'
 callfoo:    
         ;; one parameter 4+3=7 bytes
         ;; (could be lda pha lda sta = 6)
-        SETAX _T
+        SET _T
         PUSH
 
-        SETAX tcons
+        SET tcons
         PUSH
         ;; last parameter in AX
-        SETAX _nil
+        SET _nil
         jmp foo
 afterfoo:
 
-        lda #10
-        jsr _putchar
+        NEWLINE
 
         ;; foo2(_T, tcons, _nil) 
         jmp afterfoo2
 callfoo2:    
         ;; one parameter 4+3=7 bytes
         ;; (could be lda pha lda sta = 6)
-        SETAX _T
+        SET _T
         PUSH
 
-        SETAX tcons
+        SET tcons
         PUSH
         ;; last parameter in AX
-        SETAX _nil
+        SET _nil
         jmp foo2
 afterfoo2:
         jsr callfoo2
         ;; comes here after callfoo!!!
         ;; return result in AX
 
-        lda #10
-        jsr _putchar
+        NEWLINE
 
         ;; foo3(_T, tcons, _nil) 
         jmp afterfoo3
 callfoo3:    
         ;; one parameter 4+3=7 bytes
         ;; (could be lda pha lda sta = 6)
-        SETAX _T
+        SET _T
         PUSH
 
-        SETAX tcons
+        SET tcons
         PUSH
         ;; last parameter in AX
-        SETAX _nil
+        SET _nil
         jmp foo3
 afterfoo3:
         jsr callfoo3
         ;; comes here after callfoo!!!
         ;; return result in AX
 
-        lda #10
-        jsr _putchar
+        NEWLINE
 
-
-        lda #'!'
-        jsr _putchar
+        PUTC '!'
 
         rts
 .endproc
@@ -1405,11 +1460,11 @@ afterfoo3:
 ;;; foo(a,b,c) prints c, b, a
 ;;; 19B
 .proc foo
-        jsr _print
+        jsr print
         POP
-        jsr _print
+        jsr print
         POP
-        jsr _print
+        jsr print
 
         rts
 .endproc
@@ -1418,31 +1473,28 @@ afterfoo3:
 .proc foo2
         PUSH
 
-        lda #'/'
-        jsr _putchar
+        PUTC '/'
 
         ARG 0
-        jsr _print
+        jsr print
 
-        lda #'/'
-        jsr _putchar
+        PUTC '/'
 
         ARG 1
-        jsr _print
+        jsr print
 
-        lda #'/'
-        jsr _putchar
+        PUTC '/'
 
         ARG 2
-        jsr _print
+        jsr print
 
-        lda #'/'
-        jsr _putchar
+        PUTC '/'
 
         ARG 1
-        jsr _print
+        jsr print
 
-        ;; TODO:
+;; TODO: this destroyes AX no good make
+; POPRET 3
         POP
         POP
         POP
@@ -1453,29 +1505,25 @@ afterfoo3:
 .proc foo3
         PUSH
 
-        lda #'+'
-        jsr _putchar
+        PUTC '+'
 
         arg 0
-        jsr _print
+        jsr print
 
-        lda #'+'
-        jsr _putchar
+        PUTC '+'
 
         arg 1
-        jsr _print
+        jsr print
 
-        lda #'+'
-        jsr _putchar
+        PUTC '+'
 
         arg 2
-        jsr _print
+        jsr print
 
-        lda #'+'
-        jsr _putchar
+        PUTC '+'
 
         arg 1
-        jsr _print
+        jsr print
 
         ;; TODO:
         POP
@@ -1490,28 +1538,25 @@ afterfoo3:
 tcons:      .word _T, _T
 
 .proc testcons
-        lda #10
-        jsr _putchar
+        NEWLINE
 
-        SETAX tcons
-        jsr _print
+        SET tcons
+        jsr print
 
-        lda #'c'
-        jsr _putchar
+        PUTC 'c'
 
         ;; make new cons
-        SETAX tcons
+        SET tcons
         jsr setnewcar
 
-        SETAX tcons
+        SET tcons
         jsr setnewcdr
 
         jsr newcons
-        jsr _print              
+        jsr print              
         DUP
 
-        lda #10
-        jsr _putchar
+        NEWLINE
 
         POP
         DUP
@@ -1519,62 +1564,57 @@ tcons:      .word _T, _T
         POP
         jsr setnewcdr
         jsr newcons
-        jsr _print
+        jsr print
 
-        lda #10
-        jsr _putchar
-        
+        NEWLINE
+
         rts
 .endproc
 
 
 .proc testbind
-        lda #'D'
-        jsr _putchar
+        PUTC 'D'
 
         lda locidx
         eor #'0'
-        jsr _putchar
+        jsr putchar
 
-        SETAX _T
+        SET _T
         jsr getvalue
-        jsr _print
+        jsr print
 
-        lda #'X'
-        jsr _putchar
+        PUTC 'X'
 
-        SETAX tcons
+        SET tcons
         sta ptr1
         stx ptr1+1
 
-        SETAX _T
+        SET _T
 
         jsr bind
 
         lda locidx
         eor #'0'
-        jsr _putchar
+        jsr putchar
 
-        lda #'y'
-        jsr _putchar
+        PUTC 'y'
 
-        SETAX _T
+        SET _T
         jsr getvalue
-        jsr _print
+        jsr print
 
 .ifblank
         lda #$ff                ; 'O' == $ff ^ 48
         eor #'0'
-        jsr _putchar
+        jsr putchar
 
         ldy #$ff
         lda lochi,y
         tax
         lda loclo,y
-        jsr _print
+        jsr print
 
-        lda #'x'
-        jsr _putchar
+        PUTC 'x'
 .endif
 
 .ifblank
@@ -1582,11 +1622,10 @@ tcons:      .word _T, _T
         lda locidhi,y
         tax
         lda locidlo,y
-        jsr _print
+        jsr print
 .endif
 
-        lda #'Y'
-        jsr _putchar
+        PUTC 'Y'
 
         rts
 .endproc
@@ -1614,49 +1653,49 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 .endif ; ORICON
 
         ;; write string x 17
-        SETAX _hello
-        jsr _printz
+        SET _hello
+        jsr printz
 .ifdef ORICON
-        jsr _printzptr
-        jsr _printzptr
+        jsr printzptr
+        jsr printzptr
 
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
 .endif ; ORICON
 
         ;; 13 x helloN
-        SETAX _helloN
-        jsr _printz
+        SET _helloN
+        jsr printz
 .ifdef ORICON
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
 .endif ; ORICON
         
-        SETAX _helloN
-        jsr _printz
+        SET _helloN
+        jsr printz
 .ifdef ORICON
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
 
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
-        jsr _printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
+        jsr printzptr
 
         ;; write a C indirectly at current pos
         lda #'C'
@@ -1669,18 +1708,18 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
 
 .proc testtypefunc
-        SETAX _T
+        SET _T
         jsr _testtype
-        SETAX _T
-        jsr _testtype
-
-        SETAX _nil
-        jsr _testtype
-        SETAX _nil
+        SET _T
         jsr _testtype
 
-        SETAX _nil
-        jsr _print
+        SET _nil
+        jsr _testtype
+        SET _nil
+        jsr _testtype
+
+        SET _nil
+        jsr print
 
         rts
 .endproc
