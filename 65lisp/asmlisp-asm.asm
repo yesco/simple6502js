@@ -26,15 +26,14 @@ TOPMEM	= $9800
 ;;; START
 ;;; 
 ;;; .TAP delta
-;;;  320          bytes - NOTHING (search)
-;;;  493 +173     bytes - MINIMAL (- 493 320)
-;;;  683 +363     bytes - MINIMAL (- 683 320)
+;;;  325          bytes - NOTHING (search)
+;;;  687 +363     bytes - MINIMAL (- 687 325)
 ;;;     this was with eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 363 bytes
+;;; 362 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 25
 ;;;       getvalue 38, bind 19,
@@ -134,189 +133,6 @@ lochi:          .res 256
 
 
 .code
-
-;;; --------------------------------------------------
-;;; Functions f(AX) => AX
-
-.macro SET val
-        lda #<val
-        ldx #>val
-.endmacro
-
-.macro SETNUM num
-        SET (num)*2
-.endmacro
-
-;;; putchar (leaves char in A)
-.macro putc c
-        lda #(c)
-        jsr putchar
-.endmacro
-
-;;; for debugging only 'no change registers A'
-.macro PUTC c
-        PUSH
-        putc c
-        POP
-.endmacro
-
-.macro NEWLINE
-        PUTC 10
-.endmacro
-
-
-.align 2
-cdr:    
-        ldy #3
-        jmp cYr
-
-;;; car(AX) -> AX
-.align 2
-car:    
-        ldy #1
-cYr:    
-        sta ptr1
-        stx ptr1+1
-
-;;; cYr(ptr1) -> AX
-.proc ptr1cYr
-        lda (ptr1),y
-        tax
-        dey
-        lda (ptr1),y
-        rts
-.endproc
-
-
-;;; print
-
-;;; push A,X on R-stack (AX trashed, use DUP?)
-;;; (cc65: jsr pushax takes 39c!)
-;;; 3B 7c
-.macro PUSH
-        pha
-        txa
-        pha
-.endmacro
-
-;;; 3B 6C
-.macro POP
-        pla
-        tax
-        pla
-.endmacro
-
-;;; DUP AX onto stack (AX retained)
-;;; 5B
-.macro DUP
-        tay
-        pha
-        txa
-        pha
-        tya
-.endmacro
-
-;;; 3B 6c
-.macro ARGSETY
-        tsx
-        txa
-        tay
-.endmacro
-
-;;; ARG(n) n n=0 is prev arg, n=1 prev arg
-;;; 12B 14c
-.macro ARG n
-        ARGSETY                 ; probably needed always
-        YARGN n
-.endmacro
-
-.macro YARGN n
-        lda $102+(n*2),y
-        ldx $101+(n*2),y
-.endmacro
-
-;;; arg number Y
-;;; 
-;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
-
-;;; 5B 36c
-.macro arg n
-        ldy #(n*2)
-        jsr yarg
-.endmacro
-
-;;; 25c
-.proc yarg
-        sty savey
-        tsx
-        txa
-        clc
-        adc savey
-        tay
-        lda $104,y
-        ldx $103,y
-        rts
-.endproc
-
-;;; --------------------------------------------------
-;;; Functions f(AX) => AX
-
-;;; set car on new cons (A is trashed)
-setnewcar:      
-        ldy #0
-        jmp setnewcYr
-
-setnewcdr:      
-        ldy #2
-setnewcYr:      
-        sta (lowcons),y
-        iny
-        txa
-        sta (lowcons),y
-        rts
-
-
-;;; newcons -> AX address of new cons
-;;; 
-;;; 21B
-.proc newcons
-        ;; save current cons to return in AX
-        lda lowcons
-        pha
-        lda lowcons+1
-        pha
-
-        ;; lowcons-= 4
-        ;; 11B 13-14c
-;;; TODO: 7B::: ldy #4 ; ldx #lowcons ; jsr subwy
-        sec
-        lda lowcons
-        sbc #04
-        sta lowcons
-        bcs nodec
-        dec lowcons+1
-nodec:  
-.endproc
-
-popret: 
-        POP
-        rts
-
-;;; cons(car, cdr)
-.proc cons
-        jsr setnewcdr
-        POP
-        jsr setnewcar
-        jmp newcons
-.endproc
-
-;;; revcons(cdr, car)
-.proc revcons
-        jsr setnewcar
-        POP
-        jsr setnewcdr
-        jmp newcons
-.endproc
 
 ;;; ----------------------------------------
 
@@ -490,6 +306,7 @@ plaputchar:
 ;;; 
 ;;; 12B
 .proc putchar
+        stx savex
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
         bne notnl
@@ -499,7 +316,9 @@ plaputchar:
         pla
 notnl:  
         tax
-        jmp $0238
+        jsr $0238
+        ldx savex
+        rts
 .endproc
 
 .endif ; ORICON
@@ -508,6 +327,190 @@ notnl:
 ;.export _initlisp        
 ;_initlisp:      rts            
 ;.end
+
+
+;;; --------------------------------------------------
+;;; Functions f(AX) => AX
+
+.macro SET val
+        lda #<val
+        ldx #>val
+.endmacro
+
+.macro SETNUM num
+        SET (num)*2
+.endmacro
+
+;;; putchar (leaves char in A)
+.macro putc c
+        lda #(c)
+        jsr putchar
+.endmacro
+
+;;; for debugging only 'no change registers A'
+.macro PUTC c
+        pha
+        putc c
+        pla
+.endmacro
+
+.macro NEWLINE
+        PUTC 10
+.endmacro
+
+
+.align 2
+cdr:    
+        ldy #3
+        jmp cYr
+
+;;; car(AX) -> AX
+.align 2
+car:    
+        ldy #1
+cYr:    
+        sta ptr1
+        stx ptr1+1
+
+;;; cYr(ptr1) -> AX
+.proc ptr1cYr
+        lda (ptr1),y
+        tax
+        dey
+        lda (ptr1),y
+        rts
+.endproc
+
+
+;;; print
+
+;;; push A,X on R-stack (AX trashed, use DUP?)
+;;; (cc65: jsr pushax takes 39c!)
+;;; 3B 7c
+.macro PUSH
+        pha
+        txa
+        pha
+.endmacro
+
+;;; 3B 6C
+.macro POP
+        pla
+        tax
+        pla
+.endmacro
+
+;;; DUP AX onto stack (AX retained)
+;;; 5B
+.macro DUP
+        tay
+        pha
+        txa
+        pha
+        tya
+.endmacro
+
+;;; 3B 6c
+.macro ARGSETY
+        tsx
+        txa
+        tay
+.endmacro
+
+;;; ARG(n) n n=0 is prev arg, n=1 prev arg
+;;; 12B 14c
+.macro ARG n
+        ARGSETY                 ; probably needed always
+        YARGN n
+.endmacro
+
+.macro YARGN n
+        lda $102+(n*2),y
+        ldx $101+(n*2),y
+.endmacro
+
+;;; arg number Y
+;;; 
+;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
+
+;;; 5B 36c
+.macro arg n
+        ldy #(n*2)
+        jsr yarg
+.endmacro
+
+;;; 25c
+.proc yarg
+        sty savey
+        tsx
+        txa
+        clc
+        adc savey
+        tay
+        lda $104,y
+        ldx $103,y
+        rts
+.endproc
+
+;;; --------------------------------------------------
+;;; Functions f(AX) => AX
+
+;;; set car on new cons (A is trashed)
+setnewcar:      
+        ldy #0
+        jmp setnewcYr
+
+setnewcdr:      
+        ldy #2
+setnewcYr:      
+        sta (lowcons),y
+        iny
+        txa
+        sta (lowcons),y
+        rts
+
+
+;;; newcons -> AX address of new cons
+;;; 
+;;; 21B
+.proc newcons
+        ;; save current cons to return in AX
+        lda lowcons
+        pha
+        lda lowcons+1
+        pha
+
+        ;; lowcons-= 4
+        ;; 11B 13-14c
+;;; TODO: 7B::: ldy #4 ; ldx #lowcons ; jsr subwy
+        sec
+        lda lowcons
+        sbc #04
+        sta lowcons
+        bcs nodec
+        dec lowcons+1
+nodec:  
+.endproc
+
+popret: 
+        POP
+        rts
+
+;;; cons(car, cdr)
+.proc cons
+        jsr setnewcdr
+        POP
+        jsr setnewcar
+        jmp newcons
+.endproc
+
+;;; revcons(cdr, car)
+.proc revcons
+        jsr setnewcar
+        POP
+        jsr setnewcdr
+        jmp newcons
+.endproc
 
 
 ;;; printz prints zstring at AX
