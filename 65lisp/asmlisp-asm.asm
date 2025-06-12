@@ -27,26 +27,28 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  735 +410     bytes - MINIMAL (- 735 325)
+;;;  769 +444     bytes - MINIMAL (- 769 325)
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 410 bytes (- 735 325) = 410 
+;;; 444 bytes (- 769 325) = 444
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       car cdr 19, _car _cdr 20, _print 12
-;;; == 369 ==
-;;; (+ 37 10 89 17 49 38 19 14 21 12 12 19 20 12)
-;;;  TODO: wtf? (- 410 369) = 41 bytes missing, LOL
+;;; == 410 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12)
+;;;  TODO: wtf? (- 440 410) = 30 bytes missing, LOL
 
 ;;; enable numbers
-;NUMBERS=1
+;
+NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+;
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -981,6 +983,7 @@ iscons:
         sta call+1
         stx call+2
         ;; TODO: test is atom? - expesnive, lol
+        ;; (ptr1 contains expr, Y-0 after car)
         jsr car                 ; car of f-atom
         bit BITNOTINT
         bne evalnotnum
@@ -991,13 +994,44 @@ iscons:
 
         ;; prepare one parameter in AX (rest on stack)
 
-        ;; AX= car(cdr(expr))
         POP
+        ;; AX= eval(car(cdr(expr)))
+evallist:       
+        ;PUTC '?'
+        ;jsr print
         jsr cdr
+        ;; while cons
+        tay
+        and #03
+        cmp #03
+        bne finishedeval
+        tya
+        DUP
+notnil: 
         jsr car
         jsr eval
-        ;; TODO: jsr eval
-        ;;       may need to push ptr1?
+        ;PUTC ','
+        ;jsr print
+
+        ;SWAP (ax <-> R-stack)           ; S: car cdr
+        ;; 15B :-(
+        sta savea
+        stx savex
+        pla
+        tax
+        pla
+        tay
+        lda savea
+        pha
+        lda savex
+        pha
+        tya
+
+        jmp evallist
+finishedeval:   
+        POP                     ; get last arg in AX
+        ;PUTC '='
+        ;jsr print             
 
         ;; indirect call to atom car number address!
 call:   jmp ($0000)
@@ -1337,6 +1371,7 @@ iscons: lda #'C'
         jsr eval
         jsr print
 
+;;; eval(cons(_print, cons(4711, nil)))
         SETNUM 4711
         jsr setnewcar
         SET _nil
