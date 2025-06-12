@@ -342,18 +342,21 @@ notnl:
 .endmacro
 
 ;;; putchar (leaves char in A)
+;;; 5B
 .macro putc c
         lda #(c)
         jsr putchar
 .endmacro
 
 ;;; for debugging only 'no change registers A'
+;;; 7B
 .macro PUTC c
         pha
         putc c
         pla
 .endmacro
 
+;;; 7B - only used for testing
 .macro NEWLINE
         PUTC 10
 .endmacro
