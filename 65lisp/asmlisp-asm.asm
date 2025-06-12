@@ -27,28 +27,31 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  769 +444     bytes - MINIMAL (- 769 325)
-;;;  613          bytes - ORICON  (raw ORIC, no ROM)
-;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
-;;;  900          bytes - TEST + ORICON
+;;;  785 +460     bytes - MINIMAL (- 785 325)
+;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
+;;;  886 +117     bytes - NUMBERS (- 886 769)
+;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
+;;;  900?         bytes - TEST + ORICON
 
-;;; 444 bytes (- 769 325) = 444
+;;; 444 bytes (- 785 325) = 460
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
-;;;       car cdr 19, _car _cdr 20, _print 12
-;;; == 410 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12)
+;;;       _car _cdr 19, _car _cdr 20, _print 12
+;;;       _cons 16
+;;; == 426 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16)
 ;;;  TODO: wtf? (- 440 410) = 30 bytes missing, LOL
 
 ;;; enable numbers
-;
-NUMBERS=1
+;NUMBERS=1
+
+;;; enable math (div16, mul16)
+;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
-;
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -504,6 +507,7 @@ popret:
         rts
 
 ;;; cons(car, cdr)
+.align 2
 .proc cons
         jsr setnewcdr
         POP
@@ -573,6 +577,11 @@ _cdr:   .word cdr, _car, eval
 _print: .word print, _cdr, eval
         .byte "print", 0
 
+.align 4
+.res 1
+_cons:  .word cons, _print, eval
+        .byte "cons", 0
+
 .ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
@@ -601,6 +610,8 @@ print:
 ;;; by strat @ nesdev forum ; 21B
 ;;; 
 ;;; out: A: remainder; X: 0; Y: unchanged
+
+.ifdef MATH
 
 .proc div16
   ldx #16
@@ -662,7 +673,30 @@ print:
   rts
 .endproc
 
+.proc mul2
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+        rts
+.endproc
 
+.endif ; MATH
+
+.ifdef NUMBERS
+;;; needed by print for numbers
+.proc div2
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+.endproc
+.endif ; NUMBERS
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
 .proc printd
@@ -829,32 +863,9 @@ iscons:
 .endproc
 .endif
 
-.ifdef NUMBERS
-
-;;; TODO: see mul10
-.ifnblank
-.proc _mul2
-        asl
-        tay
-        txa
-        rol
-        tax
-        tya
-        rts
-.endproc
-.endif
-
-.proc _div2
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-        rts
-.endproc
-
 .ifdef TEST
+
+.ifdef NUMBERS
 .proc testnums
         ;; test hex
         ldx #$be
@@ -982,6 +993,7 @@ iscons:
         ;; this is the f-atom, indirect call CAR!
         sta call+1
         stx call+2
+        ;jsr print
         ;; TODO: test is atom? - expesnive, lol
         ;; (ptr1 contains expr, Y-0 after car)
         jsr car                 ; car of f-atom
@@ -1112,7 +1124,7 @@ found:
         bit BITNOTINT
         bne notint
 isnum:  
-        jsr _div2
+        jsr div2
         jsr printd
         jmp ret
 .endif ; NUMBERS
@@ -1345,6 +1357,12 @@ iscons: lda #'C'
         rts
 .endproc
 
+.align 4
+.res 3
+acons:  .word _T,_nil
+bcons:  .word _T,acons
+ccons:  .word _cons,bcons
+
 .proc testeval
         SET _nil
         jsr print
@@ -1395,7 +1413,15 @@ call1x: jsr call1
 
         jsr eval
 
+        NEWLINE
 
+        ;; test eval of "cons"
+        SET ccons
+        jsr print
+        jsr eval
+        jsr print
+
+        NEWLINE
         rts
 .endproc
 
@@ -1547,7 +1573,7 @@ afterfoo3:
         rts
 .endproc
 
-
+;;; create a fake cons to see it recognized
 .align 4
 .res 3
 tcons:      .word _T, _T
