@@ -31,12 +31,13 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
 ;;;  829 +504     bytes - MINIMAL (- 829 325)
+;;;  943 +618     bytes - MINIMAL+READ (- 943 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 476 bytes
+;;; 618 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
@@ -44,8 +45,10 @@ TOPMEM	= $9800
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
 ;;;       _cons 16, _atom atom 16+15=31
 ;;;       _eq 8+17=27
-;;; == 484 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27)
+;;;       _read 10, readatom 23, read 67 == READS SEXP OK!
+;;; == 584 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27 10 23 67)
+;;; 
 ;;;  TODO: wtf? (- 488 457) = 30 bytes missing (align?)
 
 ;;; enable numbers
@@ -133,6 +136,12 @@ _nil:   .res 4
         .res 4
 ;        .byte "nil", 0
 
+
+;;; simulated input
+;inptr:  .res 2
+
+;;; read/parse buffer
+buff:   .res 16
 
 ;;; --------------------------------------------------
 ;;; Uninitialized data (not stored in binary)
@@ -303,11 +312,18 @@ _scrmova:
 ;;;
 ;;; 10B
 .proc getchar      
+        stx savex
+        sty savey
+
         jsr $023B               ; ORIC ATMOS only
         bpl getchar             ; no char - loop
         tax
         ;; TODO: optional?
         jsr $0238               ; echo char
+
+        ldy savey
+        ldx savex
+
         rts
 .endproc
 
@@ -345,6 +361,11 @@ notnl:
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
+
+.macro ZERO
+        lda #0
+        tax
+.endmacro
 
 .macro SET val
         lda #<val
@@ -599,6 +620,132 @@ _atom:  .word atom, _cons
 _eq:    .word eq, _atom
         .byte "eq", 0
 
+.align 4
+.res 1
+_read:  .word read, _eq
+        .byte "read", 0
+
+
+
+;;; _readatom reads and atom into zp buff
+;;; X contains number of chars read.
+
+;;; Result: in buff, X length
+;;; ->A contains breakchar
+;;; Y unchanged
+
+cunget: .byte 0
+
+;;; 23B (before...15B)
+.proc readatom
+        ldx #0
+next:   
+        lda #0
+        sta buff, x
+        jsr getchar
+        ;; test if valid
+    .ifblank
+        ;; (we simplify like SectorLisp no char
+        ;;  !"#$%&'() may be part of atom name )
+        cmp #')'+1
+        bcc ret ; <= ')'
+    .else
+        cmp #' '+1
+        bcc ret                 ; eof/spc
+        cmp #'('
+        beq ret
+        cmp #')'
+        beq ret
+        ;; see below
+        cmp #'.'
+        beq ret
+    .endif
+        ;; TODO: minimal no read dotted pair?
+        ;cmp #'.'
+	;beq ret
+
+        ;; got valid char for atom
+        sta buff,x
+        inx
+        ;; TODO: overflow?
+        bne next                ; jmp next
+
+ret:    
+        sta cunget
+        lda #0
+        rts
+.endproc
+
+.align 2
+;;; 67B
+.proc read
+        lda cunget
+        beq nobreak
+        cmp #'('-1
+        bcs breakchar
+        ;; "white space"
+        lda #0
+        sta cunget
+        
+nobreak:        
+        jsr readatom
+        cpx #0
+        beq read
+
+        ;; first char 0-9 -> number!
+        lda buff
+        cmp #'9'+1
+        bcs symbol
+
+        ;; TODO: parsenum
+        SETNUM 42 ; LOL
+        rts
+
+symbol: 
+        ;; TODO: findsym
+        SET _T ; LOL
+        rts
+
+breakchar:      
+
+        ldx #0
+        stx cunget
+
+.ifnblank
+        ;; print the char number
+        jsr printd
+        NEWLINE
+        ;; return it as a number!
+        asl
+        rts
+.endif
+
+        ;; A is breakchar
+        ;; TODO: '.'
+        cmp #')'
+        bcs endlist             ; assume ')'
+
+        ;; start list
+readlist:       
+        jsr read                ; car
+
+        ;; if nil return nil
+        cmp #<_nil
+        bne next
+        cpx #>_nil
+        bne next
+        rts
+next:   
+        ;; continuation tail, lol
+        PUSH
+        ;; TODO: will crash stacdk fo
+        jsr readlist
+        jmp cons
+
+endlist:        
+        jmp retnil
+.endproc
+
 .ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
@@ -717,6 +864,7 @@ print:
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
 .proc printd
+;;; TODO: maybe not need save as print does?
         ;; save ax
         sta savea
         stx savex
@@ -1445,18 +1593,51 @@ iscons: lda #'C'
 
         jsr testatoms
         jsr testtypefunc
-
         jsr testbind
-
         jsr contcall
-
         jsr testcons
-
         jsr testeval
-
         jsr testtests
+        jsr testread
 
         rts
+.endproc
+
+.proc testread
+;;; readeval loop!
+        putc 10
+        putc '>'
+
+        jsr read
+        NEWLINE
+        jsr print
+        NEWLINE
+        ;jsr eval
+        ;jsr print
+        jmp testread
+
+;;; debug readatom function
+        jsr readatom
+
+        tay
+        txa
+        pha
+        putc 10
+        tya
+        ;jsr putchar
+        ;PUTC ' '
+        ;; print break char code
+        ldx #0
+        jsr printd
+        putc '#'
+        pla
+        ldx #0
+        jsr printd
+        putc ':'
+        
+        SET buff
+        jsr printz
+        jmp testread
 .endproc
 
 .proc testtests
