@@ -28,13 +28,13 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
-;;; 1629 +231     bytes - MINIMAL (- 551 320)
+;;;  605 +231     bytes - MINIMAL (- 551 320)
 ;;;     this was with _eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 285 bytes (- 1629 1024 320)
+;;; 285 bytes (- 605 320)
 ;;;       initlisp nil 37, T 10,
 ;;;       print 76, printz 17, eval 30
 ;;;       getvalue 38, bind 19,
@@ -117,6 +117,17 @@ lowcons: .res 2
 _nil:   .res 6
         .byte "nil", 0
 
+
+;;; --------------------------------------------------
+;;; Uninitialized data (not stored in binary)
+
+.bss
+
+;;; locals
+locidlo:        .res 256
+locidhi:        .res 256
+loclo:          .res 256
+lochi:          .res 256
 
 
 .code
@@ -284,11 +295,6 @@ popret:
 
 ;;; TODO: this doesn't need to be here in the binrary?
 
-;;; locals
-locidlo:        .res 256
-locidhi:        .res 256
-loclo:          .res 256
-lochi:          .res 256
 
 .ifdef ORICON
 ;;; =========================================================
