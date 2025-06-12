@@ -1242,40 +1242,40 @@ issym:
 
 iscons: 
         ;; ptr2= ax
-        sta ptr2
-        stx ptr2+1
+        sta ptr1
+        stx ptr1+1
 
         putc '('
 
 printlist:      
         ;; push CDR(ptr1)
         ldy #2
-        lda (ptr2),y ; a
+        lda (ptr1),y ; a
         pha
         iny
-        lda (ptr2),y ; x
+        lda (ptr1),y ; x
         pha
 
         ;; ptr2= CAR(ptr1)
         ldy #1
-        lda (ptr2),y ; x
+        lda (ptr1),y ; x
         tax
         dey
-        lda (ptr2),y ; a
+        lda (ptr1),y ; a
 
         jsr print
 
         ;; cdr
-        POP
-
+        POP                   
+        
         ;; !iscons => endlist
         ;; 5B
         jsr isconsSetC
         bcc endlist
 
-        ;; ptr2= ax
-        sta ptr2
-        stx ptr2+1
+        ;; ptr1= ax
+        sta ptr1
+        stx ptr1+1
 
         putc ' '
         jmp printlist
