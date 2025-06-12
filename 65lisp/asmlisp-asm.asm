@@ -16,8 +16,11 @@
 ;;; - assumes prexisting "bios": getch putch
 ;;; - only SYMBOLS and CONS
 ;;; - reader and writer (no editor, or backspace)
-;;; - T NIL QUOTE READ PRINT COND CONS CAR CDR (41)
-;;;     ?LAMBDA ?EVAL ?APPLY (16)
+;;; - T NIL ?QUOTE ?READ PRINT ?COND CONS CAR CDR
+;;;     ATOM ?LAMBDA ?EQ
+
+;;; TODO: EQ READ QUOTE COND LAMBDA
+
 ;;; - no GC (or minimal "reset")
 
 ;;; ORIC: charset in hires-mode starts here
@@ -27,31 +30,33 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  785 +460     bytes - MINIMAL (- 785 325)
+;;;  813 +488     bytes - MINIMAL (- 813 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 444 bytes (- 785 325) = 460
+;;; 488 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
-;;;       _cons 16
-;;; == 426 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16)
-;;;  TODO: wtf? (- 440 410) = 30 bytes missing, LOL
+;;;       _cons 16, _atom atom 16+15=31
+;;; == 457 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31)
+;;;  TODO: wtf? (- 488 457) = 30 bytes missing (align?)
 
 ;;; enable numbers
-;NUMBERS=1
+;
+NUMBERS=1
 
 ;;; enable math (div16, mul16)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+;
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -582,6 +587,12 @@ _print: .word print, _cdr, eval
 _cons:  .word cons, _print, eval
         .byte "cons", 0
 
+.align 4
+.res 1
+_atom:  .word atom, _cons, eval
+        .byte "atom", 0
+
+
 .ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
@@ -946,7 +957,7 @@ maybecons:
 ;;;  TODO: inline macro? 6B
 .proc isnullSetN                ; 11-12c 6B+1
         cmp #<_nil               
-        bne ret                 ; if Z=0 => not Null
+        bne ret                  ; if Z=0 => not Null
         cpx #>_nil               ; if Z=1 => is Null!
 ret:    
         rts
@@ -967,6 +978,45 @@ ret:
 .endproc
 
 .endif ; blank
+
+
+;;; xxx00 number
+;;; xxx01 atom
+;;; xxx10 number
+;;; xxx11 cons
+;;; 
+;;; 31B  (- 815 785)= 30
+.ifnblank
+.proc type
+        clc
+        bit BITNOTINT
+        beq isnumber            ; N=1 -- number
+        bit BITISCONS
+        bne iscons              ; N=0
+issym:                          ; N=1
+        tay
+        cpx #<_nil
+        bne notnull
+        cmp #>_nil
+        bne notnull
+null:   
+        lda #64+4               ; V=1 + Z=1 -- null
+        bne setP
+notnull:        
+        lda #64+4               ; V=1 -- symbol
+setP:   
+        pha
+        tya
+        plp
+        rts
+
+iscons: 
+        sec                     ; C=1 N=0 -- cons
+isnumber:        
+        clv
+        rts
+.endproc
+.endif
 
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
@@ -1012,12 +1062,21 @@ evallist:
         ;PUTC '?'
         ;jsr print
         jsr cdr
+        
+        
         ;; while cons
+        ;;
+        jsr isconsSetC
+        bcc finishedeval
+
+	;; 9B
+.ifnblank
         tay
         and #03
         cmp #03
         bne finishedeval
         tya
+.endif
         DUP
 notnil: 
         jsr car
@@ -1041,7 +1100,8 @@ notnil:
 
         jmp evallist
 finishedeval:   
-        POP                     ; get last arg in AX
+        ;; put last arg in AX
+        POP
         ;PUTC '='
         ;jsr print             
 
@@ -1115,6 +1175,29 @@ found:
         rts
 .endproc
 
+;;; 7B
+.proc isconsSetC
+        tay
+        and #03
+        ;; seems to work with #03 too?
+        cmp #03
+        tya
+        rts
+.endproc
+
+.align 2
+;;; 15B
+atom:   
+        jsr isconsSetC
+Crettrue:       
+        bcc rettrue
+retnil: 
+        SET _nil
+        rts
+rettrue:
+        SET _T
+        rts
+
 ;;; 89B (very big)
 .align 2
 .proc print
@@ -1166,12 +1249,10 @@ printlist:
         ;; cdr
         POP
 
-        ;; !iscons break
-        pha
-        and #03
-        cmp #03
-        bne endlist
-        pla
+        ;; !iscons => endlist
+        ;; 5B
+        jsr isconsSetC
+        bcc endlist
 
         ;; ptr2= ax
         sta ptr2
@@ -1181,13 +1262,15 @@ printlist:
         jmp printlist
 
 endlist:        
-        pla
 
+;;; TODO: better test
         ;; nil => no dot
+        ;; 8B
         cmp #<_nil
         bne printdot
         cpx #>_nil
         bne printdot
+
         jmp donelist
 
 printdot:       
@@ -1353,6 +1436,46 @@ iscons: lda #'C'
         jsr testcons
 
         jsr testeval
+
+        jsr testtests
+
+        rts
+.endproc
+
+.proc testtests
+        SETNUM 42
+        jsr print
+        jsr atom
+        jsr print
+        
+        NEWLINE
+
+        SET _nil
+        jsr print
+        jsr atom
+        jsr print
+        
+        NEWLINE
+
+        SET _T
+        jsr print
+        jsr atom
+        jsr print
+
+        NEWLINE
+
+        SET _print
+        jsr print
+        jsr atom
+        jsr print
+
+        NEWLINE
+        SET tcons
+        jsr print
+        jsr atom
+        jsr print
+
+        NEWLINE
 
         rts
 .endproc
@@ -1799,7 +1922,7 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 ;;; (42) bytes needed for optinoal (numbers)
 ;;;
 ;;; x - _type		29 (6)		29
-;;;   * atom (== !iscons)
+;;; ! * atom (== !iscons) 31           ..
 ;;; ! * prin1
 ;;;     - prinz         [75]
 ;;;     - putchar       [10]
@@ -1837,3 +1960,5 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 ;;;   - and
 ;;;   - or
 ;;;   - list
+
+        ;; END
