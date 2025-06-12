@@ -28,25 +28,25 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
-;;;  605 +231     bytes - MINIMAL (- 551 320)
+;;;  631 +231     bytes - MINIMAL (- 551 320)
 ;;;     this was with _eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 285 bytes (- 605 320)
+;;; 311 bytes (- 631 320)
 ;;;       initlisp nil 37, T 10,
 ;;;       print 76, printz 17, eval 30
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar setnewcdr 14, newcons 21, cons 12, rev 12
-;;;    == 286 (+ 37 10 76 17 30 38 19 14 21 12 12)
+;;;       car cdr 19, _car _cdr 20, 
+;;;    == 305 (+ 37 10 76 17 30 38 19 14 21 12 12 19 20)
 
 ;;; enable numbers
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -141,11 +141,13 @@ lochi:          .res 256
         ldx #>val
 .endmacro
 
+.align 2
 cdr:    
         ldy #3
         jmp cYr
 
 ;;; car(AX) -> AX
+.align 2
 car:    
         ldy #1
 cYr:    
@@ -532,6 +534,15 @@ end:
 _T:     .word _T, _nil, _eval
         .byte "T", 0
 
+.align 4
+.res 1
+_car:   .word car, _T, _eval
+        .byte "car", 0
+
+.align 4
+.res 1
+_cdr:   .word cdr, _T, _eval
+        .byte "cdr", 0
 
 .ifdef NUMBERS
 
@@ -1282,6 +1293,32 @@ iscons: lda #'C'
         jsr contcall
 
         jsr testcons
+
+        jsr testeval
+
+        rts
+.endproc
+
+.proc testeval
+        SETAX _nil
+        jsr _print
+        jsr _eval
+        jsr _print
+
+        SETAX _T
+        jsr _print
+        jsr _eval
+        jsr _print
+
+        SETAX _car
+        jsr _print
+        jsr _eval
+        jsr _print
+
+        SETAX _cdr
+        jsr _print
+        jsr _eval
+        jsr _print
 
         rts
 .endproc
