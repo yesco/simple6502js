@@ -45,7 +45,8 @@ TOPMEM	= $9800
 ;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+;
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -1278,6 +1279,14 @@ iscons: lda #'C'
 
         jsr testbind
 
+        jsr contcall
+
+        jsr testcons
+
+        rts
+.endproc
+
+.proc contcall
         ;; crazy idea: continuation for stack
         ;; for parameter passing
         ;; 6B, 6c overhead
@@ -1352,8 +1361,6 @@ afterfoo3:
 
         lda #'!'
         jsr _putchar
-
-        jsr testcons
 
         rts
 .endproc
