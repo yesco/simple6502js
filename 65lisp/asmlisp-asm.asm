@@ -155,9 +155,9 @@ lochi:          .res 256
 
 ;;; for debugging only 'no change registers A'
 .macro PUTC c
-        pha
+        PUSH
         putc c
-        pla
+        POP
 .endmacro
 
 .macro NEWLINE
@@ -1372,7 +1372,7 @@ iscons: lda #'C'
         jmp call1x
 call1: 
         PUSH
-        SET print
+        SET _print
         jmp revcons
 
 call1x: jsr call1
