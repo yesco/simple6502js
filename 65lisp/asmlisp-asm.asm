@@ -27,27 +27,26 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  687 +363     bytes - MINIMAL (- 687 325)
-;;;     this was with eval and getval & bind + 58B?
+;;;  735 +410     bytes - MINIMAL (- 735 325)
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 362 bytes
+;;; 410 bytes (- 735 325) = 410 
 ;;;       initlisp nil 37, T 10,
-;;;       print 89, printz 17, eval 25
+;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       car cdr 19, _car _cdr 20, _print 12
-;;;    == 345 (+ 37 10 89 17 25 38 19 14 21 12 12 19 20 12)
+;;; == 369 ==
+;;; (+ 37 10 89 17 49 38 19 14 21 12 12 19 20 12)
+;;;  TODO: wtf? (- 410 369) = 41 bytes missing, LOL
 
 ;;; enable numbers
-;
-NUMBERS=1
+;NUMBERS=1
 
 ;;; enable tests (So far depends on ORICON)
-;
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -97,6 +96,9 @@ ptr3:   .res 2
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
+
+;;; TODO: needed? clash with jsr printd???
+savexputchar:    .res 1
 
 ;;; used to detect type using BIT & beq
 BITNOTINT: .res 1
@@ -306,7 +308,7 @@ plaputchar:
 ;;; 
 ;;; 12B
 .proc putchar
-        stx savex
+        stx savexputchar
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
         bne notnl
@@ -317,15 +319,15 @@ plaputchar:
 notnl:  
         tax
         jsr $0238
-        ldx savex
+        ldx savexputchar
         rts
 .endproc
 
 .endif ; ORICON
 
-;;; enable these 3 lines for NOTHING
+;;; enable these 3 lines for NOTHING .tap => 325 bytes
 ;.export _initlisp        
-;_initlisp:      rts            
+;_initlisp:      rts
 ;.end
 
 
@@ -960,45 +962,48 @@ ret:
 ;;;    else
 ;;;      global value lookup (= car)
 
-.ifblank
-
-;;; 25B !
+;;; 49B
 .proc eval
+
 .ifdef NUMBERS
         bit BITNOTINT
         beq isnum
+.endif
 isnotnum:       
         bit BITISCONS
         beq issym
 iscons: 
         ;; APPLY
-        ;; get function
-        ;; (expr is saved in ptr1!)
-        jsr car
+        ;; get function atom
+        DUP
+        jsr car                 ; car of expr
+        ;; this is the f-atom, indirect call CAR!
+        sta call+1
+        stx call+2
+        ;; TODO: test is atom? - expesnive, lol
+        jsr car                 ; car of f-atom
         bit BITNOTINT
         bne evalnotnum
         ;; have even address==num == machine code
-        sta call+1
-        stx call+2
         ;; TODO: Z set if zero page atom called
         ;;   use this for non-eval: cond? ...
         ;;   how about user defined?
 
         ;; prepare one parameter in AX (rest on stack)
-        ; AX= car(ptr1) 
-        lda #1                  ; 1 dey 0 == car
-        jsr ptr1cYr
+
+        ;; AX= car(cdr(expr))
+        POP
+        jsr cdr
+        jsr car
+        jsr eval
         ;; TODO: jsr eval
         ;;       may need to push ptr1?
 
-        ;; indirect call to atom address!
+        ;; indirect call to atom car number address!
 call:   jmp ($0000)
 
 evalnotnum:     
-        ;; TODO: function = cons == lambda?
-
-        
-        rts
+        jmp popret
 
 issym:  
         ;; test if it's in ZP then it's self eval
@@ -1009,7 +1014,6 @@ issym:
 isself: 
 isnum:  
         rts
-.endif
 .endproc ; eval
 
 ;;; 38B 39++ found
@@ -1064,65 +1068,6 @@ found:
 
         rts
 .endproc
-
-.else ; blank
-
-.proc eval
-        ;; NIL => NIL
-        cmp #<_nil
-        bne testnum
-        cpx #>_nil
-        beq ret
-
-testnum:        
-        ;; TODO: if _nil==$01 then can test!
-        lsr
-        bcs notnum
-        ;; NUMBER
-        rol
-
-ret:    jmp incsp2
-
-notnum: 
-        ror
-        bcs iscons
-
-        ;; ATOM => lookup var in env/global
-        ; jmp _getval
-
-iscons:
-        ;; CONS => APPLY!
-        ; jsr pushax (dup x)
-
-        ;; get global val
-        ; jsr _car
-again:  
-        ;; TODO: test is atom/function/closure
-        ;; TODO: if not then
-        ;;         jsr AX=eval(env, AX)
-        ;;         jmp again
-
-        ;; AX contains ptr to "atom/func"
-        ;;    w JSR addr
-
-;;; now, basically eval falls through to
-;;;   apply(env, x, AX)
-
-apply:  
-        clc
-        ;; skip over cdr; point to addr
-        adc #04
-        bcc go
-        inx
-
-go:     
-        ;; Note: args are not evaluated
-
-        ;; AX(env,args)
-        ; jmp callax              
-
-.endproc
-.endif
 
 ;;; 89B (very big)
 .align 2
@@ -1411,7 +1356,10 @@ call1x: jsr call1
 
         jsr print
 
-        PUTC '!'
+        NEWLINE
+
+        jsr eval
+
 
         rts
 .endproc
