@@ -17,9 +17,9 @@
 ;;; - only SYMBOLS and CONS
 ;;; - reader and writer (no editor, or backspace)
 ;;; - T NIL ?QUOTE ?READ PRINT ?COND CONS CAR CDR
-;;;     ATOM ?LAMBDA ?EQ
+;;;     ATOM ?LAMBDA EQ
 
-;;; TODO: EQ READ QUOTE COND LAMBDA
+;;; TODO: READ QUOTE COND LAMBDA
 
 ;;; - no GC (or minimal "reset")
 
@@ -30,7 +30,7 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  801 +476     bytes - MINIMAL (- 801 325)
+;;;  829 +504     bytes - MINIMAL (- 829 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
@@ -43,18 +43,21 @@ TOPMEM	= $9800
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
 ;;;       _cons 16, _atom atom 16+15=31
-;;; == 457 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31)
+;;;       _eq 8+17=27
+;;; == 484 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27)
 ;;;  TODO: wtf? (- 488 457) = 30 bytes missing (align?)
 
 ;;; enable numbers
-;NUMBERS=1
+;
+NUMBERS=1
 
 ;;; enable math (div16, mul16)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
-;TEST=1
+;
+TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -591,6 +594,10 @@ _cons:  .word cons, _print
 _atom:  .word atom, _cons
         .byte "atom", 0
 
+.align 4
+.res 1
+_eq:    .word eq, _atom
+        .byte "eq", 0
 
 .ifdef NUMBERS
 
@@ -1196,6 +1203,19 @@ retnil:
 rettrue:
         SET _T
         rts
+
+.align 2
+;;; 17B
+.proc eq
+        sta savea
+        sta savex
+        POP
+        cmp savea
+        bne retnil
+        cpx savex
+        bne retnil
+        beq rettrue
+.endproc     
 
 ;;; 89B (very big)
 .align 2
