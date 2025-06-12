@@ -30,13 +30,13 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  813 +488     bytes - MINIMAL (- 813 325)
+;;;  801 +476     bytes - MINIMAL (- 801 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 488 bytes
+;;; 476 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
@@ -48,15 +48,13 @@ TOPMEM	= $9800
 ;;;  TODO: wtf? (- 488 457) = 30 bytes missing (align?)
 
 ;;; enable numbers
-;
-NUMBERS=1
+;NUMBERS=1
 
 ;;; enable math (div16, mul16)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
-;
-TEST=1
+;TEST=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -128,8 +126,9 @@ lowcons: .res 2
 ;;; _nil atom at address 5 (4+1 == atom)
 ;;; TODO: create segment to reserve memory?
 
-_nil:   .res 6
-        .byte "nil", 0
+_nil:   .res 4
+        .res 4
+;        .byte "nil", 0
 
 
 ;;; --------------------------------------------------
@@ -564,32 +563,32 @@ end:
 .align 4
 .res 1
 
-_T:     .word _T, _nil, eval
+_T:     .word _T, _nil
         .byte "T", 0
 
 .align 4
 .res 1
-_car:   .word car, _T, eval
+_car:   .word car, _T
         .byte "car", 0
 
 .align 4
 .res 1
-_cdr:   .word cdr, _car, eval
+_cdr:   .word cdr, _car
         .byte "cdr", 0
 
 .align 4
 .res 1
-_print: .word print, _cdr, eval
+_print: .word print, _cdr
         .byte "print", 0
 
 .align 4
 .res 1
-_cons:  .word cons, _print, eval
+_cons:  .word cons, _print
         .byte "cons", 0
 
 .align 4
 .res 1
-_atom:  .word atom, _cons, eval
+_atom:  .word atom, _cons
         .byte "atom", 0
 
 
@@ -1217,7 +1216,7 @@ notint:
         bne iscons
 issym:  
         ;; TODO: struct?
-        ldy #6
+        ldy #4
         jsr printzY
         jmp ret
 
@@ -1302,27 +1301,25 @@ ret:
 .assert .hibyte(_nil) = 0, error
         lda #<_nil
         sta _nil
+        sta _nil+2
         ; sta _nil+2 ; do below
-
-        lda #>_nil
-        sta _nil +1
         ; sta _nil+2 +1 ; do below
 
         ;;  write 'nil'
         lda #110
-        sta _nil+6
+        sta _nil+4
         lda #105
-        sta _nil+7
+        sta _nil+5
         lda #108
-        sta _nil+8
+        sta _nil+6
 
         ;; init 0
         ldx #0
-        stx _nil+9
-        stx _nil+2
-        stx _nil+2 +1
+        stx _nil+7              ; terminate "nil"
+        stx _nil+0+1            ; car hi
+        stx _nil+2+1            ; cdr hi
 
-        stx locidx
+        stx locidx              ; 0 means empty
 
         ;; memory mgt
         lda #<(TOPMEM-4-1)
