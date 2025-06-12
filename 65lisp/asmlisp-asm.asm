@@ -28,19 +28,19 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  320          bytes - NOTHING (search)
 ;;;  493 +173     bytes - MINIMAL (- 493 320)
-;;;  631 +231     bytes - MINIMAL (- 551 320)
+;;;  683 +363     bytes - MINIMAL (- 683 320)
 ;;;     this was with eval and getval & bind + 58B?
 ;;;  613          bytes - ORICON  (raw ORIC, no ROM)
 ;;;  663 +170 344 bytes - NUMBERS (- 663 493) (- 663 319)
 ;;;  900          bytes - TEST + ORICON
 
-;;; 311 bytes (- 631 320)
+;;; 363 bytes
 ;;;       initlisp nil 37, T 10,
-;;;       print 76, printz 17, eval 30
+;;;       print 89, printz 17, eval 25
 ;;;       getvalue 38, bind 19,
-;;;       setnewcar setnewcdr 14, newcons 21, cons 12, rev 12
-;;;       car cdr 19, _car _cdr 20, 
-;;;    == 305 (+ 37 10 76 17 30 38 19 14 21 12 12 19 20)
+;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
+;;;       car cdr 19, _car _cdr 20, _print 12
+;;;    == 345 (+ 37 10 89 17 25 38 19 14 21 12 12 19 20 12)
 
 ;;; enable numbers
 ;
@@ -956,6 +956,7 @@ ret:
 
 .ifblank
 
+;;; 25B !
 .proc eval
 .ifdef NUMBERS
         bit BITNOTINT
@@ -1117,7 +1118,7 @@ go:
 .endproc
 .endif
 
-;;; 76B (very big)
+;;; 89B (very big)
 .align 2
 .proc print
         DUP
@@ -1147,6 +1148,7 @@ iscons:
 
         putc '('
 
+printlist:      
         ;; push CDR(ptr1)
         ldy #2
         lda (ptr2),y ; a
@@ -1164,13 +1166,37 @@ iscons:
 
         jsr print
 
-        putc '.'
-
-        ;; print cdr
+        ;; cdr
         POP
 
-        jsr print
+        ;; !iscons break
+        pha
+        and #03
+        cmp #03
+        bne endlist
+        pla
 
+        ;; ptr2= ax
+        sta ptr2
+        stx ptr2+1
+
+        putc ' '
+        jmp printlist
+
+endlist:        
+        pla
+
+        ;; nil => no dot
+        cmp #<_nil
+        bne printdot
+        cpx #>_nil
+        bne printdot
+        jmp donelist
+
+printdot:       
+        PUTC '.'
+        jsr print
+donelist:       
         putc ')'
 
 ret:    
