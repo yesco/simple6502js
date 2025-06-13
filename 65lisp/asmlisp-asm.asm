@@ -19,6 +19,13 @@
 ;;; - T NIL ?QUOTE ?READ PRINT ?COND CONS CAR CDR
 ;;;     ATOM ?LAMBDA EQ
 
+;;; AsmLisp limitations;
+;;; - atom maxlength is 15 chars (not checked)
+;;; - atoms can only contain chars > ')'
+;;; - READ list length is limited by HW stack (no check)
+;;; - only SYMBOLS & CONS
+;;; - numbers are optional
+
 ;;; TODO: READ QUOTE COND LAMBDA
 
 ;;; - no GC (or minimal "reset")
@@ -30,14 +37,14 @@ TOPMEM	= $9800
 ;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
-;;;  829 +504     bytes - MINIMAL (- 829 325)
-;;;  943 +618     bytes - MINIMAL+READ (- 943 325)
+;;; (829 +504     bytes - MINIMAL (- 829 325) no read)
+;;;  927 +618     bytes - MINIMAL+READ (- 927 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 618 bytes
+;;; 602 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 89, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
@@ -45,11 +52,12 @@ TOPMEM	= $9800
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
 ;;;       _cons 16, _atom atom 16+15=31
 ;;;       _eq 8+17=27
-;;;       _read 10, readatom 23, read 67 == READS SEXP OK!
-;;; == 584 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27 10 23 67)
+;;;       getc 12, skispc 8, _read 10, readatom 23, read 17
+;;;             NOT: == READS SEXP OK!
+;;; == 554 ==
+;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
 ;;; 
-;;;  TODO: wtf? (- 488 457) = 30 bytes missing (align?)
+;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
 
 ;;; enable numbers
 ;
@@ -626,125 +634,6 @@ _read:  .word read, _eq
         .byte "read", 0
 
 
-
-;;; _readatom reads and atom into zp buff
-;;; X contains number of chars read.
-
-;;; Result: in buff, X length
-;;; ->A contains breakchar
-;;; Y unchanged
-
-cunget: .byte 0
-
-;;; 23B (before...15B)
-.proc readatom
-        ldx #0
-next:   
-        lda #0
-        sta buff, x
-        jsr getchar
-        ;; test if valid
-    .ifblank
-        ;; (we simplify like SectorLisp no char
-        ;;  !"#$%&'() may be part of atom name )
-        cmp #')'+1
-        bcc ret ; <= ')'
-    .else
-        cmp #' '+1
-        bcc ret                 ; eof/spc
-        cmp #'('
-        beq ret
-        cmp #')'
-        beq ret
-        ;; see below
-        cmp #'.'
-        beq ret
-    .endif
-        ;; TODO: minimal no read dotted pair?
-        ;cmp #'.'
-	;beq ret
-
-        ;; got valid char for atom
-        sta buff,x
-        inx
-        ;; TODO: overflow?
-        bne next                ; jmp next
-
-ret:    
-        sta cunget
-        lda #0
-        rts
-.endproc
-
-.align 2
-;;; 67B
-.proc read
-        lda cunget
-        beq nobreak
-        cmp #'('-1
-        bcs breakchar
-        ;; "white space"
-        lda #0
-        sta cunget
-        
-nobreak:        
-        jsr readatom
-        cpx #0
-        beq read
-
-        ;; first char 0-9 -> number!
-        lda buff
-        cmp #'9'+1
-        bcs symbol
-
-        ;; TODO: parsenum
-        SETNUM 42 ; LOL
-        rts
-
-symbol: 
-        ;; TODO: findsym
-        SET _T ; LOL
-        rts
-
-breakchar:      
-
-        ldx #0
-        stx cunget
-
-.ifnblank
-        ;; print the char number
-        jsr printd
-        NEWLINE
-        ;; return it as a number!
-        asl
-        rts
-.endif
-
-        ;; A is breakchar
-        ;; TODO: '.'
-        cmp #')'
-        bcs endlist             ; assume ')'
-
-        ;; start list
-readlist:       
-        jsr read                ; car
-
-        ;; if nil return nil
-        cmp #<_nil
-        bne next
-        cpx #>_nil
-        bne next
-        rts
-next:   
-        ;; continuation tail, lol
-        PUSH
-        ;; TODO: will crash stacdk fo
-        jsr readlist
-        jmp cons
-
-endlist:        
-        jmp retnil
-.endproc
 
 .ifdef NUMBERS
 
@@ -1364,6 +1253,134 @@ rettrue:
         bne retnil
         beq rettrue
 .endproc     
+
+
+.align 2
+;;; read an sexpr return in AX
+;;; 
+;;; (nice spagetti!)
+;;; 
+;;; 67B
+read:   
+        jsr skipspc
+.proc readusingA
+        ;; only gives char >='('
+        cmp #')'
+        beq retnil      ; not needed?
+        bcc readlist    ; '('
+
+        ;; valid atom char
+        jsr readatom
+
+parseatom:      
+.ifdef NUMBERS
+        ;; first char digit?
+        lda buff
+
+        cmp #'9'+1
+        bcs symbol
+        cmp #'0'-1
+        bcc symbol
+
+        ;; TODO: parsenum
+        SETNUM 42 ; LOL
+        rts
+.endif ; NUMBERS
+
+symbol: 
+        ;; TODO: findsym
+        SET _T ; LOL
+        rts
+
+readlist:       
+
+        jsr skipspc
+        ;; ) end of list
+        cmp #')'
+        beq retnil
+
+        ;; prepare car
+        jsr readusingA
+        jsr parseatom
+
+        ;; continuation tail, lol
+        PUSH
+        jsr readlist
+        jmp cons                ; tail-cont-recursion!
+.endproc
+
+cunget: .byte 0
+
+;;; 12B
+.proc getc
+        lda cunget
+        bne got
+        jsr getchar
+got:    
+        ldx #0
+        stx cunget
+        rts
+.endproc
+
+;;; 8B
+.proc skipspc
+        jsr getc
+        ;; < '(' is considered white space
+        cmp #'('-1
+        bcc skipspc
+        rts
+.endproc
+
+;;; _readatom reads and atom into zp buff
+;;; X contains number of chars read.
+
+;;; Result: in buff, X length
+;;; ->A contains breakchar
+;;; (not Y unchanged)
+
+;;; assumes a non-white space char alread in A
+;;; 
+;;; 29B before ... 23B (before...15B)
+;;; break char in A
+;;; result in buff length in X
+.proc readatom
+        ldx #0
+next:   
+        ;; test if valid
+    .ifblank
+        ;; (we simplify like SectorLisp no char
+        ;;  !"#$%&'() may be part of atom name )
+        cmp #')'+1
+        bcc done ; <= ')'
+    .else
+        cmp #' '+1
+        bcc done                ; eof/spc
+        cmp #'('
+        beq done
+        cmp #')'
+        beq done
+        ;; see below
+        cmp #'.'
+        beq done
+    .endif
+
+        ;; TODO: minimal no read dotted pair?
+        ;cmp #'.'
+	;beq ret
+
+        ;; got valid char for atom
+        sta buff,x
+        jsr getc
+        inx
+        ;; TODO: overflow?
+        bne next                ; jmp next
+
+done:    
+        sta cunget
+        rts
+.endproc
+
+
 
 ;;; 89B (very big)
 .align 2
