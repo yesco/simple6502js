@@ -7,7 +7,7 @@
 ;;; only 436 bytes, smaller than the SectoForth at 512
 ;;; bytes.
 ;;; 
-;;; There is a z80/6502 milliforth is 336/328 bytes.
+;;; There is a z80/6502 milliforth is 336/328 bytes!
 ;;; 
 ;;; can we create a minimal 6502 lisp?
 
@@ -76,18 +76,16 @@
 ;;; ORIC: charset in hires-mode starts here
 TOPMEM	= $9800
 
-;;; START
-;;; 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
 ;;; (829 +504     bytes - MINIMAL (- 829 325) no read)
-;;;  924 +599     bytes - MINIMAL+READ (- 924 325)
+;;;  917 +592     bytes - MINIMAL+READ (- 917 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 599 bytes
+;;; 592 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 92, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
@@ -102,6 +100,9 @@ TOPMEM	= $9800
 ;;; 
 ;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
 
+;;; START
+;;; 
+
 ;;; enable numbers
 ;
 NUMBERS=1
@@ -112,6 +113,10 @@ NUMBERS=1
 ;;; enable tests (So far depends on ORICON)
 ;
 TEST=1
+
+;;; enable to use larger fun instead of macro
+;;; goodif used several times
+;SWAPFUN=1
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -208,6 +213,73 @@ lochi:          .res 256
 
 
 .code
+startaddr:      
+
+;;; $53c
+.assert startaddr=1340, error ;"changed .org"
+
+.org $53c
+
+.macro CONSALIGN
+  .res 3- * .mod 4
+.endmacro
+
+.macro SYMALIGN
+  .ifnblank
+    .align 4
+    .res 1
+  .else
+  ;;; SAVED 10 BYTES!
+  .if (* .mod 4) <> 1
+    .res 1
+  .endif
+  .if (* .mod 4) <> 1
+    .res 1
+  .endif
+  .if (* .mod 4) <> 1
+    .res 1
+  .endif
+
+.endif
+.endmacro
+
+;;; various special data items, constants
+;;; - ATOMS
+;;; TODO: any evaluate to self, put in ZP?
+;;;       (easier test in eval!)
+;;; 2458-2450 = 8 bytes saved, lol
+SYMALIGN
+_T:     .word _T, _nil
+        .byte "T", 0
+
+SYMALIGN
+_car:   .word car, _T
+        .byte "car", 0
+
+SYMALIGN
+_cdr:   .word cdr, _car
+        .byte "cdr", 0
+
+SYMALIGN
+_print: .word print, _cdr
+        .byte "print", 0
+
+SYMALIGN
+_cons:  .word cons, _print
+        .byte "cons", 0
+
+SYMALIGN
+_atom:  .word atom, _cons
+        .byte "atom", 0
+
+SYMALIGN
+_eq:    .word eq, _atom
+        .byte "eq", 0
+
+SYMALIGN
+_read:  .word read, _eq
+        .byte "read", 0
+
 
 ;;; ----------------------------------------
 
@@ -634,53 +706,6 @@ end:
 ;;; LISP:
 
  
-;;; various special data items, constants
-;;; - ATOMS
-;;; TODO: any evaluate to self, put in ZP?
-;;;       (easier test in eval!)
-.align 4
-.res 1
-
-_T:     .word _T, _nil
-        .byte "T", 0
-
-.align 4
-.res 1
-_car:   .word car, _T
-        .byte "car", 0
-
-.align 4
-.res 1
-_cdr:   .word cdr, _car
-        .byte "cdr", 0
-
-.align 4
-.res 1
-_print: .word print, _cdr
-        .byte "print", 0
-
-.align 4
-.res 1
-_cons:  .word cons, _print
-        .byte "cons", 0
-
-.align 4
-.res 1
-_atom:  .word atom, _cons
-        .byte "atom", 0
-
-.align 4
-.res 1
-_eq:    .word eq, _atom
-        .byte "eq", 0
-
-.align 4
-.res 1
-_read:  .word read, _eq
-        .byte "read", 0
-
-
-
 .ifdef NUMBERS
 
 ;;; print one hex digit from A lower 4 bits at position Y
@@ -965,6 +990,7 @@ iscons:
 
 .ifdef TEST
 
+
 .ifdef NUMBERS
 .proc testnums
         ;; test hex
@@ -1114,6 +1140,7 @@ isnumber:
 ;;; TODO: OK, reusable but only used once? LOL
 ;;;   inline is 15B ...
 
+.ifdef SWAPFUN
 .proc swap                    ; a  x  y sa sx sy ma mx
 
 ;;; 22B
@@ -1156,6 +1183,30 @@ isnumber:
 .endif
 .endproc
         
+.macro SWAP
+        jsr swap
+.endmacro
+
+.else
+
+;;; SWAP (ax <-> R-stack)
+;;; 15B
+.macro SWAP
+        sta savea
+        stx savex
+        pla
+        tax
+        pla
+        tay
+        lda savea
+        pha
+        lda savex
+        pha
+        tya
+.endmacro
+
+.endif ; SWAPFUN
+
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
 ;;;   ATOM => assoc(env, x)
@@ -1224,22 +1275,8 @@ notnil:
         ;PUTC ','
         ;jsr print
 
-        ;; SWAP (ax <-> R-stack)           ; S: car cdr           ;; 15B :-(
-.ifblank
-        sta savea
-        stx savex
-        pla
-        tax
-        pla
-        tay
-        lda savea
-        pha
-        lda savex
-        pha
-        tya
-.else
-        jsr swap
-.endif
+        SWAP
+
 
         jmp evallist
 finishedeval:   
@@ -1495,7 +1532,7 @@ done:
 isnum:  
         jsr div2
         jsr printd
-        jmp popret
+        jmp ret
 .endif ; NUMBERS
 
 notint: 
@@ -1505,7 +1542,7 @@ issym:
         ;; TODO: struct?
         ldy #4
         jsr printzY
-        jmp popret
+        jmp ret
 
 iscons: 
         ;; ptr2= ax
@@ -1567,8 +1604,6 @@ donelist:
 
 ret:    
         jmp popret
-;        POP
-;        rts
 .endproc
 
 
@@ -1627,6 +1662,8 @@ ret:
 
         rts
 .endproc
+
+;;; ==================================================
 
 .ifdef TEST
 
