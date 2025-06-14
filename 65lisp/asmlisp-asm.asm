@@ -1129,6 +1129,9 @@ iscons:
         DUP
         jsr car                 ; car of expr
         ;; this is the f-atom, indirect call CAR!
+;;; TODO: XPUSH
+;;; (this may be overwritten so need push,
+;;;  but current stack is unsafe, use another!)
         sta call+1
         stx call+2
         ;jsr print
@@ -1150,7 +1153,6 @@ evallist:
         ;PUTC '?'
         ;jsr print
         jsr cdr
-        
         
         ;; while cons
         ;;
@@ -1194,6 +1196,7 @@ finishedeval:
         ;jsr print             
 
         ;; indirect call to atom car number address!
+;;; TODO: XJMP
 call:   jmp ($0000)
 
 evalnotnum:     
