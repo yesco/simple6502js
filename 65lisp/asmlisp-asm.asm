@@ -85,6 +85,8 @@ TOPMEM	= $9800
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
+;;; START
+
 ;;; 590 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 92, printz 17, eval 49
@@ -99,9 +101,6 @@ TOPMEM	= $9800
 ;;; (+ 37 10 92 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
 ;;; 
 ;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
-
-;;; START
-;;; 
 
 ;;; enable numbers
 ;
