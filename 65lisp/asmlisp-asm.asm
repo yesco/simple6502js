@@ -19,6 +19,49 @@
 ;;; - T NIL ?QUOTE ?READ PRINT ?COND CONS CAR CDR
 ;;;     ATOM ?LAMBDA EQ
 
+;;; (/ 512.0 10) = 51.2 B/fun - "sector"
+;;; (/ 446.0 10) = 44.6 B/fun - SectorLisp
+;;; (/ 328.0 10) = 32.8 B/fun - milliforth 6502
+
+;;; NIL     8, 26       = 34
+;;; T       8           =  8
+;;; CAR:    8, 13	= 21
+;;; CDR:    8, (car)+4	= 12
+;;; CONS:  12, 14	= 26
+;;; EQ:     8, 17	= 25
+;;; ATOM:  12, 15	= 27   S= 153
+
+;;; types               =  8
+;;;   BIT 8
+;;; memory              =  8      169
+;;;   initlisp 8
+
+;;; PRINT: 12, 92       =104      273
+;;;   print    92
+;;;     printz 18
+;;;     printlist ??
+
+;;; READ:               = 76++    349
+;;;   getc     12  (+ 12 8 17 17 22)
+;;;   skipspc   8
+;;;   readatom 17
+;;;   read     17
+;;;     findsym  ??    
+;;;   readlist 22
+
+;;; eval:               = 98      447
+;;;   simple 12
+;;;   apply   (+ 12 52 22 12)
+;;;     evlist 52
+;;;     apply  22
+;;;     lambda 12, ??
+
+;;; COND:
+
+;;;   QUOTE
+;;;   
+
+
 ;;; AsmLisp limitations;
 ;;; - atom maxlength is 15 chars (not checked)
 ;;; - atoms can only contain chars > ')'
@@ -38,15 +81,15 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
 ;;; (829 +504     bytes - MINIMAL (- 829 325) no read)
-;;;  927 +618     bytes - MINIMAL+READ (- 927 325)
+;;;  924 +599     bytes - MINIMAL+READ (- 924 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  886 +117     bytes - NUMBERS (- 886 769)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 602 bytes
+;;; 599 bytes
 ;;;       initlisp nil 37, T 10,
-;;;       print 89, printz 17, eval 49
+;;;       print 92, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
@@ -55,7 +98,7 @@ TOPMEM	= $9800
 ;;;       getc 12, skispc 8, _read 10, readatom 23, read 17
 ;;;             NOT: == READS SEXP OK!
 ;;; == 554 ==
-;;; (+ 37 10 89 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
+;;; (+ 37 10 92 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
 ;;; 
 ;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
 
@@ -543,6 +586,8 @@ popret:
         rts
 
 ;;; cons(car, cdr)
+;;; 
+;;; 1+13
 .align 2
 .proc cons
         jsr setnewcdr
@@ -1331,7 +1376,7 @@ got:
         rts
 .endproc
 
-;;; _readatom reads and atom into zp buff
+;;; readatom reads and atom into zp buff
 ;;; X contains number of chars read.
 
 ;;; Result: in buff, X length
@@ -1340,7 +1385,7 @@ got:
 
 ;;; assumes a non-white space char alread in A
 ;;; 
-;;; 29B before ... 23B (before...15B)
+;;; 17B ... 29B before ... 23B (before...15B)
 ;;; break char in A
 ;;; result in buff length in X
 .proc readatom
@@ -1382,7 +1427,8 @@ done:
 
 
 
-;;; 89B (very big)
+;;; 92B (very big)
+;;; 
 .align 2
 .proc print
         DUP
@@ -1402,8 +1448,7 @@ notint:
 issym:  
         ;; TODO: struct?
         ldy #4
-        jsr printzY
-        jmp ret
+        jmp printzY
 
 iscons: 
         ;; ptr2= ax
