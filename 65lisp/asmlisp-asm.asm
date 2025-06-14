@@ -1720,143 +1720,6 @@ endaddr:
 
 .ifdef TEST
 
-thetypeis: .byte "The value and type is: ",0
-
-.proc testatoms
-        ;; Atom
-        lda #<_T
-        ldx #>_T
-;;; TODO: somehow value gets lost in print ???
-        jsr print
-
-        lda #<_nil
-        ldx #>_nil
-        jsr print
-
-        lda #<_T
-        ldx #>_T
-        jsr print
-
-        lda #<_T
-        ldx #>_T
-        jsr print
-
-        rts
-.endproc
-
-.proc _testtype
-        jsr print
-
-        pha
-        txa
-        pha
-        
-        putc ':'
-
-        pla
-        tax
-        pla
-
-;;; TODO: fix
-;        jsr _type
-        bmi isnum
-        beq isnull
-        bvs issym
-        bcs iscons
-        
-nomatch:        
-        lda #'?'
-        jmp putchar
-
-isnum:  lda #'N'
-        jmp putchar
-
-isnull: lda #'Z'
-        jsr putchar
-
-issym:  lda #'S'
-        jmp putchar
-
-iscons: lda #'C'
-        jmp putchar
-
-.endproc
-
-;;; TODO: this is duplcated code in test 
-;;;   maybe do include?
-
-.ifndef NUMBERS
-;;; printd print a decimal value from AX (retained, Y trashed)
-.proc printd
-;;; TODO: maybe not need save as print does?
-        ;; save ax
-        sta savea
-        stx savex
-
-        jsr _voidprintd
-
-        ;; restore ax
-        ldx savex
-        lda savea
-
-        rts
-.endproc
-
-;;; _voidprintd print a decimal value from AX (+Y trashed)
-;;; 35B - this is a very "minimal" sized routine
-;;;       slow, one loop per bit/16
-;;;       (+ 3B for store AX)
-;;; 
-;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
-;;;       (not include time to print digits)
-;;; 
-;;; Based on DecPrint 6502 by Mike B 7/7/2017
-;;; Optimized by J. Brooks & qkubma 7/8/2017
-;;; This implementation by jsk@yesco.org 2025-06-08
-
-.proc _voidprintd
-        sta ptr1
-        stx ptr1+1
-        
-_voidprintptr1d:
-
-digit:  
-        lda #0
-        tay
-        ldx #16
-
-div10:  
-        cmp #10/2
-        bcc under10
-        sbc #10/2
-        iny
-under10:        
-        rol ptr1
-        rol ptr1+1
-        rol
-
-        dex
-        bne div10
-
-        ;; make 0-9 to '0'-'9'
-        ora #48                 ; '0'
-
-        ;; push delayed putchar
-        ;; (this is clever hack to reverse digits!)
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        dey
-        bpl digit
-
-        rts
-.endproc
-        
-.endif ; N NUMBER
-
 .proc _test
         ;; print size info for .CODE
         NEWLINE
@@ -2535,6 +2398,143 @@ _helloN:   .byte "5 Hello AsmLisp!",10,0
 
         rts
 .endproc
+
+thetypeis: .byte "The value and type is: ",0
+
+.proc testatoms
+        ;; Atom
+        lda #<_T
+        ldx #>_T
+;;; TODO: somehow value gets lost in print ???
+        jsr print
+
+        lda #<_nil
+        ldx #>_nil
+        jsr print
+
+        lda #<_T
+        ldx #>_T
+        jsr print
+
+        lda #<_T
+        ldx #>_T
+        jsr print
+
+        rts
+.endproc
+
+.proc _testtype
+        jsr print
+
+        pha
+        txa
+        pha
+        
+        putc ':'
+
+        pla
+        tax
+        pla
+
+;;; TODO: fix
+;        jsr _type
+        bmi isnum
+        beq isnull
+        bvs issym
+        bcs iscons
+        
+nomatch:        
+        lda #'?'
+        jmp putchar
+
+isnum:  lda #'N'
+        jmp putchar
+
+isnull: lda #'Z'
+        jsr putchar
+
+issym:  lda #'S'
+        jmp putchar
+
+iscons: lda #'C'
+        jmp putchar
+
+.endproc
+
+;;; TODO: this is duplcated code in test 
+;;;   maybe do include?
+
+.ifndef NUMBERS
+;;; printd print a decimal value from AX (retained, Y trashed)
+.proc printd
+;;; TODO: maybe not need save as print does?
+        ;; save ax
+        sta savea
+        stx savex
+
+        jsr _voidprintd
+
+        ;; restore ax
+        ldx savex
+        lda savea
+
+        rts
+.endproc
+
+;;; _voidprintd print a decimal value from AX (+Y trashed)
+;;; 35B - this is a very "minimal" sized routine
+;;;       slow, one loop per bit/16
+;;;       (+ 3B for store AX)
+;;; 
+;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
+;;;       (not include time to print digits)
+;;; 
+;;; Based on DecPrint 6502 by Mike B 7/7/2017
+;;; Optimized by J. Brooks & qkubma 7/8/2017
+;;; This implementation by jsk@yesco.org 2025-06-08
+
+.proc _voidprintd
+        sta ptr1
+        stx ptr1+1
+        
+_voidprintptr1d:
+
+digit:  
+        lda #0
+        tay
+        ldx #16
+
+div10:  
+        cmp #10/2
+        bcc under10
+        sbc #10/2
+        iny
+under10:        
+        rol ptr1
+        rol ptr1+1
+        rol
+
+        dex
+        bne div10
+
+        ;; make 0-9 to '0'-'9'
+        ora #48                 ; '0'
+
+        ;; push delayed putchar
+        ;; (this is clever hack to reverse digits!)
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        dey
+        bpl digit
+
+        rts
+.endproc
+        
+.endif ; N NUMBER
 
 .endif ; TEST
 
