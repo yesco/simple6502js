@@ -1736,20 +1736,21 @@ endaddr:
         NEWLINE
 
         jsr testiter
-        rts
 
         jsr testswap
 
-        jsr _testprint
+        jsr testprint
         jsr testnums
         jsr testatoms
         jsr testtypefunc
-        jsr testbind
-        jsr contcall
-        jsr testcons
-        jsr testeval
-        jsr testtests
-        jsr testread
+;        jsr testbind
+;rts
+;rts
+;        jsr contcall
+;        jsr testcons
+;        jsr testeval
+;        jsr testtests
+;        jsr testread
 
         rts
 .endproc ; _test
@@ -1813,6 +1814,7 @@ again:
 cont:   
 
 .endif ; ITERFUN
+        rts
 .endproc
 
 .proc testswap
@@ -2275,6 +2277,8 @@ tcons:      .word _T, _T
 
         SET _T
         jsr getvalue
+;rts
+;;; ;TODO: thisone goes bezer????? stackmessed up?
         jsr print
 
 .ifblank
@@ -2310,7 +2314,7 @@ tcons:      .word _T, _T
 _hello:	   .byte "4 Hello AsmLisp!",10,0
 _helloN:   .byte "5 Hello AsmLisp!",10,0
 
-.proc _testprint
+.proc testprint
 
 .ifdef ORICON
         ;; an A was written by c-code
