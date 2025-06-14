@@ -161,6 +161,7 @@ ptr3:   .res 2
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
+savez:  .res 1
 
 ;;; TODO: needed? clash with jsr printd???
 savexputchar:    .res 1
@@ -1106,6 +1107,55 @@ isnumber:
 .endproc
 .endif
 
+
+;;; swap: swaps AX <-> R-stack (one level before ret!)
+;;; 15B :-(                   ;                  04 03
+
+;;; TODO: OK, reusable but only used once? LOL
+;;;   inline is 15B ...
+
+.proc swap                    ; a  x  y sa sx sy ma mx
+
+;;; 22B
+        sta savea
+        stx savex             ; A  X  Y  A  X     a  x
+
+        arg 1
+
+        pha
+        lda savea
+        sta $104,y
+        lda savex
+        sta $103,y
+        pla
+
+        rts
+
+;;; 28B
+.ifnblank
+        sta savea
+        stx savex             ; A  X  Y  A  X     a  x
+
+        ARGSETY
+
+        ;; really other A
+        ldx $104,y            ; A  a  S  A  X     a  x
+        stx savey             ; A  a  S  A  X  a  a  x
+
+        ;; swap x
+        ldx $103,y            ; A  x  S  A  X  a  a  x
+        lda savex             ; X  x  S  A  X  a  a  x
+        sta $103,y            ; X  x  S  A  X  a  a  X
+        
+        ;; swap a
+        lda savea             ; A  x  S  A  X  a  a  X
+        sta $104,y            ; A  x  S  A  X  a  A  X
+        lda savey             ; a  x  S  A  X  a  A  X
+
+        rts
+.endif
+.endproc
+        
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
 ;;;   ATOM => assoc(env, x)
@@ -1174,8 +1224,8 @@ notnil:
         ;PUTC ','
         ;jsr print
 
-        ;SWAP (ax <-> R-stack)           ; S: car cdr
-        ;; 15B :-(
+        ;; SWAP (ax <-> R-stack)           ; S: car cdr           ;; 15B :-(
+.ifblank
         sta savea
         stx savex
         pla
@@ -1187,6 +1237,9 @@ notnil:
         lda savex
         pha
         tya
+.else
+        jsr swap
+.endif
 
         jmp evallist
 finishedeval:   
@@ -1442,7 +1495,7 @@ done:
 isnum:  
         jsr div2
         jsr printd
-        jmp ret
+        jmp popret
 .endif ; NUMBERS
 
 notint: 
@@ -1451,7 +1504,8 @@ notint:
 issym:  
         ;; TODO: struct?
         ldy #4
-        jmp printzY
+        jsr printzY
+        jmp popret
 
 iscons: 
         ;; ptr2= ax
@@ -1640,6 +1694,40 @@ iscons: lda #'C'
 
 
 .proc _test
+
+.ifnblank
+        SETNUM 5
+        PUSH
+        SETNUM 4
+        PUSH
+        SETNUM 3
+        PUSH
+        SETNUM 2
+        PUSH
+        SETNUM 1
+        PUSH
+
+        SET $0102               ; 258 772
+        PUSH
+        SET $0304               ; 772 258
+
+;;; 772 258
+        jsr swap             
+;;; 258 772
+
+        jsr printd
+        NEWLINE
+        POP
+        jsr printd
+        NEWLINE
+
+        POP
+        POP
+        POP
+        POP
+        POP
+.endif
+
         ;; test putchar getchar
         lda #'Z'
         jsr putchar
