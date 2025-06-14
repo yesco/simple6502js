@@ -79,13 +79,13 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
 ;;; (829 +504     bytes - MINIMAL (- 829 325) no read)
-;;;  917 +592     bytes - MINIMAL+READ (- 917 325)
+;;;  915 +590     bytes - MINIMAL+READ (- 915 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
-;;;  886 +117     bytes - NUMBERS (- 886 769)
+;;;  1048 +133    bytes - NUMBERS (- 1048 915)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
 ;;;  900?         bytes - TEST + ORICON
 
-;;; 592 bytes
+;;; 590 bytes
 ;;;       initlisp nil 37, T 10,
 ;;;       print 92, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
@@ -117,6 +117,9 @@ TEST=1
 ;;; enable to use larger fun instead of macro
 ;;; goodif used several times
 ;SWAPFUN=1
+
+;;; generic iter
+;ITERFUN=1 
 
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
@@ -267,11 +270,11 @@ _print: .word print, _cdr
 SYMALIGN
 _cons:  .word cons, _print
         .byte "cons", 0
-
+;;; here usese 3 bytes padding
 SYMALIGN
 _atom:  .word atom, _cons
         .byte "atom", 0
-
+;;; here usese 3 bytes padding
 SYMALIGN
 _eq:    .word eq, _atom
         .byte "eq", 0
@@ -279,7 +282,10 @@ _eq:    .word eq, _atom
 SYMALIGN
 _read:  .word read, _eq
         .byte "read", 0
+;;; here usese 3 bytes padding
 
+;;; 8 symbols here, 78 bytes (/ 78 8.0) = 9.75 B/sym
+symend: 
 
 ;;; ----------------------------------------
 
@@ -988,60 +994,8 @@ iscons:
 .endproc
 .endif
 
-.ifdef TEST
-
-
-.ifdef NUMBERS
-.proc testnums
-        ;; test hex
-        ldx #$be
-        lda #$ef
-        jsr printh
-        jsr printh
-
-        ldx #$12
-        lda #$34
-        jsr printh
-        jsr printh
-
-        ;; test dec
-        ldx #$10                ; 4321 dec
-        lda #$e1
-        jsr printd
-        jsr printd
-
-        ldx #$dd                ; 56789 dec
-        lda #$d5
-        jsr printd
-        jsr printd
-
-        ldx #$be                ; 48879 dec
-        lda #$ef
-        jsr printd
-        jsr printd
-
-        ldx #$12                ; 4660 dec
-        lda #$34
-        jsr printd
-        jsr printd
-
-        ;;; test type
-
-        ;; Number
-        lda #<(2*4711)
-        ldx #>(2*4711)
-        jsr print
-        jsr print
-        jsr print
-        jsr _testtype
-
-        rts
-.endproc
-.endif ; TEST
-
-.endif ; NUMBERS
-
-.ifnblank ; TODO: not used - remove, or update with BIT and make macro?
+; TODO: not used - remove, or update with BIT and make macro?
+.ifnblank
 
 .proc _isnumSetC                ; 12c 3B+1
         tay
@@ -1070,7 +1024,7 @@ maybecons:
 
 
 ;;;  TODO: inline macro? 6B
-.proc isnullSetN                ; 11-12c 6B+1
+.proc isnullSetZ                ; 11-12c 6B+1
         cmp #<_nil               
         bne ret                  ; if Z=0 => not Null
         cpx #>_nil               ; if Z=1 => is Null!
@@ -1206,6 +1160,66 @@ isnumber:
 .endmacro
 
 .endif ; SWAPFUN
+
+.ifdef ITERFUN
+
+;;; iterOrExit - a generic list iteration function
+;;;   convenient abstraction
+;;; 
+;;; IN:  list on stack
+;;; OUT: AX=car; cdr list on stack
+;;; 
+;;;   pop
+;;;   !iscons -> super return last cdr
+;;;   iscons -> push cdr, ax=car
+;;; 
+;;; 36B ... 24B (without test 14B)
+.proc iterOrExit
+
+;;; TODO: needs debugging
+
+        arg 1
+;        PUTC 'a'
+;        jsr printd
+        jsr isconsSetC
+        bcs iscons
+;        PUTC 'x'
+
+        ;; RETURNS: nil or last element (= nil)
+        ;; not cons => SUPER return!
+        ; remove this call and return from prev call!
+superret:       
+        tay
+        ;; remove ret
+        pla
+        pla
+        ;; remove list
+        pla
+        pla
+
+        tya
+        rts
+
+iscons: 
+;        PUTC 'c'
+        ;; ptr1= AX, AX= cdr
+        jsr cdr
+;     jsr print
+        
+        ;; store elt above return address!
+;;; TODO: SETARG 1
+;;; todo: pha, pla and adjust sta offset, lol
+        stx savex
+        tsx
+        sta $102+2,x
+        lda savex
+        sta $101+2,x
+        
+        ;; car (ptr1)
+        ldy #1
+        jmp ptr1cYr
+.endproc
+.endif ; ITERFUN
 
 ;;; eval(env, x) -> val
 ;;;   NUM => NUM
@@ -1545,13 +1559,46 @@ issym:
         jmp ret
 
 iscons: 
+        jmp printlist
+ret:    
+        jmp popret
+.endproc
+
+
+.ifdef ITERFUN
+
+printlist:
+        PUSH
+        putc '('
+        jsr printelements
+
+;;; TODO: better test
+        ;; nil => no dot
+        ;; 8B
+        cmp #<_nil
+        bne printdot
+        cpx #>_nil
+        bne printdot
+
+        jmp donelist
+
+printdot:       
+        PUTC '.'
+        jsr print
+donelist:       
+        putc ')'
+        jmp popret
+
+.else
+
+printlist:
         ;; ptr2= ax
         sta ptr1
         stx ptr1+1
 
         putc '('
 
-printlist:      
+printelements:      
         ;; push CDR(ptr1)
         ldy #2
         lda (ptr1),y ; a
@@ -1581,8 +1628,10 @@ printlist:
         sta ptr1
         stx ptr1+1
 
-        putc ' '
-        jmp printlist
+        ;; TOTALLY correct only if have more...
+        ;putc ' '
+
+        jmp printelements
 
 endlist:        
 
@@ -1602,9 +1651,9 @@ printdot:
 donelist:       
         putc ')'
 
-ret:    
-        jmp popret
-.endproc
+
+.endif ; ITERFUN
+
 
 
 .proc _initlisp
@@ -1663,7 +1712,11 @@ ret:
         rts
 .endproc
 
+endaddr:        
+
 ;;; ==================================================
+;;; 
+;;;               T       E      S     T
 
 .ifdef TEST
 
@@ -1729,10 +1782,179 @@ iscons: lda #'C'
 
 .endproc
 
+;;; TODO: this is duplcated code in test 
+;;;   maybe do include?
+
+.ifndef NUMBERS
+;;; printd print a decimal value from AX (retained, Y trashed)
+.proc printd
+;;; TODO: maybe not need save as print does?
+        ;; save ax
+        sta savea
+        stx savex
+
+        jsr _voidprintd
+
+        ;; restore ax
+        ldx savex
+        lda savea
+
+        rts
+.endproc
+
+;;; _voidprintd print a decimal value from AX (+Y trashed)
+;;; 35B - this is a very "minimal" sized routine
+;;;       slow, one loop per bit/16
+;;;       (+ 3B for store AX)
+;;; 
+;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
+;;;       (not include time to print digits)
+;;; 
+;;; Based on DecPrint 6502 by Mike B 7/7/2017
+;;; Optimized by J. Brooks & qkubma 7/8/2017
+;;; This implementation by jsk@yesco.org 2025-06-08
+
+.proc _voidprintd
+        sta ptr1
+        stx ptr1+1
+        
+_voidprintptr1d:
+
+digit:  
+        lda #0
+        tay
+        ldx #16
+
+div10:  
+        cmp #10/2
+        bcc under10
+        sbc #10/2
+        iny
+under10:        
+        rol ptr1
+        rol ptr1+1
+        rol
+
+        dex
+        bne div10
+
+        ;; make 0-9 to '0'-'9'
+        ora #48                 ; '0'
+
+        ;; push delayed putchar
+        ;; (this is clever hack to reverse digits!)
+        pha
+        lda #>(plaputchar-1)
+        pha
+        lda #<(plaputchar-1)
+        pha
+
+        dey
+        bpl digit
+
+        rts
+.endproc
+        
+.endif ; N NUMBER
 
 .proc _test
+        ;; print size info for .CODE
+        NEWLINE
+        SET startaddr
+        jsr printd
+        PUTC '#'
+        SET (symend-startaddr)
+        jsr printd
+        PUTC '-'
+        SET endaddr
+        jsr printd
+        PUTC '='
+        SET (endaddr-startaddr)
+        jsr printd
+        NEWLINE
 
-.ifnblank
+        jsr testiter
+        rts
+
+        jsr testswap
+
+        jsr _testprint
+        jsr testnums
+        jsr testatoms
+        jsr testtypefunc
+        jsr testbind
+        jsr contcall
+        jsr testcons
+        jsr testeval
+        jsr testtests
+        jsr testread
+
+        rts
+.endproc ; _test
+
+.proc testiter
+.ifdef ITERFUN
+        SET acons
+        jsr car
+        jsr print
+
+        SET acons
+        jsr cdr
+        jsr print
+
+        NEWLINE
+
+        SET _nil        
+        jsr printd
+
+        NEWLINE
+
+        SET acons
+        jsr doit
+        NEWLINE
+
+; enabling this line fcks things up???
+;        PUTC 'W'
+
+        SET ccons
+        jsr doit
+        NEWLINE
+
+; this messes up whats before???? wtf?
+;        SET ccons
+;        jsr print
+
+        PUTC 'U'
+        SET _T
+        jsr print
+        jsr eval
+        PUTC 'V'
+        NEWLINE
+        jsr print
+
+        jsr doit
+        NEWLINE
+
+        PUTC 'S'
+        NEWLINE
+
+        jmp cont
+        rts
+
+doit:   
+        PUSH
+again:  
+        jsr iterOrExit
+        jsr print
+        jmp again
+
+cont:   
+
+.endif ; ITERFUN
+.endproc
+
+.proc testswap
+.ifdef SWAPFUN
         SETNUM 5
         PUSH
         SETNUM 4
@@ -1763,8 +1985,11 @@ iscons: lda #'C'
         POP
         POP
         POP
-.endif
+.endif ; SWAPFUN
+        rts
+.endproc ; SWAPFUN
 
+.proc testio
         ;; test putchar getchar
         lda #'Z'
         jsr putchar
@@ -1774,22 +1999,7 @@ iscons: lda #'C'
         jsr putchar
         jsr getchar
         jsr putchar
-
-        jsr _testprint
-
-.ifdef NUMBERS
-        jsr testnums
-.endif
-
-        jsr testatoms
-        jsr testtypefunc
-        jsr testbind
-        jsr contcall
-        jsr testcons
-        jsr testeval
-        jsr testtests
-        jsr testread
-
+        
         rts
 .endproc
 
@@ -1816,6 +2026,7 @@ iscons: lda #'C'
         tya
         ;jsr putchar
         ;PUTC ' '
+.ifdef NUMBERS
         ;; print break char code
         ldx #0
         jsr printd
@@ -1823,11 +2034,60 @@ iscons: lda #'C'
         pla
         ldx #0
         jsr printd
+.endif ; NUMBERS
         putc ':'
         
         SET buff
         jsr printz
         jmp testread
+.endproc
+
+.proc testnums
+.ifdef NUMBERS
+        ;; test hex
+        ldx #$be
+        lda #$ef
+        jsr printh
+        jsr printh
+
+        ldx #$12
+        lda #$34
+        jsr printh
+        jsr printh
+
+        ;; test dec
+        ldx #$10                ; 4321 dec
+        lda #$e1
+        jsr printd
+        jsr printd
+
+        ldx #$dd                ; 56789 dec
+        lda #$d5
+        jsr printd
+        jsr printd
+
+        ldx #$be                ; 48879 dec
+        lda #$ef
+        jsr printd
+        jsr printd
+
+        ldx #$12                ; 4660 dec
+        lda #$34
+        jsr printd
+        jsr printd
+
+        ;;; test type
+
+        ;; Number
+        lda #<(2*4711)
+        ldx #>(2*4711)
+        jsr print
+        jsr print
+        jsr print
+        jsr _testtype
+
+.endif ; NUMBERS
+        rts
 .endproc
 
 .proc testtests
