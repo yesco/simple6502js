@@ -156,6 +156,11 @@ locidx:  .res 1
 ;;; memory
 lowcons: .res 2
 
+sidx:    .res 1
+
+ip:     .res 2
+ipy:    .res 1
+
 .code
 
 biostart:       
@@ -253,42 +258,56 @@ got:
 
 
 
+;;; 1379
+START=$563
+;START=$600
+
 startaddr:      
+
+;;; Funny, if put this here it doesn't run!
+;jmp _initlisp
 
 .export _initlisp        
 
-;;; $53c
-START=1379
-.assert startaddr=START, error ;"changed .org"
+;.assert startaddr=START, error ;"changed .org"
 
 ;;; This makes addresses near here fixed thus can
 ;;; do fancy calculated alignments!
 .org START
 
+
 ;;; enable these 3 lines for NOTHING .tap => 325 bytes
 ;_initlisp:      rts
 ;.end
 
-;;; --------------------------------------------------
-;;; Functions f(AX) => AX
+;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
-.macro ZERO
-        lda #0
-        tax
-.endmacro
+lostack= $400
+histack= lostack+128
 
-.macro SET val
-        lda #<val
-        ldx #>val
-.endmacro
+.proc dup ; push
+        dec sidx
+        ldy sidx
+        sta lostack,y
+        pha
+        txa
+        sta histack,y
+        pla
+        rts
+.endproc
 
-;;; TODO:
-.macro SETNUM num
-        SET (num)*2
-.endmacro
+;;; slower but save code
+push = dup
+
+.proc pop
+        ldy sidx
+        lda lostack,y
+        ldx lostack,y
+        inc sidx
+        rts
+.endproc
 
 
-.ifdef DODI
 cdr:    
         ldy #3
         jmp cYr
@@ -309,19 +328,209 @@ cYr:
         lda (ptr1),y
         rts
 .endproc
-.endif ; DODID
+
+.proc setnewcdr
+        ldy #2
+        jmp setnewcYr
+.endproc
+
+setnewcar:      
+        ldy #0
+.proc setnewcYr
+        sta (lowcons),y
+        txa
+        iny
+        sta (lowcons),y
+        jmp pop
+.endproc
+
+;;; newcons -> AX address of new cons
+
+;;; 
+;;; 15B
+;.ifdef USECONS
+.proc newcons
+        ;; lowcons-= 4
+        sec
+        lda lowcons
+        sbc #04
+        sta lowcons
+        bcs nodec
+        dec lowcons+1
+nodec:  
+        lda #<lowcons
+        ldx #>lowcons
+.endproc
+
+
+;;; JMP table
+;;; align on table boundary by padding
+;.res 256 - * .mod 256
+
+jmptable:  
+
+_dup:   
+        jmp dup
+_drop:
+        jmp pop
+_cons:
+cons:
+        jsr setnewcdr
+        jsr setnewcar
+        jsr newcons
+        rts
+_car:
+        jmp car
+_cdr:
+        jmp cdr
+;_eq:    
+;        lda sidx
+_atom:
+        ;; 7B        ":atom 1&!;" /3
+        bit BIT0
+        beq settrue
+        jmp setzero
+_null:
+        tay
+        bne setzero
+        txa
+        bne setzero
+        jmp settrue
+_true:  
+        jsr push
+settrue:       
+        lda #$ff
+        tax
+        rts
+_zero:
+        jsr push
+setzero:       
+        lda #0
+        tax
+        rts
+_inc:   
+        clc
+        adc #1
+        bne ret
+        inx
+_exec:  
+        stx savex
+        beq exec
+
+_exit:  
+;;; TODO: fix?
+        sta savea
+        pla
+        pla
+        lda savea
+ret:    
+        rts
+_plus:
+        ldy sidx
+        clc
+        adc lostack,y
+        pha
+        txa
+        adc histack,y
+        tax
+        dec sidx
+        pla
+        rts
+_shr:                           ; div2
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+_nand:
+        ldy sidx
+        clc
+        and lostack,y
+        eor #$ff
+        pha
+        txa
+        and histack,y
+        eor #$ff
+        tax
+        dec sidx
+        pla
+        rts
+_putc:  
+
+        jsr putchar
+        jmp pop
+_getc:         
+        jsr push
+        jsr getchar
+        ldx #0
+        rts
+        
+;;; exit exec dup drop 
+;;; cons car cdr null atom
+;;; zero true inc plus shr nand
+;;; putc getc
+;;; /17 = 127 ... 224
+
+endtable:       
+
+.assert (endtable-jmptable)<256, error, "Table too big"
+
+;;; execute byte code
+;;; - either routines exit by rts
+;;; - or ... jmp next
+
+;;; 21B 30c jsr-loop
+exec:   
+        ldy #$ff
+        sta ipy
+loop:
+        jsr next
+        jmp loop
+next:   
+        inc ipy
+        ldy ipy
+        lda (ip),y
+        sta call+1              ; lowbyte
+call:
+        jmp jmptable
+        
+        
+
+
+
+
+;;; --------------------------------------------------
+;;; Functions f(AX) => AX
+
+.macro ZERO
+        lda #0
+        tax
+.endmacro
+
+.macro SET val
+        lda #<val
+        ldx #>val
+.endmacro
+
+;;; TODO:
+.macro SETNUM num
+        SET (num)*2
+.endmacro
+
 
 ;;; push A,X on R-stack (AX trashed, use DUP?)
 ;;; (cc65: jsr pushax takes 39c!)
 ;;; 3B 7c
-.macro PUSH
+.macro RPUSH
         pha
         txa
         pha
 .endmacro
 
 ;;; 3B 6C
-.macro POP
+.macro RPOP
         pla
         tax
         pla
@@ -329,7 +538,7 @@ cYr:
 
 ;;; DUP AX onto stack (AX retained)
 ;;; 5B
-.macro DUP
+.macro RDUP
         tay
         pha
         txa
@@ -384,33 +593,12 @@ cYr:
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
 
-;;; newcons -> AX address of new cons
-;;; 
-;;; 21B
-.ifdef USECONS
-.proc newcons
-        ;; save current cons to return in AX
-        lda lowcons
-        pha
-        lda lowcons+1
-        pha
 
-        ;; lowcons-= 4
-        ;; 11B 13-14c
-;;; TODO: 7B::: ldy #4 ; ldx #lowcons ; jsr subwy
-        sec
-        lda lowcons
-        sbc #04
-        sta lowcons
-        bcs nodec
-        dec lowcons+1
-nodec:  
-.endproc
-
+.ifnblank
 popret: 
-        POP
+        RPOP
         rts
-.endif ; USECONS
+.endif
 
 ;;; (no newline added that puts does)
 ;;; 
@@ -493,6 +681,12 @@ endaddr:
         jsr printd
 
         NEWLINE
+        PUTC 'T'
+        PUTC '='
+        SET (endtable-jmptable)
+        jsr printd
+        NEWLINE
+
         PUTC 'L'
         PUTC 'I'
         PUTC 'S'
