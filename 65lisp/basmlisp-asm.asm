@@ -288,43 +288,6 @@ startaddr:
 lostack= $400
 histack= lostack+128
 
-;;; TODO: is this just copy from one memory location
-;;; to another???
-
-.proc setnewcdr
-        ldy #2
-        jmp setnewcYr
-.endproc
-
-setnewcar:      
-        ldy #0
-.proc setnewcYr
-        sta (lowcons),y
-        txa
-        iny
-        sta (lowcons),y
-        jmp pop
-.endproc
-
-;;; newcons -> AX address of new cons
-
-;;; 
-;;; 15B
-;.ifdef USECONS
-.proc newcons
-        ;; lowcons-= 4
-        sec
-        lda lowcons
-        sbc #04
-        sta lowcons
-        bcs nodec
-        dec lowcons+1
-nodec:  
-        lda #<lowcons
-        ldx #>lowcons
-.endproc
-
-
 ;;; JMP table
 ;;; align on table boundary by padding
 ;.res 256 - * .mod 256
@@ -333,9 +296,51 @@ jmptable:
 
 _cons:
 cons:
-        jsr setnewcdr
-        jsr setnewcar
-        jmp newcons
+
+.ifnblank
+;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
+;;; (+ 14 11 11) = 36
+        jsr conspush            ; cdr
+        jsr pop
+        jsr conspush            ; car
+        lda #<lowcons
+        ldx #>lowcons
+        rts
+
+conspush:       
+        jsr decw2
+        ldy #2
+        sta (lowcons),y
+        txa
+        dey
+        sta (lowcons),y
+        rts
+.else
+;;; 31
+        jsr conspush
+        jsr pop
+        jsr conspush
+        lda #<lowcons
+        ldx #>lowcons
+        rts
+
+conspush:  
+        jsr cpusha
+        tax
+
+cpusha:       
+        ;; jsr decw
+        ;; decw
+        ldy lowcons
+        bne nodec
+        dec lowcons+1
+nodec:  
+        dec lowcons
+
+        ldy #0
+        sta (lowcons),y
+        rts
+.endif
 
 _cdr:    
         ldy #3
@@ -598,7 +603,8 @@ ret:
 ;;; putc getc
 ;;; /17 = 127 ... 224
 ;;;       161 ... 357 ;; car/cdr inline
-
+;;;       207     346 ;; inline all cons
+;;;      (- 346 207 64) = 75 for exec
 endtable:       
 
 .assert (endtable-jmptable)<256, error, "Table too big"
