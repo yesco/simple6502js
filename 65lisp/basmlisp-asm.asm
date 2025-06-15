@@ -377,8 +377,7 @@ _cons:
 cons:
         jsr setnewcdr
         jsr setnewcar
-        jsr newcons
-        rts
+        jmp newcons
 _car:
         jmp car
 _cdr:
@@ -414,9 +413,10 @@ _inc:
         bne ret
         inx
 _exec:  
-        stx savex
-        beq exec
-
+        sta ip
+        stx ip+1
+        jsr pop
+        jmp exec
 _exit:  
 ;;; TODO: fix?
         sta savea
@@ -458,7 +458,6 @@ _nand:
         pla
         rts
 _putc:  
-
         jsr putchar
         jmp pop
 _getc:         
@@ -472,6 +471,51 @@ _getc:
 ;;; zero true inc plus shr nand
 ;;; putc getc
 ;;; /17 = 127 ... 224
+
+;;; 0 - zero
+;;;(9 - true ?)
+;;; & - nand
+;;; 2 - dup
+;;; \ - drop
+;;; } - shr
+;;; ? - atom?
+;;; + - plus
+
+;;; :1 0I;
+;;; :2 0II;
+;;; :3 2I;
+;;; :4 22+;
+;;; :5 4I+;
+;;; :6 33+;
+;;; :7 6I+;
+;;; :8 44+;
+;;; / 55 B
+
+;;;(A - car = @)
+;;; B
+;;;(C - cons = 01+1+1+1G2 1+1+S! ! )
+;;;(D - cdr = 1+1+@ )
+;;; E
+;;;(F - find)
+;;;(G - consheap goes down)
+;;;(H - (H)allot Heap/Here)
+;;;(I - if)
+;;; J
+;;; K - getc
+;;; L
+;;; M
+;;; N - null
+;;; O - putc
+;;;(P - print)
+;;; Q - quit
+;;;(R - recurse)
+;;;(S - swap)
+;;;(T - terpri = 10U)
+;;; U
+;;; V
+;;; X - exec
+;;;(Y - read)
+;;; Z - 
 
 endtable:       
 
@@ -489,10 +533,24 @@ loop:
         jsr next
         jmp loop
 next:   
+        pha
+        txa
+        pha
+
+        PUTC '.'
         inc ipy
         ldy ipy
+
         lda (ip),y
         sta call+1              ; lowbyte
+
+        ldx #0
+        jsr printd
+        putc ' '
+
+        pla
+        tax
+        pla
 call:
         jmp jmptable
         
@@ -660,9 +718,107 @@ end:
 
 .proc _initlisp
         ;; fallthrough to test
+        jsr _test
+        
+        lda #<printa
+        ldx #>printa
+        jsr _exec
+
+        PUTC 'X'
+loop:   
+        jsr getchar
+        jmp loop
 .endproc
 
-endaddr:        
+endaddr:
+
+
+.macro DO name
+        .byte <(name-jmptable)
+.endmacro
+
+printa: 
+        DO _zero
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        ;; 68 = 'N'
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+        DO _inc
+
+        ;; 'A' lol
+        DO _putc
+
+        DO _exit
 
 ;;; ==================================================
 ;;; 
@@ -678,6 +834,12 @@ endaddr:
         jsr printd
         PUTC '='
         SET (endaddr-startaddr)
+        jsr printd
+
+        NEWLINE
+        PUTC 'P'
+        PUTC '='
+        SET (jmptable-startaddr)
         jsr printd
 
         NEWLINE
