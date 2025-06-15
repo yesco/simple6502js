@@ -104,15 +104,13 @@ TOPMEM	= $9800
 .ifndef MINIMAL
 
 ;;; enable numbers
-;
-NUMBERS=1
+;NUMBERS=1
 
 ;;; enable math (div16, mul16)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
-;
-TEST=1
+;TEST=1
 
 ;;; enable to use larger fun instead of macro
 ;;; goodif used several times
@@ -159,12 +157,8 @@ locidx:  .res 1
 lowcons: .res 2
 
 .code
-startaddr:      
 
-;;; $53c
-.assert startaddr=1340, error ;"changed .org"
-
-.org $53c
+biostart:       
 
 ;;; TODO: move before startaddr!
 
@@ -234,9 +228,44 @@ got:
 .endproc
 .endif ; IO
 
+;;; for DEBUGGING only!
+
+;;; putchar (leaves char in A)
+;;; 5B
+.macro putc c
+        lda #(c)
+        jsr putchar
+.endmacro
+
+;;; for debugging only 'no change registers A'
+;;; 7B
+.macro PUTC c
+        pha
+        putc c
+        pla
+.endmacro
+
+;;; 7B - only used for testing
+.macro NEWLINE
+        PUTC 10
+.endmacro
+
+
+
+
+startaddr:      
+
+.export _initlisp        
+
+;;; $53c
+START=1379
+.assert startaddr=START, error ;"changed .org"
+
+;;; This makes addresses near here fixed thus can
+;;; do fancy calculated alignments!
+.org START
 
 ;;; enable these 3 lines for NOTHING .tap => 325 bytes
-;.export _initlisp        
 ;_initlisp:      rts
 ;.end
 
@@ -259,6 +288,7 @@ got:
 .endmacro
 
 
+.ifdef DODI
 cdr:    
         ldy #3
         jmp cYr
@@ -279,7 +309,7 @@ cYr:
         lda (ptr1),y
         rts
 .endproc
-
+.endif ; DODID
 
 ;;; push A,X on R-stack (AX trashed, use DUP?)
 ;;; (cc65: jsr pushax takes 39c!)
@@ -357,6 +387,7 @@ cYr:
 ;;; newcons -> AX address of new cons
 ;;; 
 ;;; 21B
+.ifdef USECONS
 .proc newcons
         ;; save current cons to return in AX
         lda lowcons
@@ -379,6 +410,7 @@ nodec:
 popret: 
         POP
         rts
+.endif ; USECONS
 
 ;;; (no newline added that puts does)
 ;;; 
@@ -429,15 +461,18 @@ end:
 .endproc
 .endif ; NUMBERS
 
+.ifnblank
 .proc _isconSetC
         tay
         lsr
         tya
         rts                     ; C= 0 if Number!
 .endproc
+.endif
 
-
-
+.proc _initlisp
+        ;; fallthrough to test
+.endproc
 
 endaddr:        
 
@@ -469,7 +504,6 @@ endaddr:
 ;;; TODO: this is duplcated code in test 
 ;;;   maybe do include?
 
-.ifndef NUMBERS
 ;;; printd print a decimal value from AX (retained, Y trashed)
 .proc printd
 ;;; TODO: maybe not need save as print does?
@@ -538,10 +572,7 @@ under10:
 
         rts
 .endproc
-.endif ; MINIMAL
         
-.endif ; N NUMBER
-
 ;;; LISP:
 ;;;   SectorForth: 	512 bytes
 ;;;   SectorLisp:  	436 bytes
