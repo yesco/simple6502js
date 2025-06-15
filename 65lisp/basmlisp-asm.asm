@@ -288,28 +288,8 @@ startaddr:
 lostack= $400
 histack= lostack+128
 
-.proc dup ; push
-        dec sidx
-        ldy sidx
-        sta lostack,y
-        pha
-        txa
-        sta histack,y
-        pla
-        rts
-.endproc
-
-;;; slower but save code
-push = dup
-
-.proc pop
-        ldy sidx
-        lda lostack,y
-        ldx lostack,y
-        inc sidx
-        rts
-.endproc
-
+;;; TODO: is this just copy from one memory location
+;;; to another???
 
 .proc setnewcdr
         ldy #2
@@ -351,10 +331,6 @@ nodec:
 
 jmptable:  
 
-_dup:   
-        jmp dup
-_drop:
-        jmp pop
 _cons:
 cons:
         jsr setnewcdr
@@ -422,7 +398,127 @@ _exec:
         stx ip+1
         jsr pop
         jmp exec
+
+_dup:   
+push:   
+;;; This one would be smaller with recursive dup
+;;; 14B
+        ;; sidx--
+        dec sidx
+        ldy sidx
+
+        sta lostack,y
+
+        pha
+        txa
+        sta histack,y
+        pla
+
+        rts
+
+
+;;; --------- MATH
+
+OPT=1
+
+.ifdef OPT
+;;; 43B for _adc _and _eor _ora _sbc _pop(?)
+;;; 1B less for 6 ops instead of 3
+;;; TODO: that is if pop works _lda???
+;;; OPS that go from lobyte to hibyte
+
+_plus:  
+_adc:  
+        ;; ADC stack,y
+        clc
+        ldy #$79
+        bne mathop
+
+_and:
+        ;; AND stack,y
+        lda #$39
+        bne mathop
+
+;;; cmp oper,y $d9 - can't use doesn't ripple
+
+_eor:
+        ;; EOR stack,y
+        lda #$59
+        bne mathop
+_ora:
+        ;; AND stack,y
+        lda #$19
+        bne mathop
+
+;;; no ROL oper,y ????
+;_rol:
+;        ;; ROL stack,y
+ ;       clc
+  ;      lda #$
+
+
+_sbc:   
+        ;; SBC stack,y
+        sec
+        ldy #$f9
+        bne mathop
+
+;;; Can't do as it's postdec???
+;xxpush:
+;xx_sta:   
+;       ;; STA oper,y
+;        lda #$99
+;        bne mathop
+
+;;; TODO: is it ok, efficient?
+
+pop:
+_lda:   
+        ;; LDA oper,y
+        ldy #$b9
+        ;; fall-through
+
+;;; self-modifying code
+;;;   Y contains byte of asm "OP oper,y"
+;;;   AX = AX op POP
+
+;;; 19B - 40c
+mathop: 
+        sty op1
+        sty op2
+
+        ldy sidx
+        dec sidx
+
+op1:    adc lostack,y
+
+        pha
+        txa
+op2:    adc histack,y
+        tax
+        pla
+
+        rts
+
+.else
+
+_drop:  
+pop:    
+;;; 11B 21c
+        ;; sidx++
+        inc sidx
+        ldy sidx
+
+        lda lostack,y
+        ldx histack+1,y
+
+        rts
+
+;;; 36B _plus and _nand only (ok _nand and +4)
+;;;  so 32B
+
 _plus:
+;;; 16B 
         ldy sidx
         clc
         adc lostack,y
@@ -433,15 +529,8 @@ _plus:
         dec sidx
         pla
         rts
-_halve:
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-        rts
 _nand:
+;;; 20B
         ldy sidx
         clc
         and lostack,y
@@ -453,6 +542,29 @@ _nand:
         tax
         dec sidx
         pla
+        rts
+.endif ; OPT
+
+
+_shl:   
+;;; 7B 18c
+        asl a
+        tay
+        txa
+        ror a
+        tax
+        tay
+        rts
+
+_shr:   
+_halve:
+;;; 7B 
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror a
         rts
 
 _putc:  
@@ -504,16 +616,16 @@ transtable:
         DO _undef              ; # - numberp?
         DO _undef              ; $ - swap/load 2 byte or hex
         DO _undef              ; % - mod?
-        DO _nand               ; &
+        DO _and                ; &
         DO _undef              ; ' - quote - hmmm see`
         DO _undef              ; ( - if/loop 
         DO _undef              ; ) -
-        DO _undef              ; * - mul
+        DO _shl                ; *
         DO _plus               ; +
         DO _undef              ; , COMMA - true
-        DO _undef              ; - :- ,^+;
+        DO _sbc                ; -
         DO _undef              ; . - print
-        DO _undef              ; / - div
+        DO _shr                ; /
         DO _zero               ; 0
         DO _number             ; 1
         DO _number             ; 2
@@ -524,8 +636,8 @@ transtable:
         DO _number             ; 7
         DO _number             ; 8
         DO _number             ; 9 
-        DO _undef              ; : - color
-        DO _undef              ; ; - TODO: load?
+        DO _undef              ; : - colon
+        DO _undef              ; ; - TODO: load? $imm
         DO _undef              ; = := -U;
         DO _undef              ; > -
         DO _undef              ; ? - is atom? if?
@@ -537,13 +649,13 @@ transtable:
         DO _exec               ; E
         DO _undef              ; F -
         DO _undef              ; G - 
-        DO _halve              ; H
+        DO _undef              ; H -
         DO _inc                ; I
         DO _undef              ; J - apply? jump?
         DO _getc               ; K
-        DO _undef              ; L - load/imm/lisp
+        DO _undef              ; L - length/load/imm/lisp
         DO _undef              ; M - mapcar
-        DO _undef              ; N -
+        DO _undef              ; N - nth?
         DO _putc               ; O
         DO _undef              ; P - print
         DO _quit               ; Q
@@ -559,7 +671,7 @@ transtable:
         DO _undef              ; [ - quote lambda
         DO _undef              ; \ - drop
         DO _dup                ; ] - dup 
-        DO _undef              ; ^ - xor
+        DO _eor                ; ^ - xor
         DO _undef              ; _ - negate (?)
         DO _undef              ; ` - find name
 
