@@ -79,7 +79,7 @@ TOPMEM	= $9800
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
 ;;; (829 +504     bytes - MINIMAL (- 829 325) no read)
-;;;  915 +590     bytes - MINIMAL+READ (- 915 325)
+;;;  916 +591     bytes - MINIMAL+READ (- 916 325)
 ;;;  613?         bytes - ORICON  (raw ORIC, no ROM)
 ;;;  1048 +133    bytes - NUMBERS (- 1048 915)
 ;;;  950  +64     bytes - MATH+NUMS (- 950 886) 
@@ -87,9 +87,9 @@ TOPMEM	= $9800
 
 ;;; START
 
-;;; 590 bytes
+;;; 591 bytes
 ;;;       initlisp nil 37, T 10,
-;;;       print 92, printz 17, eval 49
+;;;       print 23 printlist 72, printz 17, eval 49
 ;;;       getvalue 38, bind 19,
 ;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
 ;;;       _car _cdr 19, _car _cdr 20, _print 12
@@ -98,9 +98,14 @@ TOPMEM	= $9800
 ;;;       getc 12, skispc 8, _read 10, readatom 23, read 17
 ;;;             NOT: == READS SEXP OK!
 ;;; == 554 ==
-;;; (+ 37 10 92 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
+;;; (+ 37 10 25 71 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
 ;;; 
 ;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
+
+;; MINMIMAL
+;MINIMAL=1
+
+.ifndef MINIMAL
 
 ;;; enable numbers
 ;
@@ -123,6 +128,7 @@ TEST=1
 ;;; enable ORICON(sole, code for printing)
 ;;; TODO: debug, not working well get ERROR 800. lol
 ;ORICON=1
+.endif ; MINIMAL
 
 .import incsp2, incsp4, incsp6, incsp8
 ;.import addysp
@@ -1369,12 +1375,19 @@ found:
         rts
 .endproc
 
-;;; 7B
+;;; 5B (+2 NUMBERS)
 .proc isconsSetC
         tay
+.ifdef NUMBERS
         and #03
         ;; seems to work with #03 too?
         cmp #03
+.else
+;;; TODO: bit BITISCONS but sets Z=0
+        ;; only have atom/cons
+        ror
+        ror
+.endif
         tya
         rts
 .endproc
@@ -1411,7 +1424,7 @@ rettrue:
 ;;; 
 ;;; (nice spagetti!)
 ;;; 
-;;; 67B
+;;; 39B
 read:   
         jsr skipspc
 .proc readusingA
@@ -1452,7 +1465,7 @@ readlist:
 
         ;; prepare car
         jsr readusingA
-        jsr parseatom
+;        jsr parseatom
 
         ;; continuation tail, lol
         PUSH
@@ -1533,8 +1546,7 @@ done:
 
 
 
-;;; 92B (very big)
-;;; 
+;;; 25B + 71B (printlist)
 .align 2
 .proc print
         DUP
@@ -1558,14 +1570,16 @@ issym:
         jmp ret
 
 iscons: 
-        jmp printlist
+        jsr printlist
 ret:    
+        putc ' '
         jmp popret
 .endproc
 
 
 .ifdef ITERFUN
 
+;;; 41B
 printlist:
         PUSH
         putc '('
@@ -1597,6 +1611,7 @@ printlist:
 
         putc '('
 
+;;; 71B
 printelements:      
         ;; push CDR(ptr1)
         ldy #2
@@ -1649,7 +1664,7 @@ printdot:
         jsr print
 donelist:       
         putc ')'
-
+        rts
 
 .endif ; ITERFUN
 
@@ -1662,10 +1677,10 @@ donelist:
 .endif ; ORICON
         
         ;; type BITs
-        lda #01
-        sta BITNOTINT
-        lda #02
-        sta BITISCONS
+        ldx #01
+        stx BITNOTINT
+        inx
+        stx BITISCONS
 
         ;; store _nil as car and cdr of _nil
 .assert .hibyte(_nil) = 0, error
@@ -1675,7 +1690,7 @@ donelist:
         ; sta _nil+2 ; do below
         ; sta _nil+2 +1 ; do below
 
-        ;;  write 'nil'
+        ;; 12B write 'nil'
         lda #110
         sta _nil+4
         lda #105
@@ -1704,11 +1719,15 @@ donelist:
 
         ;; TODO: move to main?
 
-.ifdef TEST
-        jsr _test
-.endif ; TEST
+        ;; fallthrough to test
 
+;;; TODO: read-eval loop
+
+.ifdef MINIMAL
         rts
+.endproc
+.else
+
 .endproc
 
 endaddr:        
@@ -1716,8 +1735,6 @@ endaddr:
 ;;; ==================================================
 ;;; 
 ;;;               T       E      S     T
-
-.ifdef TEST
 
 .proc _test
         ;; print size info for .CODE
@@ -1734,7 +1751,10 @@ endaddr:
         SET (endaddr-startaddr)
         jsr printd
         NEWLINE
-
+.ifndef TEST
+        rts
+.endproc
+.else
         jsr testiter
 
         jsr testswap
@@ -1743,14 +1763,12 @@ endaddr:
         jsr testnums
         jsr testatoms
         jsr testtypefunc
-;        jsr testbind
-;rts
-;rts
-;        jsr contcall
-;        jsr testcons
-;        jsr testeval
-;        jsr testtests
-;        jsr testread
+        jsr testbind
+        jsr contcall
+        jsr testcons
+        jsr testeval
+        jsr testtests
+        jsr testread
 
         rts
 .endproc ; _test
@@ -2464,6 +2482,8 @@ iscons: lda #'C'
 
 .endproc
 
+.endif ; TEST
+
 ;;; TODO: this is duplcated code in test 
 ;;;   maybe do include?
 
@@ -2536,11 +2556,9 @@ under10:
 
         rts
 .endproc
+.endif ; MINIMAL
         
 .endif ; N NUMBER
-
-.endif ; TEST
-
 
 ;;; LISP:
 ;;;   SectorForth: 	512 bytes
