@@ -242,9 +242,12 @@ got:
         jsr putchar
 .endmacro
 
+subtract .set 0
+
 ;;; for debugging only 'no change registers A'
 ;;; 7B
 .macro PUTC c
+;        subtract .set subtract+7
         pha
         putc c
         pla
@@ -313,7 +316,6 @@ cdr:
         jmp cYr
 
 ;;; car(AX) -> AX
-.align 2
 car:    
         ldy #1
 cYr:    
@@ -382,8 +384,16 @@ _car:
         jmp car
 _cdr:
         jmp cdr
-;_eq:    
-;        lda sidx
+_storebyte: 
+        jsr car                 ; just set ptr1
+        sta (ptr1),y
+        rts
+_readbyte: 
+        jsr car                 ; just set ptr1
+        ldx #0
+        rts
+;_eq:
+;        lda sidx                ;
 _atom:
         ;; 7B        ":atom 1&!;" /3
         bit BIT0
@@ -412,19 +422,12 @@ _inc:
         adc #1
         bne ret
         inx
+        rts
 _exec:  
         sta ip
         stx ip+1
         jsr pop
         jmp exec
-_exit:  
-;;; TODO: fix?
-        sta savea
-        pla
-        pla
-        lda savea
-ret:    
-        rts
 _plus:
         ldy sidx
         clc
@@ -436,7 +439,7 @@ _plus:
         dec sidx
         pla
         rts
-_shr:                           ; div2
+_halve:
         tay
         txa
         lsr
@@ -457,6 +460,7 @@ _nand:
         dec sidx
         pla
         rts
+
 _putc:  
         jsr putchar
         jmp pop
@@ -466,64 +470,120 @@ _getc:
         ldx #0
         rts
         
-;;; exit exec dup drop 
+_number:        
+        jsr bytecode
+        .byte 0
+
+_undef: 
+_error: 
+;;; TODO: write something?
+_quit:  
+;;; TODO: fix?
+        sta savea
+        pla
+        pla
+        lda savea
+ret:    
+        rts
+
+;;; quit exec dup drop 
 ;;; cons car cdr null atom
-;;; zero true inc plus shr nand
+;;; zero true inc plus halve nand
 ;;; putc getc
 ;;; /17 = 127 ... 224
-
-;;; 0 - zero
-;;;(9 - true ?)
-;;; & - nand
-;;; 2 - dup
-;;; \ - drop
-;;; } - shr
-;;; ? - atom?
-;;; + - plus
-
-;;; :1 0I;
-;;; :2 0II;
-;;; :3 2I;
-;;; :4 22+;
-;;; :5 4I+;
-;;; :6 33+;
-;;; :7 6I+;
-;;; :8 44+;
-;;; / 55 B
-
-;;;(A - car = @)
-;;; B
-;;;(C - cons = 01+1+1+1G2 1+1+S! ! )
-;;;(D - cdr = 1+1+@ )
-;;; E
-;;;(F - find)
-;;;(G - consheap goes down)
-;;;(H - (H)allot Heap/Here)
-;;;(I - if)
-;;; J
-;;; K - getc
-;;; L
-;;; M
-;;; N - null
-;;; O - putc
-;;;(P - print)
-;;; Q - quit
-;;;(R - recurse)
-;;;(S - swap)
-;;;(T - terpri = 10U)
-;;; U
-;;; V
-;;; X - exec
-;;;(Y - read)
-;;; Z - 
 
 endtable:       
 
 .assert (endtable-jmptable)<256, error, "Table too big"
 
+
+transtable:     
+.macro DO name
+        .byte <(name-jmptable)
+.endmacro
+
+;;; "#$%&'()*+,-./0123456789:        ;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+        DO ret                 ; ' ' - nop
+        DO _storebyte          ; ! - store byte
+        DO _undef              ; " - string, prnt?
+        DO _undef              ; # - numberp?
+        DO _undef              ; $ - swap/load 2 byte or hex
+        DO _undef              ; % - mod?
+        DO _nand               ; &
+        DO _undef              ; ' - quote - hmmm see`
+        DO _undef              ; ( - if/loop 
+        DO _undef              ; ) -
+        DO _undef              ; * - mul
+        DO _plus               ; +
+        DO _undef              ; , COMMA - true
+        DO _undef              ; - :- ,^+;
+        DO _undef              ; . - print
+        DO _undef              ; / - div
+        DO _zero               ; 0
+        DO _number             ; 1
+        DO _number             ; 2
+        DO _number             ; 3
+        DO _number             ; 4
+        DO _number             ; 5
+        DO _number             ; 6
+        DO _number             ; 7
+        DO _number             ; 8
+        DO _number             ; 9 
+        DO _undef              ; : - color
+        DO _undef              ; ; - TODO: load?
+        DO _undef              ; = := -U;
+        DO _undef              ; > -
+        DO _undef              ; ? - is atom? if?
+        DO _readbyte           ; @
+        DO _car                ; A
+        DO _undef              ; B - memBer
+        DO _cons               ; C
+        DO _cdr                ; D
+        DO _exec               ; E
+        DO _undef              ; F -
+        DO _undef              ; G - 
+        DO _halve              ; H
+        DO _inc                ; I
+        DO _undef              ; J - apply? jump?
+        DO _getc               ; K
+        DO _undef              ; L - load/imm/lisp
+        DO _undef              ; M - mapcar
+        DO _undef              ; N -
+        DO _putc               ; O
+        DO _undef              ; P - print
+        DO _quit               ; Q
+        DO _undef              ; R - recurse / register
+        DO _undef              ; S - swap
+        DO _undef              ; T - terpri
+        DO _null               ; U
+        DO _undef              ; V - princ/prin1
+        DO _undef              ; W - printz
+        DO _undef              ; X - x10
+        DO _undef              ; Y - read
+        DO _undef              ; Z - tailcall?
+        DO _undef              ; [ - quote lambda
+        DO _undef              ; \ - drop
+        DO _dup                ; ] - dup 
+        DO _undef              ; ^ - xor
+        DO _undef              ; _ - negate (?)
+        DO _undef              ; ` - find name
+
+.assert *-transtable, error, "Transtable not right size"
+
 ;;; execute byte code
 ;;; - either routines exit by rts
 ;;; - or ... jmp next
+
+bytecode:       
+        pla                     ; lo
+        tay
+        pla                     ; hi
+        tax
+        tya
+        ;; address on stack (w jsr) points
+        ;; on last byte of jsr-instruction
+;;; TODO: use BRK to get here, no need inc?
+        jsr _inc
 
 ;;; 21B 30c jsr-loop
 exec:   
@@ -733,10 +793,6 @@ loop:
 endaddr:
 
 
-.macro DO name
-        .byte <(name-jmptable)
-.endmacro
-
 printa: 
         DO _zero
 
@@ -818,7 +874,7 @@ printa:
         ;; 'A' lol
         DO _putc
 
-        DO _exit
+        DO _quit
 
 ;;; ==================================================
 ;;; 
@@ -833,7 +889,7 @@ printa:
         SET endaddr
         jsr printd
         PUTC '='
-        SET (endaddr-startaddr)
+        SET (endaddr-startaddr-subtract)
         jsr printd
 
         NEWLINE
