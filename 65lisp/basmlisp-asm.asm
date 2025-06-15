@@ -311,26 +311,6 @@ push = dup
 .endproc
 
 
-cdr:    
-        ldy #3
-        jmp cYr
-
-;;; car(AX) -> AX
-car:    
-        ldy #1
-cYr:    
-        sta ptr1
-        stx ptr1+1
-
-;;; cYr(ptr1) -> AX
-.proc ptr1cYr
-        lda (ptr1),y
-        tax
-        dey
-        lda (ptr1),y
-        rts
-.endproc
-
 .proc setnewcdr
         ldy #2
         jmp setnewcYr
@@ -380,16 +360,30 @@ cons:
         jsr setnewcdr
         jsr setnewcar
         jmp newcons
-_car:
-        jmp car
-_cdr:
-        jmp cdr
+
+_cdr:    
+        ldy #3
+        jmp cYr
+;;; car(AX) -> AX forth: @
+_car:    
+        ldy #1
+cYr:    
+        sta ptr1
+        stx ptr1+1
+;;; cYr(ptr1) -> AX
+ptr1cYr:        
+        lda (ptr1),y
+        tax
+        dey
+        lda (ptr1),y
+        rts
+
 _storebyte: 
-        jsr car                 ; just set ptr1
+        jsr _car                 ; just set ptr1
         sta (ptr1),y
         rts
 _readbyte: 
-        jsr car                 ; just set ptr1
+        jsr _car                 ; just set ptr1
         ldx #0
         rts
 ;_eq:
@@ -491,6 +485,7 @@ ret:
 ;;; zero true inc plus halve nand
 ;;; putc getc
 ;;; /17 = 127 ... 224
+;;;       161 ... 357 ;; car/cdr inline
 
 endtable:       
 
