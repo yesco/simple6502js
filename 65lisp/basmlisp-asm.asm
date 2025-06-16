@@ -85,7 +85,8 @@
 ;;;           C   O   N   F   I   G
 
 ; enable this for size test
-;MINIMAL=1
+;
+MINIMAL=1
 
 ;;; 1379
 START=$563
@@ -453,6 +454,9 @@ subtract .set 0
 ;;; we start program at "sector"
 startaddr:      
 
+
+
+
 jmptable:  
 
 _reset:
@@ -467,14 +471,16 @@ recover:
 
 _quote: 
         jsr push
-        ;; TODO: maybe can make smaller!
-;;; TODO: make sub (see nextpushed)
 nexttoken:      
         inc ipy
         ldy ipy
-
         lda (ip),y
-        bne retx0
+        ldx #0
+.ifdef TRACE
+        jsr trace
+.endif
+        ; == jmp retx0
+        rts
 
 ;;; TODO: so big, build as bytecode!
 _cons:
@@ -762,7 +768,8 @@ _number:
 _undef: 
 _error: 
 ;;; TODO: write something?
-        lda call+1
+        ldy ipy
+        lda (ip),y
         jsr putchar
         putc '?'
 _quit:
@@ -794,7 +801,7 @@ _ret:
 ;;;       256     473 ;; TRACE !MINIMAL
 ;;;       254     463 ;; no RPUSH in exec,jsr nxttok
 ;;;       226     476 ;; Quit that resets,nofix BUG!
-
+;;;       221     445 ;; TRACE prompt
 ;;; crash after 29 '.'
 ;;; not when using (before) these
 ;;; changes - 362c974..06473df
@@ -805,7 +812,10 @@ _ret:
 ;;;
 ;;; TOTAL 
 ;;;    jmptable transl cons bytecode exec vars
-;;; (+ 234      64 4   57   8        33   22)
+;;; (+ 234      64 4   57   8        33   22) = 422
+
+_BB:
+        jmp BBB
 
 endtable:       
 
@@ -829,6 +839,9 @@ transtable:
         DO _undef              ; ) -
         DO _undef              ; * - mult
         DO _plus               ; +
+;;; TODO: , write word inc ptr?
+;;; TODO: ; write word dec ptr?
+;;; TODO: byte variants?
         DO _undef              ; , COMMA - true
         DO _sbc                ; -
 ;;; DEBUG - TODO: cheating - change!!!
@@ -845,14 +858,14 @@ transtable:
         DO _number             ; 8
         DO _number             ; 9 
         DO _undef              ; : - colon
-        DO _undef              ; ; - TODO: load? $imm
+        DO _undef              ; ; 
         DO _undef              ; < -
         DO _undef              ; = := -U;
         DO _undef              ; > -
         DO _undef              ; ? - is atom? if?
         DO _readbyte           ; @
         DO _car                ; A
-        DO _undef              ; B - memBer
+        DO _BB                 ; B - memBer
         DO _cons               ; C
         DO _cdr                ; D
         DO _eor                ; E
@@ -862,12 +875,12 @@ transtable:
         DO _inc                ; I
         DO _dec                ; J
         DO _getc               ; K
-        DO _undef              ; L - length/load/imm/lisp
+        DO _undef              ; L - literal!
         DO _undef              ; M - mapcar
         DO _undef              ; N - nth?
         DO _putc               ; O
         DO _undef              ; P - print
-        DO _reset              ; Qmsg?
+        DO _reset              ; Q
         DO _undef              ; R - recurse / register
         DO _setcar             ; S
         DO _terpri             ; T
@@ -968,6 +981,11 @@ call1x:
         putc '>'
 .endif
         jsr _getc
+
+.ifdef TRACE
+        jsr trace
+.endif ; TRACE
+
         ;; expects AX RPUSHED
         jmp nexta               ; exec one char
 
@@ -1064,11 +1082,14 @@ bytecode:
         ;; on last byte of jsr-instruction
 ;;; TODO: use BRK to get here, no need inc?
         jsr _inc
+        jsr printd
+        jmp _exec
+        
 
 ;;; 33B jsr-loop
 exec:   
         ldy #$ff
-        sta ipy
+        sty ipy
 loop:
         jsr next
         jmp loop
@@ -1084,14 +1105,10 @@ next:
 
 nextpushed:     
         jsr nexttoken
+        ;; at end of string
+        beq nret
 
 nexta:  
-;;; debug print token read
-.ifdef TRACE
-        PUTC '#'
-        ldx #0
-        jsr printd
-.endif
         ;; make sure it's in table
         sec
         sbc #33                 ; spc is excluded
@@ -1113,8 +1130,7 @@ again:
         
 
 .ifdef TRACE
-        PUTC 'x'
-;;; debug print offset
+        PUTC 'o'
         ldx #0
         jsr printd
 
@@ -1192,7 +1208,84 @@ end:
 .endproc
 .endif
 
+
 endaddr:
+
+;;; end usercode
+;;; ========================================
+
+;;; testing data
+
+.macro CODE str
+        jsr bytecode
+        .byte str,0
+.endmacro
+
+BBB:    
+        jsr bytecode            
+        .byte "0.I.I.I.I.I.I.I.I.J.J.J.",0
+
+        ;CODE "0.I.I.I.I.I.I.I.I.J.J.J."
+
+;;; 31B
+consz:  
+        CODE "'CAJJ'CS'CAS 'CAJJ'CS'CAS 'CA"
+;;; 13B
+        CODE "'C; 'C; 'CA"
+
+
+
+
+;;; called in nexttoken w A0 token
+.proc trace
+        RDUP
+        pha
+
+        putc 10
+
+        ;; s12d8i4711y>I
+        putc 's'
+        tsx
+        stx savex
+        lda #$ff
+        sec
+        sbc savex
+        ldx #0
+        jsr printd
+
+        putc 'd'
+        lda #$ff
+        sec
+        sbc sidx
+        ldx #0
+        jsr printd
+
+        putc 'i'
+        lda ip
+        ldx ip+1
+        jsr printd
+
+        putc 'y'
+        lda ipy
+        ldx #0
+        jsr printd
+
+        putc '>'
+        putc ' '
+        pla
+        pha
+        jsr putchar
+
+        putc ' '
+        putc '#'
+        pla
+        ldx #0
+        jsr printd
+
+        RPOP
+        rts
+.endproc
+
 
 ;;; ===============================================
 ;;; 
