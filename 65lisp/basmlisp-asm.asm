@@ -423,16 +423,21 @@ _initlisp:
         lda #0
 
         ;; AX = 0;
-        tay
+        tax
 
 ;;; TODO: eval read
 rdloop:   
+        jmp call1
+call1x: 
         RPUSH
         putc 10
         putc '>'
         jsr getchar
         ;; expects AX RPUSHED
-        jsr nexta               ; exec one char
+        jmp nexta               ; exec one char
+
+call1:  jsr call1x
+
         ;; result in AX
         jmp rdloop
 
@@ -695,7 +700,6 @@ _halve:
         rts
 
 _printd:        
-        PUTC 'p'
         jmp printd
 
 _number:        
@@ -813,6 +817,10 @@ endtrans:
 ;;;              U S E R C O D E
 ;;;                 (overflow)
 
+popret: 
+        RPOP
+        rts
+
 cons:
 
 .ifnblank
@@ -911,7 +919,7 @@ nexta:
 ;        bcs over64
 ;;; TODO: not correct for one char exec
 ;;;    todo fix by simple 2 byte buffer?
-        bcs nret                ; skip for now
+        bcs popret                ; skip for now
 
 again:      
         tay
@@ -927,6 +935,7 @@ again:
         ldx #0
         jsr printd
 
+        NEWLINE
         RPOP
 call:   jmp jmptable
 
@@ -954,12 +963,6 @@ other:
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
-
-.ifnblank
-popret: 
-        RPOP
-        rts
-.endif
 
 ;;; (no newline added that puts does)
 ;;; 
