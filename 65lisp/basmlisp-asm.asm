@@ -75,8 +75,32 @@
 
 ;;; - no GC (or minimal "reset")
 
+
+
+;;; ----------------------------------------
+;;; 
+;;;           C   O   N   F   I   G
+
+;;; 1379
+START=$563
+;START=$600
+
+;;; lisp data stack
+;;; (needs to be full page)
+;;; (page 4 free page on ORIC)
+lostack= $400
+histack= lostack+128
+
 ;;; ORIC: charset in hires-mode starts here
+;;; (needs to be 4 byte aligned)
 TOPMEM	= $9800
+
+;;;           C   O   N   F   I   G
+;;; 
+;;; ----------------------------------------
+
+
+
 
 ;;; .TAP delta
 ;;;  325          bytes - NOTHING (search)
@@ -233,6 +257,12 @@ got:
 .endproc
 .endif ; IO
 
+
+;;; ----------------------------------------
+;;;            M A C R O S
+
+
+
 ;;; for DEBUGGING only!
 
 ;;; putchar (leaves char in A)
@@ -258,12 +288,93 @@ subtract .set 0
         PUTC 10
 .endmacro
 
+.macro ZERO
+        lda #0
+        tax
+.endmacro
 
+.macro SET val
+        lda #<val
+        ldx #>val
+.endmacro
 
+;;; TODO:
+.macro SETNUM num
+        SET (num)*2
+.endmacro
 
-;;; 1379
-START=$563
-;START=$600
+;;; push A,X on R-stack (AX trashed, use DUP?)
+;;; (cc65: jsr pushax takes 39c!)
+;;; 3B 7c
+.macro RPUSH
+        pha
+        txa
+        pha
+.endmacro
+
+;;; 3B 6C
+.macro RPOP
+        pla
+        tax
+        pla
+.endmacro
+
+;;; DUP AX onto stack (AX retained)
+;;; 5B
+.macro RDUP
+        tay
+        pha
+        txa
+        pha
+        tya
+.endmacro
+
+;;; 3B 6c
+.macro ARGSETY
+        tsx
+        txa
+        tay
+.endmacro
+
+;;; ARG(n) n n=0 is prev arg, n=1 prev arg
+;;; 12B 14c
+.macro ARG n
+        ARGSETY                 ; probably needed always
+        YARGN n
+.endmacro
+
+.macro YARGN n
+        lda $102+(n*2),y
+        ldx $101+(n*2),y
+.endmacro
+
+;;; arg number Y
+;;; 
+;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
+
+;;; 5B 36c
+.macro arg n
+        ldy #(n*2)
+        jsr yarg
+.endmacro
+
+;;; 25c
+.ifnblank
+.proc yarg
+        sty savey
+        tsx
+        txa
+        clc
+        adc savey
+        tay
+        lda $104,y
+        ldx $103,y
+        rts
+.endproc
+.endif
+
+;;;              M A C R O S
+;;; ----------------------------------------
 
 startaddr:      
 
@@ -274,7 +385,7 @@ startaddr:
 
 ;.assert startaddr=START, error ;"changed .org"
 
-;;; This makes addresses near here fixed thus can
+;;; This makes addresses near here FIXED thus can
 ;;; do fancy calculated alignments!
 .org START
 
@@ -285,14 +396,40 @@ startaddr:
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
-lostack= $400
-histack= lostack+128
-
 ;;; JMP table
 ;;; align on table boundary by padding
-;.res 256 - * .mod 256
+.res 256 - * .mod 256
 
 jmptable:  
+
+_reset:
+_initlisp:      
+        ;; TODO: remove (3 bytes)
+        ;; (for now prints some info)
+        jsr _test
+        
+        ;; try exec small program
+;        lda #<printa
+;        ldx #>printa
+;        jsr _exec
+
+
+;;; TODO: eval read
+rdloop:   
+        PUTC '>'
+        jsr getchar
+
+        ldx #0
+        jsr printd
+
+        sta savea
+        RPUSH
+        lda savea
+
+        jsr nextpushed          ; exec one char
+        jmp rdloop
+
+;;; TODO: if _quit then "will" return to basic
 
 _cons:
 cons:
@@ -625,12 +762,12 @@ transtable:
         DO _undef              ; ' - quote - hmmm see`
         DO _undef              ; ( - if/loop 
         DO _undef              ; ) -
-        DO _shl                ; *
+        DO _undef              ; * - mult
         DO _plus               ; +
         DO _undef              ; , COMMA - true
         DO _sbc                ; -
         DO _undef              ; . - print
-        DO _shr                ; /
+        DO _undef              ; / - div
         DO _zero               ; 0
         DO _number             ; 1
         DO _number             ; 2
@@ -687,7 +824,7 @@ transtable:
         DO _undef              ; ~ - not
 endtrans:       
 
-;;; 21 functions!
+;;; 22 functions!
 
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
@@ -713,31 +850,51 @@ exec:
 loop:
         jsr next
         jmp loop
+
+;;; WARNING: Don't jmp next!!!
+;;; this isn't forth
 next:   
-        pha
-        txa
-        pha
+;;; TODO: maybe no keep in AX as it's lot's of
+;;;   push pop LOL
+        RPUSH
 
 nextpushed:     
-        PUTC '.'
         inc ipy
         ldy ipy
 
         lda (ip),y
-        clc
-        sbc #33                 ; spc is excluded
-        cmp #64+1
-        bcs over64
-again:
-        sta call+1              ; lowbyte
 
+nexta:  
+;;; debug print token read
+        PUTC '#'
         ldx #0
         jsr printd
-        putc ' '
 
-        pla
-        tax
-        pla
+        ;; make sure it's in table
+        clc
+        sbc #33                 ; spc is excluded
+;;; 4 ? set at table
+        cmp #64+4+1
+;;; TODO: enable local vars etc
+;        bcs over64
+;;; TODO: not correct for one char exec
+;;;    todo fix by simple 2 byte buffer?
+        bcs nextpushed          ; skip for now
+
+again:      
+        tay
+        ;; translate to offset
+        lda transtable,y
+        ;; save in "jmp jmptable" low byte!
+        sta call+1
+        
+
+        PUTC 'x'
+;;; debug print offset
+        ldx #0
+        jsr printd
+
+        RPOP
 call:   jmp jmptable
 
 over64: 
@@ -764,96 +921,6 @@ other:
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
-
-.macro ZERO
-        lda #0
-        tax
-.endmacro
-
-.macro SET val
-        lda #<val
-        ldx #>val
-.endmacro
-
-;;; TODO:
-.macro SETNUM num
-        SET (num)*2
-.endmacro
-
-
-;;; push A,X on R-stack (AX trashed, use DUP?)
-;;; (cc65: jsr pushax takes 39c!)
-;;; 3B 7c
-.macro RPUSH
-        pha
-        txa
-        pha
-.endmacro
-
-;;; 3B 6C
-.macro RPOP
-        pla
-        tax
-        pla
-.endmacro
-
-;;; DUP AX onto stack (AX retained)
-;;; 5B
-.macro RDUP
-        tay
-        pha
-        txa
-        pha
-        tya
-.endmacro
-
-;;; 3B 6c
-.macro ARGSETY
-        tsx
-        txa
-        tay
-.endmacro
-
-;;; ARG(n) n n=0 is prev arg, n=1 prev arg
-;;; 12B 14c
-.macro ARG n
-        ARGSETY                 ; probably needed always
-        YARGN n
-.endmacro
-
-.macro YARGN n
-        lda $102+(n*2),y
-        ldx $101+(n*2),y
-.endmacro
-
-;;; arg number Y
-;;; 
-;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
-
-;;; 5B 36c
-.macro arg n
-        ldy #(n*2)
-        jsr yarg
-.endmacro
-
-;;; 25c
-.ifnblank
-.proc yarg
-        sty savey
-        tsx
-        txa
-        clc
-        adc savey
-        tay
-        lda $104,y
-        ldx $103,y
-        rts
-.endproc
-.endif
-
-;;; --------------------------------------------------
-;;; Functions f(AX) => AX
-
 
 .ifnblank
 popret: 
@@ -919,19 +986,7 @@ end:
 .endproc
 .endif
 
-.proc _initlisp
-        ;; fallthrough to test
-        jsr _test
-        
-        lda #<printa
-        ldx #>printa
-        jsr _exec
 
-        PUTC 'X'
-loop:   
-        jsr getchar
-        jmp loop
-.endproc
 
 endaddr:
 
