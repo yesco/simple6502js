@@ -1142,7 +1142,7 @@ printa:
         jsr printd
 
         NEWLINE
-        SET (_printd-jmptable)+1
+        SET (_printd-jmptable)
         ldx #0
         jsr printd
 
