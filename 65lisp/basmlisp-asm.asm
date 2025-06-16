@@ -615,8 +615,7 @@ transtable:
         .byte <(name-jmptable)
 .endmacro
 
-;;; "#$%&'()*+,-./0123456789:        ;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
-        DO ret                 ; ' ' - nop
+;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
         DO _storebyte          ; ! - store byte
         DO _undef              ; " - string, prnt?
         DO _undef              ; # - numberp?
@@ -644,6 +643,7 @@ transtable:
         DO _number             ; 9 
         DO _undef              ; : - colon
         DO _undef              ; ; - TODO: load? $imm
+        DO _undef              ; < -
         DO _undef              ; = := -U;
         DO _undef              ; > -
         DO _undef              ; ? - is atom? if?
@@ -681,7 +681,15 @@ transtable:
         DO _undef              ; _ - negate (?)
         DO _undef              ; ` - find name
 
-.assert *-transtable, error, "Transtable not right size"
+        DO _shl                ; {
+        DO _ora                ; |
+        DO _shr                ; }
+        DO _undef              ; ~ - not
+endtrans:       
+
+;;; 21 functions!
+
+.assert (*-transtable)=64+4, error, "Transtable not right size"
 
 ;;; execute byte code
 ;;; - either routines exit by rts
@@ -710,11 +718,17 @@ next:
         txa
         pha
 
+nextpushed:     
         PUTC '.'
         inc ipy
         ldy ipy
 
         lda (ip),y
+        clc
+        sbc #33                 ; spc is excluded
+        cmp #64+1
+        bcs over64
+again:
         sta call+1              ; lowbyte
 
         ldx #0
@@ -724,13 +738,29 @@ next:
         pla
         tax
         pla
-call:
-        jmp jmptable
-        
-        
+call:   jmp jmptable
 
+over64: 
+        ;; local variable?
+        cmp #'z'-33+1
+        bcs other
+        ;; variables on stack a,b,c
+;;; TODO: relative fun start stack
+        adc sidx                ; change
+        lda lostack-33,y 
+        ldx histack-33,y
+        rts
 
-
+other:  
+        ;; we want to fold in > {|}~ <
+        ;; (potentially "ijklmnopqrstuvwxyz"!)
+        clc
+        sbc #'{'-33
+        cmp #64+4+1
+        bcc again
+        ;; rest was <= ' ' (wrapped around)
+        ;; or above \127
+        bcs nextpushed
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
@@ -1016,6 +1046,13 @@ printa:
         PUTC '='
         SET (endtable-jmptable)
         jsr printd
+
+        NEWLINE
+        PUTC 't'
+        PUTC '='
+        SET (endtrans-transtable)
+        jsr printd
+
         NEWLINE
 
         PUTC 'L'
