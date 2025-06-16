@@ -81,6 +81,9 @@
 ;;; 
 ;;;           C   O   N   F   I   G
 
+; enable this for size test
+;MINIMAL=1
+
 ;;; 1379
 START=$563
 ;START=$600
@@ -122,30 +125,20 @@ TOPMEM	= $9800
 ;;; 
 ;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
 
-;; MINMIMAL
-;MINIMAL=1
-
 .ifndef MINIMAL
 
 ;;; enable numbers
 ;NUMBERS=1
 
-;;; enable math (div16, mul16)
+;;; enable extra math (div16, mul16)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
 ;TEST=1
 
-;;; enable to use larger fun instead of macro
-;;; goodif used several times
-;SWAPFUN=1
+; turn on tracing of exec
+TRACE=1
 
-;;; generic iter
-;ITERFUN=1 
-
-;;; enable ORICON(sole, code for printing)
-;;; TODO: debug, not working well get ERROR 800. lol
-;ORICON=1
 .endif ; MINIMAL
 
 ;;; --------------------------------------------------
@@ -393,9 +386,6 @@ subtract .set 0
 
 
 
-;;; we start program at "sector"
-startaddr:      
-
 ;;; enable these 3 lines for NOTHING .tap => 325 bytes
 ;_initlisp:      rts
 ;.end
@@ -405,6 +395,9 @@ startaddr:
 ;;; JMP table
 ;;; align on table boundary by padding
 .res 256 - * .mod 256
+
+;;; we start program at "sector"
+startaddr:      
 
 jmptable:  
 
@@ -430,9 +423,11 @@ rdloop:
         jmp call1
 call1x: 
         RPUSH
+.ifdef TRACE
         putc 10
         putc '>'
-        jsr getchar
+.endif
+        jsr _getc
         ;; expects AX RPUSHED
         jmp nexta               ; exec one char
 
@@ -448,6 +443,7 @@ _quote:
         jsr push
         ;; TODO: maybe can make smaller!
 ;;; TODO: make sub (see nextpushed)
+nexttoken:      
         inc ipy
         ldy ipy
 
@@ -463,6 +459,7 @@ _cdr:
         jmp cYr
 ;;; car(AX) -> AX forth: @
 _car:    
+_load:      
         ldy #1
 cYr:    
         sta ptr1
@@ -475,24 +472,39 @@ ptr1cYr:
         lda (ptr1),y
         rts
 
+_setcar:
+_store: 
+;;; 16B
+        jsr _car                 ; just set ptr1!
+        jsr pop
+        ldy #0
+        sta (ptr1),y
+        iny
+        txa
+        sta (ptr1),y
+        jmp pop
+
 _storebyte: 
-        jsr _car                 ; just set ptr1
+        jsr _car                 ; just set ptr1!
         sta (ptr1),y
         rts
+
 _readbyte: 
-        jsr _car                 ; just set ptr1
+        jsr _car                 ; just set ptr1!
 retx0:   
         ldx #0              
         rts
 
+_terpri:        
+        jsr push
+        lda #10
 _putc:  
         jsr putchar
         jmp pop
 _getc:         
         jsr push
-        jsr getchar
-        bne retx0
-        
+        ldx #0
+        jmp getchar
 
 ;_eq:
 ;        lda sidx                ;
@@ -520,37 +532,37 @@ setzero:
         tax
         rts
 _inc:   
+.ifnblank
+        ;; 4B
+        CODE "1+" 
+
+        ;; 6B
+        jsr BYTECODE            
+        .byte "1+",0
+.endif
+;;; 7B
         clc
         adc #1
-        bne ret
+        bne _ret
         inx
         rts
+_dec:   
+;;; 7B
+        sec
+        sbc #1
+        bcc _ret
+        dex
+        rts
+        
 _exec:  
         sta ip
         stx ip+1
         jsr pop
         jmp exec
 
-_dup:   
-push:   
-;;; This one would be smaller with recursive dup
-;;; 14B
-        ;; sidx--
-        dec sidx
-        ldy sidx
-
-        sta lostack,y
-
-        pha
-        txa
-        sta histack,y
-        pla
-
-        rts
-
-
 ;;; --------- MATH
 
+;;; 2B less than not including! lol
 OPT=1
 
 .ifdef OPT
@@ -633,6 +645,10 @@ op2:    adc histack,y
         rts
 
 .else
+_ora = _undef
+_eor = _undef
+_sbc = _undef
+_and = _undef
 
 _drop:  
 pop:    
@@ -677,17 +693,6 @@ _nand:
         rts
 .endif ; OPT
 
-
-_shl:   
-;;; 7B 18c
-        asl a
-        tay
-        txa
-        ror a
-        tax
-        tay
-        rts
-
 _shr:   
 _halve:
 ;;; 7B 
@@ -699,23 +704,50 @@ _halve:
         ror a
         rts
 
+.ifdef MINIMAL
+
+_printd = _undef
+_shl = _undef
+
+.else        
+
+_shl:   
+;;; 7B 18c
+        asl a
+        tay
+        txa
+        ror a
+        tax
+        tay
+        rts
+
 _printd:        
         jmp printd
+.endif ; MINIMAL
+
 
 _number:        
+.ifdef NUMBERS
         jsr bytecode
         .byte 0
+.endif ; NUMBERS
 
 _undef: 
 _error: 
 ;;; TODO: write something?
-_quit:  
+        lda call+1
+        jsr putchar
+        putc '?'
+_quit:
+;;; TODO: "long jmp"
+
+_return:        
 ;;; TODO: fix?
         sta savea
         pla
         pla
         lda savea
-ret:    
+_ret:    
         rts
 
 ;;; quit exec dup drop 
@@ -726,9 +758,22 @@ ret:
 ;;;       161 ... 357 ;; car/cdr inline
 ;;;       207     346 ;; inline all cons
 ;;;      (- 346 207 64) = 75 for exec
+;;;       234     419 ;; complicatd exec
+;;;       256     455 ;; TRACE
+;;;       236     422 ;; MINIMAL
+;;;       256     473 ;; TRACE !MINIMAL
+
+;;; STATS
+
+;;; code outside...
+;;;
+;;; TOTAL 
+;;;    jmptable transl cons bytecode exec vars
+;;; (+ 234      64 4   57   8        33   22)
+
 endtable:       
 
-.assert (endtable-jmptable)<256, error, "Table too big"
+.assert (endtable-jmptable)<=256, error, "Table too big"
 
 
 transtable:     
@@ -738,12 +783,12 @@ transtable:
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
         DO _storebyte          ; ! - store byte
-        DO _undef              ; " - string, prnt?
+        DO _undef              ; " - string
         DO _undef              ; # - numberp?
-        DO _undef              ; $ - swap/load 2 byte or hex
+        DO _atom               ; $ - atom?
         DO _undef              ; % - mod?
         DO _and                ; &
-        DO _undef              ; ' - quote - hmmm see`
+        DO _quote              ; '
         DO _undef              ; ( - if/loop 
         DO _undef              ; ) -
         DO _undef              ; * - mult
@@ -774,33 +819,33 @@ transtable:
         DO _undef              ; B - memBer
         DO _cons               ; C
         DO _cdr                ; D
-        DO _exec               ; E
-        DO _undef              ; F -
+        DO _eor                ; E
+        DO _undef              ; F - forth ext?
         DO _undef              ; G - 
         DO _undef              ; H -
         DO _inc                ; I
-        DO _undef              ; J - apply? jump?
+        DO _dec                ; J
         DO _getc               ; K
         DO _undef              ; L - length/load/imm/lisp
         DO _undef              ; M - mapcar
         DO _undef              ; N - nth?
         DO _putc               ; O
         DO _undef              ; P - print
-        DO _quit               ; Q
+        DO _reset              ; Qmsg?
         DO _undef              ; R - recurse / register
-        DO _undef              ; S - swap
-        DO _undef              ; T - terpri
+        DO _setcar             ; S
+        DO _terpri             ; T
         DO _null               ; U
         DO _undef              ; V - princ/prin1
         DO _undef              ; W - printz
-        DO _undef              ; X - x10
-        DO _undef              ; Y - read
+        DO _exec               ; X
+        DO _undef              ; Y - apply/read
         DO _undef              ; Z - tailcall?
         DO _undef              ; [ - quote lambda
-        DO _undef              ; \ - drop
-        DO _dup                ; ] - dup 
-        DO _eor                ; ^ - xor
-        DO _undef              ; _ - negate (?)
+        DO _undef              ; \ - drop/LAMBDA!!!
+        DO _undef              ; ] - dup 
+        DO _return             ; ^ - RETURN
+        DO _undef              ; _ - drop? negate (?)
         DO _undef              ; ` - find name
 
         DO _shl                ; {
@@ -809,13 +854,72 @@ transtable:
         DO _undef              ; ~ - not
 endtrans:       
 
-;;; 22 functions!
+;;; 24 functions!
+
+
+
+.feature c_comments
+
+/*
+
+        DO _undef              ; " - string
+        DO _undef              ; # - numberp?
+        DO _undef              ; % - mod?
+        DO _undef              ; ( - if/loop 
+        DO _undef              ; ) -
+        DO _undef              ; , COMMA - true
+;;; DEBUG - TODO: cheating - change!!!
+        DO _undef              ; : - colon
+        DO _undef              ; ; - return? load? $imm
+        DO _undef              ; < -
+        DO _undef              ; = := -U;
+        DO _undef              ; > -
+        DO _undef              ; ? - cmp?
+        DO _undef              ; B - memBer
+        DO _undef              ; F - forth ext?
+        DO _undef              ; G - 
+        DO _undef              ; H -
+        DO _undef              ; L - length/load/imm/lisp
+        DO _undef              ; M - mapcar
+        DO _undef              ; N - nth?
+        DO _undef              ; P - print
+        DO _undef              ; V - princ/prin1
+        DO _undef              ; W - printz
+        DO _undef              ; Y - apply/read
+        DO _undef              ; [ - quote lambda/str
+        DO _undef              ; \ - LAMBDA/drop
+        DO _undef              ; ] - NO dup
+        DO _undef              ; _ - NO negate (?)
+        DO _undef              ; ` - find name
+
+        DO _shl                ; {
+        DO _shr                ; }
+        DO _undef              ; ~ - bitnot
+*/
 
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
 ;;; ----------------------------------------
 ;;;              U S E R C O D E
 ;;;                 (overflow)
+;;; usercode
+
+_dup:   
+push:   
+;;; This one would be smaller with recursive dup
+;;; 14B
+        ;; sidx--
+        dec sidx
+        ldy sidx
+
+        sta lostack,y
+
+        pha
+        txa
+        sta histack,y
+        pla
+
+        rts
 
 popret: 
         RPOP
@@ -868,11 +972,15 @@ nodec:
         rts
 .endif
 
-;;; execute byte code
+;;; execute byte code after JSR (or use BRK?)
 ;;; - either routines exit by rts
 ;;; - or ... jmp next
+;;; NOTE: to invoke use "jsr bytecode"
+;;;       BUT, it never returns thus no update
+;;;       to of PC needed, use CONT-CALLING, if need
 
 bytecode:       
+;;; 8B
         pla                     ; lo
         tay
         pla                     ; hi
@@ -883,7 +991,7 @@ bytecode:
 ;;; TODO: use BRK to get here, no need inc?
         jsr _inc
 
-;;; 21B 30c jsr-loop
+;;; 33B jsr-loop
 exec:   
         ldy #$ff
         sta ipy
@@ -904,12 +1012,16 @@ nextpushed:
 
         lda (ip),y
 
+;        ;; kills XY
+;        jsr nexttoken
+
 nexta:  
 ;;; debug print token read
+.ifdef TRACE
         PUTC '#'
         ldx #0
         jsr printd
-
+.endif
         ;; make sure it's in table
         sec
         sbc #33                 ; spc is excluded
@@ -930,15 +1042,21 @@ again:
         sta call+1
         
 
+.ifdef TRACE
         PUTC 'x'
 ;;; debug print offset
         ldx #0
         jsr printd
 
         NEWLINE
+.endif
+
         RPOP
 call:   jmp jmptable
 
+
+
+;;; 22B
 over64: 
         ;; local variable?
         cmp #'z'-33+1
@@ -990,29 +1108,6 @@ end:
 ;;; ===================================
 ;;; LISP:
 
-.ifdef NUMBERS
-.proc mul2
-        asl
-        tay
-        txa
-        rol
-        tax
-        tya
-        rts
-.endproc
-
-;;; needed by print for numbers
-.proc div2
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-        rts
-.endproc
-.endif ; NUMBERS
-
 .ifnblank
 .proc _isconSetC
         tay
@@ -1022,97 +1117,11 @@ end:
 .endproc
 .endif
 
-
-
 endaddr:
 
-
-printa: 
-        DO _zero
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        ;; 68 = 'N'
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-        DO _inc
-
-        ;; 'A' lol
-        DO _putc
-
-        DO _quit
-
-;;; ==================================================
+;;; ===============================================
 ;;; 
-;;;               T       E      S     T
+;;;             T       E      S     T
 
 .proc _test
         ;; print size info for .CODE
