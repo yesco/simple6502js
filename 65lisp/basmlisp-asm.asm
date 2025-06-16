@@ -76,6 +76,9 @@
 ;;; - no GC (or minimal "reset")
 
 
+;;; worth reading wheler on prog-lang impl 6502
+;;; - https://dwheeler.com/6502/a-lang.txt
+
 
 ;;; ----------------------------------------
 ;;; 
@@ -147,6 +150,35 @@ TRACE=1
 ;.feature string_escape
 
 .zeropage
+
+;.org 128+'a'
+
+_A:     .res 1
+_B:     .res 1
+_C:     .res 1
+_D:     .res 1
+_E:     .res 1
+_F:     .res 1
+_G:     .res 1
+_H:     .res 1
+_I:     .res 1
+_J:     .res 1
+_K:     .res 1
+_L:     .res 1
+_M:     .res 1
+_N:     .res 1
+_O:     .res 1
+_P:     .res 1
+_Q:     .res 1
+_R:     .res 1
+_S:     .res 1
+_T:     .res 1
+_U:     .res 1
+_V:     .res 1
+_W:     .res 1
+_X:     .res 1
+_Y:     .res 1
+_Z:     .res 1
 
 ;;; used as (non-modifiable) arguments
 
@@ -422,7 +454,9 @@ _initlisp:
 rdloop:   
         jmp call1
 call1x: 
-        RPUSH
+;        RPUSH
+        pha
+
 .ifdef TRACE
         putc 10
         putc '>'
@@ -498,6 +532,7 @@ retx0:
 _terpri:        
         jsr push
         lda #10
+        ;; fall-through
 _putc:  
         jsr putchar
         jmp pop
@@ -762,6 +797,11 @@ _ret:
 ;;;       256     455 ;; TRACE
 ;;;       236     422 ;; MINIMAL
 ;;;       256     473 ;; TRACE !MINIMAL
+;;;       254     463 ;; no RPUSH in exec,jsr nxttok
+
+;;; crash after 29 '.'
+;;; not when using (before) these
+;;; changes - 362c974..06473df
 
 ;;; STATS
 
@@ -1004,16 +1044,12 @@ loop:
 next:   
 ;;; TODO: maybe no keep in AX as it's lot's of
 ;;;   push pop LOL
-        RPUSH
+;;; TODO: maybe only pha?
+;        RPUSH
+        pha
 
 nextpushed:     
-        inc ipy
-        ldy ipy
-
-        lda (ip),y
-
-;        ;; kills XY
-;        jsr nexttoken
+        jsr nexttoken
 
 nexta:  
 ;;; debug print token read
@@ -1051,7 +1087,12 @@ again:
         NEWLINE
 .endif
 
-        RPOP
+;;; TODO: 6 _routines jsr push first thing!
+;;;  (maybe A>xx can change this?)
+
+;;; TODO: maybe only pha???
+;        RPOP
+        pla
 call:   jmp jmptable
 
 
