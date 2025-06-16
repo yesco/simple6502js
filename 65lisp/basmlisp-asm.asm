@@ -149,10 +149,13 @@ TRACE=1
 ;; TODO: not working in ca65, too old?
 ;.feature string_escape
 
+.feature c_comments
+
 .zeropage
 
 ;.org 128+'a'
 
+/*
 _A:     .res 1
 _B:     .res 1
 _C:     .res 1
@@ -179,6 +182,8 @@ _W:     .res 1
 _X:     .res 1
 _Y:     .res 1
 _Z:     .res 1
+
+*/
 
 ;;; used as (non-modifiable) arguments
 
@@ -210,7 +215,24 @@ sidx:    .res 1
 ip:     .res 2
 ipy:    .res 1
 
+;;; saved
+quitS:  .res 1
+
 .code
+
+;;; ----------------------------------------
+;;;               " B I O S "
+
+;;; requirement from "a bios"
+;;; - jsr getchar
+;;; - jsr putchar
+;;; 
+;;; Assumption:
+;;; 
+;;; Neither routine modifies X or Y register
+;;; (they ar saved and restored)
+;;; 
+;;; A after putchar is assumed to be A before.
 
 biostart:       
 
@@ -435,42 +457,12 @@ jmptable:
 
 _reset:
 _initlisp:      
-        ;; TODO: remove (3 bytes)
-        ;; (for now prints some info)
-        jsr _test
-        
-        ;; cons ptr
-        SET (TOPMEM-1)
-        sta lowcons
-        stx lowcons+1
-        
-        ;; zero stuff
-        lda #0
 
-        ;; AX = 0;
-        tax
-
-;;; TODO: eval read
-rdloop:   
-        jmp call1
-call1x: 
-;        RPUSH
-        pha
-
-.ifdef TRACE
-        putc 10
-        putc '>'
-.endif
-        jsr _getc
-        ;; expects AX RPUSHED
-        jmp nexta               ; exec one char
-
-call1:  jsr call1x
-
-        ;; result in AX
-        jmp rdloop
-
-;;; TODO: if _quit then "will" return to basic
+        ;; make stack recoverable
+        tsx
+        stx quitS
+recover:        
+        jmp running
 
 
 _quote: 
@@ -774,7 +766,10 @@ _error:
         jsr putchar
         putc '?'
 _quit:
-;;; TODO: "long jmp"
+        ;; basically restart at saved pos
+        ldx quitS
+        txs
+        jmp _initlisp
 
 _return:        
 ;;; TODO: fix?
@@ -798,6 +793,7 @@ _ret:
 ;;;       236     422 ;; MINIMAL
 ;;;       256     473 ;; TRACE !MINIMAL
 ;;;       254     463 ;; no RPUSH in exec,jsr nxttok
+;;;       226     476 ;; Quit that resets,nofix BUG!
 
 ;;; crash after 29 '.'
 ;;; not when using (before) these
@@ -898,8 +894,6 @@ endtrans:
 
 
 
-.feature c_comments
-
 /*
 
         DO _undef              ; " - string
@@ -943,6 +937,46 @@ endtrans:
 ;;;              U S E R C O D E
 ;;;                 (overflow)
 ;;; usercode
+
+;;; comes here from _initlisp
+running:        
+        ;; TODO: remove (3 bytes)
+        ;; (for now prints some info)
+
+        jsr _test
+        
+        ;; cons ptr
+        SET (TOPMEM-1)
+        sta lowcons
+        stx lowcons+1
+        
+        ;; zero stuff
+        lda #0
+
+        ;; AX = 0;
+        tax
+
+;;; TODO: eval read
+rdloop:   
+        jmp call1
+call1x: 
+;        RPUSH
+        pha
+
+.ifdef TRACE
+        putc 10
+        putc '>'
+.endif
+        jsr _getc
+        ;; expects AX RPUSHED
+        jmp nexta               ; exec one char
+
+call1:  jsr call1x
+
+        ;; result in AX
+        jmp rdloop
+;;; TODO: if _quit then "will" return to basic
+
 
 _dup:   
 push:   
