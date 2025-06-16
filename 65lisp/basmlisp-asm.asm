@@ -695,6 +695,7 @@ _halve:
         rts
 
 _printd:        
+        PUTC 'p'
         jmp printd
 
 _number:        
@@ -914,6 +915,8 @@ nexta:
 
 again:      
         tay
+;;; TODO: what?
+        iny
         ;; translate to offset
         lda transtable,y
         ;; save in "jmp jmptable" low byte!
@@ -1140,7 +1143,11 @@ printa:
         jsr printd
 
         NEWLINE
+        SET (_printd-jmptable)+1
+        ldx #0
+        jsr printd
 
+        NEWLINE
         PUTC 'L'
         PUTC 'I'
         PUTC 'S'
