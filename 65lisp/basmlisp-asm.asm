@@ -376,8 +376,6 @@ subtract .set 0
 ;;;              M A C R O S
 ;;; ----------------------------------------
 
-startaddr:      
-
 ;;; Funny, if put this here it doesn't run!
 ;jmp _initlisp
 
@@ -389,6 +387,14 @@ startaddr:
 ;;; do fancy calculated alignments!
 .org START
 
+
+
+;;; DON'T PUT ANY CODE HERE!!!!
+
+
+
+;;; we start program at "sector"
+startaddr:      
 
 ;;; enable these 3 lines for NOTHING .tap => 325 bytes
 ;_initlisp:      rts
@@ -408,76 +414,44 @@ _initlisp:
         ;; (for now prints some info)
         jsr _test
         
-        ;; try exec small program
-;        lda #<printa
-;        ldx #>printa
-;        jsr _exec
+        ;; cons ptr
+        SET (TOPMEM-1)
+        sta lowcons
+        stx lowcons+1
+        
+        ;; zero stuff
+        lda #0
 
+        ;; AX = 0;
+        tay
 
 ;;; TODO: eval read
 rdloop:   
-        PUTC '>'
-        jsr getchar
-
-        ldx #0
-        jsr printd
-
-        sta savea
         RPUSH
-        lda savea
-
-        jsr nextpushed          ; exec one char
+        putc 10
+        putc '>'
+        jsr getchar
+        ;; expects AX RPUSHED
+        jsr nexta               ; exec one char
+        ;; result in AX
         jmp rdloop
 
 ;;; TODO: if _quit then "will" return to basic
 
+
+_quote: 
+        jsr push
+        ;; TODO: maybe can make smaller!
+;;; TODO: make sub (see nextpushed)
+        inc ipy
+        ldy ipy
+
+        lda (ip),y
+        bne retx0
+
+;;; TODO: so big, build as bytecode!
 _cons:
-cons:
-
-.ifnblank
-;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
-;;; (+ 14 11 11) = 36
-        jsr conspush            ; cdr
-        jsr pop
-        jsr conspush            ; car
-        lda #<lowcons
-        ldx #>lowcons
-        rts
-
-conspush:       
-        jsr decw2
-        ldy #2
-        sta (lowcons),y
-        txa
-        dey
-        sta (lowcons),y
-        rts
-.else
-;;; 31
-        jsr conspush
-        jsr pop
-        jsr conspush
-        lda #<lowcons
-        ldx #>lowcons
-        rts
-
-conspush:  
-        jsr cpusha
-        tax
-
-cpusha:       
-        ;; jsr decw
-        ;; decw
-        ldy lowcons
-        bne nodec
-        dec lowcons+1
-nodec:  
-        dec lowcons
-
-        ldy #0
-        sta (lowcons),y
-        rts
-.endif
+        jmp cons
 
 _cdr:    
         ldy #3
@@ -502,8 +476,19 @@ _storebyte:
         rts
 _readbyte: 
         jsr _car                 ; just set ptr1
-        ldx #0
+retx0:   
+        ldx #0              
         rts
+
+_putc:  
+        jsr putchar
+        jmp pop
+_getc:         
+        jsr push
+        jsr getchar
+        bne retx0
+        
+
 ;_eq:
 ;        lda sidx                ;
 _atom:
@@ -709,15 +694,9 @@ _halve:
         ror a
         rts
 
-_putc:  
-        jsr putchar
-        jmp pop
-_getc:         
-        jsr push
-        jsr getchar
-        ldx #0
-        rts
-        
+_printd:        
+        jmp printd
+
 _number:        
         jsr bytecode
         .byte 0
@@ -766,7 +745,8 @@ transtable:
         DO _plus               ; +
         DO _undef              ; , COMMA - true
         DO _sbc                ; -
-        DO _undef              ; . - print
+;;; DEBUG - TODO: cheating - change!!!
+        DO _printd             ; . - print num
         DO _undef              ; / - div
         DO _zero               ; 0
         DO _number             ; 1
@@ -828,6 +808,57 @@ endtrans:
 
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
+;;; ----------------------------------------
+;;;              U S E R C O D E
+;;;                 (overflow)
+
+cons:
+
+.ifnblank
+;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
+;;; (+ 14 11 11) = 36
+        jsr conspush            ; cdr
+        jsr pop
+        jsr conspush            ; car
+        lda #<lowcons
+        ldx #>lowcons
+        rts
+
+conspush:       
+        jsr decw2
+        ldy #2
+        sta (lowcons),y
+        txa
+        dey
+        sta (lowcons),y
+        rts
+.else
+;;; 31
+        jsr conspush
+        jsr pop
+        jsr conspush
+        lda #<lowcons
+        ldx #>lowcons
+        rts
+
+conspush:  
+        jsr cpusha
+        tax
+
+cpusha:       
+        ;; jsr decw
+        ;; decw
+        ldy lowcons
+        bne nodec
+        dec lowcons+1
+nodec:  
+        dec lowcons
+
+        ldy #0
+        sta (lowcons),y
+        rts
+.endif
+
 ;;; execute byte code
 ;;; - either routines exit by rts
 ;;; - or ... jmp next
@@ -879,7 +910,7 @@ nexta:
 ;        bcs over64
 ;;; TODO: not correct for one char exec
 ;;;    todo fix by simple 2 byte buffer?
-        bcs nextpushed          ; skip for now
+        bcs nret                ; skip for now
 
 again:      
         tay
@@ -906,7 +937,7 @@ over64:
         adc sidx                ; change
         lda lostack-33,y 
         ldx histack-33,y
-        rts
+nret:   rts
 
 other:  
         ;; we want to fold in > {|}~ <
