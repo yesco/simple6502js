@@ -903,7 +903,7 @@ nexta:
         jsr printd
 
         ;; make sure it's in table
-        clc
+        sec
         sbc #33                 ; spc is excluded
 ;;; 4 ? set at table
         cmp #64+4+1
@@ -916,7 +916,6 @@ nexta:
 again:      
         tay
 ;;; TODO: what?
-        iny
         ;; translate to offset
         lda transtable,y
         ;; save in "jmp jmptable" low byte!
