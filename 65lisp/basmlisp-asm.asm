@@ -284,28 +284,6 @@ notnl:
         rts
 .endproc
 
-.ifdef IO
-.proc getc
-        lda cunget
-        bne got
-        jsr getchar
-got:    
-        ldx #0
-        stx cunget
-        rts
-.endproc
-
-;;; 8B
-.proc skipspc
-        jsr getc
-        ;; < '(' is considered white space
-        cmp #'('-1
-        bcc skipspc
-        rts
-.endproc
-.endif ; IO
-
-
 ;;; ----------------------------------------
 ;;;            M A C R O S
 
@@ -905,45 +883,6 @@ endtrans:
 
 ;;; 24 functions!
 
-
-
-/*
-
-        DO _undef              ; " - string
-        DO _undef              ; # - numberp?
-        DO _undef              ; % - mod?
-        DO _undef              ; ( - if/loop 
-        DO _undef              ; ) -
-        DO _undef              ; , COMMA - true
-;;; DEBUG - TODO: cheating - change!!!
-        DO _undef              ; : - colon
-        DO _undef              ; ; - return? load? $imm
-        DO _undef              ; < -
-        DO _undef              ; = := -U;
-        DO _undef              ; > -
-        DO _undef              ; ? - cmp?
-        DO _undef              ; B - memBer
-        DO _undef              ; F - forth ext?
-        DO _undef              ; G - 
-        DO _undef              ; H -
-        DO _undef              ; L - length/load/imm/lisp
-        DO _undef              ; M - mapcar
-        DO _undef              ; N - nth?
-        DO _undef              ; P - print
-        DO _undef              ; V - princ/prin1
-        DO _undef              ; W - printz
-        DO _undef              ; Y - apply/read
-        DO _undef              ; [ - quote lambda/str
-        DO _undef              ; \ - LAMBDA/drop
-        DO _undef              ; ] - NO dup
-        DO _undef              ; _ - NO negate (?)
-        DO _undef              ; ` - find name
-
-        DO _shl                ; {
-        DO _shr                ; }
-        DO _undef              ; ~ - bitnot
-*/
-
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
 ;;; ----------------------------------------
@@ -1207,6 +1146,29 @@ end:
         rts                     ; C= 0 if Number!
 .endproc
 .endif
+
+
+;;; TODO: should count as part of program
+.ifdef IO
+.proc getc
+        lda cunget
+        bne got
+        jsr getchar
+got:    
+        ldx #0
+        stx cunget
+        rts
+.endproc
+
+;;; 8B
+.proc skipspc
+        jsr getc
+        ;; < '(' is considered white space
+        cmp #'('-1
+        bcc skipspc
+        rts
+.endproc
+.endif ; IO
 
 
 endaddr:
@@ -1478,3 +1440,168 @@ under10:
 ;;;   - list
 
         ;; END
+
+/*
+-- VARIABLES
+(each used takes 2 bytes... some waste)
+
+'ABCDEF - free
+
+'FGH
+
+'I(J)   IP         ptr  == address
+
+('K - cannot be used, too small)
+
+'L(M)  lowcons last allocated cons
+
+'NOPQR
+
+'S(T)    datastack  byte == index
+
+'UVWX
+
+'Y(Z)    IP offset  byte == index
+
+
+-- PRIMITIVES
+@       read word from TOP store in TOP
+,       store byte in address TOP, stack+1 swap hi/lo
+Ln      literal
+#n      small literal (<256)
+U       nUll
+N       nand
+%	swap
+/2      div2
+$       dup       ; maybe can be made
+_       drop
+
+K       getchar
+O       putchar
+J+-n    jump if 0
+
+        
+# 13 primtives!
+
+('D      just L(64+4) - just variant of literal)
+
+-- CODE
+~       $ N                     ; # 2
+&       N ~                     ; # 2
+|       ~ $ ~ N ~               ; # 5
+^       N r N N r N N          - maybe # 7
+^       o & ~ % & |            - maybe # 6
+
+o       $ 'S @ #2 +            ; over # 7
+
+A       @
+D       #2 + @                  ; # 4
+!       , , _ _                 ; setcar # 4
+SD      #2 + !                  ; setcdr # 4
+
+dec2    Lfffe +                 ; # 4
+Rdec2   $ @ % dec2 % !          ; # 9
+Rinc2   $ @ % #2 + % !          ; # 8
+
+$       'S @ dec2  @ 'S @ dec2 ! ; # 9
+
+R,      $ Rdec2 % ! @           ; # 5
+
+C       'L R, 'L R,             ; cons # 6
+
+-       ~ #1 + +                ; # 5
+=       -U                      ; # 2
+
+#104 bytes! - 15 xor == (- 104 15) =-= 89
+
+-- MISSING
+
+?cons           L1 & L1 =         ; # 8
+
+readatom
+`findatom
+
+\lambda
+X
+Read
+
+;;; push 0 + chars in reverse, pop print till 0
+# 18
+
+Writez       #0 % #1 - $ @ $ J1
+             $ J+1 ^ O J-7
+
+;;; only need to print cons and atoms
+.. bad list print (foo . (bar . (fie . nil ) ) )
+# 20
+Print           $  ? J+2 W ^ 
+                   $ '( O $ A P '. O D P ') O
+Cond
+
+# 19
+Eval            $  ? J+2 getval ^
+                   $ A Eval
+                     `cond = J+2 Cond ^
+                             % Evlist Apply ^
+
+;;; push old binding, setup new, after call pop...
+
+Apply 
+
+T
+NIL
+
+COND
+
+LAMBDA
+
+dispatch loop 25
+
+# 44 chars 13 atoms = 57
+
+(+ 89 25 57 9 19 21 19 ) = 239
+
+;;; T NIL QUOTE READ PRINT COND CONS CAR CDR
+;;; ATOM LAMBDA EQ
+
+
+# 80 tokens in forth??? for div64
+- https://github.com/rufig/spf4-utf8/blob/master/devel/%7Epinka/lib/BigMath.f
+
+@29
+multiply peasants algo
+        #0 'A !
+        $ $ U J1 ^ #1 & J+8 $ 'A @ + 'A ! 
+        div2 % mul2 % J0
+
+... idea combine it with compression! backwards
+relative reference! lol all words only 2 chars?
+
+new way of evaLulation???? lol
+
+EXEC
+
+(decompress first then run like normal?)
+(this method here might have trouble getting
+ multibyte instructions... like J2, #0 etc)
+
+        pla (continuation calling)
+        pha
+
+        <128 => dispatch
+        >=128 => rel ref (-)
+          get first
+          pha old
+          pha new
+          jsr exec !
+
+          pla old
+          get second
+          pha new
+          jmp exec ! -- tail call!
+        
+          
+
+        
+
+*/
