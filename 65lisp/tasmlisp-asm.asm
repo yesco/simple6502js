@@ -466,12 +466,68 @@ _error:
         putc '?'
         jmp _quit
 
-_literal: 
+;;; lit moves lo to hi in TOS and sets lo to next byte
+;;; tos= (tos<<8) + (char*)ip[y];
+;;; 
+;;; To load a
+;;;    LITERAL $beef
+;;; do:
+;;;    lit $be lit $ef
+;;; 
+;;; NOTE: to just load one char,may need to do
+;;; 
+;;;    'A == lit 0 lit 65
+;;; or
+;;;    0 lit 65
+
+;;; TODO: unclear what usage or what is good!
+
+;;; 25 B
+nexttoken:      
+        inc ipy
+        ldy ipy
+        lda (ip),y
+        rts
+
+;;; tos= t1
+_quote: 
+        jsr _zero
+        jsr nexttoken
+        sta tos
+        rts
+;;; tos= t2t1
+_literal:       
+        jsr _quote              ; lo
+        jsr nexttoken           ; 
+        sta tos+1               ; hi
+        rts
+
+;;; 20B
+_quote: 
+        lda #0
+        sta top
+_lit: 
         jsr push
 nexttoken:      
         inc ipy
         ldy ipy
         lda (ip),y
+
+;;;  TODO: what use?
+.ifnblank
+        ;; jmp shl8
+        ;; bit hack to skip 2 bytes
+        .byte $2c
+
+swaphilo:                     
+        lda tos+1               ; a = hi
+.endif
+
+;;; writes A to lo TOS
+shl8:
+        ldy tos                 ; y = lo
+        sty tos+1               ; hi= y
+        sta tos                 ; lo= hi
 .ifdef TRACE
         jsr trace
 .endif
@@ -539,15 +595,34 @@ _getc:
         sta top
         rts
         
-
+_zbranch:        
+;;; 17 B
+        lda tos,x
+        ora tos+1,x
+        bne pop
+        ;; zero so branch relative
+        jsr nexttoken
+        clc
+        adc ipy
+        sta ipy
+        jmp pop
+;;; TODO: put befor pop?
 
 _null:
+;;; 8 B
+        lda tos,x
+        ora tos+1,x
+        beq settrue
+        bne setfalse
+
 ;;; 11+10+7=28 hmmm
+;;; 10 B
         lda tos,x
         bne setzero
         lda tos+1,x
         bne setzero
         jmp settrue
+
 _true:  
         jsr push
 settrue:       
@@ -674,6 +749,21 @@ _shl = _undef
 
 .else        
 
+;;; maybe B doesn't pop as well as O?
+;        .byte DUP,"@",DUP,"B_",+2,0,DUP,"OIB",WRITEZ
+;;; 12 B (3 dup)
+;DUP = (_dup-jmptable)
+;WRITEZ= (_writez-jmptable)
+
+_writez: 
+;;; 12B
+        ldy #0
+        lda (top),y
+        beq pop
+        jsr putchar
+        iny
+        bne _writez
+
 _printd:        
         jmp printd
 .endif ; MINIMAL
@@ -718,18 +808,38 @@ _ret:
 ;;; TOS, X points to stack, always retained
 ;;; A and Y always free to use
 
-;;; math: 38 + - & | E
-;;; null: 28 U 0 Lffff
-;;; ! @:  41 @ D "," I 2drop (+ 16 3 22)
-;;; 
-;;; io:   20 T O K   (+ 5 6 9)
+;;; math:      38   + - & | E
+;;; null:      28   U 0 Lffff
+;;; mem:       41   @ D "," I 2drop (+ 16 3 22)
+;;; interpret: 35   X
+;;; lambda:         \ ^
+;;; if:        17   zBranch
+;;; lit:       25   Lbeef nextchar 'A
+
+;;; io:        20   T O K   (+ 5 6 9)
+;;; write:     12   W
 
 ;;; inter: 
 
-;;; (+ 38 28 41 20   ) = 127
+;;;  math null mem inter io writ lit if
+;;; (+ 38   28   41   35 20 12    25 17) = 216
+;;;         14 null                        -14   CODE!
+;;;                19 Cons                 +19   CODE!
+;;;                                   --------
+;;;                                        221
+
+;;; TOO BIG!
+;;; - no space left for ???
+;;; P - print lisp
+;;; Y - read atom
+;;; R - read lisp
+;;; -- extras
+;;; V - x10 lol : V "{{+{ ; # 5
+;;; 1-9 -  read num
 
 ;;; STATS
 
+;;; OLD
 ;;; code outside...
 ;;;
 ;;; TOTAL 
@@ -743,8 +853,39 @@ _ret:
 ;;; will be interpreted as bytecode!
 
 codestart:      
-        
 
+;;; TODO: not general
+_Lcomma: 
+;;; 13 B
+        .byte "'L@JJ'L!,,__", 0
+
+_cons:
+;;; 6 B
+        DO _Lcomma
+        DO _Lcomma
+        .byte "'L@", 0
+
+
+;;; NULL: 14 B
+_true:  
+;;; 4 B
+        .byte "L"
+        .word $ffff
+        .byte 0
+_zero:  
+;;; 4 B
+        .byte "L"
+        .word $0000
+        .byte 0
+_null:  
+;;; 6 B
+        .byte "B",+2
+        .DO _true
+        .byte 0
+        .DO _zero
+        .byte 0
+
+       
 endtable:       
 
 .assert (endtable-jmptable)<=256, error, "Table too big"
@@ -756,18 +897,18 @@ transtable:
 .endmacro
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
-        DO _stor               ; !
+        DO _store              ; !
         DO _undef              ; " - dup (MINT)
-        DO _undef              ; # - numberp?
+        DO _lit                ; # - lit?numberp?
         DO _swap               ; $ - swap (MINT)
         DO _undef              ; % - over (MINT)
         DO _and                ; &
-        DO _quote              ; ' - drop (MINT)
+        DO _quote              ; ' - quote BUT: drop (MINT)
         DO _undef              ; ( - if/loop 
         DO _undef              ; ) -
         DO _undef              ; * - mult
         DO _plus               ; +
-        DO _comma              ; , ccomma
+        DO _TOPbytecomma       ; , ccomma
         DO _sbc                ; -
 
 ;;; DEBUG - TODO: cheating - change!!!
@@ -786,7 +927,7 @@ transtable:
         DO _number             ; 8
         DO _number             ; 9 
         DO _undef              ; : - colon
-        DO _undef              ; ; - semis/ret
+        DO _ret                ; ; - semis/ret also \0
         DO _undef              ; < -
         DO _undef              ; =   : = -U ; # 4
         DO _undef              ; > -
@@ -802,13 +943,13 @@ transtable:
         DO _undef              ; H - (h) append
         DO _inc                ; I
 
-;;        DO _dec                ; J
+;;      DO _dec                ; J
         DO _undef              ; J - dec
 
         DO _getc               ; K
         DO _literal            ; L
         DO _undef              ; M - mapcar
-        DO _undef              ; N - nth?/not?/null?
+        DO _undef              ; N - number?nth?/not?/null?
         DO _putc               ; O
         DO _undef              ; P - print
         DO _reset              ; Q - equal???
@@ -817,7 +958,7 @@ transtable:
         DO _terpri             ; T
         DO _null               ; U
         DO _undef              ; V - prin(c1)/var
-        DO _undef              ; W - printz
+        DO _writez             ; W (print string)
         DO _exec               ; X
         DO _undef              ; Y - apply/read?
         DO _undef              ; Z - tailcall?
@@ -825,7 +966,7 @@ transtable:
         DO _undef              ; \ - LAMBDA!!!
         DO _undef              ; ] - RETURN
         DO _return             ; ^ - RETURN
-        DO _undef              ; _ - drop? negate (?)
+        DO _drop               ; _ - drop (on the floor1)
         DO _undef              ; ` - find name
 
         DO _undef              ; { - : { "+ ; 
