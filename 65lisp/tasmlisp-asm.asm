@@ -482,12 +482,14 @@ _error:
 
 ;;; TODO: unclear what usage or what is good!
 
-;;; 25 B
 nexttoken:      
         inc ipy
         ldy ipy
         lda (ip),y
         rts
+
+
+;;; 18 B
 
 ;;; tos= t1
 _quote: 
@@ -502,36 +504,10 @@ _literal:
         sta tos+1               ; hi
         rts
 
-;;; 20B
-_quote: 
-        lda #0
-        sta top
-_lit: 
-        jsr push
-nexttoken:      
-        inc ipy
-        ldy ipy
-        lda (ip),y
 
-;;;  TODO: what use?
-.ifnblank
-        ;; jmp shl8
-        ;; bit hack to skip 2 bytes
-        .byte $2c
+;;; ----------------------------------------
+;;; memory
 
-swaphilo:                     
-        lda tos+1               ; a = hi
-.endif
-
-;;; writes A to lo TOS
-shl8:
-        ldy tos                 ; y = lo
-        sty tos+1               ; hi= y
-        sta tos                 ; lo= hi
-.ifdef TRACE
-        jsr trace
-.endif
-        rts
 
 ;;; 3B !
 _cdr:   
@@ -540,7 +516,7 @@ _cdr:
         .byte $2c
 _car:    
 _load:      
-;;; 16B
+;;; 17 B
         ldy #0
 cYr:    
         lda (top),y
@@ -554,31 +530,58 @@ cYr:
 
         rts
 
+;;; comma
 ;;; used to implement ! store
-;;; 14B
 
-_TOPcomma:      
-        jsr _cstore
-	;;; -fall-through
-
-_TOPbytecomma:
-        lda #0
+;;; 17 B
+_comma:
+        jsr _ccomma
+_ccomma:
+        ldy #0
+        lda stack,x
         sta (top),y
-        
-_inc:   
+        inx
+
+.proc _inc
         inc top
         bne ret
         inc top+1
 ret:    
         rts
+.endproc
 
+
+
+;;; 19B
+_rcomma:        
+        jsr _rbcomma
+_rbcomma:       
+        ldy #0
+        lda stack+1,x
+;;; writing wrong order bytes!
+;;;  bakcwards
+        dex
+        
+.proc _dec
+        lda top
+        bne ret
+        dec top+1
+ret:    
+        dec top
+        rts
+.endproc
+
+
+;;; 8 B
 _store: 
-        jsr _TOPcomma
+        jsr comma
 
 pop2:   inx
         inx
         jmp pop
 
+;;; memory
+;;; ----------------------------------------
 
 ;;; 5B : T #10 O ; # 4
 _terpri:
@@ -821,7 +824,7 @@ _ret:
 ;;; math:      38   + - & | E dup - 6 op - 6.3 B/op !
 ;;; null:      28   U 0 Lffff 
 ;;;   - macro:   - 14 B !
-;;; mem:       41   @ D , I 2drop (+ 16 3 22)
+;;; mem:       41   D @ ,I r,J 2drop (+ 3 17 17 19 8) = 64
 ;;; interpret: 35   X
 ;;; lambda:         \ ^
 ;;; if:        17   zBranch
@@ -833,17 +836,17 @@ _ret:
 ;;; inter: 
 
 ;;;  math null mem inter io writ lit if
-;;; (+ 38   28   41   35 20 12    25 17) = 216
+;;; (+ 38   28  64    35 20 12    25 17) = 239
 ;;;         14 null                        -14   CODE!
 ;;;                19 Cons                 +19   CODE!
 ;;;                                   --------
-;;;                                        221
+;;;                                        244
 
 ;;;                                       + 57 byte syms
 
-;;;       (- 512 (+ 221 57)  )            278
+;;;       (- 512 (+ 240 57)  )             301
 ;;; 
-;;;             234 left for impl lisp!
+;;;             215 left for impl lisp!
 ;;;                  using CODE
 
 
@@ -880,6 +883,88 @@ _ret:
 ;;; will be interpreted as bytecode!
 
 codestart:      
+
+;;; what does cons do?
+;;; 
+;;;   *--lowcons =  *stack--  ; cdr
+;;;   *--lowcons =  *stack--  ; car
+
+_cons:  
+        
+;;; 14 B
+Sdec4:  
+        clc
+
+        lda lowcons
+        sbc #4
+        sta lowcons
+        
+        lda lowcons+1
+        sbc #0
+        sta lowcons
+        
+        rts
+
+;;; 20 B
+RsbcA:  
+        sta savea
+        stx savex
+        tya
+        tax
+
+        sec     
+
+        lda 0,y
+        sbc savea
+        sta 0,y
+
+        lda 1,y
+        sbc #0
+        sta 1,y
+
+        ldx savex
+        rts
+
+
+
+;;; mem: CDR CAR could just bytecopy from stack
+;;; 10B
+        ;; S2<C S2<C   # 3
+;;; "move value from S (over) pointed to by top"
+        ldy #lowcons
+        jsr Rpush
+
+        ;; 'D @ #4 - #4 >S   # 9
+        
+        ;; 'P@ #4 S2<M
+
+        lda #4
+        jsr addY
+
+;;; copy 4 bytes from stack to top
+;;; 15 B
+        ldy #0
+four:   jsr two
+two:    jsr one
+one:    
+        lda stack,x
+        dex
+        sta (top),y
+        iny
+        rts
+        
+
+;;; memcpy 4 bytes, lol
+;;; 14 B
+loop:   ldy #0
+        lda stack,x
+        dex
+        sta (top),y
+        iny
+        cmp #4
+        bcc loop
+        rts
+
 
 ;;; TODO: not general
 _TCOMMA: 
@@ -971,10 +1056,7 @@ transtable:
         DO _undef              ; G - 
         DO _undef              ; H - (h) append
         DO _inc                ; I
-
-;;      DO _dec                ; J
-        DO _undef              ; J - dec
-
+        DO _dec                ; J
         DO _getc               ; K
         DO _literal            ; L
         DO _undef              ; M - mapcar
