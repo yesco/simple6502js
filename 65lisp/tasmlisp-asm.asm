@@ -828,11 +828,27 @@ _ret:
 ;;;                                   --------
 ;;;                                        221
 
+;;;                                       + 57 byte syms
+
+;;;       (- 512 (+ 221 57)  )            278
+;;; 
+;;;             234 left for impl lisp!
+
+
+
+;;; T NIL QUOTE READ PRINT COND CONS CAR CDR
+;;; ATOM LAMBDA EQ
+;;; 
+;;; 44 chars + 13 atoms (+ 44 13) = 57 minimal?
+
+
 ;;; TOO BIG!
 ;;; - no space left for ???
 ;;; P - print lisp
 ;;; Y - read atom
 ;;; R - read lisp
+;;; 
+
 ;;; -- extras
 ;;; V - x10 lol : V "{{+{ ; # 5
 ;;; 1-9 -  read num
@@ -1720,7 +1736,6 @@ dispatch loop 25
 
 ;;; T NIL QUOTE READ PRINT COND CONS CAR CDR
 ;;; ATOM LAMBDA EQ
-
 
 # 80 tokens in forth??? for div64
 - https://github.com/rufig/spf4-utf8/blob/master/devel/%7Epinka/lib/BigMath.f
