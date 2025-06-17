@@ -563,7 +563,7 @@ setzero:
         
 ;;; --------- MATH
 
-;;; 36B for _adc _and _eor _ora _sbc _pop
+;;; 38B for _adc _and _eor _ora _sbc _pop
 ;;; 
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
@@ -610,18 +610,21 @@ _lda:
 ;;; self-modifying code
 ;;;   Y contains byte of asm "OP oper,y"
 ;;;   AX = AX op POP
-
-;;; 14B
+;;; 
+;;; TODO: could be used for BIGNUMs!
+;;; 
+;;; 18B
 mathop: 
         sty op
-
-_genop: 
-        jsr _bplus
-
-_bplus: 
-        lda tos
+        ldy #0
+        
+        jsr genop
+        ;; - fallthrough for hibyte Y=1
+genop:  
+        lda tos,y
 op:     adc stack,x
-        sta tos
+        sta tos,y
+        iny
         inx
         rts
 
@@ -638,6 +641,9 @@ _bswap: ldy tos
         
         rts
 
+;;; TODO: remove old artifact
+;;; (this was an alt if ^|& etc are expensive) 
+.ifnblank
 _nand:
 ;;; 20B
         ldy sidx
@@ -712,15 +718,15 @@ _ret:
 ;;; TOS, X points to stack, always retained
 ;;; A and Y always free to use
 
-;;; math: 36 + - & | E
+;;; math: 38 + - & | E
 ;;; null: 28 U 0 Lffff
 ;;; ! @:  41 @ D "," I 2drop (+ 16 3 22)
-
+;;; 
 ;;; io:   20 T O K   (+ 5 6 9)
 
 ;;; inter: 
 
-;;; (+ 36 28 41 20   ) = 125
+;;; (+ 38 28 41 20   ) = 127
 
 ;;; STATS
 
@@ -1016,6 +1022,7 @@ nexta:
 call:   jmp jmptable
 
 
+;;; 35B 72c - relative expensive (?)
 interpret:      
 
 enter:  
@@ -1042,6 +1049,7 @@ subr:
         lda savea
         sta ip
         lda #>jmptable
+        sta ip+1
 
         jsr exec
         
