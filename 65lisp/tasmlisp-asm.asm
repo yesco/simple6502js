@@ -754,7 +754,17 @@ _shl = _undef
 ;;; 12 B (3 dup)
 ;DUP = (_dup-jmptable)
 ;WRITEZ= (_writez-jmptable)
+;;; 
+;;; optimal: 'P! 'P@  B+2 _ ;  O 'P++ B-2
+;;;          'P! 1 ( @P++ B+2 _ ; O ) 
+;;; 
+;;; nextc: dup @ swap I swap  # 5
 
+;;; if had an ITERATOR : dup II swap D swasp @ ;
+;;; 
+;;; 9B
+
+_printz:        
 _writez: 
 ;;; 12B
         ldy #0
@@ -808,9 +818,10 @@ _ret:
 ;;; TOS, X points to stack, always retained
 ;;; A and Y always free to use
 
-;;; math:      38   + - & | E
-;;; null:      28   U 0 Lffff
-;;; mem:       41   @ D "," I 2drop (+ 16 3 22)
+;;; math:      38   + - & | E dup - 6 op - 6.3 B/op !
+;;; null:      28   U 0 Lffff 
+;;;   - macro:   - 14 B !
+;;; mem:       41   @ D , I 2drop (+ 16 3 22)
 ;;; interpret: 35   X
 ;;; lambda:         \ ^
 ;;; if:        17   zBranch
@@ -833,7 +844,7 @@ _ret:
 ;;;       (- 512 (+ 221 57)  )            278
 ;;; 
 ;;;             234 left for impl lisp!
-
+;;;                  using CODE
 
 
 ;;; T NIL QUOTE READ PRINT COND CONS CAR CDR
@@ -871,11 +882,13 @@ _ret:
 codestart:      
 
 ;;; TODO: not general
-_Lcomma: 
+_TCOMMA: 
 ;;; 13 B
         .byte "'L@JJ'L!,,__", 0
+;;; better: , and __ 
+        .byte "'L@J'L!,_", 0
 
-_cons:
+_CONS:
 ;;; 6 B
         DO _Lcomma
         DO _Lcomma
@@ -883,17 +896,17 @@ _cons:
 
 
 ;;; NULL: 14 B
-_true:  
+_TRUE:  
 ;;; 4 B
         .byte "L"
         .word $ffff
         .byte 0
-_zero:  
+_ZERO:  
 ;;; 4 B
         .byte "L"
         .word $0000
         .byte 0
-_null:  
+_NULL:
 ;;; 6 B
         .byte "B",+2
         .DO _true
