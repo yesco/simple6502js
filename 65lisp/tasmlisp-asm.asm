@@ -752,7 +752,6 @@ _nand:
 .endif ; OPT
 
 _shr:   
-_halve:
 ;;; 5B !
         lsr top+1
         ror top
@@ -792,6 +791,121 @@ _writez:
 
 _printd:        
         jmp printd
+
+;;; comparez (ptr1, top) strings
+;;; starting at offset Y
+;;; 
+;;; Result: beq if equal (Z set)
+;;; 
+;;; 8 B !
+comparezloop:                   ; haha!
+        iny
+comparez:
+        lda (ptr1),y
+        cmp (top),y
+        beq comparezloop
+        rts
+
+;;; basmlisp-asm:
+;;;   getc     12  (+ 12 8 17) = 37
+;;;   skipspc   8
+;;;   readatom 17
+
+;;; READ: 31 B - reads ATOM or CONS only
+
+;;; readatom at addres here[Y=4]
+;;; 
+;;; Returns
+;;;   A=0 -> got string (possibly empty)
+;;;   A contains breakchar (Z== '(' C== ')
+;;; 
+;;; 38B - too much...
+proc _readatom
+;;; 11 B - ret breakchar
+        ldy breakchar
+        lda #0
+        sta breakchar
+        tya
+
+        ;; if interesting breakchar () - only!
+        cmp #'('
+        bcs ret
+        
+white:
+;;; 7 B
+        jsr getchar
+
+        ;; skip leading white space (any < '(' - LOL)
+        cmp #'('
+        bcc white
+
+        ;; offset on heap 
+        ldy #4
+
+;;; 20 B
+readloop:       
+        ;; break char: anything <= ')'
+        cmp #')'+1
+        bcc done
+        ;; accept char
+        sta (here),y
+        iny
+        jsr getchar
+        jmp readloop
+
+done:   
+        sta breakchar
+        lda #0
+        sta (here),y
+ret:    
+        rts
+.endproc        
+               
+;;; asmlisp-asm.asm:
+
+;;; READ: 31 B - reads ATOM or CONS only
+
+;;; 16B !!!! --- (still need to find/craate atom)
+;;;              (but it's for compare w READ)
+.proc _read
+        jsr _atomread
+        bcs readlist
+
+        ;; ATOM
+parseatom:      
+;;; TODO: possibly empty string? not clear
+;;;    maybe for ()  - TEST!
+
+        jsr findatom
+createatom:
+        ...
+
+readlist:
+        ;;')' => retnil!
+        ;; (is this accurate test? lol)
+        ;; (TODO: does this work? ;-)
+        bne retnil
+
+        ;; continuation tail, LOL
+        ;; car
+        jsr read
+;;; read sets Zero on '(' and Carry for '(' and ')'
+        ;; cdr
+        jsr readlist
+
+;;; TODO: different cons in town these days...
+        jmp cons
+
+.endproc
+        
+
+
+_shl:   
+;;; 5B (but technically not needed)
+        asl top
+        rol top+1
+        rts
+
 .endif ; MINIMAL
 
 
@@ -835,38 +949,52 @@ _ret:
 ;;; A and Y always free to use
 
 ;;; math:      38   + - & | E dup - 6 op - 6.3 B/op !
-;;; null:      28   U 0 Lffff 
+;;;   NOT: (null:      28   U 0 Lffff )
+;;; NULL:      14   macros: 0 U true
 ;;;   - macro:   - 14 B !
-;;; mem:       41   D @ ,I r,J 2drop (+ 3 17 17 19 8) = 64
-;;; interpret: 35   X
-;;; lambda:         \ ^
-;;; if:        17   zBranch
-;;; lit:       25   Lbeef nextchar 'A
-
+;;; mem:       64   D @ ,I r,J 2drop (+ 3 17 17 19 8) = 64
+;;; interpret: 35   X interpret
 ;;; io:        20   T O K   (+ 5 6 9)
 ;;; write:     12   W
+;;; lit:       25   Lbeef nextchar 'A
+;;; if:        17   zBranch
+;;; read:      54   brk_skps_rdatom R (+ 11 7 20 16) 
 
-;;; inter: 
+;;; lambda:         \ ^  -    TODO
 
-;;;  math null mem inter io writ lit if
-;;; (+ 38   28  64    35 20 12    25 17) = 239
-;;;         14 null                        -14   CODE!
-;;;                19 Cons                 +19   CODE!
-;;;                                   --------
-;;;                                        244
-
-;;;                                       + 57 byte syms
-
-;;;       (- 512 (+ 240 57)  )             301
+;;;  math NULL mem exe io wrt lit if read
+;;; (+ 38   28  64  35 20 12   25 17   54)
 ;;; 
-;;;             215 left for impl lisp!
-;;;                  using CODE
+;;;                         = 293
 
-
-;;; T NIL QUOTE READ PRINT COND CONS CAR CDR
-;;; ATOM LAMBDA EQ
+;;;                          + 57 byte sym NAMES
+;;;                         = 350
 ;;; 
+;;;       (- 512 (+ 293 57)  )
+;;; 
+;;;             162 left for impl lisp!
+;;;                  using CODE, lol
+;;; 
+;;;    (- 192 66) === 126 (new name, see below)
+;;; 
+
+
+;;; TODO: PRINT COND LAMBDA EQ
+;;;   need EVAL APPLY ASSOC
+
+
+;;; T NIL ?QUOTE READ ?PRINT ?COND CONS CAR CDR
+;;; ATOM ?LAMBDA ?EQ
+;;; 
+;;; TODO: PRINT COND LAMBDA EQ
+
 ;;; 44 chars + 13 atoms (+ 44 13) = 57 minimal?
+
+;;; more symbols for all?
+;;; 
+;;; AND + * & | ^ , KEY PUTC TERPRI NULL EVAL APPLY INC DEC DIV2 MUL2
+;;; 
+;;; -- 66 chars including spaces
 
 
 ;;; TOO BIG!
@@ -1061,8 +1189,8 @@ transtable:
         DO _undef              ; ? - is atom? if?
         DO _load               ; @ car
         DO _undef              ; A - assoc/alloc
-        DO _undef              ; B - memBer?
-        DO _undef              ; C - cons
+        DO _undef              ; B - ZBRANCH memBer?
+        DO _cons               ; C
         DO _cdr                ; D
         DO _eor                ; E
         DO _undef              ; F - forth ext?
@@ -1285,12 +1413,21 @@ nexta:
 
 ;;; TODO: a number of _routines LDY #0
 ;;;    others LDA #0 (tya)
-;;; enable this:
+;;; enable this.
 ;;; 
 ;;; LDY #0 - for all
 
 ;;; TODO: fix, retain token A
+;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
+;;; 
 ;;; A contains dispatch offset (should be char?)
+
+;;; NOTE: if _routines expect A+Y to be clear then
+;;;   some will break if they are called internally!
+;;;   maybe have some notation, if have name
+;;; 
+;;;   _foo_AYZ == optimized w AYZ
+;;;   foo      == safe!
 
 ;;; X points to the data stack entry (don't modify)
 call:   jmp jmptable

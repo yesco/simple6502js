@@ -1149,6 +1149,7 @@ end:
 
 
 ;;; TODO: should count as part of program
+;;; 12 B
 .ifdef IO
 .proc getc
         lda cunget
