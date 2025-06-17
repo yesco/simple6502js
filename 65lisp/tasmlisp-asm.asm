@@ -457,6 +457,17 @@ _initlisp:
 _exec:  
         jmp interpret
 
+_pushaddr:      
+        jsr push
+        lda ip
+        ldy ip+1
+;;; TODO: can one make a pushay?
+;;;    (but, "push" will clobber)
+setay:
+        sta tos
+        sty tos+1
+        rts
+
 _undef: 
 _error: 
         ;; write .? - for undefined
@@ -551,7 +562,6 @@ ret:
 .endproc
 
 
-
 ;;; 19B
 _rcomma:        
         jsr _rbcomma
@@ -630,14 +640,14 @@ _true:
         jsr push
 settrue:       
         lda #$ff
-aset:   sta tos
-        sta tos+1
-        rts
+bothset:
+        tay
+        jmp setay               ; save 1 byte!
 _zero:
         jsr push
 setzero:       
         lda #0
-        beq aset
+        beq bothset
         
 ;;; --------- MATH
 
@@ -709,11 +719,14 @@ op:     adc stack,x
 ;;; : % 'D @ 'A ! 'T @ 'D ! 'A @ 'D ! ;
 ;;; # 20
 _swap:  
+;;; TDOO: if we could assume Y=0...
+        ldy #0
         jsr _bswap
 
-_bswap: ldy tos
+_bswap: lda tos,y
+        sta savea
         lda stack,x
-        sta tos
+        sta tos,y
         tya
         sta stack,x
         
@@ -1072,10 +1085,10 @@ transtable:
         DO _writez             ; W (print string)
         DO _exec               ; X
         DO _undef              ; Y - apply/read?
-        DO _undef              ; Z - tailcall?
-        DO _undef              ; [ - quote lambda
+        DO _undef              ; Z - tailcall? B\0
+        DO _pushaddr           ; [ - quote lambda
         DO _undef              ; \ - LAMBDA!!!
-        DO _undef              ; ] - RETURN
+        DO _undef              ; ] - return or ;
         DO _return             ; ^ - RETURN
         DO _drop               ; _ - drop (on the floor1)
         DO _undef              ; ` - find name
@@ -1238,17 +1251,14 @@ loop:
 
 ;;; WARNING: Don't jmp next!!!
 ;;; this isn't forth
+;;; TODO: still valid? lol
 next:   
-;;; TODO: maybe no keep in AX as it's lot's of
-;;;   push pop LOL
-;;; TODO: maybe only pha?
-;        RPUSH
-        pha
-
-nextpushed:
         jsr nexttoken
         ;; at end of string
         beq nret
+
+;;; TODO: enable
+;        sta token
 
 nexta:  
         jsr translate
@@ -1268,9 +1278,21 @@ nexta:
         ;; save in "jmp jmptable" low byte!
         sta call+1
         
+;;; ----------- SAVE MORE BYTeS -------------
+
 ;;; TODO: 6 _routines jsr push first thing!
 ;;;  (maybe A>xx can change this?)
 
+;;; TODO: a number of _routines LDY #0
+;;;    others LDA #0 (tya)
+;;; enable this:
+;;; 
+;;; LDY #0 - for all
+
+;;; TODO: fix, retain token A
+;;; A contains dispatch offset (should be char?)
+
+;;; X points to the data stack entry (don't modify)
 call:   jmp jmptable
 
 
@@ -1376,33 +1398,10 @@ other:
         bcc again
         ;; rest was <= ' ' (wrapped around)
         ;; or above \127
-        bcs nextpushed
+        bcs next
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
-
-;;; (no newline added that puts does)
-;;; 
-;;; 17B
-.ifdef PRINTZ
-printz:  
-        ldy #0
-
-;;; printzY prints zstring from AX starting at offset Y
-;;; (no newline added that puts does)
-.proc printzY
-        sta ptr1
-        stx ptr1+1
-next:
-        lda (ptr1),y
-        beq end
-        jsr putchar
-        iny
-        bne next
-end:    
-        rts
-.endproc
-.endif ; PRINTZ
 
 ;;; ===================================
 ;;; LISP:
@@ -1417,7 +1416,7 @@ end:
 .endif
 
 
-;;; TODO: should count as part of program
+
 .ifdef IO
 .proc getc
         lda cunget
@@ -1437,7 +1436,6 @@ got:
         bcc skipspc
         rts
 .endproc
-.endif ; IO
 
 
 endaddr:
@@ -1452,11 +1450,6 @@ endaddr:
         .byte str,0
 .endmacro
 
-BBB:    
-        jsr bytecode            
-        .byte "0.I.I.I.I.I.I.I.I.J.J.J.",0
-
-        ;CODE "0.I.I.I.I.I.I.I.I.J.J.J."
 
 ;;; 31B
 consz:  
