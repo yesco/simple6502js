@@ -978,7 +978,7 @@ _ret:
 ;;; NULL:      14   macros: 0 U true
 ;;;   - macro:   - 14 B !
 ;;; mem:       64   D @ ,I r,J 2drop (+ 3 17 17 19 8) = 64
-;;; interpret: 35   X interpret
+;;; interpret: 36   X interpret
 ;;; io:        20   T O K   (+ 5 6 9)
 ;;; write:     12   W
 ;;; lit:       25   Lbeef nextchar 'A
@@ -989,15 +989,19 @@ _ret:
 ;;; STATS
 
 ;;;  math NULL mem exe io wrt lit if read \
-;;; (+ 38   28  64  35 20 12   25 17  54  19)
+;;; (+ 38   28  64  36 20 12   25 17  54  19)
 ;;; 
-;;;                         = 312
+;;;                         = 313
+;;; 
+;;; that's for almost an AL AlphabeticalLisp
+
+
 ;;;                          + 57 byte sym NAMES
-;;;                         = 369
+;;;                         = 370
 ;;; 
-;;;       (- 512 (+ 312 57)  )
+;;;       (- 512 (+ 313 57)  ) 
 ;;; 
-;;;             143 left for impl lisp!
+;;;             142 left for impl lisp!
 ;;;                  using CODE, lol
 ;;; 
 ;;;    (- 143 66) === 77 (new names, see below)
@@ -1246,13 +1250,13 @@ transtable:
         DO _drop               ; _ - drop (on the floor1)
         DO _undef              ; ` - find name
 
-        DO _undef              ; { - : { "+ ; 
+        DO _shrl               ; { - : { "+ ; 
         DO _ora                ; |
         DO _shr                ; }
         DO _undef              ; ~ - not
 endtrans:       
 
-;;; 24 functions!
+;;; 29 functions!
 
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
@@ -1458,7 +1462,7 @@ nexta:
 call:   jmp jmptable
 
 
-;;; 35B 72c - relative expensive (?)
+;;; 36B 72c - relative expensive (?)
 proc interpret
 
 enter:  
