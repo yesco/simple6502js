@@ -217,10 +217,15 @@ lowcons: .res 2
 
 sidx:    .res 1
 
-;;; state of interpretation
-ip:     .res 2                  ; point routine
-ipy:    .res 1                  ; point offset
-ipx:    .res 1                  ; frame start
+;;; current state of interpretation
+startframe:     
+
+ip:     .res 2                  ; code ptr
+ipy:    .res 1                  ; offset
+ipx:    .res 1                  ; stack frame
+ipp:    .res 1                  ; n params
+
+endframe:
 
 ;;; saved
 quitS:  .res 1
@@ -456,6 +461,26 @@ _initlisp:
 
 _exec:  
         jmp interpret
+
+;;; (number of \)-1 stored in ipp(arams)
+_lambda:        
+;;; 11 B
+        jsr nexttoken
+        cmp #'\\'
+        bne ret
+        inc ipp
+        bne _lambda             ; always true
+
+;;; value to return is in TOP
+;;; if we had \\ parameters,
+;;; from ipx we need to pop ipp==1
+_return:
+;;; 8 B
+        lda ipx
+        clc
+        sbc ipp
+        sta sidx
+        rts
 
 _pushaddr:      
         jsr push
@@ -915,7 +940,7 @@ _number:
         .byte 0
 .endif ; NUMBERS
 
-_return:        
+_exit:  
 ;;; TODO: fix?
         sta savea
         pla
@@ -959,23 +984,23 @@ _ret:
 ;;; lit:       25   Lbeef nextchar 'A
 ;;; if:        17   zBranch
 ;;; read:      54   brk_skps_rdatom R (+ 11 7 20 16) 
+;;; \ lambda:  19   \ ^
 
-;;; lambda:         \ ^  -    TODO
+;;; STATS
 
-;;;  math NULL mem exe io wrt lit if read
-;;; (+ 38   28  64  35 20 12   25 17   54)
+;;;  math NULL mem exe io wrt lit if read \
+;;; (+ 38   28  64  35 20 12   25 17  54  19)
 ;;; 
-;;;                         = 293
-
+;;;                         = 312
 ;;;                          + 57 byte sym NAMES
-;;;                         = 350
+;;;                         = 369
 ;;; 
-;;;       (- 512 (+ 293 57)  )
+;;;       (- 512 (+ 312 57)  )
 ;;; 
-;;;             162 left for impl lisp!
+;;;             143 left for impl lisp!
 ;;;                  using CODE, lol
 ;;; 
-;;;    (- 192 66) === 126 (new name, see below)
+;;;    (- 143 66) === 77 (new names, see below)
 ;;; 
 
 
@@ -1008,7 +1033,7 @@ _ret:
 ;;; V - x10 lol : V "{{+{ ; # 5
 ;;; 1-9 -  read num
 
-;;; STATS
+
 
 ;;; OLD
 ;;; code outside...
@@ -1182,7 +1207,7 @@ transtable:
         DO _number             ; 8
         DO _number             ; 9 
         DO _undef              ; : - colon
-        DO _ret                ; ; - semis/ret also \0
+        DO _exit               ; ;
         DO _undef              ; < -
         DO _undef              ; =   : = -U ; # 4
         DO _undef              ; > -
@@ -1215,7 +1240,7 @@ transtable:
         DO _undef              ; Y - apply/read?
         DO _undef              ; Z - tailcall? B\0
         DO _pushaddr           ; [ - quote lambda
-        DO _undef              ; \ - LAMBDA!!!
+        DO _lambda             ; \
         DO _undef              ; ] - return or ;
         DO _return             ; ^ - RETURN
         DO _drop               ; _ - drop (on the floor1)
@@ -1434,23 +1459,21 @@ call:   jmp jmptable
 
 
 ;;; 35B 72c - relative expensive (?)
-interpret:      
+proc interpret
 
 enter:  
         ;; save what we're calling
-        sta savea 
+;;; TODO: is is expected in A?
+;        sta savea 
 
-        ;; push IP on Rstack
-        lda ip+1
+        ;; push current stack frame
+        ldy #(endframe-startframe)
+nxt1:   
+        lda ip-1.y ; x would be cheaper (3B now)
         pha
-        lda ip
-        pha
-        ;; push ipY on Rstack
-        lda ipy
-        pha
-        ;; push X from Rstack
-        txa
-        pha
+        dey
+        bne nxt1
+        
         ;; this value is modified by \ and ^
         ;; to pop parameters orderly!
 
@@ -1461,24 +1484,25 @@ subr:
         sta ip
         lda #>jmptable
         sta ip+1
+;;; TODO: can this be moved into exec?
+;;;   (maybe some problem with Ztail/Recurse?
+        lda #0
+        sta ipp
 
         jsr exec
         
-exit:   
-        ;; pull X from Rstack
+subrexit:
+        ;; pop to current stack frame
+        ldy #0
+nxt2:   
         pla
-        tax
-        ;; pop Y from Rstack
-        pla
-        sta ipy
-        ;; pop IP from Rstack
-        pla
-        sta ip
-        pla
-        sta ip+1
+        sta ip,y
+        iny
+        cpy #(endframe-startframe)
+        bne nxt2
 
         rts
-        
+.endproc
 
 ;;; translate letter in A to effective offset
 ;;; of jmptable
