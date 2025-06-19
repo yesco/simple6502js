@@ -1316,6 +1316,60 @@ endtrans:
 
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
+;;; compressed trans, zuntrans
+;;; 
+;;; comp: (+ 32 25) = 57 B to generate table
+;;; 
+;;; but it removes complicated translation code!
+;;; 
+;;; raw: (+ 64 4 30) = 98 B (w code toskip byte)
+
+ztrans: 
+ ; (+ 7 3 2 4 2 5 2 2 2 2 1) = 32  # 19 funs
+        .byte 256-33, _store, _undef, _lit, _swap, _undef, _and
+        .byte 256-4, _plus, _comma                             .byte 256-15, _exit
+        .byte 256-4, _load, _undef, _zbranch
+        .byte 256-2, _eor
+        .byte 256-3, _inc, _dec, _getc, _literal
+        .byte 256-2, _putc
+        .byte 256-8, _exec
+        .byte 256-6, _drop
+        .byte 256-3, _shr
+        .byte 0
+
+;;; TODO: memset(
+
+;;; fill in a 128 byte table
+;;; 
+;;; 25 B
+zuntrans:
+        lda #0
+        tay
+        tax
+
+znext:  
+        lda ztran,x
+        beq ret
+        bmi zskip
+
+        sta transunz,y
+        inx
+        iny
+zskip:  
+        ;; minus means relative skip
+        stx savex
+        clc
+        adc savex
+        tax
+        bne znext
+
+ret:    
+        rts
+
+transuns:       
+        .res 128, (_undef-jmptable)
+        
+
 ;;; ----------------------------------------
 ;;;              U S E R C O D E
 ;;;                 (overflow)
