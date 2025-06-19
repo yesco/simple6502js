@@ -456,7 +456,10 @@ jmptable:
 _reset:
 _initlisp:      
 _quit:  
+;;; 6 B
         cld
+;;; set's both Data Stack, and R stack
+;;; (are we skipping one byte at DS?)
         ldx #ff
         txs
         ldy #0
@@ -475,87 +478,96 @@ _exec:
         jmp interpret
 
 
-pushregY:       
-;;; 14 B
-        jsr push
-        lda 0,y
-        sta top
-        lda 1,y
-        sta top+1
-        rts
-        
-;;; Y.push - write down
-;;; Y.pop  - read up
+;;; ----------------------------------------
+;;; memory
 
-;;; ,      - *(top) = overpop; top+= 2
-
-
-;;; I guess , comma  is "push forward" = copy
-;;;         r,       
-
-
-;;; loads ptr1 from stack in address Y
-;;; 
-;;; C:        ptr1 = *(word)y
-;;; 
-;;; 11 B
-loadptr1fromY:  
-        lda 0,y
-        sta ptr1
-        lda 1,y
-        sta ptr1+1
-        rts
-
-;;; push on stack identified add ptr at Y
-pushatY:
-;;; 17 B
-        jsr loadptr1fromY
-        ldy #0
-        lda top
-        sta (ptr1),y
+_dup:   
+push:   
+;;; 13 B
         lda top+1
+        dex
+        sta stack,x
+
+        lda top
+        dex
+        sta stack,x
+
+        rts
+
+cdr:    
+;;; 3 + 14 = 17 B
+        ldy #2
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+load:  
+car:    
+;;; (14 B)
+        ldy #0
+cYr:    
+        lda (top),y
+        pha
         iny
-        sta (ptr1),y
-        
+        lda (top),y
+;;; load TOP w (A, pla) (hi,lo)
+;;; (useless?)
+loadPOPA: 
+;;; (6 B)
+        sta top+1
+        pla
+        sta top
+        rts
+
+
+;;; comma moves words from overstack
+;;;   to address in top, top advances with 2
+;;; 
+;;; (addr value ...) -> (addr+2 ...)
+;;;   addr+2 !
+;;; 
+;;; C: *ptr1= stack[x]; x+= 2; top+= 2;
+;;;
+;;; ccomma:
+;;;   WARNING: stack is misaligned one byte!
+;;; 
+;;; 12+7= 19 B
+_comma:
+;;; 12
+        ldy #0
+        jsr _ccomma
+_ccomma:
+        lda stack,x
+        sta (top),y
+        inx
+        iny
+
+.proc _inc
+;;; (7 B)
+        inc top
+        bne ret
+        inc top+1
+ret:    
+        rts
+.endproc
+
+_store: 
+;;; 8 B
+        jsr _comma
+drop2:  
+        dex
+        dex
         jmp pop
 
-;;; push on stack identified add ptr at Y
-;;; 
-;;; C:      push( *ptr ); ptr += 2;p
-;;; 
-opatY:
-;;; 18
-        jsr loadptr1fromY
-
-        jsr push
-
-        ldy #0
-        lda top
-        sta (ptr1),y
-        lda top+1
-        iny
-        sta (ptr1),y
-
-        rts
-
-
-
-;;; rcomma
-;;; 
 _rcomma:        
-        
+;;; 6+12 = 18
+        jsr dec2
+        jsr _comma
+        ;; dec2 again, lol
+dec2:   
+;;; 3+9 = 12
+        jsr _dec
 
-;;; 19B
-_rcomma:        
-        jsr _rbcomma
-_rbcomma:       
-        ldy #0
-        lda stack+1,x
-;;; writing wrong order bytes!
-;;;  bakcwards
-        dex
-        
 .proc _dec
+;;; (9 B)
         lda top
         bne ret
         dec top+1
@@ -563,10 +575,14 @@ ret:
         dec top
         rts
 .endproc
-
+;;; 
+        
 
 ;;; memory
 ;;; ----------------------------------------
+
+
+
 
 ;;; 5B : T #10 O ; # 4
 _terpri:
@@ -662,7 +678,7 @@ _sbc:
         ldy #$fd
         bne mathop
 
-drop:   
+drop: 
 pop:
 _lda:   
         ;; LDA oper,x
@@ -705,25 +721,6 @@ _bswap: lda tos,y
         sta stack,x
         
         rts
-
-;;; TODO: remove old artifact
-;;; (this was an alt if ^|& etc are expensive) 
-.ifnblank
-_nand:
-;;; 20B
-        ldy sidx
-        clc
-        and lostack,y
-        eor #$ff
-        pha
-        txa
-        and histack,y
-        eor #$ff
-        tax
-        dec sidx
-        pla
-        rts
-.endif ; OPT
 
 _shr:   
 ;;; 5B !
@@ -1259,22 +1256,8 @@ call1x:
 ;;; TODO: if _quit then "will" return to basic
 
 
-_dup:   
-push:   
-;;; This one would be smaller with recursive dup
-;;; 14B
-        ;; sidx--
-        dec sidx
-        ldy sidx
 
-        sta lostack,y
 
-        pha
-        txa
-        sta histack,y
-        pla
-
-        rts
 
 popret: 
         RPOP

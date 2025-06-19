@@ -1,6 +1,273 @@
 ;;; cut-n-paste variants not used?
 
+;;; comma moves words from stack to ptr1
+;;;   ptr1 advances
+;;; 
+;;; C: *ptr1= stack[x]; x+= 2; top+= 2;
+;;;
+;;; ccomma:
+;;;   WARNING: stack is misaligned one byte!
+;;; 
+;;; 12+7= 19 B
+_comma:
+;;; 12
+        ldy #0
+        jsr _ccomma
+_ccomma:
+        lda stack,x
+        sta (top),y
+        inx
+        iny
 
+.proc _inc
+;;; (7 B)
+        inc top
+        bne ret
+        inc top+1
+ret:    
+        rts
+.endproc
+
+_store: 
+;;; 8 B
+        jsr _comma
+drop2:  
+        dex
+        dex
+        jmp pop
+
+_rcomma:        
+;;; 6+12 = 18
+        jsr dec2
+        jsr _comma
+        ;; dec2 again, lol
+dec2:   
+;;; 3+9 = 12
+        jsr _dec
+
+.proc _dec
+;;; (9 B)
+        lda top
+        bne ret
+        dec top+1
+ret:    
+        dec top
+        rts
+.endproc
+;;; 
+        
+
+;;; ^ (+ 19 8 18) = 45 top, inc store top, dec2 dec
+
+;;; (+ 14 16 14)= 44 store  topcomma toprc
+;;; (+ 3 8 1 9 16 9)=46 load2 store topc toprc
+
+topcomma:
+;;; 8+6 = 14
+        jsr store
+;;; 8
+        jsr push
+        lda #2
+        sta top
+        lda #0
+        sta top+1
+;;; (3)
+;        jmp push2              ;
+
+        jmp _sbc
+
+store: 
+;;; 16 B
+        ldy #0
+        lda stack,x
+        sta (top),y
+        inx
+
+        iny
+        lda stack,x
+        sta (top),y
+        inx
+
+        rts
+        
+toprcomma:      
+;;; 8+6 = 14 B
+;;; 8
+        jsr push
+        lda #2
+        sta top
+        lda #0
+        sta top+1
+;;; (3)
+;        jsr push2              ;
+
+;;; 6
+        jsr _plus
+        jmp store
+        
+
+
+;;; rcomma needed for cons
+;;; 
+_rcomma:        
+        
+
+;;; 19B
+_rcomma:        
+        jsr _rbcomma
+_rbcomma:       
+        ldy #0
+        lda stack+1,x
+;;; writing wrong order bytes!
+;;;  bakcwards
+        dex
+        
+.proc _dec
+        lda top
+        bne ret
+        dec top+1
+ret:    
+        dec top
+        rts
+.endproc
+
+
+
+_dup:   
+push:   
+;;; 13 B
+        lda top+1
+        dex
+        sta stack,x
+
+        lda top
+        dex
+        sta stack,x
+
+        rts
+
+
+dup:    
+push:  
+;;; 4+10 = 14 B
+        lda top
+        ldy top+1
+
+;;; pushAY A low, Y hi, push on data stack
+pushAY:
+;;; (10 B)
+        dex
+        dex
+        sta stack,x
+        tya
+        sta stack+1,x
+        rts
+
+;;; maybe not needed
+.ifnblank
+
+pushA:  
+;;; 5 B
+        ldy #0
+        jmp pushAY
+
+pushreg:        
+;;; 9 B
+        lda 0,y
+        ldx 1,y
+        jmp pushAY
+
+car:    
+;;; 16
+        ldy #0
+        lda (top),y
+        sta ptr1
+        iny
+        lda (top),y
+        sta ptr1+1
+
+        ldy #ptr1
+        jmp pushregY
+        
+cdr:    
+;;; 13 + 3 = 16B
+car:    
+;;; 13B
+        ldy #2
+        lda (top),y
+        pha
+        iny
+        lda (top).y
+        tay
+        pla
+        jmp pushAY
+
+cdr:    
+;;; 3 + 14 = 17 B
+        ldy #2
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+load:  
+car:    
+;;; (14 B)
+        ldy #0
+cYr:    
+        lda (top),y
+        pha
+        iny
+        lda (top),y
+;;; load TOP w (A, pla) (hi,lo)
+;;; (useless?)
+loadPOPA: 
+;;; (6 B)
+        sta top+1
+        pla
+        sta top
+        rts
+
+dup:    
+;;; 2+13 = 15
+        ldy #top
+pushregY:       
+;;; (13 B)
+        lda 0,y
+        dex
+        sta stack,x
+        
+        lda 1,y
+        dex
+        sta stack,x
+        rts
+
+pushregY:       
+;;; 14 B
+        jsr push
+        lda 0,y
+        sta top
+        lda 1,y
+        sta top+1
+        rts
+        
+
+
+;;; This one would be smaller with recursive dup
+;;; 14B
+        ;; sidx--
+        dec sidx
+        ldy sidx
+
+        sta lostack,y
+
+        pha
+        txa
+        sta histack,y
+        pla
+
+        rts
+
+popret: 
+        RPOP
+        rts
 
 
 

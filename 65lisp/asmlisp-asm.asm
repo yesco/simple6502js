@@ -534,7 +534,9 @@ notnl:
 
 .align 2
 cdr:    
+;;; 17 B
         ldy #3
+;;; TODO: bit hack, and .align NOP everywehere
         jmp cYr
 
 ;;; car(AX) -> AX

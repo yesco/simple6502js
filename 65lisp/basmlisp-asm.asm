@@ -469,6 +469,7 @@ _cdr:
         jmp cYr
 ;;; car(AX) -> AX forth: @
 _car:    
+;;; 13 B
 _load:      
         ldy #1
 cYr:    
