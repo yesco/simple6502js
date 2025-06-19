@@ -1,5 +1,107 @@
 ;;; cut-n-paste variants not used?
 
+_dup:   
+push:   
+;;; 13 B
+        lda top+1
+        dex
+        sta stack,x
+
+        lda top
+        dex
+        sta stack,x
+
+        rts
+
+_dup:   
+push:   
+;;; 8 B !
+        dex
+        dex
+        jsr _sta
+        dex
+        dex
+        rts
+
+
+
+_swap:  
+;;; 22 B
+
+;;; TDOO: if we could assume Y=0...
+        ldy #0
+        dex
+        dex
+        jsr _bswap
+_bswap:
+        inx
+        ;; q= tos
+        lda tos,y
+        pha
+        ;; tos= stack
+        lda stack,x
+        sta tos,y
+        ;; stack= q= tos
+        pla
+        sta stack,x
+        iny
+        
+        rts
+
+swap:   
+;;; 20 B lol
+        ;; 
+ WRONG????
+
+        ;; q= tos = a
+        lda tos+1
+        pha
+        lda tos
+        pha
+        
+        ;; a | b c ..
+        ;; tos= stack
+        jsr dup
+
+        inx
+        inx
+
+        ;; stack
+
+        jmp loadPOPA
+
+        ;; stack= q= tos
+        pla
+        sta stack,x
+        pla
+        sta stack+1,x
+
+        rts
+
+swwap:  
+;;; 17 B !
+        ;; q= tos = b
+        lda stack,x
+        pha
+        lda stack+1,x
+        pha
+        
+        ;; a | b c ..
+        jsr _sta
+        ;; stack = a
+
+        ;; a | (a) c ..
+        dex
+        dex
+        ;; a | a c ..
+
+        ;; tos= q (= b)
+        pla ; hi
+        jmp loadPOPA
+        ;; b | a c ..
+
+
+
 ;;; (+ 13 15 16) = 44
 
 comma:  

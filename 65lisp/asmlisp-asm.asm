@@ -1011,6 +1011,26 @@ iscons:
         rts                     ; C= 0 if Number!
 .endproc
 
+;;; TODO: consider illegal instruction !
+;;; ALR # %11 (test two lower bits in one op?)
+;;; 
+;;; order of testing...
+;;;   C= 0 => number
+;;;   Z=01 => atom!
+;;;   Z= 1 => cons!
+;;; 
+;;; ALR (ASR)
+;;; AND oper + LSR
+;;; 
+;;; A AND oper, 0 -> [76543210] -> C
+;;; 
+;;; N Z C I D V
+;;; + + + - - -
+;;; 
+;;; addressing      assembler       opc     bytes   cycles  
+;;; immediate       ALR #oper       4B      2       2  
+;;; 
+
 ;; not inline...
 .proc _isconsSetC               ; 14-19c 14B
         tay

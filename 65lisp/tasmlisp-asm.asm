@@ -88,7 +88,7 @@
 ;;; 
 ;;;           C   O   N   F   I   G
 
-; enable this for size test
+;;; enable this for size test
 ;
 MINIMAL=1
 
@@ -480,19 +480,10 @@ _exec:
 
 ;;; ----------------------------------------
 ;;; memory
+;;; 
+;;; (+ 17 8 17) = 42    cdr+car dup swap
+;;;               45    topo,+inc+!+drop2+topr,+dec2+dec 
 
-_dup:   
-push:   
-;;; 13 B
-        lda top+1
-        dex
-        sta stack,x
-
-        lda top
-        dex
-        sta stack,x
-
-        rts
 
 cdr:    
 ;;; 3 + 14 = 17 B
@@ -509,13 +500,80 @@ cYr:
         iny
         lda (top),y
 ;;; load TOP w (A, pla) (hi,lo)
-;;; (useless?)
+;;; (useless?) kindof opposite 
 loadPOPA: 
 ;;; (6 B)
         sta top+1
         pla
         sta top
         rts
+
+
+;;; - stack ops: dup swap
+
+;;;  you can see these as
+;;; 
+;;; lda a b ... -> b (b) ...
+;;;   "drop" (dup)
+
+;;; sta a b ... -> a (a) ...
+;;;   "swap drop"
+
+;;; lda:   top= stack[x], x-= 2
+;;; sta:   stack[x]= top, x-= 2
+
+
+;;; over (a b ... -> b a b ...)
+.ifnblank
+over:   
+;;; 13 B
+        jsr push                ; a a b
+        dex
+        dex                     ; a (a) b
+        jsr _lda                ; b (a b)
+        dex
+        dex                     ; b (a) b
+        dex
+        dex                     ; b a b
+        rts
+.endif
+
+_dup:  
+push:   
+;;; 8 B !
+        ;; a | b c ...
+        dex
+        dex
+        ;; a | ? b c ..
+        jsr _sta
+        ;; a | (a) b c ..
+        dex
+        dex
+        ;; a | a b c ..
+        rts
+
+swap:   
+;;; 17 B !
+        ;; q= tos = b
+        lda stack,x
+        pha
+        lda stack+1,x
+        pha
+        
+        ;; a | b c ..
+        jsr _sta
+        ;; stack = a
+
+        ;; a | (a) c ..
+        dex
+        dex
+        ;; a | a c ..
+
+        ;; tos= q (= b)
+        pla ; hi
+        jmp loadPOPA
+        ;; b | a c ..
+
 
 
 ;;; top, inc !=store drop2 topr, dec2 dec
@@ -553,6 +611,31 @@ ret:
         rts
 .endproc
 
+inc2:   
+        lda #2
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+inc:    
+        lda #1
+;;; 10 B
+        clc
+        adc top
+        sta top
+        bcc noinc
+        inc top+1
+noinc:  
+        rts
+
+;;; 13 B ????
+        clc
+        adc 0,y
+        sta 0,y
+        bcc noinc
+        inc 1,y
+noinc:  
+        rts
+        
+
 _store: 
 ;;; 8 B
         jsr _comma
@@ -579,6 +662,7 @@ ret:
         dec top
         rts
 .endproc
+
 
 ;;; memory
 ;;; ----------------------------------------
@@ -646,8 +730,9 @@ zero:
 
 ;;; --------- MATH
 
-;;; 41B for _adc _and _eor _ora _sbc _pop (6)
-;;; 
+;;; 50B _adc _and _eor _ora _sbc (_sta) _pop(_lda) shr (7)
+;;; + & E | - () _ shr (+ (* 5 2) (* 4 4) 2 17 5)
+;;;                               ^-- used by dup
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
 ;;; X must contain stack pointer always
@@ -666,6 +751,7 @@ _and:
         bne mathop
 
 ;;; cmp oper,y $d9 - can't use doesn't ripple
+;;; and wrong order...
 
 _eor:
         ;; EOR stack,x
@@ -680,6 +766,11 @@ _sbc:
         ;; SBC stack,x
         sec
         ldy #$fd
+        bne mathop
+
+_sta:   
+        ;; STA stack,x
+        ldy #$9d
         bne mathop
 
 drop: 
@@ -710,46 +801,30 @@ op:     adc stack,x
         inx
         rts
 
+_shr:   
+;;; 5B !
+        lsr top+1
+        ror top
+        rts
+
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 ;;; how we doing so far till here?
 ;;; 
 ;;; system:    6   _reset
 ;;; rdloop:   14   _interactive
 ;;;   exec:   <- to bew moved here ->
-;;; memory:   30    dup cdr car (+ 13 17)
+;;; memory:   42    cdr car dup swap
 ;;; setcar:   45    , inc ! drop2 r, dec2 dec
 ;;; IO:       20    T O K
 ;;; tests:    42    zbranch null 0 (true?sym)
-;;; math:     41    + - & | E pop (6)
+;;; math:     50    + - & | E pop shr (7)
 
-;;; TOTAL: 198 B    words: 25    avg 7.92 B/w
-;;; (/ (+ 6 14 30 45 20 42 41)                           (+ 1.0 1 3 7 3 4 6)           )
+;;; TOTAL: 219 B    words: 27    avg 8.11 B/w
+;;; (/ (+ 6  14 42 45 20 42 50)                              (+ 1.0  1  4  7  3  4  7)           )
 ;;; 
-;;; CANDO: (/ 256.0 7.92) = 32 words, lol
+;;; CANDO: (/ 256.0 8.11) = 31 words, lol
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
-
-;;; : % 'D @ 'A ! 'T @ 'D ! 'A @ 'D ! ;
-;;; # 20
-_swap:  
-;;; TDOO: if we could assume Y=0...
-        ldy #0
-        jsr _bswap
-
-_bswap: lda tos,y
-        sta savea
-        lda stack,x
-        sta tos,y
-        tya
-        sta stack,x
-        
-        rts
-
-_shr:   
-;;; 5B !
-        lsr top+1
-        ror top
-        rts
 
 .ifdef MINIMAL
 
