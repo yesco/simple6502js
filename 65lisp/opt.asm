@@ -1,5 +1,59 @@
 ;;; cut-n-paste variants not used?
 
+;;; (+ 13 15 16) = 44
+
+comma:  
+;;; 13
+        jsr store
+inc2:   
+        jsr inc
+.proc _inc
+;;; (7 B)
+        inc top
+        bne ret
+        inc top+1
+ret:    
+        rts
+.endproc
+
+rcomma:  
+;;; 15
+        jsr store
+dec2:   
+        jsr dec
+;;; (9 B)
+.proc _dec
+        lda top
+        bne ret
+        dec top+1
+ret:    
+        dec top
+        rts
+.endproc
+        
+store: 
+;;; 16 B
+        ldy #0
+        lda stack,x
+        sta (top),y
+        inx
+
+        iny
+        lda stack,x
+        sta (top),y
+        inx
+
+        rts
+
+
+;;; top, inc !=store topr, dec2 dec
+;;; 
+;;; WRONG: STORE doesn't pop2!!!
+;;; not fair to compare
+;;; 
+;;; (+ 19 8 18) = 45 
+;;; 
+
 ;;; comma moves words from stack to ptr1
 ;;;   ptr1 advances
 ;;; 

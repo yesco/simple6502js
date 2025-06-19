@@ -518,6 +518,10 @@ loadPOPA:
         rts
 
 
+;;; top, inc !=store drop2 topr, dec2 dec
+;;; 
+;;; (+ 19 8 18) = 45 B - 6.4 B/word
+
 ;;; comma moves words from overstack
 ;;;   to address in top, top advances with 2
 ;;; 
@@ -563,7 +567,7 @@ _rcomma:
         jsr _comma
         ;; dec2 again, lol
 dec2:   
-;;; 3+9 = 12
+;;; (3+9 = 12)
         jsr _dec
 
 .proc _dec
@@ -575,14 +579,9 @@ ret:
         dec top
         rts
 .endproc
-;;; 
-        
 
 ;;; memory
 ;;; ----------------------------------------
-
-
-
 
 ;;; 5B : T #10 O ; # 4
 _terpri:
@@ -599,6 +598,18 @@ _getc:
         sta top
         rts
         
+
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+;;; how we doing so far till here?
+;;; 
+;;; system:    6   _reset
+;;; rdloop:   14   _interactive
+;;;   exec:   <- to bew moved here ->
+;;; memory:   30    dup cdr car (+ 13 17)
+;;; setcar:   45    , inc ! drop2 r, dec2 dec
+
+;;; (+ 6 14 30 45) = 95
+
 _zbranch:        
 ;;; 17 B
         lda tos,x
