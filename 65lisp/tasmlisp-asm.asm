@@ -644,27 +644,9 @@ zero:
         jmp setfalse
         
 
-;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
-;;; how we doing so far till here?
-;;; 
-;;; system:    6   _reset
-;;; rdloop:   14   _interactive
-;;;   exec:   <- to bew moved here ->
-;;; memory:   30    dup cdr car (+ 13 17)
-;;; setcar:   45    , inc ! drop2 r, dec2 dec
-;;; IO:       20    T O K
-;;; tests:    42    zbranch null 0 (true?sym)
-
-;;; TOTAL: 157 B    words: 19    avg 8.26 B/w
-;;; (/ (+ 6 14 30 45 20 42)                              (+ 1.0 1 3 7 3 4)           )
-;;; 
-;;; CANDO: (/ 256.0 8.26) = 30.9 words, lol
-;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
-
-
 ;;; --------- MATH
 
-;;; 41B for _adc _and _eor _ora _sbc _pop
+;;; 41B for _adc _and _eor _ora _sbc _pop (6)
 ;;; 
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
@@ -727,6 +709,25 @@ op:     adc stack,x
         iny
         inx
         rts
+
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+;;; how we doing so far till here?
+;;; 
+;;; system:    6   _reset
+;;; rdloop:   14   _interactive
+;;;   exec:   <- to bew moved here ->
+;;; memory:   30    dup cdr car (+ 13 17)
+;;; setcar:   45    , inc ! drop2 r, dec2 dec
+;;; IO:       20    T O K
+;;; tests:    42    zbranch null 0 (true?sym)
+;;; math:     41    + - & | E pop (6)
+
+;;; TOTAL: 198 B    words: 25    avg 7.92 B/w
+;;; (/ (+ 6 14 30 45 20 42 41)                           (+ 1.0 1 3 7 3 4 6)           )
+;;; 
+;;; CANDO: (/ 256.0 7.92) = 32 words, lol
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+
 
 ;;; : % 'D @ 'A ! 'T @ 'D ! 'A @ 'D ! ;
 ;;; # 20
