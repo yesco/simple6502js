@@ -230,6 +230,11 @@ endframe:
 ;;; saved
 quitS:  .res 1
 
+;;; used  by _BRK routine
+aBRK:   .res 1
+xBRK:   .res 1
+pBRK:   .res 2
+
 .code
 
 ;;; ----------------------------------------
@@ -448,144 +453,97 @@ startaddr:
 
 jmptable:  
 
-_quit:  
 _reset:
 _initlisp:      
+_quit:  
         cld
         ldx #ff
         txs
         ldy #0
 
-        jmp running
-;;; TODO: fallthrough
+;;; 14 B
+_interactive:    
+        jsr rdloop
+        jmp retloop
+rdloop:   
+        putc '>'
+        jsr getchar
+        ;;  fallthrough
 
+;;; exec byte instruction in A
 _exec:  
         jmp interpret
 
-;;; (number of \)-1 stored in ipp(arams)
-_lambda:        
-;;; 11 B
-        jsr nexttoken
-        cmp #'\\'
-        bne ret
-        inc ipp
-        bne _lambda             ; always true
 
-;;; value to return is in TOP
-;;; if we had \\ parameters,
-;;; from ipx we need to pop ipp==1
-_return:
-;;; 8 B
-        lda ipx
-        clc
-        sbc ipp
-        sta sidx
-        rts
-
-_pushaddr:      
+pushregY:       
+;;; 14 B
         jsr push
-        lda ip
-        ldy ip+1
-;;; TODO: can one make a pushay?
-;;;    (but, "push" will clobber)
-setay:
-        sta tos
-        sty tos+1
-        rts
-
-_undef: 
-_error: 
-        ;; write .? - for undefined
-        ldy ipy
-        lda (ip),y
-        jsr putchar
-        putc '?'
-        jmp _quit
-
-;;; lit moves lo to hi in TOS and sets lo to next byte
-;;; tos= (tos<<8) + (char*)ip[y];
-;;; 
-;;; To load a
-;;;    LITERAL $beef
-;;; do:
-;;;    lit $be lit $ef
-;;; 
-;;; NOTE: to just load one char,may need to do
-;;; 
-;;;    'A == lit 0 lit 65
-;;; or
-;;;    0 lit 65
-
-;;; TODO: unclear what usage or what is good!
-
-nexttoken:      
-        inc ipy
-        ldy ipy
-        lda (ip),y
-        rts
-
-
-;;; 18 B
-
-;;; tos= t1
-_quote: 
-        jsr _zero
-        jsr nexttoken
-        sta tos
-        rts
-;;; tos= t2t1
-_literal:       
-        jsr _quote              ; lo
-        jsr nexttoken           ; 
-        sta tos+1               ; hi
-        rts
-
-
-;;; ----------------------------------------
-;;; memory
-
-
-;;; 3B !
-_cdr:   
-        ldy #2
-        ;; bit hack to skip 2 bytes
-        .byte $2c
-_car:    
-_load:      
-;;; 17 B
-        ldy #0
-cYr:    
-        lda (top),y
-        sta savea
-
-        iny
-        lda (top),y
-        sta top+1
-        lda savea
+        lda 0,y
         sta top
+        lda 1,y
+        sta top+1
+        rts
+        
+;;; Y.push - write down
+;;; Y.pop  - read up
 
+;;; ,      - *(top) = overpop; top+= 2
+
+
+;;; I guess , comma  is "push forward" = copy
+;;;         r,       
+
+
+;;; loads ptr1 from stack in address Y
+;;; 
+;;; C:        ptr1 = *(word)y
+;;; 
+;;; 11 B
+loadptr1fromY:  
+        lda 0,y
+        sta ptr1
+        lda 1,y
+        sta ptr1+1
         rts
 
-;;; comma
-;;; used to implement ! store
-
+;;; push on stack identified add ptr at Y
+pushatY:
 ;;; 17 B
-_comma:
-        jsr _ccomma
-_ccomma:
+        jsr loadptr1fromY
         ldy #0
-        lda stack,x
-        sta (top),y
-        inx
+        lda top
+        sta (ptr1),y
+        lda top+1
+        iny
+        sta (ptr1),y
+        
+        jmp pop
 
-.proc _inc
-        inc top
-        bne ret
-        inc top+1
-ret:    
+;;; push on stack identified add ptr at Y
+;;; 
+;;; C:      push( *ptr ); ptr += 2;p
+;;; 
+opatY:
+;;; 18
+        jsr loadptr1fromY
+
+        jsr push
+
+        ldy #0
+        lda top
+        sta (ptr1),y
+        lda top+1
+        iny
+        sta (ptr1),y
+
         rts
-.endproc
 
+
+
+;;; rcomma
+;;; 
+_rcomma:        
+        
 
 ;;; 19B
 _rcomma:        
@@ -606,14 +564,6 @@ ret:
         rts
 .endproc
 
-
-;;; 8 B
-_store: 
-        jsr comma
-
-pop2:   inx
-        inx
-        jmp pop
 
 ;;; memory
 ;;; ----------------------------------------
@@ -676,13 +626,12 @@ setzero:
         
 ;;; --------- MATH
 
-;;; 38B for _adc _and _eor _ora _sbc _pop
+;;; 41B for _adc _and _eor _ora _sbc _pop
 ;;; 
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
 ;;; X must contain stack pointer always
 ;;; 
-;;; using ...AX mode
 
 _plus:  
 _adc:  
@@ -726,7 +675,7 @@ _lda:
 ;;; 
 ;;; TODO: could be used for BIGNUMs!
 ;;; 
-;;; 18B
+;;; 17B
 mathop: 
         sty op
         ldy #0
@@ -973,11 +922,10 @@ _ret:
 ;;; TOS, X points to stack, always retained
 ;;; A and Y always free to use
 
-;;; math:      38   + - & | E dup - 6 op - 6.3 B/op !
+;;; math:      41   + - & | E drop - 6 op - 6.3 B/op !
+;;; NULL:      14   macro!: 0 U true
 ;;;   NOT: (null:      28   U 0 Lffff )
-;;; NULL:      14   macros: 0 U true
-;;;   - macro:   - 14 B !
-;;; mem:       64   D @ ,I r,J 2drop (+ 3 17 17 19 8) = 64
+;;; mem:       64   D @ ,I r,J 2drop (+ 3 16 18 19 8) = 64
 ;;; interpret: 36   X interpret
 ;;; io:        20   T O K   (+ 5 6 9)
 ;;; write:     12   W
@@ -989,7 +937,7 @@ _ret:
 ;;; STATS
 
 ;;;  math NULL mem exe io wrt lit if read \
-;;; (+ 38   28  64  36 20 12   25 17  54  19)
+;;; (+ 41   28  64  36 20 12   25 17  54  19)
 ;;; 
 ;;;                         = 313
 ;;; 
@@ -1181,6 +1129,10 @@ transtable:
 .endmacro
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
+
+;;; TODO: currently more "forthy" ALF
+;;;       than being "lisp" AL (AlphabeticalLisp)
+
         DO _store              ; !
         DO _undef              ; " - dup (MINT)
         DO _lit                ; # - lit?numberp?
@@ -1218,11 +1170,11 @@ transtable:
         DO _undef              ; ? - is atom? if?
         DO _load               ; @ car
         DO _undef              ; A - assoc/alloc
-        DO _undef              ; B - ZBRANCH memBer?
+        DO _zbranch            ; B - ZBRANCH memBer?
         DO _cons               ; C
         DO _cdr                ; D
         DO _eor                ; E
-        DO _undef              ; F - forth ext?
+        DO _undef              ; F - follow/iter/forth ext?
         DO _undef              ; G - 
         DO _undef              ; H - (h) append
         DO _inc                ; I
@@ -1230,10 +1182,10 @@ transtable:
         DO _getc               ; K
         DO _literal            ; L
         DO _undef              ; M - mapcar
-        DO _undef              ; N - number?nth?/not?/null?
+        DO _undef              ; N - number?nth?
         DO _putc               ; O
         DO _undef              ; P - print
-        DO _reset              ; Q - equal???
+        DO _undef              ; Q - equal
         DO _undef              ; R - recurse / register
         DO _undef              ; S - Sa setvar?
         DO _terpri             ; T
@@ -1250,7 +1202,7 @@ transtable:
         DO _drop               ; _ - drop (on the floor1)
         DO _undef              ; ` - find name
 
-        DO _shrl               ; { - : { "+ ; 
+        DO _shl                ; { - : { "+ ; 
         DO _ora                ; |
         DO _shr                ; }
         DO _undef              ; ~ - not
@@ -1374,29 +1326,6 @@ nodec:
         sta (lowcons),y
         rts
 .endif
-
-;;; execute byte code after JSR (or use BRK?)
-;;; - either routines exit by rts
-;;; - or ... jmp next
-;;; NOTE: to invoke use "jsr bytecode"
-;;;       BUT, it never returns thus no update
-;;;       to of PC needed, use CONT-CALLING, if need
-
-;;; TODO: remove, anything > CODEstart
-bytecode:       
-;;; 8B
-        pla                     ; lo
-        tay
-        pla                     ; hi
-        tax
-        tya
-        ;; address on stack (w jsr) points
-        ;; on last byte of jsr-instruction
-;;; TODO: use BRK to get here, no need inc?
-        jsr _inc
-        jsr printd
-        jmp _exec
-        
 
 ;;; 33B jsr-loop
 exec:   
