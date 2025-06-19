@@ -608,7 +608,10 @@ _getc:
 ;;; memory:   30    dup cdr car (+ 13 17)
 ;;; setcar:   45    , inc ! drop2 r, dec2 dec
 
-;;; (+ 6 14 30 45) = 95
+;;; TOTAL: 95 B    words: 12    avg 7.92 B/w
+;;; (/ (+ 6 14 30 45)                                    (+ 1.0 1 3 7)           )
+;;; 
+;;; (/ 256.0 32) = 8 B/w, lol
 
 _zbranch:        
 ;;; 17 B
