@@ -1170,18 +1170,18 @@ _ret:
 ;;; rdloop:   12  (5) _interactive
 ;;;   exec:   30      X
 ;;; lambda:    0 (19) ( \ ^ ; )
-;;; memory:   42      (cdr) @car "dup $wap
+;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
 ;;; tests:    17 (23) zbranch (null) (0 true?sym)
 ;;; math:     41  (9) + & (- |) E _drop shr
 
 ;;; ------ MINIMAL
-;;; TOTAL: 190 B    words: 17    avg: 11.3 B/op
+;;; TOTAL: 187 B    words: 18    avg: 10.4 B/op
 ;;; 
-;;; (+ 6 12 30 0 42 27 15 17 41)
-;;; (+ 1 1 1 3 3 2 1 5)
-;;; (/ 192.0 17)
+;;; (+ 6 12 30 0 39 27 15 17 41)
+;;; (+ 1  1  1 3  3  2  1  1  5)
+;;; (/ 187.0 18)
 
 ;;; TOTAL: 268 B    words: 31    avg 8.7 B/w
 ;;; 
