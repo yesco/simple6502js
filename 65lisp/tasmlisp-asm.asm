@@ -582,36 +582,31 @@ ret:
 
 ;;; memory
 ;;; ----------------------------------------
+;;; IO
+;;; (+ 5 6 9) = 20
 
 ;;; 5B : T #10 O ; # 4
 _terpri:
+;;; 5 B
         jsr push
         lda #10
         ;; fall-through
 _putc:  
+;;; 6 B
         jsr putchar
         jmp pop
 _getc:         
-;;; 9
+;;; 9 B
         jsr zero
         jsr getchar
         sta top
         rts
         
 
-;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
-;;; how we doing so far till here?
+;;; -----------------------------------
+;;; TESTS JMPS
 ;;; 
-;;; system:    6   _reset
-;;; rdloop:   14   _interactive
-;;;   exec:   <- to bew moved here ->
-;;; memory:   30    dup cdr car (+ 13 17)
-;;; setcar:   45    , inc ! drop2 r, dec2 dec
-
-;;; TOTAL: 95 B    words: 12    avg 7.92 B/w
-;;; (/ (+ 6 14 30 45)                                    (+ 1.0 1 3 7)           )
-;;; 
-;;; (/ 256.0 32) = 8 B/w, lol
+;;; (+ 17 8 9 6) = 42
 
 _zbranch:        
 ;;; 17 B
@@ -624,36 +619,49 @@ _zbranch:
         adc ipy
         sta ipy
         jmp pop
-;;; TODO: put befor pop?
 
 _null:
 ;;; 8 B
         lda tos,x
         ora tos+1,x
-        beq settrue
         bne setfalse
+        beq settrue
 
-;;; 11+10+7=28 hmmm
-;;; 10 B
-        lda tos,x
-        bne setzero
-        lda tos+1,x
-        bne setzero
-        jmp settrue
-
-_true:  
-        jsr push
-settrue:       
+settrue:        
+;;; 3 + 6 = 9 B
         lda #$ff
-bothset:
-        tay
-        jmp setay               ; save 1 byte!
-_zero:
-        jsr push
-setzero:       
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+setfalse:       
+;;; (6 B)
         lda #0
-        beq bothset
+        pha
+        jmp loadPOPA
+
+zero:   
+;;; 6 B
+        jsr push
+        jmp setfalse
         
+
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+;;; how we doing so far till here?
+;;; 
+;;; system:    6   _reset
+;;; rdloop:   14   _interactive
+;;;   exec:   <- to bew moved here ->
+;;; memory:   30    dup cdr car (+ 13 17)
+;;; setcar:   45    , inc ! drop2 r, dec2 dec
+;;; IO:       20    T O K
+;;; tests:    42    zbranch null 0 (true?sym)
+
+;;; TOTAL: 157 B    words: 19    avg 8.26 B/w
+;;; (/ (+ 6 14 30 45 20 42)                              (+ 1.0 1 3 7 3 4)           )
+;;; 
+;;; CANDO: (/ 256.0 8.26) = 30.9 words, lol
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+
+
 ;;; --------- MATH
 
 ;;; 41B for _adc _and _eor _ora _sbc _pop
