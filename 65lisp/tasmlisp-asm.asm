@@ -458,11 +458,25 @@ _initlisp:
 _quit:  
 ;;; 6 B
         cld
+
+        ;; cons ptr
+;        SET (TOPMEM-1)
+;        sta lowcons            
+;        stx lowcons+1
+        
+        ;; zero stuff
+;        lda #0
+
 ;;; set's both Data Stack, and R stack
 ;;; (are we skipping one byte at DS?)
         ldx #ff
         txs
         ldy #0
+
+;;; 3 B - don't count!
+ ;; (for now prints some info)
+        jsr _test
+        
 
 ;;; 14 B
 _interactive:    
@@ -471,11 +485,126 @@ _interactive:
 rdloop:   
         putc '>'
         jsr getchar
-        ;;  fallthrough
+
+.ifdef TRACE
+        jsr trace
+.endif ; TRACE
+
+        ;;  fallthrough to exec
 
 ;;; exec byte instruction in A
 _exec:  
-        jmp interpret
+        jmp interpret           ; jsr nexta ???
+
+;;; 33B jsr-loop
+exec:   
+        ldy #$ff
+        sty ipy
+loop:
+        jsr next
+        jmp loop
+
+;;; WARNING: Don't jmp next!!!
+;;; this isn't forth
+;;; TODO: still valid? lol
+next:   
+        jsr nexttoken
+        ;; at end of string
+        beq nret
+
+;;; TODO: enable
+;        sta token
+
+nexta:  
+        jsr translate
+
+.ifdef TRACE
+        PUTC 'o'
+        ldx #0
+        jsr printd
+
+        NEWLINE
+.endif
+
+        ;; if offset > codestart
+        ;;   then its time to interpret
+        cmp #(codestart-jmptable)
+        bcs interpret
+        ;; save in "jmp jmptable" low byte!
+        sta call+1
+        
+;;; ----------- SAVE MORE BYTeS -------------
+
+;;; TODO: 6 _routines jsr push first thing!
+;;;  (maybe A>xx can change this?)
+
+;;; TODO: a number of _routines LDY #0
+;;;    others LDA #0 (tya)
+;;; enable this.
+;;; 
+;;; LDY #0 - for all
+
+;;; TODO: fix, retain token A
+;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
+;;; 
+;;; A contains dispatch offset (should be char?)
+
+;;; NOTE: if _routines expect A+Y to be clear then
+;;;   some will break if they are called internally!
+;;;   maybe have some notation, if have name
+;;; 
+;;;   _foo_AYZ == optimized w AYZ
+;;;   foo      == safe!
+
+;;; X points to the data stack entry (don't modify)
+call:   jmp jmptable
+
+
+;;; 36B 72c - relative expensive (?)
+proc interpret
+
+enter:  
+        ;; save what we're calling
+;;; TODO: is is expected in A?
+;        sta savea 
+
+        ;; push current stack frame
+        ldy #(endframe-startframe)
+nxt1:   
+        lda ip-1.y ; x would be cheaper (3B now)
+        pha
+        dey
+        bne nxt1
+        
+        ;; this value is modified by \ and ^
+        ;; to pop parameters orderly!
+
+subr: 
+
+        ;; set new IP
+        lda savea
+        sta ip
+        lda #>jmptable
+        sta ip+1
+;;; TODO: can this be moved into exec?
+;;;   (maybe some problem with Ztail/Recurse?
+        lda #0
+        sta ipp
+
+        jsr exec
+        
+subrexit:
+        ;; pop to current stack frame
+        ldy #0
+nxt2:   
+        pla
+        sta ip,y
+        iny
+        cpy #(endframe-startframe)
+        bne nxt2
+
+        rts
+.endproc
 
 
 ;;; ----------------------------------------
@@ -807,24 +936,6 @@ _shr:
         ror top
         rts
 
-;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
-;;; how we doing so far till here?
-;;; 
-;;; system:    6   _reset
-;;; rdloop:   14   _interactive
-;;;   exec:   <- to bew moved here ->
-;;; memory:   42    cdr car dup swap
-;;; setcar:   45    , inc ! drop2 r, dec2 dec
-;;; IO:       20    T O K
-;;; tests:    42    zbranch null 0 (true?sym)
-;;; math:     50    + - & | E pop shr (7)
-
-;;; TOTAL: 219 B    words: 27    avg 8.11 B/w
-;;; (/ (+ 6  14 42 45 20 42 50)                              (+ 1.0  1  4  7  3  4  7)           )
-;;; 
-;;; CANDO: (/ 256.0 8.11) = 31 words, lol
-;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
-
 
 .ifdef MINIMAL
 
@@ -993,63 +1104,23 @@ _exit:
 _ret:    
         rts
 
-;;; quit exec dup drop 
-;;; cons car cdr null atom
-;;; zero true inc plus halve nand
-;;; putc getc
-;;; /17 = 127 ... 224
-;;;       161 ... 357 ;; car/cdr inline
-;;;       207     346 ;; inline all cons
-;;;      (- 346 207 64) = 75 for exec
-;;;       234     419 ;; complicatd exec
-;;;       256     455 ;; TRACE
-;;;       236     422 ;; MINIMAL
-;;;       256     473 ;; TRACE !MINIMAL
-;;;       254     463 ;; no RPUSH in exec,jsr nxttok
-;;;       226     476 ;; Quit that resets,nofix BUG!
-;;;       221     445 ;; TRACE prompt
-;;; crash after 29 '.'
-;;; not when using (before) these
-;;; changes - 362c974..06473df
-
-;;; tasmlisp: NEW GAME IN TOW
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
+;;; how we doing so far till here?
 ;;; 
-;;; TOS, X points to stack, always retained
-;;; A and Y always free to use
+;;; system:    6   _reset
+;;; rdloop:   14   _interactive
+;;;   exec:   <- to bew moved here ->
+;;; memory:   42    cdr car dup swap
+;;; setcar:   45    , inc ! drop2 r, dec2 dec
+;;; IO:       20    T O K
+;;; tests:    42    zbranch null 0 (true?sym)
+;;; math:     50    + - & | E pop shr (7)
 
-;;; math:      41   + - & | E drop - 6 op - 6.3 B/op !
-;;; NULL:      14   macro!: 0 U true
-;;;   NOT: (null:      28   U 0 Lffff )
-;;; mem:       64   D @ ,I r,J 2drop (+ 3 16 18 19 8) = 64
-;;; interpret: 36   X interpret
-;;; io:        20   T O K   (+ 5 6 9)
-;;; write:     12   W
-;;; lit:       25   Lbeef nextchar 'A
-;;; if:        17   zBranch
-;;; read:      54   brk_skps_rdatom R (+ 11 7 20 16) 
-;;; \ lambda:  19   \ ^
-
-;;; STATS
-
-;;;  math NULL mem exe io wrt lit if read \
-;;; (+ 41   28  64  36 20 12   25 17  54  19)
+;;; TOTAL: 219 B    words: 27    avg 8.11 B/w
+;;; (/ (+ 6  14 42 45 20 42 50)                              (+ 1.0  1  4  7  3  4  7)           )
 ;;; 
-;;;                         = 313
-;;; 
-;;; that's for almost an AL AlphabeticalLisp
-
-
-;;;                          + 57 byte sym NAMES
-;;;                         = 370
-;;; 
-;;;       (- 512 (+ 313 57)  ) 
-;;; 
-;;;             142 left for impl lisp!
-;;;                  using CODE, lol
-;;; 
-;;;    (- 143 66) === 77 (new names, see below)
-;;; 
-
+;;; CANDO: (/ 256.0 8.11) = 31 words, lol
+;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
 ;;; TODO: PRINT COND LAMBDA EQ
 ;;;   need EVAL APPLY ASSOC
@@ -1057,166 +1128,38 @@ _ret:
 
 ;;; T NIL ?QUOTE READ ?PRINT ?COND CONS CAR CDR
 ;;; ATOM ?LAMBDA ?EQ
-;;; 
-;;; TODO: PRINT COND LAMBDA EQ
 
-;;; 44 chars + 13 atoms (+ 44 13) = 57 minimal?
-
-;;; more symbols for all?
-;;; 
 ;;; AND + * & | ^ , KEY PUTC TERPRI NULL EVAL APPLY INC DEC DIV2 MUL2
 ;;; 
 ;;; -- 66 chars including spaces
 
-
-;;; TOO BIG!
-;;; - no space left for ???
-;;; P - print lisp
-;;; Y - read atom
-;;; R - read lisp
-;;; 
-
-;;; -- extras
-;;; V - x10 lol : V "{{+{ ; # 5
-;;; 1-9 -  read num
-
-
-
-;;; OLD
-;;; code outside...
-;;;
-;;; TOTAL 
-;;;    jmptable transl cons bytecode exec vars
-;;; (+ 234      64 4   57   8        33   22) = 422
-
-;;; ----------------------------------------
-;;; CODE
-;;; 
-;;; from here on, it's just strings that
-;;; will be interpreted as bytecode!
-
-codestart:      
-
-;;; what does cons do?
-;;; 
-;;;   *--lowcons =  *stack--  ; cdr
-;;;   *--lowcons =  *stack--  ; car
-
-_cons:  
-        
-;;; 14 B
-Sdec4:  
-        clc
-
-        lda lowcons
-        sbc #4
-        sta lowcons
-        
-        lda lowcons+1
-        sbc #0
-        sta lowcons
-        
-        rts
-
-;;; 20 B
-RsbcA:  
-        sta savea
-        stx savex
-        tya
-        tax
-
-        sec     
-
-        lda 0,y
-        sbc savea
-        sta 0,y
-
-        lda 1,y
-        sbc #0
-        sta 1,y
-
-        ldx savex
-        rts
-
-
-
-;;; mem: CDR CAR could just bytecopy from stack
-;;; 10B
-        ;; S2<C S2<C   # 3
-;;; "move value from S (over) pointed to by top"
-        ldy #lowcons
-        jsr Rpush
-
-        ;; 'D @ #4 - #4 >S   # 9
-        
-        ;; 'P@ #4 S2<M
-
-        lda #4
-        jsr addY
-
-;;; copy 4 bytes from stack to top
-;;; 15 B
-        ldy #0
-four:   jsr two
-two:    jsr one
-one:    
-        lda stack,x
-        dex
-        sta (top),y
-        iny
-        rts
-        
-
-;;; memcpy 4 bytes, lol
-;;; 14 B
-loop:   ldy #0
-        lda stack,x
-        dex
-        sta (top),y
-        iny
-        cmp #4
-        bcc loop
-        rts
-
-
-;;; TODO: not general
-_TCOMMA: 
-;;; 13 B
-        .byte "'L@JJ'L!,,__", 0
-;;; better: , and __ 
-        .byte "'L@J'L!,_", 0
-
-_CONS:
-;;; 6 B
-        DO _Lcomma
-        DO _Lcomma
-        .byte "'L@", 0
+codestart:
 
 
 ;;; NULL: 14 B
-_TRUE:  
+;_TRUE:  
 ;;; 4 B
-        .byte "L"
-        .word $ffff
-        .byte 0
-_ZERO:  
-;;; 4 B
-        .byte "L"
-        .word $0000
-        .byte 0
-_NULL:
-;;; 6 B
-        .byte "B",+2
-        .DO _true
-        .byte 0
-        .DO _zero
-        .byte 0
+;        .byte "L"
+;        .word $ffff
+;       .byte 0
 
-       
+;_ZERO:  
+;;;; 4 B
+;        .byte "L"
+;        .word $0000
+;        .byte 0
+
+;_NULL:
+;;; 6 B
+;        .byte "B",+2
+;        .DO _true
+;        .byte 0
+;        .DO _zero
+;        .byte 0
+
 endtable:       
 
 .assert (endtable-jmptable)<=256, error, "Table too big"
-
 
 transtable:     
 .macro DO name
@@ -1303,8 +1246,6 @@ transtable:
         DO _undef              ; ~ - not
 endtrans:       
 
-;;; 29 functions!
-
 .assert (*-transtable)=64+4, error, "Transtable not right size"
 
 ;;; ----------------------------------------
@@ -1312,57 +1253,9 @@ endtrans:
 ;;;                 (overflow)
 ;;; usercode
 
-;;; comes here from _initlisp
-running:        
-        ;; TODO: remove (3 bytes)
-        ;; (for now prints some info)
-
-        jsr _test
-        
-        ;; cons ptr
-        SET (TOPMEM-1)
-        sta lowcons
-        stx lowcons+1
-        
-        ;; zero stuff
-        lda #0
-
-        ;; AX = 0;
-        tax
-
-;;; TODO: eval read
-rdloop:   
-        jmp call1
-call1x: 
-;        RPUSH
-        pha
-
-.ifdef TRACE
-        putc 10
-        putc '>'
-.endif
-        jsr _getc
-
-.ifdef TRACE
-        jsr trace
-.endif ; TRACE
-
-        ;; exec one char
-        jsr nexta
-        jmp 
-        jmp rdloop
-;;; TODO: if _quit then "will" return to basic
-
-
-
-
-
-popret: 
-        RPOP
-        rts
-
 cons:
 
+;;; TODO: better as 
 .ifnblank
 ;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
 ;;; (+ 14 11 11) = 36
@@ -1408,115 +1301,6 @@ nodec:
         rts
 .endif
 
-;;; 33B jsr-loop
-exec:   
-        ldy #$ff
-        sty ipy
-loop:
-        jsr next
-        jmp loop
-
-;;; WARNING: Don't jmp next!!!
-;;; this isn't forth
-;;; TODO: still valid? lol
-next:   
-        jsr nexttoken
-        ;; at end of string
-        beq nret
-
-;;; TODO: enable
-;        sta token
-
-nexta:  
-        jsr translate
-
-.ifdef TRACE
-        PUTC 'o'
-        ldx #0
-        jsr printd
-
-        NEWLINE
-.endif
-
-        ;; if offset > codestart
-        ;;   then its time to interpret
-        cmp #(codestart-jmptable)
-        bcs interpret
-        ;; save in "jmp jmptable" low byte!
-        sta call+1
-        
-;;; ----------- SAVE MORE BYTeS -------------
-
-;;; TODO: 6 _routines jsr push first thing!
-;;;  (maybe A>xx can change this?)
-
-;;; TODO: a number of _routines LDY #0
-;;;    others LDA #0 (tya)
-;;; enable this.
-;;; 
-;;; LDY #0 - for all
-
-;;; TODO: fix, retain token A
-;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
-;;; 
-;;; A contains dispatch offset (should be char?)
-
-;;; NOTE: if _routines expect A+Y to be clear then
-;;;   some will break if they are called internally!
-;;;   maybe have some notation, if have name
-;;; 
-;;;   _foo_AYZ == optimized w AYZ
-;;;   foo      == safe!
-
-;;; X points to the data stack entry (don't modify)
-call:   jmp jmptable
-
-
-;;; 36B 72c - relative expensive (?)
-proc interpret
-
-enter:  
-        ;; save what we're calling
-;;; TODO: is is expected in A?
-;        sta savea 
-
-        ;; push current stack frame
-        ldy #(endframe-startframe)
-nxt1:   
-        lda ip-1.y ; x would be cheaper (3B now)
-        pha
-        dey
-        bne nxt1
-        
-        ;; this value is modified by \ and ^
-        ;; to pop parameters orderly!
-
-subr: 
-
-        ;; set new IP
-        lda savea
-        sta ip
-        lda #>jmptable
-        sta ip+1
-;;; TODO: can this be moved into exec?
-;;;   (maybe some problem with Ztail/Recurse?
-        lda #0
-        sta ipp
-
-        jsr exec
-        
-subrexit:
-        ;; pop to current stack frame
-        ldy #0
-nxt2:   
-        pla
-        sta ip,y
-        iny
-        cpy #(endframe-startframe)
-        bne nxt2
-
-        rts
-.endproc
 
 ;;; translate letter in A to effective offset
 ;;; of jmptable
@@ -1575,6 +1359,7 @@ other:
         ;; or above \127
         bcs next
 
+
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
 
@@ -1624,15 +1409,6 @@ endaddr:
         jsr bytecode
         .byte str,0
 .endmacro
-
-
-;;; 31B
-consz:  
-        CODE "'CAJJ'CS'CAS 'CAJJ'CS'CAS 'CA"
-;;; 13B
-        CODE "'C; 'C; 'CA"
-
-
 
 
 ;;; called in nexttoken w A0 token

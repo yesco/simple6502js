@@ -1,5 +1,99 @@
 ;;; cut-n-paste variants not used?
 
+_cons:  
+        
+;;; 14 B
+Sdec4:  
+        clc
+
+        lda lowcons
+        sbc #4
+        sta lowcons
+        
+        lda lowcons+1
+        sbc #0
+        sta lowcons
+        
+        rts
+
+;;; 20 B
+RsbcA:  
+        sta savea
+        stx savex
+        tya
+        tax
+
+        sec     
+
+        lda 0,y
+        sbc savea
+        sta 0,y
+
+        lda 1,y
+        sbc #0
+        sta 1,y
+
+        ldx savex
+        rts
+
+
+
+;;; mem: CDR CAR could just bytecopy from stack
+;;; 10B
+        ;; S2<C S2<C   # 3
+;;; "move value from S (over) pointed to by top"
+        ldy #lowcons
+        jsr Rpush
+
+        ;; 'D @ #4 - #4 >S   # 9
+        
+        ;; 'P@ #4 S2<M
+
+        lda #4
+        jsr addY
+
+;;; copy 4 bytes from stack to top
+;;; 15 B
+        ldy #0
+four:   jsr two
+two:    jsr one
+one:    
+        lda stack,x
+        dex
+        sta (top),y
+        iny
+        rts
+        
+
+;;; memcpy 4 bytes, lol
+;;; 14 B
+loop:   ldy #0
+        lda stack,x
+        dex
+        sta (top),y
+        iny
+        cmp #4
+        bcc loop
+        rts
+
+
+;;; TODO: not general
+_TCOMMA: 
+;;; 13 B
+        .byte "'L@JJ'L!,,__", 0
+;;; better: , and __ 
+        .byte "'L@J'L!,_", 0
+
+_CONS:
+;;; 6 B
+        DO _Lcomma
+        DO _Lcomma
+        .byte "'L@", 0
+
+
+
+
+
 _dup:   
 push:   
 ;;; 13 B
