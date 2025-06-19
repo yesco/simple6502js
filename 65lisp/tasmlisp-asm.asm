@@ -456,7 +456,9 @@ jmptable:
 _reset:
 _initlisp:      
 _quit:  
-;;; 6 B
+;;; (+ 6 14) = 20
+
+;;; (6 B)
         cld
 
         ;; cons ptr
@@ -473,17 +475,24 @@ _quit:
         txs
         ldy #0
 
-;;; 3 B - don't count!
+;;; (3 B) - don't count!
  ;; (for now prints some info)
         jsr _test
         
 
-;;; 14 B
+;;; (14 B)
 _interactive:    
+;;; this is so we alwAY get back here
+;;; (essentially, no need jsr exec and jmp)
+;;; (and this tail-calls into exec, same same!)
         jsr rdloop
         jmp retloop
 rdloop:   
+
+.ifndef MINIMAL
         putc '>'
+.endif ; MINIMAL
+
         jsr getchar
 
 .ifdef TRACE
@@ -493,10 +502,13 @@ rdloop:
         ;;  fallthrough to exec
 
 ;;; exec byte instruction in A
+;;; 
+;;; 
+;;; 30 B
 _exec:  
+        ;; sta ip... 
         jmp interpret           ; jsr nexta ???
 
-;;; 33B jsr-loop
 exec:   
         ldy #$ff
         sty ipy
@@ -508,6 +520,7 @@ loop:
 ;;; this isn't forth
 ;;; TODO: still valid? lol
 next:   
+;;; 
         jsr nexttoken
         ;; at end of string
         beq nret
@@ -560,8 +573,13 @@ nexta:
 call:   jmp jmptable
 
 
+;;; start interpreation at IP,Y
+;;; 
+;;; (+ 9 15 12) = 36
 ;;; 36B 72c - relative expensive (?)
 proc interpret
+
+;;; TODO: set IP,y?
 
 enter:  
         ;; save what we're calling
@@ -569,6 +587,7 @@ enter:
 ;        sta savea 
 
         ;; push current stack frame
+;;; 9
         ldy #(endframe-startframe)
 nxt1:   
         lda ip-1.y ; x would be cheaper (3B now)
@@ -580,7 +599,7 @@ nxt1:
         ;; to pop parameters orderly!
 
 subr: 
-
+;;; 15
         ;; set new IP
         lda savea
         sta ip
@@ -595,6 +614,7 @@ subr:
         
 subrexit:
         ;; pop to current stack frame
+;;; 12
         ldy #0
 nxt2:   
         pla
@@ -605,6 +625,32 @@ nxt2:
 
         rts
 .endproc
+
+
+;;; ----------------------------------------
+;;; lambda
+;;; 
+;;; 19 B \ ^ ;
+
+;;; (number of \)-1 stored in ipp(arams)
+_lambda:        
+;;; 11 B
+        jsr nexttoken
+        cmp #'\\'
+        bne ret
+        inc ipp
+        bne _lambda             ; always true
+
+;;; value to return is in TOP
+;;; if we had \\ parameters,
+;;; from ipx we need to pop ipp==1
+_exit:  
+;;; 8 B
+        lda ipx
+        clc
+        sbc ipp
+        sta sidx
+        rts
 
 
 ;;; ----------------------------------------
@@ -833,6 +879,8 @@ _zbranch:
         sta ipy
         jmp pop
 
+.ifndef MINIMAL
+
 _null:
 ;;; 8 B
         lda tos,x
@@ -856,6 +904,7 @@ zero:
         jsr push
         jmp setfalse
         
+.endif ; MINIMAL
 
 ;;; --------- MATH
 
@@ -886,16 +935,26 @@ _eor:
         ;; EOR stack,x
         lda #$5d
         bne mathop
+
+
+
+.ifndef MINIMAL
+
 _ora:
         ;; AND stack,x
         lda #$1d
         bne mathop
+
 
 _sbc:   
         ;; SBC stack,x
         sec
         ldy #$fd
         bne mathop
+
+.endif ; MINIMAL
+
+
 
 _sta:   
         ;; STA stack,x
@@ -1106,18 +1165,27 @@ _ret:
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 ;;; how we doing so far till here?
-;;; 
-;;; system:    6   _reset
-;;; rdloop:   14   _interactive
-;;;   exec:   <- to bew moved here ->
-;;; memory:   42    cdr car dup swap
-;;; setcar:   45    , inc ! drop2 r, dec2 dec
-;;; IO:       20    T O K
-;;; tests:    42    zbranch null 0 (true?sym)
-;;; math:     50    + - & | E pop shr (7)
+;;;        MINIMAL (lisp)
+;;; system:    6      _reset
+;;; rdloop:   12  (5) _interactive
+;;;   exec:   30      X
+;;; lambda:    0 (19) ( \ ^ ; )
+;;; memory:   42      (cdr) @car "dup $wap
+;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
+;;; IO:       15  (5) (T) O K
+;;; tests:    17 (23) zbranch (null) (0 true?sym)
+;;; math:     41  (9) + & (- |) E _drop shr
 
-;;; TOTAL: 219 B    words: 27    avg 8.11 B/w
-;;; (/ (+ 6  14 42 45 20 42 50)                              (+ 1.0  1  4  7  3  4  7)           )
+;;; ------ MINIMAL
+;;; TOTAL: 190 B    words: 17    avg: 11.3 B/op
+;;; 
+;;; (+ 6 12 30 0 42 27 15 17 41)
+;;; (+ 1 1 1 3 3 2 1 5)
+;;; (/ 192.0 17)
+
+;;; TOTAL: 268 B    words: 31    avg 8.7 B/w
+;;; 
+;;; (/ (+ 6  14 30 19 42 45 20 42 50)                        (+ 1.0  1  1  3  4  7  3  4  7)           )
 ;;; 
 ;;; CANDO: (/ 256.0 8.11) = 31 words, lol
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
@@ -1359,6 +1427,57 @@ other:
         ;; or above \127
         bcs next
 
+;;; uncompress
+;;; 
+
+;;; token in A, X is current read offset
+;;; (assuming compressed to < 256 bytes) lol
+
+;;; 44 B at least, not worth it?
+
+.ifnblank
+wr:     .word destination
+rd:     .word data
+
+unzip:  
+        ldx #0
+loop:   
+        lda rd,x
+unz:    
+        pla
+        bmi ref
+        ;; plain char
+        ldy #0
+        sta (wr),y
+        inc wr
+        bne noinc
+        inc wr
+noinc:  
+        inx
+        jmp unz
+ref:    
+        sta savea
+        txa
+
+        sec
+        sbc #1
+        pha
+        ;; push delayed call
+        ...
+
+        txa
+        clc
+        adc savea
+        tax
+load:   
+        lda rd,x
+        jmp unz
+        
+data:   
+
+destination:    
+.endif ; unzip
+        
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
@@ -1367,35 +1486,16 @@ other:
 ;;; LISP:
 
 .ifnblank
+
 .proc _isconSetC
         tay
         lsr
         tya
         rts                     ; C= 0 if Number!
 .endproc
+
 .endif
 
-
-
-.ifdef IO
-.proc getc
-        lda cunget
-        bne got
-        jsr getchar
-got:    
-        ldx #0
-        stx cunget
-        rts
-.endproc
-
-;;; 8B
-.proc skipspc
-        jsr getc
-        ;; < '(' is considered white space
-        cmp #'('-1
-        bcc skipspc
-        rts
-.endproc
 
 
 endaddr:
@@ -1460,6 +1560,7 @@ endaddr:
         RPOP
         rts
 .endproc
+
 
 
 ;;; ===============================================
