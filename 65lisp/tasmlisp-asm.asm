@@ -456,16 +456,18 @@ jmptable:
 _reset:
 _initlisp:      
 _quit:  
-;;; (+ 6 14) = 20
+;;; (+ 4 14) = 20
 
-;;; (6 B)
+;;; (4 B)
         cld
 
+.ifdef LISP
         ;; cons ptr
-;        SET (TOPMEM-1)
-;        sta lowcons            
-;        stx lowcons+1
-        
+        SET (TOPMEM-1)
+        sta lowcons            
+        stx lowcons+1
+.endif ; LISP        
+
         ;; zero stuff
 ;        lda #0
 
@@ -473,7 +475,6 @@ _quit:
 ;;; (are we skipping one byte at DS?)
         ldx #ff
         txs
-        ldy #0
 
 ;;; (3 B) - don't count!
  ;; (for now prints some info)
@@ -528,7 +529,7 @@ next:
 ;;; TODO: enable
 ;        sta token
 
-nexta:  
+nexta: 
 ;;; 12
         jsr translate
 
@@ -576,8 +577,8 @@ call:   jmp jmptable
 ;;; 
 ;;; start interpreation at IP,Y
 ;;; 
-;;; (+ 9 15 12) = 36
-;;; 36B 72c - relative expensive (?)
+;;; (+ 2 9 19 12) = 42
+;;; 42 B  72c ?update - relative expensive (?)
 proc interpret
 
 ;;; TODO: set IP,y?
@@ -636,12 +637,90 @@ nxt2:
         rts
 .endproc
 
+.ifnblank
+;;; TODO: 30 jsr so can save 11 bytes only...
+
+;;; MINIMAL:
+;;;   TODO: 25+ jsr so can save 15 B !!!
+
+
+
+;;; 6502 minimalist JSR (all in one page code!)
+;;; -------------------------------------------
+;;; A two byte JSR for calls within a page.
+;;; 
+;;; As it's 10 B
+;;; (and you need to install it: +10 B?)
+;;; 
+;;; You may need to have at least 20 calls!
+;;; to see any savings... LOL
+;;; 
+;;; PS: disable interrrupts SEI
+
+.macro uJSR addr
+        assert (addr-jmptable)<=256,error,"uJSR: too big"
+        .byte 0,(addr-jmptable)
+.endmacro
+
+_BRK:   
+;;; 10 B
+        pla                     ; lo
+        pha
+        tya
+        dey
+
+        ;; load token after BRK
+        lda $jmptable,y
+
+        jmp nexta
+
+_BRK:   
+;;; 19
+        pla                     ; lo
+        tya
+        dey
+        sty ptr3
+        ;; no care page boundary! (no underflow)
+        pla
+        sta ptr3+1
+        pha
+
+        tya                     ; restore lo
+        pha
+
+        ;; load token after BRK
+        ldy #0
+        lda (ptr3),0
+
+        ldx savex
+        jmp nexta
+
+;;; 22
+        stx savex
+
+        tsx
+        ldy 101,x               ; lo
+        dey
+        ;; no care page boundary! (no underflow)
+        sty ptr3
+        ldy 102,x               ; hi
+        sty ptr3+1
+
+        ;; load token after BRK
+        ldy #0
+        lda (ptr3),0
+
+        ldx savex
+        jmp nexta
+
+.endif ; MINIMAL _BRK
 
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
 ;;; 19 B \ ^ ;
 
+.ifndef MINIMAL
 ;;; (number of \)-1 stored in ipp(arams)
 _lambda:        
 ;;; 11 B
@@ -662,6 +741,7 @@ _exit:
         sta sidx
         rts
 
+.endif ; MINIMAL
 
 ;;; ----------------------------------------
 ;;; memory
@@ -713,11 +793,13 @@ loadPOPA:
 over:   
 ;;; 13 B
         jsr push                ; a a b
+
         dex
         dex                     ; a (a) b
         jsr _lda                ; b (a b)
         dex
         dex                     ; b (a) b
+
         dex
         dex                     ; b a b
         rts
@@ -732,6 +814,7 @@ push:
         ;; a | ? b c ..
         jsr _sta
         ;; a | (a) b c ..
+
         dex
         dex
         ;; a | a b c ..
@@ -796,30 +879,7 @@ ret:
         rts
 .endproc
 
-inc2:   
-        lda #2
-        ;; BIT-hack (skips next 2 bytes)
-        .byte $2c
-inc:    
-        lda #1
-;;; 10 B
-        clc
-        adc top
-        sta top
-        bcc noinc
-        inc top+1
-noinc:  
-        rts
-
-;;; 13 B ????
-        clc
-        adc 0,y
-        sta 0,y
-        bcc noinc
-        inc 1,y
-noinc:  
-        rts
-        
+ 
 
 _store: 
 ;;; 8 B
@@ -1175,9 +1235,9 @@ _ret:
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 ;;; how we doing so far till here?
-;;;        MINIMAL (lisp)
-;;; system:    6      _reset
-;;; rdloop:   12  (5) _interactive
+;;;        MINIMAL (lisp/non-minimal)
+;;; system:    4      _reset
+;;; rdloop:    9  (5) _interactive
 ;;;   exec:   30      X
 ;;;  enter:   42      enter subr exit
 ;;; lambda:    0 (19) ( \ ^ ; )
