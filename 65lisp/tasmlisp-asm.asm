@@ -222,8 +222,11 @@ startframe:
 
 ip:     .res 2                  ; code ptr
 ipy:    .res 1                  ; offset
+
+.ifndef MINIMAL
 ipx:    .res 1                  ; stack frame
 ipp:    .res 1                  ; n params
+.endif ; MININAL
 
 endframe:
 
@@ -636,6 +639,9 @@ enter:
 ;;; TODO: only push 2 values???
 ;;;   can we use a jsr?
 ;;;   let \lambda and ^ push the others!!!!
+;;; OR
+;;;   only enable when !MINIMAL
+;;;   for safety, otherwise CRASH real good!
 
         ;; push current stack frame
 ;;; 9
