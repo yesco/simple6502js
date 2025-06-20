@@ -486,15 +486,54 @@ _interactive:
 ;;; this is so we alwAY get back here
 ;;; (essentially, no need jsr exec and jmp)
 ;;; (and this tail-calls into exec, same same!)
-        jsr _rdloop
+        uJSR _rdloop
         jmp retloop
 _rdloop:   
+
+
+
+;;; 6502 minimalist JSR (all in one page code!)
+;;; -------------------------------------------
+;;; A two byte JSR for calls within a page.
+;;; 
+;;; As it's 8 B !
+;;; (and you need to install it: +10 B?)
+;;; 
+;;; You may need to have at least 18 calls!
+;;; to see any savings... LOL
+;;; 
+;;; PS: disable interrrupts SEI
+
+;;; enable to see if save any byte
+.ifblank
+
+.macro uJSR addr
+        jsr addr
+.endmacro
+
+.else
+
+.macro uJSR addr
+        assert addr,error,"uJSR: can't jsr 0"
+        assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .byte 0,(addr-jmptable-1)
+.endmacro
+
+_BRK:   
+;;; 8 B
+        pla                     ; lo
+        pha
+        tay
+        lda jmptable,y
+        bne callAoffset
+
+.endif ; _uJSR
 
 .ifndef MINIMAL
         putc '>'
 .endif ; MINIMAL
-
-        jsr _key
+        
+        uJSR _key
 
 .ifdef TRACE
         jsr trace
@@ -516,7 +555,7 @@ _exec:
         jmp nexta
 
 _nextloop:
-        jsr _next
+        uJSR _next
         jmp loop
 
 ;;; WARNING: Don't jmp next!!!
@@ -525,7 +564,7 @@ _nextloop:
 _next:   
 ;;; 5
         sta token
-        jsr _nexttoken
+        uJSR _nexttoken
         ;; at end of string
         beq ret
 
@@ -534,11 +573,12 @@ _next:
 
 _nexta: 
 ;;; 14
-        jsr _translate
+        jsr translate
 
 .ifdef TRACE
         PUTC 'o'
         ldx #0
+;;; TODO: no more AX!
         jsr printd
 
         NEWLINE
@@ -616,7 +656,7 @@ subr:
         ldy #$ff
         sty ipy
 
-        jsr _nextloop
+        uJSR _nextloop
         
 subrexit:
         ;; pop to current stack frame
@@ -648,35 +688,6 @@ _nexttoken:
 ;;;   TODO: 25+ jsr so can save 15 B !!!
 
 
-
-;;; 6502 minimalist JSR (all in one page code!)
-;;; -------------------------------------------
-;;; A two byte JSR for calls within a page.
-;;; 
-;;; As it's 8 B !
-;;; (and you need to install it: +10 B?)
-;;; 
-;;; You may need to have at least 18 calls!
-;;; to see any savings... LOL
-;;; 
-;;; PS: disable interrrupts SEI
-
-.macro uJSR addr
-        assert addr,error,"uJSR: can't jsr 0"
-        assert (addr-jmptable)<=256,error,"uJSR: target too far"
-        .byte 0,(addr-jmptable-1)
-.endmacro
-
-_BRK:   
-;;; 8 B
-        pla                     ; lo
-        pha
-        tay
-        lda jmptable,y
-        bne callAoffset
-
-.endif ; MINIMAL _BRK
-
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
@@ -686,7 +697,7 @@ _BRK:
 ;;; (number of \)-1 stored in ipp(arams)
 _lambda:        
 ;;; 11 B
-        jsr _nexttoken
+        uJSR _nexttoken
         cmp #'\\'
         bne ret
         inc ipp
@@ -723,7 +734,7 @@ _var:
         ldx savex
 
 ;;; 13
-        jsr push
+        uJSR push
         lda stack,y
         pha
         lda stack+1,y
@@ -733,9 +744,9 @@ _var:
 
 _binliteral:       
 ;;; 11 B
-        jsr _nexttoken
+        uJSR _nexttoken
         sta top
-        jsr _nexttoken
+        uJSR _nexttoken
         sta top+1
         rts
 
@@ -757,7 +768,7 @@ _number:
         dec ipy                 ; lol
 
 _numnext:       
-        jsr _nexttoken
+        uJSR _nexttoken
 _number:        
         sec
         sbc #'0'
@@ -766,15 +777,15 @@ _number:
         
         pha
 
-        jsr _mul10
+        uJSR _mul10
 
         ;; push digit
-        jsr _pushpla
+        uJSR _pushpla
 
         ;; finally add num
-        jsr _plus
+        uJSR _plus
 
-        jmp _numnext
+        uJSR _numnext
 
 ;;; just add a real mul (19 B for 16x8->16?)
 ;;; 38 B for 16x16->16 (?)
@@ -785,10 +796,10 @@ _number:
 ;;; 
 ;;; 12
 mul10: 
-        jsr _shl
-        jsr _dup
-        jsr _shl2
-        jmp _plus
+        uJSR _shl
+        uJSR _dup
+        uJSR _shl2
+        uJSR _plus
 
 .ifnblank
 ;;; NOT NEEDED
@@ -806,20 +817,20 @@ noinc:
 ;;; 'a
 _quote: 
 ;;; 6 B
-        jsr _getc
+        uJSR _nexttoken
         jmp _pusha
         
 ;;; _hexliteral: read exactly 4 hex-digit!
 _hexliteral:       
 ;;; 28
-        jsr _zero
+        uJSR _zero
 
         ;; do it 4 times with-out using register
-do4:    jsr do2
-do2:    jsr do
+do4:    uJSR do2
+do2:    uJSR do
 do:     
-        jsr _asl4
-        jsr _nexttoken
+        uJSR _asl4
+        uJSR _nexttoken
 
         ;; hex2bin
         cmp #'A'
@@ -834,8 +845,8 @@ digit:  and #$f
         rts
 
 ;;; 11
-_asl4:  jsr _asl2
-_asl2:  jsr _asl
+_asl4:  uJSR _asl2
+_asl2:  uJSR _asl
 _asl:   
         asl top
         rol top+1
@@ -905,11 +916,11 @@ loadPLAa:
 .ifnblank
 over:   
 ;;; 13 B
-        jsr push                ; a a b
+        uJSR push                ; a a b
 
         dex
         dex                     ; a (a) b
-        jsr _lda                ; b (a b)
+        uJSR _lda                ; b (a b)
         dex
         dex                     ; b (a) b
 
@@ -925,7 +936,7 @@ push:
         dex
         dex
         ;; a | ? b c ..
-        jsr _sta
+        uJSR _sta
         ;; a | (a) b c ..
 
         dex
@@ -942,7 +953,7 @@ swap:
         pha
         
         ;; a | b c ..
-        jsr _sta
+        uJSR _sta
         ;; stack = a
 
         ;; a | (a) c ..
@@ -976,7 +987,7 @@ swap:
 _comma:
 ;;; 12
         ldy #0
-        jsr _ccomma
+        uJSR _ccomma
 _ccomma:
         lda stack,x
         sta (top),y
@@ -996,7 +1007,7 @@ ret:
 
 _store: 
 ;;; 8 B
-        jsr _comma
+        uJSR _comma
 drop2:  
         dex
         dex
@@ -1004,12 +1015,12 @@ drop2:
 
 _rcomma:        
 ;;; 6+12 = 18
-        jsr dec2
-        jsr _comma
+        uJSR dec2
+        uJSR _comma
         ;; dec2 again, lol
 dec2:   
 ;;; (3+9 = 12)
-        jsr _dec
+        uJSR _dec
 
 .proc _dec
 ;;; (9 B)
@@ -1030,18 +1041,18 @@ ret:
 ;;; 5B : T #10 O ; # 4
 _terpri:
 ;;; 5 B
-        jsr push
+        uJSR push
         lda #10
         ;; fall-through
 _putc:  
 ;;; 6 B
-        jsr putchar
+        uJSR putchar
         jmp pop
 _key:   
 _getc:         
 ;;; 9 B
-        jsr zero
-        jsr getchar
+        uJSR zero
+        uJSR _getc
         sta top
         rts
         
@@ -1057,7 +1068,7 @@ _zbranch:
         ora tos+1,x
         bne pop
         ;; zero so branch relative
-        jsr nexttoken
+        uJSR _nexttoken
         clc
         adc ipy
         sta ipy
@@ -1091,12 +1102,12 @@ _settopPLA:
 _pushA: 
         pha
 _pushPLA:       
-        jsr push
+        uJSR push
         jmp loadPLAa
 
 zero:   
 ;;; 6 B
-        jsr push
+        uJSR push
         jmp setfalse
         
 .endif ; MINIMAL
@@ -1174,7 +1185,7 @@ mathop:
         sty op
         ldy #0
         
-        jsr genop
+        beq genop
         ;; - fallthrough for hibyte Y=1
 genop:  
         lda tos,y
@@ -1219,7 +1230,7 @@ _writez:
         ldy #0
         lda (top),y
         beq pop
-        jsr putchar
+        uJSR _putc
         iny
         bne _writez
 
@@ -1267,7 +1278,7 @@ proc _readatom
         
 white:
 ;;; 7 B
-        jsr getchar
+        uJSR _getc
 
         ;; skip leading white space (any < '(' - LOL)
         cmp #'('
@@ -1284,7 +1295,7 @@ readloop:
         ;; accept char
         sta (here),y
         iny
-        jsr getchar
+        uJSR _getc
         jmp readloop
 
 done:   
@@ -1302,7 +1313,7 @@ ret:
 ;;; 16B !!!! --- (still need to find/craate atom)
 ;;;              (but it's for compare w READ)
 .proc _read
-        jsr _atomread
+        uJSR _atomread
         bcs readlist
 
         ;; ATOM
@@ -1310,7 +1321,7 @@ parseatom:
 ;;; TODO: possibly empty string? not clear
 ;;;    maybe for ()  - TEST!
 
-        jsr findatom
+        uJSR findatom
 createatom:
         ...
 
@@ -1322,10 +1333,10 @@ readlist:
 
         ;; continuation tail, LOL
         ;; car
-        jsr read
+        uJSR read
 ;;; read sets Zero on '(' and Carry for '(' and ')'
         ;; cdr
-        jsr readlist
+        uJSR readlist
 
 ;;; TODO: different cons in town these days...
         jmp cons
@@ -1381,6 +1392,9 @@ _ret:
 ;;; (/ 377.0 37)
 ;;; 
 ;;; CANDO: (/ 512.0 10.2) = 50 words, lol
+
+;;; TODO: uJSR might save 30-50 bytes
+
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
 ;;; TODO: PRINT COND LAMBDA EQ
@@ -1769,6 +1783,7 @@ endaddr:
 ;;; testing data
 
 .macro CODE str
+;;; TODO: test...
         jsr bytecode
         .byte str,0
 .endmacro
