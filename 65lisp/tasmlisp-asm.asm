@@ -489,6 +489,11 @@ _quit:
         jsr _test
         
 
+.ifdef MINIMAL
+;;; TODO: 
+        jmp main
+.else
+
 ;;; (14 B)
 _interactive:    
 ;;; this is so we alwAY get back here
@@ -497,8 +502,6 @@ _interactive:
         uJSR _rdloop
         jmp retloop
 _rdloop:   
-
-.ifndef MINIMAL
         putc '>'
 .endif ; MINIMAL
         
@@ -509,6 +512,7 @@ _rdloop:
 .endif ; TRACE
 
         ;;  fallthrough to exec
+.endif MINIMAL
 
 ;;; exec byte instruction in A
 ;;; 
@@ -542,7 +546,9 @@ _next:
 
 _nexta: 
 ;;; 14
+.ifdef MINIMAL
         jsr translate
+.endif
 
 .ifdef TRACE
         PUTC 'o'
@@ -1468,9 +1474,10 @@ _ret:
 ;;; how we doing so far till here?
 ;;;        MINIMAL (lisp/non-minimal)
 ;;; system:    4      _reset
-;;; rdloop:    9  (5) _interactive
+;;; rdloop:    0 (14) (_interactive)
 ;;;   exec:   37      X
 ;;;  enter:   42      enter subr exit
+;;;  colon:    0 (56) : [wtf?]
 ;;; lambda:    0 (19) ( \ ^ ; a-h )
 ;;; literal:   6 (53) L (Hex 'a 1-9dec mul10)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
@@ -1478,21 +1485,29 @@ _ret:
 ;;; IO:       15  (5) (T) O K
 ;;; tests:    17 (23) zbranch (null) (0 true?sym)
 ;;; math:     41  (9) + & (- |) E _drop shr
+;;; transtable:0(102) (jsr translate, translate)
 
-;;; ------ MINIMAL
-;;; TOTAL: 242 B    words: 19    avg: 12.7 B/op
+;;; ------ MINIMAL (not interactive)
+;;; TOTAL: 298 B    words: 18    avg: 12.8 B/op
 ;;; 
-;;; (+ 6 12 37 42 0 6 39 27 15 17 41)
-;;; (+ 1  1  1  3 0 1  3  2  1  1  5)
-;;; (/ 242.0 19)
+;;; NOT COUNTING translate... hoping for compression?
+;;; (then can skip rdloop?)
+;;; 
+;;; (+ 6 37 42 6 39 27 15 17 41)
+;;; (+ 1  1  3 1  3  2  1  1  5)
+;;; (/ 230.0 18)
 
-;;; TOTAL: 377 B    words: 37    avg 10.2 B/w
+;;; ------- !MINIMAL + LISP & interactive!
+;;; TOTAL: 544 B    words: 38    avg 14.3 B/w
 ;;; 
-;;; (+ 242  5 19 53 3 18 5 23 9)
-;;; (+  19  1  3  4 1  3 2  2 2)
-;;; (/ 377.0 37)
+;;; (+ 242 14 56 19 53 3 18 5 23 9 102)
+;;; (+  19  1  1  3  4 1  3 2  2 2   0)
 ;;; 
-;;; CANDO: (/ 512.0 10.2) = 50 words, lol
+;;; OVERFLOW!!!!
+;;; 
+;;; (/ 544.0 38)    = 14.3       ; reality
+;;; 
+;;; CANDO: (/ 512.0 14.3) = 35 words, lol
 
 ;;; TODO: uJSR might save 30-50 bytes
 
@@ -1575,7 +1590,7 @@ transtable:
         DO _number             ; 7
         DO _number             ; 8
         DO _number             ; 9 
-        DO _undef              ; : - colon
+        DO _colon              ; :
         DO _exit               ; ;
         DO _undef              ; < -
         DO _undef              ; =   : = -U ; # 4
