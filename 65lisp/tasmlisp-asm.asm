@@ -96,6 +96,10 @@ MINIMAL=1
 START=$563
 ;START=$600
 
+;;; TOOD: test to put stack in ZP!
+;;;    might save a lot of code bytes!
+;;;    ...
+
 ;;; lisp data stack
 ;;; (needs to be full page)
 ;;; (page 4 free page on ORIC)
@@ -462,6 +466,7 @@ _quit:
 ;;; (+ 4 14) = 20
 
 ;;; (4 B)
+        ; sei 
         cld
 
 .ifdef LISP
@@ -492,50 +497,6 @@ _interactive:
         uJSR _rdloop
         jmp retloop
 _rdloop:   
-
-
-
-;;; 6502 minimalist JSR (all in one page code!)
-;;; -------------------------------------------
-;;; A two byte JSR for calls within a page.
-;;; 
-;;; As it's 8 B !
-;;; (and you need to install it: +10 B?)
-;;; 
-;;; You may need to have at least 18 calls!
-;;; to see any savings... LOL
-;;; 
-;;; PS: disable interrrupts SEI
-
-;;; enable to see if save any byte
-.ifblank
-
-.macro uJSR addr
-        jsr addr
-.endmacro
-
-.else
-
-.macro uJSR addr
-        ;; make sure read correct dispatch char!
-        assert (addr/256=*/256),error,"can only call within same page"
-        ;; we subtrace 1...
-        assert addr,error,"uJSR: can't jsr 0"
-        ;; yeah, limit 256 bytes
-        ;; (unless we go asl..., and .align 2)
-        assert (addr-jmptable)<=256,error,"uJSR: target too far"
-        .byte 0,(addr-jmptable-1)
-.endmacro
-
-_BRK:   
-;;; 8 B
-        pla                     ; lo
-        pha
-        tay
-        lda jmptable,y
-        bne callAoffset
-
-.endif ; _uJSR
 
 .ifndef MINIMAL
         putc '>'
@@ -624,6 +585,59 @@ call:   jmp jmptable
 ;;; 
 ;;;   _foo_AYZ == optimized w AYZ
 ;;;   foo      == safe!
+
+;;; ========================================
+;;; uJSR
+
+;;; 6502 minimalist JSR (all in one page code!)
+;;; -------------------------------------------
+;;; A two byte JSR for calls within a page.
+;;; 
+;;; As it's 8 B !
+;;; (and you need to install it: +10 B?)
+;;; 
+;;; You may need to have at least 18 calls!
+;;; to see any savings... LOL
+;;; 
+;;; PS: disable interrrupts SEI
+
+;;; enable to see if save any byte
+.ifblank
+
+.macro uJSR addr
+        jsr addr
+.endmacro
+
+.else
+
+.macro uJSR addr
+        ;; make sure read correct dispatch char!
+        assert (addr/256=*/256),error,"can only call within same page"
+        ;; we subtrace 1...
+        assert addr,error,"uJSR: can't jsr 0"
+        ;; yeah, limit 256 bytes
+        ;; (unless we go asl..., and .align 2)
+        assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .byte 0,(addr-jmptable-1)
+.endmacro
+
+_BRK:   
+;;; smallest so far!
+;;; 
+;;; 8 B
+        pla                     ; lo
+        pha
+        tay
+        lda jmptable,y
+        bne callAoffset
+
+.endif ; _uJSR
+
+;;; uJSR
+;;; ========================================
+
+
+
 
 ;;; subroutine call in A
 ;;; 
@@ -1130,9 +1144,11 @@ _key:
 _getc:         
 ;;; 9 B
         uJSR zero
+        ; cli
         uJSR _getc
-        sta top
-        rts
+	; sei
+        jmp _seta
+        
         
 
 ;;; -----------------------------------
@@ -1142,10 +1158,12 @@ _getc:
 
 _zbranch:        
 ;;; 17 B
-        lda tos,x
-        ora tos+1,x
+        lda tos
+        ora tos+1
         bne pop
         ;; zero so branch relative
+        ;; (TODO: if not compiled could encode
+        ;;  jmp at hibit, and/or some literals!)
         uJSR _nexttoken
         clc
         adc ipy
@@ -1169,11 +1187,16 @@ settrue:
 setfalse:       
 ;;; (6 B)
         lda #0
+
+
+;;; TODO: many variants, save any bytes?
+
+
 ;;; pushes A on the data stack
 _seta: 
         pha
 ;;; pushes a new value PLAd from hardware stack
-_settopPLA:
+_setPLA:
         lda #0
         jmp _loadPOPa
 
