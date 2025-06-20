@@ -524,6 +524,7 @@ _nextloop:
 ;;; TODO: still valid? lol
 _next:   
 ;;; 5
+        sta token
         jsr _nexttoken
         ;; at end of string
         beq ret
@@ -532,7 +533,7 @@ _next:
 ;        sta token
 
 _nexta: 
-;;; 12
+;;; 14
         jsr _translate
 
 .ifdef TRACE
@@ -550,7 +551,7 @@ callAoffset:
         bcs _interpret
 
         ;; save in "jmp jmptable" low byte!
-        sta call+1       
+        sta call+1
 call:   jmp jmptable
 
 ;;; ----------- SAVE MORE BYTeS -------------
@@ -636,6 +637,7 @@ _nexttoken:
         inc ipy
         ldy ipy
         lda (ip),y
+        sta token
         rts
 
 
@@ -703,9 +705,33 @@ _exit:
 
 .endif ; MINIMAL
 
+;;; a-h gives you parameter to current function
+_var:   
+;;; TODO: done twice for a-z and 0-9 ... save bytes?
+;;;  maybe keep token in A, or zp place?
+
+;;; 12+13 = 25
+        lda token
+
+        and #31
+        clc
+        adc ipx
+        tay
+
+;;;     
+        stx savex
+        ldx savex
+
+;;; 13
+        jsr push
+        lda stack,y
+        pha
+        lda stack+1,y
+        jmp loadPOPa
+        
 ;;; ----------------------------------------
 
-_literal:       
+_binliteral:       
 ;;; 11 B
         jsr _nexttoken
         sta top
@@ -728,13 +754,11 @@ _hexliteral = _undef
 ;;; means to load 42: 042 
 _number:
 ;;; 30 + 12 = 42 ; _number x10
-
-        ;; unget, lol
-        dec ipy
+        dec ipy                 ; lol
 
 _numnext:       
         jsr _nexttoken
-
+_number:        
         sec
         sbc #'0'
         cmp #10
@@ -745,7 +769,6 @@ _numnext:
         jsr _mul10
 
         ;; push digit
-        jsr push
         jsr _pushpla
 
         ;; finally add num
@@ -856,7 +879,7 @@ cYr:
         lda (top),y
 ;;; load TOP w (A, pla) (hi,lo)
 ;;; (useless?) kindof opposite 
-loadPOPA: 
+loadPLAa: 
 ;;; (6 B)
         sta top+1
         pla
@@ -1058,12 +1081,18 @@ setfalse:
 ;;; (6 B)
         lda #0
 ;;; pushes A on the data stack
-_pusha: 
+_seta: 
         pha
 ;;; pushes a new value PLAd from hardware stack
-_pushpla:
+_settopPLA:
         lda #0
         jmp _loadPOPa
+
+_pushA: 
+        pha
+_pushPLA:       
+        jsr push
+        jmp loadPLAa
 
 zero:   
 ;;; 6 B
@@ -1330,8 +1359,8 @@ _ret:
 ;;; rdloop:    9  (5) _interactive
 ;;;   exec:   37      X
 ;;;  enter:   42      enter subr exit
-;;; lambda:    0 (19) ( \ ^ ; )
-;;; literal:  11 (32) L (H)
+;;; lambda:    0 (19) ( \ ^ ; a-h )
+;;; literal:   6 (53) L (Hex 'a 1-9dec mul10)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
@@ -1339,18 +1368,19 @@ _ret:
 ;;; math:     41  (9) + & (- |) E _drop shr
 
 ;;; ------ MINIMAL
-;;; TOTAL: 247 B    words: 19    avg: 13.0 B/op
+;;; TOTAL: 242 B    words: 19    avg: 12.7 B/op
 ;;; 
-;;; (+ 6 12 37 42 0 11 39 27 15 17 41)
-;;; (+ 1  1  1  3 0  1  3  2  1  1  5)
-;;; (/ 247.0 19)
+;;; (+ 6 12 37 42 0 6 39 27 15 17 41)
+;;; (+ 1  1  1  3 0 1  3  2  1  1  5)
+;;; (/ 242.0 19)
 
-;;; TOTAL: 367 B    words: 33    avg 10.2 B/w
+;;; TOTAL: 377 B    words: 37    avg 10.2 B/w
 ;;; 
-;;; (+ 247  5 19 38 3 18 5 23 9)
-;;; (+  19  1  3  1 1  3 1  2 2)
+;;; (+ 242  5 19 53 3 18 5 23 9)
+;;; (+  19  1  3  4 1  3 2  2 2)
+;;; (/ 377.0 37)
 ;;; 
-;;; CANDO: (/ 256.0 9.7) = 31 words, lol
+;;; CANDO: (/ 512.0 10.2) = 50 words, lol
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
 ;;; TODO: PRINT COND LAMBDA EQ
@@ -1407,7 +1437,7 @@ transtable:
         DO _swap               ; $ - swap (MINT)
         DO _undef              ; % - over (MINT)
         DO _and                ; &
-        DO _quote              ; ' - quote BUT: drop (MINT)
+        DO _quote              ; '
         DO _undef              ; ( - if/loop 
         DO _undef              ; ) -
         DO _undef              ; * - mult
@@ -1587,6 +1617,20 @@ nodec:
         sta (lowcons),y
         rts
 .endif
+
+;;; translation cost:
+;;;   table: 64+4
+;;;   code: 34(+5 for vars)
+;;;   => (+ 64 4 34 5) = 107
+;;; 
+;;; or "unz"
+;;;   ztrans: 32 (minimal 19)
+;;;   code: 25  nums: 1 vars: 8
+;;;   => (+ 32 25 10 8) = 75
+;;; 
+;;; OR "compression"
+;;; 
+;;;   how good is compression of code+full (128) table?
 
 
 ;;; translate letter in A to effective offset
