@@ -1476,43 +1476,45 @@ _ret:
 ;;; system:    4      _reset
 ;;; rdloop:    0 (14) (_interactive)
 ;;;   exec:   37      X
-;;;  enter:   42      enter subr exit
-;;;  colon:    0 (56) : [wtf?]
+;;;  enter:   42      [enter subr exit = subr!]
+;;;  colon:    0 (56) (: [wtf?])
 ;;; lambda:    0 (19) ( \ ^ ; a-h )
 ;;; literal:   6 (53) L (Hex 'a 1-9dec mul10)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
-;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
+;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
 ;;; tests:    17 (23) zbranch (null) (0 true?sym)
 ;;; math:     41  (9) + & (- |) E _drop shr
 ;;; transtable:0(102) (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 298 B    words: 18    avg: 12.8 B/op
+;;; TOTAL: 230B    words: 18    avg: 12.8 B/op
 ;;; 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
+;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
+;;; 
 ;;; (+ 6 37 42 6 39 27 15 17 41)
-;;; (+ 1  1  3 1  3  2  1  1  5)
+;;; (+ 1  1  0 1  3  4  2  1  5)
 ;;; (/ 230.0 18)
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 544 B    words: 38    avg 14.3 B/w
+;;; TOTAL: 532 B    words: 38    avg 14.0 B/w
 ;;; 
 ;;; 102 is counting table overflow
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
 ;;; 
-;;; (+ 242 14 56 19 53 3 18 5 23 9 102)
+;;; (+ 230 14 56 19 53 3 18 5 23 9 102)
 ;;; (+  19  1  1  3  4 1  3 2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
-;;; (/ 544.0 38)    = 14.3       ; reality
+;;; (/ 532.0 38)    = 14.0       ; reality
 ;;; 
-;;; CANDO: (/ 512.0 14.3) = 35 words, lol
+;;; CANDO: (/ 512.0 14.0) = 36 words, lol
 
 ;;; TODO: uJSR might save 30-50 bytes
 
