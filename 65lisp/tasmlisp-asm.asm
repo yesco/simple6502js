@@ -311,7 +311,7 @@ notnl:
 ;;; 5B
 .macro putc c
         lda #(c)
-        jsr putchar
+        jsr _putc
 .endmacro
 
 subtract .set 0
@@ -486,15 +486,15 @@ _interactive:
 ;;; this is so we alwAY get back here
 ;;; (essentially, no need jsr exec and jmp)
 ;;; (and this tail-calls into exec, same same!)
-        jsr rdloop
+        jsr _rdloop
         jmp retloop
-rdloop:   
+_rdloop:   
 
 .ifndef MINIMAL
         putc '>'
 .endif ; MINIMAL
 
-        jsr getchar
+        jsr _key
 
 .ifdef TRACE
         jsr trace
@@ -513,25 +513,25 @@ _exec:
         lda top
         jmp nexta
 
-nextloop:
-        jsr next
+_nextloop:
+        jsr _next
         jmp loop
 
 ;;; WARNING: Don't jmp next!!!
 ;;; this isn't forth
 ;;; TODO: still valid? lol
-next:   
+_next:   
 ;;; 5
-        jsr nexttoken
+        jsr _nexttoken
         ;; at end of string
         beq ret
 
 ;;; TODO: enable
 ;        sta token
 
-nexta: 
+_nexta: 
 ;;; 12
-        jsr translate
+        jsr _translate
 
 .ifdef TRACE
         PUTC 'o'
@@ -541,13 +541,14 @@ nexta:
         NEWLINE
 .endif
 
+callAoffset:    
         ;; macro subtroutine?
         ;; (offset > codestart)
         cmp #(codestart-jmptable)
-        bcs interpret
+        bcs _interpret
 
         ;; save in "jmp jmptable" low byte!
-        sta call+1
+        sta call+1       
 call:   jmp jmptable
 
 ;;; ----------- SAVE MORE BYTeS -------------
@@ -579,7 +580,7 @@ call:   jmp jmptable
 ;;; 
 ;;; (+ 2 9 19 12) = 42
 ;;; 42 B  72c ?update - relative expensive (?)
-proc interpret
+proc _interpret
 
 ;;; TODO: set IP,y?
 
@@ -591,27 +592,18 @@ enter:
         ;; push current stack frame
 ;;; 9
         ldy #(endframe-startframe)
-nxt1:   
-        lda ip-1.y ; x would be cheaper (3B now)
+save:   
+        lda startframe-1.y
         pha
         dey
-        bne nxt1
+        bne save
         
-        ;; this value is modified by \ and ^
-        ;; to pop parameters orderly!
-
 subr: 
 ;;; 15
         ;; set new IP
+        ;; (only valid for one page code dispatch)
         lda savea
         sta ip
-
-;;; TODO: make it FIT!
-;;; (if <=256 then no need change hi addr!)
-.ifndef MINIMAL
-        lda #>jmptable
-        sta ip+1
-.endif 
 
 ;;; TODO: can this be moved into exec?
 ;;;   (maybe some problem with Ztail/Recurse?
@@ -621,21 +613,29 @@ subr:
         ldy #$ff
         sty ipy
 
-        jsr nextloop
+        jsr _nextloop
         
 subrexit:
         ;; pop to current stack frame
 ;;; 12
         ldy #0
-nxt2:   
+restore:   
         pla
-        sta ip,y
+        sta startframe,y
         iny
         cpy #(endframe-startframe)
-        bne nxt2
+        bne restore
 
         rts
 .endproc
+
+_nexttoken:      
+;;; 7 B
+        inc ipy
+        ldy ipy
+        lda (ip),y
+        rts
+
 
 .ifnblank
 ;;; TODO: 30 jsr so can save 11 bytes only...
@@ -669,46 +669,7 @@ _BRK:
         pha
         tay
         lda jmptable,y
-        bne execa
-
-_BRK:   
-;;; 19
-        pla                     ; lo
-        tya
-        dey
-        sty ptr3
-        ;; no care page boundary! (no underflow)
-        pla
-        sta ptr3+1
-        pha
-
-        tya                     ; restore lo
-        pha
-
-        ;; load token after BRK
-        ldy #0
-        lda (ptr3),0
-
-        ldx savex
-        jmp nexta
-
-;;; 22
-        stx savex
-
-        tsx
-        ldy 101,x               ; lo
-        dey
-        ;; no care page boundary! (no underflow)
-        sty ptr3
-        ldy 102,x               ; hi
-        sty ptr3+1
-
-        ;; load token after BRK
-        ldy #0
-        lda (ptr3),0
-
-        ldx savex
-        jmp nexta
+        bne callAoffset
 
 .endif ; MINIMAL _BRK
 
@@ -721,7 +682,7 @@ _BRK:
 ;;; (number of \)-1 stored in ipp(arams)
 _lambda:        
 ;;; 11 B
-        jsr nexttoken
+        jsr _nexttoken
         cmp #'\\'
         bne ret
         inc ipp
@@ -739,6 +700,118 @@ _exit:
         rts
 
 .endif ; MINIMAL
+
+;;; ----------------------------------------
+
+_literal:       
+;;; 11 B
+        jsr _nexttoken
+        sta top
+        jsr _nexttoken
+        sta top+1
+        rts
+
+;;; TODO: idea
+;;; 
+;;; 0: push zero
+;;; 1-9a-f: read while either got this char
+;;;   {{{{ ora sta ... loop
+
+.ifdef MINIMAL
+_hexliteral = _undef
+.esle
+
+;;; 0 pushes 0
+;;; 1-9 modifies by x10 + num
+;;; means to load 42: 042 
+_number:        
+;;; 30 + 12 = 42
+
+        ;; unget, lol
+        dec ipy
+
+_numnext:       
+        jsr _nexttoken
+
+        sec
+        sbc #'0'
+        cmp #10
+        bcs ret
+        
+        pha
+
+        jsr _mul10
+
+        ;; push digit
+        jsr push
+        lda #0
+        ;; this will pop
+        jsr _loadPOPA
+
+        ;; finally add num
+        jsr _plus
+
+        jmp _numnext
+
+;;; just add a real mul (19 B for 16x8->16?)
+;;; 38 B for 16x16->16 (?)
+mult10: 
+;;; 12
+        jsr _shl
+        jsr _dup
+        jsr _shl2
+        jmp _plus
+
+.ifnblank
+;;; NOT NEEDED
+_adda:  
+;;; 10 B
+        clc
+        adc top
+        sta top
+        bcc noinc
+        inc top+1
+noinc:  
+        rts
+.endif
+        
+
+;;; _hexliteral: read exactly 4 hex-digit!
+_hexliteral:       
+;;; (+ 32 11)  B :-(
+        jsr _setzero
+        sta savea
+        lda #4
+
+hlit:
+        jsr _asl4
+        jsr _nexttoken
+        sec
+        sbc #'0'
+        cmp #'9'+1
+        bcc digit
+        ;; a-f
+        sec
+        sbc #'A'-8+10
+digit:  
+        ora top
+        sta top
+        
+        dec savea
+        bne hlit
+
+        rts
+
+
+;;; 11
+_asl4:  jsr _asl2
+_asl2:  jsr _asl
+_asl:   
+        asl top
+        rol top+1
+        rts
+        
+.endif
 
 ;;; ----------------------------------------
 ;;; memory
@@ -921,6 +994,7 @@ _putc:
 ;;; 6 B
         jsr putchar
         jmp pop
+_key:   
 _getc:         
 ;;; 9 B
         jsr zero
@@ -1215,12 +1289,6 @@ _shl:
 .endif ; MINIMAL
 
 
-_number:        
-.ifdef NUMBERS
-        jsr bytecode
-        .byte 0
-.endif ; NUMBERS
-
 _exit:  
 ;;; TODO: fix?
         sta savea
@@ -1235,9 +1303,10 @@ _ret:
 ;;;        MINIMAL (lisp/non-minimal)
 ;;; system:    4      _reset
 ;;; rdloop:    9  (5) _interactive
-;;;   exec:   30      X
+;;;   exec:   37      X
 ;;;  enter:   42      enter subr exit
 ;;; lambda:    0 (19) ( \ ^ ; )
+;;; literal:  11 (32) L (H)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
@@ -1245,15 +1314,16 @@ _ret:
 ;;; math:     41  (9) + & (- |) E _drop shr
 
 ;;; ------ MINIMAL
-;;; TOTAL: 229 B    words: 18    avg: 12.7 B/op
+;;; TOTAL: 247 B    words: 19    avg: 13.0 B/op
 ;;; 
-;;; (+ 6 12 30 42 0 39 27 15 17 41)
-;;; (+ 1  1  1  0 3  3  2  1  1  5)
-;;; (/ 229.0 18)
+;;; (+ 6 12 37 42 0 11 39 27 15 17 41)
+;;; (+ 1  1  1  3 0  1  3  2  1  1  5)
+;;; (/ 247.0 19)
 
-;;; TOTAL: 308 B    words: 31    avg 9.9 B/w
+;;; TOTAL: 367 B    words: 33    avg 10.2 B/w
 ;;; 
-;;; (/ (+ 6  12 30 42 19 42 45 20 42 50)                     (+ 1.0  1  1  0  3  4  7  3  4  7)           )
+;;; (+ 247  5 19 38 3 18 5 23 9)
+;;; (+  19  1  3  1 1  3 1  2 2)
 ;;; 
 ;;; CANDO: (/ 256.0 9.7) = 31 words, lol
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
@@ -1270,7 +1340,6 @@ _ret:
 ;;; -- 66 chars including spaces
 
 codestart:
-
 
 ;;; NULL: 14 B
 ;_TRUE:  
@@ -1350,10 +1419,10 @@ transtable:
         DO _eor                ; E
         DO _undef              ; F - follow/iter/forth ext?
         DO _undef              ; G - 
-        DO _undef              ; H - (h) append
+        DO _hexliteral         ; H - (h) hexlit append
         DO _inc                ; I
         DO _dec                ; J
-        DO _getc               ; K
+        DO _key                ; K
         DO _literal            ; L
         DO _undef              ; M - mapcar
         DO _undef              ; N - number?nth?

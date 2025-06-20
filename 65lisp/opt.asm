@@ -1,5 +1,32 @@
 ;;; cut-n-paste variants not used?
 
+;;; 3 + 12 = 15
+inc2:   
+        lda #2
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+inc:    
+;;; 12 B
+        lda #1
+        clc
+        adc top
+        sta top
+        bcc noinc
+        inc top+1
+noinc:  
+        rts
+
+;;; 13 B ????
+        clc
+        adc 0,y
+        sta 0,y
+        bcc noinc
+        inc 1,y
+noinc:  
+        rts
+
+
+
 _cons:  
         
 ;;; 14 B
