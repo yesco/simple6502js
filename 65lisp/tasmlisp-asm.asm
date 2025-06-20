@@ -633,6 +633,10 @@ enter:
         ;; save what we're calling
         sta savea
 
+;;; TODO: only push 2 values???
+;;;   can we use a jsr?
+;;;   let \lambda and ^ push the others!!!!
+
         ;; push current stack frame
 ;;; 9
         ldy #(endframe-startframe)
@@ -871,7 +875,8 @@ _puthex:
 ;;; ----------------------------------------
 ;;; colon
 ;;; 
-;;; 56 B - barley worth it!!!
+;;; 56 B - barly worth it!!!
+;;; (milliforth: 59 B...)
 _colon:        
         uJSR _nexttoken
         ;; save alpha name of macro defined
@@ -914,13 +919,18 @@ secondpage:
 
         ;; skip to ; or \0
         ;; TODO: [] nesting?
+;;; TODO: having compiletime/runtime and making
+;;;   distinction of functions allows for maybe
+;;;   less code?
         sty secondfree
 findend:        
         uJSR _nexttoken
+        ;; no need copy, it's just there!
         beq colondone
         cmp #';'
         bne findend
 colondone:      
+
         jmp pop
 
 
