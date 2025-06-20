@@ -1500,6 +1500,11 @@ _ret:
 ;;; ------- !MINIMAL + LISP & interactive!
 ;;; TOTAL: 544 B    words: 38    avg 14.3 B/w
 ;;; 
+;;; 102 is counting table overflow
+;;;   need mapping to be interactive!
+;;; possibly lisp could be using internal coding
+;;; and then map names, but that still cost 55 B?
+;;; 
 ;;; (+ 242 14 56 19 53 3 18 5 23 9 102)
 ;;; (+  19  1  1  3  4 1  3 2  2 2   0)
 ;;; 
