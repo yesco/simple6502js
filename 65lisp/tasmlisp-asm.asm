@@ -869,6 +869,63 @@ _puthex:
 .endif
 
 ;;; ----------------------------------------
+;;; colon
+;;; 
+;;; 56 B - barley worth it!!!
+_colon:        
+        uJSR _nexttoken
+        ;; save alpha name of macro defined
+        pha
+
+        ;; save current ip+y of start of code
+        uJSR push
+        lda ip
+        clc
+        adc ipy
+        pha                     ; lo
+        lda ip+1
+        uJSR _loadPOPa          ; hmm more effic?
+
+;;; TODO: at end of first page can have forwarding
+;;;   offsets to funs in page2?
+;;; TODO: even aligned addresses? als of offset?
+        cmp #>'jmptable
+        bne secondpage
+        ;; does it fit in first page?
+firstpage:      
+        ;; save offset in translation table
+;;; TODO: assuming decompressed table!
+        pla
+        tay
+        lda top                 ; lo
+        sta transtable,y        ; save lo offset!
+        rts
+
+secondpage:     
+        ldy secondfree
+
+        pla
+        ;; store at end of second page
+        sta jmptable+256,y
+        dey
+        lda top
+        sta jmptable+256,y
+        dey
+
+        ;; skip to ; or \0
+        ;; TODO: [] nesting?
+        sty secondfree
+findend:        
+        uJSR _nexttoken
+        beq colondone
+        cmp #';'
+        bne findend
+colondone:      
+        jmp pop
+
+
+;;; colon
+;;; ----------------------------------------
 ;;; memory
 ;;; 
 ;;; (+ 17 8 17) = 42    cdr+car dup swap
