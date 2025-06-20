@@ -504,7 +504,9 @@ _rdloop:
 
 ;;; exec byte instruction in A
 ;;; 
-;;; 
+;;; references
+;;; - http://6502org.wikidot.com/software-token-threading
+;;; - 
 ;;; 30 B
 
 _exec:  
@@ -724,8 +726,8 @@ _hexliteral = _undef
 ;;; 0 pushes 0
 ;;; 1-9 modifies by x10 + num
 ;;; means to load 42: 042 
-_number:        
-;;; 30 + 12 = 42
+_number:
+;;; 30 + 12 = 42 ; _number x10
 
         ;; unget, lol
         dec ipy
@@ -744,9 +746,7 @@ _numnext:
 
         ;; push digit
         jsr push
-        lda #0
-        ;; this will pop
-        jsr _loadPOPA
+        jsr _pushpla
 
         ;; finally add num
         jsr _plus
@@ -755,8 +755,13 @@ _numnext:
 
 ;;; just add a real mul (19 B for 16x8->16?)
 ;;; 38 B for 16x16->16 (?)
-mult10: 
+;;; 
+;;; TODO: cheaper as macro!
+;;; 
+;;; : x {"{{+ ;   # 6
+;;; 
 ;;; 12
+mul10: 
         jsr _shl
         jsr _dup
         jsr _shl2
@@ -775,33 +780,35 @@ noinc:
         rts
 .endif
         
-
+;;; 'a
+_quote: 
+;;; 6 B
+        jsr _getc
+        jmp _pusha
+        
 ;;; _hexliteral: read exactly 4 hex-digit!
 _hexliteral:       
-;;; (+ 32 11)  B :-(
-        jsr _setzero
-        sta savea
-        lda #4
+;;; 28
+        jsr _zero
 
-hlit:
+        ;; do it 4 times with-out using register
+do4:    jsr do2
+do2:    jsr do
+do:     
         jsr _asl4
         jsr _nexttoken
-        sec
-        sbc #'0'
-        cmp #'9'+1
+
+        ;; hex2bin
+        cmp #'A'
         bcc digit
-        ;; a-f
-        sec
-        sbc #'A'-8+10
-digit:  
+        sbc #7                  ; carry set already
+digit:  and #$f
+
+        ;; merge into
         ora top
         sta top
-        
-        dec savea
-        bne hlit
 
         rts
-
 
 ;;; 11
 _asl4:  jsr _asl2
@@ -811,6 +818,19 @@ _asl:
         rol top+1
         rts
         
+;;; : h #15 & '0 + " '9 > B+3 6 + ; 17 B
+;;; 
+;;; 13 B
+_puthex:        
+        ;; 0-15 => '0'..'9','A'..'F'
+        ;; - from milliforth 6502
+        and #$0F
+        ora #$30
+        cmp #$3A
+        bcc @ends
+        adc #$06                ; carry set already
+        jmp _putc
+
 .endif
 
 ;;; ----------------------------------------
@@ -1037,8 +1057,13 @@ settrue:
 setfalse:       
 ;;; (6 B)
         lda #0
+;;; pushes A on the data stack
+_pusha: 
         pha
-        jmp loadPOPA
+;;; pushes a new value PLAd from hardware stack
+_pushpla:
+        lda #0
+        jmp _loadPOPa
 
 zero:   
 ;;; 6 B
@@ -1512,6 +1537,9 @@ transuns:
 ;;;                 (overflow)
 ;;; usercode
 
+;;; hash:
+;;; - http://forum.6502.org/viewtopic.php?f=9&t=8317
+;;; DJB2 is n*33+c on every character, or n+(n<<5)+c, so it is pretty fas
 cons:
 
 ;;; TODO: better as 
