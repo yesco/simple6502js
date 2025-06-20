@@ -517,8 +517,12 @@ _rdloop:
 .else
 
 .macro uJSR addr
+        ;; make sure read correct dispatch char!
         assert (addr/256=*/256),error,"can only call within same page"
+        ;; we subtrace 1...
         assert addr,error,"uJSR: can't jsr 0"
+        ;; yeah, limit 256 bytes
+        ;; (unless we go asl..., and .align 2)
         assert (addr-jmptable)<=256,error,"uJSR: target too far"
         .byte 0,(addr-jmptable-1)
 .endmacro
