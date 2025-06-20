@@ -1520,6 +1520,90 @@ _ret:
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
+;;; most common forth words (16):
+;;;   (LIT) (;) (THEN) (IF) @ " (TO) _ \0 0= $ + OVER ! (ELSE) __
+;;; 
+;;; - https://comp.lang.forth.narkive.com/pzlX5mdU/what-is-the-most-compact-ttc-scheme
+;;; 
+
+/*
+
+PermalinkTo give an idea of how byte tokens for
+primitives might be "compact enough". This is
+untested 65N02 code. You will see toward the end of
+the core engine why the return stack is X-index
+in the zero page.
+        
+        2DROP ; In initialisation, the three bytes starting at JV are loaded with JMP ;
+        ($PRIMTBL)
+
+        ;; PRIMTBL is 64 jump vectors,
+        ;;   so 64 primitives are available
+        
+        ;; IP is initalised at 0,
+        ;; probably in Warm Boot
+
+;;; good idea to make exit enter next..
+
+;;; (+ 8 14 21) = 43 next/exec enter call exit
+;;;
+;;; I have (+ 37 42) = 79!!!!
+
+;;; y is low byte of IP
+;;; 
+
+EXIT:   
+        DEX
+        DEX
+        LDY R,X                 ; saves 1B compared to
+        LDA R+1,X0              ; pla st? (3B)
+        STA IP+1
+        ;;  8B 15c
+NEXT:   
+        INY           ; assumes no bodyt modify Y....
+        BNE *+2
+        INC IP+1                ; keep Y=@(ip+1) !!!!
+ENTER0: 
+        LDA (IP),Y
+        BMI ENTER
+        STA JV+1        ; self-modify? JV where?
+        JMP JV
+        ;; 14B 23c, +4 on page crossing
+
+;;; A contains subr token (>=128)
+ENTER:  
+        ;; ip++
+        INY
+        BNE *+2
+        INC IP
+
+        ;; push IP
+        ;; upwards growth stack!
+        INX
+        INX 
+        STY R,X     ; store ipy (lo IP)
+        LDY IP+1   
+        STY R+1,X   ; store (hi IP)
+
+        ;; load new IP
+        STA IP+1    ; hi byte? curent subr token???
+        ;;                      ;
+        LDA (R,X)   ; lo byte? follow pointer at call site!
+
+        TAY
+        JMP ENTER0
+        ;; 21B 34 cycles, +4 on page crossing
+
+SRT is 11 clocks execution overhead per primitive,
+11 clocks ENTER/EXIT overhead for high level words.
+
+This is 23 cycles execution overhead per low level,
+roughly 2x, and 49 clocks ENTER/EXIT overhead,
+about 4.5x.
+
+*/
+
+
 ;;; TODO: PRINT COND LAMBDA EQ
 ;;;   need EVAL APPLY ASSOC
 
@@ -1833,7 +1917,8 @@ other:
 ;;; token in A, X is current read offset
 ;;; (assuming compressed to < 256 bytes) lol
 
-;;; 44 B at least, not worth it?
+;;; 44 B at least, not worth it!?
+;;; possibly better if include the "transtable"
 
 .ifnblank
 wr:     .word destination
