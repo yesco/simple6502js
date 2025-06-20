@@ -514,6 +514,7 @@ _rdloop:
 .else
 
 .macro uJSR addr
+        assert (addr/256=*/256),error,"can only call within same page"
         assert addr,error,"uJSR: can't jsr 0"
         assert (addr-jmptable)<=256,error,"uJSR: target too far"
         .byte 0,(addr-jmptable-1)
