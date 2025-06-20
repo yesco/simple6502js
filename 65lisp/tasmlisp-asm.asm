@@ -649,30 +649,27 @@ nxt2:
 ;;; -------------------------------------------
 ;;; A two byte JSR for calls within a page.
 ;;; 
-;;; As it's 10 B
+;;; As it's 8 B !
 ;;; (and you need to install it: +10 B?)
 ;;; 
-;;; You may need to have at least 20 calls!
+;;; You may need to have at least 18 calls!
 ;;; to see any savings... LOL
 ;;; 
 ;;; PS: disable interrrupts SEI
 
 .macro uJSR addr
-        assert (addr-jmptable)<=256,error,"uJSR: too big"
-        .byte 0,(addr-jmptable)
+        assert addr,error,"uJSR: can't jsr 0"
+        assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .byte 0,(addr-jmptable-1)
 .endmacro
 
 _BRK:   
-;;; 10 B
+;;; 8 B
         pla                     ; lo
         pha
-        tya
-        dey
-
-        ;; load token after BRK
-        lda $jmptable,y
-
-        jmp nexta
+        tay
+        lda jmptable,y
+        bne execa
 
 _BRK:   
 ;;; 19
