@@ -505,14 +505,14 @@ rdloop:
 ;;; 
 ;;; 
 ;;; 30 B
-_exec:  
-        ;; sta ip... 
-        jmp interpret           ; jsr nexta ???
 
-exec:   
-        ldy #$ff
-        sty ipy
-loop:
+_exec:  
+;;; 5
+        ;; only token
+        lda top
+        jmp nexta
+
+nextloop:
         jsr next
         jmp loop
 
@@ -520,15 +520,16 @@ loop:
 ;;; this isn't forth
 ;;; TODO: still valid? lol
 next:   
-;;; 
+;;; 5
         jsr nexttoken
         ;; at end of string
-        beq nret
+        beq ret
 
 ;;; TODO: enable
 ;        sta token
 
 nexta:  
+;;; 12
         jsr translate
 
 .ifdef TRACE
@@ -539,13 +540,15 @@ nexta:
         NEWLINE
 .endif
 
-        ;; if offset > codestart
-        ;;   then its time to interpret
+        ;; macro subtroutine?
+        ;; (offset > codestart)
         cmp #(codestart-jmptable)
         bcs interpret
+
         ;; save in "jmp jmptable" low byte!
         sta call+1
-        
+call:   jmp jmptable
+
 ;;; ----------- SAVE MORE BYTeS -------------
 
 ;;; TODO: 6 _routines jsr push first thing!
@@ -569,10 +572,8 @@ nexta:
 ;;;   _foo_AYZ == optimized w AYZ
 ;;;   foo      == safe!
 
-;;; X points to the data stack entry (don't modify)
-call:   jmp jmptable
-
-
+;;; subroutine call in A
+;;; 
 ;;; start interpreation at IP,Y
 ;;; 
 ;;; (+ 9 15 12) = 36
@@ -581,10 +582,10 @@ proc interpret
 
 ;;; TODO: set IP,y?
 
+;;; (+ 2 9 19 12) 
 enter:  
         ;; save what we're calling
-;;; TODO: is is expected in A?
-;        sta savea 
+        sta savea
 
         ;; push current stack frame
 ;;; 9
@@ -603,14 +604,23 @@ subr:
         ;; set new IP
         lda savea
         sta ip
+
+;;; TODO: make it FIT!
+;;; (if <=256 then no need change hi addr!)
+.ifndef MINIMAL
         lda #>jmptable
         sta ip+1
+.endif 
+
 ;;; TODO: can this be moved into exec?
 ;;;   (maybe some problem with Ztail/Recurse?
         lda #0
         sta ipp
 
-        jsr exec
+        ldy #$ff
+        sty ipy
+
+        jsr nextloop
         
 subrexit:
         ;; pop to current stack frame
@@ -1169,6 +1179,7 @@ _ret:
 ;;; system:    6      _reset
 ;;; rdloop:   12  (5) _interactive
 ;;;   exec:   30      X
+;;;  enter:   42      enter subr exit
 ;;; lambda:    0 (19) ( \ ^ ; )
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! [drop2] (r, dec2 J)
@@ -1177,17 +1188,17 @@ _ret:
 ;;; math:     41  (9) + & (- |) E _drop shr
 
 ;;; ------ MINIMAL
-;;; TOTAL: 187 B    words: 18    avg: 10.4 B/op
+;;; TOTAL: 229 B    words: 18    avg: 12.7 B/op
 ;;; 
-;;; (+ 6 12 30 0 39 27 15 17 41)
-;;; (+ 1  1  1 3  3  2  1  1  5)
-;;; (/ 187.0 18)
+;;; (+ 6 12 30 42 0 39 27 15 17 41)
+;;; (+ 1  1  1  0 3  3  2  1  1  5)
+;;; (/ 229.0 18)
 
-;;; TOTAL: 268 B    words: 31    avg 8.7 B/w
+;;; TOTAL: 308 B    words: 31    avg 9.9 B/w
 ;;; 
-;;; (/ (+ 6  14 30 19 42 45 20 42 50)                        (+ 1.0  1  1  3  4  7  3  4  7)           )
+;;; (/ (+ 6  12 30 42 19 42 45 20 42 50)                     (+ 1.0  1  1  0  3  4  7  3  4  7)           )
 ;;; 
-;;; CANDO: (/ 256.0 8.11) = 31 words, lol
+;;; CANDO: (/ 256.0 9.7) = 31 words, lol
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
 ;;; TODO: PRINT COND LAMBDA EQ
