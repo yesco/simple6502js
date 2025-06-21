@@ -465,9 +465,9 @@ subtract .set 0
 ;;; - https://github.com/mywave82/unlzexe/blob/master/unlzexe.c
 ;;; - https:github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Funpack.s
 ;;; 
-;;; 42 B for ASCII, (+ 13= 52 B if UNZBINARY)
+;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
 .proc unz
-x\;;; (+ 9 5 12 21) = 47 lol, is it correct now?
+;;; (+ 9 5 12 21) = 47 lol (+10= 57 B if UNZBINARY)
 
 ;;; 9 (if use rts)
         compresslen= (compressend-compresseddata)
@@ -510,16 +510,16 @@ noinc:
 minus:    
 
 .ifdef UNZBINARY
-;;; (13 B)
+;;; (10 B)
         ;; is a the quote char?
         cmp #$ff
         bne ref
 
         ;; read and store
-        lda adjusteddata,y
-        jsr store
-
         iny
+        lda adjusteddata,y
+        bmi store
+
 .endif ; UNZBINARY
 
 ref:    
