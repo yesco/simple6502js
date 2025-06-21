@@ -454,10 +454,21 @@ subtract .set 0
 ;;; We need to achieve a compression ratio
 ;;; of at least 18% for it to be worth it!
 ;;; 
-;;; 43 B (42 if use rts!!!)
+;;; Alternatives
+;;; - Haruhiko Okumura's lzss.c
+;;; - Fabrice Bellard's lzexe
+;;; - Markus Oberhumer's NRV series
+;;; - 6502 asm FilePack part of OSD
+;;; 
+;;; REF:
+;;; 
+;;; - https://github.com/mywave82/unlzexe/blob/master/unlzexe.c
+;;; - https:github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Funpack.s
+;;; 
+;;; 42 B for ASCII, (+ 10= 52 B if UNZBINARY)
 .proc unz
-compresslen= (compressend-compresseddata)
-starty= (256-compresslen)
+        compresslen= (compressend-compresseddata)
+        starty= (256-compresslen)
 
         ldy #starty
         ;;; top level keep track of when to stop
@@ -470,11 +481,14 @@ loop:
         
 doone:
         ;; Y is source read index
-compressadjusted= (compresseddata-starty)
+        compressadjusted= (compresseddata-starty)
 
 source: lda compresseddata,y
-        bmi ref
+        bmi ninus
+
+
         ;; plain char, store it
+dstoreit:       
 dest:   sta startaddr
         ;; inc inline ptr to destination
         inc dest+1
@@ -483,7 +497,24 @@ dest:   sta startaddr
 noinc:    
         rts
 
+
+minus:    
+
+.ifdef UNZBINARY
+;;; 10 B
+        ;; is a the quote char?
+        cmp #$ff
+        bne ref
+
+        ;; read and store
+        iny
+        lda compressedata,y
+
+        bmi storeit
+.endif ; UNZBINARY
+
 ref:    
+
         ;; at index A we got two chars to process
 
         ;; save current Y
