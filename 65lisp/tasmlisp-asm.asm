@@ -454,7 +454,7 @@ subtract .set 0
 ;;; We need to achieve a compression ratio
 ;;; of at least 18% for it to be worth it!
 ;;; 
-;;; 43 B
+;;; 43 B (42 if use rts!!!)
 .proc unz
 compresslen= (compressend-compresseddata)
 starty= (256-compresslen)
@@ -876,17 +876,14 @@ _var:
 ;;; TODO: done twice for a-z and 0-9 ... save bytes?
 ;;;  maybe keep token in A, or zp place?
 
-;;; 12+13 = 25
+;;; (+ 8 13) = 21
+;;; 8
         lda token
 
         and #31
         clc
         adc ipx
         tay
-
-;;;     
-        stx savex
-        ldx savex
 
 ;;; 13
         uJSR push
@@ -915,13 +912,33 @@ _binliteral:
 _hexliteral = _undef
 .esle
 
+_hash: 
+_zero:  
+
+;;; modifies existing number
+;;; first multiplies by 10 (or 16 if in hex!)
+;;; then adds current number 
+;;; 
+;;; (+ 18 12 11) = 41 B macro: (+ 18 6 7) = 31 !!!
+_number:        
+        jsr mul10
+        
+        ;; hex2bin (works for dec too!)
+        cmp #'a'
+        bcc digit
+        sbc #7                  ; carry set already
+digit:  and #$f
+
+        uJSR _pusha
+        jmp _plus
+
 ;;; 0 pushes 0
 ;;; 1-9 modifies by x10 + num
 ;;; means to load 42: 042 
 _number:
-;;; 30 + 12 = 42 ; _number x10
-        dec ipy                 ; lol
+;;; (+ 25 12 11) = 44 ; _number x10 shl24
 
+        dec ipy                 ; lol
 _numnext:       
         uJSR _nexttoken
 _number:        
@@ -939,8 +956,8 @@ _number:
 
         ;; finally add num
         uJSR _plus
-
-        uJSR _numnext
+        
+        jmp _numnext
 
 ;;; just add a real mul (19 B for 16x8->16?)
 ;;; 38 B for 16x16->16 (?)
@@ -954,7 +971,7 @@ mul10:
         uJSR _shl
         uJSR _dup
         uJSR _shl2
-        uJSR _plus
+        jmp _plus
 
 .ifnblank
 ;;; NOT NEEDED
@@ -988,9 +1005,9 @@ do:
         uJSR _nexttoken
 
         ;; hex2bin
-        cmp #'A'
+        cmp #'a'
         bcc digit
-        sbc #7                  ; carry set already
+        sbc #7+32               ; carry set already
 digit:  and #$f
 
         ;; merge into
@@ -1011,16 +1028,19 @@ _asl:
 ;;; 
 ;;; 13 B
 _puthex:        
-        ;; 0-15 => '0'..'9','A'..'F'
+        ;; 0-15 => '0'..'9','a'..'f'
         ;; - from milliforth 6502
         and #$0F
         ora #$30
         cmp #$3A
-        bcc @ends
-        adc #$06                ; carry set already
+        bcc done
+        adc #$06+32             ; carry set already
+done:   
         jmp _putc
 
 .endif
+
+
 
 ;;; ----------------------------------------
 ;;; colon
@@ -1572,6 +1592,9 @@ readlist:
         
 
 
+;;; 11 : {{{"+ ; # 6 -> shl shl2 shl3 shl4
+_shl4:  jsr _shl2
+_shl2:  jsr _shl
 _shl:   
 ;;; 5B (but technically not needed)
         asl top
@@ -1599,7 +1622,7 @@ _ret:
 ;;;  enter:   42      [enter subr exit = subr!]
 ;;;  colon:    0 (56) (: [wtf?])
 ;;; lambda:    0 (19) ( \ ^ ; a-h )
-;;; literal:   6 (53) L (Hex 'a 1-9dec mul10)
+;;; literal:  11 (37) L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
@@ -1608,27 +1631,28 @@ _ret:
 ;;; transtable:0(102) (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 230B    words: 18    avg: 12.8 B/op
+;;; TOTAL: 235B    words: 18    avg: 13.1 B/op
 ;;; 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 6 37 42 6 39 27 15 17 41)
-;;; (+ 1  1  0 1  3  4  2  1  5)
-;;; (/ 230.0 18)
+;;; (+ 6 37 42 11 39 27 15 17 41)
+;;; (+ 1  1  0  1  3  4  2  1  5)
+;;; (/ 235.0 18)   -> bytes per word
+;;; (/ 256.0 13.1) -> 19 words possible
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 532 B    words: 38    avg 14.0 B/w
+;;; TOTAL: 516 B    words: 41    avg 14.0 B/w
 ;;; 
 ;;; 102 is counting table overflow
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
 ;;; 
-;;; (+ 230 14 56 19 53 3 18 5 23 9 102)
-;;; (+  19  1  1  3  4 1  3 2  2 2   0)
+;;; (+ 230 14 56 19 37 3 18 5 23 9 102)
+;;; (+  19  1  1  3  7 1  3 2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
