@@ -465,9 +465,9 @@ subtract .set 0
 ;;; - https://github.com/mywave82/unlzexe/blob/master/unlzexe.c
 ;;; - https:github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Funpack.s
 ;;; 
-;;; 42 B for ASCII, (+ 10= 52 B if UNZBINARY)
+;;; 42 B for ASCII, (+ 13= 52 B if UNZBINARY)
 .proc unz
-;;; (+ 9 4 12 21) = 46
+x\;;; (+ 9 5 12 21) = 47 lol, is it correct now?
 
 ;;; 9 (if use rts)
         compresslen= (compressend-compresseddata)
@@ -487,18 +487,18 @@ loop:
 
 
 doone:
-;;; 4
+;;; 5
         ;; Y is source read index
-        compressadjusted= (compresseddata-starty)
+        adjusteddata= (compresseddata-starty)
 
-source: lda compressedadjusted,y
+source: lda adjusteddata,y
         bmi ninus
 
 
-        ;; plain char, store it
-dstoreit:       
-dest:   sta startaddr
+storeit:        
 ;;; 12
+        ;; plain char, store it
+dest:   sta startaddr
         ;; inc inline ptr to destination
         inc dest+1
         bne noinc
@@ -510,16 +510,16 @@ noinc:
 minus:    
 
 .ifdef UNZBINARY
-;;; (10 B)
+;;; (13 B)
         ;; is a the quote char?
         cmp #$ff
         bne ref
 
         ;; read and store
-        iny
-        lda compressedata,y
+        lda adjusteddata,y
+        jsr store
 
-        bmi storeit
+        iny
 .endif ; UNZBINARY
 
 ref:    
@@ -528,9 +528,9 @@ ref:
 
 ;;; TODO: maybe start w index in A?
 
-        ;; save current Y
+        ;; save A char and get curent index
         sta savea
-        tya 
+        tya
         pha
 
         ;; Y+= ref
@@ -550,7 +550,6 @@ ref:
         ;; restore Y
         pla
         tay
-        
         rts
 
 
