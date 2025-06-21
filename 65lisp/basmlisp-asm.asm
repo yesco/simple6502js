@@ -430,6 +430,20 @@ subtract .set 0
 .res 256 - (* .mod 256)-7
 .byte   "BEFORE>"
 
+;;; --- before any changes
+
+;;; > compress-file basmlisp.bin
+;;; LEN:   438
+;;; Z:     415
+
+;;; --- change _undef (c1) because so frequent
+;;; LEN:   438
+;;; Z:     399 -- saved 16 bytes more!
+;;;    --- totalonly 39 bytes...
+;;;        not even enough for decompress routine!
+
+
+
 ;;; we start program at "sector"
 startaddr:      
 
@@ -460,6 +474,30 @@ nexttoken:
 .endif
         ; == jmp retx0
         rts
+
+
+_undef: 
+_error: 
+;;; TODO: write something?
+        ldy ipy
+        lda (ip),y
+        jsr putchar
+        putc '?'
+_quit:
+        ;; basically restart at saved pos
+        ldx quitS
+        txs
+        jmp _initlisp
+
+_return:        
+;;; TODO: fix?
+        sta savea
+        pla
+        pla
+        lda savea
+_ret:    
+        rts
+
 
 ;;; TODO: so big, build as bytecode!
 _cons:
@@ -745,27 +783,6 @@ _number:
         .byte 0
 .endif ; NUMBERS
 
-_undef: 
-_error: 
-;;; TODO: write something?
-        ldy ipy
-        lda (ip),y
-        jsr putchar
-        putc '?'
-_quit:
-        ;; basically restart at saved pos
-        ldx quitS
-        txs
-        jmp _initlisp
-
-_return:        
-;;; TODO: fix?
-        sta savea
-        pla
-        pla
-        lda savea
-_ret:    
-        rts
 
 ;;; quit exec dup drop 
 ;;; cons car cdr null atom
