@@ -2,7 +2,21 @@
 ;;; 
 ;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
 
-;;; Second attempt - a minimal lispy byte-code intepreter
+;;; THIRD attempt - a minimal lispy byte-code intepreter
+
+;;;     asmlisp-asm.asm -- pure ASM - too big?
+;;;    basmlisp-asm.asm -- used AX as top of split-stack
+;;;      1. started using a byte-coded VM - AL
+;;;         Alphabetical Lisp
+;;; -> tasmlisp-asm.asm -- uses zp TOP and contig stack
+;;;      1. this allows some ops to be easier to do (?)
+;;;      2. total rewrite from scratch
+;;;      3. uJSR (micro-in-page 2 byte JSR!) save 53 bytes?
+;;;      4. experiement with compress map, decompress
+;;;      
+;;; 
+
+
 
 ;;; This is an attempt to write a pure assembly minimal
 ;;; lisp for 6502, similar to SectorLisp that was
@@ -97,8 +111,9 @@ START=$563
 ;START=$600
 
 ;;; TOOD: test to put stack in ZP!
-;;;    might save a lot of code bytes!
-;;;    ...
+;;;     might save a lot of code bytes!
+;;; NO: putting in page zero may save only 5 bytes
+;;;     when  LDA stack,x  ops becomes zp :-)
 
 ;;; lisp data stack
 ;;; (needs to be full page)
@@ -798,6 +813,10 @@ call:   jmp jmptable
 _BRK:   
 ;;; smallest so far!
 ;;; 
+;;; TODO: make sure uJSR isn't used to call with things
+;;;    expected to be retained in either A and Y !!!
+;;;    possibles are putchar, lol
+;;; 
 ;;; 8 B
         pla                     ; lo
         pha
@@ -875,6 +894,8 @@ restore:
         rts
 .endproc
 
+;;; next token from interpration
+;;; Returns A = token, also stored in zp: token
 _nexttoken:      
 ;;; 7 B
         inc ipy
@@ -924,20 +945,22 @@ _var:
 ;;; TODO: done twice for a-z and 0-9 ... save bytes?
 ;;;  maybe keep token in A, or zp place?
 
-;;; (+ 8 13) = 21
+;;; (+ 8 3 13) = 21
 ;;; 8
+        uJSR push
         lda token
 
+        ;; a-h --> 1--8
         and #31
         clc
         adc ipx
-        tay
 
 ;;; 13
-        uJSR push
-        lda stack,y
+        tay
+        ;; not 0 based so stack-1
+        lda stack-1,y
         pha
-        lda stack+1,y
+        lda stack-1+1,y
         jmp loadPOPa
         
 ;;; ----------------------------------------
@@ -977,7 +1000,7 @@ _number:
         sbc #7                  ; carry set already
 digit:  and #$f
 
-        uJSR _pusha
+        jsr _pusha              ; canNOT use uJSR
         jmp _plus
 
 ;;; 0 pushes 0
@@ -1093,21 +1116,22 @@ done:
 ;;; ----------------------------------------
 ;;; colon
 ;;; 
-;;; 56 B - barly worth it!!!
+;;; 56 B - barely worth it!!!
 ;;; (milliforth: 59 B...)
 _colon:        
+        uJSR push
+
         uJSR _nexttoken
         ;; save alpha name of macro defined
         pha
 
         ;; save current ip+y of start of code
-        uJSR push
         lda ip
         clc
         adc ipy
         pha                     ; lo
         lda ip+1
-        uJSR _loadPOPa          ; hmm more effic?
+        jsr _loadPOPa           ; canNOT uJSR
 
 ;;; TODO: at end of first page can have forwarding
 ;;;   offsets to funs in page2?
@@ -1273,7 +1297,7 @@ swap:
 _comma:
 ;;; 12
         ldy #0
-        uJSR _ccomma
+        jsr _ccomma             ; canNOT uJSR
 _ccomma:
         lda stack,x
         sta (top),y
@@ -1394,11 +1418,13 @@ _setPLA:
         lda #0
         jmp _loadPOPa
 
+
+;;; TODO: not clear if gonno work???
 _pushA: 
         pha
 _pushPLA:       
         uJSR push
-        jmp loadPLAa
+        jmp _seta
 
 zero:   
 ;;; 6 B
@@ -1525,7 +1551,7 @@ _writez:
         ldy #0
         lda (top),y
         beq pop
-        uJSR _putc
+        jsr _putc               ; canNOT uJSR
         iny
         bne _writez
 
@@ -1590,7 +1616,7 @@ readloop:
         ;; accept char
         sta (here),y
         iny
-        uJSR _getc
+        jsr _getc               ; canNOT uJSR
         jmp readloop
 
 done:   
@@ -1632,6 +1658,7 @@ readlist:
 ;;; read sets Zero on '(' and Carry for '(' and ')'
         ;; cdr
         uJSR readlist
+;;; TODO: are flags set for ')' ???
 
 ;;; TODO: different cons in town these days...
         jmp cons
@@ -1641,8 +1668,8 @@ readlist:
 
 
 ;;; 11 : {{{"+ ; # 6 -> shl shl2 shl3 shl4
-_shl4:  jsr _shl2
-_shl2:  jsr _shl
+_shl4:  uJSR _shl2
+_shl2:  uJSR _shl
 _shl:   
 ;;; 5B (but technically not needed)
         asl top

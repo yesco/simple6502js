@@ -26,6 +26,52 @@ int main(int argc, char** argv) {
 
   printf("LEN:\t%d\n", len);
 
+
+
+  // try find way to reduce hi-bits!
+  // 399 bytes compressed basmlisp.bin (438 bytes)
+  //
+  // Nothing obvious...
+  // and if there were we could only save 7x bytes...
+  if (0)
+  for(int i=0; i<len; ++i) {
+    char b= buff[i];
+
+    switch(4) {
+#define N 16
+    case 4: if ((b & (N-1))< (N/2)) b ^= 128; break;
+
+    case 3: // parity
+      b ^= (b ^ (b>>1) ^ (b>>2) ^ (b>>3)
+            ^ (b>>4) ^ (b>>5) ^ (b>>6))
+        ? 0 : 128;
+      break;
+      // => 398 (reverse: 423)
+    case 2: if (!(b& 64 )) b^= 1<<7; break;
+      // 1 => 410 429
+      // 2 => 423 405
+      // 4 => 414 417
+      // 8 => 402 431
+      // 16=> 415 422
+      // 32=> 409 422
+      // 64=> 404 427
+      //128=> 364 --- LOL
+    case 1: if (b& 128 ) b^= 1<<7; break;
+      // 1 => 410
+      // 2 => 423
+      // 4 => 414
+      // 8 => 402
+      // 16=> 415
+      // 32=> 409
+      // 64=> 404
+      //128=> 364 --- LOL
+    default: break;
+    }
+
+    buff[i]= b;
+  }
+
+
 //  Compressed* z= compress(buff, len);
   z= compress(buff, len);
   assert(z);

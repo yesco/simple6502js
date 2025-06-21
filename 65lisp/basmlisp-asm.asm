@@ -423,12 +423,19 @@ subtract .set 0
 ;_initlisp:      rts
 ;.end
 
+
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
+
 
 ;;; JMP table
 ;;; align on table boundary by padding
 .res 256 - (* .mod 256)-7
 .byte   "BEFORE>"
+
+
+;;; experiements done on basmlisp.bin
+;;; ( code extracted from .tap BEFORE> .. CODE <AFTER )
+;;; to see how well it compresses.
 
 ;;; --- before any changes
 
@@ -441,6 +448,64 @@ subtract .set 0
 ;;; Z:     399 -- saved 16 bytes more!
 ;;;    --- totalonly 39 bytes...
 ;;;        not even enough for decompress routine!
+
+;;; --- FULLMAP   removed translate code... (- 497 476)=24
+;;;         |            |        .--- removed 33 first B
+;;; LEN:  (497)   ....  476      443       373
+;;; Z:    (404)   ....  383      381 (-2)  353
+;;;                                         \__ NOMAP
+;;;         9%          20%      14%
+;;;                      |
+;;;                      |
+;;;                    winner - simplifies code!
+;;; 
+;;;    --- compression saves (- 497 383) == 114 B
+;;;        => [cheaper than memset?]
+;;; 
+;;;  BUT: decompression takes ~70 Bytes extra during load...
+
+;;; (- 476 373) = 103 ... size of map -30B trans code
+;;; (- 383 353) =  30 ... cost of 64+4 byte map!
+;;; 
+;;; (- 512 70  383) = 59 ... bytes left
+;;;   2sec unz zompressed
+;;; 
+;;; ALT: compressed map + init code for 19 ops == 5x bytes
+;;;      (see tasmlisp-asm.asm)
+
+;;; if we remove hibit &127 => 364 B (- 438 364)= 74 B
+;;; only 74 B savings if compressed...
+
+
+;; what tokens are most common basmlisp.tap-full
+;;
+;;   $ xxd -p -c1 basmlisp.bin-full | sort | uniq -c | sort -n > fil2
+/*
+     94 12      - _undef
+     24 20      - JSR          24 times   a
+     21 06      - first page   21 times b     a = b (almost)
+     20 07      - second page  20 times b
+     17 4c      - JMP          17 times   a
+     16 60      - RTS
+     13 00	- BRK, or filler? LD? #0
+     11 68      - PLA
+     10 da      - ... offset routine
+     10 a9      - LDA #xx
+      9 d0      - BME
+      9 aa      - TAX
+      8 a0      - LDY #xx
+      8 80      - ... offset (or hibit mask?)
+      7 91      - STA ind,y
+      7 8e      - STX abs .... TODO: why not ZP?
+      6 90      - BCC
+      6 8a      - TXA
+      6 86      - STX zp
+      5 bc      - LDY abs,x
+      5 a4      - LDY zp
+      5 a2      - LDX #xx
+      5 7a      - NOP ... TODO: probably not, lol
+*/
+
 
 
 
@@ -825,6 +890,17 @@ transtable:
 .endmacro
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
+
+;;; experiments to see cost
+;FULLMAP=1
+;
+NOMAP=1
+
+.ifndef NOMAP
+
+.ifdef FULLMAP
+;.res 33, _undef-jmptable
+.endif
         DO _storebyte          ; ! - store byte
         DO _undef              ; " - string
         DO _undef              ; # - numberp?
@@ -894,15 +970,27 @@ transtable:
         DO _undef              ; _ - drop? negate (?)
         DO _undef              ; ` - find name
 
+.ifdef FULLMAP
+.res 'z'-'a'+1, _undef-jmptable
+.endif
+
         DO _shl                ; {
         DO _ora                ; |
         DO _shr                ; }
         DO _undef              ; ~ - not
+
+.endif ; NOMAP
+
 endtrans:       
 
 ;;; 24 functions!
 
+.ifndef FULLMAP
+;;; TODO: fullmap?
+.ifndef NOMAP
 .assert (*-transtable)=64+4, error, "Transtable not right size"
+.endif
+.endif
 
 ;;; ----------------------------------------
 ;;;              U S E R C O D E
@@ -1072,8 +1160,12 @@ nexta:
         sbc #33                 ; spc is excluded
 ;;; 4 ? set at table
         cmp #64+4+1
+
 ;;; TODO: enable local vars etc
-;        bcs over64
+.ifndef FULLMAP
+        bcs over64
+.endif 
+
 ;;; TODO: not correct for one char exec
 ;;;    todo fix by simple 2 byte buffer?
         bcs popret                ; skip for now
@@ -1105,6 +1197,7 @@ call:   jmp jmptable
 
 
 
+.ifndef FULLMAP
 ;;; 22B
 over64: 
         ;; local variable?
@@ -1115,7 +1208,7 @@ over64:
         adc sidx                ; change
         lda lostack-33,y 
         ldx histack-33,y
-nret:   rts
+        rts
 
 other:  
         ;; we want to fold in > {|}~ <
@@ -1127,6 +1220,11 @@ other:
         ;; rest was <= ' ' (wrapped around)
         ;; or above \127
         bcs nextpushed
+
+.endif ; FULLMAP
+
+;;; useless
+nret:  rts
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
