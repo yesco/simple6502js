@@ -467,7 +467,8 @@ subtract .set 0
 ;;; 
 ;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
 .proc unz
-;;; (+ 9 5 12 21) = 47 lol (+10= 57 B if UNZBINARY)
+;;; (+ 9 5 12 18) = 44 lol (+10= 54 B if UNZBINARY)
+
 
 ;;; 9 (if use rts)
         compresslen= (compressend-compresseddata)
@@ -523,7 +524,7 @@ minus:
 .endif ; UNZBINARY
 
 ref:    
-;;; 21
+;;; 18
         ;; at index A we got two chars to process
 
 ;;; TODO: maybe start w index in A?
@@ -536,14 +537,10 @@ ref:
         ;; Y+= ref
         clc
         adc savea
-        pha
         tay
 
         ;; process two chars (recursivly)
         jsr doone
-
-        pla
-        tay
         iny
         jsr doone
         
@@ -551,7 +548,6 @@ ref:
         pla
         tay
         rts
-
 
 ;;; Everything after the unz is compressed data!
 compresseddata: 
