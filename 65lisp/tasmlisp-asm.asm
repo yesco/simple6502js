@@ -664,10 +664,16 @@ _next:
 ;;; TODO: enable
 ;        sta token
 
+
 _nexta: 
-;;; 14
+;;; 14 (5 + trans)
+
 .ifdef MINIMAL
+        ;; no trans for >= 128 (already offset)
+        bmi notrans
         jsr translate
+notrans:
+
 .endif
 
 .ifdef TRACE
