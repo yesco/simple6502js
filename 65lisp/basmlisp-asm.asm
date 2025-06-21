@@ -427,7 +427,8 @@ subtract .set 0
 
 ;;; JMP table
 ;;; align on table boundary by padding
-.res 256 - * .mod 256
+.res 256 - (* .mod 256)-7
+.byte   "BEFORE>"
 
 ;;; we start program at "sector"
 startaddr:      
@@ -1174,6 +1175,8 @@ got:
 
 
 endaddr:
+.byte   "<AFTER"
+
 
 ;;; end usercode
 ;;; ========================================
