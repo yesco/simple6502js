@@ -467,6 +467,9 @@ subtract .set 0
 ;;; 
 ;;; 42 B for ASCII, (+ 10= 52 B if UNZBINARY)
 .proc unz
+;;; (+ 9 4 12 21) = 46
+
+;;; 9 (if use rts)
         compresslen= (compressend-compresseddata)
         starty= (256-compresslen)
 
@@ -477,19 +480,25 @@ loop:
         iny
         bne loop
         ;; done
+        ; rts
+        ;; (non library optimization)
         beq startaddr
         
+
+
 doone:
+;;; 4
         ;; Y is source read index
         compressadjusted= (compresseddata-starty)
 
-source: lda compresseddata,y
+source: lda compressedadjusted,y
         bmi ninus
 
 
         ;; plain char, store it
 dstoreit:       
 dest:   sta startaddr
+;;; 12
         ;; inc inline ptr to destination
         inc dest+1
         bne noinc
@@ -501,7 +510,7 @@ noinc:
 minus:    
 
 .ifdef UNZBINARY
-;;; 10 B
+;;; (10 B)
         ;; is a the quote char?
         cmp #$ff
         bne ref
@@ -514,8 +523,10 @@ minus:
 .endif ; UNZBINARY
 
 ref:    
-
+;;; 21
         ;; at index A we got two chars to process
+
+;;; TODO: maybe start w index in A?
 
         ;; save current Y
         sta savea
@@ -525,9 +536,14 @@ ref:
         ;; Y+= ref
         clc
         adc savea
+        pha
+        tay
 
         ;; process two chars (recursivly)
         jsr doone
+
+        pla
+        tay
         iny
         jsr doone
         
