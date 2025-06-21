@@ -438,6 +438,128 @@ subtract .set 0
 
 
 
+
+
+.ifdef COMPRESSED
+
+;;; unzip - decompressor for one pae
+;;; 
+;;; (- 1 (/ (- 256 43) 256.0)) = 17%
+;;; 
+;;; Alas the compressed data is 213 BYTES!
+;;; 
+;;; (can max be 256, without change)
+;;; (would have to inc source+1 +8 bytes)
+;;; 
+;;; We need to achieve a compression ratio
+;;; of at least 18% for it to be worth it!
+;;; 
+;;; 43 B
+.proc unz
+compresslen= (compressend-compresseddata)
+starty= (256-compresslen)
+
+        ldy #starty
+        ;;; top level keep track of when to stop
+loop:   
+        jsr doone
+        iny
+        bne loop
+        ;; done
+        beq startaddr
+        
+doone:
+        ;; Y is source read index
+compressadjusted= (compresseddata-starty)
+
+source: lda compresseddata,y
+        bmi ref
+        ;; plain char, store it
+dest:   sta startaddr
+        ;; inc inline ptr to destination
+        inc dest+1
+        bne noinc
+        inc dest+2
+noinc:    
+        rts
+
+ref:    
+        ;; at index A we got two chars to process
+
+        ;; save current Y
+        sta savea
+        tya 
+        pha
+
+        ;; Y+= ref
+        clc
+        adc savea
+
+        ;; process two chars (recursivly)
+        jsr doone
+        iny
+        jsr doone
+        
+        ;; restore Y
+        pla
+        tay
+        
+        rts
+
+
+;;; Everything after the unz is compressed data!
+compresseddata: 
+
+;;; TODO: put compressed bytes here!
+
+compressend:    
+
+
+
+unzip:  
+        ldx #0
+loop:   
+        lda rd,x
+unz:    
+        pla
+        bmi ref
+        ;; plain char
+        ldy #0
+        sta (wr),y
+        inc wr
+        bne noinc
+        inc wr
+noinc:  
+        inx
+        jmp unz
+ref:    
+        sta savea
+        txa
+
+        sec
+        sbc #1
+        pha
+        ;; push delayed call
+        ...
+
+        txa
+        clc
+        adc savea
+        tax
+load:   
+        lda rd,x
+        jmp unz
+        
+data:   
+
+destination:    
+.endif ; unzip
+
+.endif
+
+
+
+
 ;;; DON'T PUT ANY CODE HERE!!!!
 
 
@@ -454,8 +576,6 @@ subtract .set 0
 
 ;;; we start program at "sector"
 startaddr:      
-
-
 
 
 jmptable:  
@@ -1854,6 +1974,7 @@ nodec:
 ;;;   how good is compression of code+full (128) table?
 
 
+
 ;;; translate letter in A to effective offset
 ;;; of jmptable
 ;;; 
@@ -1911,57 +2032,6 @@ other:
         ;; or above \127
         bcs next
 
-;;; uncompress
-;;; 
-
-;;; token in A, X is current read offset
-;;; (assuming compressed to < 256 bytes) lol
-
-;;; 44 B at least, not worth it!?
-;;; possibly better if include the "transtable"
-
-.ifnblank
-wr:     .word destination
-rd:     .word data
-
-unzip:  
-        ldx #0
-loop:   
-        lda rd,x
-unz:    
-        pla
-        bmi ref
-        ;; plain char
-        ldy #0
-        sta (wr),y
-        inc wr
-        bne noinc
-        inc wr
-noinc:  
-        inx
-        jmp unz
-ref:    
-        sta savea
-        txa
-
-        sec
-        sbc #1
-        pha
-        ;; push delayed call
-        ...
-
-        txa
-        clc
-        adc savea
-        tax
-load:   
-        lda rd,x
-        jmp unz
-        
-data:   
-
-destination:    
-.endif ; unzip
         
 
 ;;; --------------------------------------------------
