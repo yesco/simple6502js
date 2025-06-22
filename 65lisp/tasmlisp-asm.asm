@@ -243,7 +243,7 @@ ip:     .res 2                  ; code ptr
 ipy:    .res 1                  ; offset
 
 .ifndef MINIMAL
-ipx:    .res 1                  ; stack frame
+ipx:    .res 1                  ; d stack frame start
 ipp:    .res 1                  ; n params
 .endif ; MININAL
 
@@ -915,21 +915,20 @@ _nexttoken:
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
-;;; 19 B \ ^ ;
+;;; 11 B \ ^ ;
 
 .ifndef MINIMAL
 ;;; (number of \)-1 stored in ipp(arams)
 _lambda:        
-;;; 11 B
-        uJSR _nexttoken
-        cmp #'\\'
-        bne ret
+;;; 3 B
         inc ipp
-        bne _lambda             ; always true
+        rts
 
 ;;; value to return is in TOP
 ;;; if we had \\ parameters,
 ;;; from ipx we need to pop ipp==1
+;;; 
+;;; TODO: verify, can also change ipp start value!
 _exit:  
 ;;; 8 B
         lda ipx
@@ -1696,7 +1695,7 @@ _ret:
 ;;;   exec:   37      X
 ;;;  enter:   42      [enter subr exit = subr!]
 ;;;  colon:    0 (56) (: [wtf?])
-;;; lambda:    0 (19) ( \ ^ ; a-h )
+;;; lambda:    0 (11) ( \ ^ ; a-h )
 ;;; literal:  11 (37) L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
@@ -1719,14 +1718,14 @@ _ret:
 ;;; (/ 256.0 13.1) -> 19 words possible
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 516 B    words: 41    avg 14.0 B/w
+;;; TOTAL: 508 B    words: 41    avg 14.0 B/w
 ;;; 
 ;;; 102 is counting table overflow
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
 ;;; 
-;;; (+ 230 14 56 19 37 3 18 5 23 9 102)
+;;; (+ 230 14 56 11 37 3 18 5 23 9 102)
 ;;; (+  19  1  1  3  7 1  3 2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!

@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
   len= fread(buff, 1, 8000, f);
   fclose(f);
 
-  printf("LEN:\t%d\n", len);
+  fprintf(stderr, "LEN:\t%d\n", len);
 
 
 
@@ -76,8 +76,12 @@ int main(int argc, char** argv) {
   z= compress(buff, len);
   assert(z);
 
-  printf("Z:\t%d\n", z->len);
+  fprintf(stderr, "Z:\t%d\n", z->len);
   
+  for(int i=0; i < z->len; ++i) {
+    putchar(z->data[i]);
+  }
+
 /*
 
   char dec[8016]={0};
