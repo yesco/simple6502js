@@ -1709,6 +1709,13 @@ _ret:
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 ;;; how we doing so far till here?
+;;; 
+;;; MINIMAL: imagine a 16-bit 17 ops VM in one page?
+;;;   + & E "dup _drop div2 1+ X L @ ! , 2drop O K zBranch
+;;;   TODO: = (as macro?)
+;;; 
+;;; !MINIMAL + LISP: 20 more ops, lambda
+;;; 
 ;;;        MINIMAL (lisp/non-minimal)
 ;;; system:    4      _reset
 ;;; rdloop:    0 (14) (_interactive)
