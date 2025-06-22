@@ -811,20 +811,40 @@ call:   jmp jmptable
 .endmacro
 
 _BRK:   
-;;; smallest so far!
-;;; 
 ;;; TODO: make sure uJSR isn't used to call with things
 ;;;    expected to be retained in either A and Y !!!
 ;;;    possibles are putchar, lol
 ;;; 
-;;; 8 B
+;;; jsr calls *within* one page
+;;; 
+;;; 8 B - smallest so far!
         pla                     ; lo
         pha
         tay
-        lda jmptable,y
+        lda jmptable-1,y
         bne callAoffset
 
+.ifnblank ; more src uJSR
+
+;;; handle more than from 2 page jmp
+;;; 
+;;; 14 B
+        pla
+        tay                     ; lo from
+        pla
+        pha
+        sta brkadr+2            ; hi from
+        tya
+        pha
+brkadr: lda jmptable-1,y        ; lo to
+        bne callAoffset
+
+.endif ; more src uJSR
+
+
 .endif ; _uJSR
+
+
 
 ;;; uJSR
 ;;; ========================================
