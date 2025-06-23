@@ -36,12 +36,19 @@
 ;;; memory              =  8      169
 ;;;   initlisp 8
 
-;;; PRINT: 12, 92       =104      273
+;;; eval:               = 98      251
+;;;   simple 12
+;;;   apply   (+ 12 52 22 12)
+;;;     evlist 52
+;;;     apply  22
+;;;     lambda 12, ??
+
+;;; PRINT: 12, 92       =104      355
 ;;;   print    92
 ;;;     printz 18
 ;;;     printlist ??
 
-;;; READ:               = 76++    349
+;;; READ:               = 76++    434
 ;;;   getc     12  (+ 12 8 17 17 22)
 ;;;   skipspc   8
 ;;;   readatom 17
@@ -49,18 +56,10 @@
 ;;;     findsym  ??    
 ;;;   readlist 22
 
-;;; eval:               = 98      447
-;;;   simple 12
-;;;   apply   (+ 12 52 22 12)
-;;;     evlist 52
-;;;     apply  22
-;;;     lambda 12, ??
-
-;;; COND:
+;;; COND: ...             ??       ??
 
 ;;;   QUOTE
 ;;;   
-
 
 ;;; AsmLisp limitations;
 ;;; - atom maxlength is 15 chars (not checked)
@@ -1271,11 +1270,18 @@ iscons:
         DUP
         jsr car                 ; car of expr
         ;; this is the f-atom, indirect call CAR!
+
+
 ;;; TODO: XPUSH
 ;;; (this may be overwritten so need push,
 ;;;  but current stack is unsafe, use another!)
+
+
         sta call+1
         stx call+2
+
+
+
         ;jsr print
         ;; TODO: test is atom? - expesnive, lol
         ;; (ptr1 contains expr, Y-0 after car)
@@ -1415,8 +1421,24 @@ found:
 .endproc
 
 .align 2
-;;; 15B
 atom:   
+;;; 11B ... ?
+        ;; assume both _NIL & _T is in zp
+        ldx #0
+
+        ror
+        beq rettrue
+retnil: 
+        lda #<_NIL
+        ;; BIT-hack (skips next 2 bytes)
+        .byte $2c
+rettrue:
+        lda #<_T
+        
+        rts
+
+atom:   
+;;; 15B
         jsr isconsSetC
 Crettrue:       
         bcc rettrue

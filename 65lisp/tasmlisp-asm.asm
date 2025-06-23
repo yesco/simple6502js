@@ -234,9 +234,6 @@ locidx:  .res 1
 ;;; memory
 lowcons: .res 2
 
-;;; TODO: remove it's in X!!!
-;sidx:    .res 1
-
 ;;; current state of interpretation
 startframe:     
 
