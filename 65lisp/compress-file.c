@@ -13,7 +13,7 @@ int curmode;
 
 
 
-char buff[64*1024];
+char buff[64*1024], uzbuff[64*1024];
 int len;
 
 int main(int argc, char** argv) {
@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
   Compressed* z;
 
   FILE* f= fopen(name, "r");
-  len= fread(buff, 1, 8000, f);
+  len= fread(buff, 1, sizeof(buff), f);
   fclose(f);
 
   fprintf(stderr, "LEN:\t%d\n", len);
@@ -78,6 +78,13 @@ int main(int argc, char** argv) {
 
   fprintf(stderr, "Z:\t%d\n", z->len);
   
+  // compare decompression correctness
+  decompress(z, uzbuff);
+  
+  int res= memcmp(buff, uzbuff, len);
+  fprintf(stderr, "Decomp => %d\n", res);
+
+
   for(int i=0; i < z->len; ++i) {
     putchar(z->data[i]);
   }

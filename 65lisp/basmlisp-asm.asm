@@ -453,8 +453,9 @@ subtract .set 0
 ;;;         |            |        .--- removed 33 first B
 ;;; LEN:  (497)   ....  476      443       373
 ;;; Z:    (404)   ....  383      381 (-2)  353
-;;;                                         \__ NOMAP
-;;;         9%          20%      14%
+;;; FilePack:          (430)10%             \__ NOMAP
+;;; 
+;;; Z%:     9%          20%      14%
 ;;;                      |
 ;;;                      |
 ;;;                    winner - simplifies code!
