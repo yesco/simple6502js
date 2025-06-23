@@ -490,7 +490,7 @@ subtract .set 0
 ;;; 86 B - unlimited length, fixed addr, self mod
 ;;;        (but requires unique stopchar)
 ;;; 
-;;; (+ 8 14 4 12 39 9)= 86
+;;; (+ 8 7 7 12 12 32 15) = 93 correct missed on 12
 .proc unz
         ;; init
 ;;; 8
@@ -500,18 +500,15 @@ subtract .set 0
         sta ptr1+1
 
 loop:   
-;;; 14
+;;; 7
         ldy #0
-        jsr nextbyte
-
-        cmp #stopbyte
-        beq startaddr
-
         jsr unzchar
         bne loop
 
+
 unzchar:        
-;;; 4
+;;; 7
+        jsr nextchar
         cmp #0
         bmi minus
         ;; plain
@@ -540,7 +537,7 @@ quoted:
         bpl save
         
 ref:    
-;;; 33+2*nextchar = 39
+;;; 32
         ;; ref to two pos
         sta savea
         ;; save current pos
@@ -559,12 +556,9 @@ ref:
 
         ;; unz(pos+ref)->newpos
         ;; Y==0
-        jsr nextchar
         jsr unzchar
 
         ;; unz(newpos + 1)
-        iny
-        jsr nextchar
         jsr unzchar
 
         ;; restore pos
@@ -576,8 +570,12 @@ ref:
         rts
 
 nextbyte:
-;;; 9
+;;; 15
         lda (ptr1),y
+
+        cmp #stopbyte
+        beq startaddr
+
         ;; step
         inc ptr1
         bne noinc
