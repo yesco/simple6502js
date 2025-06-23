@@ -490,7 +490,8 @@ ENDCHAR=0
 
 ;;; TODO: variant AX
 
-;;; (+ 4 6 7 14 18 26 17) = 92 slightly smaller...
+;;; (+ 4 6 5 13 18 33 22) = 101 slightly smaller...
+;;;    BUT WORKS!!!
 .proc unz
         ;; init
 ;;; 4
@@ -503,12 +504,13 @@ loop:
         jmp loop
 
 unzchar:        
-;;; 7
+;;; 5
         jsr nextbyte
         bmi minus
         ;; plain
 save:   
 ;;; 14
+;;; TODO: remove! debug
         jsr putchar
 
 dest:   sta destination
@@ -521,7 +523,7 @@ dest:   sta destination
         rts
 
 minus:    
-;;; 14
+;;; 13
         ;; quoted?
         cmp #$ff
         bne ref
@@ -537,17 +539,11 @@ ref:
 ;        lda #':'
 ;        jsr putchar
 
-;;; 26
+;;; 33
         ;; ref to two pos
-        sta savey
+        dey
+        sty savey
 
-        tay
-        and #$0f
-        ora #$30
-        lda #'A'
-        jsr putchar
-        tya
-    
         ;; save current pos: hi,lo
         txa
         pha
@@ -583,7 +579,7 @@ ref:
         rts
 
 nextbyte:
-;;; 17
+;;; 22
         ;; step
         clc
         adc #1
@@ -892,8 +888,9 @@ data:
 ;;; Everything after the unz is compressed data!
 
 compresseddata: 
-        .byte "Jonas S Karlsson",10,ENDCHAR
-        .byte "abcdefgh",256-4,10
+        .byte "Jonas S Karlsson",10
+;;; a b c d e f g h ef hef ef hef
+        .byte "abcdefgh",256-4,256-2,256-2,10
         .byte ENDCHAR
 compressend:
 
