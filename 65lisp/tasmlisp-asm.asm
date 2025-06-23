@@ -231,6 +231,7 @@ BIT0: .res 1
 BIT1: .res 1
 
 ;;; memory
+here:    .res 2
 lowcons: .res 2
 
 ;;; top of the stack
@@ -944,29 +945,30 @@ startaddr:
 
 
 jmptable:  
-_error: 
-_undef: 
+
+;;; INIT - this should be first in jmptable at offset 0
 _reset:
 _initlisp:      
-_quit:  
-.ifdef MINIMAL
-;;; TODO: ?
-        rts
-.else
 
-;;; (+ 4 14) = 20
+        SET (HERESTART)
+        sta here
+        sta here+1
+
+.ifdef LISP
+;;; (+ 4 14) = 20 ???
 
 ;;; (4 B)
         ; sei 
         cld
 
-.ifdef LISP
         ;; cons ptr
         SET (TOPMEM-1)
         sta lowcons            
         stx lowcons+1
-.endif ; LISP        
 
+.endif ; LISP
+
+.ifndef MINIMAL
         ;; zero stuff
 ;        lda #0
 
@@ -979,10 +981,21 @@ _quit:
  ;; (for now prints some info)
         jsr _test
 
-;;; TODO: or read eval loop?
-        jmp main
+        jmp _interactive
 
 .endif ; !MINIMAL
+       
+
+
+
+_error: 
+_undef: 
+_quit:  
+
+.ifdef MINIMAL
+;;; TODO: ?
+        rts
+.endif       
 
 
 
@@ -1065,8 +1078,8 @@ _interactive:
 ;;; (essentially, no need jsr exec and jmp)
 ;;; (and this tail-calls into exec, same same!)
         uJSR _rdloop
-        jmp retloop
-_rdloop:   
+        jmp _interactive
+_rdloop:  
         putc '>'
         uJSR _key
 
@@ -1130,8 +1143,16 @@ callAoffset:
 ;;; 12
         ;; macro subtroutine?
         ;; (offset > macrostart)
-        cmp #(macrostart-jmptable)
-        bcs _interpret
+
+;;; TODO: how to handle more than one page?
+;;;   macros maybe user defined...
+
+;;; TODO: use a macro that in one page becomes nothing
+;;;   and otherwise becomes indirect invocations?
+;;;   need to adjust uJSR ???
+
+;        cmp #(macrostart-jmptable)
+;        bcs _interpret
 
         ;; save in "jmp jmptable" low byte!
         sta call+1
@@ -1318,21 +1339,22 @@ _binliteral:
 ;;; 1-9a-f: read while either got this char
 ;;;   {{{{ ora sta ... loop
 
+        _pushaddr       = _undef
+        _cons           = _undef
+        _colon          = _undef
+        _TOSbytecomma   = _undef
+
 .ifdef MINIMAL
         ;; set all undef functions of minimal
         _hexliteral     = _undef
         _number         = _undef
         _quote          = _undef
         _ora            = _undef
-        _pushaddr       = _undef
         _writez         = _undef
         _null           = _undef
         _dec            = _undef
         _cdr            = _undef
-        _cons           = _undef
-        _colon          = _undef
         _sbc            = _undef
-        _TOSbytecomma   = _undef
         _shl            = _undef
 
         _var            = _undef
@@ -1695,7 +1717,7 @@ _putc:
 
 
 
-.ifdef MINIMAL
+.ifndef MINIMAL
 ;;; 5B : T #10 O ; # 4
 _terpri:
 ;;; 5 B
@@ -1940,7 +1962,8 @@ comparez:
 ;;;   A contains breakchar (Z== '(' C== ')
 ;;; 
 ;;; 38B - too much...
-proc _readatom
+.ifnblank
+.proc _readatom
 ;;; 11 B - ret breakchar
         ldy breakchar
         lda #0
@@ -1980,6 +2003,7 @@ done:
 ret:    
         rts
 .endproc        
+.endif ; !BLANK
                
 ;;; asmlisp-asm.asm:
 
@@ -1987,6 +2011,7 @@ ret:
 
 ;;; 16B !!!! --- (still need to find/craate atom)
 ;;;              (but it's for compare w READ)
+.ifnblank
 .proc _read
         uJSR _atomread
         bcs readlist
@@ -1998,7 +2023,7 @@ parseatom:
 
         uJSR findatom
 createatom:
-        ...
+        ;;   ...
 
 readlist:
         ;;')' => retnil!
@@ -2018,7 +2043,7 @@ readlist:
         jmp cons
 
 .endproc
-        
+.endif        
 
 
 ;;; 11 : {{{"+ ; # 6 -> shl shl2 shl3 shl4
@@ -2060,7 +2085,7 @@ _shl:
 ;;; ------ MINIMAL (not interactive)
 ;;; TOTAL: 202 B   words: 19    avg: 10.6 B/op
 ;;; 
-;;;      ACTUAL: 206 B !!!!   (counting wrong...)
+;;;      ACTUAL: 205 B !!!!   (counting is approximate...)
 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
@@ -2073,21 +2098,22 @@ _shl:
 ;;; (/ 256.0 10.6) -> 24 words possible!
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 584 B    words: 42    avg 13.7 B/w
+;;; TOTAL: 596 B    words: 43    avg 13.9 B/w
 ;;; 
-;;; 102 is counting table overflow
+;;;        ACTUAL: 544 B (probably need update..)
+;;; 
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
-;;; and then map names, but that still cost 55 B?
+;;; and then map names, but that still cost 55 B symbols.
 ;;;                                   |
 ;;; (+ 235 6 6 14 4 56 43 37 3 18 14 23 9 128)
 ;;; (+  19 1 0  1 0  1  4  7 1  3  2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
-;;; (/ 575.0 42)    = 13.7       ; reality
+;;; (/ 596.0 43)    = 13.9       ; reality
 ;;; 
-;;; CANDO: (/ 512.0 13.7) = 37 words, lol
+;;; CANDO: (/ 512.0 13.9) = 36 words, lol
 
 ;;; TODO: uJSR might save 30-50 bytes
 ;;; TODO: compression... allow for transtable -100? + 70
@@ -2215,8 +2241,11 @@ macrostart:
 
 endtable:       
 
-.assert (endtable-jmptable)<=256, error, "Table too big"
-
+.ifdef MINIMAL
+  .assert (endtable-jmptable)<=256, error, "Table too big"
+.else
+  .assert (endtable-jmptable)<=512, error, "Table too big"
+.endif
 
 transtable:     
 
@@ -2521,6 +2550,9 @@ nodec:
 
 endaddr:
 .byte "<AFTER"
+
+;;; TODO: do other way? data segment?
+HERESTART:      
 
 
 ;;; end usercode
