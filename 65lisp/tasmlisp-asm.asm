@@ -302,6 +302,7 @@ plaputchar:
         pla
 
 ;;; putchar(c) print char from A
+;;; (saves X, A retains value)
 ;;; 
 ;;; 12B
 .proc putchar
@@ -452,8 +453,12 @@ subtract .set 0
 
 
 
+COMPRESSED=1
+ENDCHAR=0
+_initlisp:      
 
 .ifdef COMPRESSED
+
 
 ;;; unzip - decompressor for one pae
 ;;; 
@@ -480,11 +485,9 @@ subtract .set 0
 ;;; 
 ;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
 
-
 ;;; TODO: variant AX
 
-
-;;; (+ 4 7 14 14 26 17) = 82 slightly smaller...
+;;; (+ 4 6 7 14 18 26 17) = 92 slightly smaller...
 .proc unz
         ;; init
 ;;; 4
@@ -492,9 +495,9 @@ subtract .set 0
         ldx #>(compresseddata-1)
 
 loop:   
-;;; 5
+;;; 6
         jsr unzchar
-        bne loop
+        jmp loop
 
 unzchar:        
 ;;; 7
@@ -503,17 +506,24 @@ unzchar:
         ;; plain
 save:   
 ;;; 14
-dest:   sta dest
+        jsr putchar
+
+dest:   sta destination
         ;; step
         inc dest+1
         bne @noinc
-        ind dest+2
+        inc dest+2
 @noinc: 
         lda savea
         rts
 
 minus:    
-;;; 14
+;;; 18
+        ;; end? -> assumes stack will be fixed
+        cmp #ENDCHAR
+        beq destination
+hlt:    beq hlt
+
         ;; quoted?
         cmp #$ff
         bne ref
@@ -530,18 +540,20 @@ ref:
         ;; ref to two pos
         sta savey
 
-        ;; save current pos
+        ;; save current pos: hi,lo
         txa
         pha
         lda savea
         pha
 
-        ;; modify by add a
+        ;; modify pos by add a
         clc ; ? or sec?
         adc savey
+        tay
         txa
         adc #$ff                ; we're really sub!
         tax
+        tya
 
         ;; unz(pos+ref)->newpos
         jsr unzchar
@@ -550,11 +562,15 @@ ref:
         jsr unzchar
 
         ;; restore pos
+        sty savex               ; lol
+
         pla
-        tay
+        tay                     ; lo
         pla
-        tax
-        tya
+        tax                     ; hi
+        tya                     ; lo
+
+        ldy savex
 
         rts
 
@@ -563,21 +579,24 @@ nextbyte:
         ;; step
         clc
         adc #1
-        bne noinc
+        bcc noinc
         inx
 noinc:  
         sta savea
 
         sta ptr1
-        stx ptr2
+        stx ptr1+1
         ldy #0
         lda (ptr1),y
+
+        jsr putchar
+
         ;; flags reflect A
         rts
-
 .endproc
 
 
+.ifnblank
 
 
 ;;; 86 B - unlimited length, fixed addr, self mod
@@ -608,12 +627,13 @@ unzchar:
 save:   
 ;;; 12
 dest:   sta dest
+        lda savea
+        jsr putchar
         ;; step
         inc dest+1
         bne @noinc
         ind dest+2
 @noinc: 
-        ;; Z=0
         rts
 
 minus:    
@@ -623,9 +643,17 @@ minus:
         bne ref
         ;; quoted
 quoted: 
+        pha
+
+        ;; store a $ff
+        lda #$ff
+        jsr save
+
+        ;; save byte ^ 128 (so it's no ref)
+        pla
         jsr nextbyte
         eor #128
-        iny
+        iny ; to handle this at read time
         ;; jmp save (always pl!)
         bpl save
         
@@ -811,15 +839,6 @@ ref:
         tay
         rts
 
-;;; Everything after the unz is compressed data!
-compresseddata: 
-
-;;; TODO: put compressed bytes here!
-
-compressend:    
-
-
-
 unzip:  
         ldx #0
 loop:   
@@ -856,11 +875,28 @@ load:
         
 data:   
 
+.endif ; nblank
+
+;;; Everything after the unz is compressed data!
+
+compresseddata: 
+        .byte "Jonas S Karlsson",10
+        .byte "abcdefgh",256-4,10
+        .byte 0
+compressend:
+
+        
+
+.res 256 - * .mod 256
+
 destination:    
-.endif ; unzip
+        .res 512
 
-.endif
 
+.endif ; unz
+
+;;; just for testing unz
+.end
 
 
 
