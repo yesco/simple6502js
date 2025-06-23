@@ -482,6 +482,97 @@ subtract .set 0
 ;;; - https:github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Funpack.s
 ;;; 
 ;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
+
+;;; 92 B - unlimited length, fixed addr, self mod
+;;;        (but requires unique stopchar)
+.proc unz
+        ;; init
+        lda #<compresseddata
+        sta ptr1
+        lda #>compresseddata
+        sta ptr1+1
+
+loop:   
+        ldy #0
+        jsr nextbyte
+
+        cmp #stopbyte
+        beq startaddr
+
+        jsr unzchar
+        jmp loop
+
+unzchar:        
+        cmp #0
+        bmi minus
+        ;; plain
+save:   
+dest:   sta dest
+        ;; step
+        inc dest+1
+        bne @noinc
+        ind dest+2
+@noinc: 
+        rts
+
+minus:    
+        ;; quoted?
+        cmp #$ff
+        bne ref
+        ;; quoted
+        jsr nextbyte
+        eor #128
+        iny
+        ;; jmp save (always pl!)
+        bpl save
+        
+ref:    
+        ;; ref to two pos
+        sta savea
+        ;; save current pos
+        lda ptr1+1
+        pha
+        lda ptr1
+        pha
+
+        ;; modify by add a
+        clc ; ?
+        adc savea
+        sta ptr1
+        lda ptr1+1
+        adc #$ff                ; we're really sub!
+        sta ptr1+1
+
+        ;; unz(pos+ref)->newpos
+        ;; Y==0
+        jsr unzchar
+
+        ;; Y==0 or 1(if quoted!)
+        iny
+        ;; unz(newpos + 1)
+        jsr unzchar
+
+        ;; restore pos
+        ldy #0
+
+        pla
+        sta ptr1
+        pla
+        sta ptr1+1
+        rts
+
+nextbyte:
+        lda (ptr1),y
+        ;; step
+        inc ptr1
+        bne noinc
+        inc ptr1+1
+noinc:  
+        rts
+
+.endproc
+
+
 .proc unz
         adjusteddata= compresseddata+128-1
 
