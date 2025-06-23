@@ -234,7 +234,8 @@ locidx:  .res 1
 ;;; memory
 lowcons: .res 2
 
-sidx:    .res 1
+;;; TODO: remove it's in X!!!
+;sidx:    .res 1
 
 ;;; current state of interpretation
 startframe:     
@@ -482,6 +483,55 @@ subtract .set 0
 ;;; 
 ;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
 .proc unz
+        adjusteddata= compresseddata+128-1
+
+        ;; when this is read means stop
+sentinel:
+        lda #0
+        pha
+        pha
+
+next:   
+        inc source+1
+        bne noinc2
+        inc source+2
+
+load:
+
+source: lda adjusteddata,y
+        bpl plain
+        ;; done?
+        cmp #endchar
+        beq startaddr
+
+minus:  
+        ;; process pair
+        tay
+        ;; second part of pair
+;;; TODO: how about when quoted?
+        iny
+        tya
+        pha                     ; second pat of pair
+        dey
+        jmp load                ; first part of pair
+        
+plain:  
+        ;; plain -> store it
+dest:   sta startaddr
+        inc dest+1
+        bne noinc
+        inc dest+2
+noinc:  
+
+processesqueue: 
+        pla
+        tay
+        bne load
+        
+.endproc
+
+
+.proc unz
 ;;; (+ 9 5 12 18) = 44 lol (+10= 54 B if UNZBINARY)
 
 
@@ -715,20 +765,17 @@ _next:
 ;;; 5
         sta token
         uJSR _nexttoken
-        ;; at end of string
-        beq ret
-
-;;; TODO: enable
-;        sta token
-
 
 _nexta: 
-;;; 14 (5 + trans)
+;;; 10 (+5 trans)
 
 .ifdef MINIMAL
+
         ;; no trans for >= 128 (already offset)
         bmi notrans
-        jsr translate
+;;; transalte
+        tay
+        lda transtable,y
 notrans:
 
 .endif
@@ -750,6 +797,10 @@ callAoffset:
 
         ;; save in "jmp jmptable" low byte!
         sta call+1
+
+        ;; A= token (for _var _number ...)
+        lda token
+
 call:   jmp jmptable
 
 ;;; ----------- SAVE MORE BYTeS -------------
@@ -856,23 +907,14 @@ brkadr: lda jmptable-1,y        ; lo to
 ;;; 
 ;;; start interpreation at IP,Y
 ;;; 
-;;; (+ 2 9 19 12) = 42
-;;; 42 B  72c ?update - relative expensive (?)
+;;; (+ 2 9 19 12) = 42 B
 proc _interpret
 
 ;;; TODO: set IP,y?
 
-;;; (+ 2 9 19 12) 
 enter:  
         ;; save what we're calling
         sta savea
-
-;;; TODO: only push 2 values???
-;;;   can we use a jsr?
-;;;   let \lambda and ^ push the others!!!!
-;;; OR
-;;;   only enable when !MINIMAL
-;;;   for safety, otherwise CRASH real good!
 
         ;; push current stack frame
 ;;; 9
@@ -892,7 +934,7 @@ subr:
 
 ;;; TODO: can this be moved into exec?
 ;;;   (maybe some problem with Ztail/Recurse?
-        lda #0
+        lda #-1
         sta ipp
 
         ldy #$ff
@@ -935,29 +977,69 @@ _nexttoken:
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
-;;; 11 B \ ^ ;
+;;; 3 (+ 5 9 13 9 7) = 43 \ _vary a Sa ^ ;
 
 .ifndef MINIMAL
+
 ;;; (number of \)-1 stored in ipp(arams)
 _lambda:        
-;;; 3 B
+;;; 5 B
+        stx ipx
         inc ipp
         rts
 
-;;; value to return is in TOP
-;;; if we had \\ parameters,
-;;; from ipx we need to pop ipp==1
-;;; 
-;;; TODO: verify, can also change ipp start value!
-_exit:  
-;;; 8 B
-        lda ipx
+
+_vary:  
+;;; 9
+        ;; stack,(VAR-'a')*2 + ipx
+        sec
+        sbc #'a'
         clc
-        sbc ipp
-        sta sidx
+        asl
+        adc ipx
+        tay
         rts
 
+;;; load variable from stack (a b c .. h)
+;;; 
+;;; 13 B
+_var:   
+        jsr _vary               ; canNOT uJSR
+
+        lda stack,y 
+        pha
+        lda stack+1,y
+        jmp _loadPOPa
+
+_setvar:        
+;;; 9
+        jsr _vary               ; canNOT uJSR
+
+        jsr _pushA              ; canNOT uJSR
+        uJSR store
+
+;;; ^ return from lambda
+;;; 
+;;; adjusts stack to remove parameters atreturn
+;;; TOP retained as it contains return value!
+_return:  
+;;; 7 B
+        lda ipp
+        asl
+        clc
+        adc ipx
+        tax
+        ;; fall-through to _semis
+
 .endif ; MINIMAL
+
+;;; semis (return from interpretastion)
+_semis:
+;;; 3
+        pla
+        pla
+_ret:    
+        rts
 
 ;;; a-h gives you parameter to current function
 _var:   
@@ -1002,18 +1084,17 @@ _binliteral:
 _hexliteral = _undef
 .esle
 
-_hash: 
-_zero:  
-
 ;;; modifies existing number
 ;;; first multiplies by 10 (or 16 if in hex!)
 ;;; then adds current number 
 ;;; 
-;;; (+ 18 12 11) = 41 B macro: (+ 18 6 7) = 31 !!!
+;;; (+ 19 12 11) = 42 B macro: (+ 18 6 7) = 31 !!!
 _number:        
-        jsr mul10
+;;; 19
+        uJSR mul10
         
         ;; hex2bin (works for dec too!)
+        lda token
         cmp #'a'
         bcc digit
         sbc #7                  ; carry set already
@@ -1022,38 +1103,12 @@ digit:  and #$f
         jsr _pusha              ; canNOT use uJSR
         jmp _plus
 
-;;; 0 pushes 0
-;;; 1-9 modifies by x10 + num
-;;; means to load 42: 042 
-_number:
-;;; (+ 25 12 11) = 44 ; _number x10 shl24
-
-        dec ipy                 ; lol
-_numnext:       
-        uJSR _nexttoken
-_number:        
-        sec
-        sbc #'0'
-        cmp #10
-        bcs ret
-        
-        pha
-
-        uJSR _mul10
-
-        ;; push digit
-        uJSR _pushpla
-
-        ;; finally add num
-        uJSR _plus
-        
-        jmp _numnext
-
 ;;; just add a real mul (19 B for 16x8->16?)
 ;;; 38 B for 16x16->16 (?)
 ;;; 
 ;;; TODO: cheaper as macro!
 ;;; 
+;;; : { $+ ;      # 3
 ;;; : x {"{{+ ;   # 6
 ;;; 
 ;;; 12
@@ -1391,10 +1446,11 @@ _getc:
 ;;; -----------------------------------
 ;;; TESTS JMPS
 ;;; 
-;;; (+ 17 8 9 6) = 42
+;;; 14 (+ 8 9 6) = 23
 
+;;; jump/skip on zero (set Y!)
 _zbranch:        
-;;; 17 B
+;;; 14 B
         lda tos
         ora tos+1
         bne pop
@@ -1402,12 +1458,17 @@ _zbranch:
         ;; (TODO: if not compiled could encode
         ;;  jmp at hibit, and/or some literals!)
         uJSR _nexttoken
-        clc
-        adc ipy
         sta ipy
+;;; TODO: want user relative ascii? B2 B-2?
+;        clc
+;        adc ipy
+;        sta ipy
         jmp pop
 
 .ifndef MINIMAL
+
+;;; : U B5 ##1-; #;    (two ;?)
+;;; : = - U ; # 3
 
 _null:
 ;;; 8 B
@@ -1424,7 +1485,6 @@ settrue:
 setfalse:       
 ;;; (6 B)
         lda #0
-
 
 ;;; TODO: many variants, save any bytes?
 
@@ -1445,7 +1505,8 @@ _pushPLA:
         uJSR push
         jmp _seta
 
-zero:   
+;;; TODO: macro
+_zero:   
 ;;; 6 B
         uJSR push
         jmp setfalse
@@ -1698,15 +1759,6 @@ _shl:
 .endif ; MINIMAL
 
 
-_exit:  
-;;; TODO: fix?
-        sta savea
-        pla
-        pla
-        lda savea
-_ret:    
-        rts
-
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 ;;; how we doing so far till here?
 ;;; 
@@ -1720,48 +1772,49 @@ _ret:
 ;;; system:    4      _reset
 ;;; rdloop:    0 (14) (_interactive)
 ;;;   exec:   37      X
-;;;  enter:   42      [enter subr exit = subr!]
+;;;  enter:   42      [interpret enter subr exit = subr!]
 ;;;  colon:    0 (56) (: [wtf?])
-;;; lambda:    0 (11) ( \ ^ ; a-h )
+;;; lambda:    3 (43) ; ( \ ^ a Sa )
 ;;; literal:  11 (37) L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
 ;;; IO:       15  (5) (T) O K
-;;; tests:    17 (23) zbranch (null) (0 true?sym)
+;;; tests:    14 (23) zbranch (null) (0 true?sym)
 ;;; math:     41  (9) + & (- |) E _drop shr
 ;;; transtable:0(102) (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 235B    words: 18    avg: 13.1 B/op
+;;; TOTAL: 235 B   words: 19    avg: 12.4 B/op
 ;;; 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 6 37 42 11 39 27 15 17 41)
-;;; (+ 1  1  0  1  3  4  2  1  5)
-;;; (/ 235.0 18)   -> bytes per word
-;;; (/ 256.0 13.1) -> 19 words possible
+;;; (+ 6 37 42 3 11 39 27 15 14 41)
+;;; (+ 1  1  0 1  1  3  4  2  1  5)
+;;; (/ 235.0 19)   -> bytes per word
+;;; (/ 256.0 12.4) -> 20 words possible
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 508 B    words: 41    avg 14.0 B/w
+;;; TOTAL: 575 B    words: 42    avg 13.7 B/w
 ;;; 
 ;;; 102 is counting table overflow
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
-;;; 
-;;; (+ 230 14 56 11 37 3 18 5 23 9 102)
-;;; (+  19  1  1  3  7 1  3 2  2 2   0)
+;;;                                   |
+;;; (+ 235 14 4 56 43 37 3 18 5 23 9 128)
+;;; (+  19  1 0  1  4  7 1  3 2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
-;;; (/ 532.0 38)    = 14.0       ; reality
+;;; (/ 575.0 42)    = 13.7       ; reality
 ;;; 
-;;; CANDO: (/ 512.0 14.0) = 36 words, lol
+;;; CANDO: (/ 512.0 13.7) = 37 words, lol
 
 ;;; TODO: uJSR might save 30-50 bytes
+;;; TODO: compression... allow for transtable -100? + 70
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
@@ -1863,6 +1916,7 @@ about 4.5x.
 codestart:
 
 ;;; NULL: 14 B
+
 ;_TRUE:  
 ;;; 4 B
 ;        .byte "L"
@@ -1878,9 +1932,9 @@ codestart:
 ;_NULL:
 ;;; 6 B
 ;        .byte "B",+2
-;        .DO _true
+;        .DO _TRUE
 ;        .byte 0
-;        .DO _zero
+;        .DO _ZERO
 ;        .byte 0
 
 endtable:       
@@ -1897,14 +1951,53 @@ transtable:
 ;;; TODO: currently more "forthy" ALF
 ;;;       than being "lisp" AL (AlphabeticalLisp)
 
+        ;; 0--31
+        DO _semis              ; \0
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+        DO _undef
+
+        DO _undef
+        DO _undef
+
+        ;; ' '-127
+        DO _undef              ; ' '
         DO _store              ; !
         DO _undef              ; " - dup (MINT)
-        DO _lit                ; # - lit?numberp?
-        DO _swap               ; $ - swap (MINT)
-        DO _undef              ; % - over (MINT)
+        DO _number             ; # - lit
+        DO _swap               ; $ - hexlit? swap (MINT)
+        DO _undef              ; % - over, or ` (MINT)
         DO _and                ; &
         DO _quote              ; '
-        DO _undef              ; ( - if/loop 
+        DO _undef              ; ( - compile if "zBranch"
         DO _undef              ; ) -
         DO _undef              ; * - mult
         DO _plus               ; +
@@ -1915,8 +2008,8 @@ transtable:
 ;;; TODO: write in CODE
         DO _printd             ; . - print num
 
-        DO _undef              ; / - div
-        DO _zero               ; 0
+        DO _undef              ; / - TOOD: macro: div
+        DO _number             ; 0
         DO _number             ; 1
         DO _number             ; 2
         DO _number             ; 3
@@ -1927,52 +2020,87 @@ transtable:
         DO _number             ; 8
         DO _number             ; 9 
         DO _colon              ; :
-        DO _exit               ; ;
-        DO _undef              ; < -
+        DO _semis              ; ;
+        DO _undef              ; < - lt
         DO _undef              ; =   : = -U ; # 4
-        DO _undef              ; > -
+        DO _undef              ; > - gt
         DO _undef              ; ? - is atom? if?
         DO _load               ; @ car
         DO _undef              ; A - assoc/alloc
-        DO _zbranch            ; B - ZBRANCH memBer?
+        DO _zbranch            ; B
         DO _cons               ; C
         DO _cdr                ; D
         DO _eor                ; E
         DO _undef              ; F - follow/iter/forth ext?
         DO _undef              ; G - 
-        DO _hexliteral         ; H - (h) hexlit append
+        DO _hexliteral         ; H - (h) hexlit? Happend
         DO _inc                ; I
         DO _dec                ; J
         DO _key                ; K
         DO _literal            ; L
         DO _undef              ; M - mapcar
-        DO _undef              ; N - number?nth?
+        DO _undef              ; N - number?
         DO _putc               ; O
         DO _undef              ; P - print
         DO _undef              ; Q - equal
-        DO _undef              ; R - recurse / register
-        DO _undef              ; S - Sa setvar?
+        DO _undef              ; R - recurse
+        DO _setvar             ; S - Sa setvar?
         DO _terpri             ; T
         DO _null               ; U
         DO _undef              ; V - prin(c1)/var
-        DO _writez             ; W (print string)
+        DO _writez             ; W
         DO _exec               ; X
         DO _undef              ; Y - apply/read?
-        DO _undef              ; Z - tailcall? B\0
+        DO _undef              ; Z - tailcall?
         DO _pushaddr           ; [ - quote lambda
         DO _lambda             ; \
-        DO _undef              ; ] - return or ;
+        DO _semis              ; ] - return or ;
         DO _return             ; ^ - RETURN
         DO _drop               ; _ - drop (on the floor1)
-        DO _undef              ; ` - find name
+        DO _undef              ; ` - over? find name
+
+        ;; a-h local vars
+        DO _var                ; a
+        DO _var                ; b
+        DO _var                ; c
+        DO _var                ; d
+        DO _var                ; e
+        DO _var                ; f
+        DO _var                ; g
+        DO _var                ; h
+
+        ;; i-z
+        DO _undef              ; i -
+        DO _undef              ; j -
+        DO _undef              ; k - 
+        DO _undef              ; l - 
+        DO _undef              ; m - 
+        DO _undef              ; n - 
+        DO _undef              ; o - 
+        DO _undef              ; p - 
+        DO _undef              ; q - 
+        DO _undef              ; r - 
+        DO _undef              ; s - 
+        DO _undef              ; t - 
+        DO _undef              ; u - 
+        DO _undef              ; v - 
+        DO _undef              ; x - 
+        DO _undef              ; y - 
+        DO _undef              ; z - 
 
         DO _shl                ; { - : { "+ ; 
         DO _ora                ; |
         DO _shr                ; }
         DO _undef              ; ~ - not
+        DO _undef              ; DEL - 
+
 endtrans:       
 
-.assert (*-transtable)=64+4, error, "Transtable not right size"
+.assert (*-transtable)=128, error, "Transtable not right size"
+
+;;; maybe for MINIMAL++ ? lol
+
+.ifnblank
 
 ;;; compressed trans, zuntrans
 ;;; 
@@ -2038,7 +2166,7 @@ transuns:
 ;;; DJB2 is n*33+c on every character, or n+(n<<5)+c, so it is pretty fas
 cons:
 
-;;; TODO: better as 
+;;; TODO: better as macro?
 .ifnblank
 ;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
 ;;; (+ 14 11 11) = 36
@@ -2083,81 +2211,6 @@ nodec:
         sta (lowcons),y
         rts
 .endif
-
-;;; translation cost:
-;;;   table: 64+4
-;;;   code: 34(+5 for vars)
-;;;   => (+ 64 4 34 5) = 107
-;;; 
-;;; or "unz"
-;;;   ztrans: 32 (minimal 19)
-;;;   code: 25  nums: 1 vars: 8
-;;;   => (+ 32 25 10 8) = 75
-;;; 
-;;; OR "compression"
-;;; 
-;;;   how good is compression of code+full (128) table?
-
-
-
-;;; translate letter in A to effective offset
-;;; of jmptable
-;;; 
-;;; 34B
-translate:      
-;;; TODO: change translation to just !!!
-;;; 
-;;; tay
-;;; lda transtable,y
-
-;;; TODO: move to after endaddr
-;;;    as it "shouldn't count as bytes needed"
-;;;    I.E. we could do translation at "compiletime"
-;;;    so no translation would be needed!
-
-        ;; make sure it's in table
-        sec
-        sbc #33                 ; spc is excluded
-;;; 4 ? set at table
-        cmp #64+4+1
-;;; TODO: enable local vars etc
-;        bcs over64
-;;; TODO: not correct for one char exec
-;;;    todo fix by simple 2 byte buffer?
-        jmp potret              ; skip for now
-
-
-again:      
-        ;; translate to offset
-        tay
-        lda transtable,y
-
-over64: 
-        ;; local variable?
-        cmp #'z'-33+1
-        bcs other
-
-;;; TODO: just replace by func a b c d !!!
-
-        ;; variables on stack a,b,c
-;;; TODO: relative fun start stack
-        adc sidx                ; change
-        lda lostack-33,y 
-        ldx histack-33,y
-nret:   rts
-
-other:  
-        ;; we want to fold in > {|}~ <
-        ;; (potentially "ijklmnopqrstuvwxyz"!)
-        clc
-        sbc #'{'-33
-        cmp #64+4+1
-        bcc again
-        ;; rest was <= ' ' (wrapped around)
-        ;; or above \127
-        bcs next
-
-        
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
