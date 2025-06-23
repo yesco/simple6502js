@@ -106,6 +106,9 @@
 ;
 MINIMAL=1
 
+;;; enable to see if save a byte on each JSR
+;UJSR=1
+
 ;;; 1379
 START=$563
 ;START=$600
@@ -118,8 +121,7 @@ START=$563
 ;;; lisp data stack
 ;;; (needs to be full page)
 ;;; (page 4 free page on ORIC)
-lostack= $400
-histack= lostack+128
+stack= $400
 
 ;;; ORIC: charset in hires-mode starts here
 ;;; (needs to be 4 byte aligned)
@@ -228,11 +230,11 @@ savexputchar:    .res 1
 BIT0: .res 1
 BIT1: .res 1
 
-;;; locals
-locidx:  .res 1
-
 ;;; memory
 lowcons: .res 2
+
+;;; top of the stack
+tos:     .res 2
 
 ;;; current state of interpretation
 startframe:     
@@ -247,14 +249,26 @@ ipp:    .res 1                  ; n params
 
 endframe:
 
-;;; saved
-quitS:  .res 1
+token:  .res 1
+
+;;; TODO: for restore at error in interactive
+;quitS:  .res 1
 
 ;;; used  by _BRK routine
+.ifdef UJSR
 aBRK:   .res 1
 xBRK:   .res 1
 pBRK:   .res 2
+.endif ; UJSR
 
+
+;;; bss - area initialized
+.bss
+
+;;; data - area not initialized
+.data
+
+        
 .code
 
 ;;; ----------------------------------------
@@ -453,14 +467,15 @@ subtract .set 0
 
 
 
-_initlisp:      
+;COMPRESSED=1
+.ifdef COMPRESSED
 
-COMPRESSED=1
 ;;; ENDCHAR can't occur anywhere in the compressed data
 ;;; 
+;
 ENDCHAR=0
 
-.ifdef COMPRESSED
+_initlisp:      
 
 
 ;;; unzip - decompressor for one pae
@@ -902,11 +917,10 @@ destination:
         .res 512
 
 
-.endif ; unz
+.endif ; COMPRESSED
 
-;;; just for testing unz
-.end
-
+;;; just for testing COMPRESSED/unz
+;.end
 
 
 ;;; DON'T PUT ANY CODE HERE!!!!
@@ -919,19 +933,28 @@ destination:
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
+
+.byte "BEFORE>"
+
 ;;; JMP table
 ;;; align on table boundary by padding
-.res 256 - * .mod 256
+.res (256 - * .mod 256)-8
 
 ;;; we start program at "sector"
 startaddr:      
 
 
 jmptable:  
-
+_error: 
+_undef: 
 _reset:
 _initlisp:      
 _quit:  
+.ifdef MINIMAL
+;;; TODO: ?
+        rts
+.else
+
 ;;; (+ 4 14) = 20
 
 ;;; (4 B)
@@ -950,128 +973,26 @@ _quit:
 
 ;;; set's both Data Stack, and R stack
 ;;; (are we skipping one byte at DS?)
-        ldx #ff
+        ldx #$ff
         txs
-
+       
 ;;; (3 B) - don't count!
  ;; (for now prints some info)
         jsr _test
-        
 
-.ifdef MINIMAL
-;;; TODO: 
+;;; TODO: or read eval loop?
         jmp main
-.else
 
-;;; (14 B)
-_interactive:    
-;;; this is so we alwAY get back here
-;;; (essentially, no need jsr exec and jmp)
-;;; (and this tail-calls into exec, same same!)
-        uJSR _rdloop
-        jmp retloop
-_rdloop:   
-        putc '>'
-.endif ; MINIMAL
-        
-        uJSR _key
+.endif ; !MINIMAL
 
-.ifdef TRACE
-        jsr trace
-.endif ; TRACE
 
-        ;;  fallthrough to exec
-.endif MINIMAL
 
-;;; exec byte instruction in A
-;;; 
-;;; references
-;;; - http://6502org.wikidot.com/software-token-threading
-;;; - 
-;;; 30 B
 
-_exec:  
-;;; 5
-        ;; only token
-        lda top
-        jmp nexta
-
-_nextloop:
-        uJSR _next
-        jmp loop
-
-;;; WARNING: Don't jmp next!!!
-;;; this isn't forth
-;;; TODO: still valid? lol
-_next:   
-;;; 5
-        sta token
-        uJSR _nexttoken
-
-_nexta: 
-;;; 10 (+5 trans)
-
-.ifdef MINIMAL
-
-        ;; no trans for >= 128 (already offset)
-        bmi notrans
-;;; transalte
-        tay
-        lda transtable,y
-notrans:
-
-.endif
-
-.ifdef TRACE
-        PUTC 'o'
-        ldx #0
-;;; TODO: no more AX!
-        jsr printd
-
-        NEWLINE
-.endif
-
-callAoffset:    
-        ;; macro subtroutine?
-        ;; (offset > codestart)
-        cmp #(codestart-jmptable)
-        bcs _interpret
-
-        ;; save in "jmp jmptable" low byte!
-        sta call+1
-
-        ;; A= token (for _var _number ...)
-        lda token
-
-call:   jmp jmptable
-
-;;; ----------- SAVE MORE BYTeS -------------
-
-;;; TODO: 6 _routines jsr push first thing!
-;;;  (maybe A>xx can change this?)
-
-;;; TODO: a number of _routines LDY #0
-;;;    others LDA #0 (tya)
-;;; enable this.
-;;; 
-;;; LDY #0 - for all
-
-;;; TODO: fix, retain token A
-;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
-;;; 
-;;; A contains dispatch offset (should be char?)
-
-;;; NOTE: if _routines expect A+Y to be clear then
-;;;   some will break if they are called internally!
-;;;   maybe have some notation, if have name
-;;; 
-;;;   _foo_AYZ == optimized w AYZ
-;;;   foo      == safe!
 
 ;;; ========================================
-;;; uJSR
-
-;;; 6502 minimalist JSR (all in one page code!)
+;;; uJSR - 6502 minimalistic 2 byte JSR
+;;;
+;;; (all library in one page code!)
 ;;; -------------------------------------------
 ;;; A two byte JSR for calls within a page.
 ;;; 
@@ -1083,11 +1004,10 @@ call:   jmp jmptable
 ;;; 
 ;;; PS: disable interrrupts SEI
 
-;;; enable to see if save any byte
-.ifblank
+.ifndef UJSR
 
 .macro uJSR addr
-        jsr addr
+;        jsr addr
 .endmacro
 
 .else
@@ -1132,16 +1052,116 @@ _BRK:
 brkadr: lda jmptable-1,y        ; lo to
         bne callAoffset
 
-.endif ; more src uJSR
-
+.endif ; more alt src uJSR
 
 .endif ; _uJSR
 
 
 
-;;; uJSR
-;;; ========================================
+.ifndef MINIMAL
 
+;;; (14 B)
+_interactive:    
+;;; this is so we alwAY get back here
+;;; (essentially, no need jsr exec and jmp)
+;;; (and this tail-calls into exec, same same!)
+        uJSR _rdloop
+        jmp retloop
+_rdloop:   
+        putc '>'
+        uJSR _key
+
+.ifdef TRACE
+        jsr trace
+.endif ; TRACE
+
+        ;;  fallthrough to exec
+.endif ; MINIMAL
+
+;;; exec byte instruction in A
+;;; 
+;;; references
+;;; - http://6502org.wikidot.com/software-token-threading
+;;; - 
+;;; 30 B
+
+_exec:  
+;;; 5
+        ;; only token
+        lda tos
+        jmp _nexta
+
+_nextloop:
+        uJSR _next
+        jmp _nextloop
+
+;;; WARNING: Don't jmp next!!!
+;;; this isn't forth
+;;; TODO: still valid? lol
+_next:   
+;;; 5
+        sta token
+        uJSR _nexttoken
+
+_nexta: 
+;;; 10 (+5 trans)
+
+.ifdef MINIMAL
+
+        ;; no trans for >= 128 (already offset)
+        bmi notrans
+;;; transalte
+        tay
+        lda transtable,y
+notrans:
+
+.endif
+
+.ifdef TRACE
+        PUTC 'o'
+        ldx #0
+;;; TODO: no more AX!
+        jsr printd
+
+        NEWLINE
+.endif
+
+callAoffset:    
+        ;; macro subtroutine?
+        ;; (offset > macrostart)
+        cmp #(macrostart-jmptable)
+        bcs _interpret
+
+        ;; save in "jmp jmptable" low byte!
+        sta call+1
+
+        ;; A= token (for _var _number ...)
+        lda token
+
+call:   jmp jmptable
+
+;;; ----------- SAVE MORE BYTeS -------------
+
+;;; TODO: 6 _routines jsr push first thing!
+;;;  (maybe A>xx can change this?)
+
+;;; TODO: a number of _routines LDY #0
+;;;    others LDA #0 (tya)
+;;; enable this.
+;;; 
+;;; LDY #0 - for all
+
+;;; TODO: fix, retain token A
+;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
+;;; 
+;;; A contains dispatch offset (should be char?)
+
+;;; NOTE: if _routines expect A+Y to be clear then
+;;;   some will break if they are called internally!
+;;;   maybe have some notation, if have name
+;;; 
+;;;   _foo_AYZ == optimized w AYZ
+;;;   foo      == safe!
 
 
 
@@ -1150,7 +1170,7 @@ brkadr: lda jmptable-1,y        ; lo to
 ;;; start interpreation at IP,Y
 ;;; 
 ;;; (+ 2 9 19 12) = 42 B
-proc _interpret
+.proc _interpret
 
 ;;; TODO: set IP,y?
 
@@ -1162,7 +1182,7 @@ enter:
 ;;; 9
         ldy #(endframe-startframe)
 save:   
-        lda startframe-1.y
+        lda startframe-1,y
         pha
         dey
         bne save
@@ -1176,9 +1196,10 @@ subr:
 
 ;;; TODO: can this be moved into exec?
 ;;;   (maybe some problem with Ztail/Recurse?
-        lda #-1
+.ifndef MINIMAL
+        lda #256-1
         sta ipp
-
+.endif 
         ldy #$ff
         sty ipy
 
@@ -1207,13 +1228,6 @@ _nexttoken:
         lda (ip),y
         sta token
         rts
-
-
-.ifnblank
-;;; TODO: 30 jsr so can save 11 bytes only...
-
-;;; MINIMAL:
-;;;   TODO: 25+ jsr so can save 15 B !!!
 
 
 ;;; ----------------------------------------
@@ -1257,7 +1271,7 @@ _setvar:
 ;;; 9
         jsr _vary               ; canNOT uJSR
 
-        jsr _pushA              ; canNOT uJSR
+        jsr _pusha              ; canNOT uJSR
         uJSR store
 
 ;;; ^ return from lambda
@@ -1283,37 +1297,18 @@ _semis:
 _ret:    
         rts
 
-;;; a-h gives you parameter to current function
-_var:   
-;;; TODO: done twice for a-z and 0-9 ... save bytes?
-;;;  maybe keep token in A, or zp place?
 
-;;; (+ 8 3 13) = 21
-;;; 8
-        uJSR push
-        lda token
 
-        ;; a-h --> 1--8
-        and #31
-        clc
-        adc ipx
-
-;;; 13
-        tay
-        ;; not 0 based so stack-1
-        lda stack-1,y
-        pha
-        lda stack-1+1,y
-        jmp loadPOPa
-        
 ;;; ----------------------------------------
+
+
 
 _binliteral:       
 ;;; 11 B
         uJSR _nexttoken
-        sta top
+        sta tos
         uJSR _nexttoken
-        sta top+1
+        sta tos+1
         rts
 
 ;;; TODO: idea
@@ -1323,15 +1318,37 @@ _binliteral:
 ;;;   {{{{ ora sta ... loop
 
 .ifdef MINIMAL
-_hexliteral = _undef
-.esle
+        ;; set all undef functions of minimal
+        _hexliteral     = _undef
+        _number         = _undef
+        _quote          = _undef
+        _ora            = _undef
+        _pushaddr       = _undef
+        _writez         = _undef
+        _null           = _undef
+        _dec            = _undef
+        _cdr            = _undef
+        _cons           = _undef
+        _colon          = _undef
+        _sbc            = _undef
+        _TOSbytecomma   = _undef
+        _shl            = _undef
+
+        _var            = _undef
+        _setvar         = _undef
+        _lambda         = _undef
+        _return         = _undef
+
+        _printd         = _undef
+
+.else
 
 ;;; modifies existing number
 ;;; first multiplies by 10 (or 16 if in hex!)
 ;;; then adds current number 
 ;;; 
 ;;; (+ 19 12 11) = 42 B macro: (+ 18 6 7) = 31 !!!
-_number:        
+.proc _number
 ;;; 19
         uJSR mul10
         
@@ -1344,6 +1361,7 @@ digit:  and #$f
 
         jsr _pusha              ; canNOT use uJSR
         jmp _plus
+.endproc
 
 ;;; just add a real mul (19 B for 16x8->16?)
 ;;; 38 B for 16x16->16 (?)
@@ -1365,13 +1383,13 @@ mul10:
 _adda:  
 ;;; 10 B
         clc
-        adc top
-        sta top
+        adc tos
+        sta tos
         bcc noinc
-        inc top+1
+        inc tos+1
 noinc:  
         rts
-.endif
+.endif ; !BLANK
         
 ;;; 'a
 _quote: 
@@ -1398,8 +1416,8 @@ do:
 digit:  and #$f
 
         ;; merge into
-        ora top
-        sta top
+        ora tos
+        sta tos
 
         rts
 
@@ -1407,8 +1425,8 @@ digit:  and #$f
 _asl4:  uJSR _asl2
 _asl2:  uJSR _asl
 _asl:   
-        asl top
-        rol top+1
+        asl tos
+        rol tos+1
         rts
         
 ;;; : h #15 & '0 + " '9 > B+3 6 + ; 17 B
@@ -1425,7 +1443,7 @@ _puthex:
 done:   
         jmp _putc
 
-.endif
+.endif ; !BLANK
 
 
 
@@ -1434,7 +1452,8 @@ done:
 ;;; 
 ;;; 56 B - barely worth it!!!
 ;;; (milliforth: 59 B...)
-_colon:        
+.ifnblank
+.proc _colon
         uJSR push
 
         uJSR _nexttoken
@@ -1452,7 +1471,7 @@ _colon:
 ;;; TODO: at end of first page can have forwarding
 ;;;   offsets to funs in page2?
 ;;; TODO: even aligned addresses? als of offset?
-        cmp #>'jmptable
+        cmp #>jmptable
         bne secondpage
         ;; does it fit in first page?
 firstpage:      
@@ -1460,7 +1479,7 @@ firstpage:
 ;;; TODO: assuming decompressed table!
         pla
         tay
-        lda top                 ; lo
+        lda tos                 ; lo
         sta transtable,y        ; save lo offset!
         rts
 
@@ -1471,7 +1490,7 @@ secondpage:
         ;; store at end of second page
         sta jmptable+256,y
         dey
-        lda top
+        lda tos
         sta jmptable+256,y
         dey
 
@@ -1489,40 +1508,42 @@ findend:
         bne findend
 colondone:      
 
-        jmp pop
-
+        jmp _pop
+.endproc
+.endif ; !BLANK
 
 ;;; colon
 ;;; ----------------------------------------
 ;;; memory
 ;;; 
 ;;; (+ 17 8 17) = 42    cdr+car dup swap
-;;;               45    topo,+inc+!+drop2+topr,+dec2+dec 
+;;;               45    tos,+inc+!+drop2+topr,+dec2+dec 
 
-
-cdr:    
+.ifndef MINIMAL
+_cdr:    
 ;;; 3 + 14 = 17 B
         ldy #2
         ;; BIT-hack (skips next 2 bytes)
         .byte $2c
-load:  
-car:    
+.endif ; MINIMAL
+
+_load:  
+_car:    
 ;;; (14 B)
         ldy #0
 cYr:    
-        lda (top),y
+        lda (tos),y
         pha
         iny
-        lda (top),y
-;;; load TOP w (A, pla) (hi,lo)
+        lda (tos),y
+;;; load tos w (A, pla) (hi,lo)
 ;;; (useless?) kindof opposite 
 loadPLAa: 
 ;;; (6 B)
-        sta top+1
+        sta tos+1
         pla
-        sta top
+        sta tos
         rts
-
 
 ;;; - stack ops: dup swap
 
@@ -1534,8 +1555,8 @@ loadPLAa:
 ;;; sta a b ... -> a (a) ...
 ;;;   "swap drop"
 
-;;; lda:   top= stack[x], x-= 2
-;;; sta:   stack[x]= top, x-= 2
+;;; lda:   tos= stack[x], x-= 2
+;;; sta:   stack[x]= tos, x-= 2
 
 
 ;;; over (a b ... -> b a b ...)
@@ -1553,10 +1574,11 @@ over:
         dex
         dex                     ; b a b
         rts
-.endif
+.endif ; !BLANK
+
 
 _dup:  
-push:   
+_push:   
 ;;; 8 B !
         ;; a | b c ...
         dex
@@ -1570,7 +1592,7 @@ push:
         ;; a | a b c ..
         rts
 
-swap:   
+_swap:   
 ;;; 17 B !
         ;; q= tos = b
         lda stack,x
@@ -1589,22 +1611,22 @@ swap:
 
         ;; tos= q (= b)
         pla ; hi
-        jmp loadPOPA
+        jmp _loadPOPa
         ;; b | a c ..
 
 
 
-;;; top, inc !=store drop2 topr, dec2 dec
+;;; tos, inc !=store drop2 tosr, dec2 dec
 ;;; 
 ;;; (+ 19 8 18) = 45 B - 6.4 B/word
 
 ;;; comma moves words from overstack
-;;;   to address in top, top advances with 2
+;;;   to address in tos, tos advances with 2
 ;;; 
 ;;; (addr value ...) -> (addr+2 ...)
 ;;;   addr+2 !
 ;;; 
-;;; C: *ptr1= stack[x]; x+= 2; top+= 2;
+;;; C: *ptr1= stack[x]; x+= 2; tos+= 2;
 ;;;
 ;;; ccomma:
 ;;;   WARNING: stack is misaligned one byte!
@@ -1616,15 +1638,15 @@ _comma:
         jsr _ccomma             ; canNOT uJSR
 _ccomma:
         lda stack,x
-        sta (top),y
+        sta (tos),y
         inx
         iny
 
 .proc _inc
 ;;; (7 B)
-        inc top
+        inc tos
         bne ret
-        inc top+1
+        inc tos+1
 ret:    
         rts
 .endproc
@@ -1637,8 +1659,9 @@ _store:
 drop2:  
         dex
         dex
-        jmp pop
+        jmp _pop
 
+.ifndef MINIMAL
 _rcomma:        
 ;;; 6+12 = 18
         uJSR dec2
@@ -1650,30 +1673,34 @@ dec2:
 
 .proc _dec
 ;;; (9 B)
-        lda top
+        lda tos
         bne ret
-        dec top+1
+        dec tos+1
 ret:    
-        dec top
+        dec tos
         rts
 .endproc
-
+.endif ; MINIMAL
 
 ;;; memory
 ;;; ----------------------------------------
 ;;; IO
-;;; (+ 5 6 9) = 20
+;;; 6 (+ 5 9) = 14 .. 20
 
+_putc:  
+;;; 6 B
+        jsr putchar             ; canNOT be uJSR
+        jmp _pop
+
+
+
+.ifdef MINIMAL
 ;;; 5B : T #10 O ; # 4
 _terpri:
 ;;; 5 B
         uJSR push
         lda #10
         ;; fall-through
-_putc:  
-;;; 6 B
-        uJSR putchar
-        jmp pop
 _key:   
 _getc:         
 ;;; 9 B
@@ -1681,8 +1708,9 @@ _getc:
         ; cli
         uJSR _getc
 	; sei
-        jmp _seta
-        
+        jmp _pusha
+
+.endif ; MINIMAL
         
 
 ;;; -----------------------------------
@@ -1695,7 +1723,7 @@ _zbranch:
 ;;; 14 B
         lda tos
         ora tos+1
-        bne pop
+        bne _pop
         ;; zero so branch relative
         ;; (TODO: if not compiled could encode
         ;;  jmp at hibit, and/or some literals!)
@@ -1705,7 +1733,8 @@ _zbranch:
 ;        clc
 ;        adc ipy
 ;        sta ipy
-        jmp pop
+        jmp _pop
+
 
 .ifndef MINIMAL
 
@@ -1728,25 +1757,6 @@ setfalse:
 ;;; (6 B)
         lda #0
 
-;;; TODO: many variants, save any bytes?
-
-
-;;; pushes A on the data stack
-_seta: 
-        pha
-;;; pushes a new value PLAd from hardware stack
-_setPLA:
-        lda #0
-        jmp _loadPOPa
-
-
-;;; TODO: not clear if gonno work???
-_pushA: 
-        pha
-_pushPLA:       
-        uJSR push
-        jmp _seta
-
 ;;; TODO: macro
 _zero:   
 ;;; 6 B
@@ -1754,6 +1764,8 @@ _zero:
         jmp setfalse
         
 .endif ; MINIMAL
+
+
 
 ;;; --------- MATH
 
@@ -1810,8 +1822,8 @@ _sta:
         ldy #$9d
         bne mathop
 
-drop: 
-pop:
+_drop: 
+_pop:
 _lda:   
         ;; LDA oper,x
         ldy #$bd
@@ -1840,17 +1852,36 @@ op:     adc stack,x
 
 _shr:   
 ;;; 5B !
-        lsr top+1
-        ror top
+        lsr tos+1
+        ror tos
         rts
 
 
-.ifdef MINIMAL
+;;; TODO: many variants, save any bytes?
 
-_printd = _undef
-_shl = _undef
+;;; pushes A on the data stack
+_seta: 
+        pha
+;;; pushes a new byte value PLAd from hardware stack
+_setPLA:
+        lda #0
+_loadPOPa:      
+        sta tos+1
+        pla
+        sta tos
+        rts
 
-.else        
+
+;;; TODO: not clear if gonno work???
+_pusha:
+        pha
+_pushPLA:       
+        uJSR push
+        jmp _seta
+
+
+
+.ifndef MINIMAL
 
 ;;; maybe B doesn't pop as well as O?
 ;        .byte DUP,"@",DUP,"B_",+2,0,DUP,"OIB",WRITEZ
@@ -1871,8 +1902,8 @@ _printz:
 _writez: 
 ;;; 12B
         ldy #0
-        lda (top),y
-        beq pop
+        lda (tos),y
+        beq _pop
         jsr _putc               ; canNOT uJSR
         iny
         bne _writez
@@ -1880,7 +1911,7 @@ _writez:
 _printd:        
         jmp printd
 
-;;; comparez (ptr1, top) strings
+;;; comparez (ptr1, tos) strings
 ;;; starting at offset Y
 ;;; 
 ;;; Result: beq if equal (Z set)
@@ -1890,7 +1921,7 @@ comparezloop:                   ; haha!
         iny
 comparez:
         lda (ptr1),y
-        cmp (top),y
+        cmp (tos),y
         beq comparezloop
         rts
 
@@ -1994,8 +2025,8 @@ _shl4:  uJSR _shl2
 _shl2:  uJSR _shl
 _shl:   
 ;;; 5B (but technically not needed)
-        asl top
-        rol top+1
+        asl tos
+        rol tos+1
         rts
 
 .endif ; MINIMAL
@@ -2020,34 +2051,36 @@ _shl:
 ;;; literal:  11 (37) L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
 ;;; memory:   39  (3) (cdr) @car "dup $wap
 ;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
-;;; IO:       15  (5) (T) O K
+;;; IO:        6 (14) O (K T)
 ;;; tests:    14 (23) zbranch (null) (0 true?sym)
 ;;; math:     41  (9) + & (- |) E _drop shr
 ;;; transtable:0(102) (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 235 B   words: 19    avg: 12.4 B/op
+;;; TOTAL: 226 B   words: 19    avg: 12.4 B/op
+;;; 
+;;;         TODO: tasmlisp.bin  is 385 bytes!!!
 ;;; 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 6 37 42 3 11 39 27 15 14 41)
-;;; (+ 1  1  0 1  1  3  4  2  1  5)
+;;; (+ 6 37 42 3 11 39 27 6 14 41)
+;;; (+ 1  1  0 1  1  3  4 2  1  5)
 ;;; (/ 235.0 19)   -> bytes per word
 ;;; (/ 256.0 12.4) -> 20 words possible
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 575 B    words: 42    avg 13.7 B/w
+;;; TOTAL: 584 B    words: 42    avg 13.7 B/w
 ;;; 
 ;;; 102 is counting table overflow
 ;;;   need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
 ;;;                                   |
-;;; (+ 235 14 4 56 43 37 3 18 5 23 9 128)
-;;; (+  19  1 0  1  4  7 1  3 2  2 2   0)
+;;; (+ 235 14 4 56 43 37 3 18 14 23 9 128)
+;;; (+  19  1 0  1  4  7 1  3  2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
@@ -2155,7 +2188,7 @@ about 4.5x.
 ;;; 
 ;;; -- 66 chars including spaces
 
-codestart:
+macrostart:     
 
 ;;; NULL: 14 B
 
@@ -2183,7 +2216,11 @@ endtable:
 
 .assert (endtable-jmptable)<=256, error, "Table too big"
 
+
 transtable:     
+
+.ifndef MINIMAL
+
 .macro DO name
         .byte <(name-jmptable)
 .endmacro
@@ -2243,7 +2280,7 @@ transtable:
         DO _undef              ; ) -
         DO _undef              ; * - mult
         DO _plus               ; +
-        DO _TOPbytecomma       ; , ccomma
+        DO _TOSbytecomma       ; , ccomma
         DO _sbc                ; -
 
 ;;; DEBUG - TODO: cheating - change!!!
@@ -2279,7 +2316,7 @@ transtable:
         DO _inc                ; I
         DO _dec                ; J
         DO _key                ; K
-        DO _literal            ; L
+        DO _binliteral         ; L
         DO _undef              ; M - mapcar
         DO _undef              ; N - number?
         DO _putc               ; O
@@ -2326,6 +2363,7 @@ transtable:
         DO _undef              ; t - 
         DO _undef              ; u - 
         DO _undef              ; v - 
+        DO _undef              ; w - 
         DO _undef              ; x - 
         DO _undef              ; y - 
         DO _undef              ; z - 
@@ -2336,9 +2374,13 @@ transtable:
         DO _undef              ; ~ - not
         DO _undef              ; DEL - 
 
+.endif ; MINIMAL
+
 endtrans:       
 
+.ifndef MINIMAL
 .assert (*-transtable)=128, error, "Transtable not right size"
+.endif  
 
 ;;; maybe for MINIMAL++ ? lol
 
@@ -2396,6 +2438,7 @@ ret:
 
 transuns:       
         .res 128, (_undef-jmptable)
+.endif ; !BLANK
         
 
 ;;; ----------------------------------------
@@ -2413,7 +2456,7 @@ cons:
 ;;; ASMLISP (+ 21 -1 14 13) = 48!!!!
 ;;; (+ 14 11 11) = 36
         jsr conspush            ; cdr
-        jsr pop
+        jsr _pop
         jsr conspush            ; car
         lda #<lowcons
         ldx #>lowcons
@@ -2430,7 +2473,7 @@ conspush:
 .else
 ;;; 31
         jsr conspush
-        jsr pop
+        jsr _pop
         jsr conspush
         lda #<lowcons
         ldx #>lowcons
@@ -2452,7 +2495,7 @@ nodec:
         ldy #0
         sta (lowcons),y
         rts
-.endif
+.endif ; !BLANK
 
 ;;; --------------------------------------------------
 ;;; Functions f(AX) => AX
@@ -2474,6 +2517,8 @@ nodec:
 
 
 endaddr:
+.byte "<AFTER"
+
 
 ;;; end usercode
 ;;; ========================================
@@ -2486,7 +2531,7 @@ endaddr:
         .byte str,0
 .endmacro
 
-
+.ifndef BLANK
 ;;; called in nexttoken w A0 token
 .proc trace
         RDUP
@@ -2507,7 +2552,7 @@ endaddr:
         putc 'd'
         lda #$ff
         sec
-        sbc sidx
+;        sbc sidx
         ldx #0
         jsr printd
 
@@ -2536,7 +2581,7 @@ endaddr:
         RPOP
         rts
 .endproc
-
+.endif ; !BLANK
 
 
 ;;; ===============================================
@@ -2755,8 +2800,8 @@ under10:
 
 
 -- PRIMITIVES
-@       read word from TOP store in TOP
-,       store byte in address TOP, stack+1 swap hi/lo
+@       read word from TOS store in TOS
+,       store byte in address TOS, stack+1 swap hi/lo
 Ln      literal
 #n      small literal (<256)
 U       nUll

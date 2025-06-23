@@ -30,18 +30,19 @@ rm fil
 echo "--gen .s--"
 #rm $name.s
 cc65 -r -Oirs $OPTS -T $name.c vm-asm.s 2>/dev/null
-ls -l $name.s
+ls -g $name.s
 
 echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 
 #cl65 -vm -m $name.map $name.o
 
-ls -l $name.o $name.tap
+ls -g $name.o $name.tap
 
 # make it autostart and copy to download directory
 
 nam=$(basename $name)
 echo "NAME: $nam"
 
-cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -l $name.tap ORIC/$nam.tap
+perl -e '$_=join("",<>);s/^[\s\S]*BEFORE>//m;s/<AFTER[\s\S]*//m;print;' $nam.tap > $nam.bin
 
+cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -g $name.tap $nam.bin ORIC/$nam.tap
