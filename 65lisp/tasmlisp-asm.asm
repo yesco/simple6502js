@@ -453,9 +453,12 @@ subtract .set 0
 
 
 
-COMPRESSED=1
-ENDCHAR=0
 _initlisp:      
+
+COMPRESSED=1
+;;; ENDCHAR can't occur anywhere in the compressed data
+;;; 
+ENDCHAR=0
 
 .ifdef COMPRESSED
 
@@ -518,12 +521,7 @@ dest:   sta destination
         rts
 
 minus:    
-;;; 18
-        ;; end? -> assumes stack will be fixed
-        cmp #ENDCHAR
-        beq destination
-hlt:    beq hlt
-
+;;; 14
         ;; quoted?
         cmp #$ff
         bne ref
@@ -536,10 +534,20 @@ quoted:
         bpl save
         
 ref:    
+;        lda #':'
+;        jsr putchar
+
 ;;; 26
         ;; ref to two pos
         sta savey
 
+        tay
+        and #$0f
+        ora #$30
+        lda #'A'
+        jsr putchar
+        tya
+    
         ;; save current pos: hi,lo
         txa
         pha
@@ -589,9 +597,13 @@ noinc:
         ldy #0
         lda (ptr1),y
 
-        jsr putchar
+        ;; end? -> assumes stack will be fixed
+        cmp #ENDCHAR
+;        beq destination
+hlt:    beq hlt
 
         ;; flags reflect A
+        tay
         rts
 .endproc
 
@@ -880,9 +892,9 @@ data:
 ;;; Everything after the unz is compressed data!
 
 compresseddata: 
-        .byte "Jonas S Karlsson",10
+        .byte "Jonas S Karlsson",10,ENDCHAR
         .byte "abcdefgh",256-4,10
-        .byte 0
+        .byte ENDCHAR
 compressend:
 
         
