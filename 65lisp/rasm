@@ -43,6 +43,11 @@ ls -g $name.o $name.tap
 nam=$(basename $name)
 echo "NAME: $nam"
 
+# extract "sector" from tap file
 perl -e '$_=join("",<>);s/^[\s\S]*BEFORE>//m;s/<AFTER[\s\S]*//m;print;' $nam.tap > $nam.bin
 
+# lol
+ca65 tasmlisp-asm.asm -l tasmlisp-asm.s
+
 cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -g $name.tap $nam.bin ORIC/$nam.tap
+

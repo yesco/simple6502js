@@ -934,11 +934,10 @@ destination:
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
 
-.byte "BEFORE>"
-
 ;;; JMP table
 ;;; align on table boundary by padding
-.res (256 - * .mod 256)-8
+.res (256 - * .mod 256)-7
+.byte "BEFORE>"
 
 ;;; we start program at "sector"
 startaddr:      
@@ -1085,8 +1084,9 @@ _rdloop:
 ;;; - 
 ;;; 30 B
 
+;;; (+ 11 5 12) = 28 (+ 6 for trans)
 _exec:  
-;;; 5
+;;; 11
         ;; only token
         lda tos
         jmp _nexta
@@ -1104,9 +1104,9 @@ _next:
         uJSR _nexttoken
 
 _nexta: 
-;;; 10 (+5 trans)
+;;; 0 (+6 trans)
 
-.ifdef MINIMAL
+.ifndef MINIMAL
 
         ;; no trans for >= 128 (already offset)
         bmi notrans
@@ -1127,6 +1127,7 @@ notrans:
 .endif
 
 callAoffset:    
+;;; 12
         ;; macro subtroutine?
         ;; (offset > macrostart)
         cmp #(macrostart-jmptable)
@@ -1169,7 +1170,7 @@ call:   jmp jmptable
 ;;; 
 ;;; start interpreation at IP,Y
 ;;; 
-;;; (+ 2 9 19 12) = 42 B
+;;; (+ 2 9 11 11) = 33 B  (+ 4  non-minimal.)
 .proc _interpret
 
 ;;; TODO: set IP,y?
@@ -1188,7 +1189,7 @@ save:
         bne save
         
 subr: 
-;;; 15
+;;; 11 (+ 4)
         ;; set new IP
         ;; (only valid for one page code dispatch)
         lda savea
@@ -1207,7 +1208,7 @@ subr:
         
 subrexit:
         ;; pop to current stack frame
-;;; 12
+;;; 11
         ldy #0
 restore:   
         pla
@@ -2042,34 +2043,34 @@ _shl:
 ;;; !MINIMAL + LISP: 20 more ops, lambda
 ;;; 
 ;;;        MINIMAL (lisp/non-minimal)
-;;; system:    4      _reset
-;;; rdloop:    0 (14) (_interactive)
-;;;   exec:   37      X
-;;;  enter:   42      [interpret enter subr exit = subr!]
-;;;  colon:    0 (56) (: [wtf?])
-;;; lambda:    3 (43) ; ( \ ^ a Sa )
-;;; literal:  11 (37) L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
-;;; memory:   39  (3) (cdr) @car "dup $wap
-;;; setcar:   27 (18) , I ! drop2 (r, dec2 J)
-;;; IO:        6 (14) O (K T)
-;;; tests:    14 (23) zbranch (null) (0 true?sym)
-;;; math:     41  (9) + & (- |) E _drop shr
-;;; transtable:0(102) (jsr translate, translate)
+;;; system:    0  (6)   (_reset)
+;;; rdloop:    0 (14)   (_interactive)
+;;;   exec:   28  (6)   X (translation)
+;;;  enter:   33  (4)   [interpret enter subr exit = subr!]
+;;;  colon:    0 (56)   (: [wtf?])
+;;; lambda:    3 (43)   ; ( \ ^ a Sa )
+;;; literal:  11 (37)   L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
+;;; memory:   39  (3)   (cdr) @car "dup $wap
+;;; setcar:   27 (18)   , I ! drop2 (r, dec2 J)
+;;; IO:        6 (14)   O (K T)
+;;; tests:    14 (23)   zbranch (null 0 true?sym)
+;;; math:     41  (9)   + & (- |) E _drop shr
+;;; transtab: 0 (102)   (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 226 B   words: 19    avg: 12.4 B/op
+;;; TOTAL: 202 B   words: 19    avg: 10.6 B/op
 ;;; 
-;;;         TODO: tasmlisp.bin  is 385 bytes!!!
-;;; 
+;;;      ACTUAL: 206 B !!!!   (counting wrong...)
+
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 6 37 42 3 11 39 27 6 14 41)
+;;; (+ 0 28 33 3 11 39 27 6 14 41)
 ;;; (+ 1  1  0 1  1  3  4 2  1  5)
-;;; (/ 235.0 19)   -> bytes per word
-;;; (/ 256.0 12.4) -> 20 words possible
+;;; (/ 202.0 19)   -> bytes per word
+;;; (/ 256.0 10.6) -> 24 words possible!
 
 ;;; ------- !MINIMAL + LISP & interactive!
 ;;; TOTAL: 584 B    words: 42    avg 13.7 B/w
@@ -2079,8 +2080,8 @@ _shl:
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B?
 ;;;                                   |
-;;; (+ 235 14 4 56 43 37 3 18 14 23 9 128)
-;;; (+  19  1 0  1  4  7 1  3  2  2 2   0)
+;;; (+ 235 6 6 14 4 56 43 37 3 18 14 23 9 128)
+;;; (+  19 1 0  1 0  1  4  7 1  3  2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
@@ -2470,7 +2471,9 @@ conspush:
         dey
         sta (lowcons),y
         rts
-.else
+
+;;;  OR
+
 ;;; 31
         jsr conspush
         jsr _pop
