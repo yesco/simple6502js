@@ -483,16 +483,24 @@ subtract .set 0
 ;;; 
 ;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
 
-;;; 92 B - unlimited length, fixed addr, self mod
+
+;;; TODO: variant AX
+
+
+;;; 86 B - unlimited length, fixed addr, self mod
 ;;;        (but requires unique stopchar)
+;;; 
+;;; (+ 8 14 4 12 39 9)= 86
 .proc unz
         ;; init
+;;; 8
         lda #<compresseddata
         sta ptr1
         lda #>compresseddata
         sta ptr1+1
 
 loop:   
+;;; 14
         ldy #0
         jsr nextbyte
 
@@ -500,26 +508,31 @@ loop:
         beq startaddr
 
         jsr unzchar
-        jmp loop
+        bne loop
 
 unzchar:        
+;;; 4
         cmp #0
         bmi minus
         ;; plain
 save:   
+;;; 12
 dest:   sta dest
         ;; step
         inc dest+1
         bne @noinc
         ind dest+2
 @noinc: 
+        ;; Z=0
         rts
 
 minus:    
+;;; 12
         ;; quoted?
         cmp #$ff
         bne ref
         ;; quoted
+quoted: 
         jsr nextbyte
         eor #128
         iny
@@ -527,6 +540,7 @@ minus:
         bpl save
         
 ref:    
+;;; 33+2*nextchar = 39
         ;; ref to two pos
         sta savea
         ;; save current pos
@@ -545,23 +559,24 @@ ref:
 
         ;; unz(pos+ref)->newpos
         ;; Y==0
+        jsr nextchar
         jsr unzchar
 
-        ;; Y==0 or 1(if quoted!)
-        iny
         ;; unz(newpos + 1)
+        iny
+        jsr nextchar
         jsr unzchar
 
         ;; restore pos
-        ldy #0
-
         pla
         sta ptr1
         pla
         sta ptr1+1
+        ;; Z=0
         rts
 
 nextbyte:
+;;; 9
         lda (ptr1),y
         ;; step
         inc ptr1
