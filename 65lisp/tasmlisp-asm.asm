@@ -487,6 +487,102 @@ subtract .set 0
 ;;; TODO: variant AX
 
 
+;;; (+ 4 7 14 14 26 17) = 82 slightly smaller...
+.proc unz
+        ;; init
+;;; 4
+        lda #<(compresseddata-1)
+        ldx #>(compresseddata-1)
+
+loop:   
+;;; 5
+        jsr unzchar
+        bne loop
+
+unzchar:        
+;;; 7
+        jsr nextbyte
+        bmi minus
+        ;; plain
+save:   
+;;; 14
+dest:   sta dest
+        ;; step
+        inc dest+1
+        bne @noinc
+        ind dest+2
+@noinc: 
+        lda savea
+        rts
+
+minus:    
+;;; 14
+        ;; quoted?
+        cmp #$ff
+        bne ref
+        ;; quoted
+quoted: 
+        lda savea
+        jsr nextbyte
+        eor #128
+        ;; jmp save (always pl!)
+        bpl save
+        
+ref:    
+;;; 26
+        ;; ref to two pos
+        sta savey
+
+        ;; save current pos
+        txa
+        pha
+        lda savea
+        pha
+
+        ;; modify by add a
+        clc ; ? or sec?
+        adc savey
+        txa
+        adc #$ff                ; we're really sub!
+        tax
+
+        ;; unz(pos+ref)->newpos
+        jsr unzchar
+
+        ;; unz(newpos + 1)
+        jsr unzchar
+
+        ;; restore pos
+        pla
+        tay
+        pla
+        tax
+        tya
+
+        rts
+
+nextbyte:
+;;; 17
+        ;; step
+        clc
+        adc #1
+        bne noinc
+        inx
+noinc:  
+        sta savea
+
+        sta ptr1
+        stx ptr2
+        ldy #0
+        lda (ptr1),y
+        ;; flags reflect A
+        rts
+
+.endproc
+
+
+
+
 ;;; 86 B - unlimited length, fixed addr, self mod
 ;;;        (but requires unique stopchar)
 ;;; 
@@ -508,7 +604,7 @@ loop:
 
 unzchar:        
 ;;; 7
-        jsr nextchar
+        jsr nextbyte
         cmp #0
         bmi minus
         ;; plain
