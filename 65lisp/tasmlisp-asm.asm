@@ -347,7 +347,7 @@ notnl:
 ;;; 5B
 .macro putc c
         lda #(c)
-        jsr _putc
+        jsr _out
 .endmacro
 
 subtract .set 0
@@ -1042,7 +1042,8 @@ _BRK:
 ;;; 
 ;;; jsr calls *within* one page
 ;;; 
-;;; 8 B - smallest so far!
+;;; 9 B - smallest so far!
+        pla                     ; throw away P
         pla                     ; lo
         pha
         tay
@@ -1053,7 +1054,8 @@ _BRK:
 
 ;;; handle more than from 2 page jmp
 ;;; 
-;;; 14 B
+;;; 15 B
+        pla                     ; throw away P
         pla
         tay                     ; lo from
         pla
@@ -1312,7 +1314,7 @@ _return:
 .endif ; MINIMAL
 
 ;;; semis (return from interpretastion)
-_semis:
+_exit:  
 ;;; 3
         pla
         pla
@@ -1355,7 +1357,7 @@ _binliteral:
         _dec            = _undef
         _cdr            = _undef
         _sbc            = _undef
-        _shl            = _undef
+        _mul2           = _undef
 
         _var            = _undef
         _setvar         = _undef
@@ -1396,9 +1398,9 @@ digit:  and #$f
 ;;; 
 ;;; 12
 mul10: 
-        uJSR _shl
+        uJSR _mul2
         uJSR _dup
-        uJSR _shl2
+        uJSR _mul2
         jmp _plus
 
 .ifnblank
@@ -1464,7 +1466,7 @@ _puthex:
         bcc done
         adc #$06+32             ; carry set already
 done:   
-        jmp _putc
+        jmp _out
 
 .endif ; !BLANK
 
@@ -1710,7 +1712,7 @@ ret:
 ;;; IO
 ;;; 6 (+ 5 9) = 14 .. 20
 
-_putc:  
+_out:  
 ;;; 6 B
         jsr putchar             ; canNOT be uJSR
         jmp _pop
@@ -1725,11 +1727,10 @@ _terpri:
         lda #10
         ;; fall-through
 _key:   
-_getc:         
 ;;; 9 B
         uJSR zero
         ; cli
-        uJSR _getc
+        jsr getchar             ; canNOT be uJSR
 	; sei
         jmp _pusha
 
@@ -1792,8 +1793,8 @@ _zero:
 
 ;;; --------- MATH
 
-;;; 50B _adc _and _eor _ora _sbc (_sta) _pop(_lda) shr (7)
-;;; + & E | - () _ shr (+ (* 5 2) (* 4 4) 2 17 5)
+;;; 50B _adc _and _eor _ora _sbc (_sta) _pop(_lda) div2 (7)
+;;; + & E | - () _ div2 (+ (* 5 2) (* 4 4) 2 17 5)
 ;;;                               ^-- used by dup
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
@@ -1873,7 +1874,7 @@ op:     adc stack,x
         inx
         rts
 
-_shr:   
+_div2:   
 ;;; 5B !
         lsr tos+1
         ror tos
@@ -1927,7 +1928,7 @@ _writez:
         ldy #0
         lda (tos),y
         beq _pop
-        jsr _putc               ; canNOT uJSR
+        jsr _out                ; canNOT uJSR
         iny
         bne _writez
 
@@ -1976,7 +1977,7 @@ comparez:
         
 white:
 ;;; 7 B
-        uJSR _getc
+        uJSR _key
 
         ;; skip leading white space (any < '(' - LOL)
         cmp #'('
@@ -1993,7 +1994,7 @@ readloop:
         ;; accept char
         sta (here),y
         iny
-        jsr _getc               ; canNOT uJSR
+        jsr _key                ; canNOT uJSR
         jmp readloop
 
 done:   
@@ -2047,9 +2048,9 @@ readlist:
 
 
 ;;; 11 : {{{"+ ; # 6 -> shl shl2 shl3 shl4
-_shl4:  uJSR _shl2
-_shl2:  uJSR _shl
-_shl:   
+_mul16: uJSR _mul4
+_mul4:  uJSR _mul2
+_mul2:   
 ;;; 5B (but technically not needed)
         asl tos
         rol tos+1
@@ -2079,7 +2080,7 @@ _shl:
 ;;; setcar:   27 (18)   , I ! drop2 (r, dec2 J)
 ;;; IO:        6 (14)   O (K T)
 ;;; tests:    14 (23)   zbranch (null 0 true?sym)
-;;; math:     41  (9)   + & (- |) E _drop shr
+;;; math:     41  (9)   + & (- |) E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
 
 ;;; ------ MINIMAL (not interactive)
@@ -2215,29 +2216,40 @@ about 4.5x.
 ;;; 
 ;;; -- 66 chars including spaces
 
+;;; ========================================
+;;; I N T E R N A L   M A C R O S
+;;; 
+;;; 
+
+.macro DO label
+        .byte <(label-jmptable)
+.endmacro
+
+.macro LIT w
+        DO _binliteral
+        .word w
+.endmacro
+
+.macro ZBRANCH else,start
+        DO _zbranch
+        .byte (else-start-1+256) .mod 256
+.endmacro
+
 macrostart:     
 
-;;; NULL: 14 B
+.ifblank
 
-;_TRUE:  
-;;; 4 B
-;        .byte "L"
-;        .word $ffff
-;       .byte 0
+_NULL:
+;;; 10 B
+        ZBRANCH _ZERO, _NULL
+_FFFF:  
+        LIT $ffff
+        DO _exit
+_ZERO:  
+        LIT $0000
+        DO _exit
 
-;_ZERO:  
-;;;; 4 B
-;        .byte "L"
-;        .word $0000
-;        .byte 0
-
-;_NULL:
-;;; 6 B
-;        .byte "B",+2
-;        .DO _TRUE
-;        .byte 0
-;        .DO _ZERO
-;        .byte 0
+.endif        
 
 endtable:       
 
@@ -2251,8 +2263,10 @@ transtable:
 
 .ifndef MINIMAL
 
-.macro DO name
-        .byte <(name-jmptable)
+.macro DF label, num, name
+        .byte <(label-jmptable)
+; NOT USED - LOL
+;        .ident(name) = num
 .endmacro
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
@@ -2261,7 +2275,7 @@ transtable:
 ;;;       than being "lisp" AL (AlphabeticalLisp)
 
         ;; 0--31
-        DO _semis              ; \0
+        DO _exit               ; \0
         DO _undef
         DO _undef
         DO _undef
@@ -2299,23 +2313,23 @@ transtable:
 
         ;; ' '-127
         DO _undef              ; ' '
-        DO _store              ; !
-        DO _undef              ; " - dup (MINT)
-        DO _number             ; # - lit
-        DO _swap               ; $ - hexlit? swap (MINT)
+        DF _store, 33,"_STORE" ; !
+        DF _dup,   34,"_DUP"   ; " - dup (MINT)
+        DF _number,35,"_NUM"   ; # - lit
+        DF _swap,  36,"_SWAP"  ; $ - hexlit? swap (MINT)
         DO _undef              ; % - over, or ` (MINT)
-        DO _and                ; &
-        DO _quote              ; '
+        DF _and,   38,"_AND"   ; &
+        DF _quote, 39,"_QUOTE" ; '
         DO _undef              ; ( - compile if "zBranch"
         DO _undef              ; ) -
         DO _undef              ; * - mult
-        DO _plus               ; +
-        DO _TOSbytecomma       ; , ccomma
-        DO _sbc                ; -
+        DF _plus,  43,"_PLUS"  ; +
+        DF _TOSbytecomma,44,"_COMMA" ; , ccomma
+        DF _sbc,   45,"_MINUS" ; -
 
 ;;; DEBUG - TODO: cheating - change!!!
 ;;; TODO: write in CODE
-        DO _printd             ; . - print num
+        DF _printd,46,"_PRNUM" ; . - print num
 
         DO _undef              ; / - TOOD: macro: div
         DO _number             ; 0
@@ -2328,44 +2342,44 @@ transtable:
         DO _number             ; 7
         DO _number             ; 8
         DO _number             ; 9 
-        DO _colon              ; :
-        DO _semis              ; ;
+        DF _colon,  58,"_COLON"; :
+        DF _exit,   59,"_EXIT" ; ;
         DO _undef              ; < - lt
         DO _undef              ; =   : = -U ; # 4
         DO _undef              ; > - gt
         DO _undef              ; ? - is atom? if?
-        DO _load               ; @ car
+        DF _load,   64,"_LOAD" ; @ car
         DO _undef              ; A - assoc/alloc
-        DO _zbranch            ; B
-        DO _cons               ; C
-        DO _cdr                ; D
-        DO _eor                ; E
+        DF _zbranch,66,"_IF"   ; B
+        DF _cons,   67,"_CONS" ; C
+        DF _cdr,    68,"_CDR"  ; D
+        DF _eor,    69,"_EOR"  ; E
         DO _undef              ; F - follow/iter/forth ext?
         DO _undef              ; G - 
         DO _hexliteral         ; H - (h) hexlit? Happend
-        DO _inc                ; I
-        DO _dec                ; J
-        DO _key                ; K
-        DO _binliteral         ; L
-        DO _undef              ; M - mapcar
+        DF _inc,    73,"_INC"  ; I
+        DF _dec,    74,"_DEC"  ; J
+        DF _key,    75,"_KEY"  ; K
+        DF _binliteral,76,"_BLT"; L
+        DO _undef              ; M - mem/mapcar/minus
         DO _undef              ; N - number?
-        DO _putc               ; O
+        DF _out,     83,"_OUT" ; O
         DO _undef              ; P - print
         DO _undef              ; Q - equal
         DO _undef              ; R - recurse
-        DO _setvar             ; S - Sa setvar?
-        DO _terpri             ; T
-        DO _null               ; U
+        DF _setvar,  87,"_SET" ; S - Sa setvar?
+        DF _terpri,  88,"_TERPRI" ; T
+        DF _null,    89,"_NULL"; U
         DO _undef              ; V - prin(c1)/var
         DO _writez             ; W
-        DO _exec               ; X
+        DF _exec,    92,"_EXEC"; X
         DO _undef              ; Y - apply/read?
         DO _undef              ; Z - tailcall?
         DO _pushaddr           ; [ - quote lambda
-        DO _lambda             ; \
-        DO _semis              ; ] - return or ;
-        DO _return             ; ^ - RETURN
-        DO _drop               ; _ - drop (on the floor1)
+        DF _lambda,  96,"_LAMBDA" ; \
+        DO _exit               ; ] - return or ;
+        DF _return,  97,"_RETURN" ; ^ - RETURN
+        DF _drop,    98,"_DROP" ; _ - drop (on the floor1)
         DO _undef              ; ` - over? find name
 
         ;; a-h local vars
@@ -2398,9 +2412,9 @@ transtable:
         DO _undef              ; y - 
         DO _undef              ; z - 
 
-        DO _shl                ; { - : { "+ ; 
-        DO _ora                ; |
-        DO _shr                ; }
+        DF _mul2,   123,"_MUL2"; { - : { "+ ; 
+        DF _ora,    124,"_OR"  ; |
+        DF _div2,   125,"_DIV2"; }
         DO _undef              ; ~ - not
         DO _undef              ; DEL - 
 
@@ -2409,7 +2423,7 @@ transtable:
 endtrans:       
 
 .ifndef MINIMAL
-.assert (*-transtable)=128, error, "Transtable not right size"
+.assert (endtrans-transtable)=128, error, "Transtable not right size"
 .endif  
 
 ;;; maybe for MINIMAL++ ? lol
@@ -2430,11 +2444,11 @@ ztrans:
         .byte 256-4, _plus, _comma                             .byte 256-15, _exit
         .byte 256-4, _load, _undef, _zbranch
         .byte 256-2, _eor
-        .byte 256-3, _inc, _dec, _getc, _literal
-        .byte 256-2, _putc
+        .byte 256-3, _inc, _dec, _key, _literal
+        .byte 256-2, _out
         .byte 256-8, _exec
         .byte 256-6, _drop
-        .byte 256-3, _shr
+        .byte 256-3, _div2
         .byte 0
 
 ;;; TODO: memset(
@@ -2474,7 +2488,15 @@ transuns:
 ;;; ----------------------------------------
 ;;;              U S E R C O D E
 ;;;                 (overflow)
-;;; usercode
+;;; usercode MACROS!
+
+;_mul10: uJSR _pha
+;;; 5 B
+;        DO _mul2
+;        DO _dup
+;        DO _mul2
+;        DO _plus
+;        DO _return
 
 ;;; hash:
 ;;; - http://forum.6502.org/viewtopic.php?f=9&t=8317
