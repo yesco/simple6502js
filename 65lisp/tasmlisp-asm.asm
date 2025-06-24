@@ -130,6 +130,17 @@
 ;
 MINIMAL=1
 
+;;; enable this tomake it interactive
+;;; (w MINIMAL -> interactive ALF (ALphabetical Forth)
+
+;INTERACTIVE=1
+
+;;; enable this to get AL (Alphabetical Lisp)
+;AL=1
+
+;;; enable this to get LISP (written in AL)
+;LISP=1
+
 ;;; enable to see if save a byte on each JSR
 ;;; 244 B with, 245 with ... LOL only uJSR 10x in MINIMAL
 ;;; 
