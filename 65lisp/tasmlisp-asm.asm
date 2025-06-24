@@ -135,6 +135,13 @@ MINIMAL=1
 ;;; 
 ;;; USE for more than one page...
 ;;;   actually need to use for simple call macro!
+;;;
+;;; works if we .align 2 every external name!
+;;; avg 43 funcs will waste 22 bytes
+;;; 
+;;; 589 B with uJSR and 606 otherwise only save (- 606 589)= 17 B
+;;;   ... lol
+;;; no jsr ... (/ (- 606 528) 3.0) = 26 B saved only... ???
 ;;; 
 ;UJSR=1 
 
@@ -1066,7 +1073,14 @@ _quit:
         ;; (unless we go asl..., and .align 2)
         .assert (addr-jmptable)<=256,error,"uJSR: target too far"
         .out "uJSR"
+
+.ifdef MINIMAL
         .byte 0,(addr-jmptable-1)
+.else
+;;; TODO: need /2
+        .byte 0,(addr-jmptable-1)/2
+.endif
+
 .endmacro
 
 _BRK:   
@@ -1298,7 +1312,7 @@ _nexttoken:
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
-;;; 3 (+ 5 9 13 9 7) = 43 \ _vary a Sa ^ ;
+;;; 3 (+ 5 9 8 17) = 39 \ _vary a Sa ^ ;
 
 .ifndef MINIMAL
 
@@ -1309,35 +1323,58 @@ _lambda:
         inc ipp
         rts
 
+;;; over = (pickn,2), 3rd = (pick,4) ...
+;;; 
+;;; 3 + 11 = 14 pick ("over" only would be 13 B)
+_pickn:   
+;;; 6+11 = 17 B
+        uJSR _push
+        uJSR _nexttoken
+        
+;;; _loadpickA 4 (99 2 4 6 ... => (4 99 2 4 6 ...)
+;;; 
+;;; 2 = over = forth.pick 1, 4 = forth.pick 2, 6 = forth.pick 3
+;;; 
+;;; NOTE: 0 is NOT dup!!!
+_loadpickA:
+;;; (11)
+        tay
+        lda stack-2,y 
+        pha
+        lda stack-2+1,y
+        jmp loadApla
 
-_vary:  
+;;; 'a -> 2 'b -> 4 (+ ipx)
+varindex:  
 ;;; 9
-        ;; stack,(VAR-'a')*2 + ipx
-        sec
-        sbc #'a'
-        clc
+        uJSR _nexttoken
+        and #$f
         asl
         adc ipx
-        tay
         rts
 
 ;;; load variable from stack (a b c .. h)
 ;;; 
-;;; 13 B
+;;; 8 B
 _var:   
-        jsr _vary               ; canNOT uJSR
+        uJSR _push
+        uJSR varindex
+        bne _loadpickA
 
-        lda stack,y 
-        pha
-        lda stack+1,y
-        jmp loadApla
 
 _setvar:        
-;;; 9
-        jsr _vary               ; canNOT uJSR
+;;; 17 B
+        jsr varindex           ; canNOT uJSR
 
-        jsr _pushA              ; canNOT uJSR
-        uJSR store
+_storeunpickA:
+;;; (14)
+        tay
+        lda tos
+        sta stack-2,y
+        lda tos+1
+        sta stack-2+1,y
+
+        jmp _pop
 
 ;;; ^ return from lambda
 ;;; 
@@ -1386,14 +1423,13 @@ _binliteral:
         _cons           = _undef
         _colon          = _undef
         _TOSbytecomma   = _undef
+        _hexliteral     = _undef
 
 .ifdef MINIMAL
         ;; set all undef functions of minimal
-        _hexliteral     = _undef
         _number         = _undef
         _quote          = _undef
         _writez         = _undef
-        _null           = _undef
         _dec            = _undef
         _cdr            = _undef
         _mul2           = _undef
@@ -1414,7 +1450,7 @@ _binliteral:
 ;;; (+ 19 12 11) = 42 B macro: (+ 18 6 7) = 31 !!!
 .proc _number
 ;;; 19
-        uJSR mul10
+        uJSR _MUL10
         
         ;; hex2bin (works for dec too!)
         lda token
@@ -1427,20 +1463,11 @@ digit:  and #$f
         jmp _plus
 .endproc
 
-;;; just add a real mul (19 B for 16x8->16?)
-;;; 38 B for 16x16->16 (?)
-;;; 
-;;; TODO: cheaper as macro!
-;;; 
-;;; : { $+ ;      # 3
-;;; : x {"{{+ ;   # 6
-;;; 
-;;; 12
-mul10: 
-        uJSR _mul2
-        uJSR _dup
-        uJSR _mul2
-        jmp _plus
+;;; 'a
+_quote: 
+;;; 6 B
+        uJSR _nexttoken
+        jmp _pushA
 
 .ifnblank
 ;;; NOT NEEDED
@@ -1453,18 +1480,12 @@ _adda:
         inc tos+1
 noinc:  
         rts
-.endif ; !BLANK
-        
-;;; 'a
-_quote: 
-;;; 6 B
-        uJSR _nexttoken
-        jmp _pushA
-        
+
+       
 ;;; _hexliteral: read exactly 4 hex-digit!
 _hexliteral:       
 ;;; 28
-        uJSR _zero
+        uJSR _ZERO
 
         ;; do it 4 times with-out using register
 do4:    uJSR do2
@@ -1485,14 +1506,6 @@ digit:  and #$f
 
         rts
 
-;;; 11
-_asl4:  uJSR _asl2
-_asl2:  uJSR _asl
-_asl:   
-        asl tos
-        rol tos+1
-        rts
-        
 ;;; : h #15 & '0 + " '9 > B+3 6 + ; 17 B
 ;;; 
 ;;; 13 B
@@ -1518,7 +1531,7 @@ done:
 ;;; (milliforth: 59 B...)
 .ifnblank
 .proc _colon
-        uJSR push
+        uJSR _push
 
         uJSR _nexttoken
         ;; save alpha name of macro defined
@@ -1576,6 +1589,8 @@ colondone:
 .endproc
 .endif ; !BLANK
 
+.endif ; MINIMAL
+
 ;;; colon
 ;;; ----------------------------------------
 ;;; memory
@@ -1622,24 +1637,6 @@ loadApla:
 
 ;;; lda:   tos= stack[x], x-= 2
 ;;; sta:   stack[x]= tos, x-= 2
-
-
-;;; over (a b ... -> b a b ...)
-.ifnblank
-over:   
-;;; 13 B
-        uJSR push                ; a a b
-
-        dex
-        dex                     ; a (a) b
-        uJSR _lda                ; b (a b)
-        dex
-        dex                     ; b (a) b
-
-        dex
-        dex                     ; b a b
-        rts
-.endif ; !BLANK
 
 
 _dup:  
@@ -1745,6 +1742,7 @@ ret:
         dec tos
         rts
 .endproc
+
 .endif ; MINIMAL
 
 ;;; memory
@@ -1755,7 +1753,7 @@ ret:
 .ifndef MINIMAL
 _key:   
 ;;; 9 B
-        uJSR zero
+        uJSR _ZERO
         ; cli
         jsr getchar             ; canNOT be uJSR
 	; sei
@@ -1771,9 +1769,10 @@ _loadA:
         lda #0
         jmp loadApla
 
-;;; 5 B : T #10 O ; # 4
+;;; 4 B : T #10 O ; # 4
 _terpri:
-        uJSR push
+        dex
+        dex
         lda #10
         ;; fall-through to _out
 .endif ; MINIMAL
@@ -1813,46 +1812,16 @@ _branch:
         rts
 
 
-.ifndef MINIMAL
-
-;;; : U B5 ##1-; #;    (two ;?)
-;;; : = - U ; # 3
-
-_null:
-;;; 8 B
-        lda tos,x
-        ora tos+1,x
-        bne setfalse
-        beq settrue
-
-settrue:        
-;;; 3 + 6 = 9 B
-        lda #$ff
-        ;; BIT-hack (skips next 2 bytes)
-        .byte $2c
-setfalse:       
-;;; (6 B)
-        lda #0
-
-;;; TODO: macro
-_zero:   
-;;; 6 B
-        uJSR push
-        jmp setfalse
-        
-.endif ; MINIMAL
-
-
-
 ;;; --------- MATH
 
-;;; 50B _adc _and _eor _ora _sbc (_sta) _pop(_lda) div2 (7)
-;;; + & E | - () _ div2 (+ (* 5 2) (* 4 4) 2 17 5)
+;;; 52B _adc _and _eor _ora _sbc (_sta) _pop(_lda) div2
 ;;;                               ^-- used by dup
+;;; 
+;;; + & E | - () _ div2 (+ (* 5 2) (* 4 4) 2 17 5)
+;;; 
 ;;; (+ 13 15 27) = 55 using macro !
 ;;;
 ;;; X must contain stack pointer always
-;;; 
 
 _plus:  
 _adc:  
@@ -1863,7 +1832,7 @@ _adc:
 
 _and:
         ;; AND stack,x
-        lda #$3d
+        ldy #$3d
         bne mathop
 
 ;;; cmp oper,y $d9 - can't use doesn't ripple
@@ -1871,12 +1840,12 @@ _and:
 
 _eor:
         ;; EOR stack,x
-        lda #$5d
+        ldy #$5d
         bne mathop
 
 _ora:
         ;; AND stack,x
-        lda #$1d
+        ldy #$1d
         bne mathop
 
 
@@ -2096,15 +2065,15 @@ _mul2:
 ;;;   exec:   22  (6)   X _exit (translation)
 ;;;  enter:   50  (4)   _nexttoken _execpla2 interpret
 ;;;  colon:    0 (56)   (: [wtf?])
-;;; lambda:    3 (43)   ; ( \ ^ a Sa )
+;;; lambda:    3 (39)   ; ( \ ^ a Sa )
 ;;; literal:  11 (37)   L (6'a 31#dec mul10 mul2 mul4 mul8 mul16 (...$hex))
-;;; memory:   39  (3)   (cdr) @car "dup $wap
+;;; memory:   39 (20)   (cdr 3B) @car "dup $wap (pick 17B)
 ;;; setcar:   27 (18)   , I ! drop2 (r, dec2 J)
-;;; IO:        6 (23)   O (K T _pusha _pushPLA _loadA)
+;;; IO:        6 (22)   O (K T _pusha _pushPLA _loadA)
 ;;; tests:    18 (10)   zbranch (null 0 true?sym)
 ;;; math:     52        + - & | E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
-;;; uJSR:   30    - saves 1 byte in MINIMAL!!! :-D
+;;; uJSR: 30     - saves 1 byte in MINIMAL!!! :-D
 
 ;;; ------ MINIMAL (not interactive)
 ;;; TOTAL: 264 B   words: 22    avg: 11.5 B/op
@@ -2120,7 +2089,7 @@ _mul2:
 ;;; (/ 256.0 11.5) -> 22 words possible!
 
 ;;; ------- !MINIMAL + LISP & interactive!
-;;; TOTAL: 596 B    words: 43    avg 13.9 B/w
+;;; TOTAL: 565 B    words: 43    avg 13.9 B/w
 ;;; 
 ;;;        ACTUAL: 544 B (probably need update..)
 ;;; 
@@ -2131,8 +2100,8 @@ _mul2:
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B symbols.
 ;;;                                   |
-;;; (+ 235 0 6 14 4 56 43 37 3 18 23 10 128)
-;;; (+  19 0 0  1 0  1  4  7 1  3  2  2   0)
+;;; (+ 235 0 6 14 4 39 48 37 3 18 23 10 128)
+;;; (+  22 0 0  1 0  1  4  7 1  3  2  2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
@@ -2269,10 +2238,12 @@ about 4.5x.
 ;;; to call them having to have a JSR prelude!
 macrostart:     
 
+;;; #U give _FFFF
+
 _NULL:
 ;;; 10 B
         ZBRANCH _ZERO
-_FFFF:  
+_FFFF: 
         LIT $ffff
         DO _exit
 _ZERO:  
@@ -2283,7 +2254,7 @@ _ZERO:
 _EQ:    
 ;;; 3 B
         DO _minus
-        DO _null
+        DO _NULL
         DO _exit
 .endif
 
@@ -2298,7 +2269,7 @@ _MUL10:
         DO _dup
         DO _MUL2
         DO _MUL2
-        DO _PLUS
+        DO _plus
         DO _exit
 
 _MUL16: 
@@ -2309,20 +2280,22 @@ _MUL8:
 _MUL4:  
         DO _MUL2
 _MUL2:  
-        DO _DUP
+        DO _dup
         DO _plus
         DO _exit
 
-;;; 5 B LEFT! ...
+;;; 3 B LEFT! ... (in one page)
 
 .endif        
+
+
 
 endtable:       
 
 .ifdef MINIMAL
-  .assert (endtable-jmptable)<=256, error, "Table too big"
+  .assert (endtable-jmptable)<=256, error, "Table too big (>256)"
 .else
-  .assert (endtable-jmptable)<=512, error, "Table too big"
+;  .assert (endtable-jmptable)<=512, error, "Table too big (>512)"
 .endif
 
 
@@ -2439,7 +2412,7 @@ transtable:
         DO _undef              ; R - recurse
         DF _setvar,  87,"_SET" ; S - Sa setvar?
         DF _terpri,  88,"_TERPRI" ; T
-        DF _null,    89,"_NULL"; U
+        DF _NULL,    89,"_NULL"; U
         DO _undef              ; V - prin(c1)/var
         DO _writez             ; W
         DF _exec,    92,"_EXEC"; X
@@ -2559,14 +2532,6 @@ transuns:
 ;;;              U S E R C O D E
 ;;;                 (overflow)
 ;;; usercode MACROS!
-
-;_mul10: uJSR _pha
-;;; 5 B
-;        DO _mul2
-;        DO _dup
-;        DO _mul2
-;        DO _plus
-;        DO _return
 
 ;;; hash:
 ;;; - http://forum.6502.org/viewtopic.php?f=9&t=8317
