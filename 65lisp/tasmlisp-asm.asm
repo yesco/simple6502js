@@ -1757,13 +1757,16 @@ _zbranch:
         ;; zero so branch relative
         ;; (TODO: if not compiled could encode
         ;;  jmp at hibit, and/or some literals!)
+        uJSR _pop
+_branch:        
         uJSR _nexttoken
+
+        ;; relative jmp
+        clc
+        adc ipy
         sta ipy
-;;; TODO: want user relative ascii? B2 B-2?
-;        clc
-;        adc ipy
-;        sta ipy
-        jmp _pop
+
+        rts
 
 
 .ifndef MINIMAL
@@ -2237,24 +2240,56 @@ about 4.5x.
         .word w
 .endmacro
 
-.macro ZBRANCH else,start
+.macro ZBRANCH else
         DO _zbranch
-        .byte (else-start-1+256) .mod 256
+        .byte (256+else-*) .mod 256
 .endmacro
 
-macrostart:     
+.macro BRANCH else,start
+        DO _branch
+        .byte (256+else-*) .mod 256
+.endmacro
 
-.ifblank
+
+;;; define macros after here, then uJSR can be used
+;;; to call them having to have a JSR prelude!
+macrostart:     
 
 _NULL:
 ;;; 10 B
-        ZBRANCH _ZERO, _NULL
+        ZBRANCH _ZERO
 _FFFF:  
         LIT $ffff
         DO _exit
 _ZERO:  
         LIT $0000
         DO _exit
+
+
+.ifndef MINIMAL
+
+_MUL10: 
+;;; 6 B
+        DO _MUL2
+        DO _dup
+        DO _MUL2
+        DO _MUL2
+        DO _PLUS
+        DO _exit
+
+_MUL16: 
+;;; 6 B
+        DO _MUL8
+_MUL8:  
+        DO _MUL4
+_MUL4:  
+        DO _MUL2
+_MUL2:  
+        DO _DUP
+        DO _plus
+        DO _exit
+
+;;; 5 B LEFT! ...
 
 .endif        
 
@@ -2265,6 +2300,10 @@ endtable:
 .else
   .assert (endtable-jmptable)<=512, error, "Table too big"
 .endif
+
+
+;;; ========================================
+;;;       T  R  A  N  S  T  A  B  L  E
 
 transtable:     
 
