@@ -1862,46 +1862,49 @@ _branch:
 ;;;
 ;;; X must contain stack pointer always
 
-.export _math
-_math:  
+.export _plus
 _plus:  
 _adc:  
         ;; ADC stack,x
         clc
         ldy #$7d
-        bne mathop
+        bne _mathop
 
+.export _and
 _and:
         ;; AND stack,x
         ldy #$3d
-        bne mathop
+        bne _mathop
 
 ;;; cmp oper,y $d9 - can't use doesn't ripple
 ;;; and wrong order...
 
+.export _eor
 _eor:
         ;; EOR stack,x
         ldy #$5d
-        bne mathop
+        bne _mathop
 
-_ora:
+.export _or
+_or:
         ;; AND stack,x
         ldy #$1d
-        bne mathop
+        bne _mathop
 
-
+.export _minus
 _minus: 
-_sbc:   
         ;; SBC stack,x
         sec
         ldy #$fd
-        bne mathop
+        bne _mathop
 
+.export _sta
 _sta:   
         ;; STA stack,x
         ldy #$9d
-        bne mathop
+        bne _mathop
 
+.export _drop
 _drop: 
 _pop:
 _lda:   
@@ -1916,7 +1919,8 @@ _lda:
 ;;; TODO: could be used for BIGNUMs!
 ;;; 
 ;;; 17B
-mathop: 
+.export _mathop
+_mathop: 
         sty op
         ldy #0
         
@@ -1930,6 +1934,7 @@ op:     adc stack,x
         inx
         rts
 
+.export _div2
 _div2:   
 ;;; 5B !
         lsr tos+1
@@ -2494,7 +2499,7 @@ transtable:
         DO _undef              ; z - 
 
         DF _mul2,   123,"_MUL2"; { - : { "+ ; 
-        DF _ora,    124,"_OR"  ; |
+        DF _or,     124,"_OR"  ; |
         DF _div2,   125,"_DIV2"; }
         DO _undef              ; ~ - not
         DO _undef              ; DEL - 

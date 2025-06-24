@@ -3,6 +3,7 @@ echo "--- ORDER: $* ---"
 cat fil
 echo "--- TOP: $* ---"
 cat fil | sort -r -n
-echo "=== `cat fil | wc -l ` functions in `cat $1.bin | wc -c ` bytes!"
+echo "=== Functions: `cat fil | wc -l ` (-4 _error _sta _mathop _reset)"
+echo "=== Bytes    :`cat $1.bin | wc -c `"
 
 
