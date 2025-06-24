@@ -51,3 +51,4 @@ ca65 tasmlisp-asm.asm -l tasmlisp-asm.s
 
 cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -g $name.tap $nam.bin ORIC/$nam.tap
 
+./map $name

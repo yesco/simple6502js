@@ -3,7 +3,7 @@
 ;;; Built for minimal size not speed.
 ;;; Instructions are byte-coded.
 ;;; 
-;;; There are 24 similar to "a forth".
+;;; There are 25 similar to "a forth".
 ;;; Plus 5 convience assembly routines.
 ;;; 
 ;;; Most can be called directly with JSR,
@@ -11,14 +11,14 @@
 ;;; 
 ;;; 
 ;;; Functions:
-;;;    stack: dup map drop                      (3)
+;;;    stack: dup map drop 2drop                (4)
 ;;;   memory: store load comma ccomma           (4)
 ;;;     math: plus minus and or eor div2 inc    (7)
 ;;;    tests: null -1 zero eq                   (4)
 ;;;  control: Xexeute exit zbranch branch       (4)
 ;;;   system: Literal out [init]                (2) [1]
 ;;;    [conv: pushA pushPLA loada loadApla]         [4]
-;;;                                            (24) [5]
+;;;                                            (25) [5]
 
 ;;; inspiration, and goal:
 ;;; 
@@ -994,6 +994,8 @@ startaddr:
 jmptable:  
 
 ;;; INIT - this should be first in jmptable at offset 0
+.export _reset
+
 _reset:
 _initlisp:      
 ;;; 9
@@ -1037,7 +1039,7 @@ _initlisp:
 .endif ; !MINIMAL
        
 
-
+.export _error
 
 _error: 
 _undef: 
@@ -1134,6 +1136,7 @@ brkadr: lda jmptable-1,y        ; lo to
 .ifndef MINIMAL
 
 ;;; (14 B)
+.export _interactive
 _interactive:    
 ;;; this is so we alwAY get back here
 ;;; (essentially, no need jsr exec and jmp)
@@ -1157,6 +1160,7 @@ _rdloop:
 ;;; - http://6502org.wikidot.com/software-token-threading
 ;;; - 
 ;;; 22 B (+ 6 trans)
+.export _exec
 _exec:  
         ;; only token
         lda tos
@@ -1247,6 +1251,7 @@ call:   jmp jmptable
 ;;; call routine after uJSR (brk)
 ;;; 
 ;;; 6
+.export _execpla2
 .proc _execpla2
         pla                     ; lo
         tay
@@ -1260,6 +1265,7 @@ call:   jmp jmptable
 ;;; start interpreation at IP,Y
 ;;; 
 ;;; (+ 2 9 13 11) = 35 B  (+ 4  non-minimal.)
+.export _interpret
 .proc _interpret
 
 enter:  
@@ -1311,6 +1317,7 @@ restore:
 
 ;;; next token from interpration
 ;;; Returns A = token, also stored in zp: token
+.export _nexttoken
 _nexttoken:      
 ;;; 9 B
         inc ipy
@@ -1328,6 +1335,7 @@ _nexttoken:
 .ifndef MINIMAL
 
 ;;; (number of \)-1 stored in ipp(arams)
+.export _lambda
 _lambda:        
 ;;; 5 B
         stx ipx
@@ -1337,6 +1345,7 @@ _lambda:
 ;;; over = (pickn,2), 3rd = (pick,4) ...
 ;;; 
 ;;; 3 + 11 = 14 pick ("over" only would be 13 B)
+.export _pickn
 _pickn:   
 ;;; 6+11 = 17 B
         uJSR _push
@@ -1356,6 +1365,7 @@ _loadpickA:
         jmp loadApla
 
 ;;; 'a -> 2 'b -> 4 (+ ipx)
+.export varindex
 varindex:  
 ;;; 9
         uJSR _nexttoken
@@ -1367,12 +1377,14 @@ varindex:
 ;;; load variable from stack (a b c .. h)
 ;;; 
 ;;; 8 B
+.export _var
 _var:   
         uJSR _push
         uJSR varindex
         bne _loadpickA
 
 
+.export _setvar
 _setvar:        
 ;;; 17 B
         jsr varindex           ; canNOT uJSR
@@ -1391,6 +1403,7 @@ _storeunpickA:
 ;;; 
 ;;; adjusts stack to remove parameters atreturn
 ;;; TOP retained as it contains return value!
+.export _return
 _return:  
 ;;; 7 B
         lda ipp
@@ -1403,6 +1416,8 @@ _return:
 .endif ; MINIMAL
 
 ;;; semis (return from interpretastion)
+.export _exit_
+_exit_:
 _exit:  
 ;;; 3
         pla
@@ -1416,6 +1431,7 @@ _ret:
 
 
 
+.export _binliteral
 _binliteral:       
 ;;; 11 B
         uJSR _nexttoken
@@ -1459,6 +1475,7 @@ _binliteral:
 ;;; then adds current number 
 ;;; 
 ;;; (+ 19 12 11) = 42 B macro: (+ 18 6 7) = 31 !!!
+.export _number
 .proc _number
 ;;; 19
         uJSR _MUL10
@@ -1475,6 +1492,7 @@ digit:  and #$f
 .endproc
 
 ;;; 'a
+.export _quote
 _quote: 
 ;;; 6 B
         uJSR _nexttoken
@@ -1494,6 +1512,7 @@ noinc:
 
        
 ;;; _hexliteral: read exactly 4 hex-digit!
+.export _hexliteral
 _hexliteral:       
 ;;; 28
         uJSR _ZERO
@@ -1541,6 +1560,7 @@ done:
 ;;; 56 B - barely worth it!!!
 ;;; (milliforth: 59 B...)
 .ifnblank
+.export _colon
 .proc _colon
         uJSR _push
 
@@ -1617,6 +1637,7 @@ _cdr:
         .byte $2c
 .endif ; MINIMAL
 
+.export _load
 _load:  
 _car:    
 ;;; (14 B)
@@ -1649,7 +1670,7 @@ loadApla:
 ;;; lda:   tos= stack[x], x-= 2
 ;;; sta:   stack[x]= tos, x-= 2
 
-
+.export _dup
 _dup:  
 _push:   
 ;;; 8 B !
@@ -1665,6 +1686,7 @@ _push:
         ;; a | a b c ..
         rts
 
+.export _swap
 _swap:   
 ;;; 17 B !
         ;; q= tos = b
@@ -1687,8 +1709,6 @@ _swap:
         jmp loadApla
         ;; b | a c ..
 
-
-
 ;;; tos, inc !=store drop2 tosr, dec2 dec
 ;;; 
 ;;; (+ 19 8 18) = 45 B - 6.4 B/word
@@ -1705,6 +1725,7 @@ _swap:
 ;;;   WARNING: stack is misaligned one byte!
 ;;; 
 ;;; 12+7= 19 B
+.export _comma
 _comma:
 ;;; 12
         ldy #0
@@ -1724,17 +1745,18 @@ ret:
         rts
 .endproc
 
- 
-
+.export _store 
 _store: 
 ;;; 8 B
         uJSR _comma
-drop2:  
+.export _2drop
+_2drop:  
         dex
         dex
         jmp _pop
 
 .ifndef MINIMAL
+.export _rcomma
 _rcomma:        
 ;;; 6+12 = 18
         uJSR dec2
@@ -1762,6 +1784,7 @@ ret:
 ;;; 6 (+ 9 9 5) = 6 (+ 23)
 
 .ifndef MINIMAL
+.export _key
 _key:   
 ;;; 9 B
         uJSR _ZERO
@@ -1781,6 +1804,7 @@ _loadA:
         jmp loadApla
 
 ;;; 4 B : T #10 O ; # 4
+.export _terpri
 _terpri:
         dex
         dex
@@ -1789,6 +1813,7 @@ _terpri:
 .endif ; MINIMAL
 
 ;;; keep with _terpri above
+.export _out
 _out:  
 ;;; 6 B
         jsr putchar             ; canNOT be uJSR
@@ -1803,6 +1828,7 @@ _out:
 ;;; 14 (+ 8 9 6) = 23
 
 ;;; jump/skip on zero (set Y!)
+.export _zbranch
 _zbranch:        
 ;;; 18 B
         lda tos
@@ -1812,6 +1838,8 @@ _zbranch:
         ;; (TODO: if not compiled could encode
         ;;  jmp at hibit, and/or some literals!)
         uJSR _pop
+
+.export _branch
 _branch:        
         uJSR _nexttoken
 
@@ -1834,6 +1862,8 @@ _branch:
 ;;;
 ;;; X must contain stack pointer always
 
+.export _math
+_math:  
 _plus:  
 _adc:  
         ;; ADC stack,x
@@ -1924,6 +1954,7 @@ _div2:
 ;;; 
 ;;; 9B
 
+.export _printz
 _printz:        
 _writez: 
 ;;; 12B
@@ -2047,16 +2078,6 @@ readlist:
 
 .endproc
 .endif        
-
-
-;;; 11 : {{{"+ ; # 6 -> shl shl2 shl3 shl4
-_mul16: uJSR _mul4
-_mul4:  uJSR _mul2
-_mul2:   
-;;; 5B (but technically not needed)
-        asl tos
-        rol tos+1
-        rts
 
 .endif ; MINIMAL
 
@@ -2251,17 +2272,21 @@ macrostart:
 
 ;;; #U give _FFFF
 
+.export _NULL
 _NULL:
 ;;; 10 B
         ZBRANCH _ZERO
+.export _FFFF
 _FFFF: 
         LIT $ffff
         DO _exit
+.export _ZERO
 _ZERO:  
         LIT $0000
         DO _exit
 
 .ifdef MINIMAL
+.export _EQ
 _EQ:    
 ;;; 3 B
         DO _minus
@@ -2273,7 +2298,7 @@ _EQ:
 
 
 .ifndef MINIMAL
-
+.export _MUL10
 _MUL10: 
 ;;; 6 B
         DO _MUL2
@@ -2283,6 +2308,7 @@ _MUL10:
         DO _plus
         DO _exit
 
+.export _MUL16
 _MUL16: 
 ;;; 6 B
         DO _MUL8
@@ -2313,6 +2339,7 @@ endtable:
 ;;; ========================================
 ;;;       T  R  A  N  S  T  A  B  L  E
 
+.export transtable
 transtable:     
 
 .ifndef MINIMAL
@@ -2474,6 +2501,7 @@ transtable:
 
 .endif ; MINIMAL
 
+.export endtrans
 endtrans:       
 
 .ifndef MINIMAL

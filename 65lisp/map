@@ -1,1 +1,8 @@
-perl map.pl $* | sort -r -n
+perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main" | grep -v '_exit$' | grep -v "_initlisp"  > fil
+echo "--- ORDER: $* ---"
+cat fil
+echo "--- TOP: $* ---"
+cat fil | sort -r -n
+echo "=== `cat fil | wc -l ` functions in `cat $1.bin | wc -c ` bytes!"
+
+
