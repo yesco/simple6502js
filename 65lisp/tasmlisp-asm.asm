@@ -954,16 +954,20 @@ jmptable:
 ;;; INIT - this should be first in jmptable at offset 0
 _reset:
 _initlisp:      
+;;; 9
 
-        SET (HERESTART)
+        lda #<HERESTART
         sta here
+        lda #>HERESTART
         sta here+1
 
 .ifdef LISP
 ;;; (+ 4 14) = 20 ???
 
 ;;; (4 B)
-        ; sei 
+
+;;; TODO: this should go to BOOT
+        ; sei
         cld
 
         ;; cons ptr
@@ -1103,25 +1107,23 @@ _rdloop:
 ;;; references
 ;;; - http://6502org.wikidot.com/software-token-threading
 ;;; - 
-;;; 30 B
-
-;;; (+ 11 5 12) = 28 (+ 6 for trans)
+;;; 22 B (+ 6 trans)
 _exec:  
-;;; 11
         ;; only token
         lda tos
         jmp _nexta
 
+;;; make sure have somewhere to return to
+;;; (as we're doing jmp dispatch)
 _nextloop:
         uJSR _next
         jmp _nextloop
 
-;;; WARNING: Don't jmp next!!!
-;;; this isn't forth
-;;; TODO: still valid? lol
+;;; WARNING: Don't jmp next!!! this isn't forth
+;;;   TODO: still valid? lol
+
+;;; get next token to interpret
 _next:   
-;;; 5
-        sta token
         uJSR _nexttoken
 
 _nexta: 
@@ -1193,22 +1195,30 @@ call:   jmp jmptable
 ;;;   _foo_AYZ == optimized w AYZ
 ;;;   foo      == safe!
 
-
+;;; call routine after uJSR (brk)
+;;; 
+;;; 6
+.proc _execpla2
+        pla                     ; lo
+        tay
+        pla
+        sta savey               ; hi
+        tya
+.endproc
 
 ;;; subroutine call in A
 ;;; 
 ;;; start interpreation at IP,Y
 ;;; 
-;;; (+ 2 9 11 11) = 33 B  (+ 4  non-minimal.)
+;;; (+ 2 9 13 11) = 35 B  (+ 4  non-minimal.)
 .proc _interpret
 
-;;; TODO: set IP,y?
-
 enter:  
-        ;; save what we're calling
+        ;; save offset of what we're calling
         sta savea
 
         ;; push current stack frame
+        ;; (ip, ipy, (ipx, ipn) )
 ;;; 9
         ldy #(endframe-startframe)
 save:   
@@ -1218,14 +1228,15 @@ save:
         bne save
         
 subr: 
-;;; 11 (+ 4)
+;;; 13 (+ 4)
         ;; set new IP
         ;; (only valid for one page code dispatch)
         lda savea
         sta ip
+        lda savey
+        sta ip+1
 
-;;; TODO: can this be moved into exec?
-;;;   (maybe some problem with Ztail/Recurse?
+;;; TODO: maybe can use same $ff as net?
 .ifndef MINIMAL
         lda #256-1
         sta ipp
@@ -1252,7 +1263,7 @@ restore:
 ;;; next token from interpration
 ;;; Returns A = token, also stored in zp: token
 _nexttoken:      
-;;; 7 B
+;;; 9 B
         inc ipy
         ldy ipy
         lda (ip),y
@@ -1295,7 +1306,7 @@ _var:
         lda stack,y 
         pha
         lda stack+1,y
-        jmp _loadPOPa
+        jmp loadApla
 
 _setvar:        
 ;;; 9
@@ -1497,7 +1508,7 @@ done:
         adc ipy
         pha                     ; lo
         lda ip+1
-        jsr _loadPOPa           ; canNOT uJSR
+        jsr loadApla            ; canNOT uJSR
 
 ;;; TODO: at end of first page can have forwarding
 ;;;   offsets to funs in page2?
@@ -1569,12 +1580,13 @@ cYr:
         lda (tos),y
 ;;; load tos w (A, pla) (hi,lo)
 ;;; (useless?) kindof opposite 
-loadPLAa: 
+loadApla:       
 ;;; (6 B)
         sta tos+1
         pla
         sta tos
         rts
+
 
 ;;; - stack ops: dup swap
 
@@ -1642,7 +1654,7 @@ _swap:
 
         ;; tos= q (= b)
         pla ; hi
-        jmp _loadPOPa
+        jmp loadApla
         ;; b | a c ..
 
 
@@ -1716,31 +1728,41 @@ ret:
 ;;; memory
 ;;; ----------------------------------------
 ;;; IO
-;;; 6 (+ 5 9) = 14 .. 20
-
-_out:  
-;;; 6 B
-        jsr putchar             ; canNOT be uJSR
-        jmp _pop
-
-
+;;; 6 (+ 9 9 5) = 6 (+ 23)
 
 .ifndef MINIMAL
-;;; 5B : T #10 O ; # 4
-_terpri:
-;;; 5 B
-        uJSR push
-        lda #10
-        ;; fall-through
 _key:   
 ;;; 9 B
         uJSR zero
         ; cli
         jsr getchar             ; canNOT be uJSR
 	; sei
-        jmp _pusha
 
+;;; TODO: really nothing to it?
+
+;;; 9
+_pusha:
+        pha
+_pushPLA:       
+        uJSR _push
+_loadA:
+        lda #0
+        jmp loadApla
+
+;;; 5 B : T #10 O ; # 4
+_terpri:
+        uJSR push
+        lda #10
+        ;; fall-through to _out
 .endif ; MINIMAL
+
+;;; keep with _terpri above
+_out:  
+;;; 6 B
+        jsr putchar             ; canNOT be uJSR
+        jmp _pop
+
+
         
 
 ;;; -----------------------------------
@@ -1750,7 +1772,7 @@ _key:
 
 ;;; jump/skip on zero (set Y!)
 _zbranch:        
-;;; 14 B
+;;; 18 B
         lda tos
         ora tos+1
         bne _pop
@@ -1888,30 +1910,6 @@ _div2:
         lsr tos+1
         ror tos
         rts
-
-
-;;; TODO: many variants, save any bytes?
-
-;;; pushes A on the data stack
-_seta: 
-        pha
-;;; pushes a new byte value PLAd from hardware stack
-_setPLA:
-        lda #0
-_loadPOPa:      
-        sta tos+1
-        pla
-        sta tos
-        rts
-
-
-;;; TODO: not clear if gonno work???
-_pusha:
-        pha
-_pushPLA:       
-        uJSR _push
-        jmp _seta
-
 
 
 .ifndef MINIMAL
@@ -2078,35 +2076,36 @@ _mul2:
 ;;; !MINIMAL + LISP: 20 more ops, lambda
 ;;; 
 ;;;        MINIMAL (lisp/non-minimal)
-;;; system:    0  (6)   (_reset)
+;;; system:    6  (0)   (_reset)
 ;;; rdloop:    0 (14)   (_interactive)
-;;;   exec:   28  (6)   X (translation)
-;;;  enter:   33  (4)   [interpret enter subr exit = subr!]
+;;;   exec:   22  (6)   X _exit (translation)
+;;;  enter:   50  (4)   _nexttoken _execpla2 interpret
 ;;;  colon:    0 (56)   (: [wtf?])
 ;;; lambda:    3 (43)   ; ( \ ^ a Sa )
 ;;; literal:  11 (37)   L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
 ;;; memory:   39  (3)   (cdr) @car "dup $wap
 ;;; setcar:   27 (18)   , I ! drop2 (r, dec2 J)
-;;; IO:        6 (14)   O (K T)
-;;; tests:    14 (23)   zbranch (null 0 true?sym)
-;;; math:     41  (9)   + & (- |) E _drop div2
+;;; IO:        6 (23)   O (K T _pusha _pushPLA _loadA)
+;;; tests:    18 (10)   zbranch (null 0 true?sym)
+;;; math:     43  (9)   + & (- |) E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
 ;;; uJSR:     30     TODO: somehow uncounted!
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 202 B   words: 19    avg: 10.6 B/op
+;;; TOTAL: 253 B   words: 20    avg: 12.7 B/op
 ;;; 
-;;;      ACTUAL: 205 B !!!!   (counting is approximate...)
+;;;      ACTUAL: 241 B !!!!   (counting is approximate...)
 
 ;;; NOT COUNTING translate... hoping for compression?
 ;;; (then can skip rdloop?)
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 0 28 33 3 11 39 27 6 14 41 30)
-;;; (+ 1  1  0 1  1  3  4 2  1  5  0)
-;;; (/ 202.0 19)   -> bytes per word
-;;; (/ 256.0 10.6) -> 24 words possible!
+;;; (+ 6 22 50 3 11 39 27 6 18 41 30)
+;;; (+ 1  2  0 1  1  3  4 2  1  5  0)
+
+;;; (/ 253.0 20)   -> bytes per word
+;;; (/ 256.0 12.7) -> 20 words possible!
 
 ;;; ------- !MINIMAL + LISP & interactive!
 ;;; TOTAL: 596 B    words: 43    avg 13.9 B/w
@@ -2117,8 +2116,8 @@ _mul2:
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B symbols.
 ;;;                                   |
-;;; (+ 235 6 6 14 4 56 43 37 3 18 14 23 9 128)
-;;; (+  19 1 0  1 0  1  4  7 1  3  2  2 2   0)
+;;; (+ 235 0 6 14 4 56 43 37 3 18 23 10 9 128)
+;;; (+  19 0 0  1 0  1  4  7 1  3  2  2 2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
@@ -2740,6 +2739,7 @@ HERESTART:
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
 .proc printd
+;;; 12
 ;;; TODO: maybe not need save as print does?
         ;; save ax
         sta savea
@@ -2755,6 +2755,9 @@ HERESTART:
 .endproc
 
 ;;; _voidprintd print a decimal value from AX (+Y trashed)
+;;; 37B
+;;; 
+;;; _voidprintdptr1
 ;;; 35B - this is a very "minimal" sized routine
 ;;;       slow, one loop per bit/16
 ;;;       (+ 3B for store AX)
