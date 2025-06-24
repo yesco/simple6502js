@@ -1,3 +1,27 @@
+;;; OP16 - OnePage 16-bit VM (256 bytes!)
+;;; 
+;;; Built for minimal size not speed.
+;;; Instructions are byte-coded.
+;;; 
+;;; There are 24 similar to "a forth".
+;;; Plus 5 convience assembly routines.
+;;; 
+;;; Most can be called directly with JSR,
+;;; or from a compact byte-code program.
+;;; 
+;;; 
+;;; Functions:
+;;;    stack: dup map drop                      (3)
+;;;   memory: store load comma ccomma           (4)
+;;;     math: plus minus and or eor div2 inc    (7)
+;;;    tests: null -1 zero eq                   (4)
+;;;  control: Xexeute exit zbranch branch       (4)
+;;;   system: Literal out [init]                (2) [1]
+;;;    [conv: pushA pushPLA loada loadApla]         [4]
+;;;                                            (24) [5]
+
+;;; inspiration, and goal:
+;;; 
 ;;; "SectorLisp for 6502" asmlisp-asm.asm (+ asmlisp.c)
 ;;; 
 ;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
@@ -387,7 +411,7 @@ subtract .set 0
 .endmacro
 
 ;;; push A,X on R-stack (AX trashed, use DUP?)
-;;; (cc65: jsr pushax takes 39c!)
+;;; (cc65: jsr pushAx takes 39c!)
 ;;; 3B 7c
 .macro RPUSH
         pha
@@ -1312,7 +1336,7 @@ _setvar:
 ;;; 9
         jsr _vary               ; canNOT uJSR
 
-        jsr _pusha              ; canNOT uJSR
+        jsr _pushA              ; canNOT uJSR
         uJSR store
 
 ;;; ^ return from lambda
@@ -1368,12 +1392,10 @@ _binliteral:
         _hexliteral     = _undef
         _number         = _undef
         _quote          = _undef
-        _ora            = _undef
         _writez         = _undef
         _null           = _undef
         _dec            = _undef
         _cdr            = _undef
-        _sbc            = _undef
         _mul2           = _undef
 
         _var            = _undef
@@ -1401,7 +1423,7 @@ _binliteral:
         sbc #7                  ; carry set already
 digit:  and #$f
 
-        jsr _pusha              ; canNOT use uJSR
+        jsr _pushA              ; canNOT use uJSR
         jmp _plus
 .endproc
 
@@ -1437,7 +1459,7 @@ noinc:
 _quote: 
 ;;; 6 B
         uJSR _nexttoken
-        jmp _pusha
+        jmp _pushA
         
 ;;; _hexliteral: read exactly 4 hex-digit!
 _hexliteral:       
@@ -1741,7 +1763,7 @@ _key:
 ;;; TODO: really nothing to it?
 
 ;;; 9
-_pusha:
+_pushA:
         pha
 _pushPLA:       
         uJSR _push
@@ -1775,7 +1797,7 @@ _zbranch:
 ;;; 18 B
         lda tos
         ora tos+1
-        bne _pop
+        beq _pop
         ;; zero so branch relative
         ;; (TODO: if not compiled could encode
         ;;  jmp at hibit, and/or some literals!)
@@ -1852,25 +1874,18 @@ _eor:
         lda #$5d
         bne mathop
 
-
-
-.ifndef MINIMAL
-
 _ora:
         ;; AND stack,x
         lda #$1d
         bne mathop
 
 
+_minus: 
 _sbc:   
         ;; SBC stack,x
         sec
         ldy #$fd
         bne mathop
-
-.endif ; MINIMAL
-
-
 
 _sta:   
         ;; STA stack,x
@@ -2070,7 +2085,7 @@ _mul2:
 ;;; how we doing so far till here?
 ;;; 
 ;;; MINIMAL: imagine a 16-bit 17 ops VM in one page?
-;;;   + & E "dup _drop div2 1+ X L @ ! , 2drop O K zBranch
+;;;   + - & | E "dup _drop div2 inc X L @ ! , 2drop O K zBranch
 ;;;   TODO: = (as macro?)
 ;;; 
 ;;; !MINIMAL + LISP: 20 more ops, lambda
@@ -2082,42 +2097,42 @@ _mul2:
 ;;;  enter:   50  (4)   _nexttoken _execpla2 interpret
 ;;;  colon:    0 (56)   (: [wtf?])
 ;;; lambda:    3 (43)   ; ( \ ^ a Sa )
-;;; literal:  11 (37)   L (6'a 31#dec mul10 shl shl2 shl3 shl4 (...$hex)
+;;; literal:  11 (37)   L (6'a 31#dec mul10 mul2 mul4 mul8 mul16 (...$hex))
 ;;; memory:   39  (3)   (cdr) @car "dup $wap
 ;;; setcar:   27 (18)   , I ! drop2 (r, dec2 J)
 ;;; IO:        6 (23)   O (K T _pusha _pushPLA _loadA)
 ;;; tests:    18 (10)   zbranch (null 0 true?sym)
-;;; math:     43  (9)   + & (- |) E _drop div2
+;;; math:     52        + - & | E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
-;;; uJSR:     30     TODO: somehow uncounted!
+;;; uJSR:   30    - saves 1 byte in MINIMAL!!! :-D
 
 ;;; ------ MINIMAL (not interactive)
-;;; TOTAL: 253 B   words: 20    avg: 12.7 B/op
+;;; TOTAL: 264 B   words: 22    avg: 11.5 B/op
 ;;; 
-;;;      ACTUAL: 241 B !!!!   (counting is approximate...)
-
-;;; NOT COUNTING translate... hoping for compression?
-;;; (then can skip rdloop?)
-;;; 
+;;;      ACTUAL: 253 B !!!!   (counting is approximate...)
+;;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 6 22 50 3 11 39 27 6 18 41 30)
-;;; (+ 1  2  0 1  1  3  4 2  1  5  0)
+;;; (+ 6 22 50 3 11 39 27 6 18 52 30)
+;;; (+ 1  2  0 1  1  3  4 2  1  7  0)
 
-;;; (/ 253.0 20)   -> bytes per word
-;;; (/ 256.0 12.7) -> 20 words possible!
+;;; (/ 253.0 22)   -> bytes per word
+;;; (/ 256.0 11.5) -> 22 words possible!
 
 ;;; ------- !MINIMAL + LISP & interactive!
 ;;; TOTAL: 596 B    words: 43    avg 13.9 B/w
 ;;; 
 ;;;        ACTUAL: 544 B (probably need update..)
 ;;; 
-;;;   need mapping to be interactive!
+;;; NOT COUNTING translate... hoping for compression?
+;;; (then can skip rdloop?)
+;;; 
+;;; need mapping to be interactive!
 ;;; possibly lisp could be using internal coding
 ;;; and then map names, but that still cost 55 B symbols.
 ;;;                                   |
-;;; (+ 235 0 6 14 4 56 43 37 3 18 23 10 9 128)
-;;; (+  19 0 0  1 0  1  4  7 1  3  2  2 2   0)
+;;; (+ 235 0 6 14 4 56 43 37 3 18 23 10 128)
+;;; (+  19 0 0  1 0  1  4  7 1  3  2  2   0)
 ;;; 
 ;;; OVERFLOW!!!!
 ;;; 
@@ -2263,6 +2278,16 @@ _FFFF:
 _ZERO:  
         LIT $0000
         DO _exit
+
+.ifdef MINIMAL
+_EQ:    
+;;; 3 B
+        DO _minus
+        DO _null
+        DO _exit
+.endif
+
+;;; 3 B left!!!!!
 
 
 .ifndef MINIMAL
