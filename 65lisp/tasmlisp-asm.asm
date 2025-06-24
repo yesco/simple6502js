@@ -10,7 +10,7 @@
 ;;; 
 ;;; Lower case names can be called with JSR,
 ;;; or used as byte-code in a "DO _dup" line.
-;;
+
 
 ;;; inspiration, and goal:
 ;;; 
@@ -496,15 +496,14 @@ subtract .set 0
 ;;; Funny, if put this here it doesn't run!
 ;jmp _initlisp
 
-.export _initlisp        
-
 ;.assert startaddr=START, error ;"changed .org"
 
 ;;; This makes addresses near here FIXED thus can
 ;;; do fancy calculated alignments!
 .org START
 
-
+.export _initlisp
+_initlisp:
 
 
 ;COMPRESSED=1
@@ -515,7 +514,7 @@ subtract .set 0
 ;
 ENDCHAR=0
 
-_initlisp:      
+;_initlisp:      
 
 
 ;;; unzip - decompressor for one pae
@@ -987,9 +986,7 @@ jmptable:
 
 ;;; INIT - this should be first in jmptable at offset 0
 .export _reset
-
-_reset:
-_initlisp:      
+_reset: 
 ;;; 9
 
         lda #<HERESTART
@@ -1030,9 +1027,8 @@ _initlisp:
 
 .endif ; !MINIMAL
        
-
+;FUNC "_error"
 .export _error
-
 _error: 
 _undef: 
 _quit:  
@@ -1064,14 +1060,15 @@ _quit:
 .ifndef UJSR
 
 .macro uJSR addr
-       jsr addr
+;        .assert (.isupper(.mid(2,1,addr))),error,"uJSR: can't call macros this way"
+        jsr addr
 .endmacro
 
 .else
 
 .macro uJSR addr
         ;; make sure read correct dispatch char!
-        .assert (addr/256=*/256),error,"can only call within same page"
+        .assert (addr/256=*/256),error,"uJSR: can only call within same page"
         ;; we subtrace 1...
         .assert addr,error,"uJSR: can't jsr 0"
         ;; yeah, limit 256 bytes
@@ -1079,12 +1076,12 @@ _quit:
         .assert (addr-jmptable)<=256,error,"uJSR: target too far"
         .out "uJSR"
 
-.ifdef MINIMAL
+    .ifdef MINIMAL
         .byte 0,(addr-jmptable-1)
-.else
-;;; TODO: need /2
+    .else
+        ;;; TODO: need /2 and .align 2 for each function
         .byte 0,(addr-jmptable-1)/2
-.endif
+    .endif
 
 .endmacro
 
@@ -1128,8 +1125,7 @@ brkadr: lda jmptable-1,y        ; lo to
 .ifndef MINIMAL
 
 ;;; (14 B)
-.export _interactive
-_interactive:    
+FUNC "_interactive"
 ;;; this is so we alwAY get back here
 ;;; (essentially, no need jsr exec and jmp)
 ;;; (and this tail-calls into exec, same same!)
@@ -1152,6 +1148,7 @@ _rdloop:
 ;;; - http://6502org.wikidot.com/software-token-threading
 ;;; - 
 ;;; 22 B (+ 6 trans)
+;FUNC "_exec"
 .export _exec
 _exec:  
         ;; only token
@@ -1243,8 +1240,13 @@ call:   jmp jmptable
 ;;; call routine after uJSR (brk)
 ;;; 
 ;;; 6
-.export _OP16
-_OP16:
+.macro FUNC name
+  .export .ident(name)
+  .ident(name):
+.endmacro
+
+FUNC "_OP16"
+
 .proc _execpla2
         pla                     ; lo
         tay
@@ -1258,10 +1260,8 @@ _OP16:
 ;;; start interpreation at IP,Y
 ;;; 
 ;;; (+ 2 9 13 11) = 35 B  (+ 4  non-minimal.)
-.export _interpret
-.proc _interpret
-
-enter:  
+FUNC "_interpret"
+.proc enter
         ;; save offset of what we're calling
         sta savea
 
@@ -1310,8 +1310,7 @@ restore:
 
 ;;; next token from interpration
 ;;; Returns A = token, also stored in zp: token
-.export _nexttoken
-_nexttoken:      
+FUNC "_nexttoken"
 ;;; 9 B
         inc ipy
         ldy ipy
@@ -1328,8 +1327,7 @@ _nexttoken:
 .ifndef MINIMAL
 
 ;;; (number of \)-1 stored in ipp(arams)
-.export _lambda
-_lambda:        
+FUNC "_lambda"
 ;;; 5 B
         stx ipx
         inc ipp
@@ -1338,8 +1336,7 @@ _lambda:
 ;;; over = (pickn,2), 3rd = (pick,4) ...
 ;;; 
 ;;; 3 + 11 = 14 pick ("over" only would be 13 B)
-.export _pickn
-_pickn:   
+FUNC "_pickn"
 ;;; 6+11 = 17 B
         uJSR _push
         uJSR _nexttoken
@@ -1357,9 +1354,17 @@ _loadpickA:
         lda stack-2+1,y
         jmp loadApla
 
+
+;;; load variable from stack (a b c .. h)
+;;; 
+;;; 8 B
+FUNC "_var"
+        uJSR _push
+        uJSR varindex
+        bne _loadpickA          ; always true
+
 ;;; 'a -> 2 'b -> 4 (+ ipx)
-.export varindex
-varindex:  
+FUNC "varindex"
 ;;; 9
         uJSR _nexttoken
         and #$f
@@ -1367,18 +1372,7 @@ varindex:
         adc ipx
         rts
 
-;;; load variable from stack (a b c .. h)
-;;; 
-;;; 8 B
-.export _var
-_var:   
-        uJSR _push
-        uJSR varindex
-        bne _loadpickA
-
-
-.export _setvar
-_setvar:        
+FUNC "_setvar"
 ;;; 17 B
         jsr varindex           ; canNOT uJSR
 
@@ -1396,8 +1390,7 @@ _storeunpickA:
 ;;; 
 ;;; adjusts stack to remove parameters atreturn
 ;;; TOP retained as it contains return value!
-.export _return
-_return:  
+FUNC "_return"
 ;;; 7 B
         lda ipp
         asl
@@ -1409,8 +1402,7 @@ _return:
 .endif ; MINIMAL
 
 ;;; semis (return from interpretastion)
-.export _exit_
-_exit_:
+FUNC "_exit_"
 _exit:  
 ;;; 3
         pla
@@ -1424,8 +1416,7 @@ _ret:
 
 
 
-.export _binliteral
-_binliteral:       
+FUNC "_binliteral"
 ;;; 11 B
         uJSR _nexttoken
         sta tos
@@ -1468,8 +1459,7 @@ _binliteral:
 ;;; then adds current number 
 ;;; 
 ;;; (+ 19 12 11) = 42 B macro: (+ 18 6 7) = 31 !!!
-.export _number
-.proc _number
+FUNC "_number"
 ;;; 19
         uJSR _MUL10
         
@@ -1485,8 +1475,7 @@ digit:  and #$f
 .endproc
 
 ;;; 'a
-.export _quote
-_quote: 
+FUNC "_quote"
 ;;; 6 B
         uJSR _nexttoken
         jmp _pushA
@@ -1505,8 +1494,7 @@ noinc:
 
        
 ;;; _hexliteral: read exactly 4 hex-digit!
-.export _hexliteral
-_hexliteral:       
+FUNC "_hexliteral"
 ;;; 28
         uJSR _ZERO
 
@@ -1553,8 +1541,9 @@ done:
 ;;; 56 B - barely worth it!!!
 ;;; (milliforth: 59 B...)
 .ifnblank
-.export _colon
-.proc _colon
+
+FUNC "_colon"
+.proc _colonn
         uJSR _push
 
         uJSR _nexttoken
@@ -1630,8 +1619,7 @@ _cdr:
         .byte $2c
 .endif ; MINIMAL
 
-.export _load
-_load:  
+FUNC "_load"
 _car:    
 ;;; (14 B)
         ldy #0
@@ -1663,8 +1651,7 @@ loadApla:
 ;;; lda:   tos= stack[x], x-= 2
 ;;; sta:   stack[x]= tos, x-= 2
 
-.export _dup
-_dup:  
+FUNC "_dup"
 _push:   
 ;;; 8 B !
         ;; a | b c ...
@@ -1679,8 +1666,7 @@ _push:
         ;; a | a b c ..
         rts
 
-.export _swap
-_swap:   
+FUNC "_swap"
 ;;; 17 B !
         ;; q= tos = b
         lda stack,x
@@ -1718,8 +1704,7 @@ _swap:
 ;;;   WARNING: stack is misaligned one byte!
 ;;; 
 ;;; 12+7= 19 B
-.export _comma
-_comma:
+FUNC "_comma"
 ;;; 12
         ldy #0
         jsr _ccomma             ; canNOT uJSR
@@ -1738,28 +1723,26 @@ ret:
         rts
 .endproc
 
-.export _store 
-_store: 
+FUNC "_store"
 ;;; 8 B
         uJSR _comma
-.export _2drop
-_2drop:  
+FUNC "_2drop"
         dex
         dex
         jmp _pop
 
 .ifndef MINIMAL
-.export _rcomma
-_rcomma:        
+
+FUNC "_rcomma"
 ;;; 6+12 = 18
-        uJSR dec2
+        uJSR _dec2
         uJSR _comma
         ;; dec2 again, lol
-dec2:   
+FUNC "_dec2"   
 ;;; (3+9 = 12)
         uJSR _dec
 
-.proc _dec
+FUNC "_dec"
 ;;; (9 B)
         lda tos
         bne ret
@@ -1777,8 +1760,8 @@ ret:
 ;;; 6 (+ 9 9 5) = 6 (+ 23)
 
 .ifndef MINIMAL
-.export _key
-_key:   
+
+FUNC "_key"
 ;;; 9 B
         uJSR _ZERO
         ; cli
@@ -1797,8 +1780,7 @@ _loadA:
         jmp loadApla
 
 ;;; 4 B : T #10 O ; # 4
-.export _terpri
-_terpri:
+FUNC "_terpri"
         dex
         dex
         lda #10
@@ -1806,8 +1788,7 @@ _terpri:
 .endif ; MINIMAL
 
 ;;; keep with _terpri above
-.export _out
-_out:  
+FUNC "_out"
 ;;; 6 B
         jsr putchar             ; canNOT be uJSR
         jmp _pop
@@ -1821,8 +1802,7 @@ _out:
 ;;; 14 (+ 8 9 6) = 23
 
 ;;; jump/skip on zero (set Y!)
-.export _zbranch
-_zbranch:        
+FUNC "_zbranch"
 ;;; 18 B
         lda tos
         ora tos+1
@@ -1832,8 +1812,7 @@ _zbranch:
         ;;  jmp at hibit, and/or some literals!)
         uJSR _pop
 
-.export _branch
-_branch:        
+FUNC "_branch"
         uJSR _nexttoken
 
         ;; relative jmp
@@ -1855,49 +1834,41 @@ _branch:
 ;;;
 ;;; X must contain stack pointer always
 
-.export _plus
-_plus:  
-_adc:  
+FUNC "_plus"
         ;; ADC stack,x
         clc
         ldy #$7d
         bne _mathop
 
-.export _and
-_and:
+FUNC "_and"
         ;; AND stack,x
         ldy #$3d
         bne _mathop
 ;;; cmp oper,y $d9 - can't use doesn't ripple
 ;;; and wrong order...
 
-.export _eor
-_eor:
+FUNC "_eor"
         ;; EOR stack,x
         ldy #$5d
         bne _mathop
 
-.export _or
-_or:
+FUNC "_or"
         ;; AND stack,x
         ldy #$1d
         bne _mathop
 
-.export _minus
-_minus: 
+FUNC "_minus"
         ;; SBC stack,x
         sec
         ldy #$fd
         bne _mathop
 
-.export _sta
-_sta:   
+FUNC "_sta"
         ;; STA stack,x
         ldy #$9d
         bne _mathop
 
-.export _drop
-_drop: 
+FUNC "_drop"
 _pop:
 _lda:   
         ;; LDA oper,x
@@ -1911,8 +1882,7 @@ _lda:
 ;;; TODO: could be used for BIGNUMs!
 ;;; 
 ;;; 17B
-.export _mathop
-_mathop: 
+FUNC "_mathop"
         sty op
         ldy #0
         
@@ -1926,8 +1896,7 @@ op:     adc stack,x
         inx
         rts
 
-.export _div2
-_div2:   
+FUNC "_div2"
 ;;; 5B !
         lsr tos+1
         ror tos
@@ -1951,8 +1920,7 @@ _div2:
 ;;; 
 ;;; 9B
 
-.export _printz
-_printz:        
+FUNC "_printz"
 _writez: 
 ;;; 12B
         ldy #0
@@ -2269,34 +2237,32 @@ macrostart:
 
 ;;; #U give _FFFF
 
-.export _NULL
-_NULL:
+FUNC "_NULL"
 ;;; 10 B
         ZBRANCH _ZERO
-.export _FFFF
-_FFFF: 
+FUNC "_FFFF"
         LIT $ffff
         DO _exit
-.export _ZERO
-_ZERO:  
+FUNC "_ZERO"
         LIT $0000
         DO _exit
 
 .ifdef MINIMAL
-.export _EQ
-_EQ:    
+
+FUNC "_EQ"
 ;;; 3 B
         DO _minus
         DO _NULL
         DO _exit
+
 .endif
 
 ;;; 3 B left!!!!!
 
 
 .ifndef MINIMAL
-.export _MUL10
-_MUL10: 
+
+FUNC "_MUL10"
 ;;; 6 B
         DO _MUL2
         DO _dup
@@ -2305,15 +2271,14 @@ _MUL10:
         DO _plus
         DO _exit
 
-.export _MUL16
-_MUL16: 
+FUNC "_MUL16"
 ;;; 6 B
         DO _MUL8
-_MUL8:  
+FUNC "_MUL8"
         DO _MUL4
-_MUL4:  
+FUNC "_MUL4"
         DO _MUL2
-_MUL2:  
+FUNC "_MUL2"
         DO _dup
         DO _plus
         DO _exit
@@ -2336,8 +2301,7 @@ endtable:
 ;;; ========================================
 ;;;       T  R  A  N  S  T  A  B  L  E
 
-.export transtable
-transtable:     
+FUNC "transtable"
 
 .ifndef MINIMAL
 
@@ -2498,8 +2462,7 @@ transtable:
 
 .endif ; MINIMAL
 
-.export endtrans
-endtrans:       
+FUNC "endtrans"
 
 .ifndef MINIMAL
 .assert (endtrans-transtable)=128, error, "Transtable not right size"
