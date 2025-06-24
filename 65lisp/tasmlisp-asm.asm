@@ -3,22 +3,14 @@
 ;;; Built for minimal size not speed.
 ;;; Instructions are byte-coded.
 ;;; 
-;;; There are 25 similar to "a forth".
-;;; Plus 5 convience assembly routines.
+;;; There are 25 byte code instructions.
+;;; They are somewhat similar to a "forth".
 ;;; 
-;;; Most can be called directly with JSR,
-;;; or from a compact byte-code program.
+;;; Plus 7 convience assembly routines.
 ;;; 
-;;; 
-;;; Functions:
-;;;    stack: dup map drop 2drop                (4)
-;;;   memory: store load comma ccomma           (4)
-;;;     math: plus minus and or eor div2 inc    (7)
-;;;    tests: null -1 zero eq                   (4)
-;;;  control: Xexeute exit zbranch branch       (4)
-;;;   system: Literal out [init]                (2) [1]
-;;;    [conv: pushA pushPLA loada loadApla]         [4]
-;;;                                            (25) [5]
+;;; Lower case names can be called with JSR,
+;;; or used as byte-code in a "DO _dup" line.
+;;
 
 ;;; inspiration, and goal:
 ;;; 
@@ -1251,7 +1243,8 @@ call:   jmp jmptable
 ;;; call routine after uJSR (brk)
 ;;; 
 ;;; 6
-.export _execpla2
+.export _OP16
+_OP16:
 .proc _execpla2
         pla                     ; lo
         tay
@@ -1875,7 +1868,6 @@ _and:
         ;; AND stack,x
         ldy #$3d
         bne _mathop
-
 ;;; cmp oper,y $d9 - can't use doesn't ripple
 ;;; and wrong order...
 
