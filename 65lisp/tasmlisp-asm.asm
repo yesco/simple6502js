@@ -107,7 +107,12 @@
 MINIMAL=1
 
 ;;; enable to see if save a byte on each JSR
-;UJSR=1
+;;; 244 B with, 245 with ... LOL only uJSR 10x in MINIMAL
+;;; 
+;;; USE for more than one page...
+;;;   actually need to use for simple call macro!
+;;; 
+;UJSR=1 
 
 ;;; 1379
 START=$563
@@ -1019,19 +1024,20 @@ _quit:
 .ifndef UJSR
 
 .macro uJSR addr
-;        jsr addr
+       jsr addr
 .endmacro
 
 .else
 
 .macro uJSR addr
         ;; make sure read correct dispatch char!
-        assert (addr/256=*/256),error,"can only call within same page"
+        .assert (addr/256=*/256),error,"can only call within same page"
         ;; we subtrace 1...
-        assert addr,error,"uJSR: can't jsr 0"
+        .assert addr,error,"uJSR: can't jsr 0"
         ;; yeah, limit 256 bytes
         ;; (unless we go asl..., and .align 2)
-        assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .out "uJSR"
         .byte 0,(addr-jmptable-1)
 .endmacro
 
@@ -1900,7 +1906,7 @@ _loadPOPa:
 _pusha:
         pha
 _pushPLA:       
-        uJSR push
+        uJSR _push
         jmp _seta
 
 
@@ -2082,6 +2088,7 @@ _mul2:
 ;;; tests:    14 (23)   zbranch (null 0 true?sym)
 ;;; math:     41  (9)   + & (- |) E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
+;;; uJSR:     30     TODO: somehow uncounted!
 
 ;;; ------ MINIMAL (not interactive)
 ;;; TOTAL: 202 B   words: 19    avg: 10.6 B/op
@@ -2093,8 +2100,8 @@ _mul2:
 ;;; 
 ;;; _reset X L @ " $ , I ! O K zBranch + & E _ }
 ;;; 
-;;; (+ 0 28 33 3 11 39 27 6 14 41)
-;;; (+ 1  1  0 1  1  3  4 2  1  5)
+;;; (+ 0 28 33 3 11 39 27 6 14 41 30)
+;;; (+ 1  1  0 1  1  3  4 2  1  5  0)
 ;;; (/ 202.0 19)   -> bytes per word
 ;;; (/ 256.0 10.6) -> 24 words possible!
 
