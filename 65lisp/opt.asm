@@ -1,5 +1,163 @@
 ;;; cut-n-paste variants not used?
 
+
+FUNC "_mul"
+
+_mul:
+;;; 35 B - 9 ops from _MUL16 macro in
+;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
+
+;;; stack: A B -- ptr1*ptr2
+;;; 
+;;; top= ptr1 * ptr2 (ptr1 is trashed, ptr2 remains)
+;;; 
+;;; 32 B
+        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
+        uJSR _zero
+
+        ;; loop 16
+        ldy #16
+        sty savey
+
+loop:   
+        ;; top *= 2
+        uJSR _mul2
+
+        ;; A *= 2 => carry
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; bit not set no add: jmp
+        bcc skip
+
+        ;; top += B (perfect it stays there)
+        uJSR _add
+        ;; steal B back
+        dex
+        dex
+
+skip:   
+        dec savey
+        bpl loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+
+
+FUNC "_mul"
+
+_mul:
+;;; 35 B - 9 ops from _MUL16 macro in
+;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
+
+;;; stack: A B -- A*B
+;;; 
+;;; 27 B + 8 = 35 B (uJSR: - 7 => 28)
+        ;; top= 0
+        uJSR _ZERO
+        uJSR do16
+        ;; top remains, remove 2 values
+        inx
+        inx
+        inx
+        inx
+        rts
+
+        ;; loop 16
+do16:   uJSR do8
+do8:    uJSR do4
+do4:    uJSR do2
+do2:    
+        ;; shl top
+        uJSR _mul2
+        ;; shl A
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; bit not set jmp
+        bcc ret
+
+        ;; top+= B
+        uJSR _add
+        ;; overflow in C effects rol top? 
+ret:    
+        rts
+
+;;; poor mans looping 16 times
+_MUL16: DO __MUL8
+__MUL8: DO __MUL4
+__MUL4: DO __MUL2
+__MUL2: 
+        a{Sa b{Sb
+        bcc ret
+
+ret:    rts
+        
+        
+        
+
+        
+
+
+        ; dup U(''0^)
+	; dup #1 & UU over & pick2 _MUL2 pick2 _div2 _div + ^
+
+        ;; 23 B
+        ;; :* \\ bUB+2 0^
+        ;;       b#1& UU a&
+        ;;         a{ b} *
+        ;;       +^
+
+
+.export _swap
+_swap:   
+;;; 17 B !
+        ;; q= tos = b
+        lda stack,x
+        pha
+        lda stack+1,x
+        pha
+        
+        ;; a | b c ..
+        uJSR _sta
+        ;; stack = a
+
+        ;; a | (a) c ..
+        dex
+        dex
+        ;; a | a c ..
+
+        ;; tos= q (= b)
+        pla ; hi
+        jmp loadApla
+        ;; b | a c ..
+
+.ifnblank
+;;; TODO: could a serf-JSR-byte thingie be smaller?
+;;;  no it's 24 B
+
+        ldy #0
+        dex
+        dex
+        jsr bswap
+bswap:  
+        lda tos,y
+        pha
+        lda stack+2,x
+        sta tos,y
+        pla
+        sta stack+2,x
+        iny
+        inx
+        rts
+.endif
+
+
 ;;; 3 + 12 = 15
 inc2:   
         lda #2

@@ -1208,10 +1208,6 @@ callAoffset:
 
         ;; save in "jmp jmptable" low byte!
         sta call+1
-
-        ;; A= token (for _var _number ...)
-        lda token
-
 call:   jmp jmptable
 
 ;;; ----------- SAVE MORE BYTeS -------------
@@ -1322,7 +1318,7 @@ FUNC "_nexttoken"
 ;;; ----------------------------------------
 ;;; lambda
 ;;; 
-;;; 3 (+ 5 9 8 17) = 39 \ _vary a Sa ^ ;
+;;; 3 (+ 5 8 8 17) = 39 \ _vary a Sa ^ ;
 
 .ifndef MINIMAL
 
@@ -1365,8 +1361,8 @@ FUNC "_var"
 
 ;;; 'a -> 2 'b -> 4 (+ ipx)
 FUNC "varindex"
-;;; 9
-        uJSR _nexttoken
+;;; 8
+        lda token
         and #$f
         asl
         adc ipx
@@ -1654,6 +1650,7 @@ loadApla:
 FUNC "_dup"
 _push:   
 ;;; 8 B !
+        ;; tos | memstack
         ;; a | b c ...
         dex
         dex
@@ -2261,6 +2258,72 @@ FUNC "_EQ"
 
 
 .ifndef MINIMAL
+
+;;; #0UU =>     0   !
+;;; x UU => _FFFF   !
+
+FUNC "_mul"
+
+_mul:
+;;; 35 B - 9 ops from _MUL16 macro in
+;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
+
+;;; stack: A B -- ptr1*ptr2
+;;; 
+;;; top= ptr1 * ptr2 (ptr1 is trashed, ptr2 remains)
+;;; 
+;;; 32 B
+        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
+        uJSR _zero
+
+        ;; loop 16
+        ldy #16
+        sty savey
+
+loop:   
+        ;; top *= 2
+        uJSR _mul2
+
+        ;; A *= 2 => carry
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; bit not set no add: jmp
+        bcc skip
+
+        ;; top += B (perfect it stays there)
+        uJSR _add
+        ;; steal B back
+        dex
+        dex
+
+skip:   
+        dec savey
+        bpl loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+
+;;; shorter as macro: 
+;;; 23 B !!!
+
+        ; dup U(''0^)
+	; dup #1 & UU over & pick2 _MUL2 pick2 _div2 _div + ^
+
+        ;; 23 B
+        ;; :* \\ bUB+2 0^
+        ;;       b#1& UU a&
+        ;;         a{ b} *
+        ;;       +^
+
+FUNC "_div"
+;;; _DIV16 is 11 ops in - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
+;;; 
 
 FUNC "_MUL10"
 ;;; 6 B
