@@ -1,5 +1,224 @@
 ;;; cut-n-paste variants not used?
 
+;_initlisp:
+
+        sec                     ; => 00
+        clc                     ; => ?? (ff)    (is smaller!)
+        lda #0
+        sbc #0
+;;; V=0 for sure!
+
+        tay
+
+.ifblank
+;;;  carray?
+        ldx #'1'
+        bvs skip
+        dex
+skip:   
+        txa
+        jsr putchar
+
+        lda #':'
+        jsr putchar
+.endif
+
+;;;  print hex
+        tya
+
+        and #15
+        ora #$30
+        jsr putchar
+
+        tya
+        ror
+        ror
+        ror
+        ror
+        
+        and #15
+        ora #$30
+        jsr putchar
+
+        rts
+.end
+
+
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 
+FUNC "_lessthan"
+;;; 13 B
+
+;;; TODO: reverse order of A-B I think mathop makes it
+;;; 
+;;;        tos -= stack   .... lol
+;;; 
+;;;     we want tos = stack - tos
+;;; 
+;;;    but this would also change pop, push, swap .... _lda _sta???
+;;;    REVERSE? - need testing...
+
+;;; 10 B
+        uJSR _minus
+        ;; C=0 if smaller => $ff else $00 !
+        lda #0
+        sbc #0                  ; haha! (=> V=0)
+
+        pha
+        bvc loadApla            ; V=0 for sure!
+
+;;; 10 B
+.ifnblank
+        uJSR _minus
+        
+        lda #0
+        rol
+        pha
+        
+        jmp loadApla
+
+;;; !!! opposite!
+        ;; C=1 => $0101
+        ;; C=0 => $0000     is smaller should be ...
+        
+
+;;; 13 B - funny but not smallest....
+        uJSR _minus
+        ;; Y == 2 (can we assert this somehow???)
+        dey                     ;  1   1
+        bcc notSmaller
+smaller:                        ; !<   <
+        dey                     ;      0
+notSmaller:     
+        dey                     ;  0  -1
+
+        sty tos
+        sty tos+1
+        rts
+.endif
+
+
+;;; TODO: we really want this in!!!
+;;;   (17 B too much)
+;;;   how about just a < ??
+;;;  
+.ifndef MINIMAL
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 17 B (= 262 bytes, lol, 6 too many)
+FUNC "_cmp"
+        uJSR _minus
+;;; TODO: _minus may have been reversed look at _mathop....
+
+        ;; Y == 2
+        bcc AisSmaller          ; => -1
+        bne AisBigger           ; => +1
+        beq equal               ; +   0
+
+;;; LOL (saves 2 bytes)
+AisSmaller:                     ; =   >    <
+        dey                     ;         +1
+equal:
+        dey                     ; +1       0
+AisBigger:
+        dey                     ;  0  +1  -1
+        
+        sty tos
+        sty tos+1               ; $0 $11 $ff - lol
+        rts
+.endif ; MINIMAL
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 
+FUNC "_lessthan"
+;;; 13 B
+
+;;; TODO: reverse order of A-B I think mathop makes it
+;;; 
+;;;        tos -= stack   .... lol
+;;; 
+;;;     we want tos = stack - tos
+;;; 
+;;;    but this would also change pop, push, swap .... _lda _sta???
+;;;    REVERSE? - need testing...
+
+;;; 10 B
+        uJSR _minus
+        ;; C=0 if smaller => $ff else $00 !
+        lda #0
+        sbc #0                  ; haha! (=> V=0)
+
+        pha
+        bvc loadApla            ; V=0 for sure!
+
+;;; 10 B
+.ifnblank
+        uJSR _minus
+        
+        lda #0
+        rol
+        pha
+        
+        jmp loadApla
+
+;;; !!! opposite!
+        ;; C=1 => $0101
+        ;; C=0 => $0000     is smaller should be ...
+        
+
+;;; 13 B - funny but not smallest....
+        uJSR _minus
+        ;; Y == 2 (can we assert this somehow???)
+        dey                     ;  1   1
+        bcc notSmaller
+smaller:                        ; !<   <
+        dey                     ;      0
+notSmaller:     
+        dey                     ;  0  -1
+
+        sty tos
+        sty tos+1
+        rts
+.endif
+
+
+;;; TODO: we really want this in!!!
+;;;   (17 B too much)
+;;;   how about just a < ??
+;;;  
+.ifndef MINIMAL
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 17 B (= 262 bytes, lol, 6 too many)
+FUNC "_cmp"
+        uJSR _minus
+;;; TODO: _minus may have been reversed look at _mathop....
+
+        ;; Y == 2
+        bcc AisSmaller          ; => -1
+        bne AisBigger           ; => +1
+        beq equal               ; +   0
+
+;;; LOL (saves 2 bytes)
+AisSmaller:                     ; =   >    <
+        dey                     ;         +1
+equal:
+        dey                     ; +1       0
+AisBigger:
+        dey                     ;  0  +1  -1
+        
+        sty tos
+        sty tos+1               ; $0 $11 $ff - lol
+        rts
+.endif ; MINIMAL
+
+
+
 
 FUNC "_mul"
 

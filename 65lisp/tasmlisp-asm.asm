@@ -386,7 +386,7 @@ notnl:
 ;;; 5B
 .macro putc c
         lda #(c)
-        jsr _out
+        jsr putchar
 .endmacro
 
 subtract .set 0
@@ -967,8 +967,51 @@ destination:
 
 
 ;;; enable these 3 lines for NOTHING .tap => 325 bytes
-;_initlisp:      rts
-;.end
+
+;_initlisp:
+.ifdef FISH
+
+        sec                     ; => 00
+        clc                     ; => ?? (ff)    (is smaller!)
+        lda #0
+        sbc #0
+;;; V=0 for sure!
+
+        tay
+
+.ifblank
+;;;  carray?
+        ldx #'1'
+        bvs skip
+        dex
+skip:   
+        txa
+        jsr putchar
+
+        lda #':'
+        jsr putchar
+.endif
+
+;;;  print hex
+        tya
+
+        and #15
+        ora #$30
+        jsr putchar
+
+        tya
+        ror
+        ror
+        ror
+        ror
+        
+        and #15
+        ora #$30
+        jsr putchar
+
+        rts
+.end
+.endif
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
@@ -1090,6 +1133,8 @@ _BRK:
 ;;;    expected to be retained in either A and Y !!!
 ;;;    possibles are putchar, lol
 ;;; 
+;;; C V remains
+;;; 
 ;;; jsr calls *within* one page
 ;;; 
 ;;; 9 B - smallest so far!
@@ -1151,6 +1196,7 @@ _rdloop:
 ;FUNC "_exec"
 .export _exec
 _exec:  
+;;; xyzTODO: is it need in MINIMAL???
         ;; only token
         lda tos
         jmp _nexta
@@ -1205,6 +1251,11 @@ callAoffset:
 
 ;        cmp #(macrostart-jmptable)
 ;        bcs _interpret
+; ;; TODO: expects hi in savey!!! if use more than one page
+;;; 
+;;; if have more than two pages?
+;        ldy #>jmptable
+;        sty savey
 
         ;; save in "jmp jmptable" low byte!
         sta call+1
@@ -1214,28 +1265,12 @@ call:   jmp jmptable
 
 ;;; TODO: 6 _routines jsr push first thing!
 ;;;  (maybe A>xx can change this?)
+;;;  (but then not save call JSR ???)
 
-;;; TODO: a number of _routines LDY #0
-;;;    others LDA #0 (tya)
-;;; enable this.
-;;; 
-;;; LDY #0 - for all
 
-;;; TODO: fix, retain token A
-;;;  or not, easy to read 4B: ldy ipy; lda (ip),y
-;;; 
-;;; A contains dispatch offset (should be char?)
 
-;;; NOTE: if _routines expect A+Y to be clear then
-;;;   some will break if they are called internally!
-;;;   maybe have some notation, if have name
-;;; 
-;;;   _foo_AYZ == optimized w AYZ
-;;;   foo      == safe!
 
-;;; call routine after uJSR (brk)
-;;; 
-;;; 6
+
 .macro FUNC name
   .export .ident(name)
   .ident(name):
@@ -1258,6 +1293,7 @@ FUNC "_OP16"
 ;;; (+ 2 9 13 11) = 35 B  (+ 4  non-minimal.)
 FUNC "_interpret"
 .proc enter
+;;; TODO: expects hi in savey!!!
         ;; save offset of what we're calling
         sta savea
 
@@ -1288,8 +1324,13 @@ subr:
         ldy #$ff
         sty ipy
 
+;;; TODO: here, might "fall into" _nextloop if inlined
+
         uJSR _nextloop
         
+;;; TODO: possibly _exit could call here!!! (and do cleanup here)
+;;;   then no special case in 
+
 subrexit:
         ;; pop to current stack frame
 ;;; 11
@@ -1300,6 +1341,9 @@ restore:
         iny
         cpy #(endframe-startframe)
         bne restore
+
+;;; TODO: this could prepend _nextloop to enter _next???
+;;;    does it save 1 byte? lol
 
         rts
 .endproc
@@ -1399,8 +1443,11 @@ FUNC "_return"
 
 ;;; semis (return from interpretastion)
 FUNC "_exit_"
-_exit:  
+_exit: 
+
 ;;; 3
+;;; TODO: verify that this is enough
+;;;   possibly have it dispatch to "restore" inside _Interpret
         pla
         pla
 _ret:    
@@ -1414,11 +1461,10 @@ _ret:
 
 FUNC "_binliteral"
 ;;; 11 B
-        uJSR _nexttoken
-        sta tos
-        uJSR _nexttoken
-        sta tos+1
-        rts
+        uJSR _nexttoken         ; lo
+        pha
+        uJSR _nexttoken         ; hi
+        jmp loadApla
 
 ;;; TODO: idea
 ;;; 
@@ -1782,14 +1828,13 @@ FUNC "_terpri"
         dex
         lda #10
         ;; fall-through to _out
-.endif ; MINIMAL
 
 ;;; keep with _terpri above
 FUNC "_out"
 ;;; 6 B
         jsr putchar             ; canNOT be uJSR
         jmp _pop
-
+.endif
 
         
 
@@ -1798,27 +1843,118 @@ FUNC "_out"
 ;;; 
 ;;; 14 (+ 8 9 6) = 23
 
+.ifndef MINIMAL
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 
+FUNC "_lessthan"
+
+;;; TODO: reverse order of A-B I think mathop makes it
+;;; 
+;;;        tos -= stack   .... lol
+;;; 
+;;;     we want tos = stack - tos
+;;; 
+;;;    but this would also change pop, push, swap .... _lda _sta???
+;;;    REVERSE? - need testing...
+
+;;; 10 B (still 1 byte over!... lol)
+
+        uJSR _minus
+        ;; C=0 if smaller => $ff else $00 !
+        lda #0
+        sbc #0                  ; haha! (=> V=0)
+
+;;; Notice require V=0
+VC_loadbothAA:     
+        pha
+        bvc loadApla            ; V=0 for sure!
+
+;;; 10 B
+.ifnblank
+        uJSR _minus
+        
+        lda #0
+        rol
+        pha
+        
+        jmp loadApla
+
+;;; !!! opposite!
+        ;; C=1 => $0101
+        ;; C=0 => $0000     is smaller should be ...
+        
+
+;;; 13 B - funny but not smallest....
+        uJSR _minus
+        ;; Y == 2 (can we assert this somehow???)
+        dey                     ;  1   1
+        bcc notSmaller
+smaller:                        ; !<   <
+        dey                     ;      0
+notSmaller:     
+        dey                     ;  0  -1
+
+        sty tos
+        sty tos+1
+        rts
+.endif
+
+.endif ; MINIMAL _lessthan
+
+
+;;; TODO: we really want this in!!!
+;;;   (17 B too much)
+;;;   how about just a < ??
+;;;  
+.ifndef MINIMAL
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 17 B (= 262 bytes, lol, 6 too many)
+FUNC "_cmp"
+        uJSR _minus
+;;; TODO: _minus may have been reversed look at _mathop....
+
+        ;; Y == 2
+        bcc AisSmaller          ; => -1
+        bne AisBigger           ; => +1
+        beq equal               ; +   0
+
+;;; LOL (saves 2 bytes)
+AisSmaller:                     ; =   >    <
+        dey                     ;         +1
+equal:
+        dey                     ; +1       0
+AisBigger:
+        dey                     ;  0  +1  -1
+        
+        sty tos
+        sty tos+1               ; $0 $11 $ff - lol
+        rts
+.endif ; MINIMAL
+
 ;;; jump/skip on zero (set Y!)
 FUNC "_zbranch"
-;;; 18 B
+;;; 21 B
         lda tos
         ora tos+1
-        beq _pop
-        ;; zero so branch relative
-        ;; (TODO: if not compiled could encode
-        ;;  jmp at hibit, and/or some literals!)
-        uJSR _pop
+        ;; branch on zero
+        beq _branch
+        ;; skip next token 
+        inc ipy
+        bne _pop                ; Z=1 for sure (ipy>0)
 
 FUNC "_branch"
         uJSR _nexttoken
 
-        ;; relative jmp
+        ;; relative jmp ipy += "token"
         clc
         adc ipy
         sta ipy
-
-        rts
-
+        ;; can't guarantee C=0 because can add negative
+        jmp _pop
 
 ;;; --------- MATH
 
@@ -1877,6 +2013,8 @@ _lda:
 ;;;   AX = AX op POP
 ;;; 
 ;;; TODO: could be used for BIGNUMs!
+;;; 
+;;; NOTE: Y=2 after exit!
 ;;; 
 ;;; 17B
 FUNC "_mathop"
@@ -2068,6 +2206,21 @@ readlist:
 ;;; math:     52        + - & | E _drop div2
 ;;; transtab: 0 (102)   (jsr translate, translate)
 ;;; uJSR: 30     - saves 1 byte in MINIMAL!!! :-D
+
+;;; NOTE:            o v e r v i e w
+;;; 
+;;;   stack: 75 bytes   " ' $ (sta/lda) ! , @ 2drop
+;;;    exec: 65         X OP16 _nextoken
+;;;    ctrl: 20         B zB \0;_exit
+;;;      io:  6         O
+;;;    math: 34         _mathop   + - div2
+;;;   logic: 12         (  ^  )   & | E
+;;;   const: 19         binliteral _zero _FFFF
+;;;   tests:  5         U _EQ
+;;;     sys: 15         _reset=8 _OP16=6 _error=1
+;;; -------------------
+;;;         251         (+ 75 65 20 6 34 12 19 5 15)
+;;;         251 actual!
 
 ;;; ------ MINIMAL (not interactive)
 ;;; TOTAL: 264 B   words: 22    avg: 11.5 B/op
@@ -2355,6 +2508,7 @@ FUNC "_MUL2"
 endtable:       
 
 .ifdef MINIMAL
+;;; TODO: enable again!!! before checkin
   .assert (endtable-jmptable)<=256, error, "Table too big (>256)"
 .else
 ;  .assert (endtable-jmptable)<=512, error, "Table too big (>512)"
