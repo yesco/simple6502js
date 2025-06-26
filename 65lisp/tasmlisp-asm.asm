@@ -10,6 +10,18 @@
 ;;; 
 ;;; Lower case names can be called with JSR,
 ;;; or used as byte-code in a "DO _dup" line.
+;;; 
+;;;  
+;;; FUNCIONS
+;;; 
+;;;     stack: dup map drop 2drop                (4)
+;;;    memory: store load comma                  (3)
+;;;      math: plus minus and or eor div2 inc    (7)
+;;;     tests: null -1(=_FFFF) zero eq lessthan  (5)
+;;;   control: exit zbranch branch               (3)
+;;;    system: Literal                           (1) [0]
+;;;     [conv: pushA pushPLA loada loadApla]         [4]
+;;;              (+ 4 3 7 5 3 1)                (23) [4]
 
 
 ;;; inspiration, and goal:
@@ -264,10 +276,6 @@ savez:  .res 1
 
 ;;; TODO: needed? clash with jsr printd???
 savexputchar:    .res 1
-
-;;; used to detect type using BIT & beq
-BIT0: .res 1
-BIT1: .res 1
 
 ;;; memory
 here:    .res 2
@@ -1028,14 +1036,24 @@ startaddr:
 jmptable:  
 
 ;;; INIT - this should be first in jmptable at offset 0
+
+; no -heap 
+.ifndef MINIMAL 
+
 .export _reset
 _reset: 
 ;;; 9
 
-        lda #<HERESTART
-        sta here
-        lda #>HERESTART
+        ;; skip some bytes
+        lda #(>HERESTART)+1
         sta here+1
+        ;lda #<HERESTART
+        ;sta here
+        lda #0
+        sta here
+
+        ;; do other init to 0
+        ;; ....
 
 .ifdef LISP
 ;;; (+ 4 14) = 20 ???
@@ -1053,10 +1071,6 @@ _reset:
 
 .endif ; LISP
 
-.ifndef MINIMAL
-        ;; zero stuff
-;        lda #0
-
 ;;; set's both Data Stack, and R stack
 ;;; (are we skipping one byte at DS?)
         ldx #$ff
@@ -1068,22 +1082,15 @@ _reset:
 
         jmp _interactive
 
+
 .endif ; !MINIMAL
        
-;FUNC "_error"
+;FUNC "_error" ;; TODO: for some reason can't???
 .export _error
 _error: 
 _undef: 
 _quit:  
-
-.ifdef MINIMAL
-;;; TODO: ?
         rts
-.endif       
-
-
-
-
 
 ;;; ========================================
 ;;; uJSR - 6502 minimalistic 2 byte JSR
@@ -1192,18 +1199,21 @@ _rdloop:
 ;;; references
 ;;; - http://6502org.wikidot.com/software-token-threading
 ;;; - 
-;;; 22 B (+ 6 trans)
-;FUNC "_exec"
-.export _exec
-_exec:  
-;;; xyzTODO: is it need in MINIMAL???
+
+;;; 15 B (+ 5 _exec 6 trans)
+
+.ifndef MINIMAL
+FUNC "_exec"
         ;; only token
         lda tos
         jmp _nexta
+.endif ; MINIMAL
 
 ;;; make sure have somewhere to return to
 ;;; (as we're doing jmp dispatch)
-_nextloop:
+;FUNC "_nextloop"
+.export _nextloop
+_nextloop:      
         uJSR _next
         jmp _nextloop
 
@@ -1238,7 +1248,7 @@ notrans:
 .endif
 
 callAoffset:    
-;;; 12
+;;; (6) 
         ;; macro subtroutine?
         ;; (offset > macrostart)
 
@@ -1843,25 +1853,18 @@ FUNC "_out"
 ;;; 
 ;;; 14 (+ 8 9 6) = 23
 
-.ifndef MINIMAL
-
 ;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
 ;;; 
-;;; 
-FUNC "_lessthan"
-
-;;; TODO: reverse order of A-B I think mathop makes it
-;;; 
-;;;        tos -= stack   .... lol
-;;; 
-;;;     we want tos = stack - tos
-;;; 
-;;;    but this would also change pop, push, swap .... _lda _sta???
-;;;    REVERSE? - need testing...
+;;;   to <= do: inc <
+;;;   to >  do: swap <
+;;;   to >= do: < null
+;;;   to == do: - null
 
 ;;; 10 B (still 1 byte over!... lol)
+FUNC "_lessthan"
 
         uJSR _minus
+C_gives_FFFF_else_0000:     
         ;; C=0 if smaller => $ff else $00 !
         lda #0
         sbc #0                  ; haha! (=> V=0)
@@ -1871,19 +1874,36 @@ VC_loadbothAA:
         pha
         bvc loadApla            ; V=0 for sure!
 
+;;; (+ 6 3 3 3) = 13 B - same as macro, if have _lessthan
+FUNC "_eq"
+        uJSR _minus
+FUNC "_null"
+        lda tos
+        ora tos+1
+        beq _FFFF
+FUNC "_zero"
+        sec
+        bcs C_gives_FFFF_else_0000
+FUNC "_FFFF"
+_minus1:        
+        clc
+        bcs C_gives_FFFF_else_0000
+
+.ifndef MINIMAL
+
 ;;; 10 B
 .ifnblank
         uJSR _minus
         
         lda #0
         rol
-        pha
         
-        jmp loadApla
-
 ;;; !!! opposite!
         ;; C=1 => $0101
         ;; C=0 => $0000     is smaller should be ...
+        pha
+        jmp loadApla
+
         
 
 ;;; 13 B - funny but not smallest....
@@ -1967,6 +1987,8 @@ FUNC "_branch"
 ;;;
 ;;; X must contain stack pointer always
 
+
+;;; Carry is retained after
 FUNC "_plus"
         ;; ADC stack,x
         clc
@@ -1990,6 +2012,7 @@ FUNC "_or"
         ldy #$1d
         bne _mathop
 
+;;; Carry is retained after
 FUNC "_minus"
         ;; need to swap as _sbc does opposite!
         jsr _swap
@@ -2212,18 +2235,18 @@ readlist:
 
 ;;; NOTE:            o v e r v i e w
 ;;; 
-;;;   stack: 75 bytes   " ' $ (sta/lda) ! , @ 2drop
-;;;    exec: 65         X OP16 _nextoken
-;;;    ctrl: 20         B zB \0;_exit
-;;;      io:  6         O
-;;;    math: 34         _mathop   + - div2
-;;;   logic: 12         (  ^  )   & | E
-;;;   const: 19         binliteral _zero _FFFF
-;;;   tests:  5         U _EQ
-;;;     sys: 15         _reset=8 _OP16=6 _error=1
+;;;   stack: 72 bytes   " ' $ (sta/lda) ! , @ 2drop
+;;;                       (+ 8 2 17 4 3 19 14 5)
+;;;    exec: 69         _error OP16 _nexttoken _nextloop _interpret
+;;;                       (+ 1 6 9 15 38)
+;;;    ctrl: 24         B zB \0;_exit (+ 11 10 3)
+;;;    math: 37         _mathop   + - div2 (+ 19 5 8 5)
+;;;   logic: 12         (  ^  )   & | E (+ 4 4 4)
+;;;   tests: 35         U = < zero FFFF binliteral
+;;;                       (+ 6 3 10 3 3 10)
 ;;; -------------------
-;;;         251         (+ 75 65 20 6 34 12 19 5 15)
-;;;         251 actual!
+;;;         249         (+ 72 69 24 37 12 35)
+;;;         249 actual!
 
 ;;; ------ MINIMAL (not interactive)
 ;;; TOTAL: 264 B   words: 22    avg: 11.5 B/op
@@ -2390,26 +2413,6 @@ macrostart:
 
 ;;; #U give _FFFF
 
-FUNC "_NULL"
-;;; 10 B
-        ZBRANCH _ZERO
-FUNC "_FFFF"
-        LIT $ffff
-        DO _exit
-FUNC "_ZERO"
-        LIT $0000
-        DO _exit
-
-.ifdef MINIMAL
-
-FUNC "_EQ"
-;;; 3 B
-        DO _minus
-        DO _NULL
-        DO _exit
-
-.endif
-
 ;;; 3 B left!!!!!
 
 
@@ -2512,7 +2515,7 @@ endtable:
 
 .ifdef MINIMAL
 ;;; TODO: enable again!!! before checkin
-  .assert (endtable-jmptable)<=256, error, "Table too big (>256)"
+;  .assert (endtable-jmptable)<=256, error, "Table too big (>256)"
 .else
 ;  .assert (endtable-jmptable)<=512, error, "Table too big (>512)"
 .endif
@@ -2606,8 +2609,8 @@ FUNC "transtable"
         DO _number             ; 9 
         DF _colon,  58,"_COLON"; :
         DF _exit,   59,"_EXIT" ; ;
-        DO _undef              ; < - lt
-        DO _undef              ; =   : = -U ; # 4
+        DO _lessthan           ; < - lt
+        DO _eq                 ; =   : = -U ; # 4
         DO _undef              ; > - gt
         DO _undef              ; ? - is atom? if?
         DF _load,   64,"_LOAD" ; @ car
@@ -2622,7 +2625,7 @@ FUNC "transtable"
         DF _inc,    73,"_INC"  ; I
         DF _dec,    74,"_DEC"  ; J
         DF _key,    75,"_KEY"  ; K
-        DF _binliteral,76,"_BLT"; L
+        DF _binliteral,76,"_LIT"; L
         DO _undef              ; M - mem/mapcar/minus
         DO _undef              ; N - number?
         DF _out,     83,"_OUT" ; O
