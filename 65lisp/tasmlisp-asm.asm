@@ -1146,11 +1146,11 @@ _BRK:
 ;;; 
 ;;; 9 B - smallest so far!
         pla                     ; throw away P
-        pla                     ; lo
+        pla                     ; lo - points to byte after!
         pha
         tay
         ;; get byte after call (from one page)
-        lda jmptable-1,y
+        lda jmptable-1,y        ; get previous byte!
         bne callAoffset
 
 .ifnblank ; more src uJSR
@@ -1674,7 +1674,7 @@ _cdr:
 
 FUNC "_load"
 _car:    
-;;; (14 B)
+;;; (14 B) (can be done in 12 B but then no reuse with loadApla)
         ldy #0
 cYr:    
         lda (tos),y
@@ -1794,7 +1794,7 @@ FUNC "_rcomma"
         uJSR _dec2
         uJSR _comma
         ;; dec2 again, lol
-FUNC "_dec2"   
+FUNC "_dec2"
 ;;; (3+9 = 12)
         uJSR _dec
 
@@ -1878,7 +1878,7 @@ VC_loadbothAA:
         pha
         bvc loadApla            ; V=0 for sure!
 
-;;; (+ 6 3 3 3) = 13 B - same as macro, if have _lessthan
+;;; (+ 3 6 3 3) = 15 B - same as macro, if have _lessthan
 FUNC "_eq"
         uJSR _minus
 FUNC "_null"
@@ -2246,8 +2246,8 @@ readlist:
 ;;;    ctrl: 24         B zB \0;_exit (+ 11 10 3)
 ;;;    math: 37         _mathop   + - div2 (+ 19 5 8 5)
 ;;;   logic: 12         (  ^  )   & | E (+ 4 4 4)
-;;;   tests: 35         U = < zero FFFF binliteral
-;;;                       (+ 6 3 10 3 3 10)
+;;;   tests: 35         = U zero FFFF < binliteral
+;;;                       (+ 3 6 3 3 10 10)
 ;;; -------------------
 ;;;         249         (+ 72 69 24 37 12 35)
 ;;;         249 actual!
