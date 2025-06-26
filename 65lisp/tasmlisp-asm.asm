@@ -1149,6 +1149,7 @@ _BRK:
         pla                     ; lo
         pha
         tay
+        ;; get byte after call (from one page)
         lda jmptable-1,y
         bne callAoffset
 
