@@ -1199,25 +1199,30 @@ _rdloop:
 ;;; references
 ;;; - 44   : TTC - token threaded code - BEST!
 ;;;    - https://comp.lang.forth.narkive.com/pzlX5mdU/what-is-the-most-compact-ttc-scheme
-;;;    => super trick: Y lo IP! (and assumed not change) -6B
-;;;    => X used for R-stack in zero page                -3B
-;;; - 44 B : forth: dispatch 15B, enter/jmp/exit 6+6+6=18 B, get 11 B
+;;;    (-) super trick: Y lo IP! (and assumed not change) -6B
+;;;    (+) X used for R-stack in zero page                -3B (?)
+;;;    (-) no RTS must "JMP NEXT"            
+;;; - 45 B : forth: dispatch 16B, enter/jmp/exit "6+6+6=18 B", get 11 B
 ;;;    - http://6502org.wikidot.com/software-token-threading
-;;;    => they have all subs inside JMP-table => good dispatch
+;;;    (+) they have all subs inside JMP-table => good dispatch
+;;;    (-) Y must be retained
+;;;    (+) RTS works as well as JMP NEXT       
 ;;; - 46 B : ArcheronVM: disp 7B enter 11B jmp 15B semis 13B
 ;;;          (+ 7 11 15 13) = 46B
 ;;;          "jsr archeon" inline 13B, get? (part of disp)
 ;;;    - https://github.com/AcheronVM/acheronvm/blob/master/src/dispatch.asm
 ;;;    - https://github.com/AcheronVM/acheronvm/blob/master/src/ops-callret.asm
-;;;   => they don't have "jsr loop"(6B), so "jmp next" everywhere
-;;;      also they require X stack and Y to remain unmod?
+;;;   (-) and Y to remain unmod?
+;;;   (-) must JMP NEXT, no JSR/RTS loop
 ;;; - 62 B : disp 15B, enter/jmp/exit (+ 2 9 15 11 1) =38B
 ;;;          get 9B (+ 15 38 9) = 62 B
 ;;;          OP16 6B: (not included) cmp 13B archeon!
-;;;   => Y register free! jsr-loop & rts to return; NO jmp next
-;;;   => We're more generic for the stack (to handle \lambda params)
-;;; TODO: 
-
+;;;   (+) Y register free!
+;;;   (+) RTS can use, no need "JMP NEXT" - but can use!
+;;;   (+) more generic for the stack (to handle \lambda params)
+;;;   (-) bigger +18 B? (coz generic stack, save Y
+;;; TODO: wrap _interpret around _exec !!!
+;;; TODO: push addr to call on Datastack? Then generic Call?
 
 ;;; dipatch: 15 B (+ 5 _exec 6 trans)
 
