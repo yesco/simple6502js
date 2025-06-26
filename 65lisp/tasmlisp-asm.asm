@@ -158,6 +158,7 @@ MINIMAL=1
 ;;;   ... lol
 ;;; no jsr ... (/ (- 606 528) 3.0) = 26 B saved only... ???
 ;;; 
+;;; 246 !!! (from 249)
 ;UJSR=1 
 
 ;;; 1379
@@ -1155,7 +1156,7 @@ _BRK:
 
 .ifnblank ; more src uJSR
 
-;;; handle more than from 2 page jmp
+;;; handle call from outside onepage/twopage
 ;;; 
 ;;; 15 B
         pla                     ; throw away P
@@ -1195,14 +1196,33 @@ _rdloop:
         ;;  fallthrough to exec
 .endif ; MINIMAL
 
+;;; references
+;;; - 44   : TTC - token threaded code - BEST!
+;;;    - https://comp.lang.forth.narkive.com/pzlX5mdU/what-is-the-most-compact-ttc-scheme
+;;;    => super trick: Y lo IP! (and assumed not change) -6B
+;;;    => X used for R-stack in zero page                -3B
+;;; - 44 B : forth: dispatch 15B, enter/jmp/exit 6+6+6=18 B, get 11 B
+;;;    - http://6502org.wikidot.com/software-token-threading
+;;;    => they have all subs inside JMP-table => good dispatch
+;;; - 46 B : ArcheronVM: disp 7B enter 11B jmp 15B semis 13B
+;;;          (+ 7 11 15 13) = 46B
+;;;          "jsr archeon" inline 13B, get? (part of disp)
+;;;    - https://github.com/AcheronVM/acheronvm/blob/master/src/dispatch.asm
+;;;    - https://github.com/AcheronVM/acheronvm/blob/master/src/ops-callret.asm
+;;;   => they don't have "jsr loop"(6B), so "jmp next" everywhere
+;;;      also they require X stack and Y to remain unmod?
+;;; - 62 B : disp 15B, enter/jmp/exit (+ 2 9 15 11 1) =38B
+;;;          get 9B (+ 15 38 9) = 62 B
+;;;          OP16 6B: (not included) cmp 13B archeon!
+;;;   => Y register free! jsr-loop & rts to return; NO jmp next
+;;;   => We're more generic for the stack (to handle \lambda params)
+;;; TODO: 
+
+
+;;; dipatch: 15 B (+ 5 _exec 6 trans)
+
 ;;; exec byte instruction in A
 ;;; 
-;;; references
-;;; - http://6502org.wikidot.com/software-token-threading
-;;; - 
-
-;;; 15 B (+ 5 _exec 6 trans)
-
 .ifndef MINIMAL
 FUNC "_exec"
         ;; only token
@@ -1233,6 +1253,8 @@ _nexta:
         ;; no trans for >= 128 (already offset)
         bmi notrans
 ;;; transalte
+;;; TODO: don't need to translate if use fulladdres
+;;;   jump table (very redundant?) and use "JSR (transtable)"
         tay
         lda transtable,y
 notrans:
@@ -1289,7 +1311,12 @@ call:   jmp jmptable
 
 FUNC "_OP16"
 
-.proc _execpla2
+;;; TODO: if called with JSR then need dec 1 or Y offset higher
+;;;    ELSE: if use uJSR maybe can do THIS:
+;;; TODO: what if _execpla2 was at address 0?
+
+;;; Assumes called with _BRK : DO _BRKexecpla2
+.proc _BRKexecpla2
         pla                     ; lo
         tay
         pla
@@ -1301,16 +1328,17 @@ FUNC "_OP16"
 ;;; 
 ;;; start interpreation at IP,Y
 ;;; 
-;;; (+ 2 9 13 11) = 35 B  (+ 4  non-minimal.)
+;;; (+ 2 9 15 11 1) = 38 B  (+ 4  non-minimal.)
 FUNC "_interpret"
 .proc enter
 ;;; TODO: expects hi in savey!!!
+;;; (2)
         ;; save offset of what we're calling
         sta savea
 
         ;; push current stack frame
         ;; (ip, ipy, (ipx, ipn) )
-;;; 9
+;;; (9)
         ldy #(endframe-startframe)
 save:   
         lda startframe-1,y
@@ -1319,9 +1347,10 @@ save:
         bne save
         
 subr: 
-;;; 13 (+ 4)
+;;; (15 (+ 4))
         ;; set new IP
         ;; (only valid for one page code dispatch)
+;;; ((8))
         lda savea
         sta ip
         lda savey
@@ -1332,6 +1361,7 @@ subr:
         lda #256-1
         sta ipp
 .endif 
+;;; (4)
         ldy #$ff
         sty ipy
 
@@ -1344,7 +1374,7 @@ subr:
 
 subrexit:
         ;; pop to current stack frame
-;;; 11
+;;; (11)
         ldy #0
 restore:   
         pla
@@ -1355,6 +1385,7 @@ restore:
 
 ;;; TODO: this could prepend _nextloop to enter _next???
 ;;;    does it save 1 byte? lol
+;;; (1)
 
         rts
 .endproc
@@ -1855,7 +1886,7 @@ FUNC "_out"
 ;;; -----------------------------------
 ;;; TESTS JMPS
 ;;; 
-;;; 14 (+ 8 9 6) = 23
+;;; (+ 8 9 6) = 23 B
 
 ;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
 ;;; 
@@ -2241,9 +2272,9 @@ readlist:
 ;;; 
 ;;;   stack: 72 bytes   " ' $ (sta/lda) ! , @ 2drop
 ;;;                       (+ 8 2 17 4 3 19 14 5)
-;;;    exec: 69         _error OP16 _nexttoken _nextloop _interpret
-;;;                       (+ 1 6 9 15 38)
-;;;    ctrl: 24         B zB \0;_exit (+ 11 10 3)
+;;;    exec: 69         err nexttoken nextloop OP16 interpret
+;;;                       (+ 1 9 15 6 38)
+;;;    ctrl: 24         B zB \0exit (+ 11 10 3)
 ;;;    math: 37         _mathop   + - div2 (+ 19 5 8 5)
 ;;;   logic: 12         (  ^  )   & | E (+ 4 4 4)
 ;;;   tests: 35         = U zero FFFF < binliteral
@@ -2316,10 +2347,8 @@ in the zero page.
 
 ;;; good idea to make exit enter next..
 
-;;; (+ 8 14 21) = 43 next/exec enter call exit
+;;; (+ 8 15 21) = 44 next/exec enter call exit
 ;;;
-;;; I have (+ 37 42) = 79!!!!
-
 ;;; y is low byte of IP
 ;;; 
 
@@ -2327,7 +2356,7 @@ EXIT:
         DEX
         DEX
         LDY R,X                 ; saves 1B compared to
-        LDA R+1,X0              ; pla st? (3B)
+        LDA R+1,X               ; pla st? (3B)
         STA IP+1
         ;;  8B 15c
 NEXT:   
@@ -2338,8 +2367,8 @@ ENTER0:
         LDA (IP),Y
         BMI ENTER
         STA JV+1        ; self-modify? JV where?
-        JMP JV
-        ;; 14B 23c, +4 on page crossing
+JV:     JMP JV
+        ;; 15B 23c, +4 on page crossing
 
 ;;; A contains subr token (>=128)
 ENTER:  
