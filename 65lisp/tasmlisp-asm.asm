@@ -146,7 +146,7 @@ MINIMAL=1
 ;LISP=1
 
 ;;; enable to see if save a byte on each JSR
-;;; 244 B with, 245 with ... LOL only uJSR 10x in MINIMAL
+;;; 246 B with, 249 without ... LOL only uJSR 13x in MINIMAL
 ;;; 
 ;;; USE for more than one page...
 ;;;   actually need to use for simple call macro!
@@ -1424,7 +1424,7 @@ FUNC "varindex"
 
 FUNC "_setvar"
 ;;; 17 B
-        jsr varindex           ; canNOT uJSR
+        uJSR varindex
 
 _storeunpickA:
 ;;; (14)
@@ -1470,7 +1470,7 @@ _ret:
 
 
 FUNC "_binliteral"
-;;; 11 B
+;;; 10 B
         uJSR _nexttoken         ; lo
         pha
         uJSR _nexttoken         ; hi
@@ -1760,7 +1760,9 @@ FUNC "_swap"
 FUNC "_comma"
 ;;; 12
         ldy #0
-        jsr _ccomma             ; canNOT uJSR
+        jsr _ccomma             ; canNOT uJSR beq Y
+;;; cannot call without ldy #0
+;;; WARNING: don't use directly, unbalances stack!
 _ccomma:
         lda stack,x
         sta (tos),y
@@ -1816,7 +1818,7 @@ ret:
 
 FUNC "_key"
 ;;; 9 B
-        uJSR _ZERO
+        uJSR _zero
         ; cli
         jsr getchar             ; canNOT be uJSR
 	; sei
@@ -1843,6 +1845,7 @@ FUNC "_terpri"
 FUNC "_out"
 ;;; 6 B
         jsr putchar             ; canNOT be uJSR
+;;; TODO: can it return 0? if not can save 1 byte!
         jmp _pop
 .endif
 
@@ -2015,7 +2018,7 @@ FUNC "_or"
 ;;; Carry is retained after
 FUNC "_minus"
         ;; need to swap as _sbc does opposite!
-        jsr _swap
+        uJSR _swap
         ;; top -= stack
         ;; SBC stack,x 
         sec
@@ -2153,7 +2156,7 @@ readloop:
         ;; accept char
         sta (here),y
         iny
-        jsr _key                ; canNOT uJSR
+        uJSR _key                ; canNOT uJSR
         jmp readloop
 
 done:   
