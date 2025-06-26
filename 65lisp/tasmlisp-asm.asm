@@ -1,3 +1,28 @@
+;;; 65-MATH16 - OnePage 16-bit arith/logical operator library
+;;; 
+;;; interpration: (+ 69 24 1) = 94 exec ctrl rts
+;;; (- 249 94)  = 155 bytes USED
+;;; (- 256 155) = 101
+;;; 
+;;; Let's add:    (+ 38 5 36 8 9)= 98  mul16 div16 out key
+;;; 
+;;;   (5) mul2 ??? not clear if can fit! lol
+
+;;; compare to woz floats:
+;;; 
+;;;   "The Woz floating-point library, implemented for the
+;;;    6502 processor in the early Apple computers, is
+;;;    relatively small. It's estimated to be around 768
+;;;    bytes of code, plus some zero-page memory locations
+;;;    according to a discussion on Hacker News. This includes
+;;;    both the code and data tables. The library was designed
+;;;    for space efficiency, reflecting the limited memory
+;;;    available in early home computers."
+
+
+
+
+
 ;;; OP16 - OnePage 16-bit VM (256 bytes!)
 ;;; 
 ;;; Built for minimal size not speed.
@@ -20,7 +45,7 @@
 ;;;     tests: null neg1 zero eq lessthan  (5)
 ;;;   control: exit zbranch branch               (3)
 ;;;    system: Literal                           (1) [0]
-;;;     [conv: pushA pushPLA loada loadApla]         [4]
+;;;     [conv: pushA pushPLA loadA loadApla]         [4]
 ;;;              (+ 4 3 7 5 3 1)                (23) [4]
 
 
@@ -161,6 +186,25 @@ MINIMAL=1
 ;;; 248 !!! lol (from 249) - HAHA!
 ;UJSR=1 
 
+
+.ifndef MINIMAL
+
+;;; enable numbers
+;NUMBERS=1
+
+;;; enable extra math (div16, mul16)
+;MATH=1
+
+;;; enable tests (So far depends on ORICON)
+;TEST=1
+
+; turn on tracing of exec
+TRACE=1
+
+.endif ; MINIMAL
+
+
+
 ;;; 1379
 START=$563
 
@@ -181,47 +225,8 @@ TOPMEM=$9800
 ;;;           C   O   N   F   I   G
 ;;; 
 ;;; ----------------------------------------
-
-
-
-
-;;; .TAP delta
-;;;  325          bytes - NOTHING (search)
-
-;;; START
-
-;;; 591 bytes
-;;;       initlisp nil 37, T 10,
-;;;       print 23 printlist 72, printz 17, eval 49
-;;;       getvalue 38, bind 19,
-;;;       setnewcar/cdr 14, newcons 21, cons 12, revc 12
-;;;       _car _cdr 19, _car _cdr 20, _print 12
-;;;       _cons 16, _atom atom 16+15=31
-;;;       _eq 8+17=27
-;;;       getc 12, skispc 8, _read 10, readatom 23, read 17
-;;;             NOT: == READS SEXP OK!
-;;; == 554 ==
-;;; (+ 37 10 25 71 17 90 38 19 14 21 12 12 19 20 12 16 31 27 12 8 10 23 17)
 ;;; 
-;;;  TODO: wtf? (- 618 554) = 64 bytes missing (align?)
-
-.ifndef MINIMAL
-
-;;; enable numbers
-;NUMBERS=1
-
-;;; enable extra math (div16, mul16)
-;MATH=1
-
-;;; enable tests (So far depends on ORICON)
-;TEST=1
-
-; turn on tracing of exec
-TRACE=1
-
-.endif ; MINIMAL
-
-;;; --------------------------------------------------
+;;;            Z E R O - P A G E
 
 ;; TODO: not working in ca65, too old?
 ;.feature string_escape
@@ -233,6 +238,8 @@ TRACE=1
 ;.org 128+'a'
 
 /*
+TODO:    global variables 'A @ ... GA VA `A ... A SA lol
+
 _A:     .res 1
 _B:     .res 1
 _C:     .res 1
@@ -378,8 +385,6 @@ notnl:
 ;;; ----------------------------------------
 ;;;            M A C R O S
 
-
-
 ;;; for DEBUGGING only!
 
 ;;; putchar (leaves char in A)
@@ -515,7 +520,6 @@ _initlisp:
 ENDCHAR=0
 
 ;_initlisp:      
-
 
 ;;; unzip - decompressor for one pae
 ;;; 
@@ -963,6 +967,22 @@ destination:
 
 
 ;;; DON'T PUT ANY CODE HERE!!!!
+
+
+
+
+
+;;; ==================================================
+;;; |                                                |
+;;; |                                                |
+;;; |                                                |
+;;; |                                                |
+;;; |                One Page AL(F)                  |
+;;; |                                                |
+;;; |                                                |
+;;; |                                                |
+;;; |                                                |
+;;; ==================================================
 
 
 
