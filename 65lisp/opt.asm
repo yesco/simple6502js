@@ -1,5 +1,64 @@
 ;;; cut-n-paste variants not used?
 
+.ifnblank ; more src uJSR
+
+
+
+;;;; 13
+        pla
+
+        pha
+        tay
+        lda jmptable-1,y
+        jsr callit
+        ;; comes back here!
+        php
+        rti
+
+callit: bne callAoffset
+
+
+;;;; 14
+        pla
+
+        pha
+        tay
+        lda jmptable-1,y
+        sta subr+1              ; change lo
+subr:   jsr jmptable
+        php
+        rti
+
+
+;;; small but wrong, jmps back one char after when ret with RTS
+;;; 9 B - smallest so far!
+        pla                     ; throw away P
+        pla                     ; lo - points to byte after!
+        pha
+        tay
+        ;; get byte after call (from one page)
+        lda jmptable-1,y        ; get previous byte!
+        bne callAoffset
+
+
+;;; handle call from outside onepage/twopage
+;;; 
+;;; 15 B
+        pla                     ; throw away P
+        pla
+        tay                     ; lo from
+        pla
+        pha
+        sta brkadr+2            ; hi from
+        tya
+        pha
+brkadr: lda jmptable-1,y        ; lo to
+        bne callAoffset
+
+.endif ; more alt src uJSR
+
+.endif ; _uJSR
+
 ;_initlisp:
 
         sec                     ; => 00

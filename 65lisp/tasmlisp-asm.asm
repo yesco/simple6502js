@@ -17,7 +17,7 @@
 ;;;     stack: dup map drop 2drop                (4)
 ;;;    memory: store load comma                  (3)
 ;;;      math: plus minus and or eor div2 inc    (7)
-;;;     tests: null -1(=_FFFF) zero eq lessthan  (5)
+;;;     tests: null neg1 zero eq lessthan  (5)
 ;;;   control: exit zbranch branch               (3)
 ;;;    system: Literal                           (1) [0]
 ;;;     [conv: pushA pushPLA loada loadApla]         [4]
@@ -158,12 +158,11 @@ MINIMAL=1
 ;;;   ... lol
 ;;; no jsr ... (/ (- 606 528) 3.0) = 26 B saved only... ???
 ;;; 
-;;; 246 !!! (from 249)
+;;; 248 !!! lol (from 249) - HAHA!
 ;UJSR=1 
 
 ;;; 1379
 START=$563
-;START=$600
 
 ;;; TOOD: test to put stack in ZP!
 ;;;     might save a lot of code bytes!
@@ -173,11 +172,11 @@ START=$563
 ;;; lisp data stack
 ;;; (needs to be full page)
 ;;; (page 4 free page on ORIC)
-stack= $400
+stack=$400
 
 ;;; ORIC: charset in hires-mode starts here
 ;;; (needs to be 4 byte aligned)
-TOPMEM	= $9800
+TOPMEM=$9800
 
 ;;;           C   O   N   F   I   G
 ;;; 
@@ -302,14 +301,6 @@ token:  .res 1
 
 ;;; TODO: for restore at error in interactive
 ;quitS:  .res 1
-
-;;; used  by _BRK routine
-.ifdef UJSR
-aBRK:   .res 1
-xBRK:   .res 1
-pBRK:   .res 2
-.endif ; UJSR
-
 
 ;;; bss - area initialized
 .bss
@@ -1043,12 +1034,11 @@ jmptable:
 
 .export _reset
 _reset: 
-;;; 9
-
-        ;; skip some bytes
-        lda #(>HERESTART)+1
+;;; 8
+        ;; skip some bytes, align to page?
+        lda #(>LOWMEM)+1
         sta here+1
-        ;lda #<HERESTART
+        ;lda #<LOWMEM
         ;sta here
         lda #0
         sta here
@@ -1145,6 +1135,58 @@ _BRK:
 ;;; 
 ;;; jsr calls *within* one page
 ;;; 
+;;; 
+;;; 11 B
+
+;;; (6)
+        pla                     ; P reg - throw away
+
+        ;; we move BRK RTI return address back 1 byte
+        ;; so with RTS we'll continue at next byte
+        pla                   
+        tay
+;;; TODO: wrap call in macro, make sure addr
+;;;       doesn't overlap 0 where call is!
+        dey
+        tya
+        pha
+
+;;; (5)
+        ;; using address we look up the code where
+        ;; we came from and get actual "dispatch offset"
+        lda jmptable, y
+        bne callAoffset
+
+
+.ifnblank ; more src uJSR
+
+;;;; 13
+        pla
+
+        pha
+        tay
+        lda jmptable-1,y
+        jsr callit
+        ;; comes back here!
+        php
+        rti
+
+callit: bne callAoffset
+
+
+;;;; 14
+        pla
+
+        pha
+        tay
+        lda jmptable-1,y
+        sta subr+1              ; change lo
+subr:   jsr jmptable
+        php
+        rti
+
+
+;;; small but wrong, jmps back one char after when ret with RTS
 ;;; 9 B - smallest so far!
         pla                     ; throw away P
         pla                     ; lo - points to byte after!
@@ -1154,7 +1196,6 @@ _BRK:
         lda jmptable-1,y        ; get previous byte!
         bne callAoffset
 
-.ifnblank ; more src uJSR
 
 ;;; handle call from outside onepage/twopage
 ;;; 
@@ -1173,10 +1214,10 @@ brkadr: lda jmptable-1,y        ; lo to
 .endif ; more alt src uJSR
 
 .endif ; _uJSR
+ 
 
 
-
-.ifndef MINIMAL
+.ifndef MINIMAL 
 
 ;;; (14 B)
 FUNC "_interactive"
@@ -1925,7 +1966,7 @@ FUNC "_zero"
         sec
         bcs C_gives_FFFF_else_0000
 FUNC "_FFFF"
-_minus1:        
+_neg1:  
         clc
         bcs C_gives_FFFF_else_0000
 
@@ -2868,9 +2909,6 @@ nodec:
 endaddr:
 .byte "<AFTER"
 
-;;; TODO: do other way? data segment?
-HERESTART:      
-
 
 ;;; end usercode
 ;;; ========================================
@@ -3060,6 +3098,14 @@ under10:
         rts
 .endproc
         
+
+;;; at end of code (and tests)
+LOWMEM: 
+
+
+
+
+
 ;;; LISP:
 ;;;   SectorForth: 	512 bytes
 ;;;   SectorLisp:  	436 bytes
