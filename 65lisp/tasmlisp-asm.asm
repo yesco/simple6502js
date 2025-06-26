@@ -1991,7 +1991,10 @@ FUNC "_or"
         bne _mathop
 
 FUNC "_minus"
-        ;; SBC stack,x
+        ;; need to swap as _sbc does opposite!
+        jsr _swap
+        ;; top -= stack
+        ;; SBC stack,x 
         sec
         ldy #$fd
         bne _mathop
