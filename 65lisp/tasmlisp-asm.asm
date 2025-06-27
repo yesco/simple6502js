@@ -156,8 +156,7 @@
 ;;;           C   O   N   F   I   G
 
 ;;; enable this for size test
-;
-MINIMAL=1
+;MINIMAL=1
 
 ;;; enable this tomake it interactive
 ;;; (w MINIMAL -> interactive ALF (ALphabetical Forth)
@@ -208,7 +207,7 @@ DOUBLEPAGE=1
 ;TEST=1
 
 ; turn on tracing of exec
-TRACE=1
+;TRACE=1
 
 .endif ; MINIMAL
 
@@ -1060,7 +1059,7 @@ startaddr:
 ;;; For 2-page dispatch it can also align
 .macro FUNC name
   .ifdef DOUBLEPAGE
-    .align 2
+    .align 2, $ea               ; NOP
   .endif ; DOUBLEPAGE
 
   .export .ident(name)
@@ -1118,9 +1117,7 @@ _reset:
 .endif ; INTERACTIVE
        
 
-;FUNC "_error" ;; TODO: for some reason can't???
-.export _error
-_error: 
+FUNC "_error" ;; TODO: for some reason can't???
 _undef: 
 _quit:  
         rts
@@ -1323,9 +1320,7 @@ FUNC "_exec"
 
 ;;; make sure have somewhere to return to
 ;;; (as we're doing jmp dispatch)
-;FUNC "_nextloop"
-.export _nextloop
-_nextloop:      
+FUNC "_nextloop"
         uJSR _next
         jmp _nextloop
 
@@ -1372,7 +1367,7 @@ callAoffset:
 
 .ifdef DOUBLEPAGE
         asl
-        bcs call2
+        bcs doublepage
 .endif ; DOUBLEPAGE
         
         ;; save in "jmp jmptable" low byte!
@@ -1381,8 +1376,10 @@ call:   jmp jmptable
 
 .ifdef DOUBLEPAGE
 
-call2:  sta call2+1
-        jmp (jmptable+256)
+doublepage:     
+        ;; save in "jmp jmptable" low byte!
+        sta call2+1
+call2:  jmp (jmptable+256)
 
 .endif ; DOUBLEPAGE
 
@@ -1391,11 +1388,6 @@ call2:  sta call2+1
 ;;; TODO: 6 _routines jsr push first thing!
 ;;;  (maybe A>xx can change this?)
 ;;;  (but then not save call JSR ???)
-
-
-
-
-
 
 FUNC "_OP16"
 
@@ -2067,7 +2059,7 @@ notSmaller:
 ;;;   (17 B too much)
 ;;;   how about just a < ??
 ;;;  
-.ifndef MINIMAL
+.ifnblank
 
 ;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
 ;;; 
@@ -2092,7 +2084,7 @@ AisBigger:
         sty tos
         sty tos+1               ; $0 $11 $ff - lol
         rts
-.endif ; MINIMAL
+.endif ; !BLANK
 
 ;;; jump/skip on zero (set Y!)
 FUNC "_zbranch"
@@ -2204,6 +2196,12 @@ FUNC "_div2"
 
 
 .ifndef MINIMAL
+
+FUNC "_mul2"
+;;; 5B !
+        asl tos
+        rol tos+1
+        rts
 
 ;;; maybe B doesn't pop as well as O?
 ;        .byte DUP,"@",DUP,"B_",+2,0,DUP,"OIB",WRITEZ
@@ -2634,15 +2632,12 @@ FUNC "_mul10"
 .endif 
 
 FUNC "_mul16"
-;;; 6 B
+;;; 4 B
         DO _mul8
 FUNC "_mul8"
         DO _mul4
 FUNC "_mul4"
         DO _mul2
-FUNC "_mul2"
-        DO _dup
-        DO _plus
         DO _exit
 
 ;;; 3 B LEFT! ... (in one page)
