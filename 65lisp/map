@@ -3,7 +3,7 @@ echo "--- ORDER: $* ---"
 cat fil
 echo "--- TOP: $* ---"
 cat fil | sort -r -n
-echo "=== Functions: `cat fil | wc -l ` (-6 _error _sta _mathop _reset _nexttoken _nextloop)"
+echo "=== Functions: `tail +8 fil | wc -l ` (excluded 7: _error _sta _mathop _reset _nexttoken _nextloop _foobar)"
 echo "=== Bytes    :`cat $1.bin | wc -c `"
 
 

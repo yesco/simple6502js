@@ -1334,16 +1334,17 @@ _next:
 _nexta: 
 ;;; 0 (+6 trans)
 
-.ifdef INTERACTIVE
+;.ifdef INTERACTIVE
+.ifdef TWOPAGE
 
         ;; no trans for >= 128 (already offset)
         bmi notrans
         .error "TODO: make this compiled () jumps!"
 ;;; transalte
 ;;; TODO: don't need to translate if use fulladdres
-;;;   jump table (very redundant?) and use "JSR (transtable)"
+;;;   jump table (very redundant?) and use "JSR (_transtable)"
         tay
-        lda transtable,y
+        lda _transtable,y
 notrans:
 .endif ; INTERACTIVE
 
@@ -1745,7 +1746,7 @@ firstpage:
         pla
         tay
         lda tos                 ; lo
-        sta transtable,y        ; save lo offset!
+        sta _transtable,y        ; save lo offset!
         rts
 
 secondpage:     
@@ -2197,6 +2198,8 @@ FUNC "_div2"
 
 .ifndef MINIMAL
 
+;;; TODO: maybe should be part of minimal?
+
 FUNC "_mul2"
 ;;; 5B !
         asl tos
@@ -2398,6 +2401,22 @@ readlist:
 ;;; (/ 253.0 22)   -> bytes per word
 ;;; (/ 256.0 11.5) -> 22 words possible!
 
+
+
+;;; ------- TWOPAGE (!MINIMAL)
+;;; 
+;;; 
+;;; 128 bytes _transtable
+;;; 
+;;; 512 bytes!
+;;; 421 bytes with ompress-file
+
+;;; (+ 421 44) = 465 so can squeeze more in?
+;;; (- 512 465) = 47 B
+
+
+
+
 ;;; ------- !MINIMAL + LISP & interactive!
 ;;; TOTAL: 565 B    words: 43    avg 13.9 B/w
 ;;; 
@@ -2420,7 +2439,7 @@ readlist:
 ;;; CANDO: (/ 512.0 13.9) = 36 words, lol
 
 ;;; TODO: uJSR might save 30-50 bytes
-;;; TODO: compression... allow for transtable -100? + 70
+;;; TODO: compression... allow for _transtable -100? + 70
 
 ;;; >>>>>>>>>>>--- STATE ---<<<<<<<<<<<
 
@@ -2659,7 +2678,10 @@ endtable:
 ;;; ========================================
 ;;;       T  R  A  N  S  T  A  B  L  E
 
-FUNC "transtable"
+; Without this _transtable isn't shown
+FUNC "_foobar"
+
+FUNC "_transtable"              ; 128 B
 
 .ifndef MINIMAL
 
@@ -2823,7 +2845,7 @@ FUNC "transtable"
 FUNC "endtrans"
 
 .ifndef MINIMAL
-.assert (endtrans-transtable)=128, error, "Transtable not right size"
+.assert (endtrans-_transtable)=128, error, "Transtable not right size"
 .endif  
 
 ;;; maybe for MINIMAL++ ? lol
@@ -2960,11 +2982,10 @@ nodec:
 
 .endif
 
-
+FUNC "_END"
 
 endaddr:
 .byte "<AFTER"
-
 
 ;;; end usercode
 ;;; ========================================
@@ -3061,7 +3082,7 @@ endaddr:
         NEWLINE
         PUTC 't'
         PUTC '='
-        SET (endtrans-transtable)
+        SET (endtrans-_transtable)
         jsr printd
 
         NEWLINE
