@@ -51,6 +51,19 @@
 ;;;              (+ 4 3 7 5 3 1)                (23) [4]
 
 
+;;; Random number generator code
+;;; - http://www.6502.org/source/integers/random/random.html
+
+;;; Square root
+;;; - http://www.6502.org/source/integers/root.htm
+
+;;; Permuations
+;;; - http://www.6502.org/source/integers/perm.htm
+
+;;; String pattern matcher
+;;; - http://www.6502.org/source/strings/patmatch.htm
+
+
 ;;; inspiration, and goal:
 ;;; 
 ;;; "SectorLisp for 6502" asmlisp-asm.asm (+ asmlisp.c)
@@ -2162,6 +2175,7 @@ FUNC "_or"
 FUNC "_minus"
         ;; need to swap as _sbc does opposite!
         uJSR _swap
+_sbc:   
         ;; top -= stack
         ;; SBC stack,x 
         sec
@@ -2626,17 +2640,15 @@ FUNC "_mul"
         sty savey
 
 loop:   
-        ;; top *= 2
+        ;; tos *= 2
         uJSR _mul2
 
         ;; A *= 2 => carry
-        rol stack+2,x
+        asl stack+2,x          
         rol stack+2+1,x
-
-        ;; bit not set no add: jmp
         bcc skip
 
-        ;; top += B (perfect it stays there)
+        ;; tos += B (perfect it stays there)
         uJSR _plus
         ;; steal B back
         dex
@@ -2653,6 +2665,585 @@ inx4rts:
         inx
         inx
         rts
+
+
+
+;;; num1 * num2 => tos
+;;; 
+;;; 35 B - terminates fast for small num1
+mul:    
+        ;; top= 0
+        uJSR _zero
+loop:   
+        ;; num1 /= 2 => carry
+        lsr stack+2+1,x
+        ror stack+2,x
+        bcc skip
+
+        ;; tos += B
+        uJSR _plus
+        dex
+        dex
+
+skip:   
+        ;; num2 *= 2
+        asl stack,x
+        rol stack+1,x
+
+        ;; till num1 is zero
+        lda stack+2,x
+        ora stack+2+1,x
+        bne loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+
+
+;;; num1 * num2 => tos
+;;; 
+;;; counter
+;;; 
+;;; 35 B - lol same!!!
+mul:    
+        ;; top= 0
+        uJSR _zero
+        lda #16
+        sta savey
+loop:   
+        ;; num1 /= 2 => carry
+        lsr stack+2+1,x
+        ror stack+2,x
+        bcc skip
+
+        ;; tos += B
+        uJSR _plus
+        dex
+        dex
+
+skip:   
+        ;; num2 *= 2
+        asl stack,x
+        rol stack+1,x
+
+        dec savey
+        bne loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+
+
+;;; VL02 MUL 33 B
+;;; - http://www.6502.org/source/interpreters/vtl02.htm
+
+;;;  16-bit unsigned multiply routine
+;;;    overflow is ignored/discarded
+;;;    var[x] *= var[x+2], var[x+2] = 0, {>} is modified
+;;; 33 B
+mul:    
+    lda  0,x
+    sta  gthan
+    lda  1,x                    ; {>} = var[x]
+    sta  gthan+1
+    lda  #0
+    sta  0,x                    ; var[x] = 0
+    sta  1,x
+mul2:   
+    lsr  gthan+1
+    ror  gthan                  ; {>} /= 2
+    bcc  mul3
+    jsr  plus                   ; form the product in var[x]
+mul3:   
+    asl  2,x
+    rol  3,x                    ; left-shift var[x+2]
+
+;;; jsk: seems like bug, should be use gthan?
+    lda  2,x
+    ora  3,x                    ; loop until var[x+2] = 0
+    bne  mul2
+
+    rts
+
+
+;;; 31+4 = 35 B - wtf??? LOL fast for small numbers
+mul:    
+        jsr _zero
+mul2:   
+        ;; num1 /= 2
+        lsr stack+2+1,x
+        ror stack+2,x
+
+        bcc mul3
+        ;; bit is set: tos += num2
+        jsr _plus
+        dex
+        dex
+mul3:   
+        ;; num2 *= 2
+        asl stack,x
+        rol stack+1,x
+
+        ;; loop till 0 (hmmm?) why not other?
+        lda stack,x
+        ora stack+1,x
+        bne mul2
+
+        inx
+        inx
+        inx
+        inx
+        rts
+
+
+;;; ;                      ^ MUL
+;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;; DIV 16/16
+;;; Here's an example that divides the two-byte number NUM1
+;;; by the two-byte number NUM2, leaving the quotient in NUM1
+;;; and the remainder in REM:
+;;; 
+;;; NUM1/NUM2 => NUM1 REM
+;;; 
+;;; - https://llx.com/Neil/a2/mult.html
+;;; 
+;;; 38 B
+div:    
+        LDA #0                  ;Initialize REM to 0
+        STA REM
+        STA REM+1
+        LDX #16                 ;There are 16 bits in NUM1
+
+L1:     ASL NUM1                ;Shift hi bit of NUM1 into REM
+        ROL NUM1+1              ;(vacating the lo bit, which will
+        ;;                      ; be used for the quotient)
+        ROL REM
+        ROL REM+1
+
+        LDA REM
+
+        ;; trial subtraction
+        SEC
+        SBC NUM2
+        TAY
+        LDA REM+1
+        SBC NUM2+1
+        BCC L2                  ;Did subtraction succeed?
+        STA REM+1               ;If yes, save it
+        STY REM
+        INC NUM1                ;and record a 1 in the quotient
+
+L2:     DEX
+        BNE L1
+
+        rts
+
+
+;;; modified for tos & stack by jsk
+;;; 
+;;; 48 B - bah....
+div:    
+        ;; tos: REM = 0 
+        jsr _zero
+        ;; NUM1 is stack+2
+        ;; NUM2 is stack
+        lda #16
+        sta savea
+
+next:   
+        ;; Shift hi bit of NUM1 into REM
+        asl stack+2
+        rol stack+2+1
+        rol tos
+        rol tos+1
+
+        ;; trial subtraction
+        sec
+        lda tos
+        sbc stack,x
+        tay                     ; Y= lo sbc
+        lda tos+1
+        sbc stack+1,x
+        bcc subfail
+        ;; sub ok
+        sta tos+1
+        sty tos
+        inc stack+2,x
+
+subfail:
+        dec savea
+        bne next
+done:   
+        ;; tos     == REM
+        ;; stack   == NUM2
+        ;; stack+2 == result
+        inx
+        inx
+        ;; get result
+        jmp pop
+
+
+;;; jsk: mydiv (S D -> S/D)
+;;; 
+;;; 2025-06-28
+;;; 
+;;; 40 B - could work, lol
+FUNC "_div"
+        jsr _zero
+        ldy #17
+        sty savey
+next:   
+        ;; shift in one bit result into S!
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; done?
+        dec savey
+        beq done
+
+        ;; shift in one hi bit from S into tos
+        rol tos
+        rol tos+1
+
+        ;; tos -= D (reverse _minus)
+        jsr _sbc
+        dex
+        dex
+
+        ;; C=1 if subtract ok (?)
+        bcs next
+
+        ;; no, too big
+
+        ;; add B back, lol
+        jsr _plus
+        dex
+        dex
+        ;; carry should be clear
+
+        ;; loop Z=0 always
+        bne next
+
+done:   
+        ;; done remove D pop S which has the result
+        inx
+        inx
+        jmp _pop
+.endproc
+
+
+;;; 16div16 => 16 ??? works?
+;;;     ptr1/ptr2 => ptr1
+;;; 
+;;; did I write this while drunk?
+;;; (from asmlisp-asm.asm)
+;;; 
+;;; jsk 35 B - edited - THIS IS ZERO PAGE
+.proc div1616
+        ldx #16
+        ;; A will keep hi-byte!
+        lda #0
+divloop:
+        asl ptr1
+        rol ptr1+1
+        rol a
+
+        ;; hi-byte cmp
+        cmp ptr2+1
+        bcc no_sub
+
+        ;; lo-byte cmp
+        tay
+        lda ptr1+1
+        cmp ptr2
+        bcc no_sub
+
+        ;; add 1 to result!
+        inc ptr1
+
+        ;; carry is set
+        ;; lo-byte sub
+        sbc ptr2
+        sta ptr1+1
+
+        ;; hi-byte sub
+        tya
+        sbc ptr2+1
+        tay ; lol
+no_sub:
+        tya
+        dex
+        bne divloop
+
+        rts
+.endproc
+
+
+;;; take 3
+;;; ;
+;;; 16div16 => 16 ??? works?
+;;;     ptr1/ptr2 => ptr1
+;;; 
+;;; did I write this while drunk?
+;;; (from asmlisp-asm.asm)
+;;; 
+;;; 
+;;; (35 zero page)
+;;; 41 B - using tos + stack
+.proc div1616
+        jsr _swap
+;;; tos = DIVEND stack = divisor
+        lda #16
+        sta savey
+        
+;;; trying to be clever by keeping in A
+        ;; A will keep hi-byte!
+        lda #0
+divloop:
+        jsr _mul2
+        rol a
+
+        ;; hi-byte sbc
+        tay
+        sec
+        sbc stack+1,x
+        bcc no_sub
+
+        ;; store new hi
+        sta savea
+
+        ;; lo-byte sbc
+        lda tos+1
+        sbc stack,x
+        bcc no_sub
+
+        ;; save lo
+        sta tos+1
+        ;; set 1 bit in result
+        inc tos
+
+        ;; save hi
+        ldy savea ; lol
+no_sub:
+        ;; restore (old) hi
+        tya
+
+        dec savey
+        bne divloop
+
+        rts
+.endproc
+
+
+
+
+;;; jsk modify - take 2!
+
+;;; from nes discussion
+;;; - https://forums.nesdev.org/viewtopic.php?t=143
+;;; 
+;;; 54 B jsk -> 48 lol, HUGE!!!
+;;; 
+;;;  55B bah - noooo gooood!
+Divide: 
+        ldy #0
+        ;; shift to get highest bit set
+shift: 
+        iny
+        asl tos
+        rol tos+1
+        bcc shift
+        
+        ;; restore bit
+        ror tos+1
+        ror tos
+
+        sty savey
+
+        jsr _swap
+        ;; tos: DIVEND stack: divisor
+divloop:
+        ;; result *= 2
+        ASL QUO
+        ROL QUO+1       
+
+        ;; cmp/sbc hi-byte
+        sec
+        lda tos+1
+        sbc stack+1,x
+        bcc skip
+
+        ;; cmp/sbc lo-byte
+        tay
+        lda tos
+        sbc stack,x
+        bcc skip               
+        
+        ;; yes, we confirm
+        ;; store result after sbc
+        sta tos
+        sty tos+1
+        
+        ;; set lowest bit
+        inc quo
+skip:  
+        ;; divisor /= 2
+        lsr stack+1,x
+        ror stack,x
+                
+        dec savey
+        bne divloop
+
+        RTS
+
+
+
+
+
+
+
+
+;;; jsk modify
+
+;;; from nes discussion
+;;; - https://forums.nesdev.org/viewtopic.php?t=143
+;;; 
+;;; 54 B jsk -> 48 lol, HUGE!!!
+Divide: 
+        ldy #0
+        ;; shift to get highest bit set
+shift: 
+        INY
+        ASL DIVSOR                      
+        ROL DIVSOR+1
+        BCC shift
+        
+        ;; restore bit
+        ROR DIVSOR+1
+        ROR DIVSOR
+
+        sty savey
+
+divloop:
+        ;; result *= 2
+        ASL QUO
+        ROL QUO+1       
+
+        ;; cmp/sbc hi-byte
+        SEC
+        LDA DIVEND+1
+        SBC DIVSOR+1
+        BCC skip
+
+        ;; cmp/sbc lo-byte
+        tay
+        LDA DIVEND
+        SBC DIVSOR
+        BCC .skip               
+        
+        ;; yes, we confirm
+        ;; store result after sbc
+        STA DIVEND
+        sty DIVEND+1
+        
+        ;; set lowest bit
+        inc quo
+skip:  
+        ;; divisor /= 2
+        LSR DIVSOR+1
+        ROR DIVSOR
+                
+        dec savey
+        bne divloop
+
+        RTS
+
+
+
+;;; from nes discussion
+;;; - https://forums.nesdev.org/viewtopic.php?t=143
+;;; 
+;;; 54 B
+Divide: 
+        LDY #0
+
+.shift: 
+        INY
+        
+        ASL DIVSOR                      
+        ROL DIVSOR+1
+        BCC .shift
+        
+        ROR DIVSOR+1
+        ROR DIVSOR
+
+.divloop:
+        DEY
+        ASL QUO
+        ROL QUO+1       
+        SEC
+        
+        LDA DIVEND+1
+        SBC DIVSOR+1
+        BCC .skip
+        
+        STA VAR                 
+        LDA DIVEND
+        SBC DIVSOR
+        BCC .skip               
+        
+        STA DIVEND
+        LDA VAR
+        STA DIVEND+1
+        
+        LDA #$01
+        ORA QUO
+        STA QUO
+
+.skip:  
+        LSR DIVSOR+1
+        ROR DIVSOR
+                
+        CPY #$01                
+        BPL .divloop
+
+        RTS
+
+;;;  DIVEND / DIVSOR = QUO
+;;;  DIVEND contains remainder when finished
+
+;;;  First loop: Shift LO DIVSOR and rotate HI DIVSOR until
+;;;  there's a 1 in the highest bit 
+;;;  INY for each loop
+
+;;;  After first loop:  rotate LO and HI DIVSOR right so
+;;;  correct divisor is in place.
+
+;;;  Second loop:
+;;;
+;;;  DEY, shift LO QUOTIENT and rotate HI QUOTIENT
+;;;  so the correct bits of the result are set
+;;;
+;;;  Subtract DIVSOR from DIVEND
+;;;  if DIVSOR > DIVEND, skip these steps
+;;;      -Store difference back in DIVEND
+;;;      -Set the lowest bit of the quotient
+;;;
+;;;  Shift the HI and rotate the LO divisor right
+;;; 
+;;;  loop if Y >= 1 - if the last loop is unnecessary, it will not affect the remainder or the quotient
+
+
 
 ;;; shorter as macro: 
 ;;; 23 B !!!

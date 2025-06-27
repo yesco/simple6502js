@@ -742,12 +742,14 @@ print:
 ;;; - http://forum.6502.org/viewtopic.php?f=2&t=6258
 
 ;;; div16/8 divide ptr1 16-bits by ptr2 8-bits, result in ptr1
-;;; 
-;;; by strat @ nesdev forum ; 21B
+;;; by strat @ nesdev forum ; 21 B
 ;;; 
 ;;; out: A: remainder; X: 0; Y: unchanged
 
 .ifdef MATH
+;;; 16/8
+;;; 
+;;; 21 B
 
 .proc div16
   ldx #16
@@ -770,44 +772,48 @@ print:
 .endproc
 
 ;;; 16div16 => 16 ??? works?
+;;;     ptr1/ptr2 => ptr1
+;;; 
 ;;; jsk 37B
 .proc div1616
-  ldx #16
-  lda #0
+        ldx #16
+        lda #0                  ; keeps lowbyte!
 
 @divloop:
-  asl ptr1
-  rol ptr1+1
-  rol a
+        asl ptr1
+        rol ptr1+1
+        rol a
 
-  ;; hi-byte cmp
-  tay
-  lda ptr1+1
-  cmp ptr2+1        
-  bcc @no_sub                   ; one off?
-  tya
+        ;; hi-byte cmp
+        tay
+        lda ptr1+1
+        cmp ptr2+1
+        bcc no_sub              ; one off?
+        tya
 
-  ;; lo-byte cmp
-  cmp ptr2
-  bcc @no_sub
+        ;; lo-byte cmp
+        cmp ptr2
+        bcc no_sub
 
-  ;; lo-byte sub
-  sbc ptr2
-  inc ptr1
+        ;; lo-byte sub
+        sbc ptr2
+        inc ptr1                ; add 1 to result!
 
-  ;; hi-byte sub
-  tay
-  lda ptr1+1
-  sbc ptr2+1
-  sta ptr1+1
-  tya
+        ;; hi-byte sub
+        tay
+        lda ptr1+1
+        sbc ptr2+1
+        sta ptr1+1
+        tya
   
-@no_sub:
-  dex
-  bne @divloop
+no_sub:
+        dex
+        bne @divloop
 
-  rts
+        rts
 .endproc
+
+
 
 .proc mul2
         asl
