@@ -1,14 +1,16 @@
+;;; (thinking)
+
 ;;; 65-MATH16 - OnePage 16-bit arith/logical operator library
 ;;; 
 ;;; interpration: (+ 69 24 1) = 94 exec ctrl rts
 ;;; (- 249 94)  = 155 bytes USED
 ;;; (- 256 155) = 101
 ;;; 
-;;; Let's add:    (+ 38 5 36 8 9)= 98  mul16 div16 out key
+;;; Let's add:    (+ 38 5 36 8 9)= 98  mul div out key
 ;;; 
 ;;;   (5) mul2 ??? not clear if can fit! lol
 
-;;; compare to woz floats:
+;;; Compare to woz floats (768 Bytes):
 ;;; 
 ;;;   "The Woz floating-point library, implemented for the
 ;;;    6502 processor in the early Apple computers, is
@@ -200,7 +202,7 @@ DOUBLEPAGE=1
 ;;; enable numbers
 ;NUMBERS=1
 
-;;; enable extra math (div16, mul16)
+;;; enable extra math (div, mul)
 ;MATH=1
 
 ;;; enable tests (So far depends on ORICON)
@@ -1623,9 +1625,11 @@ FUNC "_binliteral"
         _mul2           = _undef
         _mul            = _undef
 
+.endif ; MINIMAL
+
 ;;; DEBUG
         _printd         = _undef
-.endif ; MINIMAL
+
 
 .ifdef NUMBERS
 ;;; modifies existing number
@@ -2219,11 +2223,9 @@ FUNC "_mul2"
 
 ;;; if had an ITERATOR : dup II swap D swasp @ ;
 ;;; 
-;;; 9B
-
+;;; 12 B
 FUNC "_printz"
 _writez: 
-;;; 12B
         ldy #0
         lda (tos),y
         beq _pop
@@ -2231,9 +2233,10 @@ _writez:
         iny
         bne _writez
 
-_printd:        
-        jmp printd
+;_printd:        
+;       jmp printd
 
+.ifnblank
 ;;; comparez (ptr1, tos) strings
 ;;; starting at offset Y
 ;;; 
@@ -2242,11 +2245,13 @@ _printd:
 ;;; 8 B !
 comparezloop:                   ; haha!
         iny
+FUNC "_comparez"
 comparez:
         lda (ptr1),y
         cmp (tos),y
         beq comparezloop
         rts
+.endif
 
 ;;; basmlisp-asm:
 ;;;   getc     12  (+ 12 8 17) = 37
@@ -2411,19 +2416,26 @@ readlist:
 ;  ASM:  10   _binliteral
 ;  mem:  38   _load _comma _store (+ 14 20 4)
 ;  stk:  34   _dup _swap _2drop _drop (+ 8 18 6 2)
-;   io:  50   _key _terpri _out _printz (+ 16 4 6 24)
+;   io:  38   _key _terpri _out _printz (+ 16 4 6 12)
 ; test:  28   _lessthan _eq _null _zero _FFFF (+ 10 4 6 4 4)
 ; math:  62   _plus _and _eor _or _minus _sta _mathop _div2 _mul2 (+ 6 4 4 4 8 4 20 6 6)
 ; xtra:  44   _mul [_mul10 _mul16 _mul8 _mul4] (+ 32 6 2 2 2)
+;         _div missing...
 ; ---------------
-;       512 B     36 functions
+;       500 B     36 functions
 ;;;
-;;; 512 bytes!
-;;; 421 bytes with ./compress-file (flawed)
-;;; 384 bytes code, compressed to 366 (so saves 18 bytes)
+;;; 500 bytes
+;;; 407 bytes with ./compress-file (flawed)
+;;;  93 bytes saved (- 500 407) (- 93 18) = 75
 ;;; 
-;;; (+ 421 44) = 465 so can squeeze more in?
-;;; (- 512 465) = 47 B "remaining" - NOTHING TESTED...
+;;;  19 bytes align lost (mostly first page?)
+;;; 
+;;; 372 bytes code (- 500 128)
+;;; 354 bytes compressed
+;;;  18 bytes saved (- 372 354)
+;;; 
+;;; (- 512 407 44) = 61 bytes left
+
 
 
 ;;; ------- !MINIMAL + LISP & interactive!
