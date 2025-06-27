@@ -2404,17 +2404,26 @@ readlist:
 
 
 ;;; ------- TWOPAGE (!MINIMAL)
-;;; 
-;;; 
-;;; 128 bytes _transtable
-;;; 
+; exec:  86   _error _exec _nextloop _interpret _nexttoken _quote (+ 2 6 24 38 10 6)
+; trns: 128   _transtable
+;  ASM:   6   _OP16
+; ctrl:  26   _exit_ _zbranch _branch (+ 4 10 12)
+;  ASM:  10   _binliteral
+;  mem:  38   _load _comma _store (+ 14 20 4)
+;  stk:  34   _dup _swap _2drop _drop (+ 8 18 6 2)
+;   io:  50   _key _terpri _out _printz (+ 16 4 6 24)
+; test:  28   _lessthan _eq _null _zero _FFFF (+ 10 4 6 4 4)
+; math:  62   _plus _and _eor _or _minus _sta _mathop _div2 _mul2 (+ 6 4 4 4 8 4 20 6 6)
+; xtra:  44   _mul [_mul10 _mul16 _mul8 _mul4] (+ 32 6 2 2 2)
+; ---------------
+;       512 B     36 functions
+;;;
 ;;; 512 bytes!
-;;; 421 bytes with ompress-file
-
+;;; 421 bytes with ./compress-file (flawed)
+;;; 384 bytes code, compressed to 366 (so saves 18 bytes)
+;;; 
 ;;; (+ 421 44) = 465 so can squeeze more in?
-;;; (- 512 465) = 47 B
-
-
+;;; (- 512 465) = 47 B "remaining" - NOTHING TESTED...
 
 
 ;;; ------- !MINIMAL + LISP & interactive!
@@ -2684,6 +2693,7 @@ FUNC "_foobar"
 FUNC "_transtable"              ; 128 B
 
 .ifndef MINIMAL
+;.ifnblank
 
 .macro DF label, num, name
         .byte <(label-jmptable)
@@ -2840,13 +2850,10 @@ FUNC "_transtable"              ; 128 B
         DO _undef              ; ~ - not
         DO _undef              ; DEL - 
 
-.endif ; MINIMAL
-
-FUNC "endtrans"
-
-.ifndef MINIMAL
 .assert (endtrans-_transtable)=128, error, "Transtable not right size"
-.endif  
+
+.endif ; MINIMAL
+FUNC "endtrans"
 
 ;;; maybe for MINIMAL++ ? lol
 
