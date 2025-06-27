@@ -170,6 +170,15 @@ MINIMAL=1
 ;;; enable this to get LISP (written in AL)
 ;LISP=1
 
+.ifndef MINIMAL
+;;; two page dispatch for more code
+;;; 
+;;; MINIMAL: Uses (- 272 249) = 23 bytes more (align2+dipsatch)
+;
+DOUBLEPAGE=1
+
+.endif ; MINIMAL
+
 ;;; enable to see if save a byte on each JSR
 ;;; 246 B with, 249 without ... LOL only uJSR 13x in MINIMAL
 ;;; 
@@ -297,10 +306,10 @@ startframe:
 ip:     .res 2                  ; code ptr
 ipy:    .res 1                  ; offset
 
-.ifndef MINIMAL
+.ifdef LAMBDA
 ipx:    .res 1                  ; d stack frame start
 ipp:    .res 1                  ; n params
-.endif ; MININAL
+.endif ; LAMBDA
 
 endframe:
 
@@ -1044,13 +1053,26 @@ skip:
 ;;; we start program at "sector"
 startaddr:      
 
+;;; this macro exports the _NAME func so that 
+;;; its size can be determined, as well as labels
+;;; the function. 
+;;; 
+;;; For 2-page dispatch it can also align
+.macro FUNC name
+  .ifdef DOUBLEPAGE
+    .align 2
+  .endif ; DOUBLEPAGE
+
+  .export .ident(name)
+  .ident(name):
+.endmacro
 
 jmptable:  
 
 ;;; INIT - this should be first in jmptable at offset 0
 
 ; no -heap 
-.ifndef MINIMAL 
+.ifdef INTERACTIVE
 
 .export _reset
 _reset: 
@@ -1093,9 +1115,9 @@ _reset:
 
         jmp _interactive
 
-
-.endif ; !MINIMAL
+.endif ; INTERACTIVE
        
+
 ;FUNC "_error" ;; TODO: for some reason can't???
 .export _error
 _error: 
@@ -1128,6 +1150,9 @@ _quit:
 .else
 
 .macro uJSR addr
+  .ifdef DOUBLEPAGE
+        .error "Can'tuse uJSR with DOUBLEPAGE yet"
+  .endif
         ;; make sure read correct dispatch char!
         .assert (addr/256=*/256),error,"uJSR: can only call within same page"
         ;; we subtrace 1...
@@ -1237,7 +1262,7 @@ brkadr: lda jmptable-1,y        ; lo to
  
 
 
-.ifndef MINIMAL 
+.ifdef INTERACTIVE
 
 ;;; (14 B)
 FUNC "_interactive"
@@ -1255,7 +1280,7 @@ _rdloop:
 .endif ; TRACE
 
         ;;  fallthrough to exec
-.endif ; MINIMAL
+.endif ; INTERACTIVE
 
 ;;; references
 ;;; - 44   : TTC - token threaded code - BEST!
@@ -1314,18 +1339,18 @@ _next:
 _nexta: 
 ;;; 0 (+6 trans)
 
-.ifndef MINIMAL
+.ifdef INTERACTIVE
 
         ;; no trans for >= 128 (already offset)
         bmi notrans
+        .error "TODO: make this compiled () jumps!"
 ;;; transalte
 ;;; TODO: don't need to translate if use fulladdres
 ;;;   jump table (very redundant?) and use "JSR (transtable)"
         tay
         lda transtable,y
 notrans:
-
-.endif
+.endif ; INTERACTIVE
 
 .ifdef TRACE
         PUTC 'o'
@@ -1341,24 +1366,25 @@ callAoffset:
         ;; macro subtroutine?
         ;; (offset > macrostart)
 
-;;; TODO: how to handle more than one page?
-;;;   macros maybe user defined...
-
-;;; TODO: use a macro that in one page becomes nothing
-;;;   and otherwise becomes indirect invocations?
-;;;   need to adjust uJSR ???
-
 ;        cmp #(macrostart-jmptable)
 ;        bcs _interpret
 ; ;; TODO: expects hi in savey!!! if use more than one page
-;;; 
-;;; if have more than two pages?
-;        ldy #>jmptable
-;        sty savey
 
+.ifdef DOUBLEPAGE
+        asl
+        bcs call2
+.endif ; DOUBLEPAGE
+        
         ;; save in "jmp jmptable" low byte!
         sta call+1
 call:   jmp jmptable
+
+.ifdef DOUBLEPAGE
+
+call2:  sta call2+1
+        jmp (jmptable+256)
+
+.endif ; DOUBLEPAGE
 
 ;;; ----------- SAVE MORE BYTeS -------------
 
@@ -1370,10 +1396,6 @@ call:   jmp jmptable
 
 
 
-.macro FUNC name
-  .export .ident(name)
-  .ident(name):
-.endmacro
 
 FUNC "_OP16"
 
@@ -1423,7 +1445,7 @@ subr:
         sta ip+1
 
 ;;; TODO: maybe can use same $ff as net?
-.ifndef MINIMAL
+.ifdef LAMBDA
         lda #256-1
         sta ipp
 .endif 
@@ -1472,7 +1494,7 @@ FUNC "_nexttoken"
 ;;; 
 ;;; 3 (+ 5 8 8 17) = 39 \ _vary a Sa ^ ;
 
-.ifndef MINIMAL
+.ifdef LAMBDA
 
 ;;; (number of \)-1 stored in ipp(arams)
 FUNC "_lambda"
@@ -1547,7 +1569,7 @@ FUNC "_return"
         tax
         ;; fall-through to _semis
 
-.endif ; MINIMAL
+.endif ; LAMBDA
 
 ;;; semis (return from interpretastion)
 FUNC "_exit_"
@@ -1580,30 +1602,39 @@ FUNC "_binliteral"
 ;;; 1-9a-f: read while either got this char
 ;;;   {{{{ ora sta ... loop
 
-        _pushaddr       = _undef
+.ifndef LISP
         _cons           = _undef
-        _colon          = _undef
-        _TOSbytecomma   = _undef
-        _hexliteral     = _undef
-
-.ifdef MINIMAL
-        ;; set all undef functions of minimal
-        _number         = _undef
-        _quote          = _undef
-        _writez         = _undef
-        _dec            = _undef
         _cdr            = _undef
-        _mul2           = _undef
+        ; _TOSbytecomma ?
+        _dec            = _undef
+.endif ; LISP
 
+.ifndef LAMBDA
         _var            = _undef
         _setvar         = _undef
         _lambda         = _undef
         _return         = _undef
+.endif ; LAMBDA
 
+
+;;; TODO:
+        _pushaddr       = _undef ; also works as string!
+        _colon          = _undef ; INTERACTIVE?
+        _TOSbytecomma   = _undef ; LISP
+        _hexliteral     = _undef
+
+.ifdef MINIMAL
+        ;; set all undef functions of minimal
+        _quote          = _undef
+        _writez         = _undef
+        _mul2           = _undef
+        _mul            = _undef
+
+;;; DEBUG
         _printd         = _undef
+.endif ; MINIMAL
 
-.else
-
+.ifdef NUMBERS
 ;;; modifies existing number
 ;;; first multiplies by 10 (or 16 if in hex!)
 ;;; then adds current number 
@@ -1624,11 +1655,6 @@ digit:  and #$f
         jmp _plus
 .endproc
 
-;;; 'a
-FUNC "_quote"
-;;; 6 B
-        uJSR _nexttoken
-        jmp _pushA
 
 .ifnblank
 ;;; NOT NEEDED
@@ -1683,6 +1709,11 @@ done:
 
 .endif ; !BLANK
 
+.else ; !NUMBERS
+        _number         = _undef
+        _digit          = _undef
+.endif ; NUMBERS
+
 
 
 ;;; ----------------------------------------
@@ -1690,6 +1721,8 @@ done:
 ;;; 
 ;;; 56 B - barely worth it!!!
 ;;; (milliforth: 59 B...)
+
+;;; TODO:
 .ifnblank
 
 FUNC "_colon"
@@ -1752,8 +1785,6 @@ colondone:
 .endproc
 .endif ; !BLANK
 
-.endif ; MINIMAL
-
 ;;; colon
 ;;; ----------------------------------------
 ;;; memory
@@ -1761,13 +1792,13 @@ colondone:
 ;;; (+ 17 8 17) = 42    cdr+car dup swap
 ;;;               45    tos,+inc+!+drop2+topr,+dec2+dec 
 
-.ifndef MINIMAL
+.ifdef LISP
 _cdr:    
 ;;; 3 + 14 = 17 B
         ldy #2
         ;; BIT-hack (skips next 2 bytes)
         .byte $2c
-.endif ; MINIMAL
+.endif ; LISP
 
 FUNC "_load"
 _car:    
@@ -1884,7 +1915,8 @@ FUNC "_2drop"
         dex
         jmp _pop
 
-.ifndef MINIMAL
+;;; needed by Cons
+.ifdef LISP
 
 FUNC "_rcomma"
 ;;; 6+12 = 18
@@ -1905,7 +1937,7 @@ ret:
         rts
 .endproc
 
-.endif ; MINIMAL
+.endif ; LISP
 
 ;;; memory
 ;;; ----------------------------------------
@@ -1991,6 +2023,12 @@ _neg1:
         bcs C_gives_FFFF_else_0000
 
 .ifndef MINIMAL
+
+;;; 'a
+FUNC "_quote"
+;;; 6 B
+        uJSR _nexttoken
+        jmp _pushA
 
 ;;; 10 B
 .ifnblank
@@ -2487,7 +2525,12 @@ about 4.5x.
 ;;; 
 
 .macro DO label
+    .ifndef DOUBLEPAGE    
         .byte <(label-jmptable)
+    .else
+        .assert ((label-jmptable) .mod 2)=0,error,"DOUBLEPAGE: use FUNC label to align"
+        .byte <((label-jmptable)/2)
+    .endif ;  DOUBLEPAGE    
 .endmacro
 
 .macro LIT w
@@ -2521,14 +2564,10 @@ macrostart:
 ;;; x UU => _FFFF   !
 
 FUNC "_mul"
-
-_mul:
-;;; 35 B - 9 ops from _MUL16 macro in
+;;; 9 ops from _MUL16 macro in
 ;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
-
-;;; stack: A B -- ptr1*ptr2
 ;;; 
-;;; top= ptr1 * ptr2 (ptr1 is trashed, ptr2 remains)
+;;; top= A*B (A is trashed, B remains, both are popped)
 ;;; 
 ;;; 32 B
         ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
@@ -2550,7 +2589,7 @@ loop:
         bcc skip
 
         ;; top += B (perfect it stays there)
-        uJSR _add
+        uJSR _plus
         ;; steal B back
         dex
         dex
@@ -2579,27 +2618,29 @@ inx4rts:
         ;;         a{ b} *
         ;;       +^
 
-FUNC "_div"
+;FUNC "_div"
 ;;; _DIV16 is 11 ops in - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
 ;;; 
 
-FUNC "_MUL10"
-;;; 6 B
-        DO _MUL2
+.ifndef _div
+FUNC "_mul10"
+;;; 6 B (19 B in asm)
+        DO _mul2
         DO _dup
-        DO _MUL2
-        DO _MUL2
+        DO _mul2
+        DO _mul2
         DO _plus
         DO _exit
+.endif 
 
-FUNC "_MUL16"
+FUNC "_mul16"
 ;;; 6 B
-        DO _MUL8
-FUNC "_MUL8"
-        DO _MUL4
-FUNC "_MUL4"
-        DO _MUL2
-FUNC "_MUL2"
+        DO _mul8
+FUNC "_mul8"
+        DO _mul4
+FUNC "_mul4"
+        DO _mul2
+FUNC "_mul2"
         DO _dup
         DO _plus
         DO _exit
@@ -2689,23 +2730,23 @@ FUNC "transtable"
         DO _undef              ; * - mult
         DF _plus,  43,"_PLUS"  ; +
         DF _TOSbytecomma,44,"_COMMA" ; , ccomma
-        DF _sbc,   45,"_MINUS" ; -
+        DF _minus, 45,"_MINUS" ; -
 
 ;;; DEBUG - TODO: cheating - change!!!
 ;;; TODO: write in CODE
         DF _printd,46,"_PRNUM" ; . - print num
 
         DO _undef              ; / - TOOD: macro: div
-        DO _number             ; 0
-        DO _number             ; 1
-        DO _number             ; 2
-        DO _number             ; 3
-        DO _number             ; 4
-        DO _number             ; 5
-        DO _number             ; 6
-        DO _number             ; 7
-        DO _number             ; 8
-        DO _number             ; 9 
+        DO _digit              ; 0
+        DO _digit              ; 1
+        DO _digit              ; 2
+        DO _digit              ; 3
+        DO _digit              ; 4
+        DO _digit              ; 5
+        DO _digit              ; 6
+        DO _digit              ; 7
+        DO _digit              ; 8
+        DO _digit              ; 9 
         DF _colon,  58,"_COLON"; :
         DF _exit,   59,"_EXIT" ; ;
         DO _lessthan           ; < - lt
@@ -2733,7 +2774,7 @@ FUNC "transtable"
         DO _undef              ; R - recurse
         DF _setvar,  87,"_SET" ; S - Sa setvar?
         DF _terpri,  88,"_TERPRI" ; T
-        DF _NULL,    89,"_NULL"; U
+        DF _null,    89,"_NULL"; U
         DO _undef              ; V - prin(c1)/var
         DO _writez             ; W
         DF _exec,    92,"_EXEC"; X
