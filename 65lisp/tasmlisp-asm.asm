@@ -1532,8 +1532,18 @@ FUNC "_var"
 FUNC "varindex"
 ;;; 8
         lda token
+        ;; almost -'@' (for a-h (8) i-o[p](7) )
         and #$f
         asl
+;;; TODO: handle "outer"-variables (static scope) i-o[p] (7)
+;;; 6 B
+;;;     cmp #18 ; ('a'+8-'@')*2
+;;;     bcc noouter
+;;;     and #$7 (actually will miss p, acceptable!)
+;;;     adc ipo ; outer ipx... (C should not be set)
+;;; noouter:
+;;; 
+;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
         adc ipx
         rts
 
