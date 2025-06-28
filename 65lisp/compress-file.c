@@ -78,16 +78,20 @@ int main(int argc, char** argv) {
 
   fprintf(stderr, "Z:\t%d\n", z->len);
   
+  for(int i=0; i < z->len; ++i) {
+    putchar(z->data[i]);
+  }
+
+  // print decompressed on stderr
   // compare decompression correctness
   decompress(z, uzbuff);
   
   int res= memcmp(buff, uzbuff, len);
-  fprintf(stderr, "Decomp => %d\n", res);
-
-
-  for(int i=0; i < z->len; ++i) {
-    putchar(z->data[i]);
+  fprintf(stderr, "\n\n----Decomp => %d\n", res);
+  for(int i=0; i < z->origlen; ++i) {
+    fputc(uzbuff[i], stderr);
   }
+  
 
 /*
 

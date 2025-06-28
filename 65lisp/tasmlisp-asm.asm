@@ -210,7 +210,6 @@ DOUBLEPAGE=1
 ;;; 248 !!! lol (from 249) - HAHA!
 ;UJSR=1 
 
-
 .ifndef MINIMAL
 
 ;;; enable numbers
@@ -227,6 +226,19 @@ DOUBLEPAGE=1
 
 .endif ; MINIMAL
 
+;;; Enable to have stack checked
+;CHECKSTACK=1
+
+;;; Enable to have optimization of tail calls
+;;; If not enabled can't rely on tail recursions
+;
+TAILRECURSEOPT=1
+
+.ifndef MINIMAL
+;;; Print Error message at Quit (few chars!)
+;ERRMSG=1
+.endif
+
 
 
 ;;; 1379
@@ -238,7 +250,7 @@ START=$563
 ;;;     when  LDA stack,x  ops becomes zp :-)
 
 ;;; lisp data stack
-;;; (needs to be full page)
+;;; (needs to be full page!)
 ;;; (page 4 free page on ORIC)
 stack=$400
 
@@ -1137,9 +1149,17 @@ _reset:
 .endif ; INTERACTIVE
        
 
+;;; Jump here on error
+;;; It prints current A
+;;; Could be used as "error message"
 FUNC "_error" ;; TODO: for some reason can't???
 _undef: 
 _quit:  
+.ifdef ERRMSG
+        jsr putchar
+        lda token
+        jsr putchar
+.endif ; ERRMSG
         rts
 
 ;;; ========================================
@@ -1437,6 +1457,15 @@ FUNC "_interpret"
         ;; save offset of what we're calling
         sta savea
 
+.ifdef CHECKSTACK
+        cpx #(endframe-startframe)+6
+  .ifdef ERRMSG
+        lda #'%'
+  .endif
+        bcc _quit
+.endif ; CHECKSTACK
+
+
         ;; push current stack frame
         ;; (ip, ipy, (ipx, ipn) )
 ;;; (9)
@@ -1459,7 +1488,7 @@ subr:
 
 ;;; TODO: maybe can use same $ff as net?
 .ifdef LAMBDA
-        lda #256-1
+        lda #96                 ; 'a'-1
         sta ipp
 .endif 
 ;;; (4)
@@ -1549,10 +1578,23 @@ FUNC "_var"
 ;;; 'a -> 2 'b -> 4 (+ ipx)
 FUNC "varindex"
 ;;; 8
-        lda token
-        ;; almost -'@' (for a-h (8) i-o[p](7) )
-        and #$f
-        asl
+;;; TODO: wrong order
+;;; 
+;;;    y= ipx + 2*(ipp - 'a'&f) ; ('a'&f)
+
+;;; ipx= 100 ipp= 0 + 3 ; 'a' we want 104
+;;;   ('c' 100 'b' 102 'a' 104)
+;;; 
+;;;                             ; 'a' 'b' c'
+;;; 10 B
+        lda ipp                 ; (+ 96 3) = 99
+        sec
+        sbc token               ; 'a' (- 99 97) = 2
+        nop                     ; 'c' (- 99 99) = 0
+        asl                     ;  4   2   0
+        adc ipx                 ;104 102 100 (C=0)
+        rts
+
 ;;; TODO: handle "outer"-variables (static scope) i-o[p] (7)
 ;;; 6 B
 ;;;     cmp #18 ; ('a'+8-'@')*2
@@ -1579,20 +1621,89 @@ _storeunpickA:
 
         jmp _pop
 
+
+;;; Z is the tail-recurse call
+;;; (R is functionally equivalent but may blow the stack)
+;;; If not enabled fall through to Recurse!
+
+FUNC "_tailrecurse"
+
+.ifdef TAILRECURSEOPT
+;;; (+ 6 20 7) = 33 B
+        ;; basically copy n-1 parameters
+        ;; from stack to ipx..
+;;; (6)
+        lda ipp
+        clc
+        sbc #96+1
+        asl
+
+;;; (20)
+        ;; move y bytes
+        tay
+        beq done
+        ;; (from = stack+ipx + y)
+        stx from+1
+        ;; (to = stack+ipx + y)
+        lda ipx
+        sta to+1
+next:   
+        ;; copy from self-modified address
+from:   lda stack,y
+        ;; copy to self-modified address
+to:     sta stack,y
+        dey
+        bne next
+
+done:   
+;;; (7)
+        ;; restore stack
+        ldx ipx
+        ;; go to the beginning 
+;;; TODO: \\\ needs to do enter!
+        ldy #0
+        sty ipy
+        rts
+.endif
+
+FUNC "_recurse"
+;;; TODO: this is only needed if ANON \\lambdas
+;;; TODO: more or less same as _exec
+;;;   we push current IP
+;;;   we only need reset ipy, ipx
+;;;   no need transfer or "muck" with IP
+        ;; go get current IP
+        lda ip+1
+        sta savea
+        lda ip
+
+        jmp _interpret
+
+
 ;;; ^ return from lambda
 ;;; 
 ;;; adjusts stack to remove parameters atreturn
 ;;; TOP retained as it contains return value!
 FUNC "_return"
-;;; 7 B
+;;; 9 B
+        ;; moves up X to where it was before
+        ;; putting the paramters on the stack
+        ;; (result is in tos - that's why -1)
+        ;; 
+        ;; x = ipx + 2*(n-1)
+;;; 6
         lda ipp
-        asl
         clc
+        sbc #96+1
+        asl                     ; C=0
+
+;;; 3
         adc ipx
         tax
         ;; fall-through to _semis
 
 .endif ; LAMBDA
+
 
 ;;; semis (return from interpretastion)
 FUNC "_exit_"
@@ -3503,8 +3614,8 @@ FUNC "_transtable"              ; 128 B
         DF _store, 33,"_STORE" ; !
         DF _dup,   34,"_DUP"   ; " - dup (MINT)
         DF _number,35,"_NUM"   ; # - lit
-        DF _swap,  36,"_SWAP"  ; $ - hexlit? swap (MINT)
-        DO _undef              ; % - over, or ` (MINT)
+        DF _hexliteral,36,"_HEX"; $ - hexlit? swap (MINT)
+        DF _swap,  37,"_SWAP"  ; % - swap
         DF _and,   38,"_AND"   ; &
         DF _quote, 39,"_QUOTE" ; '
         DO _undef              ; ( - compile if "zBranch"
@@ -3537,17 +3648,19 @@ FUNC "_transtable"              ; 128 B
         DO _undef              ; ? - is atom? if?
         DF _load,   64,"_LOAD" ; @ car
         DO _undef              ; A - assoc/alloc
+;;; TODO: one byte zerobyte skip, and () skip forward
+;;;   during compile ; immediate
         DF _zbranch,66,"_IF"   ; B
         DF _cons,   67,"_CONS" ; C
         DF _cdr,    68,"_CDR"  ; D
         DF _eor,    69,"_EOR"  ; E
         DO _undef              ; F - follow/iter/forth ext?
         DO _undef              ; G - 
-        DO _hexliteral         ; H - (h) hexlit? Happend
+        DO _undef              ; H -
         DF _inc,    73,"_INC"  ; I
         DF _dec,    74,"_DEC"  ; J
         DF _key,    75,"_KEY"  ; K
-        DF _binliteral,76,"_LIT"; L
+        DO _undef              ; L -
         DO _undef              ; M - mem/mapcar/minus
         DO _undef              ; N - number?
         DF _out,     83,"_OUT" ; O

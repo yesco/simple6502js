@@ -84,6 +84,7 @@ int match(char* d, char* s, int len) {
 void deprint(char* z) {
   signed char i= *z;
   if (i >= 0) putchar(i);
+  // TODO: handle hi-bit
   else {deprint(z+i);deprint(z+i+1);}
 }
 
@@ -426,7 +427,9 @@ void sdecomp(char* z) {
   static signed char i;
   i= *z;
   if (i >= 0) *++dest=i;
-  else sdecomp(z+=i),sdecomp(z+1);
+  else if (i==-1) {
+    // TODO: this messes with addresses!!!!!
+  } else sdecomp(z+=i),sdecomp(z+1);
 }
 
 // Decompress to give address
@@ -439,7 +442,7 @@ char* static_unroll_decompress(Compressed* zz, char* d) {
   int len= zz->len;
   if (!d) d= (char*)(zz->addr);
   dest= d-1;
-  z+= 2; --z;
+  --z;
   while(len--)
     if ((signed char)(*++z)>=0) *++dest= *z;
     else sdecomp(z);
