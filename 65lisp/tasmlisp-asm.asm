@@ -182,6 +182,12 @@ MINIMAL=1
 ;;; enable this to get AL (Alphabetical Lisp)
 ;AL=1
 
+;;; enable LAMBDA style functions \ ^ R Z
+;
+LAMBDA=1
+
+;PICKN=1
+
 ;;; enable this to get LISP (written in AL)
 ;LISP=1
 
@@ -1191,12 +1197,12 @@ _quit:
         .error "Can'tuse uJSR with DOUBLEPAGE yet"
   .endif
         ;; make sure read correct dispatch char!
-        .assert (addr/256=*/256),error,"uJSR: can only call within same page"
+        .assert (addr/256=*/256),error,"%% uJSR: can only call within same page"
         ;; we subtrace 1...
-        .assert addr,error,"uJSR: can't jsr 0"
+        .assert addr,error,"%% uJSR: can't jsr 0"
         ;; yeah, limit 256 bytes
         ;; (unless we go asl..., and .align 2)
-        .assert (addr-jmptable)<=256,error,"uJSR: target too far"
+        .assert (addr-jmptable)<=256,error,"%% uJSR: target too far"
         .out "uJSR"
 
     .ifdef MINIMAL
@@ -1548,11 +1554,12 @@ FUNC "_lambda"
 ;;; over = (pickn,2), 3rd = (pick,4) ...
 ;;; 
 ;;; 3 + 11 = 14 pick ("over" only would be 13 B)
+.ifdef PICKN
 FUNC "_pickn"
 ;;; 6+11 = 17 B
         uJSR _push
         uJSR _nexttoken
-        
+
 ;;; _loadpickA 4 (99 2 4 6 ... => (4 99 2 4 6 ...)
 ;;; 
 ;;; 2 = over = forth.pick 1, 4 = forth.pick 2, 6 = forth.pick 3
@@ -1565,32 +1572,38 @@ _loadpickA:
         pha
         lda stack-2+1,y
         jmp loadApla
-
+.endif ; PICKN        
 
 ;;; load variable from stack (a b c .. h)
 ;;; 
-;;; 8 B
+;;; 17 B
 FUNC "_var"
+;;; (6)
         uJSR _push
-        uJSR varindex
-        bne _loadpickA          ; always true
+        uJSR _varindex
+
+;;; (11)
+loadpickA:
+        tay
+        lda stack-2,y 
+        pha
+        lda stack-2+1,y
+        jmp loadApla
 
 ;;; 'a -> 2 'b -> 4 (+ ipx)
-FUNC "varindex"
-;;; 8
-;;; TODO: wrong order
-;;; 
+;;; No need align
+FUNC "_varindex"     
 ;;;    y= ipx + 2*(ipp - 'a'&f) ; ('a'&f)
 
 ;;; ipx= 100 ipp= 0 + 3 ; 'a' we want 104
 ;;;   ('c' 100 'b' 102 'a' 104)
 ;;; 
 ;;;                             ; 'a' 'b' c'
-;;; 10 B
+;;; 9 B
         lda ipp                 ; (+ 96 3) = 99
         sec
         sbc token               ; 'a' (- 99 97) = 2
-        nop                     ; 'c' (- 99 99) = 0
+        ;                       ; 'c' (- 99 99) = 0
         asl                     ;  4   2   0
         adc ipx                 ;104 102 100 (C=0)
         rts
@@ -1604,20 +1617,18 @@ FUNC "varindex"
 ;;; noouter:
 ;;; 
 ;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
-        adc ipx
-        rts
 
 FUNC "_setvar"
 ;;; 17 B
-        uJSR varindex
+        uJSR _varindex
 
 _storeunpickA:
 ;;; (14)
         tay
         lda tos
-        sta stack-2,y
+        sta stack,y
         lda tos+1
-        sta stack-2+1,y
+        sta stack+1,y
 
         jmp _pop
 
@@ -2592,6 +2603,23 @@ readlist:
 ;;; 
 ;;; (- 512 407 44) = 61 bytes left
 
+;;; -------- LAMBDA 
+; 42 (+4)	_interpret
+; 17(+17)	_var
+; 9  (+9)	_varindex
+; 17(+17)	_setvar
+
+; 5  (+5)	_lambda
+; 33(+33)	_tailrecurse
+; 9  (+9)	_recurse
+; 9  (+9)	_return
+
+; (+ 4 5 17 9 17 33 9 9) = 103
+; (+ 254 103) = 357
+
+;;; way too big!
+
+
 
 
 ;;; ------- !MINIMAL + LISP & interactive!
@@ -2722,7 +2750,7 @@ about 4.5x.
     .ifndef DOUBLEPAGE    
         .byte <(label-jmptable)
     .else
-        .assert ((label-jmptable) .mod 2)=0,error,"DOUBLEPAGE: use FUNC label to align"
+        .assert ((label-jmptable) .mod 2)=0,error,"%% DOUBLEPAGE: use FUNC label to align"
         .byte <((label-jmptable)/2)
     .endif ;  DOUBLEPAGE    
 .endmacro
@@ -3544,9 +3572,9 @@ endtable:
 
 .ifdef MINIMAL
 ;;; TODO: enable again!!! before checkin
-;  .assert (endtable-jmptable)<=256, error, "Table too big (>256)"
+  .assert (endtable-jmptable)<=256, warning, "%% Table too big (>256)"
 .else
-;  .assert (endtable-jmptable)<=512, error, "Table too big (>512)"
+;  .assert (endtable-jmptable)<=512, warning, "%% Table too big (>512)"
 .endif
 
 
