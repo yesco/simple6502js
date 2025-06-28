@@ -171,7 +171,8 @@
 ;;;           C   O   N   F   I   G
 
 ;;; enable this for size test
-;MINIMAL=1
+;
+MINIMAL=1
 
 ;;; enable this tomake it interactive
 ;;; (w MINIMAL -> interactive ALF (ALphabetical Forth)
@@ -313,6 +314,10 @@ lowcons: .res 2
 
 ;;; top of the stack
 tos:     .res 2
+;;; second "tos" if "jsr _pull2" - lol
+second:  .res 2
+third:   .res 2 
+
 
 ;;; current state of interpretation
 startframe:     
@@ -1852,6 +1857,7 @@ loadApla:
 ;;; lda:   tos= stack[x], x-= 2
 ;;; sta:   stack[x]= tos, x-= 2
 
+;; _push leaves Z=0
 FUNC "_dup"
 _push:   
 ;;; 8 B !
@@ -2027,20 +2033,28 @@ VC_loadbothAA:
         pha
         bvc loadApla            ; V=0 for sure!
 
-;;; (+ 3 6 3 3) = 15 B - same as macro, if have _lessthan
+;;; (+ 5 6 2 6) = 19 B - same as macro, if have _lessthan
 FUNC "_eq"
         uJSR _minus
+        ;; compensate for _null/_zero that pushes
+        dex
+        dex
 FUNC "_null"
         lda tos
         ora tos+1
         beq _FFFF
 FUNC "_zero"
         sec
-        bcs C_gives_FFFF_else_0000
+        ;; hack - BITzp skip one byte
+        ;; (not affect C)
+        .byte $24
 FUNC "_FFFF"
 _neg1:  
         clc
-        bcs C_gives_FFFF_else_0000
+pushC:  
+        jsr _push
+        ;; _push leaves Z=0
+        bne C_gives_FFFF_else_0000
 
 .ifndef MINIMAL
 
@@ -2151,24 +2165,24 @@ FUNC "_branch"
 FUNC "_plus"
         ;; ADC stack,x
         clc
-        ldy #$7d
+        lda #$7d
         bne _mathop
 
 FUNC "_and"
         ;; AND stack,x
-        ldy #$3d
+        lda #$3d
         bne _mathop
 ;;; cmp oper,y $d9 - can't use doesn't ripple
 ;;; and wrong order...
 
 FUNC "_eor"
         ;; EOR stack,x
-        ldy #$5d
+        lda #$5d
         bne _mathop
 
 FUNC "_or"
         ;; AND stack,x
-        ldy #$1d
+        lda #$1d
         bne _mathop
 
 ;;; Carry is retained after
@@ -2179,19 +2193,19 @@ _sbc:
         ;; top -= stack
         ;; SBC stack,x 
         sec
-        ldy #$fd
+        lda #$fd
         bne _mathop
 
 FUNC "_sta"
         ;; STA stack,x
-        ldy #$9d
+        lda #$9d
         bne _mathop
 
 FUNC "_drop"
 _pop:
 _lda:   
         ;; LDA oper,x
-        ldy #$bd
+        lda #$bd
         ;; fall-through
 
 ;;; self-modifying code
@@ -2204,10 +2218,10 @@ _lda:
 ;;; 
 ;;; 17B
 FUNC "_mathop"
-        sty op
         ldy #0
-        
-        beq genop
+        sta op
+opmore:    
+        jsr genop
         ;; - fallthrough for hibyte Y=1
 genop:  
         lda tos,y
@@ -2223,8 +2237,15 @@ FUNC "_div2"
         ror tos
         rts
 
-
 .ifndef MINIMAL
+
+;;; used by mul/dev pulles tos and second
+FUNC "_pull2"
+        jsr _pop
+;;; wow, any \math op can be done w double precision
+;;; by just call once more (taking a "higher-16-bits"
+;;; and using a double tos).
+        jmp opmore
 
 ;;; TODO: maybe should be part of minimal?
 
@@ -2666,7 +2687,7 @@ inx4rts:
         inx
         rts
 
-
+.ifdef DIV
 
 ;;; num1 * num2 => tos
 ;;; 
@@ -2781,8 +2802,8 @@ mul2:
         ;; num1 /= 2
         lsr stack+2+1,x
         ror stack+2,x
-
         bcc mul3
+
         ;; bit is set: tos += num2
         jsr _plus
         dex
@@ -2793,8 +2814,8 @@ mul3:
         rol stack+1,x
 
         ;; loop till 0 (hmmm?) why not other?
-        lda stack,x
-        ora stack+1,x
+        lda stack+2,x
+        ora stack+2+1,x
         bne mul2
 
         inx
@@ -2808,6 +2829,89 @@ mul3:
 ;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;; 16-bit unsigned division routine
+;;;    var[x] /= var[x+2], {%} = remainder, {>} modified
+;;;    var[x] /= 0 produces {%} = var[x], var[x] = 65535
+;;; - http://www.6502.org/source/interpreters/vtl02.htm
+;;;
+;;; 43 B - nah!
+div:    
+        lda  #0
+        sta  remn
+        sta  remn+1
+
+        lda  #16
+        sta  gthan
+
+div1:   
+        ;; gradually replaced by quotient
+        asl  0,x
+        rol  1,x
+        ;; gradually replaced by remainder
+        rol  remn
+        rol  remn+1
+        ;; partial remainder >= var[2+2]
+        lda  remn
+        cmp  2,x
+
+        lda  remn+1
+        sbc  3,x
+        bcc  div2
+        ;; yes: update the partial
+        sta  remn+1
+        ;; set low bit in the partial quotient
+        lda  remn
+        sbc  2,x
+        sta  remn
+        inc  0,x
+
+div2:   
+        dec  gthan
+        bne  div1
+
+        rts
+
+
+;;; jskVL02 variant of VL02
+;;; 49 B or 37 w _sbc and _plus
+
+;;; 39 B is good!    BEST????
+div:    
+        ;; tos = remn
+        uJSR _zero
+        lda #16
+        sta savea
+loop:   
+        ;; gradually replaced by quotient
+        rol stack+2,x
+        rol stack+2+1,x
+        ;; gradually replaced by remainder
+        rol tos
+        rol tos+1
+
+        jsr _sbc
+        inx
+        inx
+        
+        bcs ok
+
+        ;; undo
+        jsr _plus
+        inx
+        inx
+        ;; C is still 0
+        
+ok: 
+        dec  savea
+        bne  loop
+
+        inx
+        inx
+        inx
+        inx
+        bne pop                 ; never 0
+
+
 ;;; DIV 16/16
 ;;; Here's an example that divides the two-byte number NUM1
 ;;; by the two-byte number NUM2, leaving the quotient in NUM1
@@ -2817,7 +2921,7 @@ mul3:
 ;;; 
 ;;; - https://llx.com/Neil/a2/mult.html
 ;;; 
-;;; 38 B
+;;; 38 B - no adopted to stack
 div:    
         LDA #0                  ;Initialize REM to 0
         STA REM
@@ -2897,7 +3001,8 @@ done:
 ;;; 
 ;;; 2025-06-28
 ;;; 
-;;; 40 B - could work, lol
+;;; 39 B - could work, lol
+;;; TOOD: - how is different from jskVL02
 FUNC "_div"
         jsr _zero
         ldy #17
@@ -2938,7 +3043,7 @@ done:
         ;; done remove D pop S which has the result
         inx
         inx
-        jmp _pop
+        bne _pop
 .endproc
 
 
@@ -3000,6 +3105,15 @@ no_sub:
 ;;; 
 ;;; (35 zero page)
 ;;; 41 B - using tos + stack
+;;;  --------------- NO EXTRA for JSR etc?
+;;;   little overhead not much calls or pops
+;;;   remainder??? 
+
+;;; is this possible? it's trying to keep
+;;; both divend as remainder andreply by quotient?!?
+;;; 
+;;; NO I think 8 bits too little... lol!!!!
+;;;  and no remainder....
 .proc div1616
         jsr _swap
 ;;; tos = DIVEND stack = divisor
@@ -3027,13 +3141,13 @@ divloop:
         sbc stack,x
         bcc no_sub
 
-        ;; save lo
-        sta tos+1
+        ;; save result
+        sta tos+1 ; lo
+        ldy savea ; hi
+
         ;; set 1 bit in result
         inc tos
 
-        ;; save hi
-        ldy savea ; lol
 no_sub:
         ;; restore (old) hi
         tya
@@ -3149,7 +3263,7 @@ divloop:
         tay
         LDA DIVEND
         SBC DIVSOR
-        BCC .skip               
+        BCC skip               
         
         ;; yes, we confirm
         ;; store result after sbc
@@ -3177,17 +3291,17 @@ skip:
 Divide: 
         LDY #0
 
-.shift: 
+shift: 
         INY
         
         ASL DIVSOR                      
         ROL DIVSOR+1
-        BCC .shift
+        BCC shift
         
         ROR DIVSOR+1
         ROR DIVSOR
 
-.divloop:
+divloop:
         DEY
         ASL QUO
         ROL QUO+1       
@@ -3195,12 +3309,12 @@ Divide:
         
         LDA DIVEND+1
         SBC DIVSOR+1
-        BCC .skip
+        BCC skip
         
         STA VAR                 
         LDA DIVEND
         SBC DIVSOR
-        BCC .skip               
+        BCC skip               
         
         STA DIVEND
         LDA VAR
@@ -3210,12 +3324,12 @@ Divide:
         ORA QUO
         STA QUO
 
-.skip:  
+skip:  
         LSR DIVSOR+1
         ROR DIVSOR
                 
         CPY #$01                
-        BPL .divloop
+        BPL divloop
 
         RTS
 
@@ -3244,24 +3358,51 @@ Divide:
 ;;;  loop if Y >= 1 - if the last loop is unnecessary, it will not affect the remainder or the quotient
 
 
-
 ;;; shorter as macro: 
 ;;; 23 B !!!
 
         ; dup U(''0^)
 	; dup #1 & UU over & pick2 _MUL2 pick2 _div2 _div + ^
 
-        ;; 23 B
+        ;; 23 B - lambda
         ;; :* \\ bUB+2 0^
         ;;       b#1& UU a&
         ;;         a{ b} *
         ;;       +^
 
+;;; :/ dup 1 swap \\\\ ... a=4711 b=32 c=1 d=32
+;;;                             da<( a b c{ d{ R 
+;;;                    
+
+
 ;FUNC "_div"
 ;;; _DIV16 is 11 ops in - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
 ;;; 
+;;;  Divide the 16 bit number at location VLA
+;;;  by the 16 bit number at location VLB
+;;;  leaving the 16 bit quotient at QUO and
+;;;  the 16 bit remainder in REM. The value in
+;;;  location VLA is destroyed.
+;;; 
+;;;  On exit: A = ??, X = $FF, Y is unchanged.
+;;; 
+;;;  same same
+_DIV16: MACRO VLA,VLB,QUO,REM
+        _CLR16 REM
+        LDX #16
+loop:   
+        _ASL16 VLA,VLA
+        _ROL16 REM,REM
+        _SUB16 REM,VLB,REM
+        BCS next
+        _ADD16 REM,VLB,REM
+next:   
+        _ROL16 QUO,QUO
+        DEX
+        BPL loop
+ENDM
 
-.ifndef _div
+
 FUNC "_mul10"
 ;;; 6 B (19 B in asm)
         DO _mul2
@@ -3270,7 +3411,6 @@ FUNC "_mul10"
         DO _mul2
         DO _plus
         DO _exit
-.endif 
 
 FUNC "_mul16"
 ;;; 4 B
@@ -3283,7 +3423,9 @@ FUNC "_mul4"
 
 ;;; 3 B LEFT! ... (in one page)
 
-.endif        
+.endif ; mul div
+
+.endif ; MINIMAL?        
 
 
 
