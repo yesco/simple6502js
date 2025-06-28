@@ -1,5 +1,116 @@
 ;;; cut-n-paste variants not used?
 
+
+;;; -----------------------------------
+;;; TESTS JMPS
+;;; 
+;;; (+ 8 9 6) = 23 B
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;;   to <= do: inc <
+;;;   to >  do: swap <
+;;;   to >= do: < null
+;;;   to == do: - null
+
+;;; 10 B (still 1 byte over!... lol)
+FUNC "_lessthan"
+
+        uJSR _minus
+C_gives_FFFF_else_0000:     
+        ;; C=0 if smaller => $ff else $00 !
+        lda #0
+        sbc #0                  ; haha! (=> V=0)
+
+;;; Notice require V=0
+VC_loadbothAA:     
+        pha
+        bvc loadApla            ; V=0 for sure!
+
+;;; (+ 5 6 2 6) = 19 B - same as macro, if have _lessthan
+FUNC "_eq"
+        uJSR _minus
+        ;; compensate for _null/_zero that pushes
+        dex
+        dex
+FUNC "_null"
+        lda tos
+        ora tos+1
+        beq _FFFF
+FUNC "_zero"
+        sec
+        ;; hack - BITzp skip one byte
+        ;; (not affect C)
+        .byte $24
+FUNC "_FFFF"
+_neg1:  
+        clc
+pushC:  
+        jsr _push
+        ;; _push leaves Z=0
+        bne C_gives_FFFF_else_0000
+
+.ifndef MINIMAL
+
+;;; 'a
+FUNC "_quote"
+;;; 6 B
+        uJSR _nexttoken
+        jmp _pushA
+
+;;; 10 B
+.ifnblank
+;;; _cmp
+;;; 13 B - funny but not smallest....
+        uJSR _minus
+        ;; Y == 2 (can we assert this somehow???)
+        dey                     ;  1   1
+        bcc notSmaller
+smaller:                        ; !<   <
+        dey                     ;      0
+notSmaller:     
+        dey                     ;  0  -1
+
+        sty tos
+        sty tos+1
+        rts
+.endif
+
+.endif ; MINIMAL _lessthan
+
+
+;;; TODO: we really want this in!!!
+;;;   (17 B too much)
+;;;   how about just a < ??
+;;;  
+.ifnblank
+
+;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
+;;; 
+;;; 17 B (= 262 bytes, lol, 6 too many)
+FUNC "_cmp"
+        uJSR _minus
+;;; TODO: _minus may have been reversed look at _mathop....
+
+        ;; Y == 2
+        bcc AisSmaller          ; => -1
+        bne AisBigger           ; => +1
+        beq equal               ; +   0
+
+;;; LOL (saves 2 bytes)
+AisSmaller:                     ; =   >    <
+        dey                     ;         +1
+equal:
+        dey                     ; +1       0
+AisBigger:
+        dey                     ;  0  +1  -1
+        
+        sty tos
+        sty tos+1               ; $0 $11 $ff - lol
+        rts
+.endif ; !BLANK
+
+
 .ifnblank ; more src uJSR
 
 

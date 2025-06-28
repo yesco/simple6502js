@@ -1551,29 +1551,6 @@ FUNC "_lambda"
         inc ipp
         rts
 
-;;; over = (pickn,2), 3rd = (pick,4) ...
-;;; 
-;;; 3 + 11 = 14 pick ("over" only would be 13 B)
-.ifdef PICKN
-FUNC "_pickn"
-;;; 6+11 = 17 B
-        uJSR _push
-        uJSR _nexttoken
-
-;;; _loadpickA 4 (99 2 4 6 ... => (4 99 2 4 6 ...)
-;;; 
-;;; 2 = over = forth.pick 1, 4 = forth.pick 2, 6 = forth.pick 3
-;;; 
-;;; NOTE: 0 is NOT dup!!!
-_loadpickA:
-;;; (11)
-        tay
-        lda stack-2,y 
-        pha
-        lda stack-2+1,y
-        jmp loadApla
-.endif ; PICKN        
-
 ;;; load variable from stack (a b c .. h)
 ;;; 
 ;;; 17 B
@@ -1585,10 +1562,35 @@ FUNC "_var"
 ;;; (11)
 loadpickA:
         tay
-        lda stack-2,y 
-        pha
-        lda stack-2+1,y
+        lda stack,y 
+        pha                     ; lo
+        lda stack+1,y           ; hi
         jmp loadApla
+
+;;; TODO: handle "outer"-variables (static scope) i-o[p] (7)
+;;; 6 B
+;;;     cmp #18 ; ('a'+8-'@')*2
+;;;     bcc noouter
+;;;     and #$7 (actually will miss p, acceptable!)
+;;;     adc ipo ; outer ipx... (C should not be set)
+;;; noouter:
+;;; 
+;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
+
+FUNC "_setvar"
+;;; 20 B
+        uJSR _nexttoken
+        uJSR _varindex
+
+_storeunpickA:
+;;; (14)
+        tay
+        lda tos
+        sta stack,y
+        lda tos+1
+        sta stack+1,y
+
+        jmp _pop
 
 ;;; 'a -> 2 'b -> 4 (+ ipx)
 ;;; No need align
@@ -1608,29 +1610,6 @@ FUNC "_varindex"
         adc ipx                 ;104 102 100 (C=0)
         rts
 
-;;; TODO: handle "outer"-variables (static scope) i-o[p] (7)
-;;; 6 B
-;;;     cmp #18 ; ('a'+8-'@')*2
-;;;     bcc noouter
-;;;     and #$7 (actually will miss p, acceptable!)
-;;;     adc ipo ; outer ipx... (C should not be set)
-;;; noouter:
-;;; 
-;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
-
-FUNC "_setvar"
-;;; 17 B
-        uJSR _varindex
-
-_storeunpickA:
-;;; (14)
-        tay
-        lda tos
-        sta stack,y
-        lda tos+1
-        sta stack+1,y
-
-        jmp _pop
 
 
 ;;; Z is the tail-recurse call
@@ -2013,6 +1992,7 @@ FUNC "_swap"
         dex
         ;; a | a c ..
 
+loadplapla:                     ; lol
         ;; tos= q (= b)
         pla ; hi
         jmp loadApla
@@ -2178,7 +2158,7 @@ pushC:
         ;; _push leaves Z=0
         bne C_gives_FFFF_else_0000
 
-.ifndef MINIMAL
+.ifnblank
 
 ;;; 'a
 FUNC "_quote"
@@ -2186,69 +2166,7 @@ FUNC "_quote"
         uJSR _nexttoken
         jmp _pushA
 
-;;; 10 B
-.ifnblank
-        uJSR _minus
-        
-        lda #0
-        rol
-        
-;;; !!! opposite!
-        ;; C=1 => $0101
-        ;; C=0 => $0000     is smaller should be ...
-        pha
-        jmp loadApla
-
-        
-
-;;; 13 B - funny but not smallest....
-        uJSR _minus
-        ;; Y == 2 (can we assert this somehow???)
-        dey                     ;  1   1
-        bcc notSmaller
-smaller:                        ; !<   <
-        dey                     ;      0
-notSmaller:     
-        dey                     ;  0  -1
-
-        sty tos
-        sty tos+1
-        rts
 .endif
-
-.endif ; MINIMAL _lessthan
-
-
-;;; TODO: we really want this in!!!
-;;;   (17 B too much)
-;;;   how about just a < ??
-;;;  
-.ifnblank
-
-;;; Compare 16 bits C V Z N flags sets as if 8-bit CMP
-;;; 
-;;; 17 B (= 262 bytes, lol, 6 too many)
-FUNC "_cmp"
-        uJSR _minus
-;;; TODO: _minus may have been reversed look at _mathop....
-
-        ;; Y == 2
-        bcc AisSmaller          ; => -1
-        bne AisBigger           ; => +1
-        beq equal               ; +   0
-
-;;; LOL (saves 2 bytes)
-AisSmaller:                     ; =   >    <
-        dey                     ;         +1
-equal:
-        dey                     ; +1       0
-AisBigger:
-        dey                     ;  0  +1  -1
-        
-        sty tos
-        sty tos+1               ; $0 $11 $ff - lol
-        rts
-.endif ; !BLANK
 
 ;;; jump/skip on zero (set Y!)
 FUNC "_zbranch"
