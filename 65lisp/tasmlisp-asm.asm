@@ -186,6 +186,9 @@ MINIMAL=1
 ;
 LAMBDA=1
 
+;;; Don't change thks, and should be multiple of 32
+IPPSTART=96                     ; 'a'-1
+
 ;PICKN=1
 
 ;;; enable this to get LISP (written in AL)
@@ -1494,7 +1497,7 @@ subr:
 
 ;;; TODO: maybe can use same $ff as net?
 .ifdef LAMBDA
-        lda #96                 ; 'a'-1
+        lda #IPPSTART
         sta ipp
 .endif 
 ;;; (4)
@@ -1546,22 +1549,35 @@ FUNC "_nexttoken"
 
 ;;; (number of \)-1 stored in ipp(arams)
 FUNC "_lambda"
-;;; 5 B
+;;; 17 B - too long, but need "push!" (at least once)
+
+;;; TODO: move ipp init here from _interpret?
+
+        ;; All arguments must be on stack proper
+        ;; to be picked by a-h or set by Sa-Sh
+        jsr _push
+        ;; TODO: can't nest lambdas
         stx ipx
+lmore: 
         inc ipp
+        jsr _nexttoken
+        cmp #'\'
+        beq lmore
+ldone:   
+        ;; give back last non-\ char
+        dec ipy
         rts
 
 ;;; load variable from stack (a b c .. h)
 ;;; 
-;;; 17 B
+;;; 16 B
 FUNC "_var"
 ;;; (6)
         uJSR _push
         uJSR _varindex
 
-;;; (11)
+;;; (10)
 loadpickA:
-        tay
         lda stack,y 
         pha                     ; lo
         lda stack+1,y           ; hi
@@ -1578,13 +1594,12 @@ loadpickA:
 ;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
 
 FUNC "_setvar"
-;;; 20 B
+;;; 19 B
         uJSR _nexttoken
         uJSR _varindex
 
 _storeunpickA:
-;;; (14)
-        tay
+;;; (13)
         lda tos
         sta stack,y
         lda tos+1
@@ -1601,16 +1616,15 @@ FUNC "_varindex"
 ;;;   ('c' 100 'b' 102 'a' 104)
 ;;; 
 ;;;                             ; 'a' 'b' c'
-;;; 9 B
+;;; 10 B
         lda ipp                 ; (+ 96 3) = 99
         sec
         sbc token               ; 'a' (- 99 97) = 2
         ;                       ; 'c' (- 99 99) = 0
         asl                     ;  4   2   0
         adc ipx                 ;104 102 100 (C=0)
+        tay
         rts
-
-
 
 ;;; Z is the tail-recurse call
 ;;; (R is functionally equivalent but may blow the stack)
@@ -1623,9 +1637,11 @@ FUNC "_tailrecurse"
         ;; basically copy n-1 parameters
         ;; from stack to ipx..
 ;;; (6)
+.assert IPPSTART=96,error,"%% IPPSTART must be multiple of 32 if AND is going to work..."
         lda ipp
-        clc
-        sbc #96+1
+;        clc
+;        sbc #96+1
+        and #$f
         asl
 
 ;;; (20)
@@ -1682,6 +1698,7 @@ FUNC "_return"
         ;; 
         ;; x = ipx + 2*(n-1)
 ;;; 6
+.assert IPPSTART=96,error,"%% IPPSTART must be multiple of 32 if AND is going to work..."
         lda ipp
         clc
         sbc #96+1
@@ -2523,19 +2540,19 @@ readlist:
 
 ;;; -------- LAMBDA 
 ; 42 (+4)	_interpret
-; 17(+17)	_var
-; 9  (+9)	_varindex
-; 17(+17)	_setvar
+; 16(+16)	_var
+; 10(+10)	_varindex
+; 19(+19)	_setvar
 
-; 5  (+5)	_lambda
-; 33(+33)	_tailrecurse
+; 17(+17)	_lambda
+; 32(+32)	_tailrecurse
 ; 9  (+9)	_recurse
 ; 9  (+9)	_return
 
-; (+ 4 5 17 9 17 33 9 9) = 103
-; (+ 254 103) = 357
+; (+ 4 16 10 19  17 32 9 9) = 116
+; (+ 254 116) = 370
 
-;;; way too big!
+;;; way too big! 116 bytes for \ ^ a-h Sa-Sh R Z
 
 
 
