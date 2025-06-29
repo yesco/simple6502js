@@ -350,9 +350,9 @@ subtract .set 0
 ;;; 
 ;;; top= A*B (A is trashed, B remains, both are popped)
 ;;; 
-;;; 33 B
+;;; 32 B
         ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
-.proc _mul
+.proc _mulx
         jsr _zero
 
         ;; loop 16
@@ -383,6 +383,43 @@ inx4rts:
         inx
         rts
 .endproc
+
+
+;;; 38 - more efficent if second number is small
+.proc _muly
+        jsr _zero
+loop:   
+        ;; done when B is 0
+        lda stack+2,x
+        ora stack+2+1,x
+        beq done
+
+        ;; A *= 2 => carry
+        lsr stack+2+1,x
+        ror stack+2,x
+        bcc noadd
+
+        ;; tos += B (perfect it stays there)
+        jsr _plus
+        dex
+        dex
+noadd:  
+        ;; A *= 2
+        asl stack,x
+        rol stack+1,x
+        jmp loop
+
+done:   
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+.endproc
+
+_mul = _muly
 
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
@@ -431,13 +468,10 @@ next:
         bne next
 
 done:   
-        ;; done remove D pop S which has the result
         inx
         inx
+        ;; tos= remaineder stack: quotient
         rts
-
-        jmp _pop
-
 
 
 .macro PUSHNUM num
@@ -447,7 +481,6 @@ done:
         lda #>num
         sta tos+1
 .endmacro
-
 
 .macro MUL aa,bb
         PUSHNUM aa
@@ -464,6 +497,7 @@ done:
 .endmacro
 
 .macro DIV dend, divisor
+        PUSHNUM 46666
         PUSHNUM dend
         jsr printh 
         PUTC '/'
@@ -484,8 +518,17 @@ done:
         PUTC ' '
         PUTC '*'
         jsr _swap
+        jsr printh
+
         PUSHNUM divisor
+        jsr printh
+
         jsr _mul
+        jsr printh
+
+        jsr _swap
+        jsr printh
+
         jsr _plus
         jsr printh
 
@@ -498,6 +541,30 @@ _initlisp:
         PUTC 'd'
         PUTC 'i'
         PUTC 'v'
+        PUTC 10
+
+        PUSHNUM $1111
+        PUSHNUM $2222
+        PUSHNUM $3333
+        jsr printh              ; 3333
+        jsr _swap
+        jsr printh              ; 2222
+        jsr _swap
+        jsr printh              ; 3333
+        jsr _swap               
+        jsr printh              ; 2222
+        jsr _drop
+        jsr printh              ; 3333
+        jsr _swap
+        jsr printh              ; 1111
+
+        PUTC 10
+
+        PUSHNUM $6666
+        MUL $33, $164
+        jsr _drop
+        jsr printh
+
         PUTC 10
 
         ;; => $0164  % = $0025
