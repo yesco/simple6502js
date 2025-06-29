@@ -1,185 +1,11 @@
-;;; (thinking)
-
-;;; 65-MATH16 - OnePage 16-bit arith/logical operator library
-;;; 
-;;; interpration: (+ 69 24 1) = 94 exec ctrl rts
-;;; (- 249 94)  = 155 bytes USED
-;;; (- 256 155) = 101
-;;; 
-;;; Let's add:    (+ 38 5 36 8 9)= 98  mul div out key
-;;; 
-;;;   (5) mul2 ??? not clear if can fit! lol
-
-;;; Compare to woz floats (768 Bytes):
-;;; 
-;;;   "The Woz floating-point library, implemented for the
-;;;    6502 processor in the early Apple computers, is
-;;;    relatively small. It's estimated to be around 768
-;;;    bytes of code, plus some zero-page memory locations
-;;;    according to a discussion on Hacker News. This includes
-;;;    both the code and data tables. The library was designed
-;;;    for space efficiency, reflecting the limited memory
-;;;    available in early home computers."
-
-
-
-
-
-;;; Alternative names:
-;;; - NanoStack65
-;;; - uStack65 / MicroStack65
-;;; - opvm65
-;;; - vm65
-;;; - opvm65 / OnePageVM65
-
-;;; OP16 - OnePage stack 16-bit VM (256 bytes!)
-;;; 
-;;; Built for minimal size not speed.
-;;; Instructions are byte-coded.
-;;; 
-;;; There are 23 byte code instructions.
-;;; They are somewhat similar to a "forth".
-;;; 
-;;; Plus 6 convience assembly routines.
-;;; 
-;;; Lower case names can be called with JSR,
-;;; or used as byte-code in a "DO _dup" line.
-;;; 
-;;;  
-;;; FUNCIONS
-;;; 
-;;;     stack: dup smap drop 2drop               (4)
-;;;    memory: store load comma                  (3)
-;;;      math: plus minus and or eor div2 inc    (7)
-;;;     tests: null neg1 zero eq lessthan        (5)
-;;;   control: exec exit zbranch branch          (4)
-;;;    system: binliteral                        (1) [0]
-;;;     [conv: OP16 pushA pushPLA loadA loadApla]    [6]
-;;;              (+ 4 3 7 5 4 1)                (25) [6]
-
-
-;;; Random number generator code
-;;; - http://www.6502.org/source/integers/random/random.html
-
-;;; Square root
-;;; - http://www.6502.org/source/integers/root.htm
-
-;;; Permuations
-;;; - http://www.6502.org/source/integers/perm.htm
-
-;;; String pattern matcher
-;;; - http://www.6502.org/source/strings/patmatch.htm
-
-
-;;; inspiration, and goal:
-;;; 
-;;; "SectorLisp for 6502" asmlisp-asm.asm (+ asmlisp.c)
-;;; 
-;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
-
-;;; THIRD attempt - a minimal lispy byte-code intepreter
-
-;;;     asmlisp-asm.asm -- pure ASM - too big?
-;;;    basmlisp-asm.asm -- used AX as top of split-stack
-;;;      1. started using a byte-coded VM - AL
-;;;         Alphabetical Lisp
-;;; -> tasmlisp-asm.asm -- uses zp TOP and contig stack
-;;;      1. this allows some ops to be easier to do (?)
-;;;      2. total rewrite from scratch
-;;;      3. uJSR (micro-in-page 2 byte JSR!) save 53 bytes?
-;;;      4. experiement with compress map, decompress
-;;;      
-;;; 
-
-
-
-;;; This is an attempt to write a pure assembly minimal
-;;; lisp for 6502, similar to SectorLisp that was
-;;; only 436 bytes, smaller than the SectoForth at 512
-;;; bytes.
-;;; 
-;;; There is a z80/6502 milliforth is 336/328 bytes!
-;;; 
-;;; can we create a minimal 6502 lisp?
-
-;;; SectorLisp limitations:
-;;; - 512 bytes "bootable"
-;;; - assumes prexisting "bios": getch putch
-;;; - only SYMBOLS and CONS
-;;; - reader and writer (no editor, or backspace)
-;;; - T NIL ?QUOTE ?READ PRINT ?COND CONS CAR CDR
-;;;     ATOM ?LAMBDA EQ
-
-;;; (/ 512.0 10) = 51.2 B/fun - "sector"
-;;; (/ 446.0 10) = 44.6 B/fun - SectorLisp
-;;; (/ 328.0 10) = 32.8 B/fun - milliforth 6502
-
-;;; NIL     8, 26       = 34
-;;; T       8           =  8
-;;; CAR:    8, 13	= 21
-;;; CDR:    8, (car)+4	= 12
-;;; CONS:  12, 14	= 26
-;;; EQ:     8, 17	= 25
-;;; ATOM:  12, 15	= 27   S= 153
-
-;;; types               =  8
-;;;   BIT 8
-;;; memory              =  8      169
-;;;   initlisp 8
-
-;;; PRINT: 12, 92       =104      273
-;;;   print    92
-;;;     printz 18
-;;;     printlist ??
-
-;;; READ:               = 76++    349
-;;;   getc     12  (+ 12 8 17 17 22)
-;;;   skipspc   8
-;;;   readatom 17
-;;;   read     17
-;;;     findsym  ??    
-;;;   readlist 22
-
-;;; eval:               = 98      447
-;;;   simple 12
-;;;   apply   (+ 12 52 22 12)
-;;;     evlist 52
-;;;     apply  22
-;;;     lambda 12, ??
-
-;;; COND:
-
-;;;   QUOTE
-;;;   
-
-
-;;; AsmLisp limitations;
-;;; - atom maxlength is 15 chars (not checked)
-;;; - atoms can only contain chars > ')'
-;;; - READ list length is limited by HW stack (no check)
-;;; - only SYMBOLS & CONS
-;;; - numbers are optional
-
-;;; TODO: READ QUOTE COND LAMBDA
-
-;;; - no GC (or minimal "reset")
-
-
-;;; worth reading wheler on prog-lang impl 6502
-;;; - https://dwheeler.com/6502/a-lang.txt
-
-;;; MINT 6502
-;;; - https://github.com/agsb/6502.MINT/tree/main/arch/6502
-
-
+;;; throw-ways code for testing div
 
 ;;; ----------------------------------------
 ;;; 
 ;;;           C   O   N   F   I   G
 
 ;;; enable this for size test
-;
-MINIMAL=1
+;MINIMAL=1
 
 ;;; enable this tomake it interactive
 ;;; (w MINIMAL -> interactive ALF (ALphabetical Forth)
@@ -199,8 +25,7 @@ MINIMAL=1
 ;;; two page dispatch for more code
 ;;; 
 ;;; MINIMAL: Uses (- 272 249) = 23 bytes more (align2+dipsatch)
-;
-DOUBLEPAGE=1
+;DOUBLEPAGE=1
 
 .endif ; MINIMAL
 
@@ -515,505 +340,225 @@ subtract .set 0
         YARGN n
 .endmacro
 
-.macro YARGN n
-        lda $102+(n*2),y
-        ldx $101+(n*2),y
-.endmacro
 
-;;; arg number Y
+
+
+
+
+;;; 9 ops from _MUL16 macro in
+;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
 ;;; 
-;;; (cc65 5B 20c equivalent "ldy #4 ; jsr ldaxsp")
+;;; top= A*B (A is trashed, B remains, both are popped)
+;;; 
+;;; 33 B
+        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
+.proc _mul
+        jsr _zero
 
-;;; 5B 36c
-.macro arg n
-        ldy #(n*2)
-        jsr yarg
-.endmacro
-
-;;; 25c
-.ifnblank
-.proc yarg
+        ;; loop 16
+        ldy #16
         sty savey
-        tsx
-        txa
-        clc
-        adc savey
-        tay
-        lda $104,y
-        ldx $103,y
+loop:   
+        ;; result = result*2
+        jsr _mul2
+
+        ;; A *= 2 => carry
+        asl stack+2,x          
+        rol stack+2+1,x
+        bcc noadd
+
+        ;; tos += B (perfect it stays there)
+        jsr _plus
+        dex
+        dex
+noadd:  
+        dec savey
+        bne loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
         rts
 .endproc
-.endif
 
-;;;              M A C R O S
-;;; ----------------------------------------
 
-;;; Funny, if put this here it doesn't run!
-;jmp _initlisp
+;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
-;.assert startaddr=START, error ;"changed .org"
+;;; jsk: mydiv (S D -> S/D)
+;;; 
+;;; 2025-06-28
+;;; 
+;;; 39 B - could work, lol
+;;; TOOD: - how is different from jskVL02
+_div:   
+        jsr _zero
+        ldy #17
+        sty savey
+next:   
+        ;; shift in one bit result into S!
+        rol stack+2,x
+        rol stack+2+1,x
 
-;;; This makes addresses near here FIXED thus can
-;;; do fancy calculated alignments!
-.org START
+        ;; done?
+        dec savey
+        beq done
+
+        ;; shift in one hi bit from S into tos
+        rol tos
+        rol tos+1
+
+        ;; tos -= D (reverse _minus)
+        jsr _sbc
+        dex
+        dex
+
+        ;; C=1 if subtract ok (?)
+        bcs next
+
+        ;; no, too big
+
+        ;; add B back, lol
+        jsr _plus
+        dex
+        dex
+        clc
+        ;; carry should be clear
+
+        ;; loop Z=0 always
+        bne next
+
+done:   
+        ;; done remove D pop S which has the result
+        inx
+        inx
+        rts
+
+        jmp _pop
+
+
+
+.macro PUSHNUM num
+        jsr _push
+        lda #<num
+        sta tos
+        lda #>num
+        sta tos+1
+.endmacro
+
+
+.macro MUL aa,bb
+        PUSHNUM aa
+        jsr printh
+        PUTC '*'
+        PUSHNUM bb
+        jsr printh
+        PUTC '='
+        jsr _mul
+        jsr printh
+        jsr _drop
+
+        PUTC 10
+.endmacro
+
+.macro DIV dend, divisor
+        PUSHNUM dend
+        jsr printh 
+        PUTC '/'
+        PUSHNUM divisor
+        jsr printh
+        jsr _div
+        PUTC '='
+
+        jsr _swap
+
+        jsr printh
+        PUTC ' '
+        PUTC '%'
+        jsr _swap
+        jsr printh
+
+        ;; let's verify by mult!
+        PUTC ' '
+        PUTC '*'
+        jsr _swap
+        PUSHNUM divisor
+        jsr _mul
+        jsr _plus
+        jsr printh
+
+        PUTC 10
+.endmacro
 
 .export _initlisp
 _initlisp:
 
+        PUTC 'd'
+        PUTC 'i'
+        PUTC 'v'
+        PUTC 10
 
-;COMPRESSED=1
-.ifdef COMPRESSED
-
-;;; ENDCHAR can't occur anywhere in the compressed data
-;;; 
-;
-ENDCHAR=0
-
-;_initlisp:      
-
-;;; unzip - decompressor for one pae
-;;; 
-;;; (- 1 (/ (- 256 43) 256.0)) = 17%
-;;; 
-;;; Alas the compressed data is 213 BYTES!
-;;; 
-;;; (can max be 256, without change)
-;;; (would have to inc source+1 +8 bytes)
-;;; 
-;;; We need to achieve a compression ratio
-;;; of at least 18% for it to be worth it!
-;;; 
-;;; Alternatives
-;;; - Haruhiko Okumura's lzss.c
-;;; - Fabrice Bellard's lzexe
-;;; - Markus Oberhumer's NRV series
-;;; - 6502 asm FilePack part of OSD
-;;; 
-;;; REF:
-;;; 
-;;; - https://github.com/mywave82/unlzexe/blob/master/unlzexe.c
-;;; - https:github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Funpack.s
-;;; 
-;;; was: (42 B for ASCII, (+ 13= 52 B if UNZBINARY))
-
-;;; TODO: variant AX
-
-;;; (+ 4 6 5 13 18 33 22) = 101 slightly smaller...
-;;;    BUT WORKS!!!
-.proc unz
-        ;; init
-;;; 4
-        lda #<(compresseddata-1)
-        ldx #>(compresseddata-1)
-
-loop:   
-;;; 6
-        jsr unzchar
-        jmp loop
-
-unzchar:        
-;;; 5
-        jsr nextbyte
-        bmi minus
-        ;; plain
-save:   
-;;; 14
-;;; TODO: remove! debug
-        jsr putchar
-
-dest:   sta destination
-        ;; step
-        inc dest+1
-        bne @noinc
-        inc dest+2
-@noinc: 
-        lda savea
-        rts
-
-minus:    
-;;; 13
-        ;; quoted?
-        cmp #$ff
-        bne ref
-        ;; quoted
-quoted: 
-        lda savea
-        jsr nextbyte
-        eor #128
-        ;; jmp save (always pl!)
-        bpl save
+        ;; => $0164  % = $0025
+        DIV $4711, $0033
+        DIV $4711, $0033
+        DIV 100, 3
+        DIV 1000, 3
+        DIV 16, 2
+        DIV $4711, $0033
         
-ref:    
-;        lda #':'
-;        jsr putchar
+        MUL 0,0
+        MUL 1,1
+        MUL 0,1
+        MUL 1,0
+        MUL 2,2
+        MUL 4,4
+        MUL 8,8
 
-;;; 33
-        ;; ref to two pos
-        dey
-        sty savey
+halt:   jmp halt
 
-        ;; save current pos: hi,lo
-        txa
-        pha
-        lda savea
-        pha
 
-        ;; modify pos by add a
-        clc ; ? or sec?
-        adc savey
+;;;  print hex
+printh: 
+        putc '$'
+
+        lda tos+1
+        jsr print2h
+        lda tos
+
+print2h:      
         tay
-        txa
-        adc #$ff                ; we're really sub!
-        tax
+        ;; hi
+        ror
+        ror
+        ror
+        ror
+        jsr print1h
+        ;; lo
         tya
-
-        ;; unz(pos+ref)->newpos
-        jsr unzchar
-
-        ;; unz(newpos + 1)
-        jsr unzchar
-
-        ;; restore pos
-        sty savex               ; lol
-
-        pla
-        tay                     ; lo
-        pla
-        tax                     ; hi
-        tya                     ; lo
-
-        ldy savex
-
-        rts
-
-nextbyte:
-;;; 22
-        ;; step
-        clc
-        adc #1
-        bcc noinc
-        inx
-noinc:  
-        sta savea
-
-        sta ptr1
-        stx ptr1+1
-        ldy #0
-        lda (ptr1),y
-
-        ;; end? -> assumes stack will be fixed
-        cmp #ENDCHAR
-;        beq destination
-hlt:    beq hlt
-
-        ;; flags reflect A
-        tay
-        rts
-.endproc
-
-
-.ifnblank
-
-
-;;; 86 B - unlimited length, fixed addr, self mod
-;;;        (but requires unique stopchar)
-;;; 
-;;; (+ 8 7 7 12 12 32 15) = 93 correct missed on 12
-.proc unz
-        ;; init
-;;; 8
-        lda #<compresseddata
-        sta ptr1
-        lda #>compresseddata
-        sta ptr1+1
-
-loop:   
-;;; 7
-        ldy #0
-        jsr unzchar
-        bne loop
-
-
-unzchar:        
-;;; 7
-        jsr nextbyte
-        cmp #0
-        bmi minus
-        ;; plain
-save:   
-;;; 12
-dest:   sta dest
-        lda savea
-        jsr putchar
-        ;; step
-        inc dest+1
-        bne @noinc
-        ind dest+2
-@noinc: 
-        rts
-
-minus:    
-;;; 12
-        ;; quoted?
-        cmp #$ff
-        bne ref
-        ;; quoted
-quoted: 
-        pha
-
-        ;; store a $ff
-        lda #$ff
-        jsr save
-
-        ;; save byte ^ 128 (so it's no ref)
-        pla
-        jsr nextbyte
-        eor #128
-        iny ; to handle this at read time
-        ;; jmp save (always pl!)
-        bpl save
         
-ref:    
-;;; 32
-        ;; ref to two pos
-        sta savea
-        ;; save current pos
-        lda ptr1+1
-        pha
-        lda ptr1
-        pha
-
-        ;; modify by add a
-        clc ; ?
-        adc savea
-        sta ptr1
-        lda ptr1+1
-        adc #$ff                ; we're really sub!
-        sta ptr1+1
-
-        ;; unz(pos+ref)->newpos
-        ;; Y==0
-        jsr unzchar
-
-        ;; unz(newpos + 1)
-        jsr unzchar
-
-        ;; restore pos
-        pla
-        sta ptr1
-        pla
-        sta ptr1+1
-        ;; Z=0
-        rts
-
-nextbyte:
-;;; 15
-        lda (ptr1),y
-
-        cmp #stopbyte
-        beq startaddr
-
-        ;; step
-        inc ptr1
-        bne noinc
-        inc ptr1+1
-noinc:  
-        rts
-
-.endproc
+print1h:        
+        and #$0f
+        ora #$30
+        cmp #'9'+1
+        bcc printit
+        adc #6
+printit:        
+        jmp putchar
 
 
-.proc unz
-        adjusteddata= compresseddata+128-1
-
-        ;; when this is read means stop
-sentinel:
-        lda #0
-        pha
-        pha
-
-next:   
-        inc source+1
-        bne noinc2
-        inc source+2
-
-load:
-
-source: lda adjusteddata,y
-        bpl plain
-        ;; done?
-        cmp #endchar
-        beq startaddr
-
-minus:  
-        ;; process pair
-        tay
-        ;; second part of pair
-;;; TODO: how about when quoted?
-        iny
-        tya
-        pha                     ; second pat of pair
-        dey
-        jmp load                ; first part of pair
-        
-plain:  
-        ;; plain -> store it
-dest:   sta startaddr
-        inc dest+1
-        bne noinc
-        inc dest+2
-noinc:  
-
-processesqueue: 
-        pla
-        tay
-        bne load
-        
-.endproc
 
 
-.proc unz
-;;; (+ 9 5 12 18) = 44 lol (+10= 54 B if UNZBINARY)
 
 
-;;; 9 (if use rts)
-        compresslen= (compressend-compresseddata)
-        starty= (256-compresslen)
-
-        ldy #starty
-        ;;; top level keep track of when to stop
-loop:   
-        jsr doone
-        iny
-        bne loop
-        ;; done
-        ; rts
-        ;; (non library optimization)
-        beq startaddr
-        
 
 
-doone:
-;;; 5
-        ;; Y is source read index
-        adjusteddata= (compresseddata-starty)
-
-source: lda adjusteddata,y
-        bmi ninus
 
 
-storeit:        
-;;; 12
-        ;; plain char, store it
-dest:   sta startaddr
-        ;; inc inline ptr to destination
-        inc dest+1
-        bne noinc
-        inc dest+2
-noinc:    
-        rts
 
 
-minus:    
 
-.ifdef UNZBINARY
-;;; (10 B)
-        ;; is a the quote char?
-        cmp #$ff
-        bne ref
-
-        ;; read and store
-        iny
-        lda adjusteddata,y
-        bmi store
-
-.endif ; UNZBINARY
-
-ref:    
-;;; 18
-        ;; at index A we got two chars to process
-
-;;; TODO: maybe start w index in A?
-
-        ;; save A char and get curent index
-        sta savea
-        tya
-        pha
-
-        ;; Y+= ref
-        clc
-        adc savea
-        tay
-
-        ;; process two chars (recursivly)
-        jsr doone
-        iny
-        jsr doone
-        
-        ;; restore Y
-        pla
-        tay
-        rts
-
-unzip:  
-        ldx #0
-loop:   
-        lda rd,x
-unz:    
-        pla
-        bmi ref
-        ;; plain char
-        ldy #0
-        sta (wr),y
-        inc wr
-        bne noinc
-        inc wr
-noinc:  
-        inx
-        jmp unz
-ref:    
-        sta savea
-        txa
-
-        sec
-        sbc #1
-        pha
-        ;; push delayed call
-        ...
-
-        txa
-        clc
-        adc savea
-        tax
-load:   
-        lda rd,x
-        jmp unz
-        
-data:   
-
-.endif ; nblank
-
-;;; Everything after the unz is compressed data!
-
-compresseddata: 
-        .byte "Jonas S Karlsson",10
-;;; a b c d e f g h ef hef ef hef
-        .byte "abcdefgh",256-4,256-2,256-2,10
-        .byte ENDCHAR
-compressend:
-
-        
-
-.res 256 - * .mod 256
-
-destination:    
-        .res 512
-
-
-.endif ; COMPRESSED
-
-;;; just for testing COMPRESSED/unz
-;.end
 
 
 ;;; DON'T PUT ANY CODE HERE!!!!
@@ -1036,59 +581,10 @@ destination:
 
 
 
-;;; enable these 3 lines for NOTHING .tap => 325 bytes
-
-;_initlisp:
-.ifdef FISH
-
-        sec                     ; => 00
-        clc                     ; => ?? (ff)    (is smaller!)
-        lda #0
-        sbc #0
-;;; V=0 for sure!
-
-        tay
-
-.ifblank
-;;;  carray?
-        ldx #'1'
-        bvs skip
-        dex
-skip:   
-        txa
-        jsr putchar
-
-        lda #':'
-        jsr putchar
-.endif
-
-;;;  print hex
-        tya
-
-        and #15
-        ora #$30
-        jsr putchar
-
-        tya
-        ror
-        ror
-        ror
-        ror
-        
-        and #15
-        ora #$30
-        jsr putchar
-
-        rts
-.end
-.endif
-
-;;; (- (* 6 256) 1379) = 157 bytes before page boudary
-
 
 ;;; JMP table
 ;;; align on table boundary by padding
-.res (256 - * .mod 256)-7
+;.res (256 - * .mod 256)-7
 .byte "BEFORE>"
 
 ;;; we start program at "sector"
@@ -1776,7 +1272,7 @@ FUNC "_binliteral"
         _quote          = _undef
         _writez         = _undef
         _mul2           = _undef
-        _mul            = _undef
+;        _mul            = _undef
 
 .endif ; MINIMAL
 
@@ -2723,7 +2219,7 @@ macrostart:
 ;;; 3 B left!!!!!
 
 
-.ifndef MINIMAL
+.ifdef xyaaDIVxxxxMINIMAL
 
 ;;; #0UU =>     0   !
 ;;; x UU => _FFFF   !
@@ -2875,7 +2371,6 @@ mul3:
     bne  mul2
 
     rts
-
 
 ;;; 31+4 = 35 B - wtf??? LOL fast for small numbers
 mul:    
