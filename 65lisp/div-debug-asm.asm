@@ -424,6 +424,8 @@ _mul = _muly
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
 
+
+
 ;;; jsk: mydiv (S D -> S/D)
 ;;; 
 ;;; 2025-06-28
@@ -435,7 +437,7 @@ _div:
         ldy #17
         sty savey
 next:   
-        ;; shift in one bit result into S!
+        ;; shift in one bit result into S
         rol stack+2,x
         rol stack+2+1,x
 
@@ -470,7 +472,7 @@ next:
 done:   
         inx
         inx
-        ;; tos= remaineder stack: quotient
+        ;; tos= remainder stack: quotient
         rts
 
 
@@ -484,13 +486,13 @@ done:
 
 .macro MUL aa,bb
         PUSHNUM aa
-        jsr printh
+        jsr printn
         PUTC '*'
         PUSHNUM bb
-        jsr printh
+        jsr printn
         PUTC '='
         jsr _mul
-        jsr printh
+        jsr printn
         jsr _drop
 
         PUTC 10
@@ -499,38 +501,38 @@ done:
 .macro DIV dend, divisor
         PUSHNUM 46666
         PUSHNUM dend
-        jsr printh 
+        jsr printn 
         PUTC '/'
         PUSHNUM divisor
-        jsr printh
+        jsr printn
         jsr _div
         PUTC '='
 
         jsr _swap
 
-        jsr printh
+        jsr printn
         PUTC ' '
         PUTC '%'
         jsr _swap
-        jsr printh
+        jsr printn
 
         ;; let's verify by mult!
         PUTC ' '
         PUTC '*'
         jsr _swap
-        jsr printh
+        jsr printn
 
         PUSHNUM divisor
-        jsr printh
+        jsr printn
 
         jsr _mul
-        jsr printh
+        jsr printn
 
         jsr _swap
-        jsr printh
+        jsr printn
 
         jsr _plus
-        jsr printh
+        jsr printn
 
         PUTC 10
 .endmacro
@@ -543,27 +545,37 @@ _initlisp:
         PUTC 'v'
         PUTC 10
 
+        PUSHNUM $1234
+        jsr printn
+
+        PUTC 10
+
+        PUSHNUM 12345
+        jsr printn
+
+        PUTC 10
+
         PUSHNUM $1111
         PUSHNUM $2222
         PUSHNUM $3333
-        jsr printh              ; 3333
+        jsr printn              ; 3333
         jsr _swap
-        jsr printh              ; 2222
+        jsr printn              ; 2222
         jsr _swap
-        jsr printh              ; 3333
+        jsr printn              ; 3333
         jsr _swap               
-        jsr printh              ; 2222
+        jsr printn              ; 2222
         jsr _drop
-        jsr printh              ; 3333
+        jsr printn              ; 3333
         jsr _swap
-        jsr printh              ; 1111
+        jsr printn              ; 1111
 
         PUTC 10
 
         PUSHNUM $6666
         MUL $33, $164
         jsr _drop
-        jsr printh
+        jsr printn
 
         PUTC 10
 
@@ -586,16 +598,73 @@ _initlisp:
 halt:   jmp halt
 
 
-;;;  print hex
-printh: 
-        putc '$'
+printn:
+.ifnblank
+        stx savey               ; lol
+        lda tos
+        ldx tos+1
+        jsr xprintd
+        ldx savey
+        rts
+.endif
+;        jmp printh
 
+        jsr _dup
+        jmp printd
+
+;;; print decimal
+;;; 
+;;; TODO: ironically, the fastest routine to print is 
+;;;   voidprintptr1 33 B could do it on tos, +2 for jmp pop
+;;;   so 35 B or 29 B requiring _div and is much slower...
+;;;           6 B difference...
+;;; 
+;;; 29 B + 14 B (plaprint1h)
+
+;;; TODO: make it a system zp variable?
+;;; init cost 4 bytes... lol
+BASE=10
+
+.proc printd
+        ;; divide by BASE
+        lda #BASE
+        jsr _pushA
+        jsr _div
+
+        ;; delayed print digit (reverses order!)
+        lda tos
+        pha
+        lda #>(plaprint1h-1)
+        pha
+        lda #<(plaprint1h-1)
+        pha
+
+        jsr _drop
+
+        ;; p => done
+        lda tos
+        ora tos
+        bne printd
+done:
+        jmp _drop
+.endproc
+        
+        
+
+
+;;; print hex
+printh: 
+;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
+;;; 5
+        putc '$'
+;;; 7
         lda tos+1
         jsr print2h
         lda tos
 
 print2h:      
-        tay
+;;; (8)
+        pha
         ;; hi
         ror
         ror
@@ -603,8 +672,10 @@ print2h:
         ror
         jsr print1h
         ;; lo
-        tya
         
+plaprint1h:     
+;;; (14)
+        pla
 print1h:        
         and #$0f
         ora #$30
@@ -3511,7 +3582,7 @@ endaddr:
 ;;;   maybe do include?
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
-.proc printd
+.proc xprintd
 ;;; 12
 ;;; TODO: maybe not need save as print does?
         ;; save ax
@@ -3531,9 +3602,9 @@ endaddr:
 ;;; 37B
 ;;; 
 ;;; _voidprintdptr1
-;;; 35B - this is a very "minimal" sized routine
+;;; 33B - this is a very "minimal" sized routine
 ;;;       slow, one loop per bit/16
-;;;       (+ 3B for store AX)
+;;;       (+ 4B for store AX)
 ;;; 
 ;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
 ;;;       (not include time to print digits)
