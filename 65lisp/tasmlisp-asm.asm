@@ -25,15 +25,22 @@
 
 
 
-;;; OP16 - OnePage 16-bit VM (256 bytes!)
+;;; Alternative names:
+;;; - NanoStack65
+;;; - uStack65 / MicroStack65
+;;; - opvm65
+;;; - vm65
+;;; - opvm65 / OnePageVM65
+
+;;; OP16 - OnePage stack 16-bit VM (256 bytes!)
 ;;; 
 ;;; Built for minimal size not speed.
 ;;; Instructions are byte-coded.
 ;;; 
-;;; There are 25 byte code instructions.
+;;; There are 23 byte code instructions.
 ;;; They are somewhat similar to a "forth".
 ;;; 
-;;; Plus 7 convience assembly routines.
+;;; Plus 6 convience assembly routines.
 ;;; 
 ;;; Lower case names can be called with JSR,
 ;;; or used as byte-code in a "DO _dup" line.
@@ -41,14 +48,14 @@
 ;;;  
 ;;; FUNCIONS
 ;;; 
-;;;     stack: dup map drop 2drop                (4)
+;;;     stack: dup smap drop 2drop               (4)
 ;;;    memory: store load comma                  (3)
 ;;;      math: plus minus and or eor div2 inc    (7)
-;;;     tests: null neg1 zero eq lessthan  (5)
-;;;   control: exit zbranch branch               (3)
-;;;    system: Literal                           (1) [0]
-;;;     [conv: pushA pushPLA loadA loadApla]         [4]
-;;;              (+ 4 3 7 5 3 1)                (23) [4]
+;;;     tests: null neg1 zero eq lessthan        (5)
+;;;   control: exec exit zbranch branch          (4)
+;;;    system: binliteral                        (1) [0]
+;;;     [conv: OP16 pushA pushPLA loadA loadApla]    [6]
+;;;              (+ 4 3 7 5 4 1)                (25) [6]
 
 
 ;;; Random number generator code
@@ -183,8 +190,7 @@ MINIMAL=1
 ;AL=1
 
 ;;; enable LAMBDA style functions \ ^ R Z
-;
-LAMBDA=1
+;LAMBDA=1
 
 ;;; enable this to get LISP (written in AL)
 ;LISP=1
@@ -1541,7 +1547,28 @@ FUNC "_nexttoken"
 FUNC "_lambda"
 ;;; 19 B - too long, but need "push!" (at least once)
 
-;;; TODO: move ipp init here from _interpret?
+;;; TODO: Y is assumed to start at 0
+;;;    and the first \ is assumed to be at 0
+;;;    this may not be true for
+;;;      3 4 \\ aU(b^) aJbI Z
+;;; 
+;;; TODO: could be solved by:
+;;;    IP += ipy,ipy=0 (reuseing current call)
+
+.ifnblank
+;;; 12 B
+;;; if _inc, _dec  all used this w prelude
+;;; (+ 7 9 12)  (+ 13 2 3 3 3 3 4)= 31
+
+todoRincA:
+        lda ip
+        clc
+        adc ipy
+        sta ip
+        lda ip+1
+        adc #0
+        sta ip+1
+.endif
 
         ;; All arguments must be on stack proper
         ;; to be picked by a-h or set by Sa-Sh
@@ -2023,14 +2050,13 @@ _ccomma:
         inx
         iny
 
-.proc _inc
+FUNC "_inc"
 ;;; (7 B)
         inc tos
         bne ret
         inc tos+1
 ret:    
         rts
-.endproc
 
 FUNC "_store"
 ;;; 8 B
