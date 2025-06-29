@@ -2175,7 +2175,7 @@ pushC:
         ;; _push leaves Z=0
         bne C_gives_FFFF_else_0000
 
-.ifnblank
+.ifndef MINIMAL
 
 ;;; 'a
 FUNC "_quote"
