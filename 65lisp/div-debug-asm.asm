@@ -430,11 +430,11 @@ _mul = _muly
 ;;; 
 ;;; 2025-06-28
 ;;; 
-;;; 39 B - could work, lol
+;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
 ;;; TOOD: - how is different from jskVL02
-_div:   
+_divmod:   
         jsr _zero
-        ldy #17
+        ldy #17                 ; avoid first clc!
         sty savey
 next:   
         ;; shift in one bit result into S
@@ -464,9 +464,10 @@ next:
         dex
         dex
         clc
-        ;; carry should be clear
-
+        ;; carry must be clear (why isn't?)
+        ;; (to be shifted in)
         ;; loop Z=0 always
+;;; TODO: jskVL02 does the loop differently
         bne next
 
 done:   
@@ -505,7 +506,7 @@ done:
         PUTC '/'
         PUSHNUM divisor
         jsr printn
-        jsr _div
+        jsr _divmod
         PUTC '='
 
         jsr _swap
@@ -629,7 +630,7 @@ BASE=10
         ;; divide by BASE
         lda #BASE
         jsr _pushA
-        jsr _div
+        jsr _divmod
 
         ;; delayed print digit (reverses order!)
         lda tos
@@ -2588,9 +2589,8 @@ div2:
 
 
 ;;; jskVL02 variant of VL02
-;;; 49 B or 37 w _sbc and _plus
 
-;;; 39 B is good!    BEST????
+;;; 36 (+1?) B is good!    BEST????
 div:    
         ;; tos = remn
         uJSR _zero
@@ -2604,27 +2604,26 @@ loop:
         rol tos
         rol tos+1
 
-        jsr _sbc
-        inx
-        inx
+        uJSR _sbc
+        dex
+        dex
         
         bcs ok
 
         ;; undo
-        jsr _plus
-        inx
-        inx
-        ;; C is still 0
+        uJSR _plus
+        dex
+        dex
+;;; clc needed by mine?
+        ;; C is still 0 ??? ( I think onot...)
         
 ok: 
         dec  savea
-        bne  loop
+        bne  loop               ; or did it use bpl and 16
 
         inx
         inx
-        inx
-        inx
-        bne pop                 ; never 0
+        rts
 
 
 ;;; DIV 16/16
