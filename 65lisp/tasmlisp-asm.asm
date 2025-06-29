@@ -186,11 +186,6 @@ MINIMAL=1
 ;
 LAMBDA=1
 
-;;; Don't change thks, and should be multiple of 32
-IPPSTART=96                     ; 'a'-1
-
-;PICKN=1
-
 ;;; enable this to get LISP (written in AL)
 ;LISP=1
 
@@ -347,8 +342,8 @@ ip:     .res 2                  ; code ptr
 ipy:    .res 1                  ; offset
 
 .ifdef LAMBDA
-ipx:    .res 1                  ; d stack frame start
-ipp:    .res 1                  ; n params
+ipx:    .res 1                  ; d stack after cal
+ipp:    .res 1                  ; d stack before parameters
 .endif ; LAMBDA
 
 endframe:
@@ -1495,11 +1490,6 @@ subr:
         lda savey
         sta ip+1
 
-;;; TODO: maybe can use same $ff as net?
-.ifdef LAMBDA
-        lda #IPPSTART
-        sta ipp
-.endif 
 ;;; (4)
         ldy #$ff
         sty ipy
@@ -1549,17 +1539,27 @@ FUNC "_nexttoken"
 
 ;;; (number of \)-1 stored in ipp(arams)
 FUNC "_lambda"
-;;; 17 B - too long, but need "push!" (at least once)
+;;; 19 B - too long, but need "push!" (at least once)
 
 ;;; TODO: move ipp init here from _interpret?
 
         ;; All arguments must be on stack proper
         ;; to be picked by a-h or set by Sa-Sh
         jsr _push
+
+taillambda: 
         ;; TODO: can't nest lambdas
         stx ipx
+        stx ipp
+
+;;; TODO: need adjust IP if Y!=0 ???
+;;;   otherwise tailrecursion/recursion is off!!!
+
 lmore: 
+        ;; inc stackx by two for each param
         inc ipp
+        inc ipp
+
         jsr _nexttoken
         cmp #'\'
         beq lmore
@@ -1570,18 +1570,29 @@ ldone:
 
 ;;; load variable from stack (a b c .. h)
 ;;; 
-;;; 16 B
+;;; 15 B
 FUNC "_var"
 ;;; (6)
         uJSR _push
         uJSR _varindex
 
+loadpickY:
+;;;  (9)
+;;; TODO: maybe, but off by one?
+        stx savex
+        tax
+        jsr _lda
+        ldx savex
+        rts
+
+.ifnblank
+loadpickY:
 ;;; (10)
-loadpickA:
         lda stack,y 
         pha                     ; lo
         lda stack+1,y           ; hi
         jmp loadApla
+.endif
 
 ;;; TODO: handle "outer"-variables (static scope) i-o[p] (7)
 ;;; 6 B
@@ -1593,36 +1604,31 @@ loadpickA:
 ;;; 
 ;;; TODO: globals q-rstuvw[x] xyz remains "FREE"
 
+;;; lisp style wouldn't pop value
 FUNC "_setvar"
-;;; 19 B
+;;; 17 B
         uJSR _nexttoken
         uJSR _varindex
 
+;;; TODO: use _lda?
 _storeunpickA:
-;;; (13)
+;;; (11)
         lda tos
         sta stack,y
         lda tos+1
         sta stack+1,y
 
-        jmp _pop
+        rts
 
 ;;; 'a -> 2 'b -> 4 (+ ipx)
 ;;; No need align
 FUNC "_varindex"     
-;;;    y= ipx + 2*(ipp - 'a'&f) ; ('a'&f)
-
-;;; ipx= 100 ipp= 0 + 3 ; 'a' we want 104
-;;;   ('c' 100 'b' 102 'a' 104)
-;;; 
-;;;                             ; 'a' 'b' c'
-;;; 10 B
-        lda ipp                 ; (+ 96 3) = 99
-        sec
-        sbc token               ; 'a' (- 99 97) = 2
-        ;                       ; 'c' (- 99 99) = 0
-        asl                     ;  4   2   0
-        adc ipx                 ;104 102 100 (C=0)
+;;; - no code savings yet if called only 2x
+;;; 9
+        lda token
+        and #$f
+        asl                     ; C=0
+        adc ipp
         tay
         rts
 
@@ -1633,52 +1639,40 @@ FUNC "_varindex"
 FUNC "_tailrecurse"
 
 .ifdef TAILRECURSEOPT
-;;; (+ 6 20 7) = 33 B
-        ;; basically copy n-1 parameters
-        ;; from stack to ipx..
-;;; (6)
-.assert IPPSTART=96,error,"%% IPPSTART must be multiple of 32 if AND is going to work..."
-        lda ipp
-;        clc
-;        sbc #96+1
-        and #$f
-        asl
+;;; (+ 16 7) = 23 B
 
-;;; (20)
-        ;; move y bytes
-        tay
-        beq done
-        ;; (from = stack+ipx + y)
-        stx from+1
-        ;; (to = stack+ipx + y)
-        lda ipx
-        sta to+1
-next:   
-        ;; copy from self-modified address
-from:   lda stack,y
-        ;; copy to self-modified address
-to:     sta stack,y
+;;; (16)
+        ;; basically copy n parameters
+        ;; from current stack to [ipx..ipx]
+        ldy ipp                 ; before params
         dey
+        dey
+next:   
+        ;; from
+        lda stack,x
+        dex
+        ;; to
+        dey
+        sta stack,y
+        ;; done when reached ipx (== just before call)
+        cpy ipx
         bne next
 
-done:   
 ;;; (7)
-        ;; restore stack
+        ;; restore stack to after call (params there)
         ldx ipx
-        ;; go to the beginning 
-;;; TODO: \\\ needs to do enter!
+
+        ;; go to beginning
         ldy #0
         sty ipy
+
+        ;; next will go parse \ again!
         rts
 .endif
 
 FUNC "_recurse"
-;;; TODO: this is only needed if ANON \\lambdas
-;;; TODO: more or less same as _exec
-;;;   we push current IP
-;;;   we only need reset ipy, ipx
-;;;   no need transfer or "muck" with IP
-        ;; go get current IP
+;;; 9
+        ;; IP of current function
         lda ip+1
         sta savea
         lda ip
@@ -1691,23 +1685,9 @@ FUNC "_recurse"
 ;;; adjusts stack to remove parameters atreturn
 ;;; TOP retained as it contains return value!
 FUNC "_return"
-;;; 9 B
-        ;; moves up X to where it was before
-        ;; putting the paramters on the stack
-        ;; (result is in tos - that's why -1)
-        ;; 
-        ;; x = ipx + 2*(n-1)
-;;; 6
-.assert IPPSTART=96,error,"%% IPPSTART must be multiple of 32 if AND is going to work..."
-        lda ipp
-        clc
-        sbc #96+1
-        asl                     ; C=0
-
-;;; 3
-        adc ipx
-        tax
-        ;; fall-through to _semis
+;;; 2
+        ldx ipp
+        ;; fall-through to _exit
 
 .endif ; LAMBDA
 
@@ -1716,9 +1696,9 @@ FUNC "_return"
 FUNC "_exit_"
 _exit: 
 
+;;; Return from nested JSR-loop in exec
+;;; 
 ;;; 3
-;;; TODO: verify that this is enough
-;;;   possibly have it dispatch to "restore" inside _Interpret
         pla
         pla
 _ret:    
@@ -2539,20 +2519,20 @@ readlist:
 ;;; (- 512 407 44) = 61 bytes left
 
 ;;; -------- LAMBDA 
-; 42 (+4)	_interpret
-; 16(+16)	_var
-; 10(+10)	_varindex
-; 19(+19)	_setvar
+; 15	_var
+; 9	_varindex
+; 17	_setvar
 
-; 17(+17)	_lambda
-; 32(+32)	_tailrecurse
-; 9  (+9)	_recurse
-; 9  (+9)	_return
+; 21	_lambda
+; 23	_tailrecurse
+; 9 	_recurse
+; 2 	_return
 
-; (+ 4 16 10 19  17 32 9 9) = 116
-; (+ 254 116) = 370
+; (+ 15 9 17 21 23 9 2) = 96
+; (+ 254 96) = 350
 
-;;; way too big! 116 bytes for \ ^ a-h Sa-Sh R Z
+;;; way too big! 96 bytes for \ ^ a-h Sa-Sh R Z
+;;;  (down 20!!!)
 
 
 
