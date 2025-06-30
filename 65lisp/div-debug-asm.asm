@@ -350,7 +350,7 @@ subtract .set 0
 ;;; 
 ;;; top= A*B (A is trashed, B remains, both are popped)
 ;;; 
-;;; 0x0: 15, $33x$164: 18 (rev 18), $ffff^2: 29 (29 same as mulx)
+;;; 0x0: 11, $33x$164: 14 (rev 14), $ffff^2: 25 (25 same as mulx)
 ;;; 
 ;;; 32 B
         ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
@@ -389,7 +389,7 @@ inx4rts:
 
 ;;; 38 - more efficent if second number is small
 ;;;    ( 6 byte more ...)
-;;; 0x0: 6, $33x$164: 12 (rev: 14), $ffff^2: 29 (29 same as mulx)
+;;; 0x0: 2, $33x$164: 8 (rev: 10), $ffff^2: 25 (25 same as mulx)
 .proc _muly
         jsr _zero
 loop:   
@@ -437,7 +437,7 @@ _mul=_mulx
 ;;; 
 ;;; TOOD: - how is different from jskVL02
 ;;; 
-;;; 100x => 39cs
+;;; 100x => 35-39cs
 ;;; 
 ;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
 .proc _divmodx   
@@ -489,7 +489,7 @@ done:
 .endproc
 
 
-;;; 100x => 17cs ! (_divmodx => 39cs)
+;;; 100x => 13cs ! (_divmodx => 23-39cs)
 ;;; 
 ;;; 44 B (_divmodx => 39 B)
 .proc _divmody
@@ -717,19 +717,24 @@ _initlisp:
         sta savez
         jsr _resettime
 nextm:  
-        ;; muly: 6 mulx: 15
+        ;; - overhead 4 subtracted
+        ;; muly: 2 mulx: 11
 ;        PUSHNUM $0000
 ;        PUSHNUM $0000
-        ;; muly: 12 mulx: 18
+        ;; muly: 8 mulx: 14
 ;        PUSHNUM $33
 ;        PUSHNUM $164
-        ;; muly: 14 mulx: 18
+        ;; muly: 10 mulx: 14
         PUSHNUM $164
         PUSHNUM $33
-        ;; muly: 29 mulx: 29
+        ;; muly: 25 mulx: 25
 ;        PUSHNUM $ffff
 ;        PUSHNUM $ffff
-        jsr _mul
+
+        ;; overhead: 4cs
+        jsr _mul                
+
+        jsr _drop
         jsr _drop
 
         dec savez
@@ -754,16 +759,20 @@ nextm:
         sta savez
         jsr _resettime
 nextd:  
-        ;; x: 39 y: 17!
-;        PUSHNUM $4711
-;        PUSHNUM $33
-        ;; x: 43 y: 17
+        ;; - overhead 4 subtracted
+        ;; x: 35 y: 13
+        PUSHNUM $4711
+        PUSHNUM $33
+        ;; x: 39 y: 13
 ;        PUSHNUM $0000
 ;        PUSHNUM $ffff
-        ;; x: 27 y: 18
-        PUSHNUM $ffff
-        PUSHNUM $0000
+        ;; x: 23 y: 14
+;        PUSHNUM $ffff
+;        PUSHNUM $0000
+
+;;; no _divmod => 4 cs
         jsr _divmod
+
         jsr _drop
         jsr _drop
 
