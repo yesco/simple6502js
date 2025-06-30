@@ -350,6 +350,8 @@ subtract .set 0
 ;;; 
 ;;; top= A*B (A is trashed, B remains, both are popped)
 ;;; 
+;;; 0x0: 15, $33x$164: 18 (rev 18), $ffff^2: 29 (29 same as mulx)
+;;; 
 ;;; 32 B
         ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
 .proc _mulx
@@ -386,6 +388,8 @@ inx4rts:
 
 
 ;;; 38 - more efficent if second number is small
+;;;    ( 6 byte more ...)
+;;; 0x0: 6, $33x$164: 12 (rev: 14), $ffff^2: 29 (29 same as mulx)
 .proc _muly
         jsr _zero
 loop:   
@@ -419,7 +423,8 @@ inx4rts:
         rts
 .endproc
 
-_mul = _muly
+_mul=_mulx
+;_mul=_muly
 
 
 ;;; (- (* 6 256) 1379) = 157 bytes before page boudary
@@ -430,14 +435,18 @@ _mul = _muly
 ;;; 
 ;;; 2025-06-28
 ;;; 
-;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
 ;;; TOOD: - how is different from jskVL02
+;;; 
+;;; 100x => 39cs
+;;; 
+;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
 .proc _divmodx   
         jsr _zero
 ;;; TODO: if 16 it hangs - why?
 ;;;   (yes 17 is correct as we want to move in last bit)
         ldy #17                 ; avoid first clc!
         sty savey
+
 next:   
         ;; shift in one bit result into S
         rol stack+2,x
@@ -452,7 +461,7 @@ next:
         rol tos+1
 
         ;; tos -= D (reverse _minus)
-        jsr _sbc
+        jsr _rminus
         dex
         dex
 
@@ -480,8 +489,53 @@ done:
 .endproc
 
 
+;;; 100x => 17cs ! (_divmodx => 39cs)
+;;; 
+;;; 44 B (_divmodx => 39 B)
+.proc _divmody
+        jsr _zero
+        ldy #17                 ; avoid first clc!
+        sty savey
 
-_divmod=_divmodx
+next:   
+        ;; shift in one bit result into S
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; done?
+        dec savey
+        beq done
+
+        ;; shift in one hi bit from S into tos
+        rol tos
+        rol tos+1
+
+        lda tos
+        sec
+        sbc stack,x
+        tay
+        lda tos+1
+        sbc stack+1,x
+
+        bcc next
+        ;; ok - store new
+        sta tos+1
+        sty tos
+
+        bcs next
+
+done:   
+        inx
+        inx
+        ;; tos= remainder stack: quotient
+        rts
+.endproc
+
+
+;_divmod=_divmodx
+_divmod=_divmody
+
+
 
 .macro PUSHNUM num
         jsr _push
@@ -544,8 +598,42 @@ _divmod=_divmodx
         PUTC 10
 .endmacro
 
+_pushtime:      
+        jsr _push
+        lda $0276
+        sta tos
+        lda $0276+1
+        sta tos+1
+        rts
+
+_printtime:      
+        ;; report time since start
+        jsr _pushtime
+        jsr _minus
+        PUTC ' '
+        PUTC 't'
+        jsr printd
+        PUTC ' '
+;        jsr _drop
+        jsr _pushtime
+        rts
+
+_resettime:
+        jsr _pushtime
+        rts
+
+        ;; reset ORIC timer
+        jsr _push
+        lda #$ff
+        sta $0276
+        sta $0276+1
+
+        rts
+
 .export _initlisp
 _initlisp:
+
+        jsr _printtime
 
         PUTC 'd'
         PUTC 'i'
@@ -553,12 +641,16 @@ _initlisp:
         PUTC 10
 
         PUSHNUM $1234
+        jsr _printtime
         jsr printn
+        jsr _printtime
 
         PUTC 10
 
         PUSHNUM 12345
+        jsr _printtime
         jsr printn
+        jsr _printtime
 
         PUTC 10
 
@@ -586,6 +678,7 @@ _initlisp:
 
         PUTC 10
 
+        jsr _printtime
         ;; => $0164  % = $0025
         DIV $4711, $0033
         DIV $4711, $0033
@@ -597,6 +690,8 @@ _initlisp:
         DIV $FFFF, $0003
         DIV $FFFF, $FFFF
         DIV $FFFE, $FFFF
+
+        jsr _printtime
         
         MUL 0,0
         MUL 1,1
@@ -605,6 +700,99 @@ _initlisp:
         MUL 2,2
         MUL 4,4
         MUL 8,8
+
+
+
+        PUTC 'M'
+        jsr _resettime
+        PUSHNUM $33
+        PUSHNUM $164
+        jsr _mul
+        jsr _drop
+        jsr _printtime
+        PUTC 10
+
+        PUTC 'M'
+        lda #100
+        sta savez
+        jsr _resettime
+nextm:  
+        ;; muly: 6 mulx: 15
+;        PUSHNUM $0000
+;        PUSHNUM $0000
+        ;; muly: 12 mulx: 18
+;        PUSHNUM $33
+;        PUSHNUM $164
+        ;; muly: 14 mulx: 18
+        PUSHNUM $164
+        PUSHNUM $33
+        ;; muly: 29 mulx: 29
+;        PUSHNUM $ffff
+;        PUSHNUM $ffff
+        jsr _mul
+        jsr _drop
+
+        dec savez
+        bne nextm
+
+        jsr _printtime
+        PUTC 10
+
+
+        PUTC 'D'
+        jsr _resettime
+        PUSHNUM $4711
+        PUSHNUM $33
+        jsr _divmod
+        jsr _drop
+        jsr _drop
+        jsr _printtime
+        PUTC 10
+
+        PUTC 'D'
+        lda #100
+        sta savez
+        jsr _resettime
+nextd:  
+        ;; x: 39 y: 17!
+;        PUSHNUM $4711
+;        PUSHNUM $33
+        ;; x: 43 y: 17
+;        PUSHNUM $0000
+;        PUSHNUM $ffff
+        ;; x: 27 y: 18
+        PUSHNUM $ffff
+        PUSHNUM $0000
+        jsr _divmod
+        jsr _drop
+        jsr _drop
+
+        dec savez
+        bne nextd
+
+        jsr _printtime
+        PUTC 10
+
+
+        PUTC 'D'
+        lda #200
+        sta savez
+        jsr _resettime
+nextd2:  
+        PUSHNUM $4711
+        PUSHNUM $33
+        jsr _divmod
+        jsr _drop
+        jsr _drop
+
+        dec savez
+        bne nextd2
+
+        jsr _printtime
+        PUTC 10
+
+
+
 
 halt:   jmp halt
 
@@ -1897,10 +2085,11 @@ FUNC "_or"
 FUNC "_minus"
         ;; need to swap as _sbc does opposite!
         uJSR _swap
-_sbc:   
         ;; top -= stack
         ;; SBC stack,x 
+_rminus:        
         sec
+_sbc:
         lda #$fd
         bne _mathop
 

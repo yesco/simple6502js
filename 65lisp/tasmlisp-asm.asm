@@ -2273,13 +2273,16 @@ FUNC "_or"
         bne _mathop
 
 ;;; Carry is retained after
+;;; minus: tos = second - tos ; 7 3 - gives 4
 FUNC "_minus"
         ;; need to swap as _sbc does opposite!
         uJSR _swap
-_sbc:   
+;;; revermse minus tos = tos - second
+_rminus:
         ;; top -= stack
         ;; SBC stack,x 
         sec
+_sbc:   
         lda #$fd
         bne _mathop
 
