@@ -432,8 +432,10 @@ _mul = _muly
 ;;; 
 ;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
 ;;; TOOD: - how is different from jskVL02
-_divmod:   
+.proc _divmodx   
         jsr _zero
+;;; TODO: if 16 it hangs - why?
+;;;   (yes 17 is correct as we want to move in last bit)
         ldy #17                 ; avoid first clc!
         sty savey
 next:   
@@ -475,7 +477,11 @@ done:
         inx
         ;; tos= remainder stack: quotient
         rts
+.endproc
 
+
+
+_divmod=_divmodx
 
 .macro PUSHNUM num
         jsr _push
@@ -587,6 +593,10 @@ _initlisp:
         DIV 1000, 3
         DIV 16, 2
         DIV $4711, $0033
+        DIV $FFFF, $0001
+        DIV $FFFF, $0003
+        DIV $FFFF, $FFFF
+        DIV $FFFE, $FFFF
         
         MUL 0,0
         MUL 1,1
@@ -1917,6 +1927,7 @@ _lda:
 ;;; 17B
 FUNC "_mathop"
         ldy #0
+oponce: 
         sta op
 opmore:    
         jsr genop
@@ -2574,6 +2585,7 @@ div1:
         sbc  3,x
         bcc  div2
         ;; yes: update the partial
+;;; jsk: really, why is it guaranteed?
         sta  remn+1
         ;; set low bit in the partial quotient
         lda  remn
