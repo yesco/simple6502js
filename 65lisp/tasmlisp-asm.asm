@@ -251,7 +251,27 @@ TAILRECURSEOPT=1
 ;ERRMSG=1
 .endif
 
+;;; PRINT.ASM --------------------
 
+;;; Enable to save bytes (and get slower)
+;SAVEBYTES=1 
+
+;;; Enable to print decimal numbers by default
+;;; (this one wll use and prefer DIVMOD impl)
+PRINTDEC=1
+
+;;; Enable to print decimal numbers by default
+;;; (this one uses dedicated printd 35 bytes)
+;PRINTDECFAST=1
+
+;;; Enable to print hexadecimal numbers by default
+;PRINTHEX=1
+
+;;; Default to use $abcd notation
+PRINTHEXDOLLAR=1
+
+.include "print.asm"
+;;; END PRINT.ASM --------------------
 
 ;;; 1379
 START=$563
@@ -1426,7 +1446,7 @@ notrans:
         PUTC 'o'
         ldx #0
 ;;; TODO: no more AX!
-        jsr printd
+        jsr printn
 
         NEWLINE
 .endif
@@ -1803,9 +1823,6 @@ FUNC "_binliteral"
         _mul            = _undef
 
 .endif ; MINIMAL
-
-;;; DEBUG
-        _printd         = _undef
 
 
 .ifdef NUMBERS
@@ -2369,9 +2386,6 @@ _writez:
         jsr _out                ; canNOT uJSR
         iny
         bne _writez
-
-;_printd:        
-;       jmp printd
 
 .ifnblank
 ;;; comparez (ptr1, tos) strings
@@ -3649,7 +3663,7 @@ FUNC "_transtable"              ; 128 B
 
 ;;; DEBUG - TODO: cheating - change!!!
 ;;; TODO: write in CODE
-        DF _printd,46,"_PRNUM" ; . - print num
+        DF _printn,46,"_PRNUM" ; . - print num
 
         DO _undef              ; / - TOOD: macro: div
         DO _digit              ; 0
@@ -3911,24 +3925,24 @@ endaddr:
         sec
         sbc savex
         ldx #0
-        jsr printd
+        jsr printn
 
         putc 'd'
         lda #$ff
         sec
 ;        sbc sidx
         ldx #0
-        jsr printd
+        jsr printn
 
         putc 'i'
         lda ip
         ldx ip+1
-        jsr printd
+        jsr printn
 
         putc 'y'
         lda ipy
         ldx #0
-        jsr printd
+        jsr printn
 
         putc '>'
         putc ' '
@@ -3940,7 +3954,7 @@ endaddr:
         putc '#'
         pla
         ldx #0
-        jsr printd
+        jsr printn
 
         RPOP
         rts
@@ -3956,36 +3970,36 @@ endaddr:
         ;; print size info for .CODE
         NEWLINE
         SET startaddr
-        jsr printd
+        jsr printn
         PUTC '-'
         SET endaddr
-        jsr printd
+        jsr printn
         PUTC '='
         SET (endaddr-startaddr-subtract)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'P'
         PUTC '='
         SET (jmptable-startaddr)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'T'
         PUTC '='
         SET (endtable-jmptable)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 't'
         PUTC '='
         SET (endtrans-_transtable)
-        jsr printd
+        jsr printn
 
         NEWLINE
-        SET (_printd-jmptable)
+        SET (printn-jmptable)
         ldx #0
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'L'
@@ -3996,82 +4010,9 @@ endaddr:
         rts
 .endproc
 
-;;; TODO: this is duplcated code in test 
-;;;   maybe do include?
 
-;;; printd print a decimal value from AX (retained, Y trashed)
-.proc printd
-;;; 12
-;;; TODO: maybe not need save as print does?
-        ;; save ax
-        sta savea
-        stx savex
 
-        jsr _voidprintd
 
-        ;; restore ax
-        ldx savex
-        lda savea
-
-        rts
-.endproc
-
-;;; _voidprintd print a decimal value from AX (+Y trashed)
-;;; 37B
-;;; 
-;;; _voidprintdptr1
-;;; 35B - this is a very "minimal" sized routine
-;;;       slow, one loop per bit/16
-;;;       (+ 3B for store AX)
-;;; 
-;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
-;;;       (not include time to print digits)
-;;; 
-;;; Based on DecPrint 6502 by Mike B 7/7/2017
-;;; Optimized by J. Brooks & qkubma 7/8/2017
-;;; This implementation by jsk@yesco.org 2025-06-08
-
-.proc _voidprintd
-        sta ptr1
-        stx ptr1+1
-        
-_voidprintptr1d:
-
-digit:  
-        lda #0
-        tay
-        ldx #16
-
-div10:  
-        cmp #10/2
-        bcc under10
-        sbc #10/2
-        iny
-under10:        
-        rol ptr1
-        rol ptr1+1
-        rol
-
-        dex
-        bne div10
-
-        ;; make 0-9 to '0'-'9'
-        ora #48                 ; '0'
-
-        ;; push delayed putchar
-        ;; (this is clever hack to reverse digits!)
-        pha
-        lda #>(plaputchar-1)
-        pha
-        lda #<(plaputchar-1)
-        pha
-
-        dey
-        bpl digit
-
-        rts
-.endproc
-        
 
 ;;; at end of code (and tests)
 LOWMEM: 

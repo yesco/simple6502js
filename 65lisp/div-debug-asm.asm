@@ -1,13 +1,28 @@
-;;; printdec wants to know if there is divmod
+;;; TODO:
 DIVMOD=1
 
-;;; print options (set before include)
+;;; PRINT.ASM --------------------
+;;; Enable to save bytes (and get slower)
+;SAVEBYTES=1 
+
+;;; Enable to print decimal numbers by default
+;;; (this one wll use and prefer DIVMOD impl)
 ;PRINTDEC=1
-PRINTDECFAST=1                 
-;PRINTHEX=1
+
+;;; Enable to print decimal numbers by default
+;;; (this one uses dedicated printd 35 bytes)
+;PRINTDECFAST=1
+
+;;; Enable to print hexadecimal numbers by default
+PRINTHEX=1
+
+;;; Default to use $abcd notation
 PRINTHEXDOLLAR=1
 
 .include "print.asm"
+;;; END PRINT.ASM --------------------
+
+
 
 
 ;;; throw-ways code for testing div
@@ -627,7 +642,7 @@ _printtime:
         jsr _minus
         PUTC ' '
         PUTC 't'
-        jsr _printd
+        jsr _printn
         PUTC ' '
 ;        jsr _drop
         jsr _pushtime

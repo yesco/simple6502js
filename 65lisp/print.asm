@@ -1,3 +1,46 @@
+;;; print.asm - asm generic print routines
+;;; 
+;;; set flags before .include this file
+
+.ifnblank
+;;; COPY THIS:
+
+;;; PRINT.ASM --------------------
+;;; Enable to save bytes (and get slower)
+;SAVEBYTES=1 
+
+;;; Enable to print decimal numbers by default
+;;; (this one wll use and prefer DIVMOD impl)
+;PRINTDEC=1
+
+;;; Enable to print decimal numbers by default
+;;; (this one uses dedicated printd 35 bytes)
+;PRINTDECFAST=1
+
+;;; Enable to print hexadecimal numbers by default
+;PRINTHEX=1
+
+;;; Default to use $abcd notation
+PRINTHEXDOLLAR=1
+
+.include "print.asm"
+;;; END PRINT.ASM --------------------
+
+.endif
+
+;;; --- these prints the TOS value and pops it
+;;; _printn - pop prints using choosen format
+;;; _printd - pop prints in decimal
+;;; _printh - pop prints in hex
+
+;;; --- these prints and leaves value on TOS/stack
+;;; (typically used for debugging?)
+;;; printn - print a number using choosen format
+;;; printh - prints hex
+;;; printd - prints 
+
+;;; ----------------------------------------
+
 .ifdef PRINTHEX
         PRINT=1
 
@@ -106,14 +149,15 @@ done:
 
 .ifdef PRINTHEX
 
-printn: 
+printn:
 
 ;;; print hex
 printh:
 ;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
 ;;; 5
 .ifdef PRINTHEXDOLLAR
-        putc '$'
+        lda #'$'
+        jsr putchar
 .endif
 ;;; 7
         lda tos+1
@@ -187,9 +231,13 @@ _writez:
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
 
+.ifdef PRINTDECFAST
+
+.ifndef _printd
 _printd:        
         jsr xprintd
         jmp _drop
+.endif
 
 .ifndef printn
   printn: 
@@ -272,3 +320,5 @@ under10:
 
         rts
 .endproc
+
+.endif ; PRINTDECFAST
