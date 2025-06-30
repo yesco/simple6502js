@@ -218,6 +218,8 @@ DOUBLEPAGE=1
 ;;; no jsr ... (/ (- 606 528) 3.0) = 26 B saved only... ???
 ;;; 
 ;;; 248 !!! lol (from 249) - HAHA!
+;;; 
+;;; DOUBLEPAGE: ...+2 B - LOL - again NO real savings...
 ;UJSR=1 
 
 .ifndef MINIMAL
@@ -1197,25 +1199,35 @@ _quit:
 .else
 
 .macro uJSR addr
-  .ifdef DOUBLEPAGE
-        .error "Can'tuse uJSR with DOUBLEPAGE yet"
-  .endif
+  .ifndef DOUBLEPAGE
+        ;; onepage limit 256 bytes
+        .assert (addr-jmptable)<=256,error,"%% uJSR: target ttoo far"
         ;; make sure read correct dispatch char!
         .assert (addr/256=*/256),error,"%% uJSR: can only call within same page"
-        ;; we subtrace 1...
-        .assert addr,error,"%% uJSR: can't jsr 0"
-        ;; yeah, limit 256 bytes
-        ;; (unless we go asl..., and .align 2)
-        .assert (addr-jmptable)<=256,error,"%% uJSR: target too far"
-        .out "uJSR"
+  .else
+;        .assert (addr/512=*/512),error,"%% uJSR: can only call within DOUBLEPAGE page"
+        .assert (addr-jmptable)<=512,error,"%% uJSR: target too far" 
+        .assert (addr .mod 2)=0,error,"%% uJSR: target not aligned, use FUNC"
+        ;; if zero crossing - just jsr
+        ;; (this is because we do dey on dispatch byte)
+     .if ((*+2) .mod 256)=0
+        jsr addr
+        .exitmacro
+     .endif
 
-    .ifdef MINIMAL
-        .byte 0,(addr-jmptable-1)
-    .else
-        ;;; TODO: need /2 and .align 2 for each function
-        .byte 0,(addr-jmptable-1)/2
-    .endif
+  .endif
 
+  .assert addr,error,"%% uJSR: can't jsr 0"
+
+  .out "uJSR"
+
+  .ifndef DOUBLEPAGE
+        .byte 0,(addr-jmptable)
+  .else
+        .byte 0,(addr-jmptable)/2
+  .endif
+
+  .assert ((*+2) .mod 256)<>0,error,"%% uJSR: zerocrossing not mitigated"
 .endmacro
 
 _BRK:   
@@ -1228,7 +1240,7 @@ _BRK:
 ;;; jsr calls *within* one page
 ;;; 
 ;;; 
-;;; 11 B
+;;; 11 B (+ 5 B SECONDPAGE)
 
 ;;; (6)
         pla                     ; P reg - throw away
@@ -1237,8 +1249,20 @@ _BRK:
         ;; so with RTS we'll continue at next byte
         pla                   
         tay
+
+.ifdef DOUBLEPAGE
+;;; Handle call from outside first page
+;;; (TODO: uJSR needs to make sure no zero in dey)
+;;; 5 B
+        ;; hi
+        pla
+        sta source+2
+        pha
+.endif
+
 ;;; TODO: wrap call in macro, make sure addr
 ;;;       doesn't overlap 0 where call is!
+        ;; save lo-1
         dey
         tya
         pha
@@ -1246,7 +1270,7 @@ _BRK:
 ;;; (5)
         ;; using address we look up the code where
         ;; we came from and get actual "dispatch offset"
-        lda jmptable, y
+source: lda jmptable, y
         bne callAoffset
 
 
@@ -1378,7 +1402,7 @@ FUNC "_nextloop"
 ;;;   TODO: still valid? lol
 
 ;;; get next token to interpret
-_next:   
+FUNC "_next"
         uJSR _nexttoken
 
 _nexta: 
