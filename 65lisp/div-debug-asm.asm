@@ -1,3 +1,44 @@
+;;; TODO: move to tasmlisp-asm.asm
+
+;;; possibly print options
+;PRINTDEC=1
+DIV=1
+PRINTDECFAST=1                 
+;PRINTHEX=1
+
+PRINTHEXDOLLAR=1
+
+.ifdef PRINTHEX
+        PRINT=1
+
+.endif ; PRINTHEX
+
+.ifdef PRINTDEC
+        PRINT=1
+
+  .ifdef SAVEBYTES
+
+    .ifdef DIV
+      .ifdef PRINTDECFAST
+        .error "%% Conflic PRINTDECFAST & SAVEBYTES"
+      .endif
+
+        PRINTDECDIV=1
+    .else ; NDIV
+        ;; actually smaller than div+printd
+        PRINTDECFAST=1
+    .endif ; NDIV
+
+  .else
+    .ifdef DIV
+        PRINTDECDIV=1
+    .else    
+        PRINTDECFAST=1
+    .endif
+  .endif ; SAVEBYTES
+.endif ; PRINTDEC
+
+
 ;;; throw-ways code for testing div
 
 ;;; ----------------------------------------
@@ -532,17 +573,20 @@ done:
 .endproc
 
 
-;_divmod=_divmodx
-_divmod=_divmody
+_divmod=_divmodx
+;_divmod=_divmody
 
 
-
-.macro PUSHNUM num
-        jsr _push
+.macro LOADNUM num
         lda #<num
         sta tos
         lda #>num
         sta tos+1
+.endmacro
+
+.macro PUSHNUM num
+        jsr _push
+        LOADNUM num
 .endmacro
 
 .macro MUL aa,bb
@@ -612,23 +656,31 @@ _printtime:
         jsr _minus
         PUTC ' '
         PUTC 't'
-        jsr printd
+        jsr _printd
         PUTC ' '
 ;        jsr _drop
         jsr _pushtime
         rts
 
-_resettime:
-        jsr _pushtime
-        rts
-
         ;; reset ORIC timer
-        jsr _push
+_resettime:     
         lda #$ff
         sta $0276
         sta $0276+1
 
         rts
+
+_reporttime:    
+        putc '<'
+        PUSHNUM $ffff
+        jsr _pushtime
+        jsr _minus
+        putc ' '
+        putc 't'
+        jsr _printd
+        putc ' '
+        rts
+        
 
 .export _initlisp
 _initlisp:
@@ -704,7 +756,7 @@ _initlisp:
 
 
         PUTC 'M'
-        jsr _resettime
+        jsr _pushtime
         PUSHNUM $33
         PUSHNUM $164
         jsr _mul
@@ -715,7 +767,7 @@ _initlisp:
         PUTC 'M'
         lda #100
         sta savez
-        jsr _resettime
+        jsr _pushtime
 nextm:  
         ;; - overhead 4 subtracted
         ;; muly: 2 mulx: 11
@@ -744,7 +796,7 @@ nextm:
 
 
         PUTC 'D'
-        jsr _resettime
+        jsr _pushtime
         PUSHNUM $4711
         PUSHNUM $33
         jsr _divmod
@@ -756,7 +808,7 @@ nextm:
         PUTC 'D'
         lda #100
         sta savez
-        jsr _resettime
+        jsr _pushtime
 nextd:  
         ;; - overhead 4 subtracted
         ;; x: 35 y: 13
@@ -785,7 +837,7 @@ nextd:
         PUTC 'D'
         lda #200
         sta savez
-        jsr _resettime
+        jsr _pushtime
 nextd2:  
         PUSHNUM $4711
         PUSHNUM $33
@@ -802,23 +854,102 @@ nextd2:
 
 
 
+.macro beginBENCH oneletter,IT
+        putc oneletter
+
+        lda #100
+        sta savez
+        jsr _resettime
+@benext:  
+.endmacro
+
+.macro endBENCH
+        dec savez
+        bne @benext
+
+        putc ' '
+        jsr _reporttime
+        putc 10
+.endmacro
+
+
+
+       
+      beginBENCH 'P'
+        ;; pushnum/drop overhead t1 !
+        PUSHNUM 12345
+        ;; 139 cs (_divmody _divmodx= 260 cs!!!)
+        jsr _printd
+        ;;  87 cs 
+;        jsr xprintd
+;        jsr _drop
+        ;;  63 cs (50 without $)
+;        jsr printh
+      endBENCH
+
+
+
+        putc 10
+        putc 'E'
+        putc 'N'
+        putc 'D'
+
 halt:   jmp halt
 
 
-printn:
+.macro LIT num
+  .if num=0
+        DO _zero
+    .exitmacro        
+  .endif
+  
+  .if num=$ffff
+        DO _FFFF
+    .exitmacro
+  .endif
+
+  .if num<256 && .def(_quote)
+        DO _quote
+        .byte num
+    .exitmacro    
+  .endif
+
+        ;;  fallback
+        DO _binliteral
+        .word num
+
+.endmacro ; LIT
+
+
+
 .ifnblank
-        stx savey               ; lol
-        lda tos
-        ldx tos+1
-        jsr xprintd
-        ldx savey
-        rts
-.endif
-;        jmp printh
 
-        jsr _dup
-        jmp printd
+.macro BYTECODE
+        uJSR OPVM65
+.endmacro
 
+.proc _printd
+;;; 14 B
+        BYTECODE
+
+next:   LIT 10
+        DO _divmod
+        ;; Recurse to print higher value digits first!
+        DO _swap
+        DO _printd
+
+        DO print1h              ; maybe CALL?
+        DO _drop
+        BRANCH next
+
+        DO _drop
+        DO _exit
+.endproc        
+
+.endif ; BLANK
+
+
+.ifdef PRINTDECDIV
 ;;; print decimal
 ;;; 
 ;;; TODO: ironically, the fastest routine to print is 
@@ -826,13 +957,24 @@ printn:
 ;;;   so 35 B or 29 B requiring _div and is much slower...
 ;;;           6 B difference...
 ;;; 
+;;; TODO: too big! (might as well use xprintd...)
+;;; 
+;;; Maybe can write as OP16?
+
 ;;; 29 B + 14 B (plaprint1h)
 
 ;;; TODO: make it a system zp variable?
 ;;; init cost 4 bytes... lol
 BASE=10
 
-.proc printd
+;;; this one preserves TOS
+printn: 
+        jsr _dup
+
+;;; TODO: FUNC "_printd"
+.align 2, $ea                   ; NOP
+.export _printd
+.proc _printd
         ;; divide by BASE
         lda #BASE
         jsr _pushA
@@ -851,19 +993,25 @@ BASE=10
         ;; p => done
         lda tos
         ora tos
-        bne printd
+        bne _printd
 done:
         jmp _drop
 .endproc
-        
+
+.endif ; PRINTDECDIV
         
 
+.ifdef PRINTHEX
+
+printn: 
 
 ;;; print hex
-printh: 
+printh:
 ;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
 ;;; 5
+.ifdef PRINTHEXDOLLAR
         putc '$'
+.endif
 ;;; 7
         lda tos+1
         jsr print2h
@@ -880,10 +1028,16 @@ print2h:
         jsr print1h
         ;; lo
         
+.endif ; PRINTHEX
+
+
+
+.if .def(PRINTHEX) || .def(PRINTDECDIV)
+
 plaprint1h:     
 ;;; (14)
         pla
-print1h:        
+.proc print1h        
         and #$0f
         ora #$30
         cmp #'9'+1
@@ -891,9 +1045,9 @@ print1h:
         adc #6
 printit:        
         jmp putchar
+.endproc
 
-
-
+.endif ; PRINTDECDIV || PRINTHEX
 
 
 
@@ -1620,9 +1774,6 @@ FUNC "_binliteral"
 ;        _mul            = _undef
 
 .endif ; MINIMAL
-
-;;; DEBUG
-        _printd         = _undef
 
 
 .ifdef NUMBERS
@@ -2541,17 +2692,17 @@ about 4.5x.
     .endif ;  DOUBLEPAGE    
 .endmacro
 
-.macro LIT w
-        DO _binliteral
-        .word w
-.endmacro
+;.macro LIT w
+;        DO _binliteral
+;        .word w
+;.endmacro
 
 .macro ZBRANCH else
         DO _zbranch
         .byte (256+else-*) .mod 256
 .endmacro
 
-.macro BRANCH else,start
+.macro BRANCH else
         DO _branch
         .byte (256+else-*) .mod 256
 .endmacro
@@ -3701,24 +3852,24 @@ endaddr:
         sec
         sbc savex
         ldx #0
-        jsr printd
+        jsr printn
 
         putc 'd'
         lda #$ff
         sec
 ;        sbc sidx
         ldx #0
-        jsr printd
+        jsr printn
 
         putc 'i'
         lda ip
         ldx ip+1
-        jsr printd
+        jsr printn
 
         putc 'y'
         lda ipy
         ldx #0
-        jsr printd
+        jsr printn
 
         putc '>'
         putc ' '
@@ -3730,7 +3881,7 @@ endaddr:
         putc '#'
         pla
         ldx #0
-        jsr printd
+        jsr printn
 
         RPOP
         rts
@@ -3746,36 +3897,36 @@ endaddr:
         ;; print size info for .CODE
         NEWLINE
         SET startaddr
-        jsr printd
+        jsr printn
         PUTC '-'
         SET endaddr
-        jsr printd
+        jsr printn
         PUTC '='
         SET (endaddr-startaddr-subtract)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'P'
         PUTC '='
         SET (jmptable-startaddr)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'T'
         PUTC '='
         SET (endtable-jmptable)
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 't'
         PUTC '='
         SET (endtrans-_transtable)
-        jsr printd
+        jsr printn
 
         NEWLINE
         SET (_printd-jmptable)
         ldx #0
-        jsr printd
+        jsr printn
 
         NEWLINE
         PUTC 'L'
@@ -3790,18 +3941,33 @@ endaddr:
 ;;;   maybe do include?
 
 ;;; printd print a decimal value from AX (retained, Y trashed)
+
+_printd:        
+        jsr xprintd
+        jmp _drop
+
+.ifndef printn
+  printn: 
+.endif
+
+printd: 
 .proc xprintd
 ;;; 12
 ;;; TODO: maybe not need save as print does?
         ;; save ax
         sta savea
         stx savex
+        sty savey
+
+        lda tos
+        ldx tos+1
 
         jsr _voidprintd
 
         ;; restore ax
         ldx savex
         lda savea
+        ldy savey
 
         rts
 .endproc
