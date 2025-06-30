@@ -735,7 +735,6 @@ nextm:
         jsr _mul                
 
         jsr _drop
-        jsr _drop
 
         dec savez
         bne nextm
