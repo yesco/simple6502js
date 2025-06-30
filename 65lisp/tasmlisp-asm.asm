@@ -2725,9 +2725,33 @@ about 4.5x.
     .endif ;  DOUBLEPAGE    
 .endmacro
 
-.macro LIT w
+.macro LIT num
+  .if num=0
+        DO _zero
+    .exitmacro        
+  .endif
+  
+  .if num=$ffff
+        DO _FFFF
+    .exitmacro
+  .endif
+
+  .if num<256 && .def(_quote)
+        DO _quote
+        .byte num
+    .exitmacro    
+  .endif
+
+        ;;  fallback
         DO _binliteral
-        .word w
+        .word num
+
+.endmacro ; LIT
+
+
+
+.macro BYTECODE
+        uJSR OPVM65
 .endmacro
 
 .macro ZBRANCH else
