@@ -1,3 +1,34 @@
+foo_isBYTECODE: 
+foo:    
+        rts
+        
+;;; WORKS!
+.if .def(.ident(.concat("f", "oo")))
+        .out "DEFINED!"
+.endif
+
+.macro call name
+;  .if .def(.ident(.concat(name, "_isBYTECODE")))
+;        .out "isssss"
+;  .endif
+
+  .if .def(.ident(.concat(.string(name), "_isBYTECODE")))
+        .out "_isBYTECODE DEFINED!"
+  .endif
+
+  .if .def(.ident(.string(name)))
+        .out "DEFINED!"
+  .endif
+
+.endmacro
+
+        call foo
+
+        .out ""
+        .out ""
+.end
+
+
 ;;; TODO: include tasmlisp-asm.asm
 ;;;    instead of duplicate
 

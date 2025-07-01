@@ -1,4 +1,4 @@
-perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main" | grep -v '_exit$' | grep -v "_initlisp"  > fil
+perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main$" | grep -v '_exit$' | grep -v "_initlisp"  > fil
 echo "--- ORDER: $* ---"
 cat fil
 echo "--- TOP: $* ---"

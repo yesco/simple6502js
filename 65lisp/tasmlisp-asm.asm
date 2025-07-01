@@ -625,9 +625,12 @@ startaddr:
 ;;; 
 ;;; For 2-page dispatch it can also align
 .macro FUNC name
+
   .ifdef DOUBLEPAGE
-    .align 2, $ea               ; NOP
-  .endif ; DOUBLEPAGE
+;;; TODO: seems .code segment not aligned?
+;    .align 2, $ea               ; NOP
+     .res (* .mod 2), $ea 
+ .endif ; DOUBLEPAGE
 
   .export .ident(name)
   .ident(name):
@@ -639,8 +642,7 @@ startaddr:
 jmptable:  
 .assert (jmptable .mod 256)=0,error,"%% jmptable not aligned"
 
-.export _initlisp
-_initlisp:
+FUNC "_initlisp"
 
 ;;; INIT - this should be first in jmptable at offset 0
 
@@ -696,7 +698,7 @@ _reset:
 ;;; Could be used as "error message"
 FUNC "_error" ;; TODO: for some reason can't???
 _undef: 
-_quit:  
+_quit: 
 .ifdef ERRMSG
         jsr putchar
         lda token
@@ -722,8 +724,22 @@ _quit:
 .ifndef UJSR
 
 .macro uJSR addr
-;        .assert (.isupper(.mid(2,1,addr))),error,"uJSR: can't call macros this way"
+;        .assert (.isupper(.mid(2,1,addr))),error,"uJSR: can't call bytecode this way"
+  .if .def(.ident(.concat(.string(addr), "_isBYTECODE")))
+
+        ;; label is to be interpreted!
+        ;; 
+        ;; 9 B - TODO: jsr variant => 6; BRK: => 3!
+        ldy #>addr
+        sty savey
+        lda #<addr
+        jsr _interpret
+
+  .else
+        ;; it's a machine code label:
         jsr addr
+
+  .endif        
 .endmacro
 
 .else
@@ -1122,7 +1138,7 @@ todoRincA:
         lda ip+1
         adc #0
         sta ip+1
-.endif
+.endif ; !BLANK
 
         ;; All arguments must be on stack proper
         ;; to be picked by a-h or set by Sa-Sh
@@ -1868,9 +1884,10 @@ FUNC "_pull2"
 
 FUNC "_mul2"
 ;;; 5B !
-        clc
-_rol:   
-        rol tos
+;        clc
+;_rol:   
+;        rol tos
+        asl tos
         rol tos+1
         rts
 
@@ -2236,20 +2253,25 @@ about 4.5x.
 ;;; -- 66 chars including spaces
 
 ;;; ========================================
-;;; I N T E R N A L   M A C R O S
+;;;     B Y T E C O D E -  M A C R O S
 ;;; 
 ;;; 
 
 .macro DO label
+
     .ifndef DOUBLEPAGE    
         .byte <(label-jmptable)
     .else
-        .assert ((label-jmptable) .mod 2)=0,error,"%% DOUBLEPAGE: use FUNC label to align"
+
+;        .assert ((label-jmptable) .mod 2)=0,error,"%% DOUBLEPAGE: use FUNC label to align"
         .byte <((label-jmptable)/2)
     .endif ;  DOUBLEPAGE    
 .endmacro
 
+;;; make a literal, use the most appropriate
+;;; depending on value
 .macro LIT num
+
   .if num=0
         DO _zero
     .exitmacro        
@@ -2274,9 +2296,33 @@ about 4.5x.
 
 
 
-.macro BYTECODE
-        uJSR OPVM65
+.macro BYTEFUNC name
+
+;;; TODO: alternatively "misalign" BYTEFUNC!
+;;;   but then we can't detect errors... lol
+;;;   (wouldn't save any bytes, but...)
+
+  .ifdef DOUBLEPAGE
+;;; TODO: seems .code segment not aligned?
+;     .align 2, ' '              ; BYTECODE "NOP"
+     .res (* .mod 2), ' '
+  .endif ; DOUBLEPAGE
+
+  ;;; the first identifier is just used as a flag
+  ;;; telling us it's bytecode and that calls
+  ;;; uJSR needs to be done differently!
+  .ident(.concat(.string(name), "_isBYTECODE")) :
+
+  .ident(.string(name)) :   
+
+;;; caller using uJSR will invoke interpreter!
+
+;;; TODO: remove
+        ;; invoke _interpreter
+;        uJSR _OP16
+
 .endmacro
+
 
 .macro ZBRANCH else
         DO _zbranch
@@ -2289,779 +2335,16 @@ about 4.5x.
 .endmacro
 
 
+
+
 ;;; define macros after here, then uJSR can be used
 ;;; to call them having to have a JSR prelude!
 macrostart:     
 
-;;; #U give _FFFF
-
-;;; 3 B left!!!!!
-
-
 .ifndef MINIMAL
 
-;;; #0UU =>     0   !
-;;; x UU => _FFFF   !
-
-FUNC "_mul"
-;;; 9 ops from _MUL16 macro in
-;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
-;;; 
-;;; top= A*B (A is trashed, B remains, both are popped)
-;;; 
-;;; 32 B
-        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
-        uJSR _zero
-
-        ;; loop 16
-        ldy #16
-        sty savey
-
-loop:   
-        ;; tos *= 2
-        uJSR _mul2
-
-        ;; A *= 2 => carry
-        asl stack+2,x          
-        rol stack+2+1,x
-        bcc skip
-
-        ;; tos += B (perfect it stays there)
-        uJSR _plus
-        ;; steal B back
-        dex
-        dex
-
-skip:   
-        dec savey
-        bpl loop
-
-        ;; drop A,B (top remains)
-inx4rts:        
-        inx
-        inx
-        inx
-        inx
-        rts
-
-.ifdef DIV
-
-;;; num1 * num2 => tos
-;;; 
-;;; 35 B - terminates fast for small num1
-mul:    
-        ;; top= 0
-        uJSR _zero
-loop:   
-        ;; num1 /= 2 => carry
-        lsr stack+2+1,x
-        ror stack+2,x
-        bcc skip
-
-        ;; tos += B
-        uJSR _plus
-        dex
-        dex
-
-skip:   
-        ;; num2 *= 2
-        asl stack,x
-        rol stack+1,x
-
-        ;; till num1 is zero
-        lda stack+2,x
-        ora stack+2+1,x
-        bne loop
-
-        ;; drop A,B (top remains)
-inx4rts:        
-        inx
-        inx
-        inx
-        inx
-        rts
-
-
-;;; num1 * num2 => tos
-;;; 
-;;; counter
-;;; 
-;;; 35 B - lol same!!!
-mul:    
-        ;; top= 0
-        uJSR _zero
-        lda #16
-        sta savey
-loop:   
-        ;; num1 /= 2 => carry
-        lsr stack+2+1,x
-        ror stack+2,x
-        bcc skip
-
-        ;; tos += B
-        uJSR _plus
-        dex
-        dex
-
-skip:   
-        ;; num2 *= 2
-        asl stack,x
-        rol stack+1,x
-
-        dec savey
-        bne loop
-
-        ;; drop A,B (top remains)
-inx4rts:        
-        inx
-        inx
-        inx
-        inx
-        rts
-
-
-;;; VL02 MUL 33 B
-;;; - http://www.6502.org/source/interpreters/vtl02.htm
-
-;;;  16-bit unsigned multiply routine
-;;;    overflow is ignored/discarded
-;;;    var[x] *= var[x+2], var[x+2] = 0, {>} is modified
-;;; 33 B
-mul:    
-    lda  0,x
-    sta  gthan
-    lda  1,x                    ; {>} = var[x]
-    sta  gthan+1
-    lda  #0
-    sta  0,x                    ; var[x] = 0
-    sta  1,x
-mul2:   
-    lsr  gthan+1
-    ror  gthan                  ; {>} /= 2
-    bcc  mul3
-    jsr  plus                   ; form the product in var[x]
-mul3:   
-    asl  2,x
-    rol  3,x                    ; left-shift var[x+2]
-
-;;; jsk: seems like bug, should be use gthan?
-    lda  2,x
-    ora  3,x                    ; loop until var[x+2] = 0
-    bne  mul2
-
-    rts
-
-
-;;; 31+4 = 35 B - wtf??? LOL fast for small numbers
-mul:    
-        jsr _zero
-mul2:   
-        ;; num1 /= 2
-        lsr stack+2+1,x
-        ror stack+2,x
-        bcc mul3
-
-        ;; bit is set: tos += num2
-        jsr _plus
-        dex
-        dex
-mul3:   
-        ;; num2 *= 2
-        asl stack,x
-        rol stack+1,x
-
-        ;; loop till 0 (hmmm?) why not other?
-        lda stack+2,x
-        ora stack+2+1,x
-        bne mul2
-
-        inx
-        inx
-        inx
-        inx
-        rts
-
-
-;;; ;                      ^ MUL
-;;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;;; 16-bit unsigned division routine
-;;;    var[x] /= var[x+2], {%} = remainder, {>} modified
-;;;    var[x] /= 0 produces {%} = var[x], var[x] = 65535
-;;; - http://www.6502.org/source/interpreters/vtl02.htm
-;;;
-;;; 43 B - nah!
-div:    
-        lda  #0
-        sta  remn
-        sta  remn+1
-
-        lda  #16
-        sta  gthan
-
-div1:   
-        ;; gradually replaced by quotient
-        asl  0,x
-        rol  1,x
-        ;; gradually replaced by remainder
-        rol  remn
-        rol  remn+1
-        ;; partial remainder >= var[2+2]
-        lda  remn
-        cmp  2,x
-
-        lda  remn+1
-        sbc  3,x
-        bcc  div2
-        ;; yes: update the partial
-        sta  remn+1
-        ;; set low bit in the partial quotient
-        lda  remn
-        sbc  2,x
-        sta  remn
-        inc  0,x
-
-div2:   
-        dec  gthan
-        bne  div1
-
-        rts
-
-
-;;; jskVL02 variant of VL02
-;;; 49 B or 37 w _sbc and _plus
-
-;;; 39 B is good!    BEST????
-div:    
-        ;; tos = remn
-        uJSR _zero
-        lda #16
-        sta savea
-loop:   
-        ;; gradually replaced by quotient
-        rol stack+2,x
-        rol stack+2+1,x
-        ;; gradually replaced by remainder
-        rol tos
-        rol tos+1
-
-        jsr _sbc
-        inx
-        inx
-        
-        bcs ok
-
-        ;; undo
-        jsr _plus
-        inx
-        inx
-        ;; C is still 0
-        
-ok: 
-        dec  savea
-        bne  loop
-
-        inx
-        inx
-        inx
-        inx
-        bne pop                 ; never 0
-
-
-;;; DIV 16/16
-;;; Here's an example that divides the two-byte number NUM1
-;;; by the two-byte number NUM2, leaving the quotient in NUM1
-;;; and the remainder in REM:
-;;; 
-;;; NUM1/NUM2 => NUM1 REM
-;;; 
-;;; - https://llx.com/Neil/a2/mult.html
-;;; 
-;;; 38 B - no adopted to stack
-div:    
-        LDA #0                  ;Initialize REM to 0
-        STA REM
-        STA REM+1
-        LDX #16                 ;There are 16 bits in NUM1
-
-L1:     ASL NUM1                ;Shift hi bit of NUM1 into REM
-        ROL NUM1+1              ;(vacating the lo bit, which will
-        ;;                      ; be used for the quotient)
-        ROL REM
-        ROL REM+1
-
-        LDA REM
-
-        ;; trial subtraction
-        SEC
-        SBC NUM2
-        TAY
-        LDA REM+1
-        SBC NUM2+1
-        BCC L2                  ;Did subtraction succeed?
-        STA REM+1               ;If yes, save it
-        STY REM
-        INC NUM1                ;and record a 1 in the quotient
-
-L2:     DEX
-        BNE L1
-
-        rts
-
-
-;;; modified for tos & stack by jsk
-;;; 
-;;; 48 B - bah....
-div:    
-        ;; tos: REM = 0 
-        jsr _zero
-        ;; NUM1 is stack+2
-        ;; NUM2 is stack
-        lda #16
-        sta savea
-
-next:   
-        ;; Shift hi bit of NUM1 into REM
-        asl stack+2
-        rol stack+2+1
-        rol tos
-        rol tos+1
-
-        ;; trial subtraction
-        sec
-        lda tos
-        sbc stack,x
-        tay                     ; Y= lo sbc
-        lda tos+1
-        sbc stack+1,x
-        bcc subfail
-        ;; sub ok
-        sta tos+1
-        sty tos
-        inc stack+2,x
-
-subfail:
-        dec savea
-        bne next
-done:   
-        ;; tos     == REM
-        ;; stack   == NUM2
-        ;; stack+2 == result
-        inx
-        inx
-        ;; get result
-        jmp pop
-
-
-;;; jsk: mydiv (S D -> S/D)
-;;; 
-;;; 2025-06-28
-;;; 
-;;; 39 B - could work, lol
-;;; TOOD: - how is different from jskVL02
-FUNC "_div"
-        jsr _zero
-        ldy #17
-        sty savey
-next:   
-        ;; shift in one bit result into S!
-        rol stack+2,x
-        rol stack+2+1,x
-
-        ;; done?
-        dec savey
-        beq done
-
-        ;; shift in one hi bit from S into tos
-        rol tos
-        rol tos+1
-
-        ;; tos -= D (reverse _minus)
-        jsr _sbc
-        dex
-        dex
-
-        ;; C=1 if subtract ok (?)
-        bcs next
-
-        ;; no, too big
-
-        ;; add B back, lol
-        jsr _plus
-        dex
-        dex
-        ;; carry should be clear
-
-        ;; loop Z=0 always
-        bne next
-
-done:   
-        ;; done remove D pop S which has the result
-        inx
-        inx
-        bne _pop
-.endproc
-
-
-;;; 16div16 => 16 ??? works?
-;;;     ptr1/ptr2 => ptr1
-;;; 
-;;; did I write this while drunk?
-;;; (from asmlisp-asm.asm)
-;;; 
-;;; jsk 35 B - edited - THIS IS ZERO PAGE
-.proc div1616
-        ldx #16
-        ;; A will keep hi-byte!
-        lda #0
-divloop:
-        asl ptr1
-        rol ptr1+1
-        rol a
-
-        ;; hi-byte cmp
-        cmp ptr2+1
-        bcc no_sub
-
-        ;; lo-byte cmp
-        tay
-        lda ptr1+1
-        cmp ptr2
-        bcc no_sub
-
-        ;; add 1 to result!
-        inc ptr1
-
-        ;; carry is set
-        ;; lo-byte sub
-        sbc ptr2
-        sta ptr1+1
-
-        ;; hi-byte sub
-        tya
-        sbc ptr2+1
-        tay ; lol
-no_sub:
-        tya
-        dex
-        bne divloop
-
-        rts
-.endproc
-
-
-;;; take 3
-;;; ;
-;;; 16div16 => 16 ??? works?
-;;;     ptr1/ptr2 => ptr1
-;;; 
-;;; did I write this while drunk?
-;;; (from asmlisp-asm.asm)
-;;; 
-;;; 
-;;; (35 zero page)
-;;; 41 B - using tos + stack
-;;;  --------------- NO EXTRA for JSR etc?
-;;;   little overhead not much calls or pops
-;;;   remainder??? 
-
-;;; is this possible? it's trying to keep
-;;; both divend as remainder andreply by quotient?!?
-;;; 
-;;; NO I think 8 bits too little... lol!!!!
-;;;  and no remainder....
-.proc div1616
-        jsr _swap
-;;; tos = DIVEND stack = divisor
-        lda #16
-        sta savey
-        
-;;; trying to be clever by keeping in A
-        ;; A will keep hi-byte!
-        lda #0
-divloop:
-        jsr _mul2
-        rol a
-
-        ;; hi-byte sbc
-        tay
-        sec
-        sbc stack+1,x
-        bcc no_sub
-
-        ;; store new hi
-        sta savea
-
-        ;; lo-byte sbc
-        lda tos+1
-        sbc stack,x
-        bcc no_sub
-
-        ;; save result
-        sta tos+1 ; lo
-        ldy savea ; hi
-
-        ;; set 1 bit in result
-        inc tos
-
-no_sub:
-        ;; restore (old) hi
-        tya
-
-        dec savey
-        bne divloop
-
-        rts
-.endproc
-
-
-
-
-;;; jsk modify - take 2!
-
-;;; from nes discussion
-;;; - https://forums.nesdev.org/viewtopic.php?t=143
-;;; 
-;;; 54 B jsk -> 48 lol, HUGE!!!
-;;; 
-;;;  55B bah - noooo gooood!
-Divide: 
-        ldy #0
-        ;; shift to get highest bit set
-shift: 
-        iny
-        asl tos
-        rol tos+1
-        bcc shift
-        
-        ;; restore bit
-        ror tos+1
-        ror tos
-
-        sty savey
-
-        jsr _swap
-        ;; tos: DIVEND stack: divisor
-divloop:
-        ;; result *= 2
-        ASL QUO
-        ROL QUO+1       
-
-        ;; cmp/sbc hi-byte
-        sec
-        lda tos+1
-        sbc stack+1,x
-        bcc skip
-
-        ;; cmp/sbc lo-byte
-        tay
-        lda tos
-        sbc stack,x
-        bcc skip               
-        
-        ;; yes, we confirm
-        ;; store result after sbc
-        sta tos
-        sty tos+1
-        
-        ;; set lowest bit
-        inc quo
-skip:  
-        ;; divisor /= 2
-        lsr stack+1,x
-        ror stack,x
-                
-        dec savey
-        bne divloop
-
-        RTS
-
-
-
-
-
-
-
-
-;;; jsk modify
-
-;;; from nes discussion
-;;; - https://forums.nesdev.org/viewtopic.php?t=143
-;;; 
-;;; 54 B jsk -> 48 lol, HUGE!!!
-Divide: 
-        ldy #0
-        ;; shift to get highest bit set
-shift: 
-        INY
-        ASL DIVSOR                      
-        ROL DIVSOR+1
-        BCC shift
-        
-        ;; restore bit
-        ROR DIVSOR+1
-        ROR DIVSOR
-
-        sty savey
-
-divloop:
-        ;; result *= 2
-        ASL QUO
-        ROL QUO+1       
-
-        ;; cmp/sbc hi-byte
-        SEC
-        LDA DIVEND+1
-        SBC DIVSOR+1
-        BCC skip
-
-        ;; cmp/sbc lo-byte
-        tay
-        LDA DIVEND
-        SBC DIVSOR
-        BCC skip               
-        
-        ;; yes, we confirm
-        ;; store result after sbc
-        STA DIVEND
-        sty DIVEND+1
-        
-        ;; set lowest bit
-        inc quo
-skip:  
-        ;; divisor /= 2
-        LSR DIVSOR+1
-        ROR DIVSOR
-                
-        dec savey
-        bne divloop
-
-        RTS
-
-
-
-;;; from nes discussion
-;;; - https://forums.nesdev.org/viewtopic.php?t=143
-;;; 
-;;; 54 B
-Divide: 
-        LDY #0
-
-shift: 
-        INY
-        
-        ASL DIVSOR                      
-        ROL DIVSOR+1
-        BCC shift
-        
-        ROR DIVSOR+1
-        ROR DIVSOR
-
-divloop:
-        DEY
-        ASL QUO
-        ROL QUO+1       
-        SEC
-        
-        LDA DIVEND+1
-        SBC DIVSOR+1
-        BCC skip
-        
-        STA VAR                 
-        LDA DIVEND
-        SBC DIVSOR
-        BCC skip               
-        
-        STA DIVEND
-        LDA VAR
-        STA DIVEND+1
-        
-        LDA #$01
-        ORA QUO
-        STA QUO
-
-skip:  
-        LSR DIVSOR+1
-        ROR DIVSOR
-                
-        CPY #$01                
-        BPL divloop
-
-        RTS
-
-;;;  DIVEND / DIVSOR = QUO
-;;;  DIVEND contains remainder when finished
-
-;;;  First loop: Shift LO DIVSOR and rotate HI DIVSOR until
-;;;  there's a 1 in the highest bit 
-;;;  INY for each loop
-
-;;;  After first loop:  rotate LO and HI DIVSOR right so
-;;;  correct divisor is in place.
-
-;;;  Second loop:
-;;;
-;;;  DEY, shift LO QUOTIENT and rotate HI QUOTIENT
-;;;  so the correct bits of the result are set
-;;;
-;;;  Subtract DIVSOR from DIVEND
-;;;  if DIVSOR > DIVEND, skip these steps
-;;;      -Store difference back in DIVEND
-;;;      -Set the lowest bit of the quotient
-;;;
-;;;  Shift the HI and rotate the LO divisor right
-;;; 
-;;;  loop if Y >= 1 - if the last loop is unnecessary, it will not affect the remainder or the quotient
-
-
-;;; shorter as macro: 
-;;; 23 B !!!
-
-        ; dup U(''0^)
-	; dup #1 & UU over & pick2 _MUL2 pick2 _div2 _div + ^
-
-        ;; 23 B - lambda
-        ;; :* \\ bUB+2 0^
-        ;;       b#1& UU a&
-        ;;         a{ b} *
-        ;;       +^
-
-;;; :/ dup 1 swap \\\\ ... a=4711 b=32 c=1 d=32
-;;;                             da<( a b c{ d{ R 
-;;;                    
-
-
-;FUNC "_div"
-;;; _DIV16 is 11 ops in - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
-;;; 
-;;;  Divide the 16 bit number at location VLA
-;;;  by the 16 bit number at location VLB
-;;;  leaving the 16 bit quotient at QUO and
-;;;  the 16 bit remainder in REM. The value in
-;;;  location VLA is destroyed.
-;;; 
-;;;  On exit: A = ??, X = $FF, Y is unchanged.
-;;; 
-;;;  same same
-_DIV16: MACRO VLA,VLB,QUO,REM
-        _CLR16 REM
-        LDX #16
-loop:   
-        _ASL16 VLA,VLA
-        _ROL16 REM,REM
-        _SUB16 REM,VLB,REM
-        BCS next
-        _ADD16 REM,VLB,REM
-next:   
-        _ROL16 QUO,QUO
-        DEX
-        BPL loop
-ENDM
-
-
-FUNC "_mul10"
 ;;; 6 B (19 B in asm)
+BYTEFUNC _mul10
         DO _mul2
         DO _dup
         DO _mul2
@@ -3069,18 +2352,17 @@ FUNC "_mul10"
         DO _plus
         DO _exit
 
-FUNC "_mul16"
+
 ;;; 4 B
+BYTEFUNC _mul16
         DO _mul8
-FUNC "_mul8"
+BYTEFUNC _mul8
         DO _mul4
-FUNC "_mul4"
+BYTEFUNC _mul4
         DO _mul2
         DO _exit
 
 ;;; 3 B LEFT! ... (in one page)
-
-.endif ; mul div
 
 .endif ; MINIMAL?        
 
