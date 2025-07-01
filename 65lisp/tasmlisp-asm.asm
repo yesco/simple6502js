@@ -258,7 +258,7 @@ TAILRECURSEOPT=1
 
 ;;; Enable to print decimal numbers by default
 ;;; (this one wll use and prefer DIVMOD impl)
-PRINTDEC=1
+;PRINTDEC=1
 
 ;;; Enable to print decimal numbers by default
 ;;; (this one uses dedicated printd 35 bytes)
@@ -272,6 +272,49 @@ PRINTHEXDOLLAR=1
 
 .include "print.asm"
 ;;; END PRINT.ASM --------------------
+
+
+.ifnblank
+;;; dummys
+plaputchar:     
+ptr1:   
+savea:  
+savex:  
+savey:  
+tos:    
+putchar:        
+_drop:   
+.endif
+
+.ifnblank
+
+.export _initlisp
+_initlisp:      
+        lda #'@'
+
+next1:  clc
+        adc #1
+
+        ldy #0
+next2:   
+        sta $bb81,y
+        iny
+        bne next2
+
+        cmp #'Z'
+        bne next1
+
+        jmp _initlisp
+
+halt:   jmp halt
+        
+;        lda #'!'
+;        jsr putchar
+;        jmp _initlisp
+.end
+.endif
+
+
 
 ;;; 1379
 START=$563
@@ -390,69 +433,7 @@ token:  .res 1
         
 .code
 
-;;; ----------------------------------------
-;;;               " B I O S "
-
-;;; requirement from "a bios"
-;;; - jsr getchar
-;;; - jsr putchar
-;;; 
-;;; Assumption:
-;;; 
-;;; Neither routine modifies X or Y register
-;;; (they ar saved and restored)
-;;; 
-;;; A after putchar is assumed to be A before.
-
-biostart:       
-
-;;; TODO: move before startaddr!
-
-;;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
-
-;;; input char from keyboard
-;;;
-;;; 10B
-.proc getchar      
-        stx savex
-        sty savey
-
-        jsr $023B               ; ORIC ATMOS only
-        bpl getchar             ; no char - loop
-        tax
-        ;; TODO: optional?
-        jsr $0238               ; echo char
-
-        ldy savey
-        ldx savex
-
-        rts
-.endproc
-
-;;; platputchar used to delay print A
-;;; (search usage in printd)
-plaputchar:    
-        pla
-
-;;; putchar(c) print char from A
-;;; (saves X, A retains value)
-;;; 
-;;; 12B
-.proc putchar
-        stx savexputchar
-        ;; '\n' -> '\n\r' = CRLF
-        cmp #$0A                ; '\n'
-        bne notnl
-        pha
-        ldx #$0D                ; '\r'
-        jsr $0238
-        pla
-notnl:  
-        tax
-        jsr $0238
-        ldx savexputchar
-        rts
-.endproc
+.include "bios.asm"
 
 ;;; ----------------------------------------
 ;;;            M A C R O S
@@ -579,10 +560,12 @@ subtract .set 0
 ;;; do fancy calculated alignments!
 .org START
 
+
 ;COMPRESSED=1
 .ifdef COMPRESSED
   .include "unz.asm"
 .endif ; COMPRESSED
+
 
 
 ;;; DON'T PUT ANY CODE HERE!!!!
@@ -642,7 +625,29 @@ startaddr:
 jmptable:  
 .assert (jmptable .mod 256)=0,error,"%% jmptable not aligned"
 
-FUNC "_initlisp"
+.export _initlisp
+_initlisp:      
+        lda #'@'
+
+next1:  clc
+        adc #1
+
+        ldy #0
+next2:   
+        sta $bb81,y
+        iny
+        bne next2
+
+        cmp #'Z'
+        bne next1
+
+        jmp _initlisp
+
+
+;FUNC "_initlisp"
+        putc '!'
+        jmp _initlisp
+
 
 ;;; INIT - this should be first in jmptable at offset 0
 
@@ -651,6 +656,7 @@ FUNC "_initlisp"
 
 .export _reset
 _reset: 
+
 ;;; 8
         ;; skip some bytes, align to page?
         lda #(>LOWMEM)+1
@@ -1348,6 +1354,7 @@ FUNC "_binliteral"
         _mul2           = _undef
         _mul            = _undef
 
+        _printn         = _undef
 .endif ; MINIMAL
 
 
@@ -2701,7 +2708,7 @@ endaddr:
         .byte str,0
 .endmacro
 
-.ifndef BLANK
+.ifdef TRACE
 ;;; called in nexttoken w A0 token
 .proc trace
         RDUP
@@ -2751,14 +2758,22 @@ endaddr:
         RPOP
         rts
 .endproc
-.endif ; !BLANK
+
+.endif ; TRACE
 
 
 ;;; ===============================================
 ;;; 
 ;;;             T       E      S     T
 
+.ifdef TEST
 .proc _test
+        putc 'X'
+        putc 'Y'
+        putc 'Z'
+        putc 10
+        rts
+
         ;; print size info for .CODE
         NEWLINE
         SET startaddr
@@ -2802,8 +2817,7 @@ endaddr:
         rts
 .endproc
 
-
-
+.endif ; TEST
 
 
 ;;; at end of code (and tests)
