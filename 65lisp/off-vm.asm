@@ -1,25 +1,73 @@
-;;;   exec: 22  3'  _interpret [get] _next _execA (+ 6 7 3 6)
+;;;   exec: 55  2"  _call _exec/_exit [get _next _execA] (+ 3 30 6 7 3 6)
 ;;;  stack: 30  4"" _drop2 _drop _dup _swap [pushAY AYtoTOS pushAA pushPLAY] (+ 2 2 11 15)
 ;;;    mem: 28  2   ! @ (+ 14 14) 
-;;;   math: 53  9   - + EOR | & _not +shr +shl +inc (+ 31 5 5 5 7)
+;;;   math: 62 10   - + EOR | & _not +shr +shl inc dec (+ 31 5 5 5 7 9)
 ;;;  const: 28  4   _true 0 ' _literal (+ 3 6 7 12)
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; branch: 21  2   _jp _jz (+ 3 18)
 ;;; 
-;;; (+ 22 30 28 53 28 18 21) = 200
-;;; (+  3  4  2  9  4  3  2) =  27  extra'""= (+ 1 4)
-;;; (/ 200.0 27) =  7.4 B/op !
-;;; (- 256  200) = 56 (+ 32 39)=71 mul+divmod
+;;; (+ 55 30 28 62 28 18 21) = 242
+;;; (+  3  4  2 10  4  3  2) =  28  extra"""= 6
+;;; (/ 242.0 28) =  8.6 B/op !
+;;; (- 256  242) = 14 (+ 32 39)=71 mul+divmod
+
+.macro SKIPONE
+        .byte $24               ; BITzp 2 B
+.endmacro
 
 .macro SKIPTWO
-        .byte $2c               ; skip next 2 bytes
+        .byte $2c               ; BITabs 3 B
 .endmacro
 
 
-_interpret
+_call: 
+;;; 3 exec as int X4711
+        jsr _literal
+_exec:
+;;; (+ 11 9 10) = 30 exec sa in L4711 X
+        jsr doit
+        ;; come here after called 4711!
+semis:  
+;;; (11)
+        ;; remove jsrloop
+        pla
+        pla
+        ;; back to interpration
+        pla
+        tay
+        pla
+        sta ip
+        pla
+        sta ip+1
+        rts
+enter: 
+;;; (9)
+        ;; save current interpretation
+        lda ip+1
+        pha
+        lda ip
+        pha
+        lda ipy
+        pha
+;;; (10)
+        ;; hi
+        lda 1,x
+        pha
+        ;; lo
+        lda 0,x
+        pha
+
+        inx
+        inx
+
+        ;; "return to addr"
+        php
+        rti
+
+jsrloop:        
 ;;; 6B 9c
         jsr _next
-        jmp _interpret
+        jmp jsrloop
 
 ;;; get next byte
 get:
@@ -193,6 +241,14 @@ _inc:
         inc 0,x
         bne @noinc
         inc 1,x
+        rts
+_dec:   
+;;; 9
+        lda 0,x
+        bne @nodec
+        dec 1,x
+@nodec:
+        dec 0,x
         rts
 
 ;;; -- math / logical
