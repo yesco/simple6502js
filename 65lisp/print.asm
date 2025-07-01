@@ -233,15 +233,12 @@ _writez:
 
 .ifdef PRINTDECFAST
 
-.ifndef _printd
+_printn:        
 _printd:        
         jsr xprintd
         jmp _drop
-.endif
 
-.ifndef printn
-  printn: 
-.endif
+printn:
 
 printd: 
 .proc xprintd
