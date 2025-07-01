@@ -3,6 +3,208 @@
 ;;; basically mul16 div16(mod?)
 
 
+;;; 9 ops from _MUL16 macro in
+;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
+;;; 
+;;; top= A*B (A is trashed, B remains, both are popped)
+;;; 
+;;; 0x0: 11, $33x$164: 14 (rev 14), $ffff^2: 25 (25 same as mulx)
+;;; 
+;;; 32 B
+        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
+.proc _mulx
+        jsr _zero
+
+        ;; loop 16
+        ldy #16
+        sty savey
+loop:   
+        ;; result = result*2
+        jsr _mul2
+
+        ;; A *= 2 => carry
+        asl stack+2,x          
+        rol stack+2+1,x
+        bcc noadd
+
+        ;; tos += B (perfect it stays there)
+        jsr _plus
+        dex
+        dex
+noadd:  
+        dec savey
+        bne loop
+
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+.endproc
+
+
+;;; 38 - more efficent if second number is small
+;;;    ( 6 byte more ...)
+;;; 0x0: 2, $33x$164: 8 (rev: 10), $ffff^2: 25 (25 same as mulx)
+.proc _muly
+        jsr _zero
+loop:   
+        ;; done when B is 0
+        lda stack+2,x
+        ora stack+2+1,x
+        beq done
+
+        ;; A *= 2 => carry
+        lsr stack+2+1,x
+        ror stack+2,x
+        bcc noadd
+
+        ;; tos += B (perfect it stays there)
+        jsr _plus
+        dex
+        dex
+noadd:  
+        ;; A *= 2
+        asl stack,x
+        rol stack+1,x
+        jmp loop
+
+done:   
+        ;; drop A,B (top remains)
+inx4rts:        
+        inx
+        inx
+        inx
+        inx
+        rts
+.endproc
+
+_mul=_mulx
+;_mul=_muly
+
+
+;;; (- (* 6 256) 1379) = 157 bytes before page boudary
+
+
+
+;;; jsk: mydiv (S D -> S/D)
+;;; 
+;;; 2025-06-28
+;;; 
+;;; TOOD: - how is different from jskVL02
+;;; 
+;;; 100x => 35-39cs
+;;; 
+;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
+.proc _divmodx   
+        jsr _zero
+;;; TODO: if 16 it hangs - why?
+;;;   (yes 17 is correct as we want to move in last bit)
+        ldy #17                 ; avoid first clc!
+        sty savey
+
+next:   
+        ;; shift in one bit result into S
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; done?
+        dec savey
+        beq done
+
+        ;; shift in one hi bit from S into tos
+        rol tos
+        rol tos+1
+
+        ;; tos -= D (reverse _minus)
+        jsr _rminus
+        dex
+        dex
+
+        ;; C=1 if subtract ok (?)
+        bcs next
+
+        ;; no, too big
+
+        ;; add B back, lol
+        jsr _plus
+        dex
+        dex
+        clc
+        ;; carry must be clear (why isn't?)
+        ;; (to be shifted in)
+        ;; loop Z=0 always
+;;; TODO: jskVL02 does the loop differently
+        bne next
+
+done:   
+        inx
+        inx
+        ;; tos= remainder stack: quotient
+        rts
+.endproc
+
+
+;;; 100x => 13cs ! (_divmodx => 23-39cs)
+;;; 
+;;; 44 B (_divmodx => 39 B)
+.proc _divmody
+        jsr _zero
+        ldy #17                 ; avoid first clc!
+        sty savey
+
+next:   
+        ;; shift in one bit result into S
+        rol stack+2,x
+        rol stack+2+1,x
+
+        ;; done?
+        dec savey
+        beq done
+
+        ;; shift in one hi bit from S into tos
+        rol tos
+        rol tos+1
+
+        lda tos
+        sec
+        sbc stack,x
+        tay
+        lda tos+1
+        sbc stack+1,x
+
+        bcc next
+        ;; ok - store new
+        sta tos+1
+        sty tos
+
+        bcs next
+
+done:   
+        inx
+        inx
+        ;; tos= remainder stack: quotient
+        rts
+.endproc
+
+
+_divmod=_divmodx
+;_divmod=_divmody
+
+
+
+
+
+;--------------------------------------------------
+;;;  OLD STUFF OF COLLECTED MUL16 and DIV16
+;;; 
+;;;        I G N O R E !
+;;; 
+
+.ifnblank
+
 
 ;;; jsk: haha!
 zp_num1 = -2
@@ -177,3 +379,5 @@ overflow:
 
   rts
 .endproc
+
+.endif

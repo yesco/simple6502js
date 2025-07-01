@@ -1,34 +1,3 @@
-;;; TODO: include tasmlisp-asm.asm
-;;;    instead of duplicate
-
-;;; TODO:
-DIVMOD=1
-
-;;; PRINT.ASM --------------------
-;;; Enable to save bytes (and get slower)
-;SAVEBYTES=1 
-
-;;; Enable to print decimal numbers by default
-;;; (this one wll use and prefer DIVMOD impl)
-;PRINTDEC=1
-
-;;; Enable to print decimal numbers by default
-;;; (this one uses dedicated printd 35 bytes)
-;
-PRINTDECFAST=1
-
-;;; Enable to print hexadecimal numbers by default
-;PRINTHEX=1
-
-;;; Default to use $abcd notation
-PRINTHEXDOLLAR=1
-
-.include "print.asm"
-;;; END PRINT.ASM --------------------
-
-
-
-
 ;;; throw-ways code for testing div
 
 ;;; ----------------------------------------
@@ -108,7 +77,8 @@ TAILRECURSEOPT=1
 
 
 ;;; 1379
-START=$563
+;START=$563
+START=$53c
 
 ;;; TOOD: test to put stack in ZP!
 ;;;     might save a lot of code bytes!
@@ -123,6 +93,39 @@ stack=$400
 ;;; ORIC: charset in hires-mode starts here
 ;;; (needs to be 4 byte aligned)
 TOPMEM=$9800
+
+;;; TODO: include tasmlisp-asm.asm
+;;;    instead of duplicate
+
+;;; TODO:
+DIVMOD=1
+
+;;; PRINT.ASM --------------------
+;;; Enable to save bytes (and get slower)
+;SAVEBYTES=1 
+
+;;; Enable to print decimal numbers by default
+;;; (this one wll use and prefer DIVMOD impl)
+;PRINTDEC=1
+
+;;; Enable to print decimal numbers by default
+;;; (this one uses dedicated printd 35 bytes)
+;
+PRINTDECFAST=1
+
+;;; Enable to print hexadecimal numbers by default
+;
+PRINTHEX=1
+
+;;; Default to use $abcd notation
+PRINTHEXDOLLAR=1
+
+;.include "print.asm"
+;;; END PRINT.ASM --------------------
+
+
+
+
 
 ;;;           C   O   N   F   I   G
 ;;; 
@@ -221,10 +224,42 @@ token:  .res 1
 ;;; data - area not initialized
 .data
 
-        
 .code
 
+.org START
+
+HERE=*
+
 .include "bios.asm"
+
+.res $600-*
+
+;;; minimal test to get START!!!
+
+.ifnblank
+
+jmptable:       
+_reset: 
+.export _initlisp
+_initlisp:      
+        lda #<HERE
+        sta tos
+        lda #>HERE
+        sta tos+1
+        jsr printh
+
+        lda #<jmptable
+        sta tos
+        lda #>jmptable
+        sta tos+1
+        jsr printh
+
+halt:   jmp halt
+
+.endif
+
+;.end        
+        
 
 ;;; ----------------------------------------
 ;;;            M A C R O S
@@ -254,257 +289,6 @@ subtract .set 0
         PUTC 10
 .endmacro
 
-.macro ZERO
-        lda #0
-        tax
-.endmacro
-
-.macro SET val
-        lda #<val
-        ldx #>val
-.endmacro
-
-;;; TODO:
-.macro SETNUM num
-        SET (num)*2
-.endmacro
-
-;;; push A,X on R-stack (AX trashed, use DUP?)
-;;; (cc65: jsr pushAx takes 39c!)
-;;; 3B 7c
-.macro RPUSH
-        pha
-        txa
-        pha
-.endmacro
-
-;;; 3B 6C
-.macro RPOP
-        pla
-        tax
-        pla
-.endmacro
-
-;;; DUP AX onto stack (AX retained)
-;;; 5B
-.macro RDUP
-        tay
-        pha
-        txa
-        pha
-        tya
-.endmacro
-
-;;; 3B 6c
-.macro ARGSETY
-        tsx
-        txa
-        tay
-.endmacro
-
-;;; ARG(n) n n=0 is prev arg, n=1 prev arg
-;;; 12B 14c
-.macro ARG n
-        ARGSETY                 ; probably needed always
-        YARGN n
-.endmacro
-
-
-
-
-
-
-;;; 9 ops from _MUL16 macro in
-;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
-;;; 
-;;; top= A*B (A is trashed, B remains, both are popped)
-;;; 
-;;; 0x0: 11, $33x$164: 14 (rev 14), $ffff^2: 25 (25 same as mulx)
-;;; 
-;;; 32 B
-        ;; top= 0 (push 0 => stack: A B 0 ; A,B in "memstack")
-.proc _mulx
-        jsr _zero
-
-        ;; loop 16
-        ldy #16
-        sty savey
-loop:   
-        ;; result = result*2
-        jsr _mul2
-
-        ;; A *= 2 => carry
-        asl stack+2,x          
-        rol stack+2+1,x
-        bcc noadd
-
-        ;; tos += B (perfect it stays there)
-        jsr _plus
-        dex
-        dex
-noadd:  
-        dec savey
-        bne loop
-
-        ;; drop A,B (top remains)
-inx4rts:        
-        inx
-        inx
-        inx
-        inx
-        rts
-.endproc
-
-
-;;; 38 - more efficent if second number is small
-;;;    ( 6 byte more ...)
-;;; 0x0: 2, $33x$164: 8 (rev: 10), $ffff^2: 25 (25 same as mulx)
-.proc _muly
-        jsr _zero
-loop:   
-        ;; done when B is 0
-        lda stack+2,x
-        ora stack+2+1,x
-        beq done
-
-        ;; A *= 2 => carry
-        lsr stack+2+1,x
-        ror stack+2,x
-        bcc noadd
-
-        ;; tos += B (perfect it stays there)
-        jsr _plus
-        dex
-        dex
-noadd:  
-        ;; A *= 2
-        asl stack,x
-        rol stack+1,x
-        jmp loop
-
-done:   
-        ;; drop A,B (top remains)
-inx4rts:        
-        inx
-        inx
-        inx
-        inx
-        rts
-.endproc
-
-_mul=_mulx
-;_mul=_muly
-
-
-;;; (- (* 6 256) 1379) = 157 bytes before page boudary
-
-
-
-;;; jsk: mydiv (S D -> S/D)
-;;; 
-;;; 2025-06-28
-;;; 
-;;; TOOD: - how is different from jskVL02
-;;; 
-;;; 100x => 35-39cs
-;;; 
-;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
-.proc _divmodx   
-        jsr _zero
-;;; TODO: if 16 it hangs - why?
-;;;   (yes 17 is correct as we want to move in last bit)
-        ldy #17                 ; avoid first clc!
-        sty savey
-
-next:   
-        ;; shift in one bit result into S
-        rol stack+2,x
-        rol stack+2+1,x
-
-        ;; done?
-        dec savey
-        beq done
-
-        ;; shift in one hi bit from S into tos
-        rol tos
-        rol tos+1
-
-        ;; tos -= D (reverse _minus)
-        jsr _rminus
-        dex
-        dex
-
-        ;; C=1 if subtract ok (?)
-        bcs next
-
-        ;; no, too big
-
-        ;; add B back, lol
-        jsr _plus
-        dex
-        dex
-        clc
-        ;; carry must be clear (why isn't?)
-        ;; (to be shifted in)
-        ;; loop Z=0 always
-;;; TODO: jskVL02 does the loop differently
-        bne next
-
-done:   
-        inx
-        inx
-        ;; tos= remainder stack: quotient
-        rts
-.endproc
-
-
-;;; 100x => 13cs ! (_divmodx => 23-39cs)
-;;; 
-;;; 44 B (_divmodx => 39 B)
-.proc _divmody
-        jsr _zero
-        ldy #17                 ; avoid first clc!
-        sty savey
-
-next:   
-        ;; shift in one bit result into S
-        rol stack+2,x
-        rol stack+2+1,x
-
-        ;; done?
-        dec savey
-        beq done
-
-        ;; shift in one hi bit from S into tos
-        rol tos
-        rol tos+1
-
-        lda tos
-        sec
-        sbc stack,x
-        tay
-        lda tos+1
-        sbc stack+1,x
-
-        bcc next
-        ;; ok - store new
-        sta tos+1
-        sty tos
-
-        bcs next
-
-done:   
-        inx
-        inx
-        ;; tos= remainder stack: quotient
-        rts
-.endproc
-
-
-_divmod=_divmodx
-;_divmod=_divmody
-
-
 .macro LOADNUM num
         lda #<num
         sta tos
@@ -516,6 +300,8 @@ _divmod=_divmodx
         jsr _push
         LOADNUM num
 .endmacro
+
+
 
 .macro MUL aa,bb
         PUSHNUM aa
@@ -899,7 +685,8 @@ _reset:
         cld
 
         ;; cons ptr
-        SET (TOPMEM-1)
+        lda #<(TOPMEM-1)
+        lda #>(TOPMEM-1)
         sta lowcons            
         stx lowcons+1
 
@@ -3515,71 +3302,19 @@ endaddr:
 ;;; end usercode
 ;;; ========================================
 
-;;; testing data
 
-.macro CODE str
-;;; TODO: test...
-        jsr bytecode
-        .byte str,0
-.endmacro
 
-.ifndef BLANK
-;;; called in nexttoken w A0 token
-.proc trace
-        RDUP
-        pha
 
-        putc 10
 
-        ;; s12d8i4711y>I
-        putc 's'
-        tsx
-        stx savex
-        lda #$ff
-        sec
-        sbc savex
-        ldx #0
-        jsr printn
 
-        putc 'd'
-        lda #$ff
-        sec
-;        sbc sidx
-        ldx #0
-        jsr printn
 
-        putc 'i'
-        lda ip
-        ldx ip+1
-        jsr printn
-
-        putc 'y'
-        lda ipy
-        ldx #0
-        jsr printn
-
-        putc '>'
-        putc ' '
-        pla
-        pha
-        jsr putchar
-
-        putc ' '
-        putc '#'
-        pla
-        ldx #0
-        jsr printn
-
-        RPOP
-        rts
-.endproc
-.endif ; !BLANK
 
 
 ;;; ===============================================
 ;;; 
 ;;;             T       E      S     T
 
+.ifnblank
 .proc _test
         ;; print size info for .CODE
         NEWLINE
@@ -3623,6 +3358,12 @@ endaddr:
         NEWLINE
         rts
 .endproc
+.endif ; BLANK
+
+
+.include "print.asm"
+.include "math.asm"
+
 
 
 ;;; at end of code (and tests)

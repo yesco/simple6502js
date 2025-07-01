@@ -71,6 +71,11 @@ PRINTHEXDOLLAR=1
   .endif ; SAVEBYTES
 .endif ; PRINTDEC
 
+.ifndef PRINT
+  .ifdef PRINTDECFAST
+        PRINT=1
+  .endif
+.endif
 
 .ifnblank
 
@@ -238,15 +243,21 @@ _printd:
         jsr xprintd
         jmp _drop
 
+
+.ifndef printn
 printn:
+.endif
 
 printd: 
+
 .proc xprintd
 ;;; 12
 ;;; TODO: maybe not need save as print does?
         ;; save ax
         sta savea
         stx savex
+
+;;; WTF - include this line and it crashes???
         sty savey
 
         lda tos
@@ -258,7 +269,6 @@ printd:
         ldx savex
         lda savea
         ldy savey
-
         rts
 .endproc
 
@@ -319,3 +329,4 @@ under10:
 .endproc
 
 .endif ; PRINTDECFAST
+
