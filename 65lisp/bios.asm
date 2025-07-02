@@ -14,6 +14,12 @@
 ;;; 
 ;;; A after putchar is assumed to be A before.
 
+.zeropage
+
+savexputchar:   .res 1
+
+.code
+
 biostart:       
 
 ;;; TODO: move before startaddr!
@@ -63,3 +69,27 @@ notnl:
         ldx savexputchar
         rts
 .endproc
+
+
+;;; for DEBUGGING only!
+
+;;; putchar (leaves char in A)
+;;; 5B
+.macro putc c
+        lda #(c)
+        jsr putchar
+.endmacro
+
+;;; for debugging only 'no change registers A'
+;;; 7B
+.macro PUTC c
+;        subtract .set subtract+7
+        pha
+        putc c
+        pla
+.endmacro
+
+;;; 7B - only used for testing
+.macro NEWLINE
+        PUTC 10
+.endmacro

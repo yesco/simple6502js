@@ -393,7 +393,7 @@ savey:  .res 1
 savez:  .res 1
 
 ;;; TODO: needed? clash with jsr printd???
-savexputchar:    .res 1
+;savexputchar:    .res 1
 
 ;;; memory
 here:    .res 2
@@ -437,31 +437,6 @@ token:  .res 1
 
 ;;; ----------------------------------------
 ;;;            M A C R O S
-
-;;; for DEBUGGING only!
-
-;;; putchar (leaves char in A)
-;;; 5B
-.macro putc c
-        lda #(c)
-        jsr putchar
-.endmacro
-
-subtract .set 0
-
-;;; for debugging only 'no change registers A'
-;;; 7B
-.macro PUTC c
-;        subtract .set subtract+7
-        pha
-        putc c
-        pla
-.endmacro
-
-;;; 7B - only used for testing
-.macro NEWLINE
-        PUTC 10
-.endmacro
 
 .macro ZERO
         lda #0
