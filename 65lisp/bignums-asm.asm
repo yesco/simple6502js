@@ -114,6 +114,10 @@ halt:   jmp halt
 .endproc
 
 .proc _bigprint
+        pha
+        tya
+        pha
+
         lda #'$'
         jsr putchar
 
@@ -124,11 +128,18 @@ next:
         dey
         bne next
         
+        pla
+        tay
+        pla
         rts
 .endproc
 
 ;;; uses savea
 .proc _bigshl
+        pha
+        tya
+        pha
+
         ldy #0
         lda (tos),y
         sta savea
@@ -159,12 +170,19 @@ ret:
         ldy #0
         sta (tos),y
 
+        pla
+        tay
+        pla
         rts
 .endproc
 
 ;;; cool >255 => 0 len == OVERFLOW!!!
 ;;; uses savey savea
 .proc _bigadd
+        pha
+        tya
+        pha
+
         ;; maxlen(tos, snd)
         ldy #0
         lda (tos),y
@@ -207,6 +225,9 @@ ret:
         ldy #0
         sta (tos),y
         
+        pla
+        tay
+        pla
         rts
 .endproc
 
@@ -218,6 +239,10 @@ ret:
 ;;; TRD FACTOR 2
 ;;; uses savez
 .proc _bigmul
+        pha
+        tay
+        pha
+
 ;;; 25 B !
         ;; todo find out which direction is faster!
         ;; snd < trd or other way around?
@@ -240,18 +265,14 @@ nextbyte:
         ldx #8
 nextbit:        
         ;; shl TOS
-        pha
         jsr _bigshl
-        pla
 
         asl
         bcc noadd
         
-        PUTC '+'
+;        PUTC '+'
         ;; TOS += SND if next high bit set in TRD
-        pha
         jsr _bigadd
-        pla
 
 noadd:  
         PUTC '.'
@@ -259,11 +280,14 @@ noadd:
         dex
         bne nextbit
 
-        PUTC ' '
+;        PUTC ' '
 
         dec savez
         bne nextbyte
         
+        pla
+        tay
+        pla
         rts
 .endproc
 

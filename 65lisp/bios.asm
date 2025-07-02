@@ -51,7 +51,7 @@ plaputchar:
         pla
 
 ;;; putchar(c) print char from A
-;;; (saves X, A retains value)
+;;; (saves X, A retains value, Y not used)
 ;;; 
 ;;; 12B
 .proc putchar
