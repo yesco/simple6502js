@@ -1131,6 +1131,15 @@ FUNC "_lambda"
 ;;; TODO: could be solved by:
 ;;;    IP += ipy,ipy=0 (reuseing current call)
 
+
+;;; TODO: init ipp in jsr again? lol
+;;;    NO - not enough, last value need to be pushed...
+;;;      \\\" .... ^    --- haha! :-D
+        inc ipp
+        inc ipp
+        rts
+
+
 .ifnblank
 ;;; 12 B
 ;;; if _inc, _dec  all used this w prelude

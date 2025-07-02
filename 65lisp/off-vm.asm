@@ -1,4 +1,4 @@
-;;;   exec: 65  3"' [_ovm65] _call _exec+_exit [get _next _execA] (+ 9 3 31 6 7 3 6)
+;;;   exec: 69  3"' call _exec+_exit_ [get _next _execA] (+ 47 7 6 3 6) subr+get+jsrloop+next+call
 ;;;  stack: 30  4"" _drop2 _drop _dup _swap [pushAY AYtoTOS pushAA pushPLAY] (+ 2 2 11 15)
 ;;;    mem: 28  2   ! @ (+ 14 14) 
 ;;;   math: 62 10   - + EOR | & _not +shr +shl inc dec (+ 31 5 5 5 7 9)
@@ -6,10 +6,10 @@
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; branch: 21  2   _jp _jz (+ 3 18)
 ;;; 
-;;; (+ 65 31 28 62 28 18 21) = 253
+;;; (+ 69 31 28 62 28 18 21) = 257 !!!!!
 ;;; (+  3  4  2 10  4  3  2) =  28  extra"""= 6
-;;; (/ 253.0 28) =  9.0 B/op !
-;;; (- 256  253) =  3 (+ 32 39)=71 mul+divmod
+;;; (/ 255.0 28) =  9.1 B/op !
+;;; (- 256  255) =  1 (+ 32 39)=71 mul+divmod
 
 .macro SKIPONE
         .byte $24               ; BITzp 2 B
@@ -20,68 +20,68 @@
 .endmacro
 
 
-;;; jsr _ovm65 .byte "3+4+7+", 0
-;;; TODO: make sure PC!=$ff at last byte of jsr
-_ovm65: 
-;;; 9
-        ;; inc lo (come from jsr)
-        pla
-        tay
-        iny
-        tya
-        pha
-        ;; 
-        lda #0
-        pha
-        jsr dointerpret
+;;; subr
+;;; (+ 3 17 10 3 9 5) = 47
+;;; call exec callit enter loadip semis
 
+
+;;; call bytecode
 _call: 
-;;; 3 exec as int X4711
+;;; 3
         jsr _literal
+;;; _exec bytecode from stack ( addr - )
 _exec:
-;;; (+ 12 9 10) = 31 exec sa in L4711 X
-        jsr doit
-
-        ;; come here after called 4711!
-;;; end of interpration of byte code
-_exit_:
-semis:  
-;;; (12)
+;;; 17
         ;; remove jsrloop
         pla
         pla
-        ;; back up to last interpration: hi lo ipy
-dointerpret: 
-        pla
-        sta ipy
-        pla
-        sta ip
-        pla
-        sta ip+1
-        rts
-enter: 
-;;; (9)
-        ;; save current interpretation: hi lo ipy
+        ;; save current IP
+        ;; R.push( IP )
         lda ip+1
         pha
         lda ip
         pha
         lda ipy
         pha
-;;; (10)
-        ;; hi
+
+        ;; push another jsrloop, lol
+        jsr callit
+        jmp jsrloop
+
+callit:        
+        ;; call machine code addr
+;;; 10
+        ;; call( pop )= R.push ( pop ); R.call
         lda 1,x
         pha
-        ;; lo
         lda 0,x
         pha
-
         inx
         inx
 
         ;; "return to addr"
         php
         rti
+
+;;; jsr _ovm65 .byte "3+4+7+", 0
+_ovm65: 
+_interpret:
+_enter:
+;;; 3
+        ;; (this will skip zeroth byte!)
+        lda #0
+        pha
+
+        ;; IP= R.pop
+loadip:
+;;; 9
+        pla
+        sta ipy
+        pla
+        sta ip
+        pla
+        sta ip+1
+        ;; continue to jsrloop
 
 jsrloop:        
 ;;; 6B 9c
@@ -112,6 +112,15 @@ _execA:
 ;;; 6
         sta go+1                ; lo offset
 go:     jmp ONEPAGE
+
+_exit_: 
+_semis:
+;;; 5
+        ;; remove jsrloop
+        pla
+        pla
+        jmp loadip
+
 
 ;;; -- stack
         
@@ -251,6 +260,7 @@ _load:
         lda (0,x)
         tay
         
+loadPLAY:       
         inx
         inx
         jmp pushPLAY
