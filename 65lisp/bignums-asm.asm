@@ -49,9 +49,9 @@ PRINTHEX=1
 
 anum:   .byte 1,0
         .res 256
-bnum:   .byte 1,1
+bnum:   .byte 1,0
         .res 256
-cnum:   .byte 1,2
+cnum:   .byte 1,1
         .res 256
 
 .code
@@ -83,25 +83,50 @@ double:
         jmp double
 .endif
 
-        ;; Multiplication a = b * c
-        TOS anum
-        SND bnum
-        TRD cnum
         
 mul:    
+        ;; b = b + a
+        TOS bnum
+        SND cnum
+        jsr _bigadd
+        jsr _bigprint
+
+;;; TODO: 
+;;; 
+;;; BUG: $0100 ^2 == $ff0000 ???? LOL
+
+        PUTC ':'
+        ;; Multiplication a = b * b
+        TOS anum
+        SND bnum
+        TRD bnum
         jsr _bigmul
         jsr _bigprint
         NEWLINE
 
+        jsr getchar
+
+.ifnblank
         ;; B = A
         ldy #0
         lda anum,y
         tay
-copy:   
+bcopy:   
         lda anum,y
         sta bnum,y
         dey
-        bpl copy
+        bpl bcopy
+
+        ;; C = A
+        ldy #0
+        lda anum,y
+        tay
+ccopy:   
+        lda anum,y
+        sta cnum,y
+        dey
+        bpl ccopy
+.endif
 
         jmp mul
 
@@ -289,16 +314,16 @@ nextbit:
 
         bcc noadd
         
-        PUTC '+'
+;        PUTC '+'
         ;; TOS += SND if next high bit set in TRD
         jsr _bigadd
 
 noadd:  
-        PUTC '.'
+;        PUTC '.'
         dex
         bne nextbit
 
-        PUTC ' '
+;        PUTC ' '
 
         dey
         bne nextbyte
