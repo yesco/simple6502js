@@ -5,6 +5,8 @@ savex:  .res 1
 savey:  .res 1
 
 tos:    .res 2
+snd:    .res 2
+trd:    .res 2
 
 ;;; ========================================
 .code
@@ -30,6 +32,13 @@ bnum:   .byte 1,$ab
         sta tos+1
 .endmacro
 
+.macro SND num
+        lda #<num
+        sta snd
+        lda #>num
+        sta snd+1
+.endmacro
+
 .export _initlisp
 _initlisp:
 
@@ -38,10 +47,12 @@ _initlisp:
         NEWLINE
         
         TOS bnum
+        SND bnum
 double: 
-;        jsr _bigprint
-;        NEWLINE
-        jsr _bigshl
+        jsr _bigprint
+        NEWLINE
+        
+        jsr _bigadd
         jmp double
 
         NEWLINE
@@ -107,9 +118,55 @@ ret:
         rts
 .endproc
 
+;;; cool >255 => 0 len == OVERFLOW!!!
+.proc _bigadd
+        ;; maxlen(tos, sos)
+        ldy #0
+        lda (tos),y
+        sta savey
         
+        lda (snd),y
+        cmp savey
+        bcc smaller
+        sta savey
+smaller:        
+        lda savey
+        sta savea
+
+        jsr print2h             ; not use y
+
+        clc
+next:   
+        iny
+        lda (tos),y
+        adc (snd),y
+        sta (tos),y
+        dec savey
+        bne next
+        
+        ;; extend?
+        bcc ret
+
+        inc savea
+        iny
+
+        lda #1
+        sta (tos),y
+ret:
+
+        lda savea
+        ldy #0
+        sta (tos),y
+        
+        rts
+.endproc
+
+
 ;;; 1 byte 2 digits
 ; (+ (* 9 16) 9) = 153        
 
-        
+
+;;; (* 99 99) = 9801 (/ 9801 256) = 38
+
+
         
