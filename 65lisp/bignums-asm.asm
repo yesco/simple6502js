@@ -24,17 +24,6 @@ PRINTHEX=1
 
 
 
-.data
-
-anum:   .byte 1,0     
-        .res 256
-bnum:   .byte 1,1
-        .res 256
-cnum:   .byte 1,2
-        .res 256
-
-.code
-
 .macro TOS num
         lda #<num
         sta tos
@@ -56,10 +45,29 @@ cnum:   .byte 1,2
         sta trd+1
 .endmacro
 
+.data
+
+anum:   .byte 1,0
+        .res 256
+bnum:   .byte 1,1
+        .res 256
+cnum:   .byte 1,2
+        .res 256
+
+.code
+
 .export _initlisp
 _initlisp:
 
         TOS anum
+        jsr _bigprint
+        NEWLINE
+
+        TOS bnum
+        jsr _bigprint
+        NEWLINE
+
+        TOS cnum
         jsr _bigprint
         NEWLINE
         
@@ -70,7 +78,8 @@ double:
         jsr _bigprint
         NEWLINE
         
-        jsr _bigadd
+;        jsr _bigadd
+        jsr _bigshl
         jmp double
 .endif
 
@@ -139,6 +148,8 @@ next:
         pha
         tya
         pha
+        txa
+        pha
 
         ldy #0
         lda (tos),y
@@ -147,12 +158,13 @@ next:
 ;        jsr print2h
 
         clc
+        tax
 next:   
         iny
         lda (tos),y
         adc (tos),y
         sta (tos),y
-        dec savex
+        dex
         bne next
         
 ;;; TODO: same in _bigadd
@@ -171,6 +183,8 @@ ret:
         sta (tos),y
 
         pla
+        tax
+        pla
         tay
         pla
         rts
@@ -181,6 +195,8 @@ ret:
 .proc _bigadd
         pha
         tya
+        pha
+        txa
         pha
 
         ;; maxlen(tos, snd)
@@ -226,6 +242,8 @@ ret:
         sta (tos),y
         
         pla
+        tax
+        pla
         tay
         pla
         rts
@@ -249,17 +267,17 @@ ret:
 
         ;; TOS = 0
         lda #1
-        tay
+        ldy #0
         sta (tos),y
-        iny
+        lda #0
+        ldy #1
         sta (tos),y
 
         ldy #0
         lda (trd),y
-        sta savez
 
+        tay
 nextbyte:   
-        ldy savez
         lda (trd),y
 
         ldx #8
@@ -268,21 +286,21 @@ nextbit:
         jsr _bigshl
 
         asl
+
         bcc noadd
         
-;        PUTC '+'
+        PUTC '+'
         ;; TOS += SND if next high bit set in TRD
         jsr _bigadd
 
 noadd:  
         PUTC '.'
-
         dex
         bne nextbit
 
-;        PUTC ' '
+        PUTC ' '
 
-        dec savez
+        dey
         bne nextbyte
         
         pla
