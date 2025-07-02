@@ -49,7 +49,7 @@ PRINTHEX=1
 
 anum:   .byte 1,0
         .res 256
-bnum:   .byte 1,0
+bnum:   .byte 1,3
         .res 256
 cnum:   .byte 1,1
         .res 256
@@ -85,28 +85,58 @@ double:
 
         
 mul:    
+.ifnblank
+        PUTC 'a'
+        TOS anum
+        jsr _bigprint
+        NEWLINE
+
+        PUTC 'b'
+        TOS bnum
+        jsr _bigprint
+        NEWLINE
+.endif
+
+.ifnblank
         ;; b = b + a
         TOS bnum
         SND cnum
         jsr _bigadd
         jsr _bigprint
+        PUTC ':'
+.endif
 
 ;;; TODO: 
 ;;; 
 ;;; BUG: $0100 ^2 == $ff0000 ???? LOL
+        PUTC 'c'
+        TOS bnum
+        PUTC '>'
 
-        PUTC ':'
+.ifblank
+        ldy #0
+        lda #0
+zeroa:   
+        sta anum,y
+        iny
+        bne zeroa
+.endif
+
         ;; Multiplication a = b * b
         TOS anum
         SND bnum
         TRD bnum
+
         jsr _bigmul
         jsr _bigprint
         NEWLINE
 
-        jsr getchar
+;        jsr getchar
 
-.ifnblank
+;;; TODO: hmmm, this makes "it work"
+;;;  cleaning out garabare because
+;;;  see TODO in add (different lengths)
+
         ;; B = A
         ldy #0
         lda anum,y
@@ -117,6 +147,7 @@ bcopy:
         dey
         bpl bcopy
 
+.ifnblank
         ;; C = A
         ldy #0
         lda anum,y
@@ -297,7 +328,7 @@ ret:
         lda #0
         ldy #1
         sta (tos),y
-
+        
         ldy #0
         lda (trd),y
 
@@ -311,7 +342,6 @@ nextbit:
         jsr _bigshl
 
         asl
-
         bcc noadd
         
 ;        PUTC '+'
