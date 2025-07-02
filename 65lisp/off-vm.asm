@@ -1,4 +1,4 @@
-;;;   exec: 55  2"  _call _exec/_exit [get _next _execA] (+ 3 30 6 7 3 6)
+;;;   exec: 65  3"' [_ovm65] _call _exec+_exit [get _next _execA] (+ 9 3 31 6 7 3 6)
 ;;;  stack: 30  4"" _drop2 _drop _dup _swap [pushAY AYtoTOS pushAA pushPLAY] (+ 2 2 11 15)
 ;;;    mem: 28  2   ! @ (+ 14 14) 
 ;;;   math: 62 10   - + EOR | & _not +shr +shl inc dec (+ 31 5 5 5 7 9)
@@ -6,10 +6,10 @@
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; branch: 21  2   _jp _jz (+ 3 18)
 ;;; 
-;;; (+ 55 30 28 62 28 18 21) = 242
+;;; (+ 65 31 28 62 28 18 21) = 253
 ;;; (+  3  4  2 10  4  3  2) =  28  extra"""= 6
-;;; (/ 242.0 28) =  8.6 B/op !
-;;; (- 256  242) = 14 (+ 32 39)=71 mul+divmod
+;;; (/ 253.0 28) =  9.0 B/op !
+;;; (- 256  253) =  3 (+ 32 39)=71 mul+divmod
 
 .macro SKIPONE
         .byte $24               ; BITzp 2 B
@@ -20,21 +20,40 @@
 .endmacro
 
 
+;;; jsr _ovm65 .byte "3+4+7+", 0
+;;; TODO: make sure PC!=$ff at last byte of jsr
+_ovm65: 
+;;; 9
+        ;; inc lo (come from jsr)
+        pla
+        tay
+        iny
+        tya
+        pha
+        ;; 
+        lda #0
+        pha
+        jsr dointerpret
+
 _call: 
 ;;; 3 exec as int X4711
         jsr _literal
 _exec:
-;;; (+ 11 9 10) = 30 exec sa in L4711 X
+;;; (+ 12 9 10) = 31 exec sa in L4711 X
         jsr doit
+
         ;; come here after called 4711!
+;;; end of interpration of byte code
+_exit_:
 semis:  
-;;; (11)
+;;; (12)
         ;; remove jsrloop
         pla
         pla
-        ;; back to interpration
+        ;; back up to last interpration: hi lo ipy
+dointerpret: 
         pla
-        tay
+        sta ipy
         pla
         sta ip
         pla
@@ -42,7 +61,7 @@ semis:
         rts
 enter: 
 ;;; (9)
-        ;; save current interpretation
+        ;; save current interpretation: hi lo ipy
         lda ip+1
         pha
         lda ip
