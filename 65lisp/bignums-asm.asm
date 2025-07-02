@@ -3,6 +3,7 @@
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
+savez:  .res 1                  ; lol!
 
 tos:    .res 2
 snd:    .res 2
@@ -16,11 +17,20 @@ trd:    .res 2
 PRINTHEX=1
 .include "print.asm"
 
+;;; ========================================
+
+
+
+
+
+
 .data
 
 anum:   .byte 1,0     
         .res 256
-bnum:   .byte 1,$ab 
+bnum:   .byte 1,1
+        .res 256
+cnum:   .byte 1,2
         .res 256
 
 .code
@@ -39,6 +49,13 @@ bnum:   .byte 1,$ab
         sta snd+1
 .endmacro
 
+.macro TRD num
+        lda #<num
+        sta trd
+        lda #>num
+        sta trd+1
+.endmacro
+
 .export _initlisp
 _initlisp:
 
@@ -46,6 +63,7 @@ _initlisp:
         jsr _bigprint
         NEWLINE
         
+.ifnblank
         TOS bnum
         SND bnum
 double: 
@@ -54,6 +72,29 @@ double:
         
         jsr _bigadd
         jmp double
+.endif
+
+        ;; Multiplication a = b * c
+        TOS anum
+        SND bnum
+        TRD cnum
+        
+mul:    
+        jsr _bigmul
+        jsr _bigprint
+        NEWLINE
+
+        ;; B = A
+        ldy #0
+        lda anum,y
+        tay
+copy:   
+        lda anum,y
+        sta bnum,y
+        dey
+        bpl copy
+
+        jmp mul
 
         NEWLINE
         putc 'E'
@@ -86,11 +127,13 @@ next:
         rts
 .endproc
 
+;;; uses savea
 .proc _bigshl
         ldy #0
         lda (tos),y
-        sta savey
-        jsr print2h
+        sta savea
+
+;        jsr print2h
 
         clc
 next:   
@@ -98,29 +141,31 @@ next:
         lda (tos),y
         adc (tos),y
         sta (tos),y
-        dec savey
+        dec savex
         bne next
         
+;;; TODO: same in _bigadd
         ;; extend?
         bcc ret
+
+        inc savea
         iny
-        lda #0
-        adc #0
+        
+        ;; save carry
+        lda #1
         sta (tos),y
-
-        ldy #0
-        lda (tos),y
-        clc
-        adc #1
-        sta (tos),y
-
 ret:
+        lda savea
+        ldy #0
+        sta (tos),y
+
         rts
 .endproc
 
 ;;; cool >255 => 0 len == OVERFLOW!!!
+;;; uses savey savea
 .proc _bigadd
-        ;; maxlen(tos, sos)
+        ;; maxlen(tos, snd)
         ldy #0
         lda (tos),y
         sta savey
@@ -133,11 +178,14 @@ smaller:
         lda savey
         sta savea
 
-        jsr print2h             ; not use y
+;        jsr print2h             ; not use y
 
         clc
 next:   
         iny
+;;; TODO: if one is out of data
+;;;   we should replace by 0?
+;;;   LUCKILY: it's all zero padded for now...
         lda (tos),y
         adc (snd),y
         sta (tos),y
@@ -150,6 +198,7 @@ next:
         inc savea
         iny
 
+        ;; save carry
         lda #1
         sta (tos),y
 ret:
@@ -161,6 +210,62 @@ ret:
         rts
 .endproc
 
+
+;; TODO: doesn't handle overflow gracefully
+
+;;; TOS RESULT
+;;; SND FACTOR 1
+;;; TRD FACTOR 2
+;;; uses savez
+.proc _bigmul
+;;; 25 B !
+        ;; todo find out which direction is faster!
+        ;; snd < trd or other way around?
+
+        ;; TOS = 0
+        lda #1
+        tay
+        sta (tos),y
+        iny
+        sta (tos),y
+
+        ldy #0
+        lda (trd),y
+        sta savez
+
+nextbyte:   
+        ldy savez
+        lda (trd),y
+
+        ldx #8
+nextbit:        
+        ;; shl TOS
+        pha
+        jsr _bigshl
+        pla
+
+        asl
+        bcc noadd
+        
+        PUTC '+'
+        ;; TOS += SND if next high bit set in TRD
+        pha
+        jsr _bigadd
+        pla
+
+noadd:  
+        PUTC '.'
+
+        dex
+        bne nextbit
+
+        PUTC ' '
+
+        dec savez
+        bne nextbyte
+        
+        rts
+.endproc
 
 ;;; 1 byte 2 digits
 ; (+ (* 9 16) 9) = 153        
