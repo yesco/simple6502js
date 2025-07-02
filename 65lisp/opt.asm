@@ -1,6 +1,56 @@
 ;;; cut-n-paste variants not used?
 
 
+
+avar=tos
+_toA:
+        ldy #avar
+toY:   
+;;; 11
+        lda 0,x
+        sta 0,y
+        lda 1,x
+        sta 1,y
+        jmp _drop
+
+;;; (+ 6 3 10 3 2 7) = 31
+;;; load wread cread incA inc
+
+_load:
+;;; (6)
+        jsr _toA
+        jsr _zero
+_wread: 
+;;; (3)
+        jsr _cread
+        ;; fall-through to _cread
+
+;;; NOTE: you may need to _zero first!
+_cread:  
+;;; (10)
+        ;; hi = lo
+        lda 0,x
+        sta 1,x
+        ;; lo = byte[vara++]
+        ldy #0
+        lda (areg),y
+        sta 0,x
+_incA: 
+;;; (3)
+        ldy #areg
+        SKIPTWO
+_inc:   
+;;; (2)
+        txa
+        tay
+_incR:   
+;;; (7)
+        inc 0,y
+        bne @noinc
+        inc 1,y
+        rts
+
+
 ;;; -----------------------------------
 ;;; TESTS JMPS
 ;;; 

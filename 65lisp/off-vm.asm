@@ -1,15 +1,15 @@
-;;;   exec: 69  3"' call _exec+_exit_ [get _next _execA] (+ 47 7 6 3 6) subr+get+jsrloop+next+call
+;;;   exec: 69  3"' call _exec+_exit_ [get _next _execA] (+ 47 22) subr + get+jsrloop+next+call (+ 7 6 3 6)=22
 ;;;  stack: 30  4"" _drop2 _drop _dup _swap [pushAY AYtoTOS pushAA pushPLAY] (+ 2 2 11 15)
 ;;;    mem: 28  2   ! @ (+ 14 14) 
-;;;   math: 62 10   - + EOR | & _not +shr +shl inc dec (+ 31 5 5 5 7 9)
+;;;   math: 53  9   - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
 ;;;  const: 28  4   _true 0 ' _literal (+ 3 6 7 12)
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; branch: 21  2   _jp _jz (+ 3 18)
 ;;; 
-;;; (+ 69 31 28 62 28 18 21) = 257 !!!!!
-;;; (+  3  4  2 10  4  3  2) =  28  extra"""= 6
-;;; (/ 255.0 28) =  9.1 B/op !
-;;; (- 256  255) =  1 (+ 32 39)=71 mul+divmod
+;;; (+ 69 30 28 53 28 18 21) = 247 !!!!!
+;;; (+  3  4  2  9  4  3  2) =  27  extra"""= 6
+;;; (/ 248.0 27) =  9.2 B/op !
+;;; (- 256  248) =  8 (+ 32 39)=71 mul+divmod
 
 .macro SKIPONE
         .byte $24               ; BITzp 2 B
@@ -21,7 +21,7 @@
 
 
 ;;; subr
-;;; (+ 3 17 10 3 9 5) = 47
+;;; (+ 3 11 6 10 3 9 5) = 47
 ;;; call exec callit enter loadip semis
 
 
@@ -31,7 +31,7 @@ _call:
         jsr _literal
 ;;; _exec bytecode from stack ( addr - )
 _exec:
-;;; 17
+;;; 11
         ;; remove jsrloop
         pla
         pla
@@ -45,6 +45,7 @@ _exec:
         pha
 
         ;; push another jsrloop, lol
+;;; 6
         jsr callit
         jmp jsrloop
 
@@ -132,11 +133,14 @@ _dup:
 pushAY:
         dex
         dex
-AYtoTOS:       
+AYtoTOS:
         sta 0,x
         sty 1,x
 
         rts
+
+;;; TODO: _rot _over _pick
+;;;       >R <R (jmp next) @zp !zp (vars?)
 
 _swap:  
 ;;; 15
@@ -237,20 +241,26 @@ _store:
         jmp _drop2
 ;;; TODO: optimize w jsr & tail and inx
 
-;;; 
-        jsr
-
-        lda 2,x
-        sta (0,x)
-        jsr _inc
-
-        lda 3,x
-        sta (0,x)
-
+;;; (+ 6 13) = 19
+_store: 
+;;; (6)
+        jsr _comma
         jmp _drop2
 
+;;; ((13))
+_comma: 
+;;; (6)
+        jsr _ccomma
+        lda 3,x
+        SKIPTWO
+_ccomma:
+;;; (7)
+        lda 2,x
+_cstainc:  
+        sta (0,x)
+        jmp _inc
 
-_load:  
+_load:
 ;;; 14
         ;; lo
         lda (0,x)
@@ -265,12 +275,8 @@ loadPLAY:
         inx
         jmp pushPLAY
 
-_inc:   
-;;; 7
-        inc 0,x
-        bne @noinc
-        inc 1,x
-        rts
+
+.ifnblank
 _dec:   
 ;;; 9
         lda 0,x
@@ -279,6 +285,7 @@ _dec:
 @nodec:
         dec 0,x
         rts
+.endif
 
 ;;; -- math / logical
 ;;; 
@@ -312,6 +319,7 @@ _plus:
         SKIP_TWO
 
 .ifnblank
+_nip:                           ; !!!
 _swapdrop:
 _lda:   
 ;;; 3
