@@ -1,3 +1,42 @@
+.zeropage
+
+tos:    .res 2
+tmp1:   .res 2
+
+.code
+
+;;; set's TOS to num
+;;; (change this depending on impl
+.macro SETNUM num
+        lda #<num
+        sta tos
+        lda #>num
+        sta tos+1
+.endmacro
+
+.macro SUBTRACT num
+        sec
+
+        lda tos
+        sbc #<num
+        sta tos
+
+        lda tos+1
+        sbc #>num
+        sta tos+1
+.endmacro
+
+.macro DEBUGPRINT
+        jsr debugprintn
+;; TODO: doesn't seem to trigger on this sybmold
+  .ifdef debugprintd
+        PUTC '#'
+        jsr debugprintd
+  .endif
+.endmacro
+
+;;; ========================================
+
 .include "begin.asm"
 
 .zeropage
@@ -39,16 +78,27 @@ _start:
 .endif
         rts
 
-;PRINTHEX=1                     
-;PRINTDEC=1
+;.ifndef _drop
+;  .error "%% _drop not defined"
+;.endif
+
+;.ifndef _pop
+;  .error "%% _pop not defined"
+;.endif
+
+
+
+
+PRINTDECFAST=1
+PRINTHEX=1
 .include "print.asm"
+
+
+
 
 ;;;                  M A I N
 ;;; ========================================
 
-.include "end.asm"
-
-.end
 
 ;;; TODO: make this part of the file...
 
@@ -204,7 +254,7 @@ here:    .res 2
 lowcons: .res 2
 
 ;;; top of the stack
-tos:     .res 2
+;tos:     .res 2
 ;;; second "tos" if "jsr _pull2" - lol
 second:  .res 2
 third:   .res 2 
@@ -235,46 +285,6 @@ token:  .res 1
 .data
 
 .code
-
-.org START
-
-HERE=*
-
-.include "bios.asm"
-
-.res $600-*
-
-;;; minimal test to get START!!!
-
-;;; comemnt this line to allow for .end !
-;.ifnblank
-
-_drop:  rts
-
-.include "print.asm"
-
-jmptable:       
-_reset: 
-.export _initlisp
-_initlisp:      
-        lda #<HERE
-        sta tos
-        lda #>HERE
-        sta tos+1
-        jsr printh
-
-        lda #<jmptable
-        sta tos
-        lda #>jmptable
-        sta tos+1
-        jsr printh
-
-halt:   jmp halt
-
-.end
-
-.endif
-        
 
 ;;; ----------------------------------------
 ;;;            M A C R O S
@@ -348,6 +358,10 @@ subtract .set 0
         PUTC 10
 .endmacro
 
+
+
+
+
 _pushtime:      
         jsr _push
         lda $0276
@@ -383,7 +397,7 @@ _reporttime:
         jsr _minus
         putc ' '
         putc 't'
-        jsr _printd
+        jsr _printn
         putc ' '
         rts
         
@@ -588,7 +602,7 @@ nextd2:
         ;; pushnum/drop overhead t1 !
         PUSHNUM 12345
         ;; 139 cs (_divmody _divmodx= 260 cs!!!)
-        jsr _printd
+        jsr _printn
         ;;  87 cs 
 ;        jsr xprintd
 ;        jsr _drop
@@ -3038,6 +3052,18 @@ endtable:
 .endif
 
 
+
+
+
+;;; works best if included here, lol?
+
+.include "math.asm"
+
+
+
+
+
+
 ;;; ========================================
 ;;;       T  R  A  N  S  T  A  B  L  E
 
@@ -3054,6 +3080,8 @@ FUNC "_transtable"              ; 128 B
 ; NOT USED - LOL
 ;        .ident(name) = num
 .endmacro
+
+
 
 ;;; > !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ <
 
@@ -3115,7 +3143,7 @@ FUNC "_transtable"              ; 128 B
 
 ;;; DEBUG - TODO: cheating - change!!!
 ;;; TODO: write in CODE
-        DF _printd,46,"_PRNUM" ; . - print num
+        DF _printn,46,"_PRNUM" ; . - print num
 
         DO _undef              ; / - TOOD: macro: div
         DO _digit              ; 0
@@ -3289,11 +3317,6 @@ nodec:
 
 .endif
 
-FUNC "_END"
-
-endaddr:
-.byte "<AFTER"
-
 ;;; end usercode
 ;;; ========================================
 
@@ -3355,11 +3378,12 @@ endaddr:
 .endproc
 .endif ; BLANK
 
+;;; ========================================
+;;; ========================================
 
-;.include "print.asm"
-.include "math.asm"
+.include "end.asm"
 
-
+.end
 
 ;;; at end of code (and tests)
 LOWMEM: 

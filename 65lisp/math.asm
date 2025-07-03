@@ -98,7 +98,7 @@ _mul=_mulx
 ;;; 100x => 35-39cs
 ;;; 
 ;;; 39 B - does work! (3: 1 clc needed - verified, 2 bne)
-.proc _divmodx   
+.proc _divmodx
         jsr _zero
 ;;; TODO: if 16 it hangs - why?
 ;;;   (yes 17 is correct as we want to move in last bit)

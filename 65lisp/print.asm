@@ -245,17 +245,19 @@ _writez:
 
 .ifdef PRINTDECFAST
 
-debugprintn:    
-debugprinth:    
+  debugprintd:
+
+.ifndef debugprintn
+  debugprintn:   
+  debugprinth:    
+.endif
 
 .ifndef print_for_debug
   
-  .ifdef _drop
-    _printn:        
-    _printd:        
-        jsr xprintd
-        jmp _drop
-  .endif
+  _printn:        
+  _printd:        
+      jsr xprintd
+      jmp _drop
 
   .ifndef printn
     printn:
