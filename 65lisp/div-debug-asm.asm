@@ -46,10 +46,13 @@ tmp1:   .res 2
 ;;; Uncomment this to determine start
 ;;; (If size of the loader PROGRAM.c changed)
 
-;ORGSTART= $600
+ORGSTART= $054E
 
 .ifdef ORGSTART
+
+.feature org_per_seg
 .org ORGSTART
+
 .endif
 
 orgaddr:    
