@@ -12,6 +12,19 @@
 ;;; Uncomment this to determine start
 ;;; (If size of the loader PROGRAM.c changed)
 
+.macro DEBUGPRINT
+        jsr debugprintn
+;; TODO: doesn't seem to trigger on this sybmold
+  .ifdef debugprintd
+        PUTC '#'
+        jsr debugprintd
+  .endif
+.endmacro
+
+;;; ========================================-
+
+;;; TODO: comment to find out changed ORGSTART
+;;;    (reported as "o$05xx" in _showsize)
 ORGSTART= $054E
 
 .ifdef ORGSTART

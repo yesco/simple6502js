@@ -26,15 +26,6 @@ tmp1:   .res 2
         sta tos+1
 .endmacro
 
-.macro DEBUGPRINT
-        jsr debugprintn
-;; TODO: doesn't seem to trigger on this sybmold
-  .ifdef debugprintd
-        PUTC '#'
-        jsr debugprintd
-  .endif
-.endmacro
-
 ;;; ========================================
 
 .include "begin.asm"
