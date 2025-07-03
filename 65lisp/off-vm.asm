@@ -1,6 +1,6 @@
 ;;;   exec: 69  3"' call _exec+_exit_ [get _next _execA] (+ 47 22) subr + get+jsrloop+next+call (+ 7 6 3 6)=22
 ;;;  stack: 37  5"" _drop2 _drop _dup _pick _swap [pushAY AYtoTOS pushAA] (+ 2 2 5 13 15)
-;;;    mem: 26  2   ! @ (+ 12 14) 
+;;;    mem: 26  2   @ ! (+ 12 14) 
 ;;;   math: 53  9   - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
 ;;;  const: 32  4   _true 0 ' _literal (+ 3 6 7 16)
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
@@ -300,6 +300,7 @@ _store:
         jmp _drop2
 ;;; TODO: optimize w jsr & tail and inx
 
+.ifnblank
 ;;; (+ 6 13) = 19
 _store: 
 ;;; (6)
@@ -318,6 +319,7 @@ _ccomma:
 _cstainc:  
         sta (0,x)
         jmp _inc
+.endif
 
 _load:
 ;;; 12
@@ -330,6 +332,7 @@ _load:
         tay
         
         jmp setPLAY
+
 
 .ifnblank
 _dec:   
