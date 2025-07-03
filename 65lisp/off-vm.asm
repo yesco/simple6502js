@@ -1,15 +1,25 @@
 ;;;   exec: 69  3"' call _exec+_exit_ [get _next _execA] (+ 47 22) subr + get+jsrloop+next+call (+ 7 6 3 6)=22
-;;;  stack: 30  4"" _drop2 _drop _dup _swap [pushAY AYtoTOS pushAA pushPLAY] (+ 2 2 11 15)
-;;;    mem: 28  2   ! @ (+ 14 14) 
+;;;  stack: 37  5"" _drop2 _drop _dup _pick _swap [pushAY AYtoTOS pushAA] (+ 2 2 5 13 15)
+;;;    mem: 26  2   ! @ (+ 12 14) 
 ;;;   math: 53  9   - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
-;;;  const: 28  4   _true 0 ' _literal (+ 3 6 7 12)
+;;;  const: 32  4   _true 0 ' _literal (+ 3 6 7 16)
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; branch: 21  2   _jp _jz (+ 3 18)
 ;;; 
-;;; (+ 69 30 28 53 28 18 21) = 247 !!!!!
-;;; (+  3  4  2  9  4  3  2) =  27  extra"""= 6
-;;; (/ 248.0 27) =  9.2 B/op !
-;;; (- 256  248) =  8 (+ 32 39)=71 mul+divmod
+;;; (+ 69 37 26 53 32 18 21) = 256 !!!!!
+;;; (+  3  5  2  9  4  3  2) =  28  extra"""= 6
+;;; (/ 256.0 28) =  9.1 B/op !
+;;; (- 256  256) =  0 (+ 32 39)=71 mul+divmod
+
+;;; LISP: to be used in a LISP
+;;; 
+;;;  stack: 37  5"" _drop2 _drop _dup _pick _swap [pushAY AYtoTOS pushAA] (+ 2 2 5 13 15)
+;;;    mem: 26  2   ! @ (+ 12 14) 
+;;;   math: 53  9   - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
+;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
+;;; 
+;;; (+ 37 26 53 18) = 134 bytes
+;;; (+ 5 2 9 3)     = 19  19 impls
 
 .macro SKIPONE
         .byte $24               ; BITzp 2 B
@@ -124,8 +134,50 @@ _semis:
 
 
 ;;; -- stack
+
+_dup:   
+;;; 5
+        ;; push a value
+        dex
+        dex
+        lda #1
+        ;; skip to pickA
+        SKIPTWO
+;;; N pick; N=0 => dup, N=1 => over
+_pick:  
+;;; 16
+        lda 0,x
+pickA:  
+        ;; replace a value
+        stx savex
+        asl
+        adc savex
+        
+        lda 1,y
+        pha
+        lda 2,y
+        tay
+        
+        jmp setPLAY
+
+;;; 16
+        txa
+        clc
+        adc 0,x
+        adc 0,x
+pickA:        
+        ;; replace a value
+        tay
+
+        lda 1,y
+        pha
+        lda 2,y
+        tay
+
+        jmp setPLAY
         
 
+.ifnblank
 _dup: 
 ;;; 11
         lda 0,x
@@ -216,7 +268,7 @@ _iit:
         beq pushAY
 
 _literal:       
-;;; 12
+;;; 12+4 = 16 (4 is "library")
         ;; lo
         jsr get
         pha
@@ -224,9 +276,16 @@ _literal:
         jsr get
         tay
 
-pushPLAY:
+pushAY:
+        dex
+        dex
+setPLAY:
         pla
-        jmp pushAY
+AYtoTOS:
+        sta 0,x
+        sty 1,x
+
+        rts
 
 
 _store: 
@@ -261,7 +320,7 @@ _cstainc:
         jmp _inc
 
 _load:
-;;; 14
+;;; 12
         ;; lo
         lda (0,x)
         pha
@@ -270,11 +329,7 @@ _load:
         lda (0,x)
         tay
         
-loadPLAY:       
-        inx
-        inx
-        jmp pushPLAY
-
+        jmp setPLAY
 
 .ifnblank
 _dec:   
@@ -304,8 +359,9 @@ _shl:
         rts
 _not:   
 ;;; 5
-        jsr _true
+        jsr _neg1
         ;; last op was "dex" in pushAY (Z=0)
+;;; TODO: revisit!
         bne _eor
 _minus: 
 ;;; 5
