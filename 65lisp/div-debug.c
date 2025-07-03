@@ -4,7 +4,8 @@
 // 2434 bytes with printf, 
 // #include <stdio.h>
 
-extern void initlisp();
+extern void showsize();
+extern void start();
 
 // from conio-raw.c
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
@@ -27,7 +28,10 @@ void main() {
   //printf("Hello World!\n");
   
   *TEXTSCREEN= 'A';
-  
-  initlisp();
 
+  showsize();
+
+  start();
+
+  TEXTSCREEN[2]= 'C';
 }

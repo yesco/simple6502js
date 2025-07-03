@@ -16,7 +16,9 @@
 
 .zeropage
 
+saveaputchar:   .res 1
 savexputchar:   .res 1
+saveyputchar:   .res 1
 
 .code
 
@@ -30,8 +32,8 @@ biostart:
 ;;;
 ;;; 10B
 .proc getchar      
-        stx savex
-        sty savey
+        stx savexputchar
+        sty saveyputchar
 
         jsr $023B               ; ORIC ATMOS only
         bpl getchar             ; no char - loop
@@ -39,8 +41,8 @@ biostart:
         ;; TODO: optional?
         jsr $0238               ; echo char
 
-        ldy savey
-        ldx savex
+        ldy saveyputchar
+        ldx savexputchar
 
         rts
 .endproc

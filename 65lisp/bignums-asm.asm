@@ -54,10 +54,19 @@ bnum:   .byte 1,3
 cnum:   .byte 1,1
         .res 256
 
+zero:           .byte 1,0
+one:            .byte 1,1
+two:            .byte 1,2
+overflow:       .byte 0
+
 .code
 
 .export _initlisp
 _initlisp:
+        lda #'&'
+        jsr putchar
+halt2:  jmp halt2
+
 
         TOS anum
         jsr _bigprint
@@ -86,21 +95,9 @@ double:
         
 mul:    
 .ifnblank
-        PUTC 'a'
-        TOS anum
-        jsr _bigprint
-        NEWLINE
-
-        PUTC 'b'
-        TOS bnum
-        jsr _bigprint
-        NEWLINE
-.endif
-
-.ifnblank
         ;; b = b + a
         TOS bnum
-        SND cnum
+        SND one
         jsr _bigadd
         jsr _bigprint
         PUTC ':'
@@ -112,15 +109,6 @@ mul:
         PUTC 'c'
         TOS bnum
         PUTC '>'
-
-.ifblank
-        ldy #0
-        lda #0
-zeroa:   
-        sta anum,y
-        iny
-        bne zeroa
-.endif
 
         ;; Multiplication a = b * b
         TOS anum
@@ -171,6 +159,8 @@ halt:   jmp halt
 ;;; ========================================
 ;;;               B I G N U M S
 
+;;; TODO: negatives
+
 .proc bignum 
         ldy #0
         lda (tos),y
@@ -193,6 +183,30 @@ next:
         dey
         bne next
         
+        pla
+        tay
+        pla
+        rts
+.endproc
+
+;;; writes zeroes
+.proc _bigzero
+        pha
+        tya
+        pha
+
+;;; TODO: remove once "add" knows when to "stop"
+        ldy #0
+        tya
+zeroa:   
+        sta anum,y
+        iny
+        bne zeroa
+
+        lda #1
+        ldy #1
+        sta (tos),y
+
         pla
         tay
         pla
@@ -322,17 +336,14 @@ ret:
         ;; snd < trd or other way around?
 
         ;; TOS = 0
-        lda #1
-        ldy #0
-        sta (tos),y
-        lda #0
-        ldy #1
-        sta (tos),y
-        
+        jsr _bigzero
+
+        ;; Y= length bytes of factor 2
         ldy #0
         lda (trd),y
-
         tay
+
+        ;; loop y times for y bytes
 nextbyte:   
         lda (trd),y
 

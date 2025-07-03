@@ -21,7 +21,7 @@
 ;PRINTHEX=1
 
 ;;; Default to use $abcd notation
-PRINTHEXDOLLAR=1
+;PRINTHEXNODOLLAR=1
 
 .include "print.asm"
 ;;; END PRINT.ASM --------------------
@@ -42,12 +42,14 @@ PRINTHEXDOLLAR=1
 ;;; ----------------------------------------
 
 .ifdef PRINTHEX
-        PRINT=1
+        PRINTER=1
 
 .endif ; PRINTHEX
 
 .ifdef PRINTDEC
-        PRINT=1
+  .ifndef PRINTER
+        PRINTER=1
+  .endif
 
   .ifdef SAVEBYTES
 
@@ -71,9 +73,9 @@ PRINTHEXDOLLAR=1
   .endif ; SAVEBYTES
 .endif ; PRINTDEC
 
-.ifndef PRINT
+.ifndef PRINTER
   .ifdef PRINTDECFAST
-        PRINT=1
+        PRINTER=1
   .endif
 .endif
 
@@ -154,13 +156,18 @@ done:
 
 .ifdef PRINTHEX
 
-printn:
+debugprintn:
+debugprinth:
+
+.ifndef print_for_debug
+  printn:
+  printh:
+.endif
 
 ;;; print hex
-printh:
 ;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
 ;;; 5
-.ifdef PRINTHEXDOLLAR
+.ifndef PRINTHEXNODOLLAR
         lda #'$'
         jsr putchar
 .endif
@@ -238,37 +245,39 @@ _writez:
 
 .ifdef PRINTDECFAST
 
-_printn:        
-_printd:        
+debugprintn:    
+debugprinth:    
+
+.ifndef print_for_debug
+  
+  .ifdef _drop
+    _printn:        
+    _printd:        
         jsr xprintd
         jmp _drop
+  .endif
 
+  .ifndef printn
+    printn:
+  .endif
 
-.ifndef printn
-printn:
+  printd: 
+
 .endif
 
-printd: 
-
 .proc xprintd
-;;; 12
-;;; TODO: maybe not need save as print does?
-        ;; save ax
-        sta savea
-        stx savex
-
-;;; WTF - include this line and it crashes???
-        sty savey
+        PHA
+        TXA
+        PHA
 
         lda tos
         ldx tos+1
 
         jsr _voidprintd
 
-        ;; restore ax
-        ldx savex
-        lda savea
-        ldy savey
+        PLA
+        TAX
+        PLA
         rts
 .endproc
 
@@ -287,11 +296,11 @@ printd:
 ;;; Optimized by J. Brooks & qkubma 7/8/2017
 ;;; This implementation by jsk@yesco.org 2025-06-08
 
-.proc _voidprintd
-        sta ptr1
-        stx ptr1+1
+_voidprintd:    
+        sta tmp1
+        stx tmp1+1
         
-_voidprintptr1d:
+.proc _voidprinttmp1d
 
 digit:  
         lda #0
@@ -304,8 +313,8 @@ div10:
         sbc #10/2
         iny
 under10:        
-        rol ptr1
-        rol ptr1+1
+        rol tmp1
+        rol tmp1+1
         rol
 
         dex
