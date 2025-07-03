@@ -1,3 +1,37 @@
+;;; TODO: Replace this with your code intro:
+ 
+
+
+;;; TEMPLATE for minamalistic 6502 ASM projects
+;;; 
+;;; Why use it?
+;;; 
+;;; It provides these main benefits:
+;;; 
+;;; 1. A 6502 "BIOS" that is excluded from the bytecount.
+;;; 
+;;; 2. DEBUGPRINT function (hex/decimal)
+;;; 
+;;; 3. Before starting your code, reports the various
+;;;    info, like:
+;;; 
+;;;        o$053E - ORG address of whole thing
+;;;        s$0600 - user code START address
+;;;        e$0627 - user code END address
+;;;        z$0027 - SIZE in bytes of user code
+;;; 
+;;;    The size excludes the "loader" (PROGRAM.c)
+;;;    and the "bios.asm" code. Also
+;;; 
+;;; 4. User code starts on a PAGE boudnary
+;;;    allowing various hacky optimizations1
+;;; 
+;;; 5. ???
+;;; 
+
+
+
+;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
 
 .zeropage
