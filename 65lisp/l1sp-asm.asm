@@ -73,6 +73,7 @@ _start:
 ;;; 8 + 8
 
 .zeropage
+ip:       .res 2
 ipy:      .res 1
 
 lowcons:  .res 2
@@ -91,6 +92,15 @@ envvar:   .res 2
 
         sty envvar
         sta envvar+1
+
+        ;; set IP - point to read-eval!
+        lda #<_readeval
+        sta ip
+        lda #>_readeval
+        sta ip+1
+
+        ldy #0
+        sty ipy
 
 ;;; END
 
@@ -300,6 +310,86 @@ _dropcdr:
         inx
         jmp _cdr
 
+;;;                                           226 :-(
+
+;;; How about a really tight offset interpreter?
+;;; all within one page (so only push 1B!)
+        
+;;; exec
+;;; 
+;;; (+ 3 19 5) = 27 !
+
+.ifnblank
+_exec:  
+        lda 0,x
+        dex
+        dex
+        pha
+.endif
+
+_semis: 
+;;; 3
+        pla
+        sta ipy
+next:   
+;;; 19
+        ;; next token
+        inc ipy
+        ldy ipy
+        lda _start,y
+
+;;; TODO: atoms could be self pushing? (if at end)
+;;; (10 B but only __nll __T __lambda ... so...)
+        cmp #<offbytecode
+        bcs enter
+        
+        sta call+1
+call:   jsr call
+        jmp next
+
+enter:  
+;;; 5
+        ;; Y=ip A=new to interpret
+        sta ipy
+        tya
+        pha
+        bne next
+        
+
+;;;                                  .. +29 = 255
+
+;;; maybe keep names at "offset from atomaddr?"
+;;; (could pack them in and no fillers!)
+
+ATOM "print", _print, "__cond"
+ATOM "read", _read, "__print"
+ATOM "lambda", _lambda, "__read"
+ATOM "quote", _quote, "__lambda"
+ATOM "T", .ident("__T"), "__quote"
+
+;;;                                          = 312
+;;; (+ 255 12 12 12 12 8) = 311
+
+.ifnblank
+.endif
+
+_quote: 
+_cond:
+_readeval:      
+_print: 
+_read:  
+_lambda:        
+_apply: 
+_assoc: 
+        rts
+
+;;; from here on, only use for bytecode routines!
+offbytecode:    
+
+;;; ==================================================
+;;;                  B Y T E C O D E
+
+.ifnblank
 _cond:
 ;;; 33 [15]
         jsr _nullkeep
@@ -411,71 +501,8 @@ atomlookup:
         ;; get global value!
         jmp _car
 
-;;;                                           333 :-(
 
-;;; How about a really tight offset interpreter?
-;;; all within one page (so only push 1B!)
-        
-;;; exec
-;;; 
-;;; (+ 3 19 5) = 27 !
-
-.ifnblank
-_exec:  
-        lda 0,x
-        dex
-        dex
-        pha
 .endif
-
-_semis: 
-;;; 3
-        pla
-        sta ipy
-next:   
-;;; 19
-        ;; next token
-        inc ipy
-        ldy ipy
-        lda _start,y
-
-;;; TODO: atoms could be self pushing? (if at end)
-;;; (10 B but only __nll __T __lambda ... so...)
-        cmp #<offbytecode
-        bcs enter
-        
-        sta call+1
-call:   jsr call
-        jmp next
-
-enter:  
-;;; 5
-        ;; Y=ip A=new to interpret
-        sta ipy
-        tya
-        pha
-        bne next
-        
-;;; from here on, only use for bytecode routines!
-offbytecode:    
-
-;;;                                  .. +29 = 362
-.ifnblank
-
-
-ATOM "print", _print, "__cond"
-ATOM "read", _read, "__print"
-ATOM "lambda", _lambda, "__read"
-ATOM "quote", _quote, "__lambda"
-ATOM "T", .ident("__T"), "__quote"
-.endif
-
-_print: 
-_read:  
-_lambda:        
-_apply: 
-_assoc: 
-        rts
 
 ;PRINTHEX=1                     
 ;PRINTDEC=1
@@ -488,26 +515,33 @@ _assoc:
 
 .end
 
-;;; nil:   8
-;;; car:   8 17
-;;; cdr:   8  3
-;;; eq:    8 21
-;;; cons: 12 24
-;;; print:12
-;;; read: 12
-;;; lambda:12
-;;; quote:12
-;;; T:     8
+;;;                            OFFSET
+;;; nil:   8                    5 3
+;;; car:   8 17                 5 3
+;;; cdr:   8  3                 5 3
+;;; eq:    8 21                 5 2
+;;; cons: 12 24                 5 4
+;;; print:12                    5 5
+;;; read: 12                    5 4
+;;; lambda:12                   5 6
+;;; quote:12                    5 5
+;;; T:     8                    5 1
 ;;; (+ 8 8 17 8 3 8 21 12 24 12 12 12 12 8) = 165
+;;; OFFSET: (+ (* 8 10) -1 1 2 1 3  2 -2  17 3 21 24)= 151
 
+;;; TODO:
+;;; read:      (50)  20
 ;;; readatom    20
+;;; printatom   10
 ;;; printz      12
 ;;; - bytecode
+;;; print      (50)  20
 ;;; eval       (39)  11
 ;;; assoc      (34)  12
 ;;; apply       10
-;;; (+ 20 12 11 12 10) = 65
+;;; (+ 20 20 10 12 20 11 12 10) = 115
 
+;;; branch 
 ;;; inc/2 10  inc inc2
 ;;; exec  29  semis next enter (+ 3 19 5)
 ;;; stack 34  dup pushZPY swap nip (+ 2 12 14 6)
@@ -515,7 +549,7 @@ _assoc:
 ;;; iter  23  supret retnotcons dupcar dropcdr (+ 3 9 6 5)
 ;;; (+ 10 29 34 16 23) = 112
 
-;;; (+ 165 65 112) = 342
+;;; (+ 151 115 112) = 378
 ;;; 
 ;;; so... need two pages?
 
