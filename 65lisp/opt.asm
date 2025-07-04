@@ -1,5 +1,261 @@
 ;;; cut-n-paste variants not used?
 
+;;; cheapest w most flex???
+; (+ 2 3 2 6 5 3) = 21
+_dup:   
+;;; 2
+        lda #0
+_pickA:  
+;;; 3
+        dex
+        dex
+        SKIPTWO
+_pick:
+;;; 2
+        lda 0,x
+;;; 15
+setpickA:  
+;;; (6)
+        asl
+        stx savex
+        adc savex
+        tay
+
+;;; (5)
+        lda 2,y   
+        pha
+        lda 3,y
+        ;; hA lPLA
+;;; (3)
+        jmp setlPLAhA
+
+
+; (+ 2 3 2 15) = 22
+_dup:   
+;;; 2
+        lda #0
+_pickA:  
+;;; 3
+        dex
+        dex
+        SKIPTWO
+_pick:
+;;; 2
+        lda 0,x
+;;; 15
+setpickA:  
+;;; (6)
+        asl
+        stx savex
+        adc savex
+        tay
+
+;;; 5
+        lda 2,y
+        pha
+        lda 3,y
+        ;; hA lPLA
+        
+;;; (+ 6 5 4) = 15
+
+        ;; set
+;;; 4
+        tay
+        jmp setPLAY
+
+        ;; push
+;;; 4
+        tay
+        jmp pushAY
+
+
+
+; (+ 5 2 6 9) = 22
+
+;;; replaces N with Nth pick
+_pick:
+;;; 5
+        lda 0,x
+        inx
+        inx
+        SKIPTWO
+_dup:   
+;;; 2
+        lda #0
+;;; pushes Ath pick
+;;; ((15))
+pickA:
+;;; (6)
+        asl
+        stx savex
+        adc savex
+        tay
+
+;;; 11
+        dex
+        dex
+        lda 2,y
+        sta 0,x
+        lda 3,y
+        sta 1,x
+        rts
+        
+
+;;; (9)
+        lda 2,y
+        pha
+        lda 3,y
+        ;; hA lPLA
+        tay
+        jmp pushAY
+
+
+
+
+
+;;; -- stack
+
+;;; 24 == too much!
+_dup:   
+;;; 3
+        lda #0
+        SKIPTWO
+;;; N pick; N=0 => dup, N=1 => over
+;;; replaces N to pick with VALUE
+_pick:  
+;;; 21
+        lda 0,x
+        ;; replacing value
+        inx
+        inx
+;;; push picked value A
+_pickA: 
+        dex
+        dex
+setPickA:
+        asl
+        stx savex
+        adc savex
+        tay
+
+setPickZPY: 
+        lda 0,y
+        sta 2,x
+        lda 1,y
+        sta 3,x
+
+        rts
+
+;;; 22 == too much!
+_dup:   
+;;; 5
+        lda #0
+        dex
+        dex
+        SKIPTWO
+;;; N pick; N=0 => dup, N=1 => over
+;;; replaces N to pick with VALUE
+_pick:  
+;; 17
+        lda 0,x
+setPickA:
+        asl
+        stx savex
+        adc savex
+        tay
+
+setPickZPY: 
+        lda 0,y
+        sta 2,x
+        lda 1,y
+        sta 3,x
+
+        rts
+
+
+.ifnblank
+
+setPickZPY: 
+;;; 5+3 = 8
+ZPYtolPHAhA:    
+        lda 0,y
+        pha
+        lda 1,y
+
+setlPLAhA:
+;;; 6
+        sta 1,x
+        pla
+        sta 0,x
+        rts
+
+;;; 17
+pickY:   
+;;; 8
+        sty savey
+        txa
+        asl savey
+        adc savey
+        tay
+;;; 9
+        ...
+        
+
+;;; 21
+dup:    
+;;; 6
+        dex
+        dex
+        lda #1
+        sta 0,x                 ; ugly
+;;; shortest, but dup is big...
+;;; 15
+pick:  
+;;; 
+        txa
+        asl 0,x                 ; modify! (throw away)
+        adc 0,x
+        ;; replace a value
+        tay
+
+;;; 9
+        lda 0,y
+        sta 0,x
+        lda 1,y
+        sta 1,x
+
+        rts
+
+;;; shorter but can't give A input from reg
+;;; 16
+pickA:  
+        txa
+        clc
+        adc 0,x
+        adc 0,x
+        ;; replace a value
+        tay
+
+        lda 1,y
+        pha
+        lda 2,y
+        tay
+
+        jmp setPLAY
+        
+_dup: 
+;;; 11
+        lda 0,x
+        ldy 1,x
+pushAY:
+        dex
+        dex
+AYtoTOS:
+        sta 0,x
+        sty 1,x
+
+        rts
+.endif
 
 
 avar=tos
