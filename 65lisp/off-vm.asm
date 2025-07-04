@@ -199,7 +199,6 @@ _swap:
         dex
         dex
         jsr @one
-
 @one:
         lda 2,x
         ldy 4,x
@@ -209,27 +208,58 @@ _swap:
         inx
         rts
         
+.ifnblank
+;;; These tests rely on Vatom Zull Cons flags set
+;;; after a jsr _test (part of _car,_cdr!)
+;;; 
+;;; 13 (+10 RetNoCons+jZVC)
+_jVsym: 
+        bvs _j
+        bvc noj
+_jZull:  
+        beq _j
+        bne noj
+
+;;; (10)
+.ifnblank
+_RetNoCons:     
+        bcs ret
+        bcc _exit_
+;;; _jzvc go_Zull go_Vsym ...cons
+_jZVC:
+        jsr _jZull
+        jsr _jVsym
+.endif
+_jCons: 
+        bcs _j
+noj:    
+        inc ipy
+        rts
+.endif
+
 _j:     
 ;;; 3
         jsr _zero
 _jz:    
-;;; 18
+        inx
+        inx
+;;; 16
         ;; current ip
         ldy ipy
+        ;; and skip next byte
         iny
 
-        lda 0,x
-        ora 2,x
-        bne @noskip
-@doskip: 
-        ;; add next byte to y
+        lda 256-2,x
+        ora 256-1,x
+        bne @noj
+        ;; do jmp - add next byte to y
         tya
         clc
-        ;; get next byte
+        ;; get branch offset
         adc (ip),y
-@noskip:
+@noj:   
         sty ipy
-        jmp _drop
+        rts
 
 
 _lt:    
@@ -250,10 +280,13 @@ _null:
         ora 3,x
         bne _zero
         ;; =0 fall to _true
+;;; Z=0 after call
 _true:  
 ;;; 3
         lda #$ff
         SKIPTWO
+
+;;; Z=1 after call
 _zero:  
 ;;; 6
         lda #0
