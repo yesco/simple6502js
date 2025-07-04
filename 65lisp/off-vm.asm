@@ -37,7 +37,7 @@
 ;;;   math: 59 10   nip - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; 
-;;; (+ 41 26 59 18) = 144 bytes
+;;; (+ 44 26 59 18) = 147 bytes
 ;;; (+  5  2 10  3) =  19 impls
 
 .macro SKIPONE
