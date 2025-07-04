@@ -1,5 +1,37 @@
 ;;; cut-n-paste variants not used?
 
+;;; set hi-bit of the last char in string
+;;; (saves one byte!)
+.macro HISTR str
+        .byte .left(.strlen(str)-1, str)
+        .byte 128 | .strat(str, .strlen(str)-1)
+.endmacro
+
+;;; 22
+_printz: 
+;;; (8)
+        jsr _toptr1
+        ;; read string offset rel start of atom
+        ldy #4
+        lda (ptr1),y
+        tay
+
+pnextc: 
+;;; (14)
+        lda (ptr1),y
+        ;; zero ends
+        beq pdone
+        pha
+        and #$7f
+        jsr putchar
+        pla
+        ;; or if hi bit set of last char
+        bpl pnextc
+pdone:  
+        rts
+        
+
+
 ;;; cheapest w most flex???
 ; (+ 2 3 2 6 5 3) = 21
 _dup:   

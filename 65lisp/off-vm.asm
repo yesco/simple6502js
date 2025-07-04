@@ -51,6 +51,8 @@
 
 .zeropage
 
+ptr1:   .res 2
+
 ip:     .res 2
 ;;; TODO: remove, actually, only have this!!!!
 ipy:    .res 1
@@ -60,7 +62,13 @@ savex:  .res 1
 savey:  .res 1
 savez:  .res 1                  ; haha!
 
+
 .code
+
+.feature org_per_seg
+.org $600
+
+.res (255-(* .mod 256))
 
 .export _start
 _start: 
@@ -190,16 +198,13 @@ _semis:
 ;;; 3
         pla
         sta ipy
-next:   
+next:  
 ;;; 16
         ;; next token
         jsr get
 
-;;; 
-;;; TODO: atoms could be self pushing? (if at end)
-;;; (10 B but only __nll __T __lambda ... so...)
+        ;; NOTE: C flag modified...
         cmp #<offbytecode
-;;; NOTE: C flag modified...
         bcs enter
         
         ;; primtive ops in first page
@@ -212,16 +217,22 @@ enter:
         ;; Y=ip A=new to interpret
 
 ;;; 12
+        ;; Y=ipy, A=zeropage offset containing
+        ;; C modified before
+
         ;; look up second page offset at Y!
-        tya
+        ;; see label "offbytecode"
+        ;; 
+        ;;   ipy = _start[bytecodes[ipy]]
+        tay
         lda _start,y
-        ;; swap
+        ;; "swap"
         ldy ipy
         sta ipy
         ;; push old Y
         tya
         pha
-        bne next
+        bcs next                ; C still set!
 
 ;;; ============END NEW EXEC
 
@@ -302,7 +313,7 @@ noj:
         rts
 .endif
 
-_j:     
+_jp:    
 ;;; 3
         jsr _zero
 _jz:    
@@ -547,30 +558,167 @@ math:
         inx
         rts
 
-;;; here is a list of offset (walk back from 255)
+;;; All "instructions" of our bytecode language
+;;; are offsets into the firstpage: _start[instr]
+;;; 
+;;; Normally, these are machinecode locations for
+;;; primtivies.
+;;; 
+;;; But for "syntesized" bytecode routines, they
+;;; are used as an offset to get the offset of
+;;; the bytecode routine in page2: _bytecodes[offset].
+
+;;; Effectively:
+;;; 
+;;; next:
+;;; 
+;;; get:  
+;;;    o= bytecodes[ipy]
+;;; 
+;;;    if o < offbytecode
+;;;      JSR _start+o
+;;;    else
+;;;      PHA ipy
+;;;      ipy= _start[o]
+;;;    
+;;;    goto next
+
+.macro MAPTO bytecodefun
+        .assert (bytecodefun-bytecodes)>=0,error,"%% MAPTO only maps to labels in bytecodes page"
+        .assert (bytecodefun-bytecodes)<256,error,"%% MAPTO it seems the bytecodes page is full"
+
+        ;; We store offset-1 as we prc-inc in get
+        .byte (bytecodefun-bytecodes)-1
+.endmacro
+
+;;; Forwarding for machine code not fit in this page
+_printatom:     jmp printatom
+
+;;; Here is a list of offsets (walk back from 255)
 offbytecode:
+;;; add directly after here:
 
-_mul10: .byte (mul10-secondpage)
+_readbyte:      MAPTO readbyte
+_read:          MAPTO read
+_eval:          MAPTO eval
+_readeval:      MAPTO readeval
+_mul10:         MAPTO mul10
 
-.assert (*-_start)<256,error,"Out of space in page 1"
+.assert (*-_start)<256,error,"%% Out of space in page 1"
 
 ;;; ==================================================
 
-secondpage:     
-
-bytecodes:      
-
 .macro DO fun
-.assert (fun-_start)<256,error,"%% DO can only do funs in first page"
+        .assert (fun-_start)<256,error,"%% DO can only do funs in first page"
         .byte (fun-_start)
 .endmacro
 
-mul10:    
+
+.macro JP label
+        DO _jp
+        .byte label-bytecodes
+.endmacro
+
+
+.macro JZ label
+        DO _jz
+        .byte label-bytecodes
+.endmacro
+
+
+.macro LIT lit
+        .assert lit<256,error,"%% LIT n - needs to be < 256"
+        DO _lit
+        .byte lit
+.endmacro
+
+
+.macro LITERAL lit
+
+  .if (lit=0) 
+        DO _zero
+    .exitmacro
+  .endif
+
+  .if (lit=$ffff) 
+        DO _FFFF
+    .exitmacro
+  .endif
+
+  .if (lit<256)
+        DO _lit
+        .byte lit
+    .exitmacro
+  .endif
+
+        ;; fallback
+        DO _literal
+        .word lit
+
+.endmacro
+
+
+
+.res (255-(* .mod 256))
+bytecodes:     
+
+;;; first byte to "skip"
+.byte 42
+
+readeval:
+        DO _read
+        DO _eval
+        JP readeval
+
+read:   
+eval:   
+        DO _semis
+
+;;; set hi-bit of the last char in string
+;;; (saves one byte!)
+.macro HISTR str
+        .byte .left(.strlen(str)-1, str)
+        .byte 128 | .strat(str, .strlen(str)-1)
+.endmacro
+
+;;; 5
+printatom:
+        ;jsr _toptr1
+        ;; at offset 4
+        ldy #4-1
+
+;;; prints ascizz pointed to at ptr1
+;;; starting at position Y+1
+;;; 
+;;; 9
+.proc _printzyplus1
+;       dey ; for printzy
+next:   
+        iny
+        lda (ptr1),y
+;        jsr putchar
+        ;; ok, we'll print \0, any harm? lol
+        bne next
+
+        rts
+.endproc        
+
+
+;;; 5
+readbyte:
+        DO _load
+        LIT $ff
+        DO _and
+        DO _semis
+        
+
+;;; _mul10
+mul10:
         DO _shl
         DO _dup
         DO _shl
         DO _shl
         DO _plus
         DO _semis
-        
-        
+
+;;; 
