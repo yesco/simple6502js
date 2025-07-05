@@ -341,50 +341,39 @@ ret:
 
 ;; TODO: doesn't handle overflow gracefully
 
-;;; TOS RESULT
-;;; SND FACTOR 1
-;;; TRD FACTOR 2
-;;; uses savez
+;;; Multiply: TOS = SND * TRD
+;;; 
+;;; 27 bytes core algo (+ 7 bytes for stack save/rts)
 .proc _bigmul
         pha
         tay
         pha
 
-;;; 25 B !
-        ;; todo find out which direction is faster!
-        ;; snd < trd or other way around?
-
         ;; TOS = 0
         jsr _bigzero
 
-        ;; Y= length bytes of factor 2
+        ;; Y= SND length bytes
         ldy #0
         lda (trd),y
         tay
-
         ;; loop y times for y bytes
 nextbyte:   
+        ;; A = next byte of TRD
         lda (trd),y
-
         ldx #8
 nextbit:        
         ;; shl TOS
         jsr _bigshl
 
+        ;; skip add if next bit of A (TRD)==0
         asl
         bcc noadd
         
-;        PUTC '+'
-        ;; TOS += SND if next high bit set in TRD
+        ;; TOS += SND
         jsr _bigadd
-
 noadd:  
-;        PUTC '.'
         dex
         bne nextbit
-
-;        PUTC ' '
-
         dey
         bne nextbyte
         
@@ -394,11 +383,5 @@ noadd:
         rts
 .endproc
 
-;;; 1 byte 2 digits
-; (+ (* 9 16) 9) = 153        
 
 
-;;; (* 99 99) = 9801 (/ 9801 256) = 38
-
-
-        

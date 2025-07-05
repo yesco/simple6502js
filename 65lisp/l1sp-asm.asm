@@ -166,15 +166,23 @@ _inc:
         rts
 
 ATOM "cdr", _cdr, "__car"       ; ... = 54
+.ifnblank
+cdr:    
+        DO _inc
+        DO _inc
+        DO _car
+        DO _semis
+.endif
 ATOM "eq", _eq, "__cdr"         ; ... = 76
 _eq: 
 ;;; 15
         ldy #0
         lda 3,x
         cmp 1,x
-        beq @eq
-        dey
+        beq @neq
 @eq:
+        dey
+@neq:
 ;;; 6
 popsetYY:       
         tya
@@ -185,7 +193,28 @@ popsetlYhA:
 ATOM "cons", _cons, "__eq"      ; ... + 119
 ;;;                          (+ 76 8 4 8 24) .. 127
 
-_cons:  
+_cons: 
+.ifnblank
+        ;; writing forward (10)
+        DO _swap
+        LIT lowcons
+        DO _load
+        DO _comma
+        DO _comma
+        LIT lowcons
+        DO _save
+        DO _semis
+
+        ;; assuming reverse comma (9)
+        LIT lowcons
+        DO _load
+        DO _rcomma
+        DO _rcomma
+        LIT lowcons
+        DO _store
+        DO _semis
+.endif
+
 ;;; TODO: too big!
 
 ;;; (+ 9 15) = 24
@@ -201,19 +230,21 @@ _cons:
 ;;; (15)
         ldy #0
         ;; store cdr
-        jsr popstore
+        jsr wordstore
         ;; store car
-popstore:       
+wordstore: 
         ;; lo
-        jsr bytepopstore
+        jsr bytestore
         ;; hi
-bytepopstore:   
+bytestore: 
         lda 0,x
         sta (lowcons),y
         iny
         inx
 ret:
         rts
+
+
 
 ;;;                                         127
 
@@ -238,7 +269,7 @@ setlYhPLA:
         pla
         jmp setlYhA
 
-_swap:  
+_swap:
 ;;; 14
         dex
         jsr _byteswap
@@ -515,31 +546,86 @@ atomlookup:
 
 .end
 
-;;;                            OFFSET
-;;; nil:   8                    5 3
-;;; car:   8 17                 5 3
-;;; cdr:   8  3                 5 3
-;;; eq:    8 21                 5 2
-;;; cons: 12 24                 5 4
-;;; print:12                    5 5
-;;; read: 12                    5 4
-;;; lambda:12                   5 6
-;;; quote:12                    5 5
-;;; T:     8                    5 1
+;;; bytes:
+;;;     atoms bytecode
+;;;               machinecode 
+;;; nil:   8           
+;;; car:   8        17 
+;;; cdr:   8   (5)   3 
+;;; eq:    8        15 
+;;; cons: 12   (6)  24
+;;; cond: 12  (23)  33     TODO: look at _cond byte code 15?
+;;; progn:    (12)   ?
+;;; print:12 
+;;; read: 12 
+;;; lambda:12          
+;;; quote:12           
+;;; T:     8           
+;;; names: (+ 8 8 8 8 12 12 12 12 12 12 8) = 112
 ;;; (+ 8 8 17 8 3 8 21 12 24 12 12 12 12 8) = 165
 ;;; OFFSET: (+ (* 8 10) -1 1 2 1 3  2 -2  17 3 21 24)= 151
 
-;;; TODO:
-;;; read:      (50)  20
-;;; readatom    20
-;;; printatom   10
-;;; printz      12
+;;; --- TODO:
+;;; read:      (48)  20???
+;;; (readatom                 (8+15) )
+;;; (rdlist                   (20)   )
+;;; getatomc   (15) ??? TOOD:
+;;; print      (28)  15
+;;; (printatom        5         (9)
+;;; printz            9
+
+;;; (prlist          30         (19)
 ;;; - bytecode
-;;; print      (50)  20
-;;; eval       (39)  11
-;;; assoc      (34)  12
-;;; apply       10
+;;; eval       (27)  36 
+;;; eavllist   (23)
+;;; assoc      (12)  34
+;;; (apply                       10)
+;;; 
 ;;; (+ 20 20 10 12 20 11 12 10) = 115
+
+;;; bytecodes: (+ 5 6 23 12 48 28 27 23 12) = 184
+;;; havetoasm: (+ 17 15) = 32
+;;; onlymc:    (+ 17 3 15 24 33 30 20 24 20 15 20 5 9 36 25 34 10) = 348
+;;; 
+;;; lisp: bytecodes+havto = (+ 184 32) = 216
+;;; 
+;;;    atomnames = 112
+;;; 
+;;; basic VM ops? +++ 
+
+;;; LISP BYTES: (+ 216 112) = 328
+;;; 
+;;;  VM routines used: 25 only1
+;;; 
+;;; exec/next/enter/semis        (+ 38)          = 38
+;;; ( drop drop2 dup nip swap  ; (+ 3 2 11 3 14) = 33 
+;;;   car cdr load store         (+ 3 17 11 14)  = 45 
+;;; TODO: ccomma comma rcomma    (+ 10 5 15) ??? = 30
+;;;   eq null zero               (+ 3 8 6)       = 17
+;;;   inc plus                   (+ 7 4 14) ???  = 25
+;;;   semis JZ JP                (+ 0 18 3)      = 21
+;;; TODO: jump                   (+ 12)     ???  = 12
+;;;   putc getc                  (+ 6 5)         = 11
+;;; TODO: getatomchar peekc      (+ 15 10)       = 25
+;;;  )
+;;; 
+;;; (+ 38 33 45 30 17 25 21 12 11 25) = 257
+;;;       HUH   ..... ?????
+
+;;; We define:
+;;; ( assoc cons dropcdr dupcar eval evparams progn
+;;; TODO:  isstrictfun atom islambda
+;;;   print printatom read readlist )
+;;; 
+;;; TODO: apply_lambda 
+
+;;; if we only count: 
+;;; "savings"?  (+ 18 10 15 5 10 7 5 11 9 10 22) = 122
+
+;;; (- 348 122) =  226 ok.... makes sense
+
+
+
 
 ;;; branch 
 ;;; inc/2 10  inc inc2
@@ -555,3 +641,257 @@ atomlookup:
 
 
 
+;;; write as many lisp functions as possibly in byte code!
+.ifnblank
+
+ATOM "nil", .ident("__nil"), "__nil"
+
+ATOM "cdr", _cdr, "__nil"
+;;; 5
+        LIT 2
+        DO _plus
+        DO _load
+        DO _semis
+
+ATOM "car", _load, "__cdr"
+
+ATOM "cons", _cons, "__car"
+;;; 6
+        DO _swap
+;;; TODO: how to say use lowcons???
+;;; to ptr1?
+        DO _comma
+        DO _comma
+        DO _semis
+
+;;; ATOM "null", _null, "__car"
+;;; TODO: if nil was at address 0 ...
+;        LIT __nil
+ATOM "eq", _eq, "__cons"
+
+
+;;; ATOM "eval", _eval, __
+;;; (+ 12 15) = 27
+
+;;; 12 - atoms
+        DO _atom
+        JZ evalcons
+        ;; atom
+        DO _envptr
+;;; special assoc, returns: (sought . value)
+;;;     or if fail return: sought
+        DO _assoc
+        DO _atom
+        JZ foundvar
+notfound:       
+        ;; look up global value
+;;; TODO: what if value was in cdr!!! 
+;;;    would ave 2 bytes here!
+        DO _car
+        DO _semis
+foundvar:       
+        DO _cdr
+        DO _semis
+
+evalcons:
+;;; (+ 8 4 3) = 15
+        ;; we have (fun params...)
+        DO _dupcar
+        ;; eval fun
+        DO _eval
+        DO _dup
+        DO _isstricfun
+        JZ evalapply
+evalapply:
+;;; (4)
+        ;; stack: (fun params...) funaddr
+        DO _swap
+        DO _evparams
+        DO _swap
+nlambda:        
+;;; (3)
+        ;; nlambdas
+        DO _load
+        DO _jump                
+        DO _jump
+        ;; doesn't return (?) (have DO _call)
+
+ATOM "cond", _cond, "__eq"
+;;; (+ 6 9 4 4) = 23 
+
+;;; (6)
+        ;; L= ( F=(test1 progn1) G=...)
+        DO _dupcar              ; L F
+        ;; (test1 progn1)
+        DO _dupcar              ; L F test1
+        DO _eval                ; L F res
+        DO _dup                 ; L F res res
+        ;; jmp if nil = clause failed
+        JZ _cnext               ; L F res
+        ;; true
+;;; (9)
+        DO _swap                ; L res F
+        DO _cdr                 ; L res progn1
+        DO _dup                 ; L res progn1 progn1
+        DO _null                ; L res progn1 0/true  
+        JZ haveprogn            ; L res progn1
+        ;; no progn - just return res
+        DO _drop                ; L res
+        DO _nip                 ; res
+        DO _semis
+haveprogn:      
+;;; (4)
+        ;;                      ; L res progn1
+        DO _nip
+        DO _nip
+;;; TODO: tail calls?
+        DO _progn
+        DO _semis
+
+cnext:
+;;; (4)
+        ;;                      ; L F res
+        DO _drop                ; L F
+        ;; go next
+        DO _dropcdr             ; G
+        JP _cond
+
+;; ATOM "progn", _progn, "...
+;;;  P= (a Q=...)
+;;; 12
+        DO _dupcar              ; P a
+        DO _eval                ; P v
+        DO _swap                ; v P
+pnext:   
+        DO _cdr                 ; v Q   
+        DO _dup                 ; v Q Q
+        JZ patend               ; v Q
+        ;; have more
+        DO _nip                 ; Q
+        JP _progn
+
+patend: 
+        DO _drop                ; v
+        DO _semis
+        
+
+ATOM "lambda", _lambda, "__cond"
+        ;; TODO: needs to have access to itself
+        ;; self-quoting, or applying? hmmmm
+        ;; but would then need to have special support
+        ;; in apply, or put something else on stack!
+
+ATOM "print", _print, "__lambda"
+;;; (+ 9 19) = 28
+pratom: 
+;;; (9)
+        DO _dup
+        DO _atom
+        JZ prcons
+        DO _printatom
+        LIT ' '
+        DO _putc
+        DO _semis
+
+prcons: 
+;;; (19)
+        LIT '('
+        DO _putc
+prlist: 
+        DO _dupcar
+        DO _print
+        DO _cdr
+        DO _atom
+        JZ prlist
+pratend:        
+        ;; if cdr<>nil print atom; putc ')'
+        DO _dup
+        JZ prend
+        ;; . atom
+        LIT '.'
+        DO _putc
+prend:
+        LIT ')
+        DO _putc
+        DO _semis
+
+ATOM "read", _read, "__print"
+;;; (+ 5 15 8 20) = 48
+
+;;; (5)
+        DO _getatomchar
+        DO _dup
+        JZ readlist
+createatom:     
+;;; (15)
+        LIT here
+
+        ;; set car
+        LIT __nil
+        ;; TODO: how to say use here?
+        ;; to ptr1?
+        DO _comma
+        DO _drop2
+
+        ;; set cdr: next atom link
+        LIT _T
+        DO _cdr
+        DO _comma
+
+        ;; link this one in
+        DUP _here
+        LIT _T
+        DO _store
+        
+        DO _swap
+rdatom: 
+;;; (8)
+        ;; save char to 
+        DO _ccomma
+
+        DO _getatomchar
+        DO _dup
+        JZ rdatom
+
+rdatomend:      
+        ;; create atom
+        DO _zero
+        DO _ccomma
+        DO _semis
+
+readlist:
+;;; (20)
+        DO _dup
+        LIT ')'
+        DO _eq
+        JZ readlist2
+rdlend:  
+        LIT __nil
+        DO _semis
+
+readlist2:      
+        LIT '('
+        DO _eq
+        JZ rderr
+rdlstart:
+        DO _read
+        DO _readlist
+;;; tail call?
+        DO _cons
+        DO _semis
+
+rderr:  
+        LIT __nil
+        DO _semis
+        
+getatomc:       
+        DO _peekc
+        DO _
+...
+
+ATOM "quote", _quote, "__read"
+        ;; TODO: needs to have access to itself
+
+ATOM "T", .ident("__T"), "__quote"
+
+.endif
