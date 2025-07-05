@@ -480,7 +480,7 @@ bytecodes:
         .byte label-bytecodes
 .endmacro
 
-.macro JP label
+.macro GOTO label
         DO _jp
         OFFSET label
 .endmacro
@@ -491,6 +491,19 @@ bytecodes:
         OFFSET label
 .endmacro
 
+.macro ELSE label
+        JZ label
+.endmacro
+
+;;; lol
+.macro IF test
+        DO test
+.endmacro
+
+.macro IFNOT test, label
+        IF test
+        ELSE label
+.endmacro
 
 ;;; use only for non-const (variables/addresses)
 .macro ADDR lit
@@ -567,7 +580,7 @@ bytecodes:
 bc_readeval:
         DO _read
         DO _eval
-        JP bc_readeval
+        GOTO bc_readeval
 
 ATOM "nil", .ident("__nil"), "__nil"
 
@@ -642,15 +655,13 @@ ATOM "eq", _eq, "__cons"
 
 ;;; 13 - atoms
 bc_eval:
-        DO _atom
-        JZ evalcons
+        IFNOT _atom, evalcons
         ;; atom
         ADDR envvar
 ;;; special assoc, returns: (sought . value)
 ;;;     or if fail return: sought
         DO _assoc
-        DO _atom
-        JZ foundvar
+        IFNOT _atom, foundvar
 notfound:       
         ;; look up global value
 ;;; TODO: what if value was in cdr!!! 
@@ -668,8 +679,7 @@ evalcons:
         ;; eval fun
         DO _eval
         DO _dup
-        DO _isstrictfun
-        JZ evalapply
+        IFNOT _isstrictfun, evalapply
 evalapply:
 ;;; (4)
         ;; stack: (fun params...) funaddr
@@ -743,16 +753,15 @@ bc_cond:
         ;; (test1 progn1)
         DO _dupcar              ; L F test1
         DO _eval                ; L F res
-        DO _dup                 ; L F res res
         ;; jmp if nil = clause failed
-        JZ cnext               ; L F res
+        IFNOT _dup, cnext        ; L F res
         ;; true
 ;;; (9)
         DO _swap                ; L res F
         DO _cdr                 ; L res progn1
         DO _dup                 ; L res progn1 progn1
-        DO _null                ; L res progn1 0/true  
-        JZ haveprogn            ; L res progn1
+        IF _null                ; L res progn1 0/true  
+        ELSE haveprogn            ; L res progn1
         ;; no progn - just return res
         DO _drop                ; L res
         DO _nip                 ; res
@@ -772,7 +781,7 @@ cnext:
         DO _drop                ; L F
         ;; go next
         DO _dropcdr             ; G
-        JP bc_cond
+        GOTO bc_cond
 
 .ifnblank
 
@@ -826,11 +835,10 @@ bc_progn:
         DO _swap                ; v P
 pnext:   
         DO _cdr                 ; v Q   
-        DO _dup                 ; v Q Q
-        JZ patend               ; v Q
+        IFNOT _dup, patend      ; v Q Q
         ;; have more
         DO _nip                 ; Q
-        JP bc_progn
+        GOTO bc_progn
 
 patend: 
         DO _drop                ; v
@@ -903,8 +911,7 @@ ATOM "print", _print, "__lambda"
 ;;; (9)
 bc_print:       
         DO _dup
-        DO _atom
-        JZ prcons
+        IFNOT _atom, prcons
 pratom:
         DO _printatom
         LIT ' '
@@ -919,12 +926,10 @@ prlist:
         DO _dupcar
         DO _print
         DO _cdr
-        DO _atom
-        JZ prlist
+        IFNOT _atom, prlist
 pratend:        
         ;; if cdr<>nil print atom; putc ')'
-        DO _dup
-        JZ prend
+        IFNOT _dup, prend
         ;; . atom
         LIT '.'
         DO _putc
@@ -938,8 +943,7 @@ ATOM "read", _read, "__print"
 bc_read:        
 ;;; (4)
         DO _getatomchar
-        DO _dup
-        JZ bc_readlist
+        IFNOT _dup, bc_readlist
 createatom:     
 ;;; (18)
         LIT here
@@ -967,9 +971,7 @@ rdatom:
         ;; save char to 
         DO _ccomma
         DO _getatomchar
-        DO _dup
-        JZ rdatom
-
+        IFNOT _dup, rdatom
 rdatomend:      
         ;; create atom
         DO _zero
@@ -982,8 +984,7 @@ bc_readlist:
 ;;; (21)
         DO _dup
         LIT ')'
-        DO _eq
-        JZ readlist2
+        IFNOT _eq, readlist2
 rdlend:  
         LIT __nil
         DO _semis
@@ -991,9 +992,9 @@ rdlend:
 
 readlist2:
         LIT '('
-        DO _eq
+        IF _eq
 ;;; TODO:too big bytecodes?
-;        JZ rderr
+;       ELSE rderr
 rdlstart:
         DO _read
         DO _readlist
