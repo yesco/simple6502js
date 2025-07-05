@@ -95,7 +95,7 @@ FUNC _start
 .endif
 
 ;;; INIT
-;;; 8 + 8
+;;; 22 bytes already, make constants range and memcopy!
 
 .zeropage
 
@@ -453,7 +453,7 @@ _isstrictfun:   MAPTO bc_isstrictfun
 _readeval:      MAPTO bc_readeval
 
 ;;; align
-.res (255-(* .mod 256))
+.res (256-(* .mod 256))
 bytecodes:     
 
 ;;; first byte to "skip"
@@ -493,7 +493,12 @@ bytecodes:
 
 
 ;;; use only for non-const (variables/addresses)
-.macro LITERAL literal
+.macro ADDR lit
+        DO _lit
+        .byte lit
+.endmacro
+
+.macro ADDRESS literal
         DO _literal
         .word literal
 .endmacro
@@ -635,12 +640,12 @@ ATOM "eq", _eq, "__cons"
 ;;; ATOM "eval", _eval, __
 ;;; (+ 12 15) = 27
 
-;;; 12 - atoms
+;;; 13 - atoms
 bc_eval:
         DO _atom
         JZ evalcons
         ;; atom
-        LITERAL envvar
+        ADDR envvar
 ;;; special assoc, returns: (sought . value)
 ;;;     or if fail return: sought
         DO _assoc
@@ -656,10 +661,8 @@ foundvar:
         DO _cdr
         DO _semis
 
-.byte *-bytecodes
-
 evalcons:
-;;; (+ 8 4 3) = 15
+;;; (+ 6 3 2) = 11
         ;; we have (fun params...)
         DO _dupcar
         ;; eval fun
@@ -931,14 +934,14 @@ prend:
         DO _semis
 
 ATOM "read", _read, "__print"
-;;; (+ 5 15 8 20) = 48
+;;; (+ 4 18 8 21) = 51
 bc_read:        
-;;; (5)
+;;; (4)
         DO _getatomchar
         DO _dup
         JZ bc_readlist
 createatom:     
-;;; (15)
+;;; (18)
         LIT here
 
         ;; set car
@@ -949,13 +952,13 @@ createatom:
         DO _drop2
 
         ;; set cdr: next atom link
-        LITERAL __T
+        ADDRESS __T
         DO _cdr
         DO _comma
 
         ;; link this one in
         DO _dup
-        LITERAL __T
+        ADDRESS __T
         DO _store
         
         DO _swap
@@ -976,7 +979,7 @@ rdatomend:
 ;;; need mapped as we recruse!
 ;;; (alt: DO _exec (not have!))
 bc_readlist:
-;;; (20)
+;;; (21)
         DO _dup
         LIT ')'
         DO _eq
