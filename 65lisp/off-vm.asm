@@ -3,7 +3,7 @@
 ;;;   math: 59 10   nip - + EOR | & _not +shr +shl inc {dec} {9}
 ;;;  const: 32  4   _true 0 ' _literal (+ 3 6 8 15)
 ;;;   test: 20  3   _null _eq _lt (+ 8 3 9)
-;;; branch: 21  2   _jp _jz (+ 3 18)
+;;; branch: 17  2   _jp _jz (+ 3 14)
 
 
 ;;; --- GENERIC 
@@ -11,10 +11,10 @@
 ;;; 
 ;;;              - OVERFLOW -
 ;;; 
-;;; (+ 69 44 26 59 32 20 21) = 271 !!!!!
+;;; (+ 69 44 26 59 32 20 17) = 267 !!!!!
 ;;; (+  3  5  2 10  4  3  2) =  29  extra"""= 6
-;;; (/ 266.0 29) =  9.2 B/op !
-;;; (- 256  256) =  0 (+ 32 39)=71 mul+divmod
+;;; (/ 267.0 29) =  9.2 B/op !
+;;; (- 256  267) = -11... (+ 32 39)=71 mul+divmod
 
 
 
@@ -49,7 +49,7 @@
         .byte $2c               ; BITabs 3 B
 .endmacro
 
-
+ 
 .zeropage
 
 ptr1:   .res 2
@@ -188,7 +188,7 @@ _semis:
 ;;; ============ NEW EXEC
 ;;; (+ 7 3 16 12) = 38
 
-get:    
+get:
 ;;; 7 
         inc ipy
         ldy ipy
@@ -318,24 +318,17 @@ _jp:
 ;;; 3
         jsr _zero
 _jz:    
-;;; 18
+;;; 14
         inx
         inx
-        ;; current ip
-        ldy ipy
-        ;; and skip next byte
-        iny
 
         lda 256-2,x
         ora 256-1,x
         bne @noj
-        ;; do jmp - add next byte to y
-        tya
-        clc
-        ;; get branch offset
-        adc (ip),y
+        ;; do jmp - ipy= new addr
+        jsr get
+        sta ipy
 @noj:   
-        sty ipy
         rts
 
 
@@ -608,57 +601,6 @@ _mul10:         MAPTO mul10
 .assert (*-_start)<256,error,"%% Out of space in page 1"
 
 ;;; ==================================================
-
-.macro DO fun
-        .assert (fun-_start)<256,error,"%% DO can only do funs in first page"
-        .byte (fun-_start)
-.endmacro
-
-
-.macro JP label
-        DO _jp
-        .byte label-bytecodes
-.endmacro
-
-
-.macro JZ label
-        DO _jz
-        .byte label-bytecodes
-.endmacro
-
-
-.macro LIT lit
-        .assert lit<256,error,"%% LIT n - needs to be < 256"
-        DO _lit
-        .byte lit
-.endmacro
-
-
-.macro LITERAL lit
-
-  .if (lit=0) 
-        DO _zero
-    .exitmacro
-  .endif
-
-  .if (lit=$ffff) 
-        DO _FFFF
-    .exitmacro
-  .endif
-
-  .if (lit<256)
-        DO _lit
-        .byte lit
-    .exitmacro
-  .endif
-
-        ;; fallback
-        DO _literal
-        .word lit
-
-.endmacro
-
-
 
 .res (255-(* .mod 256))
 bytecodes:     

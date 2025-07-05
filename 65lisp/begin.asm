@@ -51,11 +51,37 @@ orgaddr:
         DEBUGPRINT
         NEWLINE
 
+        putc 'b'
+        SETNUM bytecodes
+        DEBUGPRINT
+        NEWLINE
+
         putc 'e'
         SETNUM endaddr
         DEBUGPRINT
         NEWLINE
 
+        SETNUM endaddr
+        PUTC 'z'
+        SUBTRACT _start
+        DEBUGPRINT
+        NEWLINE
+
+        NEWLINE
+
+        SETNUM bytecodes
+        PUTC 'v'
+        SUBTRACT _start
+        DEBUGPRINT
+        NEWLINE
+
+        SETNUM endaddr
+        PUTC 'w'
+        SUBTRACT bytecodes
+        DEBUGPRINT
+        NEWLINE
+
+        SETNUM endaddr
         PUTC 'z'
         SUBTRACT _start
         DEBUGPRINT
