@@ -9,13 +9,21 @@ tos:    .res 2
 snd:    .res 2
 trd:    .res 2
 
+tmp1:   .res 2
+
 ;;; ========================================
 .code
 
 .include "bios.asm"
 
 PRINTHEX=1
+;;; dummy
+_drop:   rts
+
+PRINTDECFAST=1
 .include "print.asm"
+
+.include "oric-timer.asm"
 
 ;;; ========================================
 
@@ -63,10 +71,12 @@ overflow:       .byte 0
 
 .export _initlisp
 _initlisp:
+
+.ifnblank
         lda #'&'
         jsr putchar
 halt2:  jmp halt2
-
+.endif
 
         TOS anum
         jsr _bigprint
@@ -115,7 +125,9 @@ mul:
         SND bnum
         TRD bnum
 
+        jsr _resettime
         jsr _bigmul
+        jsr _reporttime
         jsr _bigprint
         NEWLINE
 
@@ -173,6 +185,13 @@ halt:   jmp halt
         tya
         pha
 
+        ;; print size in bytes
+        jsr bignum
+        sty tmp1
+        lda #0
+        sta tmp1+1
+        jsr _voidprinttmp1d
+
         lda #'$'
         jsr putchar
 
@@ -203,7 +222,7 @@ zeroa:
         iny
         bne zeroa
 
-        lda #1
+        lda #0
         ldy #1
         sta (tos),y
 
