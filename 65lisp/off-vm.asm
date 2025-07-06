@@ -686,9 +686,51 @@ FUNC _next
 
         ;; store it before modify!
         sta call+1
-        sec
-        sbc #<offbytecode
-        bcs _enter
+
+.ifnblank
+pha
+tya
+pha
+txa
+pha
+
+putc 10
+
+txa
+clc
+adc #'j'
+jsr putchar
+;jsr print2h
+
+tsx
+txa
+clc
+adc #'M'
+jsr putchar
+;jsr print2h
+
+putc '.'
+lda ipy
+jsr print2h
+
+putc ':'
+lda call+1
+jsr print2h
+
+putc ' '
+
+;halt:   jmp halt
+
+pla
+tax
+pla
+tay
+pla
+.endif
+
+;        sec
+;        sbc #<offbytecode
+;        bcs _enter
         
         ;; primtive ops in first page
 call:   jsr _start
@@ -706,6 +748,7 @@ FUNC _enter
         ;; see label "offbytecode"
         ;; 
         ;;   ipy = _start[bytecodes[ipy]]
+PUTC '-'
         tay
         lda bytecodes,y
         ;; "swap"
@@ -716,11 +759,14 @@ FUNC _enter
         pha
         bcs _next                ; C still set!
 
+;;; Set this to last function+1 defined in VM
+;;; any number >= this will be used to dispatch
+;;; to byte code functions automatically.
+offbytecode= _enter+1
 
 ;;; ============END NEW EXEC
 
-
-FUNC _end
+FUNC _endvm
 
 .ifdef SECONDPAGE
 

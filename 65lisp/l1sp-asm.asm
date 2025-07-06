@@ -8,10 +8,14 @@
 ;;; Initial functions requirement for
 ;;; template/begin.asm
 
+
+;ENFORCE_ONEPAGE=1
+
 ;USETHESE=1
 ;DISABLEINTERRRUPTS
 
-;BOOT=0
+;
+BOOT=1
 
 ;;; Applies to off-vm.asm
 ;
@@ -25,7 +29,8 @@ MINIMAL=1
 LISP=1
 .ifdef LISP
   ATOMMISALIGNMENT=0
-  ;LISPINIT=1
+  ;
+  LISPINIT=1
 .endif
 
 
@@ -425,8 +430,9 @@ FUNC _rcomma
 .endif ; USETHESE
 
 
+;;; ========================================
 ;;; enable this to ignore bytecodes
-;.ifnblank
+.ifnblank
 
 offbytecode:    
 endfirstpage:   
@@ -440,8 +446,10 @@ bytecodes:
 
 _readeval:      
 _nil_:  
-_bytecodeinit:  
+
 .include "end.asm"
+
+
 .end
 
 .endif
@@ -481,9 +489,36 @@ _bytecodeinit:
         .byte (bytecodefun-bytecodes)-1
 .endmacro
 
-
+;;; experiement
+.ifnblank
 offbytecode:
+_l1spinit:
+.ifnblank
+        putc '>'
+        jsr getchar
+        jmp _l1spinit
+.endif
 
+        ldy #<foo
+        sty ipy
+        jmp next
+
+foo:    
+        LIT 65
+        DO _dup
+        DO _emit
+        jp foo
+
+.include "end.asm"
+.end
+
+.endif
+
+
+;;; ========================================
+
+;;; TODO: changing this...
+.ifnblank
 ;;; 13 items 13 bytes!
 
 .assert (offbytecode-_start)<256,error,"%% No space left in page 1 for MAPTO"
@@ -503,41 +538,25 @@ _evparams:      MAPTO bc_evparams
 _isstrictfun:   MAPTO bc_isstrictfun
 _readeval:      MAPTO bc_readeval
 
+.endif
+
+;;; ========================================
 endfirstpage:   
-
+.ifdef ENFORCE_ONEPAGE
 .assert *-_start<=256,error,"%% firstpage is FULL!"
-
+.endif
 ;;; align ; Not using _NOP_ as this is usable space
 .res (256-(* .mod 256)), 0 
-
-bytecodes:
-
-
-
-
-
-;;; first byte to "skip"
-.byte 42
-
-;;; from here on, only use for bytecode routines!
-
-;;; ==================================================
-;;;                  B Y T E C O D E
+;;; ========================================
 
 .macro DO fun
         .assert fun-_start>0,error,"%% DO: cannot call fun at offset 0"
         .assert (fun-_start)<256,error,"%% DO: can only do funs in first page"
-        .assert 0,error,"%% NOTNOTNOTNONTONTT"
-;;; Haha- never triggered! ?
-.assert 42<7,error,"FISH"
 
         ;; -1 as we pre-inc in "get"
         .byte (fun-_start)
 .endmacro
 
-
-;;; Haha- never triggered! ?
-.assert 42<7,error,"FDISHDLKFJDS"
 
 ;;; Branch instruction are simplified as we're
 ;;; only within the same page to set ipy!
@@ -545,12 +564,16 @@ bytecodes:
 .macro OFFSET label
   .assert label-bytecodes>0,error,"%% JP/JZ offset neg"
   .assert label-bytecodes<256,error,"%% JP/JZ offset too big"
-        .byte label-bytecodes
+        .byte label-bytecodes-1
+.endmacro
+
+.macro JP label
+        DO _jp
+        OFFSET label
 .endmacro
 
 .macro GOTO label
-        DO _jp
-        OFFSET label
+        JP label
 .endmacro
 
 
@@ -669,6 +692,76 @@ bytecodes:
         .byte name, 0
 .endmacro
 
+
+secondpage:
+bytecodes:
+;;; --------------------------------------------------
+;;; dispatch offset table (used by _enter)
+
+
+
+;;; from here on, you can use bytecode routines
+;;; ==================================================
+;;;                  B Y T E C O D E
+
+
+;;; ------- simple experiment
+
+;.ifnblank
+_l1spinit:
+        putc '>'
+        jsr getchar
+;        jmp _l1spinit
+
+;;; "exec"
+        ldy #<foo-1
+        sty ipy
+        jmp _next
+
+foo:
+        LIT 10
+        DO _emit
+
+        LIT 65+32
+        DO _dup
+        DO _emit
+bar:
+        LIT '.'
+        LIT '?'
+
+        LIT '^'
+        DO _emit
+
+        DO _emit
+        DO _key
+        DO _dup
+        DO _emit
+        DO _emit
+        DO _emit
+
+        LIT 10
+        DO _emit
+
+        DO _inc
+        DO _dup
+        DO _emit
+
+        JP bar
+
+.include "end.asm"
+
+.end
+.endif
+
+
+
+
+
+
+
+
+
+
 ;PRINTHEX=1                     
 ;PRINTDEC=1
 ;.include "print.asm"
@@ -697,6 +790,15 @@ next:
         sta 0,x
         dex
         bpl next
+
+
+;;; DO some tests
+
+        putc 'a'
+        putc 'b'
+        putc 'd'
+
+
 
         rts
 

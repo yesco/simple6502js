@@ -186,17 +186,13 @@ print2h:
         ror
         jsr print1h
         ;; lo
-        
+        ;; nice: falls-through to pla!
 .endif ; PRINTHEX
-
-
-
 .if .def(PRINTHEX) || .def(PRINTDECDIV)
-
 plaprint1h:     
 ;;; (14)
         pla
-.proc print1h        
+.proc print1h
         and #$0f
         ora #$30
         cmp #'9'+1
