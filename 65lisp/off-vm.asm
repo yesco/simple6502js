@@ -1,4 +1,23 @@
-;;; stack: 
+;;; ------------------- STATE ------------------
+;;;                  2025-07-06
+;;; IO=1
+;;; LISP=1
+;;; MINIMAL=1
+;;; 
+;;;    jmps: 17  2    _nilq _jnil (+ 17)
+;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
+;;;      IO: 15  2   _key _emit (+ 8 7)
+;;;    exec: 39  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
+;;;   stack: 33  5   _dup _swap _drop2 _drop nip (+ 11 14 2 3 3)
+;;;    ctrl:         _jp _jz (+ 3 14)
+;;;    test: 43  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 6 8 15)
+;;;     mem: 38  5   _store _dupcar _dropcdr _cdr _car (+ 16 6 2 3 11)
+;;;    math: 43  7   _inc2 _inc _shr _minus _plus _eor _and {_math} (+ 3 7 5 5 4 3 2 14)
+;;;             TODO: _minus, can eq be made without?
+;;;  toptr1: 23  1    {_toptr1} _printatom {_printzyplus1} (+ 9 5 9)
+;;; 
+;;; (+ 17 15 39 33 43 38 43 23) = 251 bytes
+;;; (+  2     2  1  5  6  5  7) =  28 words
 
 
 ;;;  stack: 43  5"" _drop2 _drop _swap _dup _pick [pushAY AYtoTOS pushAA] (+ 2 2 14 2 23) {_pickA, setpickA}
@@ -25,10 +44,10 @@
 ;;;    5 bytes more?
 
 ;;; --- 2 PAGE (one prims, one bytecodes)
-;;;   exec: 38  1"' _exit_ [get] next+enter
+;;;   exec: 39  1"' _exit_ [get] next+enter
 ;;; 
 ;;; 
-;;; (+ 38 43 26 59 32 20 21) = 239 (- 256 240) = 16
+;;; (+ 39 43 26 59 32 20 21) = 249 (- 256 240) = 16
 ;;; (+  1  5  2 10  4  3  2) =  27
 ;;; 
 ;;; :- means can have max 21 bytecode routines in 2nd
@@ -218,7 +237,7 @@ FUNC _emit
 
 
 ;;; ============ NEW EXEC
-;;; (+ 7 3 16 12) = 38
+;;; (+ 8 3 16 12) = 39
 
 FUNC _get
 ;;; 8 
