@@ -2,7 +2,7 @@ endaddr:
 .byte "<AFTER"
 
 ;;; for debuggability, if no printer included
-;;; include it AFTER, so it doesn't count for size
+;;; we include it AFTER, so it doesn't count for size!
 
 .ifndef PRINTER
 print_for_debug:

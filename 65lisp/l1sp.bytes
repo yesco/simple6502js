@@ -1,0 +1,61 @@
+;; actual file .bin says 246 bytes!
+;; 26 functions
+
+(+ 8 7 8 3 16 12 11 14 3 14 3 8 3 2 8 15 11 2 3 6 2 3 11 3 7 5 5 4 3 3 2 14 9 5 9) = 242
+
+(+ 39 15 33 17 39 33 43 23) = 242
+(+  1  2  5  2  6  5  7  1) =  29
+
+(+ 8 7  8 3 16 12  11 14   3 14   3 8 3 6 8 15  16 2 3 6 2 3 11   3 7 5 5 4 3 3 2 14   9 5 9) = 251
+
+
+8	_get
+3	_semis
+16	_next
+12	_enter
+(+ 8 3 16 12)
+
+8	_key
+7	_emit
+(+ 8 7) 15
+
+11	_dup
+14	_swap
+2	_drop2
+3	_drop
+3	_nip
+(+ 11 14 2 3 3) 33
+
+3	_jp
+14	_jz
+(+ 3 14) 17
+
+3	_eq
+8	_null
+3	_FFFF
+2	_zero
+8	_lit
+15	_literal
+(+ 3 8 3 2 8 15) 39
+
+11	_store
+6	_dupcar
+2	_dropcdr
+3	_cdr
+11	_car
+(+ 11 6 2 3 11) 33
+
+3	_inc2
+7	_inc
+5	_shr
+5	_minus
+4	_plus
+3	_eor
+2	_and
+14 math
+(+ 3 7 5 5 4 3 2 14) 43 
+
+9	_toptr1
+5	_printatom
+9	_printzyplus1
+(+ 9 5 9) 23

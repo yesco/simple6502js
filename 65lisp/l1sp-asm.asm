@@ -9,40 +9,25 @@
 ;;; template/begin.asm
 
 ;USETHESE=1
-LISP=1
-IO=1                            ; _getc _putc
+;DISABLEINTERRRUPTS
+
+;BOOT=0
+
+;;; Applies to off-vm.asm
+;
+IO=1
+;
 MINIMAL=1
 
-;;; used for show_size
-;;; 
-;;; TODO: make conditional
-.zeropage
+;;; Applies to the "sectorlisp"
+;;; (it has no numbers, even == atom, odd == cons)
+;
+LISP=1
+.ifdef LISP
+  ATOMMISALIGNMENT=0
+  ;LISPINIT=1
+.endif
 
-tos:    .res 2
-tmp1:   .res 2
-
-.code
-
-;;; set's TOS to num
-;;; (change this depending on impl
-.macro SETNUM num
-        lda #<num
-        sta tos
-        lda #>num
-        sta tos+1
-.endmacro
-
-.macro SUBTRACT num
-        sec
-
-        lda tos
-        sbc #<num
-        sta tos
-
-        lda tos+1
-        sbc #>num
-        sta tos+1
-.endmacro
 
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
@@ -67,16 +52,25 @@ _NOP_=$ea
 
 .zeropage
 
-;ip:       .res 2
+;;; LOL, may not be possible, but makes
+;;; _nil_ address==0, using _null, _zero!
 
-.ifndef USETHESE
-ipy:      .res 1
-.endif
+.org 0
 
+;;; VVVVVVVVVVV don't modify VVVVVVVVVVVVVV
+;;; (this must be congruent with constdata!)
+zerovarstart:   
+
+NIL8B:    .res 8
 lowcons:  .res 2
 envvar:   .res 2
-
 here:     .res 2
+ipy:      .res 1
+
+zerovarsend:
+;;; ^^^^^^^^^^^^ don't modify ^^^^^^^^^^^^^
+
+;;; put other non-init vars here...
 
 .code
 
@@ -101,10 +95,31 @@ FUNC _start
         putc 'N'
         putc 'D'
 .endif
-        jmp _bytecodeinit
 
+;;; Or we could say this is up to the user app?
+;;; 
+;;; 4 (+1 DIS) (+3 LISPINIT)
+.ifdef BOOT
+boot:   
 
+        ;; disable interrupts
+.ifdef DISABLEINTERRUPTS
+        sei
+.endif
+        ;; init hardware + data stack
+        ldx #$ff
+        txs
 
+        ;; init your "app"
+
+.ifdef LISPINIT
+        jmp _l1spinit
+.else
+
+        rts
+.endif
+
+.endif ; BOOT
 
 ;;; ----------------------------------------
 ;;;              alternative implementations
@@ -115,34 +130,6 @@ FUNC _start
 
 .ifndef USETHESE
 
-       
-;;; Doesn't consume the value
-_nilqkeep:
-;;; 17
-        lda 0,x
-        cmp #<_nil_
-        bne @notnil
-        lda 1,x
-        cmp #>_nil_
-        ;; == _nil
-@notnil:
-        ;; tail calls
-        bne _true
-        beq _zero
-_jnil:
-        jsr _nilqkeep
-        ;; arrives here with 
-        ;; _zero == is nil; _true == is ! not
-        ;; -- fall through to _jz
-        jmp _jz
-;_jz:     
-
-_comma: 
-_ccomma:        
-_getatomchar:
-_jump:  
-        ;; TODO:
-        rts
   .include "off-vm.asm"
 
 
@@ -439,6 +426,7 @@ FUNC _rcomma
 
 
 ;;; enable this to ignore bytecodes
+;.ifnblank
 
 offbytecode:    
 endfirstpage:   
@@ -448,8 +436,9 @@ _readeval:
 _nil_:  
 _bytecodeinit:  
 .include "end.asm"
-
 .end
+
+.endif
 
 
 
@@ -514,39 +503,6 @@ endfirstpage:
 
 ;;; align ; Not using _NOP_ as this is usable space
 .res (256-(* .mod 256)), 0 
-
-FUNC _bytecodeinit
-
-;;; more efficent init? memcpy?
-        lda #<LOWCONSSTART
-        sta lowcons
-        lda #>LOWCONSSTART
-        sta lowcons+1
-        
-        lda #<HERESTART
-        sta here
-        lda #>HERESTART
-        sta here+1
-
-        ;; set things to nil
-        ldy #<_nil_
-        lda #>_nil_
-
-        sty envvar
-        sta envvar+1
-
-        ;; set IP - point to read-eval!
-        lda #<_readeval
-        sta ipy
-;        sta ip
-;        lda #>_readeval
-;        sta ip+1
-
-        ldy #0
-        sty ipy
-
-        rts
-;;; END
 
 bytecodes:
 
@@ -702,11 +658,10 @@ bytecodes:
 
 .export .ident(.concat("_", name,"_"))
 .ident(.concat("_", name,"_")) :
-        MISALIGN 4,1
+        MISALIGN 4,ATOMMISALIGNMENT
         .word val, .ident(prev)
         .byte name, 0
 .endmacro
-
 
 ;PRINTHEX=1                     
 ;PRINTDEC=1
@@ -717,14 +672,102 @@ bytecodes:
 bc_readeval:
 
 ;.byte _start    ; $700
-;.byte _read     ; $844
+;.byte endfirstpage ; $806
+;.byte _read     ; $801
 ;.byte bytecodes ; $900
 
         DO _read
         DO _eval
         GOTO bc_readeval
 
+FUNC l1spinit
+.scope
+
+;;; Copy initconst area to zero page
+        ldx #(initend-initconst)-1
+        
+next:   
+        lda initconst,x
+        sta 0,x
+        dex
+        bpl next
+
+        rts
+
+.endscope
+
+;;; This area is copied to zero page at startup
+initconst:      
+
+
+;;; TODO: shit! _nil_ will be at address 0
+;;;   to easy test _nil_ == 0 == _null test
+;;;   OK: fine, remember we "don't" have numbers
+;;;   in "sectorlisp".
+
+;;; For another extended lisp with numbers, we'd expect
+;;;   iii00 = int*2
+;;;   aaa01 = atoms
+;;;   iii10 = int*2
+;;;   ccc11 = cons
+
 ATOM "nil", .ident("_nil_"), "_nil_"
+.assert _nil_==constdata,error,"%% initconst: _nil_ must be first to be copied to address 0"
+
+__lowcons:      .word LOWCONSSTART
+__envvar:       .word _nil_
+__here:         .word HERESTART
+__ipy:          .byte <_readeval
+
+constend:       
+.assert (zerovarsend-zerovarsstart==constend-constdata),error,"%% zorovarstart and constdata area sizes don't match"
+;;; <<<< don't put anything before except consts!
+
+
+
+
+
+;;; -------------------------------------
+;;; --- added machine VM instructions ---
+;;; 
+;;; TODO: These need "jmp trampolines"
+;;;       in 1st page!
+
+;;; this doesn't consume value on stack
+.ifnblank
+_nilqkeep:
+;;; 17
+        lda 0,x
+        cmp #<_nil_
+        bne @notnil
+        lda 1,x
+        cmp #>_nil_
+        ;; == _nil
+@notnil:
+        ;; tail calls
+        bne _true
+        beq _zero
+_jnil:
+        jsr _nilqkeep
+        ;; arrives here with 
+        ;; _zero == is nil; _true == is ! not
+        ;; -- fall through to _jz
+        jmp _jz
+.endif
+
+_comma: 
+_ccomma:        
+_getatomchar:
+_jump:  
+        ;; TODO:
+        rts
+;;; ----------------------------------------
+
+
+
+
+
+
 
 ATOM "cdr", _cdr, "_nil_"
 ;;; smaller in machine code (before _load/_car)

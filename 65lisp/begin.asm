@@ -12,6 +12,41 @@
 ;;; Uncomment this to determine start
 ;;; (If size of the loader PROGRAM.c changed)
 
+;;; used for show_size
+;;; 
+;;; TODO: make conditional
+
+
+;;; TODO: make this no do again if included again!
+
+.zeropage
+
+tos:    .res 2
+tmp1:   .res 2
+
+.code
+
+;;; set's TOS to num
+;;; (change this depending on impl
+.macro SETNUM num
+        lda #<num
+        sta tos
+        lda #>num
+        sta tos+1
+.endmacro
+
+.macro SUBTRACT num
+        sec
+
+        lda tos
+        sbc #<num
+        sta tos
+
+        lda tos+1
+        sbc #>num
+        sta tos+1
+.endmacro
+
 .macro DEBUGPRINT
         jsr debugprintn
 ;; TODO: doesn't seem to trigger on this sybmold
