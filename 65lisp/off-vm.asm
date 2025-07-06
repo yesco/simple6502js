@@ -1,3 +1,6 @@
+;;; stack: 
+
+
 ;;;  stack: 43  5"" _drop2 _drop _swap _dup _pick [pushAY AYtoTOS pushAA] (+ 2 2 14 2 23) {_pickA, setpickA}
 ;;;    mem: 25  2   ! @ (+ 14 11) 
 ;;;   math: 59 10   nip - + EOR | & _not +shr +shl inc {dec} {9}
@@ -191,6 +194,25 @@ FUNC _semis:
 .endif ; OLD exec
 
 
+.ifdef IO
+
+;;; Reads char, put on stack, and in A
+;;; TODO: key
+FUNC _key
+;;; 8
+        jsr getchar
+        ldy #0
+        jmp pushAY
+
+;;; TODO: emit?
+FUNC _emit
+;;; 7
+        lda 0,x
+        inx
+        inx
+        jmp putchar
+
+.endif ; IO
 
 
 
@@ -249,7 +271,8 @@ FUNC _enter
 
 ;;; ------------------ STACK --------------------
 
-.ifnblank
+.ifdef MINIMAL
+
 FUNC _dup
 ;;; 11
         lda 0,x
@@ -262,7 +285,8 @@ AYtoTOS:
         sty 1,x
 
         rts
-.endif
+
+.else
 
 ;;; cheapest w most flex???
 ; (+ 2 3 2 6 7 3) = 23
@@ -292,7 +316,7 @@ FUNC _setpickA
         ;; hA lPLA
 ;;; (3)
         jmp setlPLAhA
-
+.endif
 
 ;;; TODO: _rot _over _pick
 ;;;       >R <R (jmp next) @zp !zp (vars?)
@@ -356,6 +380,7 @@ FUNC _jz
 @noj:   
         rts
 
+.ifndef MINIMAL
 
 FUNC _lt
 ;;; 9
@@ -364,6 +389,8 @@ FUNC _lt
         inx
         bcc _true
         bcs _zero
+.endif
+
 FUNC _eq
 ;;; 3
         jsr _minus
@@ -429,13 +456,16 @@ FUNC _store
 
 ;;; TODO: these are counted in "STACK" in docs...
 FUNC _drop2 
+;;; 2
         inx
         inx
 ;;; no savings unless can bXX here!
 FUNC _drop
+;;; 3
         inx
         inx
         rts
+
 
 
 .ifnblank
@@ -459,10 +489,21 @@ _cstainc:
         jmp _inc
 .endif
 
+
 .ifdef LISP
-FUNC _cdr 
+FUNC _dupcar
+;;; 6
+        jsr _dup
+        jmp _car
+
+FUNC _dropcdr
+;;; 2
+        inx
+        inx
+FUNC _cdr
+;;; 3
         jsr _inc2
-;FUNC _car   
+FUNC _car   
 .endif ; LISP
 FUNC _load
 ;;; 11
@@ -493,8 +534,10 @@ FUNC _dec
 ;;; (/ 59.0 10) = 5.9 B/ops
 ;;; shr shl not - + nip eor | & inc "math"
 
-FUNC _inc2  
+.ifdef LISP
+FUNC _inc2
         jsr _inc
+.endif
 FUNC _inc   
 ;;; (7)
         inc 0,x
@@ -502,13 +545,15 @@ FUNC _inc
         inc 1,x
 @noinc:
         rts
-        
+
 
 FUNC _shr   
 ;;; 5
         lsr 1,x
         ror 0,x
         rts
+
+.ifndef MINIMAL
 FUNC _shl   
 ;;; 5
         asl 0,x
@@ -520,6 +565,7 @@ FUNC _not
         ;; last op ???
 ;;; TODO: revisit!
         bne _eor
+.endif
 
 ;;; For
 SBCzpx=$f5
@@ -567,10 +613,14 @@ FUNC _eor
 ;;; 3
         lda #EORzpx
         SKIPTWO
+
+.ifndef MINIMAL
 FUNC _or
 ;;; 3
         lda #ORAzpx
         SKIPTWO
+.endif
+
 FUNC _and
         lda #ANDzpx
 ;;; 2
@@ -587,6 +637,21 @@ FUNC _math
         inx
         rts
 
+.ifnblank
+;;; If we use _math 2x we saved!
+FUNC _plus
+;;; 14
+        clc
+        lda 0,x
+        adc 2,x
+        sta 2,x
+        lda 1,x
+        adc 3,x
+        sta 3,x
+        rts
+.endif
+
+.ifdef LISP
 FUNC _toptr1
 ;;; 9
         lda 0,x
@@ -615,6 +680,8 @@ pnext:
         bne pnext
 
         rts
+
+.endif ; LISP
 
 
 .ifdef SECONDPAGE
@@ -653,11 +720,6 @@ pnext:
         .byte (bytecodefun-bytecodes)-1
 .endmacro
 
-
-
-;;; Forwarding for machine code not fit in this page
-FUNC _printatom
-        jmp printatom
 
 ;;; Here is a list of offsets (walk back from 255)
 offbytecode:

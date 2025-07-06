@@ -9,6 +9,9 @@
 ;;; template/begin.asm
 
 ;USETHESE=1
+LISP=1
+IO=1                            ; _getc _putc
+MINIMAL=1
 
 ;;; used for show_size
 ;;; 
@@ -112,38 +115,7 @@ FUNC _start
 
 .ifndef USETHESE
 
-.ifnblank
-_car:   
-_putc:  
-_cdr:   
-_dropcdr:       
-_dupcar:        
-_nilqkeep:     
-_jnil:  
-
-
-.else
-_car=_load
-
-_cdr:   
-        jsr _inc2
-        jmp _car
-
-_putc:
-        lda 0,x
-        inx
-        inx
-        jmp putchar
-        
-_dropcdr:       
-        inx
-        inx
-        jmp _cdr
-
-_dupcar:
-        jsr _dup
-        jmp _car
-
+       
 ;;; Doesn't consume the value
 _nilqkeep:
 ;;; 17
@@ -164,7 +136,6 @@ _jnil:
         ;; -- fall through to _jz
         jmp _jz
 ;_jz:     
-.endif
 
 _comma: 
 _ccomma:        
@@ -459,7 +430,7 @@ FUNC _store
 FUNC _comma
 FUNC _ccomma
 ;;; TODO:
-FUNC _rcomma        
+FUNC _rcomma
 ;;; TODO:
         ;; lol
         rts
@@ -1278,7 +1249,7 @@ ATOM "T", .ident("_T_"), "_quote_"
 ;;;   inc plus                   (+ 7 4 14) ???  = 25
 ;;;   semis JZ JP                (+ 0 14 3)      = 17
 ;;; TODO: jump                   (+ 12)     ???  = 12
-;;;   putc getc                  (+ 6 5)         = 11
+;;;   emti key                   (+ 7 8)         = 11
 ;;; TODO: getatomchar peekc      (+ 15 10)       = 25
 ;;;  )
 ;;; 
