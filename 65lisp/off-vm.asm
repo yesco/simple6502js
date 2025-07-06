@@ -239,6 +239,21 @@ enter:
 
 ;;; ------------------ STACK --------------------
 
+.ifnblank
+_dup: 
+;;; 11
+        lda 0,x
+        ldy 1,x
+pushAY:
+        dex
+        dex
+AYtoTOS:
+        sta 0,x
+        sty 1,x
+
+        rts
+.endif
+
 ;;; cheapest w most flex???
 ; (+ 2 3 2 6 5 3) = 21
 _dup:   

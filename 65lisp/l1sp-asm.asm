@@ -66,6 +66,7 @@ LOWCONSSTART= ((endaddr+HEAPSIZE+CONSSPACESIZE)/4)*4
         inx
 .endmacro
 
+_NOP_=$ea
 ;;; this macro exports the _NAME func so that 
 ;;; its size can be determined, as well as labels
 ;;; the function. 
@@ -75,8 +76,8 @@ LOWCONSSTART= ((endaddr+HEAPSIZE+CONSSPACESIZE)/4)*4
 
   .ifdef DOUBLEPAGE
 ;;; TODO: seems .code segment not aligned?
-;    .align 2, $ea               ; NOP
-     .res (* .mod 2), $ea 
+;    .align 2, _NOP_
+     .res (* .mod 2), _NOP_
  .endif ; DOUBLEPAGE
 
   .export .ident(.string(name))
@@ -121,8 +122,8 @@ here:     .res 2
         sta here+1
 
         ;; set things to nil
-        ldy #<__nil
-        lda #>__nil
+        ldy #<_nil_
+        lda #>_nil_
 
         sty envvar
         sta envvar+1
@@ -169,11 +170,11 @@ USETHESE=1
 _nilqkeep:
 ;;; 17
         lda 0,x
-        cmp #<__nil
+        cmp #<_nil_
         bne @notnil
         lda 1,x
-        cmp #>__nil
-        ;; == __nil
+        cmp #>_nil_
+        ;; == _nil
 @notnil:
         ;; tail calls
         bne _true
@@ -283,6 +284,20 @@ FUNC _zero
 ;;; could choose different impls
 
 FUNC _dup
+;;; 11
+        lda 0,x
+        ldy 1,x
+pushAY:
+        dex
+        dex
+AYtoTOS:
+        sta 0,x
+        sty 1,x
+
+        rts
+
+.ifnblank
+FUNC _dup
 ;;; 2 !
         txa
         tay
@@ -300,6 +315,7 @@ pushlYhA:
 setlYhPLA:
         pla
         jmp setlYhA
+.endif
 
 FUNC _swap
 ;;; 14
@@ -334,9 +350,9 @@ FUNC _nullkeep
 ;;; 9
 ;;; TODO: is there a getlYhA ?
         lda 256-2,x             ; neg addressing!
-        cmp #<__nil
+        cmp #<_nil_
         lda 256-1,x             ; neg addressing!
-        sbc #>__nil
+        sbc #>_nil_
 ;;; is Z=1 if equal? or just if last byte == ???
         rts
 
@@ -396,7 +412,7 @@ FUNC _next
         lda _start,y
 
 ;;; TODO: atoms could be self pushing? (if at end)
-;;; (10 B but only __nll __T __lambda ... so...)
+;;; (10 B but only _nll _T _lambda ... so...)
         cmp #<offbytecode
         bcs enter
         
@@ -483,8 +499,8 @@ endfirstpage:
 
 .assert *-_start<=256,error,"%% firstpage is FULL!"
 
-;;; align
-.res (256-(* .mod 256))
+;;; align ; Not using _NOP_ as this is usable space
+.res (256-(* .mod 256)), 0 
 bytecodes:     
 
 ;;; first byte to "skip"
@@ -609,20 +625,24 @@ bytecodes:
 .macro MISALIGN base,off
   .assert base<=4,error,"%% MISALIGN: base too big"
 
+;;; ONLY 10 bytes lost...
+;;; TODO: maybe can move some code around
         .if (* .mod base)<>off
-          .res 1
+          .res 1,_NOP_
         .endif
         .if (* .mod base)<>off
-          .res 1
+          .res 1,_NOP_
         .endif
         .if (* .mod base)<>off
-          .res 1
+          .res 1,_NOP_
         .endif
 .endmacro
 
 
 .macro ATOM name,val,prev
-.ident(.concat("__", name)) :
+
+.export .ident(.concat("_", name,"_"))
+.ident(.concat("_", name,"_")) :
         MISALIGN 4,1
         .word val, .ident(prev)
         .byte name, 0
@@ -640,9 +660,9 @@ bc_readeval:
         DO _eval
         GOTO bc_readeval
 
-ATOM "nil", .ident("__nil"), "__nil"
+ATOM "nil", .ident("_nil_"), "_nil_"
 
-ATOM "cdr", _cdr, "__nil"
+ATOM "cdr", _cdr, "_nil_"
 ;;; smaller in machine code (before _load/_car)
 .ifnblank
 ;;; 5
@@ -654,9 +674,9 @@ _cdr:
         DO _semis
 .endif
 
-ATOM "car", _load, "__cdr"
+ATOM "car", _load, "_cdr_"
 
-ATOM "cons", _cons, "__car"
+ATOM "cons", _cons, "_car_"
 ;;; 6
 bc_cons:
         DO _swap
@@ -703,12 +723,13 @@ ret:
 
 
 
-;;; ATOM "null", _null, "__car"
+;;; ATOM "null", _null, "_car"
 ;;; TODO: if nil was at address 0 ...
-;        LIT __nil
-ATOM "eq", _eq, "__cons"
+;        LIT _nil_
+ATOM "eq", _eq, "_cons_"
 
-;;; ATOM "eval", _eval, __
+FUNC _bc_eval
+;;; ATOM "eval", _eval, _
 ;;; (+ 12 15) = 27
 
 ;;; 13 - atoms
@@ -754,14 +775,17 @@ nlambda:
         DO _jump                
         ;; doesn't return (?) (have DO _call)
 
+FUNC _bc_atom
 bc_atom:        
         .res 4
         DO _semis
 
+FUNC _bc_isstrictfun
 bc_isstrictfun: 
         .res 8
         DO _semis
 
+FUNC _bc_evparams
 bc_evparams:       
         .res 12
 ;;; TODO:
@@ -800,10 +824,11 @@ rett:
         rts
 .endif
 
-ATOM "cond", _cond, "__eq"
+ATOM "cond", _cond, "_eq"
 ;;; (+ 6 9 4 4) = 23
 
 ;;; (6)
+FUNC _bc_cond
 bc_cond:  
         ;; L= ( F=(test1 progn1) G=...)
         DO _dupcar              ; L F
@@ -823,7 +848,8 @@ bc_cond:
         DO _drop                ; L res
         DO _nip                 ; res
         DO _semis
-haveprogn:      
+
+haveprogn:
 ;;; (4)
         ;;                      ; L res progn1
         DO _nip
@@ -886,6 +912,7 @@ _cond:
 ;; ATOM "progn", _progn, "...
 ;;;  P= (a Q=...)
 ;;; 12
+FUNC _bc_progn
 bc_progn: 
         DO _dupcar              ; P a
         DO _eval                ; P v
@@ -902,6 +929,7 @@ patend:
         DO _semis
         
 
+FUNC _bc_assoc
 ;;; ATOM "assoc"
 bc_assoc: 
 ;;; TODO: write bytecode!
@@ -925,7 +953,6 @@ nextass:
         jsr dropcdr_DropRetIfNotCons
         jmp assoc
         
-
 
 atomlookup:
 ;;; (+ 3 3 3 16) = 25 BIG!!!
@@ -955,17 +982,18 @@ atomlookup:
 
 .endif
 
-ATOM "lambda", _lambda, "__cond"
+ATOM "lambda", _lambda, "_cond_"
         ;; TODO: needs to have access to itself
         ;; self-quoting, or applying? hmmmm
         ;; but would then need to have special support
         ;; in apply, or put something else on stack!
-_lambda:        
+_lambda:
 ;;; TODO:
 
-ATOM "print", _print, "__lambda"
+ATOM "print", _print, "_lambda_"
 ;;; (+ 9 19) = 28
 ;;; (9)
+FUNC _bc_print
 bc_print:       
         DO _dup
         IFNOT _atom, prcons
@@ -975,6 +1003,7 @@ pratom:
         DO _putc
         DO _semis
 
+FUNC _bc_prlist
 prcons: 
 ;;; (19)
         LIT '('
@@ -995,8 +1024,9 @@ prend:
         DO _putc
         DO _semis
 
-ATOM "read", _read, "__print"
+ATOM "read", _read, "_print_"
 ;;; (+ 4 18 8 21) = 51
+FUNC _bc_read
 bc_read:        
 ;;; (4)
         DO _getatomchar
@@ -1006,20 +1036,20 @@ createatom:
         LIT here
 
         ;; set car
-        LIT __nil
+        LIT _nil_
         ;; TODO: how to say use here?
         ;; to ptr1?
         DO _comma
         DO _drop2
 
         ;; set cdr: next atom link
-        ADDRESS __T
+        ADDRESS _T_
         DO _cdr
         DO _comma
 
         ;; link this one in
         DO _dup
-        ADDRESS __T
+        ADDRESS _T_
         DO _store
         
         DO _swap
@@ -1038,6 +1068,7 @@ rdatomend:
 
 ;;; need mapped as we recruse!
 ;;; (alt: DO _exec (not have!))
+FUNC _bc_readlist
 bc_readlist:
 ;;; (21)
 
@@ -1047,7 +1078,7 @@ bc_readlist:
 ;        IFNOTEQ ')', readlist2
 
 rdlend:  
-        LIT __nil
+        LIT _nil_
         DO _semis
 
 
@@ -1064,7 +1095,7 @@ rdlstart:
         DO _semis
 
 rderr:  
-        LIT __nil
+        LIT _nil_
         DO _semis
         
 
@@ -1079,12 +1110,12 @@ getatomc:
 
 
 
-ATOM "quote", _quote, "__read"
+ATOM "quote", _quote, "_read_"
         ;; TODO: needs to have access to itself
 _quote: 
 ;;; TODO:
 
-ATOM "T", .ident("__T"), "__quote"
+ATOM "T", .ident("_T_"), "_quote_"
 
 ;;;                  M A I N
 ;;; ========================================
