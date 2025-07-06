@@ -52,11 +52,11 @@
  
 .zeropage
 
-ptr1:   .res 2
-
-ip:     .res 2
-;;; TODO: remove, actually, only have this!!!!
+.ifndef ipy
 ipy:    .res 1
+.endif
+
+ptr1:   .res 2
 
 savea:  .res 1
 savex:  .res 1
@@ -71,10 +71,19 @@ savez:  .res 1                  ; haha!
 
 .res (255-(* .mod 256))
 
+.ifndef _start
 .export _start
 _start: 
+.endif
 
 .ifnblank
+
+;;; only used in this branch,
+;;; the other only have ipy!
+
+.zeropage
+ip:     .res 2
+.code
 
 ;;; subr
 ;;; (+ 3 11 6 10 3 9 5) = 47
@@ -478,6 +487,8 @@ _dec:
 ;;; (/ 59.0 10) = 5.9 B/ops
 ;;; shr shl not - + nip eor | & inc "math"
 
+_inc2:  
+        jsr _inc
 _inc:   
 ;;; (7)
         inc 0,x
@@ -567,6 +578,34 @@ math:
         inx
         rts
 
+
+;;; 5
+.export _printatom
+_printatom:
+        ;jsr _toptr1
+        ;; at offset 4
+        ldy #4-1
+
+;;; prints ascizz pointed to at ptr1
+;;; starting at position Y+1
+;;; 
+;;; 9
+.proc _printzyplus1
+;       dey ; for printzy
+next:   
+        iny
+        lda (ptr1),y
+;        jsr putchar
+        ;; ok, we'll print \0, any harm? lol
+        bne next
+
+        rts
+.endproc        
+
+
+.ifdef SECONDPAGE
+
+
 ;;; All "instructions" of our bytecode language
 ;;; are offsets into the firstpage: _start[instr]
 ;;; 
@@ -600,6 +639,8 @@ math:
         .byte (bytecodefun-bytecodes)-1
 .endmacro
 
+
+
 ;;; Forwarding for machine code not fit in this page
 _printatom:     jmp printatom
 
@@ -607,8 +648,8 @@ _printatom:     jmp printatom
 offbytecode:
 ;;; add directly after here:
 
-_readbyte:      MAPTO readbyte
-_read:          MAPTO read
+;_readbyte:      MAPTO readbyte
+;_read:          MAPTO read
 _eval:          MAPTO eval
 _readeval:      MAPTO readeval
 _mul10:         MAPTO mul10
@@ -639,28 +680,6 @@ eval:
         .byte 128 | .strat(str, .strlen(str)-1)
 .endmacro
 
-;;; 5
-printatom:
-        ;jsr _toptr1
-        ;; at offset 4
-        ldy #4-1
-
-;;; prints ascizz pointed to at ptr1
-;;; starting at position Y+1
-;;; 
-;;; 9
-.proc _printzyplus1
-;       dey ; for printzy
-next:   
-        iny
-        lda (ptr1),y
-;        jsr putchar
-        ;; ok, we'll print \0, any harm? lol
-        bne next
-
-        rts
-.endproc        
-
 
 ;;; 5
 readbyte:
@@ -680,3 +699,6 @@ mul10:
         DO _semis
 
 ;;; 
+
+.endif ; SECONDPAGE
+
