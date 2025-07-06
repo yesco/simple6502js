@@ -59,23 +59,6 @@ HERESTART= endaddr
 LOWCONSSTART= ((endaddr+HEAPSIZE+CONSSPACESIZE)/4)*4
 
 _NOP_=$ea
-;;; this macro exports the _NAME func so that 
-;;; its size can be determined, as well as labels
-;;; the function. 
-;;; 
-;;; For 2-page dispatch it can also align
-.macro FUNC name
-
-  .ifdef DOUBLEPAGE
-;;; TODO: seems .code segment not aligned?
-;    .align 2, _NOP_
-     .res (* .mod 2), _NOP_
- .endif ; DOUBLEPAGE
-
-  .export .ident(.string(name))
-  .ident(.string(name)) :
-.endmacro
-
 
 ;;; ========================================
 
@@ -109,43 +92,13 @@ FUNC _start
 ;;; 22 bytes already, make constants range and memcopy!
 
 
-;;; more efficent init? memcpy?
-        lda #<LOWCONSSTART
-        sta lowcons
-        lda #>LOWCONSSTART
-        sta lowcons+1
-        
-        lda #<HERESTART
-        sta here
-        lda #>HERESTART
-        sta here+1
-
-        ;; set things to nil
-        ldy #<_nil_
-        lda #>_nil_
-
-        sty envvar
-        sta envvar+1
-
-        ;; set IP - point to read-eval!
-        lda #<_readeval
-        sta ipy
-;        sta ip
-;        lda #>_readeval
-;        sta ip+1
-
-        ldy #0
-        sty ipy
-
-;;; END
-
 .ifnblank
         NEWLINE
         putc 'E'
         putc 'N'
         putc 'D'
 .endif
-        rts
+        jmp _bytecodeinit
 
 
 
@@ -514,6 +467,20 @@ FUNC _rcomma
 .endif ; USETHESE
 
 
+;;; enable this to ignore bytecodes
+
+offbytecode:    
+endfirstpage:   
+
+bytecodes:      
+_readeval:      
+_nil_:  
+_bytecodeinit:  
+.include "end.asm"
+
+.end
+
+
 
 ;;; All "instructions" of our bytecode language
 ;;; are offsets into the firstpage: _start[instr]
@@ -553,6 +520,8 @@ offbytecode:
 
 ;;; 13 items 13 bytes!
 
+.assert (offbytecode-_start)<256,error,"%% No space left in page 1 for MAPTO"
+
 _cons:          MAPTO bc_cons
 _eval:          MAPTO bc_eval
 _cond:          MAPTO bc_cond
@@ -574,7 +543,45 @@ endfirstpage:
 
 ;;; align ; Not using _NOP_ as this is usable space
 .res (256-(* .mod 256)), 0 
-bytecodes:     
+
+FUNC _bytecodeinit
+
+;;; more efficent init? memcpy?
+        lda #<LOWCONSSTART
+        sta lowcons
+        lda #>LOWCONSSTART
+        sta lowcons+1
+        
+        lda #<HERESTART
+        sta here
+        lda #>HERESTART
+        sta here+1
+
+        ;; set things to nil
+        ldy #<_nil_
+        lda #>_nil_
+
+        sty envvar
+        sta envvar+1
+
+        ;; set IP - point to read-eval!
+        lda #<_readeval
+        sta ipy
+;        sta ip
+;        lda #>_readeval
+;        sta ip+1
+
+        ldy #0
+        sty ipy
+
+        rts
+;;; END
+
+bytecodes:
+
+
+
+
 
 ;;; first byte to "skip"
 .byte 42
@@ -585,11 +592,19 @@ bytecodes:
 ;;;                  B Y T E C O D E
 
 .macro DO fun
-        .assert fun-_start>0,error,"%% DO cannot call fun at offset 0"
-        .assert (fun-_start)<256,error,"%% DO can only do funs in first page"
+        .assert fun-_start>0,error,"%% DO: cannot call fun at offset 0"
+        .assert (fun-_start)<256,error,"%% DO: can only do funs in first page"
+        .assert 0,error,"%% NOTNOTNOTNONTONTT"
+;;; Haha- never triggered! ?
+.assert 42<7,error,"FISH"
+
         ;; -1 as we pre-inc in "get"
         .byte (fun-_start)
 .endmacro
+
+
+;;; Haha- never triggered! ?
+.assert 42<7,error,"FDISHDLKFJDS"
 
 ;;; Branch instruction are simplified as we're
 ;;; only within the same page to set ipy!
@@ -724,13 +739,18 @@ bytecodes:
 
 ;PRINTHEX=1                     
 ;PRINTDEC=1
-.include "print.asm"
+;.include "print.asm"
 
 ;;; write as many lisp functions as possibly in byte code!
 
 bc_readeval:
-;        DO _read
-;        DO _eval              
+
+;.byte _start    ; $700
+;.byte _read     ; $844
+;.byte bytecodes ; $900
+
+        DO _read
+        DO _eval
         GOTO bc_readeval
 
 ATOM "nil", .ident("_nil_"), "_nil_"
@@ -755,8 +775,8 @@ bc_cons:
         DO _swap
 ;;; TODO: how to say use lowcons???
 ;;; to ptr1?
-;        DO _comma
-;        DO _comma
+        DO _comma
+        DO _comma
         DO _semis
 
 .ifnblank
@@ -807,13 +827,13 @@ FUNC _bc_eval
 
 ;;; 13 - atoms
 bc_eval:
-;        IFNOT _atom, evalcons
+        IFNOT _atom, evalcons
         ;; atom
         ADDR envvar
 ;;; special assoc, returns: (sought . value)
 ;;;     or if fail return: sought
-;        DO _assoc
-;        IFNOT _atom, foundvar
+        DO _assoc
+        IFNOT _atom, foundvar
 notfound:       
         ;; look up global value
 ;;; TODO: what if value was in cdr!!! 
@@ -829,13 +849,13 @@ evalcons:
         ;; we have (fun params...)
         DO _dupcar
         ;; eval fun
-;        DO _eval
-;        IFNOT _isstrictfun, nlambda
+        DO _eval
+        IFNOT _isstrictfun, nlambda
 evalapply:
 ;;; (4)
         ;; stack: (fun params...) funaddr
         DO _swap
-;        DO _evparams
+        DO _evparams
         DO _swap
 nlambda:        
 ;;; (3)
@@ -845,7 +865,7 @@ nlambda:
 
         ;; nlambdas
         DO _load
-;        DO _jump                
+        DO _jump                
         ;; doesn't return (?) (have DO _call)
 
 FUNC _bc_atom
@@ -904,9 +924,9 @@ bc_cond:
         DO _dupcar              ; L F
         ;; (test1 progn1)
         DO _dupcar              ; L F test1
-;        DO _eval                ; L F res
+        DO _eval                ; L F res
         ;; jmp if nil = clause failed
-;        IF_NIL_GOTO cnext      ; L F res
+        IF_NIL_GOTO cnext      ; L F res
         ;; true
 ;;; (9)
         DO _swap                ; L res F
@@ -925,7 +945,7 @@ haveprogn:
         DO _nip
         DO _nip
 ;;; TODO: tail calls?
-;        DO _progn
+        DO _progn
         DO _semis
 
 cnext:
@@ -985,11 +1005,11 @@ _cond:
 FUNC _bc_progn
 bc_progn: 
         DO _dupcar              ; P a
-;        DO _eval                ; P v
+        DO _eval                ; P v
         DO _swap                ; v P
 pnext:   
         DO _cdr                 ; v Q   
-;        IF_NIL_GOTO patend        ; v Q Q
+        IF_NIL_GOTO patend        ; v Q Q
         ;; have more
         DO _nip                 ; Q
         GOTO bc_progn
@@ -1066,7 +1086,7 @@ ATOM "print", _print, "_lambda_"
 FUNC _bc_print
 bc_print:       
         DO _dup
-;        IFNOT _atom, prcons
+        IFNOT _atom, prcons
 pratom:
         DO _printatom
         LIT ' '
@@ -1080,12 +1100,12 @@ prcons:
         DO _putc
 prlist: 
         DO _dupcar
-;        DO _print
+        DO _print
         DO _cdr
-;        IFNOT _atom, prlist
+        IFNOT _atom, prlist
 pratend:        
         ;; if cdr<>nil print atom; putc ')'
-;        IF_NIL_GOTO prend
+        IF_NIL_GOTO prend
         ;; . atom
         LIT '.'
         DO _putc
@@ -1109,13 +1129,13 @@ createatom:
         LIT _nil_
         ;; TODO: how to say use here?
         ;; to ptr1?
-;        DO _comma
+        DO _comma
         DO _drop2
 
         ;; set cdr: next atom link
         ADDRESS _T_
         DO _cdr
-;        DO _comma
+        DO _comma
 
         ;; link this one in
         DO _dup
@@ -1126,14 +1146,14 @@ createatom:
 rdatom: 
 ;;; (8)
         ;; save char to 
-;        DO _ccomma
-;        DO _getatomchar
+        DO _ccomma
+        DO _getatomchar
         DO _dup
-;        JZ rdatom
+        JZ rdatom
 rdatomend:      
         ;; create atom
         DO _zero
-;        DO _ccomma
+        DO _ccomma
         DO _semis
 
 ;;; need mapped as we recruse!
@@ -1145,7 +1165,7 @@ bc_readlist:
 
 ;;; TODO:  we're FULL !!!
 
-;        IFNOTEQ ')', readlist2
+        IFNOTEQ ')', readlist2
 
 rdlend:  
         LIT _nil_
@@ -1158,10 +1178,10 @@ readlist2:
 ;;; TODO:too big bytecodes?
 ;       ELSE rderr
 rdlstart:
-;        DO _read
-;        DO _readlist
+        DO _read
+        DO _readlist
 ;;; tail call?
-;        DO _cons
+        DO _cons
         DO _semis
 
 rderr:  

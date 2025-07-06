@@ -1,4 +1,4 @@
-;;;  stack: 44  5"" _drop2 _drop _swap _dup _pick [pushAY AYtoTOS pushAA] (+ 2 2 14 2 21) {_pickA, setpickA}
+;;;  stack: 43  5"" _drop2 _drop _swap _dup _pick [pushAY AYtoTOS pushAA] (+ 2 2 14 2 23) {_pickA, setpickA}
 ;;;    mem: 25  2   ! @ (+ 14 11) 
 ;;;   math: 59 10   nip - + EOR | & _not +shr +shl inc {dec} {9}
 ;;;  const: 32  4   _true 0 ' _literal (+ 3 6 8 15)
@@ -11,7 +11,7 @@
 ;;; 
 ;;;              - OVERFLOW -
 ;;; 
-;;; (+ 69 44 26 59 32 20 17) = 267 !!!!!
+;;; (+ 69 43 26 59 32 20 17) = 266 !!!!!
 ;;; (+  3  5  2 10  4  3  2) =  29  extra"""= 6
 ;;; (/ 267.0 29) =  9.2 B/op !
 ;;; (- 256  267) = -11... (+ 32 39)=71 mul+divmod
@@ -25,7 +25,7 @@
 ;;;   exec: 38  1"' _exit_ [get] next+enter
 ;;; 
 ;;; 
-;;; (+ 38 44 26 59 32 20 21) = 240 (- 256 240) = 16
+;;; (+ 38 43 26 59 32 20 21) = 239 (- 256 240) = 16
 ;;; (+  1  5  2 10  4  3  2) =  27
 ;;; 
 ;;; :- means can have max 21 bytecode routines in 2nd
@@ -33,12 +33,12 @@
 ;;; -----------------------------------------------
 ;;; LISP: to be used in a LISP
 ;;; 
-;;;  stack: 44  5"" _drop2 _drop _dup _pick _swap [pushAY AYtoTOS pushAA] (+ 2 2 2 2 5 13 15)
+;;;  stack: 43  5"" _drop2 _drop _dup _pick _swap [pushAY AYtoTOS pushAA] (+ 2 2 2 2 5 13 17)
 ;;;    mem: 26  2   ! @ (+ 12 14) 
 ;;;   math: 59 10   nip - + EOR | & _not +shr +shl inc {dec} (+ 31 5 5 5 7) {9}
 ;;;   test: 18  3   _null _eq _lt (+ 8 3 7)
 ;;; 
-;;; (+ 44 26 59 18) = 147 bytes
+;;; (+ 43 26 59 18) = 146 bytes
 ;;; (+  5  2 10  3) =  19 impls
 
 .macro SKIPONE
@@ -67,13 +67,15 @@ savez:  .res 1                  ; haha!
 .code
 
 .feature org_per_seg
-.org $600
 
-.res (255-(* .mod 256))
+;;; TODO: why need?
+
+;.org $700
+
+;.res (255-(* .mod 256))
 
 .ifndef _start
-.export _start
-_start: 
+FUNC _start
 .endif
 
 .ifnblank
@@ -90,11 +92,11 @@ ip:     .res 2
 ;;; call exec callit enter loadip semis
 
 ;;; call bytecode
-_call: 
+FUNC _call
 ;;; 3
         jsr _literal
 ;;; _exec bytecode from stack ( addr - )
-_exec:
+FUNC _exec
 ;;; 11
         ;; remove jsrloop
         pla
@@ -129,8 +131,8 @@ callit:
         rti
 
 ;;; jsr _ovm65 .byte "3+4+7+", 0
-_ovm65: 
-_interpret:
+FUNC _ovm65 
+FUNC _interpret
 _enter:
 ;;; 3
         ;; (this will skip zeroth byte!)
@@ -154,18 +156,18 @@ jsrloop:
         jmp jsrloop
 
 ;;; get next byte
-get:
+FUNC get
 ;;; 7 (saves at least 3 bytes as subtroutine)
         inc ipy
         ldy ipy
         lda (ip),y
         rts
 
-_drop2:
+FUNC _drop2
 ;;; 2
         inx
         inx
-_drop:
+FUNC _drop
 ;;; 2
         inx
         inx
@@ -173,14 +175,13 @@ _drop:
 _next:
 ;;; 3 20c (+ 12+6+9=27c rts 1B to loop, OR 3c jmp next 3B)
         jsr get
-_execA: 
+FUNC _execA
 ;;; 6
         sta go+1                ; lo offset
 go:     jmp ONEPAGE
 
 
-_exit_: 
-_semis:
+FUNC _semis:
 ;;; 5
         ;; remove jsrloop
         pla
@@ -197,32 +198,32 @@ _semis:
 ;;; ============ NEW EXEC
 ;;; (+ 7 3 16 12) = 38
 
-get:
-;;; 7 
+FUNC _get
+;;; 8 
         inc ipy
         ldy ipy
         lda bytecodes,y
         rts
 
-_semis:
+FUNC _semis
 ;;; 3
         pla
         sta ipy
-next:  
+FUNC _next
 ;;; 16
         ;; next token
-        jsr get
+        jsr _get
 
         ;; NOTE: C flag modified...
         cmp #<offbytecode
-        bcs enter
+        bcs _enter
         
         ;; primtive ops in first page
         sta call+1
 call:   jsr _start
-        jmp next
+        jmp _next
 
-enter:  
+FUNC _enter 
         ;; bytecode in second page (only)
         ;; Y=ip A=new to interpret
 
@@ -242,14 +243,14 @@ enter:
         ;; push old Y
         tya
         pha
-        bcs next                ; C still set!
+        bcs _next                ; C still set!
 
 ;;; ============END NEW EXEC
 
 ;;; ------------------ STACK --------------------
 
 .ifnblank
-_dup: 
+FUNC _dup
 ;;; 11
         lda 0,x
         ldy 1,x
@@ -264,27 +265,27 @@ AYtoTOS:
 .endif
 
 ;;; cheapest w most flex???
-; (+ 2 3 2 6 5 3) = 21
-_dup:   
+; (+ 2 3 2 6 7 3) = 23
+FUNC _dup
 ;;; 2
         lda #0
-_pickA:  
+FUNC _pickA 
 ;;; 3
         dex
         dex
         SKIPTWO
-_pick:
+FUNC _pick
 ;;; 2
         lda 0,x
 ;;; 15
-setpickA:  
+FUNC _setpickA 
 ;;; (6)
         asl
         stx savex
         adc savex
         tay
 
-;;; (5)
+;;; (7)
         lda 2,y   
         pha
         lda 3,y
@@ -297,7 +298,7 @@ setpickA:
 ;;;       >R <R (jmp next) @zp !zp (vars?)
 
 ;;; 14 (can't do shorter?
-_swap:   
+FUNC _swap   
         dex
         jsr byteswap
         inx
@@ -314,34 +315,34 @@ byteswap:
 ;;; after a jsr _test (part of _car,_cdr!)
 ;;; 
 ;;; 13 (+10 RetNoCons+jZVC)
-_jVsym: 
+FUNC _jVsym 
         bvs _j
         bvc noj
-_jZull:  
+FUNC _jZull  
         beq _j
         bne noj
 
 ;;; (10)
 .ifnblank
-_RetNoCons:     
+FUNC _RetNoCons     
         bcs ret
         bcc _exit_
 ;;; _jzvc go_Zull go_Vsym ...cons
-_jZVC:
+FUNC _jZVC
         jsr _jZull
         jsr _jVsym
 .endif
-_jCons: 
+FUNC _jCons
         bcs _j
 noj:    
         inc ipy
         rts
 .endif
 
-_jp:    
+FUNC _jp
 ;;; 3
         jsr _zero
-_jz:    
+FUNC _jz
 ;;; 14
         inx
         inx
@@ -350,23 +351,23 @@ _jz:
         ora 256-1,x
         bne @noj
         ;; do jmp - ipy= new addr
-        jsr get
+        jsr _get
         sta ipy
 @noj:   
         rts
 
 
-_lt:    
+FUNC _lt
 ;;; 9
         jsr _minus
         inx
         inx
         bcc _true
         bcs _zero
-_eq:
+FUNC _eq
 ;;; 3
         jsr _minus
-_null:  
+FUNC _null  
 ;;; 8
         ;; compensate for push _zero/_true
         inx
@@ -377,36 +378,36 @@ _null:
         bne _zero
         ;; =0 fall to _true
 ;;; Z=0 after call
-_FFFF:  
+FUNC _FFFF  
 _neg1:  
 _true:  
 ;;; 3
         lda #$ff
         SKIPTWO
 ;;; Z=1 after call
-_zero:  
+FUNC _zero
 ;;; 6
         lda #0
-_pushAA:
+FUNC _pushAA
         pha
         jmp pushlPLAhA
 
-_lit:   
+FUNC _lit
 ;;; 8
-        jsr get
+        jsr _get
         pha
         lda #0
         beq pushlPLAhA
 
-_literal:       
+FUNC _literal
 ;;; 15
         ;; lo
-        jsr get
+        jsr _get
         pha
         ;; hi
-        jsr get
+        jsr _get
 
-pushlPLAhA:
+pushlPLAhA:     
         dex
         dex
 setlPLAhA:      
@@ -417,8 +418,8 @@ setlPLAhA:
         rts
 
 
-_store: 
-;;; 14
+FUNC _store
+;;; 16
         lda 2,x
         sta (0,x)
         jsr _inc
@@ -427,11 +428,11 @@ _store:
         sta (0,x)
 
 ;;; TODO: these are counted in "STACK" in docs...
-_drop2: 
+FUNC _drop2 
         inx
         inx
 ;;; no savings unless can bXX here!
-_drop:
+FUNC _drop
         inx
         inx
         rts
@@ -439,18 +440,18 @@ _drop:
 
 .ifnblank
 ;;; (+ 6 13) = 19
-_store: 
+FUNC _store 
 ;;; (6)
         jsr _comma
         jmp _drop2
 
 ;;; ((13))
-_comma: 
+FUNC _comma
 ;;; (6)
         jsr _ccomma
         lda 3,x
         SKIPTWO
-_ccomma:
+_ccomma:        
 ;;; (7)
         lda 2,x
 _cstainc:  
@@ -458,7 +459,12 @@ _cstainc:
         jmp _inc
 .endif
 
-_load:
+.ifdef LISP
+FUNC _cdr 
+        jsr _inc2
+;FUNC _car   
+.endif ; LISP
+FUNC _load
 ;;; 11
         ;; lo
         lda (0,x)
@@ -471,7 +477,7 @@ _load:
 
 
 .ifnblank
-_dec:   
+FUNC _dec   
 ;;; 9
         lda 0,x
         bne @nodec
@@ -487,9 +493,9 @@ _dec:
 ;;; (/ 59.0 10) = 5.9 B/ops
 ;;; shr shl not - + nip eor | & inc "math"
 
-_inc2:  
+FUNC _inc2  
         jsr _inc
-_inc:   
+FUNC _inc   
 ;;; (7)
         inc 0,x
         bne @noinc
@@ -498,17 +504,17 @@ _inc:
         rts
         
 
-_shr:   
+FUNC _shr   
 ;;; 5
         lsr 1,x
         ror 0,x
         rts
-_shl:   
+FUNC _shl   
 ;;; 5
         asl 0,x
         rol 1,x
         rts
-_not:   
+FUNC _not   
 ;;; 5
         jsr _neg1
         ;; last op ???
@@ -527,46 +533,49 @@ STAzpx=$9d
 .ifnblank
 ;;; Not efficient
 ;;; 10
-_dup:   
+FUNC _dup: 
 _sta:   
         dex
         dex
         lda #STAzpx
-        jsr math
+        jsr _math
         dex
         dex
         rts
 .endif
 
-_minus: 
+;;; TODO: this one is right,
+;;;   but for mul we need reverse!
+FUNC _minus
 ;;; 5
         sec
         lda #SBCzpx
-        bne math
-_plus:
+        bne _math
+FUNC _plus
 ;;; 4
         clc
         lda #ADCzpx
         SKIPTWO
-_nip:                           ; !!!
+
+FUNC _nip                       ; !!!
 _swapdrop:
 _lda:   
 ;;; 3
         lda #LDAzpx
         SKIPTWO
-_eor:   
+FUNC _eor
 ;;; 3
         lda #EORzpx
         SKIPTWO
-_or:    
+FUNC _or
 ;;; 3
         lda #ORAzpx
         SKIPTWO
-_and:
+FUNC _and
         lda #ANDzpx
 ;;; 2
 
-math:
+FUNC _math
 ;;; 14
         sta @op
         jsr @one
@@ -578,11 +587,17 @@ math:
         inx
         rts
 
+FUNC _toptr1
+;;; 9
+        lda 0,x
+        sta ptr1
+        lda 1,x
+        sta ptr1+1
+        rts
 
+FUNC _printatom
 ;;; 5
-.export _printatom
-_printatom:
-        ;jsr _toptr1
+        jsr _toptr1
         ;; at offset 4
         ldy #4-1
 
@@ -590,17 +605,16 @@ _printatom:
 ;;; starting at position Y+1
 ;;; 
 ;;; 9
-.proc _printzyplus1
+FUNC _printzyplus1
 ;       dey ; for printzy
-next:   
+pnext:   
         iny
         lda (ptr1),y
-;        jsr putchar
+        jsr putchar
         ;; ok, we'll print \0, any harm? lol
-        bne next
+        bne pnext
 
         rts
-.endproc        
 
 
 .ifdef SECONDPAGE
@@ -642,7 +656,8 @@ next:
 
 
 ;;; Forwarding for machine code not fit in this page
-_printatom:     jmp printatom
+FUNC _printatom
+        jmp printatom
 
 ;;; Here is a list of offsets (walk back from 255)
 offbytecode:
@@ -650,9 +665,12 @@ offbytecode:
 
 ;_readbyte:      MAPTO readbyte
 ;_read:          MAPTO read
-_eval:          MAPTO eval
-_readeval:      MAPTO readeval
-_mul10:         MAPTO mul10
+FUNC _eval
+        MAPTO eval
+FUNC _readeval
+        MAPTO readeval
+FUNC _mul10
+        MAPTO mul10
 
 .assert (*-_start)<256,error,"%% Out of space in page 1"
 

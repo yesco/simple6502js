@@ -109,3 +109,21 @@ orgaddr:
 
 ;;;             I N T E R L U D E
 ;;; ========================================
+
+;;; this macro exports the _NAME func so that 
+;;; its size can be determined, as well as labels
+;;; the function. 
+;;; 
+;;; For 2-page dispatch it can also align
+.macro FUNC name
+
+  .ifdef DOUBLEPAGE
+;;; TODO: seems .code segment not aligned?
+;    .align 2, _NOP_
+     .res (* .mod 2), _NOP_
+ .endif ; DOUBLEPAGE
+
+  .export .ident(.string(name))
+  .ident(.string(name)) :
+.endmacro
+
