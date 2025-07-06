@@ -673,10 +673,30 @@ FUNC _get
         inc ipy
         ldy ipy
         lda bytecodes,y
+.ifnblank
+PHA
+TYA
+PHA
+TXA
+PHA
+
+putc '('
+ldy ipy
+lda bytecodes,y
+jsr print2h
+putc ')'
+
+PLA
+TAX
+PLA
+TAY
+PLA
+.endif
         rts
 
 FUNC _semis
 ;;; 3
+PUTC '\'
         pla
         sta ipy
 FUNC _next
@@ -701,6 +721,8 @@ clc
 adc #'j'
 jsr putchar
 ;jsr print2h
+
+        ;; jsk to find it fast!
 
 tsx
 txa
@@ -728,9 +750,9 @@ tay
 pla
 .endif
 
-;        sec
-;        sbc #<offbytecode
-;        bcs _enter
+        sec
+        sbc #<offbytecode
+        bcs _enter
         
         ;; primtive ops in first page
 call:   jsr _start

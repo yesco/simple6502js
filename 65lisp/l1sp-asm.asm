@@ -742,7 +742,10 @@ bar:
         LIT 10
         DO _emit
 
-        DO _inc
+;;; jsk   _inc changes x???? hmmm
+
+;        DO _inc
+;        DO _inc
         DO _dup
         DO _emit
 
