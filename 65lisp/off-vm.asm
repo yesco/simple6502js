@@ -21,7 +21,7 @@
 ;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
 ;;; 
 ;;; (+ 39 15 33 17 39 33 43 23) = 242 wtf bytes (246 in file?)
-;;; (+  1  2  5  2  6  5  7  1) =  29 words
+;;; (+  1  2  5  2  6  5  7  1) =  29 words (+1 semis)
 
 */
 
@@ -246,61 +246,6 @@ FUNC _emit
         jmp putchar
 
 .endif ; IO
-
-
-
-
-;;; ============ NEW EXEC
-;;; (+ 8 3 16 12) = 39
-
-FUNC _get
-;;; 8 
-        inc ipy
-        ldy ipy
-        lda bytecodes,y
-        rts
-
-FUNC _semis
-;;; 3
-        pla
-        sta ipy
-FUNC _next
-;;; 16
-        ;; next token
-        jsr _get
-
-        ;; NOTE: C flag modified...
-        cmp #<offbytecode
-        bcs _enter
-        
-        ;; primtive ops in first page
-        sta call+1
-call:   jsr _start
-        jmp _next
-
-FUNC _enter 
-        ;; bytecode in second page (only)
-        ;; Y=ip A=new to interpret
-
-;;; 12
-        ;; Y=ipy, A=zeropage offset containing
-        ;; C modified before
-
-        ;; look up second page offset at Y!
-        ;; see label "offbytecode"
-        ;; 
-        ;;   ipy = _start[bytecodes[ipy]]
-        tay
-        lda _start,y
-        ;; "swap"
-        ldy ipy
-        sta ipy
-        ;; push old Y
-        tya
-        pha
-        bcs _next                ; C still set!
-
-;;; ============END NEW EXEC
 
 ;;; ------------------ STACK --------------------
 
@@ -714,9 +659,68 @@ pnext:
 
         rts
 
-FUNC _end
 .endif ; LISP
 
+
+
+
+
+;;; ============ NEW EXEC
+;;; (+ 8 3 16 12) = 39
+
+FUNC _get
+;;; 8 
+        inc ipy
+        ldy ipy
+        lda bytecodes,y
+        rts
+
+FUNC _semis
+;;; 3
+        pla
+        sta ipy
+FUNC _next
+;;; 16
+        ;; next token
+        jsr _get
+
+        ;; store it before modify!
+        sta call+1
+        sec
+        sbc #<offbytecode
+        bcs _enter
+        
+        ;; primtive ops in first page
+call:   jsr _start
+        jmp _next
+
+FUNC _enter
+        ;; bytecode in second page (only)
+        ;; Y=ip A=new to interpret
+
+;;; 12
+        ;; Y=ipy, A=index 0.. of routine to call!
+        ;; C is set
+
+        ;; look up second page offset at Y!
+        ;; see label "offbytecode"
+        ;; 
+        ;;   ipy = _start[bytecodes[ipy]]
+        tay
+        lda bytecodes,y
+        ;; "swap"
+        ldy ipy
+        sta ipy
+        ;; push old Y
+        tya
+        pha
+        bcs _next                ; C still set!
+
+
+;;; ============END NEW EXEC
+
+
+FUNC _end
 
 .ifdef SECONDPAGE
 
@@ -745,6 +749,7 @@ FUNC _end
 ;;;      ipy= _start[o]
 ;;;    
 ;;;    goto next
+
 
 .macro MAPTO bytecodefun
         .assert (bytecodefun-bytecodes)>=0,error,"%% MAPTO only maps to labels in bytecodes page"
@@ -815,4 +820,6 @@ mul10:
 ;;; 
 
 .endif ; SECONDPAGE
+
+
 

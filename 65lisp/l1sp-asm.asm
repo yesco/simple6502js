@@ -431,7 +431,13 @@ FUNC _rcomma
 offbytecode:    
 endfirstpage:   
 
+secondpage:
 bytecodes:      
+
+;;; We start by offset index here
+
+
+
 _readeval:      
 _nil_:  
 _bytecodeinit:  
@@ -450,7 +456,7 @@ _bytecodeinit:
 ;;; 
 ;;; But for "syntesized" bytecode routines, they
 ;;; are used as an offset to get the offset of
-;;; the bytecode routine in page2: _bytecodes[offset].
+;;; the bytecode routine in page2: bytecodes[offset].
 
 ;;; Effectively:
 ;;; 
@@ -712,7 +718,7 @@ initconst:
 ;;;   ccc11 = cons
 
 ATOM "nil", .ident("_nil_"), "_nil_"
-.assert _nil_==constdata,error,"%% initconst: _nil_ must be first to be copied to address 0"
+.assert(_nil_=constdata),error,"%% initconst: _nil_ must be first to be copied to address 0"
 
 __lowcons:      .word LOWCONSSTART
 __envvar:       .word _nil_
@@ -720,7 +726,7 @@ __here:         .word HERESTART
 __ipy:          .byte <_readeval
 
 constend:       
-.assert (zerovarsend-zerovarsstart==constend-constdata),error,"%% zorovarstart and constdata area sizes don't match"
+.assert (zerovarsend-zerovarsstart=constend-constdata),error,"%% zorovarstart and constdata area sizes don't match"
 ;;; <<<< don't put anything before except consts!
 
 
