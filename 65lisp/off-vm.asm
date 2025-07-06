@@ -716,7 +716,7 @@ pha
 
 putc 10
 
-txa
+lda ipy
 clc
 adc #'j'
 jsr putchar
