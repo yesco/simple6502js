@@ -165,18 +165,47 @@ USETHESE=1
 
 .else
 
+;;; Doesn't consume the value
+_nilqkeep:
+;;; 17
+        lda 0,x
+        cmp #<__nil
+        bne @notnil
+        lda 1,x
+        cmp #>__nil
+        ;; == __nil
+@notnil:
+        ;; tail calls
+        bne _true
+        beq _zero
+_jnil:
+        jsr _nilqkeep
+        ;; arrives here with 
+        ;; _zero == is nil; _true == is ! not
+        ;; -- fall through to _jz
+_jz:     
+;;; TODO: implement!
+        rts
+
+.ifnblank
+_duptestelse:
+;;; 12
+        jsr _dup
+        jsr get
+        jsr _exec
+        jmp _jz
+.endif        
+
 ;;; TODO: wow so much "msising"
 FUNC _printatom     
 FUNC _putc
 FUNC _getc
 FUNC _getatomchar
 FUNC _jp
-FUNC _jz
 FUNC _null
 FUNC _jump
 FUNC _lit
 FUNC _literal
-        .res 15
         rts
 
 
@@ -388,11 +417,9 @@ FUNC _store
 FUNC _comma
 FUNC _ccomma
 ;;; TODO:
-        .res 15
 FUNC _rcomma        
 ;;; TODO:
         ;; lol
-        rts
         rts
 
 .endif ; USETHESE
@@ -452,6 +479,10 @@ _evparams:      MAPTO bc_evparams
 _isstrictfun:   MAPTO bc_isstrictfun
 _readeval:      MAPTO bc_readeval
 
+endfirstpage:   
+
+.assert *-_start<=256,error,"%% firstpage is FULL!"
+
 ;;; align
 .res (256-(* .mod 256))
 bytecodes:     
@@ -496,13 +527,40 @@ bytecodes:
 .endmacro
 
 ;;; lol
+;;; 2x
 .macro IF test
+        ;; TODO: make this _instruction!
+        DO _dup
         DO test
 .endmacro
 
+;;; 6 B  can do in 3 B -save 3 B
+;;; 1x
+.macro IFNOTEQ val, label
+        DO _dup
+        LIT val
+        DO _eq
+        ELSE label
+.endmacro
+
+;;; 4 B can do it in 3 B save 7 B
+;; TODO: make this _instruction!
+;;; 7x
 .macro IFNOT test, label
         IF test
         ELSE label
+.endmacro
+
+;;; TODO: 8 B  do it in 2 B - save: (- 24 6)=18 B to save
+;;; 3x                   IFFF we can use 0 instead!
+;;; 
+;;;         _jnil    (- 24 17) = 7 bytes saved
+
+;;; TODO: if using 0 for NIL then *easy*
+
+.macro IF_NIL_GOTO label
+        DO _jnil
+        OFFSET label
 .endmacro
 
 ;;; use only for non-const (variables/addresses)
@@ -678,8 +736,7 @@ evalcons:
         DO _dupcar
         ;; eval fun
         DO _eval
-        DO _dup
-        IFNOT _isstrictfun, evalapply
+        IFNOT _isstrictfun, nlambda
 evalapply:
 ;;; (4)
         ;; stack: (fun params...) funaddr
@@ -754,7 +811,7 @@ bc_cond:
         DO _dupcar              ; L F test1
         DO _eval                ; L F res
         ;; jmp if nil = clause failed
-        IFNOT _dup, cnext        ; L F res
+        IF_NIL_GOTO cnext      ; L F res
         ;; true
 ;;; (9)
         DO _swap                ; L res F
@@ -835,7 +892,7 @@ bc_progn:
         DO _swap                ; v P
 pnext:   
         DO _cdr                 ; v Q   
-        IFNOT _dup, patend      ; v Q Q
+        IF_NIL_GOTO patend        ; v Q Q
         ;; have more
         DO _nip                 ; Q
         GOTO bc_progn
@@ -929,7 +986,7 @@ prlist:
         IFNOT _atom, prlist
 pratend:        
         ;; if cdr<>nil print atom; putc ')'
-        IFNOT _dup, prend
+        IF_NIL_GOTO prend
         ;; . atom
         LIT '.'
         DO _putc
@@ -943,7 +1000,7 @@ ATOM "read", _read, "__print"
 bc_read:        
 ;;; (4)
         DO _getatomchar
-        IFNOT _dup, bc_readlist
+        JZ bc_readlist
 createatom:     
 ;;; (18)
         LIT here
@@ -971,7 +1028,8 @@ rdatom:
         ;; save char to 
         DO _ccomma
         DO _getatomchar
-        IFNOT _dup, rdatom
+        DO _dup
+        JZ rdatom
 rdatomend:      
         ;; create atom
         DO _zero
@@ -982,9 +1040,12 @@ rdatomend:
 ;;; (alt: DO _exec (not have!))
 bc_readlist:
 ;;; (21)
-        DO _dup
-        LIT ')'
-        IFNOT _eq, readlist2
+
+
+;;; TODO:  we're FULL !!!
+
+;        IFNOTEQ ')', readlist2
+
 rdlend:  
         LIT __nil
         DO _semis

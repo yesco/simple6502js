@@ -69,7 +69,8 @@ orgaddr:
 
         NEWLINE
 
-        SETNUM bytecodes
+
+        SETNUM endfirstpage
         PUTC 'v'
         SUBTRACT _start
         DEBUGPRINT
