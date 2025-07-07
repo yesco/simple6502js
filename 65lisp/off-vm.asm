@@ -264,7 +264,7 @@ FUNC _dup
 push_hA_lPLA:
         dex
         dex
-setlPLAhA:      
+set_hA_lPLA:      
         sta 1,x
         pla
         sta 0,x
@@ -445,7 +445,7 @@ FUNC _load
         jsr _inc
         lda (0,x)
 
-        jmp setlPLAhA
+        jmp set_hA_lPLA
 
 
 .ifnblank

@@ -23,13 +23,17 @@
 ;;; (/ 446.0 10) = 44.6 B/fun - SectorLisp
 ;;; (/ 328.0 10) = 32.8 B/fun - milliforth 6502
 
-;;; NIL     8, 26       = 34
-;;; T       8           =  8
-;;; CAR:    8, 13	= 21
-;;; CDR:    8, (car)+4	= 12
-;;; CONS:  12, 14	= 26
-;;; EQ:     8, 17	= 25
+;;;                                    pad
+;;; NIL     8, 26       = 34            2
+;;; T       8           =  8            0
+;;; CAR:    8, 13	= 21            3
+;;; CDR:    8, (car)+4	= 12            0
+;;; CONS:  12, 14	= 26            2
+;;; EQ:     8, 17	= 25            3
 ;;; ATOM:  12, 15	= 27   S= 153
+;;;       ---           ----          ---
+;;;        64            153           10
+;;;                                UNCOUNTED!
 
 ;;; types               =  8
 ;;;   BIT 8
@@ -48,11 +52,11 @@
 ;;;     printz 18
 ;;;     printlist ??
 
-;;; READ:               = 76++    434
-;;;   getc     12  (+ 12 8 17 17 22)
+;;; READ:               = 80++    434
+;;;   getc     12  (+ 12 8 19 19 22)
 ;;;   skipspc   8
-;;;   readatom 17
-;;;   read     17
+;;;   readatom 17 xx 19
+;;;   read     17 xx 19
 ;;;     findsym  ??    
 ;;;   readlist 22
 

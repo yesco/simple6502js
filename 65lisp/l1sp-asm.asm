@@ -704,11 +704,136 @@ bytecodes:
 ;;; ==================================================
 ;;;                  B Y T E C O D E
 
+.ifdef NEWREADERS
+
+.zeropage
+;;; TODO: init to zero!
+unc:    .res 1
+.code
+
+;;; ------ compare asmlisp-asm.asm
+;;;  (put asm reader) 76 bytes...
+;;; 
+;;; READ:               = 80++    434
+;;;   getc     12  (+ 12 8 19 19 22) = 80
+;;;   skipspc   8
+;;;   readatom 17 xx 19
+;;;   read     17 xx 19
+;;;     findsym  ??    
+;;;   readlist 22
+
+
+;;; (+ 12 8 10) = 30 ; _getc _skipspc _atomchar
+;;;  we haven't even started on reader
+;;; 
+;;; _read (bytecodes) createatom rdatom rdatomend rdlst
+;;; (+ 4 7 14 21) = 46
+;;; 
+;;; TOTAL: (+ 30 46) = 76 ...
+
+;;; Reads the next
+FUNC _getc
+;;; 12
+        ldy #0
+        lda unc
+        bne got
+        jsr getchar
+got:    
+        sty unc
+        rts
+        
+;;; skips spaces
+;;; 
+;;; Returns:
+;;;   A= peek at next key
+;;; 
+;;; To consume the key call _getc
+;;;   OR set unc=0
+FUNC _skipspc
+;;; 8
+        jsr _getc
+        cmp #' '+1
+        bcc _skipspc
+        sta unc
+        rts
+
+;;; _atomkey: reads an atom valid char
+;;; 
+;;; Returns: char in A
+;;;   0 if fail (not valid char)
+;;; 
+FUNC _atomkey
+;;; 10
+        jsr _getc
+        cmp #')'+1
+        bcs ret
+notvalid:       
+        sta unc
+ret:    
+        rts
+
+;;; readsatom: Reads an atom of valid chars.
+;;; 
+;;; Result:
+;;;   String read is stored at memory here+4.
+;;;   It may be empty. Y is length + 4.
+;;; 
+;;;   Y>4 means an atom skring was read
+;;;   or if mem[here+4] is set.
+;;; 
+;;; After:
+;;;   A=0 Z=1
+
+.ifnblank
+FUNC _readatomstr
+;;; 11 - 6 B as bytecode?
+;;;             _atomkey _dup _ccomma _jz xx _semis
+        jsr _atomkey
+        pha
+        jsr _ccomma             ; TODO!?
+        pla
+        bne _readatom
+        rts
+.endif
+
+FUNC _readatomstr
+;;; 14
+        jsr _skipspc
+        ldy #3
+valid:  
+        iny
+        jsr _atomkey
+        ;; automatically zero terminates!
+        sta (here),y
+        bne valid
+        rts
+
+
+
+
+_read:  
+;        DO _readatomstr
+        DO _dup
+        JZ notatom
+        DO _dup
+;        DO _findatom
+        JZ notfound
+found:  
+        DO _semis
+notfound:       
+        ;; create
+;        ... (wrote before)
+        
+notatom:
+;        ... readlist
+
+
+.endif ; NEWREADERS
 
 ;;; ------- simple experiment
 
 ;.ifnblank
-_l1spinit:
+FUNC _l1spinit
         putc '>'
         jsr getchar
 ;        jmp _l1spinit
@@ -750,6 +875,8 @@ bar:
         DO _emit
 
         JP bar
+
+
 
 .include "end.asm"
 
@@ -948,7 +1075,7 @@ ATOM "eq", _eq, "_cons_"
 
 FUNC _bc_eval
 ;;; ATOM "eval", _eval, _
-;;; (+ 12 15) = 27
+;;; (+ 12 15) = 27  _eval _apply but _nlambda ???
 
 ;;; 13 - atoms
 bc_eval:
@@ -995,10 +1122,12 @@ nlambda:
 
 FUNC _bc_atom
 bc_atom:        
+;;; TODO::
         DO _semis
 
 FUNC _bc_isstrictfun
 bc_isstrictfun: 
+;;; TODO::
         DO _semis
 
 FUNC _bc_evparams
@@ -1008,7 +1137,7 @@ bc_evparams:
 .ifnblank
 
 _eval:
-;;; 36 B  [11? tokens]
+;;; 36 B  [11? tokens] missing _apply!!!
 ;;; RetIfNullOrNUmber_jIfSymbol_StayIfCons 3 tokens
 ;;; (8) [3]
         jsr _nullkeep
@@ -1239,46 +1368,63 @@ prend:
         DO _putc
         DO _semis
 
+
+
 ATOM "read", _read, "_print_"
-;;; (+ 4 18 8 21) = 51
+;;; (+ 4 19 8 14 21) = 66
 FUNC _bc_read
 bc_read:        
 ;;; (4)
-;        DO _getatomchar
+        DO _skipspc
+;;; TODO: rework
+        DO _getatomchar
+        DO _dup
         JZ bc_readlist
-createatom:     
-;;; (18)
-        LIT here
+createatom:
+;;; (18) + 1
+        DO _align2
+        ADDR here
+        DO _dup
+        DO _dup
 
         ;; set car
-        LIT _nil_
-        ;; TODO: how to say use here?
-        ;; to ptr1?
+        ADDRESS _nil_
         DO _comma
-        DO _drop2
 
         ;; set cdr: next atom link
         ADDRESS _T_
         DO _cdr
+        DO _swap
         DO _comma
 
-        ;; link this one in
-        DO _dup
-        ADDRESS _T_
-        DO _store
-        
+        ;; stack: address char
         DO _swap
 rdatom: 
 ;;; (8)
-        ;; save char to 
+        ;; store char
         DO _ccomma
         DO _getatomchar
         DO _dup
         JZ rdatom
-rdatomend:      
-        ;; create atom
-        DO _zero
-        DO _ccomma
+rdatomend:
+;;; (14)
+        DO _findatom
+        DO _dup
+        DO _null
+        JZ fndatom
+rdnotfnd:       
+        ;; create the atom
+        DO _drop
+
+        ;; link the new addr in
+        DO _dup
+        ADDRESS _T_
+        DO _store
+fndatom:
+        ;; get rid of here addr
+;;; TODO: undo here somehow...
+        DO _nip
+
         DO _semis
 
 ;;; need mapped as we recruse!
@@ -1286,37 +1432,27 @@ rdatomend:
 FUNC _bc_readlist
 bc_readlist:
 ;;; (21)
-
-
-;;; TODO:  we're FULL !!!
-
+        ;; drop the zero
+        DO _drop
+        ;; we know it's not atomchar
+        DO _getc
         IFNOTEQ ')', readlist2
-
 rdlend:  
         LIT _nil_
         DO _semis
 
-
 readlist2:
-        LIT '('
-        IF _eq
-;;; TODO:too big bytecodes?
-;       ELSE rderr
+        IFNOTEQ '(', rderr
+
 rdlstart:
         DO _read
         DO _readlist
-;;; tail call?
         DO _cons
         DO _semis
 
 rderr:  
         LIT _nil_
         DO _semis
-        
-
-getatomc:       
-;        DO _peekc
-;;; TODO: 
 
 ;;;  ......
 
@@ -1359,6 +1495,7 @@ ATOM "T", .ident("_T_"), "_quote_"
 ;;; lambda:12          
 ;;; quote:12           
 ;;; T:     8           
+;;; 
 ;;; names: (+ 8 8 8 8 12 12 12 12 12 12 8) = 112
 ;;; (+ 8 8 17 8 3 8 21 12 24 12 12 12 12 8) = 165
 ;;; OFFSET: (+ (* 8 10) -1 1 2 1 3  2 -2  17 3 21 24)= 151
