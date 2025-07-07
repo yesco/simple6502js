@@ -294,12 +294,13 @@ FUNC _setpickA
         tay
 
 ;;; (7)
-        lda 2,y   
+setfromZPYm2:                   ; LOL
+        lda 2,y
         pha
         lda 3,y
         ;; hA lPLA
 ;;; (3)
-        jmp setlPLAhA
+        jmp set_hA_lPLA
 .endif
 
 ;;; TODO: _rot _over _pick
@@ -357,12 +358,12 @@ FUNC _zero
         jmp pushA
 
 FUNC _lit
-;;; 9
+;;; 8
         jsr _get
 pushA: 
         pha
         lda #0
-        jmp push_hA_lPLA
+        beq push_hA_lPLA
 
 FUNC _literal
 ;;; 10
@@ -583,12 +584,21 @@ FUNC _plus
 
 .ifdef LISP
 FUNC _toptr1
-;;; 9
-        lda 0,x
-        sta ptr1
-        lda 1,x
-        sta ptr1+1
-        rts
+;;; 8 - 4 as bytecode! ( addr ptr1 store semis )
+        lda #ptr1
+;;; TODO: not efficient!
+storeatZPA:
+        jsr pushA
+        jmp _store
+
+.ifnblank
+FUNC _fromptr1
+        lda #ptr1
+;;; TODO: not efficient!
+pushZPA:
+        jsr pushA
+        jmp _load
+.endif
 
 FUNC _printatom
 ;;; 5
