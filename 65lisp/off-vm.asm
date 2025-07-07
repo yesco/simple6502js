@@ -9,19 +9,24 @@
 ;;; LISP=1
 ;;; MINIMAL=1
 ;;; 
-;;;    exec: 39  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
-;;;      IO: 15  2   _key _emit (+ 8 7)
-;;;   stack: 33  5   _dup _swap _drop2 _drop nip (+ 11 14 2 3 3)
+;;;    BOOT:  6  1   _start
+;;;    exec: 40  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
 ;;;    ctrl: 17  2   _jp _jz (+ 3 14)
-;;;    test: 39  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 2 8 15) {_pushAA}
+;;;      IO: 13  2   _key _emit (+ 6 7)
+;;;   stack: 35  5   _dup _swap _drop2 _drop nip (+ 13 14 2 3 3)
+;;;    test: 38  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 5 9 10) {_pushAA}
 ;;;     mem: 33  5   _store _dupcar _dropcdr _cdr _car/_load (+ 11 6 2 3 11)
 ;;;    math: 43  7   _inc2 _inc _shr _minus _plus _eor _and {_math} (+ 3 7 5 5 4 3 2 14)
 ;;;             TODO: _minus, can eq be made without?
-;;;  toptr1: 23  1    {_toptr1} _printatom {_printzyplus1} (+ 9 5 9)
+;;;  toptr1: 23  2    _toptr1 _printatom {_printzyplus1} (+ 9 5 9)
 ;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
 ;;; 
-;;; (+ 39 15 33 17 39 33 43 23) = 242 wtf bytes (246 in file?)
-;;; (+  1  2  5  2  6  5  7  1) =  29 words (+1 semis)
+;;; (+ 6 40 17 13 35 38 33 43 23) = 248 wtf bytes
+;;; (+ 1  1  2  2  5  6  5  7  2) =  31 words
+;;;
+;;; BOOT = 6 bytes
+;;; (+ 242 6) = 248
+
 
 */
 
@@ -58,10 +63,10 @@
 ;;;    5 bytes more?
 
 ;;; --- 2 PAGE (one prims, one bytecodes)
-;;;   exec: 39  1"' _exit_ [get] next+enter
+;;;   exec: 40  1"' _exit_ [get] next+enter
 ;;; 
 ;;; 
-;;; (+ 39 43 26 59 32 20 21) = 249 (- 256 240) = 16
+;;; (+ 40 43 26 59 32 20 21) = 241 (- 256 240) = 16
 ;;; (+  1  5  2 10  4  3  2) =  27
 ;;; 
 ;;; :- means can have max 21 bytecode routines in 2nd
@@ -232,10 +237,9 @@ FUNC _semis:
 ;;; Reads char, put on stack, and in A
 ;;; TODO: key
 FUNC _key
-;;; 8
+;;; 6
         jsr getchar
-        ldy #0
-        jmp pushAY
+        jmp pushA
 
 ;;; TODO: emit?
 FUNC _emit
@@ -252,18 +256,20 @@ FUNC _emit
 .ifdef MINIMAL
 
 FUNC _dup
-;;; 11
+;;; 5 + 8 = 13 (but make literal cheaper)
         lda 0,x
-        ldy 1,x
-pushAY:
+        pha
+        lda 1,x
+        
+push_hA_lPLA:
         dex
         dex
-AYtoTOS:
+setlPLAhA:      
+        sta 1,x
+        pla
         sta 0,x
-        sty 1,x
 
         rts
-
 .else
 
 ;;; cheapest w most flex???
@@ -312,51 +318,6 @@ byteswap:
 
         rts
 
-.ifnblank
-;;; These tests rely on Vatom Zull Cons flags set
-;;; after a jsr _test (part of _car,_cdr!)
-;;; 
-;;; 13 (+10 RetNoCons+jZVC)
-FUNC _jVsym 
-        bvs _j
-        bvc noj
-FUNC _jZull  
-        beq _j
-        bne noj
-
-;;; (10)
-.ifnblank
-FUNC _RetNoCons     
-        bcs ret
-        bcc _exit_
-;;; _jzvc go_Zull go_Vsym ...cons
-FUNC _jZVC
-        jsr _jZull
-        jsr _jVsym
-.endif
-FUNC _jCons
-        bcs _j
-noj:    
-        inc ipy
-        rts
-.endif
-
-FUNC _jp
-;;; 3
-        jsr _zero
-FUNC _jz
-;;; 14
-        inx
-        inx
-
-        lda 256-2,x
-        ora 256-1,x
-        bne @noj
-        ;; do jmp - ipy= new addr
-        jsr _get
-        sta ipy
-@noj:   
-        rts
 
 .ifndef MINIMAL
 
@@ -393,34 +354,25 @@ _true:
 FUNC _zero
 ;;; 6
         lda #0
-FUNC pushAA
-        pha
-        jmp pushlPLAhA
+        jmp pushA
 
 FUNC _lit
-;;; 8
+;;; 9
         jsr _get
+pushA: 
         pha
         lda #0
-        beq pushlPLAhA
+        jmp push_hA_lPLA
 
 FUNC _literal
-;;; 15
+;;; 10
         ;; lo
         jsr _get
         pha
         ;; hi
         jsr _get
 
-pushlPLAhA:     
-        dex
-        dex
-setlPLAhA:      
-        sta 1,x
-        pla
-        sta 0,x
-
-        rts
+        jmp push_hA_lPLA
 
 
 FUNC _store
@@ -666,7 +618,13 @@ pnext:
 
 
 ;;; ============ NEW EXEC
-;;; (+ 8 3 16 12) = 39
+;;; (+ 8 3 17 12) = 40
+;;; 
+;;; Provides an interpreter (next) as well as
+;;; way to do subroutines in bytecode (semis/enter).
+
+;;; To make it gerneral lda+pha=3 pla+sta=3 ===> 6
+;;; 
 
 FUNC _get
 ;;; 8 
@@ -694,13 +652,14 @@ PLA
 .endif
         rts
 
+
 FUNC _semis
 ;;; 3
-PUTC '\'
+;PUTC '\'
         pla
         sta ipy
 FUNC _next
-;;; 16
+;;; 17
         ;; next token
         jsr _get
 
@@ -714,13 +673,13 @@ pha
 txa
 pha
 
-putc 10
+;putc 10
 
 lda ipy
-clc
-adc #'j'
-jsr putchar
-;jsr print2h
+;clc
+;adc #'j'
+;jsr putchar
+jsr print2h
 
         ;; jsk to find it fast!
 
@@ -770,7 +729,7 @@ FUNC _enter
         ;; see label "offbytecode"
         ;; 
         ;;   ipy = _start[bytecodes[ipy]]
-PUTC '-'
+;PUTC '-'
         tay
         lda bytecodes,y
         ;; "swap"
@@ -781,7 +740,58 @@ PUTC '-'
         pha
         bcs _next                ; C still set!
 
-;;; Set this to last function+1 defined in VM
+
+;;; ^Keep the _jump instructions close as their
+;;; implementations are directly dependent on the
+;;; semis/next/enter!
+
+.ifnblank
+;;; These tests rely on Vatom Zull Cons flags set
+;;; after a jsr _test (part of _car,_cdr!)
+;;; 
+;;; 13 (+10 RetNoCons+jZVC)
+FUNC _jVsym 
+        bvs _j
+        bvc noj
+FUNC _jZull  
+        beq _j
+        bne noj
+
+;;; (10)
+.ifnblank
+FUNC _RetNoCons     
+        bcs ret
+        bcc _exit_
+;;; _jzvc go_Zull go_Vsym ...cons
+FUNC _jZVC
+        jsr _jZull
+        jsr _jVsym
+.endif
+FUNC _jCons
+        bcs _j
+noj:    
+        inc ipy
+        rts
+.endif
+
+FUNC _jp
+;;; 3
+        jsr _zero
+FUNC _jz
+;;; 14
+        inx
+        inx
+
+        lda 256-2,x
+        ora 256-1,x
+        bne @noj
+        ;; do jmp - ipy= new addr
+        jsr _get
+        sta ipy
+@noj:   
+        rts
+
+;;; Set this to last function+1 callable in VM
 ;;; any number >= this will be used to dispatch
 ;;; to byte code functions automatically.
 offbytecode= _enter+1

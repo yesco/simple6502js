@@ -739,8 +739,8 @@ bar:
         DO _emit
         DO _emit
 
-        LIT 10
-        DO _emit
+;        LIT 10
+;        DO _emit
 
 ;;; jsk   _inc changes x???? hmmm
 

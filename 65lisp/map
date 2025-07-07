@@ -1,4 +1,7 @@
-perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main$" | grep -v '_exit$' | grep -v "_initlisp" | grep -v '_start' | grep -v "_showsize" | grep -v '_start' | grep -v '_pushAA' > fil
+# counts only _named exported functions
+# __name is consider internal and avoided
+# 
+perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main$" | grep -v '_exit$' | grep -v "_showsize" > fil
 echo "--- ORDER: $* ---"
 cat fil
 echo "--- TOP: $* ---"
