@@ -627,6 +627,63 @@ pnext:
 
 
 
+
+;;; VVVV--Keep the _jump instructions close as their
+;;; implementations are directly dependent on the
+;;; semis/next/enter!
+
+.ifnblank
+;;; These tests rely on Vatom Zull Cons flags set
+;;; after a jsr _test (part of _car,_cdr!)
+;;; 
+;;; 13 (+10 RetNoCons+jZVC)
+FUNC _jVsym 
+        bvs _j
+        bvc noj
+FUNC _jZull  
+        beq _j
+        bne noj
+
+;;; (10)
+.ifnblank
+FUNC _RetNoCons     
+        bcs ret
+        bcc _exit_
+;;; _jzvc go_Zull go_Vsym ...cons
+FUNC _jZVC
+        jsr _jZull
+        jsr _jVsym
+.endif
+FUNC _jCons
+        bcs _j
+noj:    
+        inc ipy
+        rts
+.endif
+
+FUNC _jp
+        jsr _get
+        sta ipy
+        rts
+
+;;; 3
+        jsr _zero
+FUNC _jz
+;;; 14
+        jsr _get
+        tay
+
+        lda 0,x
+        ora 1,x
+        bne @noj
+        ;; do jmp - ipy= new addr
+        sty ipy
+@noj:   
+        inx
+        inx
+        rts
+;;; ^^^^ keep _jp close!
+
 ;;; ============ NEW EXEC
 ;;; (+ 8 3 17 12) = 40
 ;;; 
@@ -676,47 +733,8 @@ FUNC _next
         ;; store it before modify!
         sta call+1
 
-.ifnblank
-pha
-tya
-pha
-txa
-pha
-
-;putc 10
-
-lda ipy
-;clc
-;adc #'j'
-;jsr putchar
-jsr print2h
-
-        ;; jsk to find it fast!
-
-tsx
-txa
-clc
-adc #'M'
-jsr putchar
-;jsr print2h
-
-putc '.'
-lda ipy
-jsr print2h
-
-putc ':'
-lda call+1
-jsr print2h
-
-putc ' '
-
-;halt:   jmp halt
-
-pla
-tax
-pla
-tay
-pla
+.ifblank
+jsr TRACE        
 .endif
 
         sec
@@ -750,164 +768,74 @@ FUNC _enter
         pha
         bcs _next                ; C still set!
 
-
-;;; ^Keep the _jump instructions close as their
-;;; implementations are directly dependent on the
-;;; semis/next/enter!
-
-.ifnblank
-;;; These tests rely on Vatom Zull Cons flags set
-;;; after a jsr _test (part of _car,_cdr!)
-;;; 
-;;; 13 (+10 RetNoCons+jZVC)
-FUNC _jVsym 
-        bvs _j
-        bvc noj
-FUNC _jZull  
-        beq _j
-        bne noj
-
-;;; (10)
-.ifnblank
-FUNC _RetNoCons     
-        bcs ret
-        bcc _exit_
-;;; _jzvc go_Zull go_Vsym ...cons
-FUNC _jZVC
-        jsr _jZull
-        jsr _jVsym
-.endif
-FUNC _jCons
-        bcs _j
-noj:    
-        inc ipy
-        rts
-.endif
-
-FUNC _jp
-;;; 3
-        jsr _zero
-FUNC _jz
-;;; 14
-        inx
-        inx
-
-        lda 256-2,x
-        ora 256-1,x
-        bne @noj
-        ;; do jmp - ipy= new addr
-        jsr _get
-        sta ipy
-@noj:   
-        rts
-
 ;;; Set this to last function+1 callable in VM
 ;;; any number >= this will be used to dispatch
 ;;; to byte code functions automatically.
-offbytecode= _enter+1
+offbytecode= _jz+1              ; lol
+
+
+
+
+
+        ;;  NO CALLABLE FUNC CODE AFTER HERE!!!!!
+
+
+
+
 
 ;;; ============END NEW EXEC
 
+
+        ;;  NO CALLABLE FUNC CODE AFTER HERE!!!!!
+
+
 FUNC _endvm
 
-.ifdef SECONDPAGE
-
-
-;;; All "instructions" of our bytecode language
-;;; are offsets into the firstpage: _start[instr]
-;;; 
-;;; Normally, these are machinecode locations for
-;;; primtivies.
-;;; 
-;;; But for "syntesized" bytecode routines, they
-;;; are used as an offset to get the offset of
-;;; the bytecode routine in page2: _bytecodes[offset].
-
-;;; Effectively:
-;;; 
-;;; next:
-;;; 
-;;; get:  
-;;;    o= bytecodes[ipy]
-;;; 
-;;;    if o < offbytecode
-;;;      JSR _start+o
-;;;    else
-;;;      PHA ipy
-;;;      ipy= _start[o]
-;;;    
-;;;    goto next
-
-
-.macro MAPTO bytecodefun
-        .assert (bytecodefun-bytecodes)>=0,error,"%% MAPTO only maps to labels in bytecodes page"
-        .assert (bytecodefun-bytecodes)<256,error,"%% MAPTO it seems the bytecodes page is full"
-
-        ;; We store offset-1 as we prc-inc in get
-        .byte (bytecodefun-bytecodes)-1
-.endmacro
-
-
-;;; Here is a list of offsets (walk back from 255)
-offbytecode:
-;;; add directly after here:
-
-;_readbyte:      MAPTO readbyte
-;_read:          MAPTO read
-FUNC _eval
-        MAPTO eval
-FUNC _readeval
-        MAPTO readeval
-FUNC _mul10
-        MAPTO mul10
-
-.assert (*-_start)<256,error,"%% Out of space in page 1"
-
-;;; ==================================================
-
-.res (255-(* .mod 256))
-bytecodes:     
-
-;;; first byte to "skip"
-.byte 42
-
-readeval:
-        DO _read
-        DO _eval
-        JP readeval
-
-read:   
-eval:   
-        DO _semis
-
-;;; set hi-bit of the last char in string
-;;; (saves one byte!)
-.macro HISTR str
-        .byte .left(.strlen(str)-1, str)
-        .byte 128 | .strat(str, .strlen(str)-1)
-.endmacro
-
-
-;;; 5
-readbyte:
-        DO _load
-        LIT $ff
-        DO _and
-        DO _semis
-        
-
-;;; _mul10
-mul10:
-        DO _shl
-        DO _dup
-        DO _shl
-        DO _shl
-        DO _plus
-        DO _semis
-
-;;; 
-
-.endif ; SECONDPAGE
 
 
 
+TRACE:  
+        ;stx savex
+        pha
+        tya
+        pha
+        txa
+        pha
+
+        putc 10
+
+        ;lda savex            
+        txa
+        clc
+        adc #'j'
+        jsr putchar
+        ;jsr print2h
+
+        ;; jsk to find it fast!
+
+        tsx
+        txa
+        clc
+        adc #'M'
+        jsr putchar
+                                ;jsr print2h
+
+        putc '.'
+        lda ipy
+        jsr print2h
+
+        putc ':'
+        lda call+1
+        jsr print2h
+
+        putc ' '
+
+                                ;halt:   jmp halt
+
+        pla
+        tax
+        pla
+        tay
+        pla
+
+        rts

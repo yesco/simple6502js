@@ -60,6 +60,8 @@ _NOP_=$ea
 ;;; LOL, may not be possible, but makes
 ;;; _nil_ address==0, using _null, _zero!
 
+;;; ORIC BASIC INTERACTS...
+
 .org 0
 
 ;;; VVVVVVVVVVV don't modify VVVVVVVVVVVVVV
@@ -565,6 +567,7 @@ endfirstpage:
   .assert label-bytecodes>0,error,"%% JP/JZ offset neg"
   .assert label-bytecodes<256,error,"%% JP/JZ offset too big"
         .byte label-bytecodes-1
+;        .byte label-bytecodes
 .endmacro
 
 .macro JP label
@@ -847,22 +850,41 @@ foo:
         LIT 10
         DO _emit
 
-        LIT 65+32
+        LIT 'd'
         DO _dup
         DO _emit
 bar:
+        DO _zero
+        DO _drop
+        DO _zero
+        DO _drop
+
+        DO _key
+        DO _emit
+        DO _jp
+        .byte $15
+
+
+
+
+        LIT 12
+        DO _emit
+
         LIT '.'
+
         LIT '?'
 
-        LIT '^'
-        DO _emit
+        LIT '_'
+        DO _emit                ; ^
 
-        DO _emit
+        DO _emit                ; ?
+
         DO _key
         DO _dup
-        DO _emit
-        DO _emit
-        DO _emit
+        DO _emit                ; k
+        DO _emit                ; k
+
+        DO _emit                ; .
 
 ;        LIT 10
 ;        DO _emit
@@ -872,7 +894,7 @@ bar:
 ;        DO _inc
 ;        DO _inc
         DO _dup
-        DO _emit
+        DO _emit                ; a
 
         JP bar
 
