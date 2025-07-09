@@ -600,7 +600,7 @@ endfirstpage:
 
 ;;; 4 B can do it in 3 B save 7 B
 ;; TODO: make this _instruction! (9B)
-;;; 7x (- (* 4 7) -7 +9) = 26 (save 2B)
+;;; 7x (+ (* 4 7) -7 +9) = 30 (loose 2 bytes)
 .macro IFNOT test, label
         IF test
         ELSE label
