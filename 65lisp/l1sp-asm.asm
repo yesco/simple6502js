@@ -435,25 +435,16 @@ FUNC _rcomma
 
 
 ;;; ========================================
-;;; enable this to ignore bytecodes
+;;; enable this JUST to get 1st page SIZE
 ;.ifnblank
 
 endfirstpage:   
-
 secondpage:
 bytecodes:      
-
-;;; We start by offset index here
-
-
-
 _l1spinit:      
 _readeval:      
 _nil_:  
-
 .include "end.asm"
-
-
 .end
 
 .endif
@@ -594,7 +585,6 @@ endfirstpage:
 ;;; lol
 ;;; 2x
 .macro IF test
-        ;; TODO: make this _instruction!
         DO _dup
         DO test
 .endmacro
@@ -609,22 +599,15 @@ endfirstpage:
 .endmacro
 
 ;;; 4 B can do it in 3 B save 7 B
-;; TODO: make this _instruction!
-;;; 7x
+;; TODO: make this _instruction! (9B)
+;;; 7x (- (* 4 7) -7 +9) = 26 (save 2B)
 .macro IFNOT test, label
         IF test
         ELSE label
 .endmacro
 
-;;; TODO: 8 B  do it in 2 B - save: (- 24 6)=18 B to save
-;;; 3x                   IFFF we can use 0 instead!
-;;; 
-;;;         _jnil    (- 24 17) = 7 bytes saved
-
-;;; TODO: if using 0 for NIL then *easy*
-
 .macro IF_NIL_GOTO label
-        DO _jnil
+        DO _djz
         OFFSET label
 .endmacro
 

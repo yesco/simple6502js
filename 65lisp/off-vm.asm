@@ -9,6 +9,10 @@
 ;;; LISP=1
 ;;; MINIMAL=1
 ;;; 
+;;; Extras included:
+;;;   BOOT _djz _key _emit _dupcar _dropcdr _minus toptr1 printatom printz
+;;;   (+ 3 6 7 6 2 5 23) = 55 bytes lisp extra
+;;;
 ;;;    BOOT:  6  1   _start
 ;;;    exec: 42  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
 ;;;    ctrl: 20  3   _jp _jz _djz (+ 17 3)
@@ -602,6 +606,49 @@ FUNC _printatom
         ;; at offset 4
         ldy #4-1
 
+.ifnblank
+;;; ... 15+6 would be 21, but...
+;;; 
+;;; BAD: see _printimmstr
+;;; 
+;;; (+ 6 10 6) = 22 or (+ 6 3 6)= 15
+FUNC _type
+;;; (6)
+        ;; Let's pretend we're interpreting str
+        ;; "enter"
+        lda ip
+        pha
+        lda ipy
+        pha
+        ;; set str from stack as new "ip"
+        ;; "exec"
+;;; (10)
+        ;; jsr _setip
+        inx
+        inx
+        lda $100-2+0,x
+        sta ipy
+        lda $100-2+1,x
+        sta ip
+
+;;; (6)
+        jsr _printimmstr
+        ;; this restores it!
+        jmp semis
+
+;;; Print Immediate String (following bytes)
+;;; ends with 0
+;;; 
+;;; WARNING:BAD: string can't pass page border!
+;;;  - lol - crap (for generitc strings)
+FUNC _printimmstr
+;;; 9
+        jsr _get
+        jsr putchar
+        bne _type
+        rts
+.endif
+
 ;;; prints ascizz pointed to at ptr1
 ;;; starting at position Y+1
 ;;; 
@@ -723,12 +770,28 @@ PLA
 FUNC _semis
 ;;; 5
 ;PUTC '\'
+
+;;; TODO: if only 0 is used as semis
+;;;   (not ;) then don't need plapla
+;;;   but after jsr _get ; beq _semis
+
         ;; remove call (jsr(loop))
         pla
         pla
         ;; get ipy
         pla
         sta ipy
+
+;;; total +3
+;;; but allows jsr _next !
+.ifdef JSRLOOP
+
+jsrloop:
+;;; 6
+        jsr _next
+        jmp jsrloop
+.endif ; JSRLOOP
+
 FUNC _next
 ;;; 17
         ;; next token
@@ -746,8 +809,12 @@ jsr TRACE
         bcs _enter
         
         ;; primtive ops in first page
+.ifdef JSRLOOP
+call:   jmp _start
+.else
 call:   jsr _start
         jmp _next
+.endif
 
 FUNC _enter
 ;;; 12
