@@ -3,17 +3,17 @@
 ;;; ------------------- STATE ------------------
 ;;;                  2025-07-06
 ;;; 
-;;;        BYTES: 246      WORDS: 27
+;;;        BYTES: 249      WORDS: 27
 ;;; 
 ;;; IO=1
 ;;; LISP=1
 ;;; MINIMAL=1
 ;;; 
 ;;;    BOOT:  6  1   _start
-;;;    exec: 40  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
-;;;    ctrl: 17  2   _jp _jz (+ 3 14)
+;;;    exec: 42  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
+;;;    ctrl: 20  3   _jp _jz _djz (+ 17 3)
 ;;;      IO: 13  2   _key _emit (+ 6 7)
-;;;   stack: 35  5   _dup _swap _drop2 _drop nip (+ 13 14 2 3 3)
+;;;   stack: 35  5   _dup _swap _drop2 _drop _nip (+ 13 14 2 3 3)
 ;;;    test: 38  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 5 9 10) {_pushAA}
 ;;;     mem: 33  5   _store _dupcar _dropcdr _cdr _car/_load (+ 11 6 2 3 11)
 ;;;    math: 43  7   _inc2 _inc _shr _minus _plus _eor _and {_math} (+ 3 7 5 5 4 3 2 14)
@@ -21,12 +21,8 @@
 ;;;  toptr1: 23  2    _toptr1 _printatom {_printzyplus1} (+ 9 5 9)
 ;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
 ;;; 
-;;; (+ 6 40 17 13 35 38 33 43 23) = 248 wtf bytes
-;;; (+ 1  1  2  2  5  6  5  7  2) =  31 words
-;;;
-;;; BOOT = 6 bytes
-;;; (+ 242 6) = 248
-
+;;; (+ 6 42 20 13 35 38 33 43 23) = 251 wtf bytes
+;;; (+ 1  1  3  2  5  6  5  7  2) =  32 words
 
 */
 
@@ -661,31 +657,35 @@ noj:
         rts
 .endif
 
+
+;;; Jump if 0 without removing tos
+;;; 
+;;; 20
+FUNC _djz
+        jsr _dup
+;;; Remove tos, if 0 jump
+FUNC _jz
+;;; (17)
+        inx
+        inx
+        lda $100-2+0,x
+        ora $100-2+1,x
+        bne noj
+        ;; do jmp - ipy= new addr
 FUNC _jp
         jsr _get
         sta ipy
         rts
-
-;;; 3
-        jsr _zero
-FUNC _jz
-;;; 14
-        jsr _get
-        tay
-
-        lda 0,x
-        ora 1,x
-        bne @noj
-        ;; do jmp - ipy= new addr
-        sty ipy
-@noj:   
-        inx
-        inx
+noj:
+        ;; skip jmp dest byte
+        inc ipy
         rts
+
+
 ;;; ^^^^ keep _jp close!
 
 ;;; ============ NEW EXEC
-;;; (+ 8 3 17 12) = 40
+;;; (+ 8 5 17 12) = 42
 ;;; 
 ;;; Provides an interpreter (next) as well as
 ;;; way to do subroutines in bytecode (semis/enter).
@@ -721,8 +721,12 @@ PLA
 
 
 FUNC _semis
-;;; 3
+;;; 5
 ;PUTC '\'
+        ;; remove call (jsr(loop))
+        pla
+        pla
+        ;; get ipy
         pla
         sta ipy
 FUNC _next
@@ -733,7 +737,7 @@ FUNC _next
         ;; store it before modify!
         sta call+1
 
-.ifblank
+.ifdef TRACE
 jsr TRACE        
 .endif
 
@@ -746,10 +750,8 @@ call:   jsr _start
         jmp _next
 
 FUNC _enter
-        ;; bytecode in second page (only)
-        ;; Y=ip A=new to interpret
-
 ;;; 12
+        ;; bytecode in second page (only)
         ;; Y=ipy, A=index 0.. of routine to call!
         ;; C is set
 
@@ -771,7 +773,7 @@ FUNC _enter
 ;;; Set this to last function+1 callable in VM
 ;;; any number >= this will be used to dispatch
 ;;; to byte code functions automatically.
-offbytecode= _jz+1              ; lol
+offbytecode= _enter+1           ; lol
 
 
 
@@ -794,6 +796,7 @@ FUNC _endvm
 
 
 
+.ifdef TRACE
 TRACE:  
         ;stx savex
         pha
@@ -839,3 +842,4 @@ TRACE:
         pla
 
         rts
+.endif ; TRACE

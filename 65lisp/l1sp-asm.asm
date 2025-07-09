@@ -9,6 +9,8 @@
 ;;; template/begin.asm
 
 
+;TRACE=trace
+
 ;ENFORCE_ONEPAGE=1
 
 ;USETHESE=1
@@ -434,9 +436,8 @@ FUNC _rcomma
 
 ;;; ========================================
 ;;; enable this to ignore bytecodes
-.ifnblank
+;.ifnblank
 
-offbytecode:    
 endfirstpage:   
 
 secondpage:
@@ -446,6 +447,7 @@ bytecodes:
 
 
 
+_l1spinit:      
 _readeval:      
 _nil_:  
 
@@ -1207,9 +1209,8 @@ bc_cond:
 ;;; (9)
         DO _swap                ; L res F
         DO _cdr                 ; L res progn1
-        DO _dup                 ; L res progn1 progn1
-        IF _null                ; L res progn1 0/true  
-        ELSE haveprogn            ; L res progn1
+        IF _null                ; L res progn1 0/true
+        ELSE haveprogn          ; L res progn1
         ;; no progn - just return res
         DO _drop                ; L res
         DO _nip                 ; res
