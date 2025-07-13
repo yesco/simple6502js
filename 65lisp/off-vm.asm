@@ -14,18 +14,18 @@
 ;;;   (+ 3 6 7 6 2 5 23) = 55 bytes lisp extra
 ;;;
 ;;;    BOOT:  6  1   _start
-;;;    exec: 42  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 3 16 12)
-;;;    ctrl: 20  3   _jp _jz _djz (+ 17 3)
+;;;    exec: 41  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 5 16 12)
+;;;    ctrl: 20  3   _jp _jz _djz (+ 3 8 9 )
 ;;;      IO: 13  2   _key _emit (+ 6 7)
 ;;;   stack: 35  5   _dup _swap _drop2 _drop _nip (+ 13 14 2 3 3)
-;;;    test: 38  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 5 9 10) {_pushAA}
+;;;    test: 37  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 5 8 10) {_pushAA}
 ;;;     mem: 33  5   _store _dupcar _dropcdr _cdr _car/_load (+ 11 6 2 3 11)
 ;;;    math: 43  7   _inc2 _inc _shr _minus _plus _eor _and {_math} (+ 3 7 5 5 4 3 2 14)
 ;;;             TODO: _minus, can eq be made without?
-;;;  toptr1: 23  2    _toptr1 _printatom {_printzyplus1} (+ 9 5 9)
+;;;  toptr1: 22  2    _toptr1 _printatom {_printzyplus1} (+ 8 5 9)
 ;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
 ;;; 
-;;; (+ 6 42 20 13 35 38 33 43 23) = 251 wtf bytes
+;;; (+ 6 41 20 13 35 37 33 43 22) = 250 wtf bytes
 ;;; (+ 1  1  3  2  5  6  5  7  2) =  32 words
 
 */
@@ -490,7 +490,7 @@ FUNC _shl
         asl 0,x
         rol 1,x
         rts
-FUNC _not   
+FUNC _not 
 ;;; 5
         jsr _neg1
         ;; last op ???
@@ -532,6 +532,24 @@ FUNC _plus
 ;;; 4
         clc
         lda #ADCzpx
+
+;;; with this (4B extra) _not we save 1B
+;;; -2 at _not bne _eor
+;;; +1 bne /instead of skiptwo
+.ifdef MINIMAL
+        SKIPTWO
+.else
+        bne _math
+FUNC _not 
+;;; 3
+        jsr _neg1
+        ;; fall-through to _eor
+.endif ; MINIMAL
+
+
+FUNC _eor
+;;; 3
+        lda #EORzpx
         SKIPTWO
 
 FUNC _nip                       ; !!!
@@ -539,10 +557,6 @@ _swapdrop:
 _lda:   
 ;;; 3
         lda #LDAzpx
-        SKIPTWO
-FUNC _eor
-;;; 3
-        lda #EORzpx
         SKIPTWO
 
 .ifndef MINIMAL
@@ -732,7 +746,7 @@ noj:
 ;;; ^^^^ keep _jp close!
 
 ;;; ============ NEW EXEC
-;;; (+ 8 5 17 12) = 42
+;;; (+ 8 5 16 12) = 41
 ;;; 
 ;;; Provides an interpreter (next) as well as
 ;;; way to do subroutines in bytecode (semis/enter).
@@ -793,23 +807,22 @@ jsrloop:
 .endif ; JSRLOOP
 
 FUNC _next
-;;; 17
+;;; 16
         ;; next token
         jsr _get
-
-        ;; store it before modify!
-        sta call+1
 
 .ifdef TRACE
 jsr TRACE        
 .endif
 
-        sec
-        sbc #<offbytecode
+        cmp #<offbytecode
         bcs _enter
         
         ;; primtive ops in first page
+        sta call+1
+
 .ifdef JSRLOOP
+;;; 3B more, but can jsr _next
 call:   jmp _start
 .else
 call:   jsr _start
@@ -825,10 +838,10 @@ FUNC _enter
         ;; look up second page offset at Y!
         ;; see label "offbytecode"
         ;; 
-        ;;   ipy = _start[bytecodes[ipy]]
+        ;;   ipy = _start[bytecodes[adjusted_ipy]]
 ;PUTC '-'
         tay
-        lda bytecodes,y
+        lda bytecodes-(offbytecode-_start),y
         ;; "swap"
         ldy ipy
         sta ipy
