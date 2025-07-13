@@ -149,13 +149,13 @@ boot:
 ;;; LOL
 ; set USETHESE=1 above!
 
-.ifndef USETHESE
+.ifdef USETHESE
 
-  .include "off-vm.asm"
+  .include "l1sp-funs.asm"
 
 .else
 
-  .include "l1sp-funs.asm"
+  .include "off-vm.asm"
 
 .endif ; USETHESE
 
@@ -1289,7 +1289,7 @@ ATOM "T", .ident("_T_"), "_quote_"
 ;;; 
 ;;;  VM routines used: 25 only1
 ;;; 
-;;; exec/next/enter/semis        (+ 38)          = 38
+;;; exec/next/enter/semis        (+ 41)          = 41
 ;;; ( drop drop2 dup nip swap  ; (+ 3 2 11 3 14) = 33 
 ;;;   car cdr load store         (+ 3 17 11 14)  = 45 
 ;;; TODO: ccomma comma rcomma    (+ 10 5 15) ??? = 30
