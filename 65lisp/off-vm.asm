@@ -82,6 +82,10 @@
 ;;; (+ 43 26 59 18) = 146 bytes
 ;;; (+  5  2 10  3) =  19 impls
 
+
+
+
+
 .macro SKIPONE
         .byte $24               ; BITzp 2 B
 .endmacro
@@ -92,6 +96,10 @@
 
  
 .zeropage
+
+.ifdef UNC
+unc:    .res 1
+.endif
 
 .ifndef ipy
 ipy:    .res 1
@@ -119,6 +127,9 @@ savez:  .res 1                  ; haha!
 FUNC _start
 .endif
 
+
+
+;;; ---------------------------------- OLD exec
 .ifnblank
 
 ;;; only used in this branch,
@@ -232,7 +243,25 @@ FUNC _semis:
 .endif ; OLD exec
 
 
+
+
+
 .ifdef IO
+
+.ifdef UNC
+
+;;; Reads the next
+FUNC _getc
+;;; 12
+        ldy #0
+        lda unc
+        bne got
+        jsr getchar
+got:    
+        sty unc
+        rts
+
+.else
 
 ;;; Reads char, put on stack, and in A
 ;;; TODO: key
@@ -240,6 +269,9 @@ FUNC _key
 ;;; 6
         jsr getchar
         jmp pushA
+
+.endif ; UNC
+
 
 ;;; TODO: emit?
 FUNC _emit

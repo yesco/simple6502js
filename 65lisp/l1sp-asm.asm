@@ -16,6 +16,12 @@
 ;USETHESE=1
 ;DISABLEINTERRRUPTS
 
+;;; UNC: ungetchar needed by skipspace, readatom
+;;; +9 B (_key: +6 B, +3 init/BOOT, )
+;UNC=1
+
+
+;;; BOOT does init UNC etc
 ;
 BOOT=1
 
@@ -119,6 +125,12 @@ boot:
         ldx #$ff
         txs
 
+        ;;  init 0:es
+.ifdef UNC
+        inx
+        sta unc
+.endif ; UNC
+        
         ;; init your "app"
 
 .ifdef LISPINIT
@@ -409,12 +421,7 @@ bytecodes:
 ;;; ==================================================
 ;;;                  B Y T E C O D E
 
-.ifdef NEWREADERS
-
-.zeropage
-;;; TODO: init to zero!
-unc:    .res 1
-.code
+.ifdef READERS
 
 ;;; ------ compare asmlisp-asm.asm
 ;;;  (put asm reader) 76 bytes...
@@ -427,7 +434,6 @@ unc:    .res 1
 ;;;     findsym  ??    
 ;;;   readlist 22
 
-
 ;;; (+ 12 8 10) = 30 ; _getc _skipspc _atomchar
 ;;;  we haven't even started on reader
 ;;; 
@@ -436,44 +442,37 @@ unc:    .res 1
 ;;; 
 ;;; TOTAL: (+ 30 46) = 76 ...
 
-;;; Reads the next
-FUNC _getc
-;;; 12
-        ldy #0
-        lda unc
-        bne got
-        jsr getchar
-got:    
-        sty unc
-        rts
         
 ;;; skips spaces
 ;;; 
 ;;; Returns:
 ;;;   A= peek at next key
 ;;; 
-;;; To consume the key call _getc
+;;; To consume the key call _key
 ;;;   OR set unc=0
 FUNC _skipspc
 ;;; 8
-        jsr _getc
+        jsr _key
         cmp #' '+1
         bcc _skipspc
         sta unc
         rts
 
 ;;; _atomkey: reads an atom valid char
+;;;    (any other character is "put back")
 ;;; 
-;;; Returns: char in A
-;;;   0 if fail (not valid char)
+;;; Returns:
+;;;   C is set if is valid char
+;;;   A: char in register A
 ;;; 
 FUNC _atomkey
-;;; 10
-        jsr _getc
+;;; 12
+        jsr _key
         cmp #')'+1
         bcs ret
 notvalid:       
         sta unc
+        lda #0
 ret:    
         rts
 
@@ -489,17 +488,18 @@ ret:
 ;;; After:
 ;;;   A=0 Z=1
 
-.ifnblank
 FUNC _readatomstr
-;;; 11 - 6 B as bytecode?
+;;; 11 - 6/7 B as bytecode?
 ;;;             _atomkey _dup _ccomma _jz xx _semis
+rdloop: 
+        ;; This also zero terminates as last char returned
+        ;; is zero
         jsr _atomkey
         pha
         jsr _ccomma             ; TODO!?
         pla
         bne _readatom
         rts
-.endif
 
 FUNC _readatomstr
 ;;; 14
@@ -512,9 +512,6 @@ valid:
         sta (here),y
         bne valid
         rts
-
-
-
 
 _read:  
 ;        DO _readatomstr
@@ -535,6 +532,10 @@ notatom:
 
 .endif ; NEWREADERS
 
+
+
+
+;;; ==================================================
 ;;; ------- simple experiment
 
 ;.ifnblank
