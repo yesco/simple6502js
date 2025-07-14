@@ -5,9 +5,7 @@
 ;;; implemented in 134 bytes!
 
 ;;; ========================================
-;;; Initial functions requirement for
-;;; template/begin.asm
-
+;;;                 C O N F I G
 
 ;TRACE=trace
 
@@ -16,31 +14,51 @@
 ;USETHESE=1
 ;DISABLEINTERRRUPTS
 
-;;; UNC: ungetchar needed by skipspace, readatom
-;;; +9 B (_key: +6 B, +3 init/BOOT, )
-;UNC=1
-
-
-;;; BOOT does init UNC etc
-;
-BOOT=1
-
-;;; Applies to off-vm.asm
-;
-IO=1
-;
-MINIMAL=1
-
 ;;; Applies to the "sectorlisp"
 ;;; (it has no numbers, even == atom, odd == cons)
-;
-LISP=1
+;;; LISP= 241            NOLISP= 228 B 
+;LISP=1
+
 .ifdef LISP
   ATOMMISALIGNMENT=0
-  ;
   LISPINIT=1
+
+  BOOT=1
+  IO=1
+  IOSTRING=1
+  ;; "sectorlisp" (not even plus/minus!)
+  MINIMAL=1
+
+.else
+
+;;; Include _not:
+;;; +3 B
+;
+NOT=1
+
+;;; UNC: ungetchar needed by skipspace, readatom
+;;; +10 B (_key: +6 B, +3 init/BOOT, )
+;UNC=1
+
+;;; BOOT does init UNC etc
+;;; +6 B
+;BOOT=1
+
+;;; Applies to off-vm.asm
+;;; +13 B !
+;
+IO=1
+
+;;; IO string printz printatom 
+;IOSTRING=1
+
+;;; MINIMAL (doesn't even have _plus/_minus!)
+;MINIMAL=1
+
 .endif
 
+;;;                 C O N F I G
+;;; ========================================
 
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
@@ -49,7 +67,7 @@ LISP=1
 ;;; ========================================
 ;;;                  M A I N
 
-;;; CONFIG
+;;; CONFIG OF MEMORY
 
 ;;; "heap"
 HEAPSIZE= 1024

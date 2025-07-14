@@ -3,7 +3,7 @@
 ;;; ------------------- STATE ------------------
 ;;;                  2025-07-06
 ;;; 
-;;;        BYTES: 245      WORDS: 31
+;;;        BYTES: 241      WORDS: 30
 ;;; 
 ;;; IO=1
 ;;; LISP=1
@@ -256,7 +256,7 @@ FUNC _semis:
 .ifdef UNC
 
 ;;; Reads the next
-FUNC _getc
+FUNC _key
 ;;; 12
         ldy #0
         lda unc
@@ -293,24 +293,22 @@ FUNC _emit
 .ifdef MINIMAL
 
 FUNC _dup
-;;; 5 + 8 = 13 (but make literal cheaper)
+;;; 8
         lda 0,x
         pha
         lda 1,x
         
-push_hA_lPLA:
-        dex
-        dex
-set_hA_lPLA:      
-        sta 1,x
-        pla
-        sta 0,x
-
-        rts
+        jmp push_hA_lPLA
 .else
 
 ;;; cheapest w most flex???
 ; (+ 2 3 2 6 7 3) = 23
+.ifnblank
+FUNC _over
+;;; 3
+        lda #1
+        SKIPTWO
+.endif
 FUNC _dup
 ;;; 2
         lda #0
@@ -395,6 +393,8 @@ FUNC _zero
         lda #0
         jmp pushA
 
+;;; having two "lits" is it worth it?
+;;; (need at least 8 _lit to earn bytes...)
 FUNC _lit
 ;;; 8
         jsr _get
@@ -411,7 +411,17 @@ FUNC _literal
         ;; hi
         jsr _get
 
-        jmp push_hA_lPLA
+;;; (used by _dup too)
+;;; 8
+push_hA_lPLA:
+        dex
+        dex
+set_hA_lPLA:      
+        sta 1,x
+        pla
+        sta 0,x
+
+        rts
 
 
 FUNC _store
@@ -636,7 +646,7 @@ FUNC _plus
         rts
 .endif
 
-.ifdef LISP
+.ifdef IOSTRING
 ;;; (+ 8 5 9) = 22 _toptr1 _printatom _printz...
 
 FUNC _toptr1
@@ -800,7 +810,7 @@ FUNC _get
 ;;; 8 
         inc ipy
         ldy ipy
-        lda bytecodes,y
+        lda bytecodes,y         ; +1 byte for abs addr
 .ifnblank
 PHA
 TYA
