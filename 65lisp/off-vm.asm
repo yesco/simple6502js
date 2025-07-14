@@ -10,30 +10,28 @@
 ;;; MINIMAL=1
 
 
-;;; Extras included:
+;;; MINIMAL+LISP
 ;;;   BOOT _djz _key _emit _dupcar _dropcdr toptr1 printatom printz
 ;;;   (+ 3 6 7 6 2 22) = 46 bytes lisp extra
 
 
-;;; MINIMAL exclude:
-;;;   _lt _pick(A) _shl _not _plus _or
-;;;     (+ 9 (- 23 13) 5 3 5 3) = 35
-
+;;; MINIMAL+LISP exclude:
+;;;   _lt _pick(A) _shl _not _minus _plus _or
+;;;     (+ 9 (- 23 13) 5 3 5 4 3) = 39
 
 ;;;    BOOT:  6  1   _start
 ;;;    exec: 41  1   [TODO: jump] {_get} _sewis {_next _enter} (+ 8 5 16 12)
 ;;;    ctrl: 20  3   _jp _jz _djz (+ 3 8 9 )
-;;;      IO: 13  2   _key _emit (+ 6 7)
+;;;      IO: 13  2   _key _emit (+ 6 7) (+9 for UNC)
 ;;;   stack: 35  5   _dup _swap _drop2 _drop _nip (+ 13 14 2 3 3)
 ;;;    test: 37  6   _eq _null _FFFF _zero _lit _literal (+ 3 8 3 5 8 10) {_pushAA}
 ;;;     mem: 33  5   _store _dupcar _dropcdr _cdr _car/_load (+ 11 6 2 3 11)
-;;;    math: 37  6   _inc2 _inc _shr _minus [_plus] _eor _and {_math} (+ 3 7 5 4 3 2 14) (_plus 5)
-;;;             TODO: _minus, can eq be made without?
+;;;    math: 34  5   _inc2 _inc _shr [_minus _plus] _eor _and {_math} (+ 3 7 5 3 2 14) [_plus 5 _minus 4]
 ;;;  toptr1: 22  2    _toptr1 _printatom {_printzyplus1} (+ 8 5 9)
 ;;;    TODO:         _comma _ccomma _getatomchar _jump (+ 1 
 ;;; 
-;;; (+ 6 41 20 13 35 37 33 38 22) = 245 wtf bytes
-;;; (+ 1  1  3  2  5  6  5  6  2) =  31 words
+;;; (+ 6 41 20 13 35 37 33 34 22) = 241 bytes
+;;; (+ 1  1  3  2  5  6  5  5  2) =  30 words
 
 */
 
@@ -372,7 +370,7 @@ FUNC _lt
 
 FUNC _eq
 ;;; 3
-        jsr _minus
+        jsr _eor                ; _minus works, too
         ;; fall-through
 FUNC _null
 ;;; 8
@@ -555,6 +553,8 @@ _sta:
         rts
 .endif
 
+.ifndef MINIMAL
+
 ;;; TODO: this one is right,
 ;;;   but for mul we need reverse!
 ;;; MINIMAL: needed for _eq!
@@ -562,13 +562,9 @@ FUNC _minus
 ;;; 4 (+1 !MINIMAL)
         sec
         lda #SBCzpx
-.ifdef MINIMAL
         SKIPTWO
-.else
         bne _math
-.endif ; MINIMAL
 
-.ifndef MINIMAL
 FUNC _plus
 ;;; 4
         clc
@@ -581,6 +577,7 @@ FUNC _plus
         SKIPTWO
 .else
         bne _math
+
 FUNC _not 
 ;;; 3
         jsr _neg1
