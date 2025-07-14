@@ -937,6 +937,9 @@ offbytecode= _enter+1           ; lol
 
 .else
 
+;;; -------------------------------------
+;;;     newer jsr _enter ip(y) code
+
 ;;; Forth65: (+ 18 25 6) = 49    (+ 16 19) = 35
 ;;;  84 bytes enter next semis branch zbranch
 ;;; 
@@ -954,6 +957,155 @@ offbytecode= _enter+1           ; lol
 ;;; 
 ;;;   BRAN  = 16       (+ 3 JMP NEXT)
 ;;;   ZBRAN = 19 bytes     ( inc2 )
+
+
+;;; _djz _jz _jp  _get _semis       _enter _next     _jsr
+;;; (+        19     7      4           30     9)=69 (+11)
+;;; 
+;;; == 69 (+11) bytes ! ugh....
+
+;;; ; >>>>>>>>>>>>>>>> 253 bytes
+;;;    (can't fit _jsr)
+
+;;; DO NOTE: _jp _jz _djz need to be relative!
+;;;      (or not?)
+
+;;; _dupjumpzero: Jump if 0 without removing tos
+;;; (maybe this is the use of ?dup normally?)
+;;; 
+;;; (+ 3 8 5 3) = 19
+FUNC _djz
+;;; (3)
+        jsr _dup
+;;; Remove tos, if 0 jump
+FUNC _jz
+;;; (8)
+        inx
+        inx
+        lda $100-2+0,x
+        ora $100-2+1,x
+        bne noj
+        ;; do jmp - ipy= new addr
+FUNC _jp
+;;; (5) 
+        jsr _get
+;;; jp need to compensate with a +1, lol?
+
+;;; ;;;;;; NONONONONONONO !!!!!!!!!!!!!!
+;;; ; BAD IDEA... fixed means cannot have several
+;;;   entry points.... lol
+;;;   as this is relative a SINGLE start of routine...
+;;;   (not a problemin Forth65...) hmmmm.
+        sta ipy
+noj:
+;;; (3)
+        ;; skip jmp dest byte
+        inc ipy
+        rts
+
+
+;;; (+ 7 4 30 9) =  50
+
+FUNC _get
+;;; 7
+        inc ipy
+        ldy ipy
+        lda (ip),y
+        rts
+
+;;; (+ 4 30) = 34
+FUNC _semis
+;;; 4
+        pla
+        pla
+
+        sec
+        SKIPONE
+        
+;;; JSR _enter BYTECODES...
+;;; (+ 1 8 2 9 10) = 30
+FUNC _enter
+;;; 1
+        clc
+;;; 8 (3 more savey=ipy)
+        pla
+        sta savey
+
+        pla
+        sta savea
+        pla
+        tay
+;;; +2
+        bcs skip_push
+;;; 9 (3 more ipy)
+        lda ip+1
+        pha
+        lda ip
+        pha
+        lda ipy
+        pha
+skip_push:
+;;; 10 (4 more ipy)
+        sty ip+1
+        lda savea
+        sta ip
+        lda savey
+        sta ipy
+
+        ;; fall-through
+
+FUNC _next
+;;; 9 (+4)
+        jsr _get
+
+        ;; all bytecodes fit/jmps to one page!
+        sta call+1
+call:   jmp _start
+
+;;; ?? update
+;;; (+ 9 4 13) = 26 ... => 13 indirect refs (/3=8)
+offbytecodes= _next+1
+
+.ifnblank
+
+;;; TODO: this needs to be before _next/_enter
+;;; 
+;;; OR
+;;; 
+FUNC _call
+;;; 13
+        jsr _get
+        tay
+        jsr _get
+        pha
+        tya
+        pha
+        jmp _enter
+.endif
+
+.ifnblank
+;;; call machine-code routine
+;;; (could be bytecode w "JSR VM" prefix)
+FUNC _foo
+FUNC _jsr
+;;; 11
+        ;; lo
+        jsr _get
+        tay
+        ;; hi
+        jsr _get
+        pha
+        tya
+        pha
+        ;; famous
+        rts
+.endif
+FUNC _bar
+
+.ifnblank ; _enter alternatives
+
+
+
 
 
 ;;; _djz _jz _jp  _get _semis       _enter _next _jsr
@@ -1169,7 +1321,6 @@ FUNC _jsr
 
 
 
-.ifnblank ; _enter alternatives
 
 ;;; (+ 8 18 2) = 28
 FUNC _semis

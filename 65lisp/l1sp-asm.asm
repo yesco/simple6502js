@@ -68,7 +68,8 @@ IO=1
 ;;; prefixed? (save some bytes in dispatch)
 
 ;;; MAX_BYTECODES allow more than one page of bytecode
-;MAX_BYTECODES=1
+;
+MAX_BYTECODES=1
 
 .endif
 
