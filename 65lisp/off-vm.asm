@@ -780,6 +780,7 @@ noj:
 .endif
 
 
+.ifndef MAX_BYTECODES
 ;;; Jump if 0 without removing tos
 ;;; 
 ;;; 20
@@ -899,8 +900,107 @@ call:   jsr _start
         jmp _next
 .endif
 
+FUNC _enter
+;;; 12
+        ;; bytecode in second page (only)
+        ;; Y=ipy, A=index 0.. of routine to call!
+        ;; C is set
+
+        ;; look up second page offset at Y!
+        ;; see label "offbytecode"
+        ;; 
+        ;;   ipy = _start[bytecodes[adjusted_ipy]]
+;PUTC '-'
+        tay
+        lda bytecodes-(offbytecode-_start),y
+        ;; "swap"
+        ldy ipy
+        sta ipy
+        ;; push old Y
+        tya
+        pha
+
 .ifdef MAX_BYTECODES
+;;; 6
+        lda ip+1
+        pha
+        lda ip
+        pha
+.endif ; MAX_BYTECODES
+
+        bcs _next                ; C still set!
+
+;;; Set this to last function+1 callable in VM
+;;; any number >= this will be used to dispatch
+;;; to byte code functions automatically.
+offbytecode= _enter+1           ; lol
+
+.else
+
+;;; Forth65: (+ 18 25 6) = 49    (+ 16 19) = 35
+;;;  84 bytes enter next semis branch zbranch
+;;; 
+;;;   DOCOL = 18 bytes (+ 3 JMP NEXT)
+;;;     rpush(W)
+;;;     IP+= 2
+;;;     JMP NEXT
+;;;   NEXT  = 25 bytes
+;;;     W= *IP
+;;;     IP+= 2
+;;;     JMP W
+;;;   SEMIS =  6       (+ 3 JMP NEXT)
+;;;     IP= rpop()
+;;;     JMP NEXT
+;;; 
+;;;   BRAN  = 16       (+ 3 JMP NEXT)
+;;;   ZBRAN = 19 bytes     ( inc2 )
+
+
+;;; _djz _jz _jp  _get _semis       _enter _next _jsr
+;;; (+ 3  19 9 3    11      4  1 5 2 6 6 9     9   11)
+;;; == 98 bytes ! ugh....
+
 ;;; DO NOTE: _jp _jz _djz need to be relative!
+
+;;; _dupjumpzero: Jump if 0 without removing tos
+;;; (maybe this is the use of ?dup normally?)
+;;; 
+;;; (+ 3 9 19 3) = 34
+FUNC _djz
+;;; (3)
+        jsr _dup
+;;; Remove tos, if 0 jump
+FUNC _jz
+;;; (9)
+        inx
+        inx
+        lda $100-2+0,x
+        ora $100-2+1,x
+        bne noj
+        ;; do jmp - ipy= new addr
+FUNC _jp
+;;; (19) -- too big???
+        jsr _get
+
+        ;; sign extended add ip+= (+/-)A
+        ldy #0
+        bpl pos
+        dey                     ; $ff if negative!
+pos:    
+        clc
+        adc ip
+        sta ip
+        ;; add with sign extended value
+        tya
+        adc ip+1
+        sta ip+1
+
+        rts
+noj:
+;;; (3)
+        ;; skip jmp dest byte
+        inc ipy
+        rts
 
 
 ;;; (+ 11 4 20 9) = 44
@@ -968,16 +1068,53 @@ skip_push:
         ;; fall-through
 
 FUNC _next
-;;; 9+4
+;;; 9 (+4)
         jsr _get
 
+;;; if TRANSLATION, user interaction
+.ifdef FULL_VECTOR
+
+;;; 7 + 3 ==> 10 bytes total
+;;;           BUT 256 bytes translation... lol
+        asl
+.ifdef HIBIT_JUMP
+;;; (2)
+        bcs jumps
+.endif
+        sta call+1
+call:   jmp (translationtable)
+
+
+.ifdef HIBIT_JUMP
+; hibit set means relative jump
+;;; So we can jump +/-63
+jumps:
+;;; (+ 44 -9 10 2 16) = 63 ... TOO BIG...
+;;;                       if have jump table just overflow
+;;;                       maybe also not use so minimal...
+;;;                       but faster implementation....!
+;;; 16
+        ;; C=1
+        adc #64-1
+        ;; ip+= A
+        clc
+        adc ip
+        sta ip
+        lda #0
+        adc ip+1
+        sta ip+1
+        jmp _next
+.endif ; HIBIT_JUMP
+
+.else
 .ifdef INTERNAL_BYTECODE
+;;; (+4)
         cmp #<offbytecodes
         bcs internal_bytecodes
 .endif
-
         sta call+1
 call:   jmp $ffff
+.endif
 
 ;;; OPTIONAL
 ;;; 
@@ -995,8 +1132,10 @@ internal_bytecodes:
         pha
         jmp _enter
 
-;;; (+ 9 4 13) = 26 ... => 13 indirect refs
+;;; (+ 9 4 13) = 26 ... => 13 indirect refs (/3=8)
 offbytecodes= _next+1
+
+.ifnblank
 
 ;;; TODO: this needs to be before _next/_enter
 ;;; 
@@ -1011,8 +1150,26 @@ FUNC _call
         tya
         pha
         jmp _enter
+.endif
+
+;;; call machine-code routine
+;;; (could be bytecode w "JSR VM" prefix)
+FUNC _jsr
+;;; 11
+        ;; lo
+        jsr _get
+        tay
+        ;; hi
+        jsr _get
+        pha
+        tya
+        pha
+        ;; famous
+        rts
 
 
+
+.ifnblank ; _enter alternatives
 
 ;;; (+ 8 18 2) = 28
 FUNC _semis
@@ -1357,45 +1514,8 @@ swaprbyte:
         inx
         inx
         rts
+.endif ; NBLANK ; _enter alternatives
 
-
-
-.else
-
-FUNC _enter
-;;; 12
-        ;; bytecode in second page (only)
-        ;; Y=ipy, A=index 0.. of routine to call!
-        ;; C is set
-
-        ;; look up second page offset at Y!
-        ;; see label "offbytecode"
-        ;; 
-        ;;   ipy = _start[bytecodes[adjusted_ipy]]
-;PUTC '-'
-        tay
-        lda bytecodes-(offbytecode-_start),y
-        ;; "swap"
-        ldy ipy
-        sta ipy
-        ;; push old Y
-        tya
-        pha
-
-.ifdef MAX_BYTECODES
-;;; 6
-        lda ip+1
-        pha
-        lda ip
-        pha
-.endif ; MAX_BYTECODES
-
-        bcs _next                ; C still set!
-
-;;; Set this to last function+1 callable in VM
-;;; any number >= this will be used to dispatch
-;;; to byte code functions automatically.
-offbytecode= _enter+1           ; lol
 
 .endif ; MAX_BYTECODES
 
