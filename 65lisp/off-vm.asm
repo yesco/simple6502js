@@ -134,6 +134,15 @@ FUNC _start
 
 
 
+.ifdef MAX_BYTECODES
+
+.zeropage
+ip:     .res 2
+.code
+
+.endif ; MAX_BYTECODES
+
+;;; TODO: reconsile?
 ;;; ---------------------------------- OLD exec
 .ifnblank
 
@@ -807,29 +816,36 @@ noj:
 ;;; 
 
 FUNC _get
-;;; 8 
+;;; 8 (7)
         inc ipy
         ldy ipy
+.ifdef MAX_BYTECODES
+        lda (ip),y
+.else
         lda bytecodes,y         ; +1 byte for abs addr
-.ifnblank
-PHA
-TYA
-PHA
-TXA
-PHA
-
-putc '('
-ldy ipy
-lda bytecodes,y
-jsr print2h
-putc ')'
-
-PLA
-TAX
-PLA
-TAY
-PLA
 .endif
+
+
+.ifnblank
+        PHA
+        TYA
+        PHA
+        TXA
+        PHA
+
+        putc '('
+        ldy ipy
+        lda bytecodes,y
+        jsr print2h
+        putc ')'
+
+        PLA
+        TAX
+        PLA
+        TAY
+        PLA
+.endif
+
         rts
 
 
@@ -867,8 +883,10 @@ FUNC _next
 jsr TRACE        
 .endif
 
+.ifndef MAX_BYTECODES
         cmp #<offbytecode
         bcs _enter
+.endif ; MAX_BYTECODES
         
         ;; primtive ops in first page
         sta call+1
@@ -880,6 +898,469 @@ call:   jmp _start
 call:   jsr _start
         jmp _next
 .endif
+
+.ifdef MAX_BYTECODES
+;;; DO NOTE: _jp _jz _djz need to be relative!
+
+
+;;; (+ 11 4 20 9) = 44
+;;;                +17 (4+13 for "internal bytecode")
+;;;                ---
+;;;                 61
+;;; 17 bytes code overhead + 2 bytes per routine
+;;; but saves 3 bytes no "jsr _enter" neeed.
+;;; 
+;;; :.  17+2n = 3n  => n>=17 routines gives benefit
+;;; 
+;;; Bigger saving might be not need CALL bytecodeaddr
+;;; 1 byte instead of 3 bytes (+ 13 bytes _call)
+;;; 
+;;; :.  savings= n-17 + calls*2 + 13 = n+calls*2 - 4
+;;; 
+;;; n=2 => calls >= 1
+;;; n=4 => calls >= 0
+;;; n=5 => calls >= 6
+
+FUNC _get
+;;; 11
+        inc ip
+        bne noinc
+        inc ip+1
+noinc:  
+        ldy #0
+        lda (ip),y
+        rts
+
+;;; BEST BEST BEST!!!
+;;; (+ 4 21) = 25
+FUNC _semis
+;;; 4
+        pla
+        pla
+
+        sec
+        SKIPONE
+        
+;;; JSR _enter BYTECODES...
+;;; (+ 1 5 2 6 6) = 20
+FUNC _enter
+;;; 1
+        clc
+;;; 5
+        pla
+        sta savea
+        pla
+        beq _enter
+        tay
+;;; +2
+        bcs skip_push
+;;; 6
+        lda ip+1
+        pha
+        lda ip
+        pha
+skip_push:
+;;; 6
+        sty ip+1
+        lda savea
+        sta ip
+
+        ;; fall-through
+
+FUNC _next
+;;; 9+4
+        jsr _get
+
+.ifdef INTERNAL_BYTECODE
+        cmp #<offbytecodes
+        bcs internal_bytecodes
+.endif
+
+        sta call+1
+call:   jmp $ffff
+
+;;; OPTIONAL
+;;; 
+;;; These utilize an secondary trampoline
+;;; located at the beginning of second page
+internal_bytecodes:
+;;; 13
+        tay
+        ;; hi
+        lda second_page+(offbytecodes-_start),y
+        pha
+        ;; lo
+        dey
+        lda second_page+(offbytecodes-_start),y
+        pha
+        jmp _enter
+
+;;; (+ 9 4 13) = 26 ... => 13 indirect refs
+offbytecodes= _next+1
+
+;;; TODO: this needs to be before _next/_enter
+;;; 
+;;; OR
+;;; 
+FUNC _call
+;;; 13
+        jsr _get
+        tay
+        jsr _get
+        pha
+        tya
+        pha
+        jmp _enter
+
+
+
+;;; (+ 8 18 2) = 28
+FUNC _semis
+;;; 8
+        pla
+        pla
+
+        ;; exchange w zero to pop!
+        lda #0
+        sta ip
+        sta ip+1
+        
+        ;; fall-through
+
+;;; (+ 5 6 6 1) = 18
+FUNC _enter
+;;; 5 (+2 for _semis)
+        pla
+        sta savea
+        pla
+        ;; hi=0 => pop!
+        beq _enter
+        tay
+;;; 6
+        lda ip+1
+        pha
+        lda ip
+        pha
+;;; 6
+        sty ip+1
+        lda savea
+        sta ip
+;;; 1
+        rts
+
+
+;;; what if we had two ip to toggle between? !!!
+;;; (+ 8 8 8 3 13 -1) = 39
+FUNC _enter
+        ;; swap yc yo pointer, lol
+;;; 8
+        ldy yc
+        lda yo
+        sty yo
+        sta yc
+;;; 8
+        ;; load new ip
+        ldy yc
+        pla
+        sta ip,y
+        pla
+        sta ip+1,y
+        
+;;; 8
+        ;; save old ip
+        ldy yo
+        lda ip,y
+        pha
+        lda ip+1,y
+        pha
+
+;;; 3
+        jmp _next
+        
+FUNC _semis
+;;; 13 - 2
+        pla
+        pla
+        
+        ;; load "old" new ip
+        ldy yc
+        pla
+        sta ip,y
+        pla
+        sta ip+1,y
+        
+        jmp _next
+
+
+
+;;; is smallest????
+;;; (+ 26 4) = 30
+FUNC _semis
+;;; 4
+        pla
+        pla
+
+        sec
+        SKIPONE
+FUNC _enter
+        clc
+;;; (+ 3 6 6 11) = 26
+;;; 
+        ;; _fromR
+FUNC _semis2
+;;; 6
+        pla
+        sta savea
+        pla
+        sta savey
+        ;; _rpuship
+        bcs skip_push
+;;; 6
+        lda ip+1
+        pha
+        lda ip
+        pha
+skip_push:      
+        ;; _jump
+        ;; IP= pop
+_jump:  
+;;; 11
+        lda savea
+        sta ip
+        lda savey
+        sta ip+1
+        rts
+
+
+
+;;; _get 11 _next 9 (single offset still)
+;;;         (all callable bytecodes need trampoline)
+;;; (+ 11 9 30) = 50 ....
+
+;;; (+ 9 10 11) = 30
+;;; swap 2
+FUNC _enter
+;;; 9 
+        stx savex
+        txa
+        jsr _ripswap
+        ldx savex
+        SKIPTWO
+FUNC _semis
+;;; 10
+        pla
+        pla
+
+        pla
+        sta ip
+        pla
+        sta ip+1
+        bne _next
+        
+_ripswap:       
+;;; 4
+        jsr _bripswap
+        inx
+_bripswap:       
+;;; 11
+        ;; lo
+        lda 102,x
+        ldy ip
+        sta ip
+        sty 102,x
+        rts
+
+
+;;; (+ 26 11) = 37
+;;; swap 2
+FUNC _enter
+;;; 26
+        stx savex
+
+        txa
+        ;; lo
+        lda 100,x
+        ldy ip
+        sta ip
+        sty 100,x
+        ;; hi
+        lda 101,x
+        ldy ip
+        sta ip
+        sty 101,x
+
+        ldx savex
+        SKIPTWO
+FUNC _semis
+;;; 11
+        pla
+        pla
+
+        pla
+        sta ip
+        pla
+        sta ip+1
+        jmp _next
+
+
+
+;;;  BEST????
+
+;;; (+ 20 9) = 29 no ipy
+FUNC _enter
+;;; 20
+        ;; save new
+        pla
+        sta savea
+        pla
+        sta savey
+        ;; push old
+        lda ip+1
+        pha
+        lda ip
+        pha
+        ;; push new
+        lda savey
+        pha
+        lda savea
+        pha
+
+        SKIPTWO
+FUNC _semis
+;;; 9
+;;; remove jsrloop
+        pla
+        pla
+FUNC _loadip2
+        pla
+        sta ip
+        pla
+        sta ip+1
+
+;;; ... _next
+
+
+;;;  plain but ...
+
+FUNC _enter
+;;; (+ 5 9 11) = 25
+;;; 5
+        pla                    
+        tay
+        pla
+        sta savea
+;;; 9
+        lda ip+1
+        pha
+        lda ip
+        pha
+        lda ipy
+        pha
+;;; 11
+        lda savea
+        sta ip+1
+        sty ip
+        ldy #0
+        sty ipy
+
+        rts
+
+FUNC _semis
+        pla
+        pla
+        
+        pla
+
+        
+
+FUNC _enter
+;;; (+ 6 9 13) = 28
+        ;; jsr call addr
+;;; 6
+        pla
+        sta savea
+        pla
+        sta savex
+        ;; store current
+;;; 9
+        lda ip+1
+        pha
+        lda ip
+        pha
+        lda ipy
+        pha
+        ;; set new
+;;; 13
+        lda savex
+        sta ip+1
+        lda savea
+        sta ip
+        lda #0
+        sta ipy
+
+        rts
+
+
+;;; All bytecodes are machine code which require
+;;; an "JSR _enter" that'll get here
+;;; (cannot return to machine code after)
+;;; (TODO: special _semis_to_machinecode?)
+
+;;; (+ 13 33) = 46 ... + _next :-(
+FUNC _semis
+;;; 13
+        ;; get rid of jsrloop
+        pla
+        pla
+        ;; call _enter and...
+        jsr _s_ret
+        ;; ... and
+        ;; here after _enter
+        ;; ip(y) has been "reset"
+        ;; (drop where we were)
+        pla
+        pla
+        pla
+        bne _next               ; never called from ZP
+
+_s_ret: jmp _enter
+        
+
+FUNC _enter
+;;; 14+19 = 33...
+        ;; on stack==bytecodeaddr-1 !
+        lda #0
+        pha
+        ;; swap 3 bytes on stack <-> ip(y)
+        stx savex
+        tsx
+
+        jsr swaprip
+
+        ldx savex
+        jmp _next
+
+
+;;; swap 3 bytes ip(2) ipy(1) w R stack
+swaprip:        
+;;; 19
+        jsr swaprbyte
+        jsr swaprbyte
+swaprbyte:
+;;; (13)
+        ;; rstack: ... newip' newip newipy call' call -
+        ;; swap R:ip <-> ip
+        lda ip
+        ldy 102,x
+        sta 102,x
+        sty ip
+        inx
+        inx
+        rts
+
+
+
+.else
 
 FUNC _enter
 ;;; 12
@@ -900,6 +1381,15 @@ FUNC _enter
         ;; push old Y
         tya
         pha
+
+.ifdef MAX_BYTECODES
+;;; 6
+        lda ip+1
+        pha
+        lda ip
+        pha
+.endif ; MAX_BYTECODES
+
         bcs _next                ; C still set!
 
 ;;; Set this to last function+1 callable in VM
@@ -907,6 +1397,7 @@ FUNC _enter
 ;;; to byte code functions automatically.
 offbytecode= _enter+1           ; lol
 
+.endif ; MAX_BYTECODES
 
 
 

@@ -16,10 +16,11 @@
 
 ;;; Applies to the "sectorlisp"
 ;;; (it has no numbers, even == atom, odd == cons)
-;;; LISP= 241            NOLISP= 228 B 
+;;; 
 ;LISP=1
 
 .ifdef LISP
+;;; 241 bytes!
   ATOMMISALIGNMENT=0
   LISPINIT=1
 
@@ -30,9 +31,17 @@
   MINIMAL=1
 
 .else
+;;; 245 bytes (no IOSTRING)
+;;; 
+;;; MAX_BYTECODES
+;;;  248 bytes (+ 245 -41 44) new _enter...
+;;; 
+;;;        = requires "JSR VM16" for bytecodes
+;;;          (and can call w/o "jmp trampoline")
+;;;   (- 256 248) = 8 bytes left = 2x3 = 2 routines, lol
+
 
 ;;; Include _not:
-;;; +3 B
 ;
 NOT=1
 
@@ -54,6 +63,12 @@ IO=1
 
 ;;; MINIMAL (doesn't even have _plus/_minus!)
 ;MINIMAL=1
+
+;;; Maybe this would require bytecodes to be 
+;;; prefixed? (save some bytes in dispatch)
+
+;;; MAX_BYTECODES allow more than one page of bytecode
+;MAX_BYTECODES=1
 
 .endif
 
