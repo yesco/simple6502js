@@ -63,8 +63,7 @@ FUNC _start
 ;;; - https://justine.lol/sectorlisp2/sectorlisp.lst.html
 
 ;;; 44 B   0000-002b - NIL\0...
-
-;;; jsk: (44B !)
+;;; ==> 44B
         jmp skipper
 
 ;;; Cannot do the sectorlisp trick as these goes astray
@@ -92,8 +91,10 @@ halt:   jmp halt
 ;;; 30     006c-0086 - PrintList
 ;;; 27     0087-0092 - PutObject/PrintString/PrintAtom
 ;;; 49     0093-00b8 - GetObject/Intern
+
 ;;;  3     00b9-00bc - GetChar
 ;;; 14     00c7-00c8 - PutChar \r \n
+
 ;;;  2     00c9-00e0 - PairLis
 ;;; 24     00e1-00f0 - EvLis
 ;;; 16     00f1-00fc - xCons/Cons
@@ -108,14 +109,80 @@ halt:   jmp halt
 ;;;  8      153- 155 -   .retF
 ;;;  3      156- 15c -   .ifCons
 ;;; 11      161- 163 -   .retT
-;;; 10     0164-016d - Assoc
-;;;  3     016e-0170 - Cadr - overlap fallthrough...
-;;;  1     0171-0171 - Cdr
-;;;  5     0172-0176 - Car
-;;; 17     0177-0187 - EvCon
-;;; 47     0188-01b7 - Eval
-;;; 71     01b8-01ff - fill! (name)
 
+;;; 10     0164-016d - Assoc
+;;; ==> 45 (+ 35!)
+_assoc:
+;;; itstart
+;;; (11)
+        sta ptr2
+        stx ptr2+1
+        jsr _car
+        sta ptr1
+        stx ptr1+1
+
+        ;; reverse AX
+        pla                     ; lo
+        tax                     
+        pla                     ; hi
+        pha
+
+        ;; (eq (car ptr1))
+        ldy #1
+        cmp (ptr1),y
+        bne nassoc
+        txa
+        dey
+        cmp (ptr1),y
+        beq eqass
+nasssoc:
+        txa
+        pha
+
+;;; itnext
+;;; (7)
+        lda ptr2
+        ldx ptr2+1
+        jsr _cdr
+
+        jmp _assoc
+        
+eqass:  
+        pla
+        lda ptr2
+        ldx ptr2+1
+        rts
+        
+
+;;;  3     016e-0170 - Cadr - overlap fallthrough...
+;;; ==> 5 B (+2)
+_cadr:  
+        jsr _cdr
+        SKIPTWO
+
+;;;  1     0171-0171 - Cdr
+;;; ==> 3 B (+2)
+_cdr:   
+        ldy #3
+        SKIPTWO
+
+;;;  5     0172-0176 - Car
+;;; ==> 13 B (+7)
+_car:   
+        ldy #1
+        sta ptr1
+        stx ptr1+1
+        lda (ptr1),y
+        tax
+        dey
+        lda (ptr1),y
+        rts
+        
+;;; 17     0177-0187 - EvCon
+;;; ==> 
+;;; 47     0188-01b7 - Eval
+;;; ==> 
+;;; 71     01b8-01ff - fill! (name)
 
 
 .ifnblank
