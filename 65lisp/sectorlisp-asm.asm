@@ -41,6 +41,8 @@ _NOP_=$ea
 ptr1:   .res 2
 ptr2:   .res 2
 
+env:    .res 2
+
 .code
 
 .macro SKIPONE
@@ -85,6 +87,7 @@ halt:   jmp halt
 
 ;;; 12     002c-0037 - begin
 ;;; 22     0038-004d - main
+
 ;;; 30     004e-006b - GetToken
 ;;; 30     006c-0086 - PrintList
 ;;; 27     0087-0092 - PutObject/PrintString/PrintAtom
@@ -98,16 +101,6 @@ halt:   jmp halt
 ;;; 16     00f1-00fc - xCons/Cons
 ;;; 12     00fd-0115 - Gc
 ;;; 25     0116-012a - GetList
-;;; 21(57) 012b-0163 - Apply
-;;;  5      130- 13b -   .lambda
-;;; 12      13c- 142 -   .switch
-;;;  7      143- 146 -   .ifCar
-;;;  4      147- 14a -   .ifCdr
-;;;  4      14b- 152 -   .ifAtom
-;;;  8      153- 155 -   .retF
-;;;  3      156- 15c -   .ifCons
-;;; 11      161- 163 -   .retT
-
 ;;; 10     0164-016d - Assoc
 ;;; ==> 45 (+ 35!)
 _assoc:
@@ -180,6 +173,127 @@ _car:
 ;;; ==> 
 ;;; 47     0188-01b7 - Eval
 ;;; ==> 
+
+;;; (+ 21 21 15 18 15) = 90
+;;; sectorlisp: eval 47, evcon 17, apply: 57
+;;; (+ 47 17 57) = 121 (more than 6502???)
+
+_eval:  
+;;; (21)
+        tay
+        ror
+        bcc iscons
+        tya
+        ;; is atom, lookup value
+        jsr callassoc
+        jmp cdr
+
+callassoc:      
+        pha
+        txa
+        pha
+
+        lda env
+        ldx env+1
+        jmp _assoc
+        
+iscons: 
+;;; (21)
+        tya
+        pha
+        txa
+        pha
+        tya
+        
+        ;; fun
+        jsr _car
+        
+        ;; prim?
+        cpx #>kNil
+        bne notprim
+        ;; now only need compare low byte
+        tay
+        
+        ;; no-eval "special forms"
+        cpy #<kQuote
+        beq _quote
+        cmp #<kCond
+        beq _cond
+        
+        ;; eval args
+;;; (15)
+        sty savey
+        pla
+        tax
+        pla
+        tay
+
+        lda savey
+        pha
+
+        tya
+        jsr _evalargs
+        
+        sta savea
+
+        ;; get lo fun atom
+        pla
+        tay
+
+        lda savea
+        
+        ;; two args
+        cpy #<kCons
+        beq _cons
+
+        cpy #<kEq              
+	bne noteq
+        ;; eq
+        ...
+
+
+;;; 21(57) 012b-0163 - Apply
+;;;  5      130- 13b -   .lambda
+;;; 12      13c- 142 -   .switch
+;;;  7      143- 146 -   .ifCar
+;;;  4      147- 14a -   .ifCdr
+;;;  4      14b- 152 -   .ifAtom
+;;;  8      153- 155 -   .retF
+;;;  3      156- 15c -   .ifCons
+;;; 11      161- 163 -   .retT
+        ;; call prims
+;;; (18)
+noteq:  
+        cpy #<kCar
+        beq _car
+        cpy #<kCdr
+        beq _cdr
+
+        ;cpy #<kAtom
+        ;bne natom:
+        ;; atom
+        pla
+        tax
+        pla
+        
+        ...
+        rts
+
+
+
+notprim:
+;;; (15)
+        jsr _eval
+        pha
+        txa
+        pha
+        jsr _evalargs
+apply:  
+        pla
+        tax
+        pla
+;       jmp _apply
+
 ;;; 71     01b8-01ff - fill! (name)
 
 
