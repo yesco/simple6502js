@@ -967,6 +967,12 @@ offbytecode= _enter+1           ; lol
 ;;; ; >>>>>>>>>>>>>>>> 253 bytes
 ;;;    (can't fit _jsr)
 
+;;; No space for bytecode trampolines....
+;;; How about code to dispatch (3 bytes?) lol - CANNOT!
+;;;     .... (+ 4 9) = 13
+
+;;; save: _djz 3, _not 3, _shl 5 = (+ 3 3 5) = 11
+
 ;;; DO NOTE: _jp _jz _djz need to be relative!
 ;;;      (or not?)
 
@@ -1060,7 +1066,10 @@ FUNC _next
 
         ;; all bytecodes fit/jmps to one page!
         sta call+1
-call:   jmp _start
+call:   jmp _start 
+        ;; ^jsr && jmp _next === + 6 bytes...
+
+;;; TODO: jsr-loop?!?!
 
 ;;; ?? update
 ;;; (+ 9 4 13) = 26 ... => 13 indirect refs (/3=8)
