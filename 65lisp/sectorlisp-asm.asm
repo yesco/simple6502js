@@ -38,10 +38,8 @@ _NOP_=$ea
 
 .zeropage
 
-;;; LOL, may not be possible, but makes
-;;; _nil_ address==0, using _null, _zero!
-
-;;; ORIC BASIC INTERACTS...
+ptr1:   .res 2
+ptr2:   .res 2
 
 .code
 
@@ -135,7 +133,7 @@ _assoc:
         dey
         cmp (ptr1),y
         beq eqass
-nasssoc:
+nassoc:
         txa
         pha
 
@@ -155,7 +153,7 @@ eqass:
         
 
 ;;;  3     016e-0170 - Cadr - overlap fallthrough...
-;;; ==> 5 B (+2)
+;;; ==> 4 B (+1)
 _cadr:  
         jsr _cdr
         SKIPTWO
@@ -195,7 +193,6 @@ _car:
 
 ;;; INIT
 ;;; 22 bytes already, make constants range and memcopy!
-
 
 .ifnblank
         NEWLINE
