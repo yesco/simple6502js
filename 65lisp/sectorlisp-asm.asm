@@ -85,24 +85,220 @@ putc '-'
 
 halt:   jmp halt
 
-;;; 12     002c-0037 - begin
-;;; 22     0038-004d - main
+;;; 12     002c-0037 - begin - "BOOT"
+;;; ==> 3
+_boot:  
+        ldx #$ff
+        txs
+        
+;;; 22     0038-004d - main - "ReadEval-loop"
+;;; ==> 22!
+_readeval:      
+        lda #'\n'
+        jsr putchar
+        lda #'>'
+        jsr putchar
+
+        jsr read
+        jsr eval
+        jsr print
+
+        jmp _readeval
 
 ;;; 30     004e-006b - GetToken
+;;; ==> 32, TODO: doesn't handle ungetc/lookup/restore
+;;; Y is length (may be 0)
+_read:  
+        ;; peek
+        lda unc
+        cmp #'('
+        beq _readlist
+        ;; atom
+        lda here
+        and #1
+        inc here
+nowaligned:     
+        ldy #0
+rdloop: 
+        jsr getchar
+        cmp #')'+1
+        bcc rdend 
+        sta (here),y
+        iny
+        jmp redloop
+rdend:  
+        lda #0
+        sta (here),y
+
+        ;; TODO: advance here if not found?
+        rts
+        
+        
 ;;; 30     006c-0086 - PrintList
+;;; ==> 32 (not printing ".X")
+_prinlist:     
+;;; (assumes A is in Y!)
+        lda #'('
+        jsr putchar
+        ;; push
+_prrest:        
+        tya
+        pha
+        txa
+        pha
+        tya
+
+        jsr car
+        jsr prin1
+        ;; pop
+        pla
+        tax
+        pla
+
+        jsr cdr
+        tay
+        ror
+        bcc _prrest
+
+_endlist:       
+        ;; TODO: (a . X) X!=nil print...
+        lda #')'
+        jmp putchar
+
 ;;; 27     0087-0092 - PutObject/PrintString/PrintAtom
+;;; ==> 19 (!)
+_prin1:
+        tay
+        ror
+        bcs _prinlist
+        ;; atom
+        tya
+        ;; just set ptr1
+        jsr _car 
+        ;; (y==0)
+_prstr: 
+        lda (ptr1),0
+        beq ret
+        jsr putchar
+        iny
+        bne _prstr
+ret:
+        rts
+        
 ;;; 49     0093-00b8 - GetObject/Intern
 
 ;;;  3     00b9-00bc - GetChar
 ;;; 14     00c7-00c8 - PutChar \r \n
 
 ;;;  2     00c9-00e0 - PairLis
+;;; TODO: not reqcurse on PairLis?
 ;;; 24     00e1-00f0 - EvLis
+_evalist:       
+        eqnil
+        bnil rts
+
+        jsr eval
+        ...
+        jsr _evallist
+        ;; fall-trough - jsr _cons
+
 ;;; 16     00f1-00fc - xCons/Cons
+;;; ==> 22
+_cons:  
+;;; (+ 3 19) = 22
+        jsr rcomma               ; cdr first?
+        ;; 2nd fall-through
+
+.ifnblank
+rcomma:  
+;;; 22
+        ldy #0
+        sta (chere),y
+        iny
+        txa
+        sta (chere),y
+
+        ;; chere -= 2
+        ldx chere+1
+        lda chere
+        pha
+        sec
+        sbc #2
+        bcs nodec
+        dec chere+1
+nodec:  
+        pla
+        rts
+
+
+rcomma: 
+;;; 24
+        pha
+        txa
+        pha
+
+        ldy #0
+
+        jsr bcomma
+        ;; 2nd fall-through
+bcomma: 
+        lda chere
+        bne nodec
+        dec chere+1
+nodec:  
+        dec chere
+
+        pla
+        sta (chere),y
+        
+        lda chere
+        ldx chere+1
+        rts
+        
+.endif
+
+rcomma: 
+;;; 19 !!!
+        ldy cherey
+        dey
+        ;; no underflow as it starts at end of page?
+        ;; (TODO: hmm, strange align)
+        sta (chere),y
+        dey
+        bne nodec
+        dec chere+1
+nodec:  
+        txa
+        sta (chere),y
+        sty cherey
+
+        tya
+        ldx chere+1
+        rts
+        
+
 ;;; 12     00fd-0115 - Gc
+;;;   TODO: I don't understand the ABC GC
+;;;   (bad description?)
 ;;; 25     0116-012a - GetList
+;;; ==> 20
+_readlist:      
+        ;; peek
+        lda unc
+        cmp #')'
+        beq rdend
+        
+        jsr read
+        ;; TODO: '.'
+        jsr _readlist
+        jmp _cons
+rdend:  
+        lda #<kNil
+        ldx #>kNil
+        rts
+
 ;;; 10     0164-016d - Assoc
-;;; ==> 45 (+ 35!)
+;;; ==> 45 (ie. + 35 :-()
 _assoc:
 ;;; itstart
 ;;; (11)
@@ -465,7 +661,7 @@ valid:
         iny
         jsr _atomkey
         ;; automatically zero terminates!
-        sta (here),y
+        sta (chere),y
         bne valid
         rts
 
