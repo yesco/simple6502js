@@ -691,3 +691,52 @@ notatom:
 .end
 .endif
 
+
+;;; sectorlisp.asm - analysis
+
+;;; - https://justine.lol/sectorlisp2/sectorlisp.lst.html
+
+;;; 44 B   0000-002b - NIL\0...
+;;; ==> 44
+;;; 12     002c-0037 - begin
+;;; ==> 3
+;;; 22     0038-004d - main
+;;; ==> 22
+;;; 30     004e-006b - GetToken
+;;; ==> 32
+;;; 30     006c-0086 - PrintList
+;;; ==> 32
+;;; 27     0087-0092 - PutObject/PrintString/PrintAtom
+;;; ==> 19
+;;; 49     0093-00b8 - GetObject/Intern
+;;;  3     00b9-00bc - GetChar
+;;; 14     00c7-00c8 - PutChar \r \n
+;;;  2     00c9-00e0 - PairLis
+;;; 24     00e1-00f0 - EvLis
+;;; 16     00f1-00fc - xCons/Cons
+;;; ==> 22
+;;; 12     00fd-0115 - Gc
+;;; 25     0116-012a - GetList
+;;; ==> 20
+;;; 21(57) 012b-0163 - Apply
+;;; ==> see eval (+ 15 18 15 ...) = 48
+;;;  5      130- 13b -   .lambda
+;;; 12      13c- 142 -   .switch
+;;;  7      143- 146 -   .ifCar
+;;;  4      147- 14a -   .ifCdr
+;;;  4      14b- 152 -   .ifAtom
+;;;  8      153- 155 -   .retF
+;;;  3      156- 15c -   .ifCons
+;;; 11      161- 163 -   .retT
+;;; 10     0164-016d - Assoc
+;;; ==> 45
+;;;  3     016e-0170 - Cadr - overlap fallthrough...
+;;; ==> 3
+;;;  1     0171-0171 - Cdr
+;;; ==> 3
+;;;  5     0172-0176 - Car
+;;; ==> 13
+;;; 17     0177-0187 - EvCon
+;;; 47     0188-01b7 - Eval
+;;; ==> (+ 21 21 15) = 57
+;;; 71     01b8-01ff - fill! (name)
