@@ -71,8 +71,155 @@ _start:
         putc 'N'
         putc 'D'
 .endif
+
+
+.zeropage
+        
+inp:    .res 2
+
+.code
+
+;;; parser
+        putc 'A'
+        NEWLINE
+
+        lda #<input
+        sta inp
+        lda #>input
+        sta inp+1
+        
+        lda #<ruleA
+        sta rule
+        lda #>ruleA
+        sta rule+1
+
+next:   
+;;; TODO: Stopping condition?
+        jsr getr
+        jsr nextc
+        ;; literaly equal (assume it's ok)
+        beq next
+;;; TODO: if space match space, allow/skip any/all spaces
+        
+        ;; apply matchers...
+        cpx #'.'
+        beq next
+
+;;; TODO: special rule... (?)
+        cpx #'?'
+        beq optionalnext
+        cpx #'+'
+        beq atleastonce
+        cpx #'*'
+        beq repeats
+
+        ;; TODO: don't need push/OR/alt?
+        cpx #'|'
+        beq endrule
+        cpx #0
+        beq endrule
+        
+        ;; fail match -> backtrack
+;;; TODO: may need pop-a-lot!
+        jsr getr
+        
+
+
         rts
 
+getr:   
+        ldy #rule
+        jsr incRY
+        ldy #0
+        lda (rule),y
+        ;; ref another rule?
+        beq @endrule
+        bpl @norule
+        ;; special rules (char class)
+        cmp #'d'+128
+        bne notdigit 
+digitchar:
+        lda (inp),y
+        sec
+        sbc #'0'
+        cmp #'9'+1
+        bcs FAIL
+        jmp NEXT
+;;; TODO: make a: i=identifier= w*(w|d|_)
+;;;     w=word= +v v=wordchar
+;;;     n=number= +d d=digit
+notdigit:       
+        cmp #'w'+128
+        bne notword
+wordchar:       
+        lda (inp),y
+        sec
+        sbc #'A'
+        ;; fold case
+        and #(255-32)           ; TODO:correct?
+        cmp #'Z'+1
+        bcs endword
+        ;; keep eating chars
+        iny
+        jmp wordchar
+endword:        
+        cpy #0
+        bcs FAIL
+        ;; accept, Y points to end
+;;; TODO: store match
+        jmp NEXT
+
+notword:
+        cmp #'w'+128
+        bne notword
+wordchar:       
+
+notword:        
+        ;; - new rule        
+        asl
+        tax
+        ;; push current rule
+        lda rule
+        pha
+        lda rule+1
+        pha
+        ;; new rule
+        lda ruletable,x
+        sta rule
+        lda ruletable+1,x
+        sta rule+1
+        jmp getr
+@endrule:
+        ;; pop rule state
+        pla
+        sta rule+1
+        pla
+        sta rule
+        jmp getr
+;;; TODO: use some other?
+@norule:
+        rts
+
+;;; Gets next char in A
+;;; Flags: Z= if lit equal
+nextc: 
+;;; 12
+        ldy #inp
+        jsr incRY
+        ldy #0
+        lda (inp),y
+        cmp (rule),y
+        rts
+        
+incrY:
+;;; 9
+        inc 0,y                 ; 3B
+        bne @noinc
+        inc 1,y                 ; 3B
+noinc:  
+        rts
+        
+        
 ;PRINTHEX=1                     
 ;PRINTDEC=1
 .include "print.asm"
@@ -83,6 +230,15 @@ _start:
 endfirstpage:        
 secondpage:     
 bytecodes:      
+
+rules:  
+
+ruleA:  
+        .byte 'A'+128
+        .byte "aaa",0
+
+input:  
+        .byte "aaa",0
 
 .include "end.asm"
 
