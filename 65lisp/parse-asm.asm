@@ -1,33 +1,48 @@
-;;; TODO: Replace this with your code intro:
- 
+;;; 6502 parser of BNF that generates machinecode
+;;; 
+;;; (c) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; 
+;;; Essentially this is a dynamic compiler.
+;;; 
+;;; It interprets a BNF-description of a programming
+;;; language while reading a source text in that
+;;; langauge. The BNF contains generative instructions
+;;; that directly generates machine code. This code can
+;;; then be executed.
 
+;;; If there is an error a newline '%' letter error-code
+;;; is printed.
 
-;;; TEMPLATE for minamalistic 6502 ASM projects
+;;; How-to use
 ;;; 
-;;; Why use it?
+;;; 1. The BNF is inline, rule 'P' is executed
+;;; 2. The source is pointed to at addr "inp"
+;;; 3. The code is generated at "out"
+
+;;; Compile with
 ;;; 
-;;; It provides these main benefits:
+;;;    ./rasm parse
 ;;; 
-;;; 1. A 6502 "BIOS" that is excluded from the bytecount.
+;;; gives a parse.tap in ORIC folder (symlink)
+
+;;; BNF capabilities
 ;;; 
-;;; 2. DEBUGPRINT function (hex/decimal)
+;;; The BNF is very simplified and is interpreted
+;;; using backtracking. It may be ambigious but first
+;;; matching result is accepted. Can be seen as priorities.
 ;;; 
-;;; 3. Before starting your code, reports the various
-;;;    info, like:
-;;; 
-;;;        o$053E - ORG address of whole thing
-;;;        s$0600 - user code START address
-;;;        e$0627 - user code END address
-;;;        z$0027 - SIZE in bytes of user code
-;;; 
-;;;    The size excludes the "loader" (PROGRAM.c)
-;;;    and the "bios.asm" code. Also
-;;; 
-;;; 4. User code starts on a PAGE boudnary
-;;;    allowing various hacky optimizations1
-;;; 
-;;; 5. ???
-;;; 
+;;; In a BNF-rule
+;;; - lower case letter is matched literally
+;;; - a letter with hi-bit set ('R'+128) references
+;;;   another rule that is matched by recursion
+;;; - Rules can have alternatives: E= aa | a | b that are
+;;;   tried in sequence.
+;;; - %D - matches a sequence of digits (number: /\d+/ )
+;;; - %I - matches an "ident" (name: /[A-Z_][a-z_\d]*/ )
+
+;;; Warning: The recursive rule matching is limited by
+;;;   the hardware stack. (~ 256/6)
+
 
 
 
@@ -40,6 +55,16 @@
 
 ;;; ========================================
 ;;;                  M A I N
+
+.macro SKIPONE
+        .byte $24               ; BITzp 2 B
+.endmacro
+
+.macro SKIPTWO
+        .byte $2c               ; BITabs 3 B
+.endmacro
+
+
 
 .export _start
 _start:
@@ -75,11 +100,17 @@ _start:
 
 .zeropage
         
-inp:    .res 2
+
+state:  
+  rule:   .res 2
+  inp:    .res 2
+stateend:       
+
 
 .code
 
 ;;; parser
+init:
         putc 'A'
         NEWLINE
 
@@ -93,132 +124,144 @@ inp:    .res 2
         lda #>ruleA
         sta rule+1
 
+        ;; end-all marker
+        lda #128
+        pha
+
 next:   
-;;; TODO: Stopping condition?
-        jsr getr
-        jsr nextc
-        ;; literaly equal (assume it's ok)
-        beq next
-;;; TODO: if space match space, allow/skip any/all spaces
-        
-        ;; apply matchers...
-        cpx #'.'
-        beq next
-
-;;; TODO: special rule... (?)
-        cpx #'?'
-        beq optionalnext
-        cpx #'+'
-        beq atleastonce
-        cpx #'*'
-        beq repeats
-
-        ;; TODO: don't need push/OR/alt?
-        cpx #'|'
-        beq endrule
-        cpx #0
-        beq endrule
-        
-        ;; fail match -> backtrack
-;;; TODO: may need pop-a-lot!
-        jsr getr
-        
-
-
-        rts
-
-getr:   
-        ldy #rule
-        jsr incRY
         ldy #0
         lda (rule),y
-        ;; ref another rule?
-        beq @endrule
-        bpl @norule
-        ;; special rules (char class)
-        cmp #'d'+128
-        bne notdigit 
-digitchar:
-        lda (inp),y
-        sec
-        sbc #'0'
-        cmp #'9'+1
-        bcs FAIL
-        jmp NEXT
-;;; TODO: make a: i=identifier= w*(w|d|_)
-;;;     w=word= +v v=wordchar
-;;;     n=number= +d d=digit
-notdigit:       
-        cmp #'w'+128
-        bne notword
-wordchar:       
-        lda (inp),y
-        sec
-        sbc #'A'
-        ;; fold case
-        and #(255-32)           ; TODO:correct?
-        cmp #'Z'+1
-        bcs endword
-        ;; keep eating chars
-        iny
-        jmp wordchar
-endword:        
-        cpy #0
-        bcs FAIL
-        ;; accept, Y points to end
-;;; TODO: store match
-        jmp NEXT
+        beq endrule
+        bmi enterrule
+        ;; also end-rule
+        cmp #'|'
+        beq endrule
 
-notword:
-        cmp #'w'+128
-        bne notword
-wordchar:       
+        ;; lit eq?
+        cmp (inp),y
+        bne fail
+@eq:     
+        jsr incI
+        jsr incR
+        jmp next
 
-notword:        
-        ;; - new rule        
-        asl
-        tax
-        ;; push current rule
-        lda rule
-        pha
+enterrule:      
+        ;; enter rule
+        ;; - save (0, rule)
         lda rule+1
         pha
-        ;; new rule
-        lda ruletable,x
+        lda rule
+        pha
+        lda #0                  ; rule-mark
+        pha
+
+        ;; - load new rule
+        lda (rule),y
+        tay
+        lda rules,y
         sta rule
-        lda ruletable+1,x
+        lda rules+1,y
         sta rule+1
-        jmp getr
-@endrule:
-        ;; pop rule state
+
+        ;; - push inp for retries
+        lda inp+1
+        pha
+        lda inp
+        pha
+        lda #1
+        pha
+
+        jmp next
+;;; TODO: use jsr, to know when to stop pop?
+;;; (maybe don't need marker on stack?)
+
+endrule:
+        ;; accept as match
+        ;; - remove (all) re-tries
+        pla
+        beq @gotrule
+        bmi endall
+@gotretry:
+        pla
+        pla
+        jmp endrule
+
+@gotrule:
+        pla
+        sta rule
         pla
         sta rule+1
-        pla
-        sta rule
-        jmp getr
-;;; TODO: use some other?
-@norule:
+
+        jmp next
+
+endall: 
         rts
 
-;;; Gets next char in A
-;;; Flags: Z= if lit equal
-nextc: 
-;;; 12
-        ldy #inp
-        jsr incRY
-        ldy #0
-        lda (inp),y
-        cmp (rule),y
-        rts
-        
-incrY:
+
+fail:   
+;;; TODO: test special matchers
+;;;   %D - digits
+;;;   %I - ident
+
+        ;; - seek next alt in rule
+@loop:
+        jsr incR
+        beq @endrule
+        cmp #'|'
+        bne @loop
+        ;; - standing at | alternative
+        jsr incR
+        ;; - restore inp
+        pla
+        bmi @gotendall   
+        beq @gotrule
+
+@gotretry:
+        ;; copy from stack
+        tsx
+        pla
+        sta inp
+        pla
+        sta inp+1
+        txs
+
+@gotendall:
+        lda #'E'
+        SKIPTWO
+
+@endrule:
+        lda #'Z'
+        SKIPTWO
+
+@gotrule:
+        lda #'X'
+        ;; fall-through to error
+
+error:  
+        pha
+        NEWLINE
+        putc '%'
+        pla
+        jsr putchar
+halt:
+        jmp halt
+
+
+
+incR:
+        ldx #rule
+        SKIPTWO
+incI:   
+        ldx #inp
+incRX:
 ;;; 9
-        inc 0,y                 ; 3B
+        inc 0,x                 ; 3B
         bne @noinc
-        inc 1,y                 ; 3B
-noinc:  
+        inc 1,x                 ; 3B
+@noinc:  
         rts
         
+
         
 ;PRINTHEX=1                     
 ;PRINTDEC=1
