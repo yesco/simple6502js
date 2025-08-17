@@ -65,7 +65,6 @@
 .endmacro
 
 
-
 .export _start
 _start:
 .ifnblank
@@ -111,7 +110,7 @@ stateend:
 
 ;;; parser
 init:
-        putc 'A'
+        putc 'S'
         NEWLINE
 
         lda #<input
@@ -119,17 +118,23 @@ init:
         lda #>input
         sta inp+1
         
+        ;; end-all marker
+        lda #128
+        pha
+
         lda #<ruleA
         sta rule
         lda #>ruleA
         sta rule+1
 
-        ;; end-all marker
-        lda #128
-        pha
-
 next:   
         ldy #0
+    PUTC ' '
+    lda (rule),y
+    jsr putchar
+    PUTC ':'
+    lda (inp),y
+    jsr putchar
         lda (rule),y
         beq endrule
         bmi enterrule
@@ -141,6 +146,7 @@ next:
         cmp (inp),y
         bne fail
 @eq:     
+    PUTC '='
         jsr incI
         jsr incR
         jmp next
@@ -148,6 +154,7 @@ next:
 enterrule:      
         ;; enter rule
         ;; - save (0, rule)
+    PUTC '>'
         lda rule+1
         pha
         lda rule
@@ -176,17 +183,20 @@ enterrule:
 ;;; (maybe don't need marker on stack?)
 
 endrule:
+    PUTC '<'
         ;; accept as match
         ;; - remove (all) re-tries
         pla
         beq @gotrule
         bmi endall
 @gotretry:
+    PUTC '.'
         pla
         pla
         jmp endrule
 
 @gotrule:
+    PUTC '_'
         pla
         sta rule
         pla
@@ -203,20 +213,23 @@ fail:
 ;;;   %D - digits
 ;;;   %I - ident
 
+    PUTC '%'
         ;; - seek next alt in rule
 @loop:
         jsr incR
         beq @endrule
         cmp #'|'
         bne @loop
-        ;; - standing at | alternative
+        ;; - standing at '|' alternative
         jsr incR
         ;; - restore inp
+    PUTC '|'
         pla
         bmi @gotendall   
         beq @gotrule
 
 @gotretry:
+    PUTC '!'
         ;; copy from stack
         tsx
         pla
@@ -275,13 +288,18 @@ secondpage:
 bytecodes:      
 
 rules:  
+        .word ruleA
+        .word ruleB
+        .word 0
 
 ruleA:  
-        .byte 'A'+128
         .byte "aaa",0
 
+ruleB:  
+        .byte "bbb",0
+
 input:  
-        .byte "aaa",0
+        .byte "aaaa",0
 
 .include "end.asm"
 
