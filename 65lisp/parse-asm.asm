@@ -66,8 +66,7 @@
 
 
 ;;; Enable for debug info
-;
-DEBUG=1
+;DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -92,9 +91,14 @@ stateend:
 
 
 .code
+;;; TOTOAL
+;;;    161 Bytes
+
 
 ;;; parser
-init:
+FUNC _init
+;;; 19 B
+
 .ifdef DEBUG 
        putc 'S'
         NEWLINE
@@ -113,7 +117,8 @@ init:
         lda #>ruleA
         sta rule+1
 
-next:   
+FUNC _next
+;;; 16 B
         ldy #0
 .ifdef DEBUG
     PUTC ' '
@@ -124,22 +129,24 @@ next:
     jsr putchar
 .endif ; DEBUG
         lda (rule),y
-        beq endrule
-        bmi enterrule
+        beq _endrule
+        bmi _enterrule
         ;; also end-rule
         cmp #'|'
-        beq endrule
+        beq _endrule
 
         ;; lit eq?
         cmp (inp),y
-        bne fail
-@eq:     
+        bne _fail
+FUNC _eq    
+;;; 9 B
     DEBC '='
-        jsr incI
-        jsr incR
-        jmp next
+        jsr _incI
+        jsr _incR
+        jmp _next
 
-enterrule:      
+FUNC _enterrule
+;;; 34 B
         ;; enter rule
         ;; - save (0, rule)
     DEBC '>'
@@ -166,17 +173,18 @@ enterrule:
         lda #1
         pha
 
-        jmp next
+        jmp _next
 ;;; TODO: use jsr, to know when to stop pop?
 ;;; (maybe don't need marker on stack?)
 
-endrule:
+FUNC _endrule
+;;; 19 B
     DEBC '<'
         ;; accept as match
         ;; - remove (all) re-tries
         pla
         beq @gotrule
-        bmi endall
+        bmi _endall
 @gotretry:
     DEBC '.'
         pla
@@ -190,33 +198,35 @@ endrule:
         pla
         sta rule+1
 
-        jmp next
+        jmp _next
 
-endall: 
+FUNC _endall
         rts
 
 
-fail:   
+FUNC _fail
 ;;; TODO: test special matchers
 ;;;   %D - digits
 ;;;   %I - ident
 
+;;; 25 B
+
     DEBC '%'
         ;; - seek next alt in rule
 @loop:
-        jsr incR
-        beq @endrule
+        jsr _incR
+        beq _endrule
         cmp #'|'
         bne @loop
         ;; - standing at '|' alternative
-        jsr incR
+        jsr _incR
         ;; - restore inp
     DEBC '|'
         pla
-        bmi @gotendall   
-        beq @gotrule
+        bmi gotendall   
+        beq gotrule
 
-@gotretry:
+gotretry:
     DEBC '!'
         ;; copy from stack
         tsx
@@ -226,21 +236,28 @@ fail:
         sta inp+1
         txs
 
-@gotendall:
+
+
+;;; ERRORS
+
+FUNC _errors
+;;; 25
+
+gotendall:
         lda #'E'
         SKIPTWO
 
-@endrule:
+endrule:
         lda #'Z'
         SKIPTWO
 
-@gotrule:
+gotrule:
         lda #'X'
         ;; fall-through to error
 
 error:  
         pha
-        NEWLINE
+        putc 10
         putc '%'
         pla
         jsr putchar
@@ -249,19 +266,22 @@ halt:
 
 
 
-incR:
+FUNC _incR
+;;; 3
         ldx #rule
         SKIPTWO
-incI:   
+FUNC _incI 
+;;; 2
         ldx #inp
-incRX:
-;;; 9
+FUNC _incRX
+;;; 7
         inc 0,x                 ; 3B
         bne @noinc
         inc 1,x                 ; 3B
 @noinc:  
         rts
         
+FUNC _dummy
 
         
 ;;;                  M A I N
