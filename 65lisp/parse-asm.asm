@@ -66,7 +66,8 @@
 
 
 ;;; Enable for debug info
-;DEBUG=1
+;
+DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -97,7 +98,10 @@ stateend:
 
 ;;; parser
 FUNC _init
-;;; 19 B
+;;; 21 B
+
+        ldx #$ff
+        txs
 
 .ifdef DEBUG 
        putc 'S'
@@ -108,20 +112,22 @@ FUNC _init
         lda #>input
         sta inp+1
         
-        ;; end-all marker
-        lda #128
-        pha
-
+;;; TODO: improve using 'P'
         lda #<ruleA
         sta rule
         lda #>ruleA
         sta rule+1
 
+        ;; end-all marker
+        lda #128
+        pha
+
 FUNC _next
 ;;; 16 B
         ldy #0
 .ifdef DEBUG
-    PUTC ' '
+;    PUTC ' '
+    PUTC 10
     lda (rule),y
     jsr putchar
     PUTC ':'
@@ -142,13 +148,14 @@ FUNC _eq
 ;;; 9 B
     DEBC '='
         jsr _incI
+exitrule:      
         jsr _incR
         jmp _next
 
 FUNC _enterrule
 ;;; 34 B
         ;; enter rule
-        ;; - save (0, rule)
+        ;; - save current rulepos
     DEBC '>'
         lda rule+1
         pha
@@ -159,6 +166,8 @@ FUNC _enterrule
 
         ;; - load new rule
         lda (rule),y
+        and #31
+        asl
         tay
         lda rules,y
         sta rule
@@ -170,7 +179,7 @@ FUNC _enterrule
         pha
         lda inp
         pha
-        lda #1
+        lda #'I'
         pha
 
         jmp _next
@@ -180,16 +189,18 @@ FUNC _enterrule
 FUNC _endrule
 ;;; 19 B
     DEBC '<'
+@loop:
         ;; accept as match
         ;; - remove (all) re-tries
         pla
         beq @gotrule
         bmi _endall
 @gotretry:
+        jsr putchar
     DEBC '.'
         pla
         pla
-        jmp endrule
+        jmp @loop
 
 @gotrule:
     DEBC '_'
@@ -198,10 +209,13 @@ FUNC _endrule
         pla
         sta rule+1
 
-        jmp _next
+        jmp exitrule
 
 FUNC _endall
-        rts
+        putc 10
+        putc 'O'
+        putc 'K'
+        jmp halt
 
 
 FUNC _fail
@@ -211,19 +225,22 @@ FUNC _fail
 
 ;;; 25 B
 
-    DEBC '%'
+    DEBC '|'
         ;; - seek next alt in rule
 @loop:
         jsr _incR
-        beq _endrule
+        ldy #0
+        lda (rule),y
+        beq failrule
         cmp #'|'
         bne @loop
-        ;; - standing at '|' alternative
+        ;; - move after '!'
         jsr _incR
+
         ;; - restore inp
-    DEBC '|'
         pla
-        bmi gotendall   
+        pha
+        bmi gotendall
         beq gotrule
 
 gotretry:
@@ -231,11 +248,12 @@ gotretry:
         ;; copy from stack
         tsx
         pla
+        pla
         sta inp
         pla
         sta inp+1
         txs
-
+        jmp _next
 
 
 ;;; ERRORS
@@ -247,7 +265,7 @@ gotendall:
         lda #'E'
         SKIPTWO
 
-endrule:
+failrule:
         lda #'Z'
         SKIPTWO
 
@@ -293,21 +311,28 @@ secondpage:
 
 bytecodes:      
 
+;;; Rules A-
 rules:  
+        .word rule0
         .word ruleA
         .word ruleB
         .word 0
 
+rule0:
 ruleA:  
-        .byte "aaa",0
+        .byte "a",'B'+128,"d",0
 
 ruleB:  
-        .byte "bbb",0
+        .byte "bcc|bc",0
 
 .include "end.asm"
 
+
+
 input:  
-        .byte "aaaa",0
+        .byte "abcd",0
+
+
 
 ;PRINTHEX=1                     
 ;PRINTDEC=1
