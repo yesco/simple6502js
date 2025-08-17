@@ -65,37 +65,22 @@
 .endmacro
 
 
-.export _start
-_start:
-.ifnblank
+;;; Enable for debug info
+;
+DEBUG=1
 
-        SETNUM $BAAD
-        DEBUGPRINT
-        NEWLINE
-
-        SETNUM $F00D
-;        jsr printn
-        NEWLINE
-
-        lda #'B'
-        sta $bb81
-        
-        lda #'D'
-        jsr putchar
-
-        SETNUM $4711
-        jsr printh
-        NEWLINE
-
-        SETNUM 12345
-        jsr printd
-        NEWLINE
-
-        putc 'E'
-        putc 'N'
-        putc 'D'
+.ifdef DEBUG
+  .macro DEBC c
+    PUTC c
+  .endmacro
+.else
+  .macro DEBC c
+  .endmacro
 .endif
 
+
+.export _start
+_start:
 
 .zeropage
         
@@ -110,9 +95,10 @@ stateend:
 
 ;;; parser
 init:
-        putc 'S'
+.ifdef DEBUG 
+       putc 'S'
         NEWLINE
-
+.endif ; DEBUG
         lda #<input
         sta inp
         lda #>input
@@ -129,12 +115,14 @@ init:
 
 next:   
         ldy #0
+.ifdef DEBUG
     PUTC ' '
     lda (rule),y
     jsr putchar
     PUTC ':'
     lda (inp),y
     jsr putchar
+.endif ; DEBUG
         lda (rule),y
         beq endrule
         bmi enterrule
@@ -146,7 +134,7 @@ next:
         cmp (inp),y
         bne fail
 @eq:     
-    PUTC '='
+    DEBC '='
         jsr incI
         jsr incR
         jmp next
@@ -154,7 +142,7 @@ next:
 enterrule:      
         ;; enter rule
         ;; - save (0, rule)
-    PUTC '>'
+    DEBC '>'
         lda rule+1
         pha
         lda rule
@@ -183,20 +171,20 @@ enterrule:
 ;;; (maybe don't need marker on stack?)
 
 endrule:
-    PUTC '<'
+    DEBC '<'
         ;; accept as match
         ;; - remove (all) re-tries
         pla
         beq @gotrule
         bmi endall
 @gotretry:
-    PUTC '.'
+    DEBC '.'
         pla
         pla
         jmp endrule
 
 @gotrule:
-    PUTC '_'
+    DEBC '_'
         pla
         sta rule
         pla
@@ -213,7 +201,7 @@ fail:
 ;;;   %D - digits
 ;;;   %I - ident
 
-    PUTC '%'
+    DEBC '%'
         ;; - seek next alt in rule
 @loop:
         jsr incR
@@ -223,13 +211,13 @@ fail:
         ;; - standing at '|' alternative
         jsr incR
         ;; - restore inp
-    PUTC '|'
+    DEBC '|'
         pla
         bmi @gotendall   
         beq @gotrule
 
 @gotretry:
-    PUTC '!'
+    DEBC '!'
         ;; copy from stack
         tsx
         pla
@@ -276,15 +264,13 @@ incRX:
         
 
         
-;PRINTHEX=1                     
-;PRINTDEC=1
-.include "print.asm"
-
 ;;;                  M A I N
 ;;; ========================================
 
 endfirstpage:        
+  .res 256-(* .mod 256)
 secondpage:     
+
 bytecodes:      
 
 rules:  
@@ -298,9 +284,13 @@ ruleA:
 ruleB:  
         .byte "bbb",0
 
+.include "end.asm"
+
 input:  
         .byte "aaaa",0
 
-.include "end.asm"
+;PRINTHEX=1                     
+;PRINTDEC=1
+;.include "print.asm"
 
 .end
