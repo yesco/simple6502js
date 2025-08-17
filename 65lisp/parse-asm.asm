@@ -88,13 +88,14 @@ _start:
 state:  
   rule:   .res 2
   inp:    .res 2
+  out:    .res 2
 stateend:       
 
 
 .code
-;;; TOTOAL
-;;;    161 Bytes
-
+;;; TOTAL:
+;;;    193 Bytes
+;;; 
 
 ;;; parser
 FUNC _init
@@ -104,14 +105,20 @@ FUNC _init
         txs
 
 .ifdef DEBUG 
-       putc 'S'
-        NEWLINE
+        putc 'S'
+        putc 10
 .endif ; DEBUG
+
         lda #<input
         sta inp
         lda #>input
         sta inp+1
         
+        lda #<output
+        sta out
+        lda #>output
+        sta out+1
+
 ;;; TODO: improve using 'P'
         lda #<ruleA
         sta rule
@@ -130,20 +137,34 @@ FUNC _next
     PUTC 10
     lda (rule),y
     jsr putchar
-    PUTC ':'
-    lda (inp),y
-    jsr putchar
 .endif ; DEBUG
         lda (rule),y
         beq _endrule
         bmi _enterrule
+
+;;; TODO: reorder
         ;; also end-rule
         cmp #'|'
         beq _endrule
+        ;; gen-rule
+        cmp #'['
+        beq _generate
+
+.ifdef DEBUG
+    pha
+    PUTC ':'
+    lda (inp),y
+    jsr putchar
+    pla
+.endif ; DEBUG
 
         ;; lit eq?
         cmp (inp),y
-        bne _fail
+;;; TODO:
+;        bne _fail
+        beq _eq
+        jmp _fail
+
 FUNC _eq    
 ;;; 9 B
     DEBC '='
@@ -196,7 +217,7 @@ FUNC _endrule
         beq @gotrule
         bmi _endall
 @gotretry:
-        jsr putchar
+;        jsr putchar
     DEBC '.'
         pla
         pla
@@ -211,12 +232,29 @@ FUNC _endrule
 
         jmp exitrule
 
+FUNC _generate
+;;; 19 B
+        jsr _incR
+        ldy #0
+        lda (rule),y
+;;; TODO: can conflict w data
+        cmp #']'
+;;; TODO:
+;        beq _next
+        bne @skip
+        jsr _incR
+        jmp _next
+@skip:   
+        sta (out),y
+        jsr _incO
+        jmp _generate
+
 FUNC _endall
         putc 10
         putc 'O'
         putc 'K'
+        jsr output
         jmp halt
-
 
 FUNC _fail
 ;;; TODO: test special matchers
@@ -259,7 +297,7 @@ gotretry:
 ;;; ERRORS
 
 FUNC _errors
-;;; 25
+;;; 25 B
 
 gotendall:
         lda #'E'
@@ -284,6 +322,10 @@ halt:
 
 
 
+FUNC _incO
+;;; 3
+        ldx #out
+        SKIPTWO
 FUNC _incR
 ;;; 3
         ldx #rule
@@ -320,18 +362,35 @@ rules:
 
 rule0:
 ruleA:  
-        .byte "a",'B'+128,"d",0
+        .byte "a",'B'+128,"d"
+      .byte '['
+        lda #'A'
+        jsr putchar 
+        lda #'B'
+        jsr putchar
+        rts
+        ;; TODO: HOWTO? maybe conflic with 'putchar'
+      .byte ']'
+        .byte 0
 
 ruleB:  
-        .byte "bcc|bc",0
+        .byte "bcc|bc"
+      .byte '['
+        lda #'E'
+        jsr putchar
+      .byte ']'
+        .byte 0
 
 .include "end.asm"
 
 
-
+;;; TODO: make it point at screen,
+;;;   make a OricAtmosTurboC w fullscreen edit!
 input:  
         .byte "abcd",0
 
+output: 
+        .res 8*1024, 0
 
 
 ;PRINTHEX=1                     
