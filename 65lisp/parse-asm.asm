@@ -66,8 +66,7 @@
 
 
 ;;; Enable for debug info
-;
-DEBUG=1
+;DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -94,8 +93,8 @@ stateend:
 
 .code
 ;;; TOTAL:
-;;;    193 Bytes
-;;; 
+;;;    193 Bytes backtrack parse w rule
+;;;    239 Bytes codegen with []
 
 ;;; parser
 FUNC _init
