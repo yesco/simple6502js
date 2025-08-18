@@ -542,6 +542,7 @@ ruleE:
         tya
       .byte ']'
 
+        .byte "|"
         .byte 0
 
 .include "end.asm"
@@ -554,7 +555,6 @@ input:
         .byte "voidmain(){return 8421*2;}",0
         .byte "voidmain(){return 8421/2;}",0
         .byte "voidmain(){return 4010+701;}",0
-
         .byte "voidmain(){return 4711;}",0
 
 output: 
