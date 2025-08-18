@@ -95,7 +95,12 @@ stateend:
 ;;; TOTAL:
 ;;;    193 Bytes backtrack parse w rule
 ;;;    239 Bytes codegen with []
-;;;    436 Bytes %D parse number and codegen <>
+;;;    349 BYtes codegen <> and  (+25 +36 mul10 digits)
+;;; 
+;;; (- 410 25 36) = 349
+;;;   mul10 : 25 B
+;;;   digits: 36 B
+;;; not counting: printd
 
 ;;; parser
 FUNC _init
@@ -350,7 +355,7 @@ halt:
 
 FUNC _digits
 DEBC '#'
-;;; 35 B (+ 35 19 7) = 61 
+;;; 36 B (+ 36 25) = 61
         ;; skip 'D'
         jsr _incR
         jsr _incR
@@ -387,6 +392,7 @@ digit:
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
 FUNC _mul10
+;;; 25
         lda tos
         ldx tos+1
         jsr _double
@@ -403,30 +409,7 @@ _double:
         rol tos+1
         rts
 
-FUNC _mul10x
-;;; 19+7
-        sta tos
-        stx tos+1
-        jsr _double
-        jsr _double
-        clc
-        adc tos
-        tay
-        txa
-        adc tos+1
-        tax
-        tya
-        ;; fall-through _double
-_doublex: 
-        asl
-        tay
-        txa
-        asl
-        tax
-        tya
-        rts
-        
-        
+
 FUNC _incO
 ;;; 3
         ldx #out
