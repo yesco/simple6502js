@@ -95,6 +95,7 @@ stateend:
 ;;; TOTAL:
 ;;;    193 Bytes backtrack parse w rule
 ;;;    239 Bytes codegen with []
+;;;    436 Bytes %D parse number and codegen <>
 
 ;;; parser
 FUNC _init
@@ -147,8 +148,11 @@ FUNC _next
         beq _endrule
         ;; gen-rule
         cmp #'['
-        beq _generate
+;beq _generate
+        bne testeq
+        jmp _generate
 
+testeq: 
 .ifdef DEBUG
     pha
     PUTC ':'
@@ -162,6 +166,11 @@ FUNC _next
 ;;; TODO:
 ;        bne _fail
         beq _eq
+        cmp #'%'
+        bne failjmp
+        ;; special %D
+        jmp _digits
+failjmp:        
         jmp _fail
 
 FUNC _eq    
@@ -238,15 +247,28 @@ FUNC _generate
         lda (rule),y
 ;;; TODO: can conflict w data
         cmp #']'
-;;; TODO:
-;        beq _next
         bne @skip
+        ;; continue rule parse
+DEBC ']'
         jsr _incR
         jmp _next
 @skip:   
+        cmp #'<'
+        bne @skip2
+DEBC '<'
+        lda tos
+        jmp @doout
+@skip2: 
+        cmp #'>'
+        bne @skip3
+DEBC '>'
+        lda tos+1
+@skip3:
+@doout:
         sta (out),y
         jsr _incO
         jmp _generate
+
 
 FUNC _endall
         putc 10
@@ -261,7 +283,7 @@ FUNC _endall
         putc '='
 
         ;; prints tos
-        jsr _printd
+        jsr printd
         jmp halt
 
 FUNC _fail
@@ -326,7 +348,85 @@ halt:
         jmp halt
 
 
+FUNC _digits
+DEBC '#'
+;;; 35 B (+ 35 19 7) = 61 
+        ;; skip 'D'
+        jsr _incR
+        jsr _incR
 
+        lda #0
+        sta tos
+        sta tos+1
+nextdigit:
+        ldy #0
+        lda (inp),y
+.ifdef DEBUG
+        jsr putchar
+.endif ; DEBUG
+
+        sec
+        sbc #'0'
+        cmp #10
+        bcc digit
+        ;; end (not 0-9)
+        jmp _next
+digit:  
+        pha
+        jsr _mul10
+        pla
+        clc
+        adc tos
+        sta tos
+        bcc @noinc
+        inc tos+1
+@noinc:
+        jsr _incI
+        jmp nextdigit
+
+;;; Isn't it just that AX means more code than
+;;; separate tos?
+FUNC _mul10
+        lda tos
+        ldx tos+1
+        jsr _double
+        jsr _double
+        clc
+        adc tos
+        sta tos
+        txa
+        adc tos+1
+        sta tos+1
+        ;; double
+_double:        
+        asl tos
+        rol tos+1
+        rts
+
+FUNC _mul10x
+;;; 19+7
+        sta tos
+        stx tos+1
+        jsr _double
+        jsr _double
+        clc
+        adc tos
+        tay
+        txa
+        adc tos+1
+        tax
+        tya
+        ;; fall-through _double
+_doublex: 
+        asl
+        tay
+        txa
+        asl
+        tax
+        tya
+        rts
+        
+        
 FUNC _incO
 ;;; 3
         ldx #out
@@ -372,30 +472,30 @@ rules:
         .word rule0
         .word ruleA
         .word ruleB
+        .word ruleC
         .word 0
 
 rule0:
 ruleA:  
-        .byte "a",'B'+128,"d"
+        .byte "voidmain()",'B'+128,""
       .byte '['
-        lda #'A'
-        jsr putchar 
-        lda #'B'
-        jsr putchar
-        lda #<4711
-        ldx #>4711
+        PUTC 'E'
         rts
         ;; TODO: HOWTO? maybe conflic with 'putchar'
       .byte ']'
         .byte 0
 
 ruleB:  
-        .byte "bcc|bc"
-      .byte '['
-        lda #'E'
-        jsr putchar
-      .byte ']'
+        .byte "{",'C'+128,"}"
         .byte 0
+
+ruleC:  
+        .byte "return %D;"
+      .byte '['
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+         .byte 0
 
 .include "end.asm"
 
@@ -403,7 +503,7 @@ ruleB:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:  
-        .byte "abcd",0
+        .byte "voidmain(){return 4711;}",0
 
 output: 
         .res 8*1024, 0
