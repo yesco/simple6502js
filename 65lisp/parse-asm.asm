@@ -13,11 +13,12 @@
 
 
 ;;; TOTAL:
-;;;    193 Bytes backtrack parse w rule
-;;;    239 Bytes codegen with []
-;;;    349 BYtes codegen <> and  (+25 +36 mul10 digits)
-;;; 
-;;; (- 410 25 36) = 349
+;;;    193 bytes backtrack parse w rule
+;;;    239 bytes codegen with []
+;;;    349 bytes codegen <> and  (+25 +36 mul10 digits)
+;;;    424 bytes codegen +> and vars! (+ 70 bytes)
+
+;;; (- 485 25 36) = 424
 ;;;   mul10 : 25 B
 ;;;   digits: 36 B
 ;;; not counting: printd
@@ -85,8 +86,7 @@
 
 
 ;;; Enable for debug info
-;
-DEBUG=1
+;DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -103,12 +103,21 @@ _start:
 
 .zeropage
         
+;;; TOS
+; (defined in print.asm .lol)
 
-state:  
+;;; DOS (second value)
+dos:    .res 2
+
+
+;;; not pushing all
+;state:  
   rule:   .res 2
   inp:    .res 2
   out:    .res 2
-stateend:       
+;stateend:       
+        
+
 
 
 .code
@@ -147,6 +156,8 @@ FUNC _init
         lda #128
         pha
 
+;;; TODO: move this to "the middle" then
+;;;   can reach everything (?)
 FUNC _next
 ;;; 16 B
         ldy #0
@@ -186,8 +197,22 @@ testeq:
         beq _eq
         cmp #'%'
         bne failjmp
-        ;; special %D
+        ;; special %?
+        jsr _incR
+        ldy #0
+        lda (rule),y
+        ;; assumes A not modified
+        jsr _incR
+
+        cmp #'V'
+        beq isvar
+isdigits:       
+        ;; assume it's %D
         jmp _digits
+isvar:    
+        ;; %D
+        jmp _var
+
 failjmp:        
         jmp _fail
 
@@ -259,7 +284,7 @@ FUNC _endrule
         jmp exitrule
 
 FUNC _generate
-;;; 19 B
+;;; ??? 19 B
         jsr _incR
         ldy #0
         lda (rule),y
@@ -281,7 +306,30 @@ DEBC '<'
         bne @skip3
 DEBC '>'
         lda tos+1
+        jmp @doout
 @skip3:
+        cmp #'+'
+        bne @skip4
+;;; put word+1
+DEBC '+'
+        ldx tos+1
+
+        ldy tos
+        iny
+        tay
+        bne @noinc
+        inx
+@noinc:
+        ;; put
+        ldy #0
+        sta (out),y
+        txa
+        pha
+        jsr _incO
+        jsr _incR
+        pla
+        iny
+@skip4:
 @doout:
         sta (out),y
         jsr _incO
@@ -347,6 +395,9 @@ gotretry:
 FUNC _errors
 ;;; 25 B
 
+illegalvar:     
+        lda #'I'
+        SKIPTWO
 gotendall:
         lda #'E'
         SKIPTWO
@@ -366,13 +417,38 @@ halt:
         jmp halt
 
 
+FUNC _var
+DEBC '$'
+        ldy #0
+        lda (inp),y
+.ifdef DEBUG
+  jsr putchar        
+.endif ; DEBUG
+        sec
+        sbc #'a'
+        cmp #'z'+1
+        bcs _fail
+
+        ;; pick global address
+        asl
+        adc #<vars
+;;; TODO: dos and tos??? lol
+;;;    good for a+=5; maybe?
+;        sta dos
+        sta tos
+        lda #>vars
+        adc #0
+;        sta dos+1
+        sta tos+1
+
+        jsr _incI
+        jmp _next
+
+
+;;; TODO: doesn't FAIL if not digit!
 FUNC _digits
 DEBC '#'
 ;;; 36 B (+ 36 25) = 61
-        ;; skip 'D'
-        jsr _incR
-        jsr _incR
-
         lda #0
         sta tos
         sta tos+1
@@ -492,32 +568,41 @@ ruleC:
         .byte 0
 
 ruleD:  
-        .byte "%D"
+        .byte "%V"
+      .byte '['
+VAL0= '<' + 256*'>'
+VAL1= '+' + 256*'>'
+        lda VAL0
+        ldx VAL1
+      .byte ']'
+
+        .byte "|%D"
       .byte '['
         lda #'<'
         ldx #'>'
       .byte ']'
+
         .byte 0
 
 ruleE:  
         .byte "+%D"
-      .byte '['
-        sec
-        sbc #'<'
-        tay
-        txa
-        sbc #'>'
-        tax
-        tya
-      .byte ']'
-
-        .byte "|-%D"
       .byte '['
         clc
         adc #'<'
         tay
         txa
         adc #'>'
+        tax
+        tya
+      .byte ']'
+
+        .byte "|-%D"
+      .byte '['
+        sec
+        sbc #'<'
+        tay
+        txa
+        sbc #'>'
         tax
         tya
       .byte ']'
@@ -552,10 +637,20 @@ ruleE:
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:  
         ;; WOW, constant modify arith!
+        .byte "voidmain(){return e+12305;}",0
+        .byte "voidmain(){return e;}",0
+        .byte "voidmain(){return 4010+701;}",0
         .byte "voidmain(){return 8421*2;}",0
         .byte "voidmain(){return 8421/2;}",0
-        .byte "voidmain(){return 4010+701;}",0
         .byte "voidmain(){return 4711;}",0
+
+vars:
+;        .res 2*('z'-'a'+2)
+;;; TODO: remove (once have assignement?)
+        ;;    a  b  c  d  e  f  g  h  i  j
+        .word 0,10,20,30,40,50,60,70,80,90
+        .word 100,110,120,130,140,150,160,170
+        .word 180,190,200,210,220,230,240,250,260
 
 output: 
         .res 8*1024, 0
