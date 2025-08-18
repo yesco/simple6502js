@@ -10,6 +10,25 @@
 ;;; that directly generates machine code. This code can
 ;;; then be executed.
 
+
+
+;;; TOTAL:
+;;;    193 Bytes backtrack parse w rule
+;;;    239 Bytes codegen with []
+;;;    349 BYtes codegen <> and  (+25 +36 mul10 digits)
+;;; 
+;;; (- 410 25 36) = 349
+;;;   mul10 : 25 B
+;;;   digits: 36 B
+;;; not counting: printd
+
+;;; C-Rules:
+;;;    71 Bytes - voidmain(){return4711;}
+;;;   112 Bytes - ...return 8421*2; /2, +, -
+
+
+
+
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed.
 
@@ -66,7 +85,8 @@
 
 
 ;;; Enable for debug info
-;DEBUG=1
+;
+DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -92,15 +112,6 @@ stateend:
 
 
 .code
-;;; TOTAL:
-;;;    193 Bytes backtrack parse w rule
-;;;    239 Bytes codegen with []
-;;;    349 BYtes codegen <> and  (+25 +36 mul10 digits)
-;;; 
-;;; (- 410 25 36) = 349
-;;;   mul10 : 25 B
-;;;   digits: 36 B
-;;; not counting: printd
 
 ;;; parser
 FUNC _init
@@ -108,6 +119,8 @@ FUNC _init
 
         ldx #$ff
         txs
+
+        jsr getchar
 
 .ifdef DEBUG 
         putc 'S'
@@ -456,6 +469,8 @@ rules:
         .word ruleA
         .word ruleB
         .word ruleC
+        .word ruleD
+        .word ruleE
         .word 0
 
 rule0:
@@ -473,12 +488,61 @@ ruleB:
         .byte 0
 
 ruleC:  
-        .byte "return %D;"
+        .byte "return ",'D'+128,'E'+128,";"
+        .byte 0
+
+ruleD:  
+        .byte "%D"
       .byte '['
         lda #'<'
         ldx #'>'
       .byte ']'
-         .byte 0
+        .byte 0
+
+ruleE:  
+        .byte "+%D"
+      .byte '['
+        sec
+        sbc #'<'
+        tay
+        txa
+        sbc #'>'
+        tax
+        tya
+      .byte ']'
+
+        .byte "|-%D"
+      .byte '['
+        clc
+        adc #'<'
+        tay
+        txa
+        adc #'>'
+        tax
+        tya
+      .byte ']'
+
+        .byte "|/2"
+      .byte '['
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+      .byte ']'
+
+        .byte "|*2"
+      .byte '['
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+      .byte ']'
+
+        .byte 0
 
 .include "end.asm"
 
@@ -486,6 +550,11 @@ ruleC:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:  
+        ;; WOW, constant modify arith!
+        .byte "voidmain(){return 8421*2;}",0
+        .byte "voidmain(){return 8421/2;}",0
+        .byte "voidmain(){return 4010+701;}",0
+
         .byte "voidmain(){return 4711;}",0
 
 output: 
