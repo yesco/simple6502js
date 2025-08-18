@@ -252,7 +252,16 @@ FUNC _endall
         putc 10
         putc 'O'
         putc 'K'
+
         jsr output
+        sta tos
+        stx tos+1
+
+        putc 10
+        putc '='
+
+        ;; prints tos
+        jsr _printd
         jmp halt
 
 FUNC _fail
@@ -301,16 +310,13 @@ FUNC _errors
 gotendall:
         lda #'E'
         SKIPTWO
-
 failrule:
         lda #'Z'
         SKIPTWO
-
 gotrule:
         lda #'X'
         ;; fall-through to error
-
-error:  
+error:
         pha
         putc 10
         putc '%'
@@ -340,6 +346,15 @@ FUNC _incRX
 @noinc:  
         rts
         
+
+;;; dummy
+_drop:  rts
+
+;PRINTHEX=1                     
+PRINTDEC=1
+.include "print.asm"
+
+
 FUNC _dummy
 
         
@@ -367,6 +382,8 @@ ruleA:
         jsr putchar 
         lda #'B'
         jsr putchar
+        lda #<4711
+        ldx #>4711
         rts
         ;; TODO: HOWTO? maybe conflic with 'putchar'
       .byte ']'
@@ -391,9 +408,5 @@ input:
 output: 
         .res 8*1024, 0
 
-
-;PRINTHEX=1                     
-;PRINTDEC=1
-;.include "print.asm"
 
 .end
