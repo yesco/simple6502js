@@ -28,7 +28,9 @@
 ;;;   112 bytes - ...return 8421*2; /2, +, -
 ;;;   124 bytes - ...return e+12305;
 ;;;   128 bytes -           1+2+3+4+5
-
+;;;   262 bytes - +-&|^ %V %D ... 
+;;; TODO: parameterize the ops?
+;;; TODO: jsr ... lol
 
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed.
@@ -599,13 +601,41 @@ VAL1= '+' + 256*'>'
         .byte 0
 
 ruleE:  
-        .byte "+%D"
+;;; 18 *2
+
+;;; TODO: %V before %D (otherwise not working)
+        .byte "+%V"
+      .byte '['
+        clc
+        adc VAL0
+        tay
+        txa
+        adc VAL1
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+        .byte "|+%D"
       .byte '['
         clc
         adc #'<'
         tay
         txa
         adc #'>'
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+;;; 18 *2
+        .byte "|-%D"
+      .byte '['
+        sec
+        sbc VAL0
+        tay
+        txa
+        sbc VAL1
         tax
         tya
       .byte ']'
@@ -623,6 +653,80 @@ ruleE:
       .byte ']'
         .byte 'E'+128
 
+;;; 17 *2
+        .byte "|&%V"
+      .byte '['
+        and VAL0
+        tay
+        txa
+        and VAL1
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+        .byte "|&%D"
+      .byte '['
+        and #'<'
+        tay
+        txa
+        and #'>'
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+.ifnblank
+;;; TODO: \ quoting
+;;; 17 *2
+        .byte "|\|%V"
+      .byte '['
+        ora VAL0
+        tay
+        txa
+        ora VAL1
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+        .byte "|\|%D"
+      .byte '['
+        ora #'<'
+        tay
+        txa
+        ora #'>'
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+.endif ; NBLANK
+
+;;; 17 *2
+        .byte "|^%V"
+      .byte '['
+        eor VAL0
+        tay
+        txa
+        eor VAL1
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+        .byte "|^%D"
+      .byte '['
+        eor #'<'
+        tay
+        txa
+        eor #'>'
+        tax
+        tya
+      .byte ']'
+        .byte 'E'+128
+
+;;; 24
+        
         .byte "|/2"
       .byte '['
         tay
@@ -655,6 +759,9 @@ ruleE:
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
         ;; WOW, constant modify arith!
+        .byte "voidmain(){return e+e;}",0
+;        .byte "voidmain(){42=>a; return a+a;}",0
+
         .byte "voidmain(){return 1+2+3+4+5;}",0
         .byte "voidmain(){return e+12305;}",0
         .byte "voidmain(){return e;}",0
