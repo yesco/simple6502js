@@ -16,18 +16,18 @@
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
 ;;;    349 bytes codegen <> and  (+25 +36 mul10 digits)
-;;;    424 bytes codegen +> and vars! (+ 70 bytes)
+;;;    450 bytes codegen +> and vars! (+ 70 bytes)
 
-;;; (- 485 25 36) = 424
+;;; (- 511 25 36) = 450
 ;;;   mul10 : 25 B
 ;;;   digits: 36 B
 ;;; not counting: printd
 
 ;;; C-Rules:
-;;;    71 Bytes - voidmain(){return4711;}
-;;;   112 Bytes - ...return 8421*2; /2, +, -
-
-
+;;;    71 bytes - voidmain(){return4711;}
+;;;   112 bytes - ...return 8421*2; /2, +, -
+;;;   124 bytes - ...return e+12305;
+;;;   128 bytes -           1+2+3+4+5
 
 
 ;;; If there is an error a newline '%' letter error-code
@@ -350,6 +350,20 @@ FUNC _endall
 
         ;; prints tos
         jsr printd
+
+        putc 10
+        putc 'C'
+        
+        sec
+        lda out
+        sbc #<output
+        sta tos
+        lda out+1
+        sbc #>output
+        sta tos+1
+        
+        jsr printd
+
         jmp halt
 
 FUNC _fail
@@ -595,6 +609,7 @@ ruleE:
         tax
         tya
       .byte ']'
+        .byte 'E'+128
 
         .byte "|-%D"
       .byte '['
@@ -606,6 +621,7 @@ ruleE:
         tax
         tya
       .byte ']'
+        .byte 'E'+128
 
         .byte "|/2"
       .byte '['
@@ -616,6 +632,7 @@ ruleE:
         tya
         ror
       .byte ']'
+        .byte 'E'+128
 
         .byte "|*2"
       .byte '['
@@ -626,6 +643,7 @@ ruleE:
         tax
         tya
       .byte ']'
+        .byte 'E'+128
 
         .byte "|"
         .byte 0
@@ -635,8 +653,9 @@ ruleE:
 
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
-input:  
+input:
         ;; WOW, constant modify arith!
+        .byte "voidmain(){return 1+2+3+4+5;}",0
         .byte "voidmain(){return e+12305;}",0
         .byte "voidmain(){return e;}",0
         .byte "voidmain(){return 4010+701;}",0
@@ -652,7 +671,7 @@ vars:
         .word 100,110,120,130,140,150,160,170
         .word 180,190,200,210,220,230,240,250,260
 
-output: 
+output:
         .res 8*1024, 0
 
 
