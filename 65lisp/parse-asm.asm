@@ -88,7 +88,8 @@
 
 
 ;;; Enable for debug info
-;DEBUG=1
+;
+DEBUG=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -298,18 +299,21 @@ DEBC ']'
         jsr _incR
         jmp _next
 @skip:   
+
         cmp #'<'
         bne @skip2
 DEBC '<'
         lda tos
         jmp @doout
 @skip2: 
+
         cmp #'>'
         bne @skip3
 DEBC '>'
         lda tos+1
         jmp @doout
 @skip3:
+
         cmp #'+'
         bne @skip4
 ;;; put word+1
@@ -332,6 +336,7 @@ DEBC '+'
         pla
         iny
 @skip4:
+
 @doout:
         sta (out),y
         jsr _incO
@@ -382,6 +387,16 @@ FUNC _fail
         ldy #0
         lda (rule),y
         beq failrule
+
+        cmp #'['
+        bne @notgen
+@skiprule:
+        jsr _incR
+        lda (rule),y
+        cmp #']'
+        bne @skiprule
+        
+@notgen:
         cmp #'|'
         bne @loop
         ;; - move after '!'
@@ -749,6 +764,43 @@ ruleE:
       .byte ']'
         .byte 'E'+128
 
+;;; ==
+
+        .byte "|==%V"
+      .byte '['
+        ;; 15
+        ldy #0
+        cmp VAL0
+        bne @neqv
+        cpx VAL1
+        bne @neqv
+        ;; eq => -1
+        dey
+        ;; neq => 0
+@neqv:
+        tya
+        tax
+      .byte ']'
+        .byte 'E'+128
+
+        .byte "|==%D"
+      .byte '['
+        ;; 13
+        ldy #0
+        cmp #'<'
+        bne @neqd
+        cpx #'>'
+        bne @neqd
+        ;; eq => -1
+        dey
+        ;; neq => 0
+@neqd:
+        tya
+        tax
+      .byte ']'
+        .byte 'E'+128
+
+
         .byte "|"
         .byte 0
 
@@ -758,8 +810,17 @@ ruleE:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
-        ;; WOW, constant modify arith!
+;;; WORKS
+;        .byte "voidmain(){return 42==e;}",0
+;;; WORKS
+;        .byte "voidmain(){return 40==e;}",0
+;;; ???
+        .byte "voidmain(){return e==40;}",0
+
+;;; FAILS
+        .byte "voidmain(){return 42==42;}",0
         .byte "voidmain(){return e+e;}",0
+
 ;        .byte "voidmain(){42=>a; return a+a;}",0
 
         .byte "voidmain(){return 1+2+3+4+5;}",0
