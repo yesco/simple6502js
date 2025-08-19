@@ -88,8 +88,11 @@
 
 
 ;;; Enable for debug info
-;
-DEBUG=1
+;DEBUG=1
+
+;;; show input
+;;; Note: some chars are repeated at backtracking!
+SHOWINPUT=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -191,8 +194,14 @@ testeq:
     lda (inp),y
     jsr putchar
     pla
+.else
+  .ifdef SHOWINPUT
+    pha
+    lda (inp),y
+    jsr putchar
+    pla
+  .endif
 .endif ; DEBUG
-
         ;; lit eq?
         cmp (inp),y
 ;;; TODO:
@@ -813,10 +822,9 @@ input:
 ;;; WORKS
 ;        .byte "voidmain(){return 42==e;}",0
 ;;; WORKS
-;        .byte "voidmain(){return 40==e;}",0
-;;; ???
+        .byte "voidmain(){return 40==e;}",0
+;;; FAILS
         .byte "voidmain(){return e==40;}",0
-
 ;;; FAILS
         .byte "voidmain(){return 42==42;}",0
         .byte "voidmain(){return e+e;}",0
