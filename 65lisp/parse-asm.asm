@@ -12,26 +12,33 @@
 
 
 
-;;; TOTAL:
+;;; STATS:
+
+;;; TOTAL: 788 bytes = (+ 424 364)
+;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
 ;;;    349 bytes codegen <> and  (+25 +36 mul10 digits)
 ;;;    450 bytes codegen +> and vars! (+ 70 bytes)
+;;;    424 bytes codegen : %V %A fix recurse
+;;;         ( moved out bunch of stuff - "not counting" )
+;;;    
 
-;;; (- 511 25 36) = 450
-;;;   mul10 : 25 B
-;;;   digits: 36 B
-;;; not counting: printd
+;;; not counting: printd, mul10, end: print out
 
-;;; C-Rules:
+;;; C-Rules: (52 bytes is table a-z)
+;;; 
 ;;;    71 bytes - voidmain(){return4711;}
 ;;;   112 bytes - ...return 8421*2; /2, +, -
 ;;;   124 bytes - ...return e+12305;
 ;;;   128 bytes -           1+2+3+4+5
-;;;   262 bytes - +-&|^ %V %D ... 
+;;;   262 bytes - +-&|^ %V %D == ... 
+;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
+;;; 
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
 
+;;; 
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed.
 
@@ -137,8 +144,7 @@
 
 ;;; show input
 ;;; Note: some chars are repeated at backtracking!
-;
-SHOWINPUT=1
+;SHOWINPUT=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -596,6 +602,44 @@ digit:
         jsr _incI
         jmp nextdigit
 
+
+FUNC _incO
+;;; 3
+        ldx #out
+        SKIPTWO
+FUNC _incR
+;;; 3
+        ldx #rule
+        SKIPTWO
+FUNC _incI 
+;;; 2
+        ldx #inp
+FUNC _incRX
+;;; 7
+        inc 0,x                 ; 3B
+        bne @noinc
+        inc 1,x                 ; 3B
+@noinc:  
+        rts
+        
+
+;;; dummy
+_drop:  rts
+
+FUNC _dummy
+
+        
+;;;                  M A I N
+;;; ========================================
+
+endfirstpage:        
+
+;;; BEGIN CHEAT? - not count...
+
+;PRINTHEX=1                     
+PRINTDEC=1
+.include "print.asm"
+
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
 FUNC _mul10
@@ -617,6 +661,7 @@ _double:
         rts
 
 FUNC _endallfunc
+;;; 
         putc 10
         putc 'O'
         putc 'K'
@@ -646,42 +691,9 @@ FUNC _endallfunc
 
         jmp halt
 
-
-FUNC _incO
-;;; 3
-        ldx #out
-        SKIPTWO
-FUNC _incR
-;;; 3
-        ldx #rule
-        SKIPTWO
-FUNC _incI 
-;;; 2
-        ldx #inp
-FUNC _incRX
-;;; 7
-        inc 0,x                 ; 3B
-        bne @noinc
-        inc 1,x                 ; 3B
-@noinc:  
-        rts
-        
-
-;;; dummy
-_drop:  rts
-
-;PRINTHEX=1                     
-PRINTDEC=1
-.include "print.asm"
+;;; END CHEAT?
 
 
-FUNC _dummy
-
-        
-;;;                  M A I N
-;;; ========================================
-
-endfirstpage:        
   .res 256-(* .mod 256)
 secondpage:     
 
