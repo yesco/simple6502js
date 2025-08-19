@@ -596,7 +596,6 @@ VAL1= '+' + 256*'>'
 
 rule0:
 ruleA:  
-ruleC:  
 ruleF:
 ruleG:
 ruleH:  
@@ -619,10 +618,12 @@ ruleZ:
         .byte 0
 ;;; Block
 ruleB:  
+;;; TODO: empty?
         .byte "{",'S'+128,"}"
         .byte 0
-;;; Digitits/var
-ruleD:  
+
+;;; Constant/(variable) (simple, lol)
+ruleC:  
         .byte "%V"
       .byte '['
         lda VAL0
@@ -637,9 +638,8 @@ ruleD:
 
         .byte 0
 
-;;; Extension
-ruleE:  
 ;;; 18 *2
+ruleD:
 
 ;;; TODO: %V before %D (otherwise not working)
         .byte "+%V"
@@ -652,7 +652,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|+%D"
       .byte '['
@@ -664,7 +664,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 ;;; 18 *2
         .byte "|-%D"
@@ -677,7 +677,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|-%D"
       .byte '['
@@ -689,7 +689,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 ;;; 17 *2
         .byte "|&%V"
@@ -701,7 +701,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|&%D"
       .byte '['
@@ -712,7 +712,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 .ifnblank
 ;;; TODO: \ quoting
@@ -726,7 +726,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|\|%D"
       .byte '['
@@ -737,7 +737,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 .endif ; NBLANK
 
 ;;; 17 *2
@@ -750,7 +750,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|^%D"
       .byte '['
@@ -761,7 +761,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 ;;; 24
         
@@ -774,7 +774,7 @@ ruleE:
         tya
         ror
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|*2"
       .byte '['
@@ -785,7 +785,7 @@ ruleE:
         tax
         tya
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 ;;; ==
 
@@ -804,7 +804,7 @@ ruleE:
         tya
         tax
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
         .byte "|==%D"
       .byte '['
@@ -821,11 +821,15 @@ ruleE:
         tya
         tax
       .byte ']'
-        .byte 'E'+128
+        .byte 'D'+128
 
 
         .byte "|"
         .byte 0
+
+;;; Exprssion:
+ruleE:  
+        .byte 'C'+128,'D'+128,0
 
 ;;; Program
 ruleP:  
@@ -839,7 +843,7 @@ ruleP:
 
 ;;; Statement
 ruleS:
-        .byte "return ",'D'+128,'E'+128,";"
+        .byte "return ",'E'+128,";",0
         .byte 0
 
 .include "end.asm"
@@ -848,6 +852,7 @@ ruleS:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+        .byte "voidmain(){return 1+2+3+4+5;}",0
 ;;; WORKS
 ;        .byte "voidmain(){return 42==e;}",0
 ;;; WORKS
@@ -860,7 +865,6 @@ input:
 
 ;        .byte "voidmain(){42=>a; return a+a;}",0
 
-        .byte "voidmain(){return 1+2+3+4+5;}",0
         .byte "voidmain(){return e+12305;}",0
         .byte "voidmain(){return e;}",0
         .byte "voidmain(){return 4010+701;}",0
