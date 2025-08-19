@@ -59,11 +59,56 @@
 ;;;   another rule that is matched by recursion
 ;;; - Rules can have alternatives: E= aa | a | b that are
 ;;;   tried in sequence.
-;;; - %D - matches a sequence of digits (number: /\d+/ )
-;;; - %I - matches an "ident" (name: /[A-Z_][a-z_\d]*/ )
+;;; - %D - match sequence of digits (number: /\d+/ )
+;;; - %V - match "variable" (name: /[A-Z_][a-z_\d]*/ )
+;;; - %A - (for assignment)
+;;;        same as %V but stored in "dos" (and "tos")
+;;;        (generative rule ':' will set tos=dos)
 
 ;;; Warning: The recursive rule matching is limited by
 ;;;   the hardware stack. (~ 256/6)
+
+
+;;; [ GENERATIVE ]
+;;; 
+;;; The generative part of the rule may be invoked
+;;; several times. Each one will generate code.
+;;; 
+;;; Note: There is no backtradking/reset of code
+;;;       generated, so use with care!
+
+;;; Inside the generative brackets normal *relative*
+;;; 6502 asm is assumed to be used.
+;;; 
+;;; There are directives used that doesn't match
+;;; any 6502 byte-codes, these come from this set
+;;; of printable bytecodes.
+;;;
+;;;      "#'+2347:;<>?BCDGKOZ[\\]_bcdgkortwz{|
+;;; 
+;;; The following are used:
+;;; 
+;;;   ]   - ends the generation
+;;;   <   - lo byte of last %D number matched
+;;;   >   - hi byte         - " -
+;;;   <>  - little endian 2 bytes of %D
+;;;   +>  -       - " -           of %D+1
+;;;         (actually + and next byte will be replaced)
+;;;   :   - set %D value from %A(ssign)
+;;; 
+;;; NOTE: if any constant being used, such as
+;;;       address of JSR/JMP (library?) or a
+;;;       variable/#constant matches any of these
+;;;       characters
+;;; 
+;;; NOTE2: This hasn't (?) happened yet, but we don't
+;;;        test for it so we don't know.
+;;; 
+;;;        Hey it's a hack!
+;;; 
+;;; TODO: detect this and give assert error?
+;;;       alt: parameterize any constants?
+
 
 
 
@@ -92,6 +137,7 @@
 
 ;;; show input
 ;;; Note: some chars are repeated at backtracking!
+;
 SHOWINPUT=1
 
 .ifdef DEBUG
@@ -115,6 +161,10 @@ _start:
 ;;; DOS (second value)
 dos:    .res 2
 
+;;; if %V or %A stores 'V' or 'A'
+;;; 'A' for assigment
+vrule:  .res 1
+
 
 ;;; not pushing all
 ;state:  
@@ -134,8 +184,6 @@ FUNC _init
 
         ldx #$ff
         txs
-
-        jsr getchar
 
 .ifdef DEBUG 
         putc 'S'
@@ -162,6 +210,11 @@ FUNC _init
         lda #128
         pha
 
+;;; pause before as DEBUG scroll info away, lol
+.ifdef DEBUG
+        jsr getchar
+.endif ; NDEBUG
+
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
 FUNC _next
@@ -174,13 +227,13 @@ FUNC _next
     jsr putchar
 .endif ; DEBUG
         lda (rule),y
-        beq _endrule
+        beq _acceptrule
         bmi _enterrule
 
 ;;; TODO: reorder
         ;; also end-rule
         cmp #'|'
-        beq _endrule
+        beq _acceptrule
         ;; gen-rule
         cmp #'['
 ;beq _generate
@@ -208,7 +261,7 @@ testeq:
 ;        bne _fail
         beq _eq
         cmp #'%'
-        bne failjmp
+        bne _fail
         ;; special %?
         jsr _incR
         ldy #0
@@ -216,23 +269,21 @@ testeq:
         ;; assumes A not modified
         jsr _incR
 
-        cmp #'V'
-        beq isvar
+        cmp #'D'
+        beq isdigits
+isvar:    
+        ;; % anything...
+        ;; %V (or %W)
+        jmp _var
 isdigits:       
         ;; assume it's %D
         jmp _digits
-isvar:    
-        ;; %D
-        jmp _var
-
-failjmp:        
-        jmp _fail
 
 FUNC _eq    
 ;;; 9 B
     DEBC '='
         jsr _incI
-exitrule:      
+exitrule:
         jsr _incR
         jmp _next
 
@@ -241,6 +292,9 @@ FUNC _enterrule
         ;; enter rule
         ;; - save current rulepos
     DEBC '>'
+.ifdef DEBUG
+        jsr getchar
+.endif ; DEBUG
         lda rule+1
         pha
         lda rule
@@ -270,14 +324,14 @@ FUNC _enterrule
 ;;; TODO: use jsr, to know when to stop pop?
 ;;; (maybe don't need marker on stack?)
 
-FUNC _endrule
+
+FUNC _acceptrule
 ;;; 19 B
     DEBC '<'
 @loop:
-        ;; accept as match
         ;; - remove (all) re-tries
         pla
-        beq @gotrule
+        beq uprule
         bmi _endall
 @gotretry:
 ;        jsr putchar
@@ -286,7 +340,7 @@ FUNC _endrule
         pla
         jmp @loop
 
-@gotrule:
+uprule: 
     DEBC '_'
         pla
         sta rule
@@ -295,92 +349,7 @@ FUNC _endrule
 
         jmp exitrule
 
-FUNC _generate
-;;; ??? 19 B
-        jsr _incR
-        ldy #0
-        lda (rule),y
-;;; TODO: can conflict w data
-        cmp #']'
-        bne @skip
-        ;; continue rule parse
-DEBC ']'
-        jsr _incR
-        jmp _next
-@skip:   
 
-        cmp #'<'
-        bne @skip2
-DEBC '<'
-        lda tos
-        jmp @doout
-@skip2: 
-
-        cmp #'>'
-        bne @skip3
-DEBC '>'
-        lda tos+1
-        jmp @doout
-@skip3:
-
-        cmp #'+'
-        bne @skip4
-;;; put word+1
-DEBC '+'
-        ldx tos+1
-
-        ldy tos
-        iny
-        tay
-        bne @noinc
-        inx
-@noinc:
-        ;; put
-        ldy #0
-        sta (out),y
-        txa
-        pha
-        jsr _incO
-        jsr _incR
-        pla
-        iny
-@skip4:
-
-@doout:
-        sta (out),y
-        jsr _incO
-        jmp _generate
-
-
-FUNC _endall
-        putc 10
-        putc 'O'
-        putc 'K'
-
-        jsr output
-        sta tos
-        stx tos+1
-
-        putc 10
-        putc '='
-
-        ;; prints tos
-        jsr printd
-
-        putc 10
-        putc 'C'
-        
-        sec
-        lda out
-        sbc #<output
-        sta tos
-        lda out+1
-        sbc #>output
-        sta tos+1
-        
-        jsr printd
-
-        jmp halt
 
 FUNC _fail
 ;;; TODO: test special matchers
@@ -395,22 +364,38 @@ FUNC _fail
         jsr _incR
         ldy #0
         lda (rule),y
-        beq failrule
+        bne @notend
+        ;; nothing to backtrack
+        ;; - get rid of retry
+        pla
+        pla
+        pla
+        ;; - get rid of current rule
+        pla
+        pla
+        pla
 
+        jmp uprule
+
+@notend:
+
+        ;; skip any inline gen
         cmp #'['
         bne @notgen
-@skiprule:
+@skipgen:
         jsr _incR
         lda (rule),y
         cmp #']'
-        bne @skiprule
+        bne @skipgen
         
 @notgen:
         cmp #'|'
         bne @loop
-        ;; - move after '!'
+
+        ;; - move after '|'
         jsr _incR
 
+@done:
         ;; - restore inp
         pla
         pha
@@ -428,6 +413,10 @@ gotretry:
         sta inp+1
         txs
         jmp _next
+
+
+_endall:        
+        jmp _endallfunc
 
 
 ;;; ERRORS
@@ -456,9 +445,9 @@ error:
 halt:
         jmp halt
 
-
 FUNC _var
 DEBC '$'
+        sta vrule
         ldy #0
         lda (inp),y
 .ifdef DEBUG
@@ -466,7 +455,7 @@ DEBC '$'
 .endif ; DEBUG
         sec
         sbc #'a'
-        cmp #'z'+1
+        cmp #'z'-'a'+1
         bcs _fail
 
         ;; pick global address
@@ -474,24 +463,113 @@ DEBC '$'
         adc #<vars
 ;;; TODO: dos and tos??? lol
 ;;;    good for a+=5; maybe?
-;        sta dos
         sta tos
+        tay
         lda #>vars
         adc #0
-;        sta dos+1
         sta tos+1
+        ;; AY = lohi = addr
 
+        ;; vrule='A' >>1 => C=1
+        ;;       'V' >>1 => C=0
+        ror vrule
+        bcc @noset
+        ;; set dos
+        sty dos
+        sta dos+1
+@noset:
         jsr _incI
         jmp _next
+
+
+FUNC _generate
+;;; ??? 19 B
+        jsr _incR
+        ldy #0
+        lda (rule),y
+;;; TODO: can conflict w data
+        cmp #']'
+        bne @skip
+        ;; continue rule parse
+DEBC ']'
+        jsr _incR
+        jmp _next
+@skip:   
+
+        cmp #'<'
+        bne @skip2
+DEBC '<'
+        lda tos
+        jmp @doout
+@skip2: 
+
+        cmp #'>'
+        bne @skip3
+DEBC '>'
+        lda tos+1
+        jmp @doout
+
+@skip3:
+        cmp #':'
+        bne @skip4
+DEBC ':'
+        lda dos
+        sta tos
+        lda dos+1
+        sta tos+1
+        jmp _generate
+
+@skip4:  
+        cmp #'+'
+        bne @skip5
+;;; put word+1
+DEBC '+'
+        ldx tos+1
+
+        ldy tos
+        iny
+        tay
+        bne @noinc
+        inx
+@noinc:
+        ;; put
+        ldy #0
+        sta (out),y
+        txa
+        pha
+        jsr _incO
+        jsr _incR
+        pla
+        iny
+@skip5:
+
+@doout:
+        sta (out),y
+        jsr _incO
+        jmp _generate
+
+failjmp:        
+        jmp _fail
 
 
 ;;; TODO: doesn't FAIL if not digit!
 FUNC _digits
 DEBC '#'
 ;;; 36 B (+ 36 25) = 61
+
+        ;; valid initial digit or fail?
+        ldy #0
+        lda (inp),y
+        sec
+        sbc #'0'
+        cmp #10
+        bcs failjmp
+
+        ;; start with 0
         lda #0
         sta tos
         sta tos+1
+
 nextdigit:
         ldy #0
         lda (inp),y
@@ -538,6 +616,36 @@ _double:
         rol tos+1
         rts
 
+FUNC _endallfunc
+        putc 10
+        putc 'O'
+        putc 'K'
+
+        jsr output
+        sta tos
+        stx tos+1
+
+        putc 10
+        putc '='
+
+        ;; prints tos
+        jsr printd
+
+        putc 10
+        
+        sec
+        lda out
+        sbc #<output
+        sta tos
+        lda out+1
+        sbc #>output
+        sta tos+1
+        
+        jsr printd
+        putc 'B'
+
+        jmp halt
+
 
 FUNC _incO
 ;;; 3
@@ -579,6 +687,10 @@ secondpage:
 
 bytecodes:      
 
+;;; ========================================
+;;; START rules
+
+
 ;;; Rules 0,A-
 rules:  
         .word rule0             ; TODO: if we use &and?
@@ -595,7 +707,6 @@ VAL0= '<' + 256*'>'
 VAL1= '+' + 256*'>'
 
 rule0:
-ruleA:  
 ruleF:
 ruleG:
 ruleH:  
@@ -608,7 +719,6 @@ ruleN:
 ruleO:  
 ruleQ:
 ruleR:
-ruleT:  
 ruleU:  
 ruleV:  
 ruleW:  
@@ -616,10 +726,17 @@ ruleX:
 ruleY:  
 ruleZ:  
         .byte 0
+
+;;; aggregate statements
+ruleA:  
+        ;; Right-recrusion is "fine"
+        .byte 'S'+128,'A'+128,"|",0
+
 ;;; Block
 ruleB:  
 ;;; TODO: empty?
-        .byte "{",'S'+128,"}"
+        .byte "{}"
+        .byte "|{",'A'+128,"}"
         .byte 0
 
 ;;; Constant/(variable) (simple, lol)
@@ -833,18 +950,51 @@ ruleE:
 
 ;;; Program
 ruleP:  
-        .byte "voidmain()",'B'+128,""
+        .byte 'T'+128,"main()",'B'+128
       .byte '['
-        PUTC 'E'
         rts
         ;; TODO: HOWTO? maybe conflic with 'putchar'
       .byte ']'
         .byte 0
 
+;;; Type
+ruleT:  
+        .byte "int|char|void",0
+
 ;;; Statement
 ruleS:
-        .byte "return ",'E'+128,";",0
+;;; TODO: if
+
+        .byte "return ",'E'+128,";"
+      .byte '['
+        rts
+      .byte ']'
+
+        ;; simple assignement, ONLY as statement
+        ;; and can't be nested or part of expression
+        ;; (unless we use a stack...)
+        .byte "|%A=",'E'+128,";"
+      .byte "[:"                ; ':' => tos=dos
+        sta VAL0
+        stx VAL1
+      .byte "]"
+
+;;; Extention to C:
+;;; Forward assignemenbt 3=>a; could work! lol
+;;; TODO: make it multiple 3=>a=>b+7=>c; ...
+        .byte "|",'E'+128,"=>%A;"
+      .byte "[:"
+        sta VAL0
+        stx VAL1
+      .byte "]"
+
+        ;; empty statement is legal
+        .byte "|;"
+
         .byte 0
+
+;;; END rules
+;;; ========================================
 
 .include "end.asm"
 
@@ -852,25 +1002,41 @@ ruleS:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
-        .byte "voidmain(){return 1+2+3+4+5;}",0
-;;; WORKS
-;        .byte "voidmain(){return 42==e;}",0
-;;; WORKS
-        .byte "voidmain(){return 40==e;}",0
-;;; FAILS
-        .byte "voidmain(){return e==40;}",0
-;;; FAILS
-        .byte "voidmain(){return 42==42;}",0
-        .byte "voidmain(){return e+e;}",0
 
-;        .byte "voidmain(){42=>a; return a+a;}",0
 
-        .byte "voidmain(){return e+12305;}",0
-        .byte "voidmain(){return e;}",0
-        .byte "voidmain(){return 4010+701;}",0
-        .byte "voidmain(){return 8421*2;}",0
-        .byte "voidmain(){return 8421/2;}",0
-        .byte "voidmain(){return 4711;}",0
+;;; OK
+        .byte "intmain(){a=99;a=a+1;a=a+100;return a+1;}",0 ;
+
+;;; TODO: somehow this gives garbage and jumps wrong!
+;;;  (stack messed up?)
+
+;;; FAILS
+        .byte "intmain(){return e==40;}",0
+;;; FAILS
+        .byte "intmain(){return 42==42;}",0
+
+
+;;; OKAY:
+        .byte "intmain(){a=42;return a+a;}",0
+        .byte "intmain(){42=>a;return a+a;}",0
+        .byte "intmain(){return 40==e;}",0
+        .byte "intmain(){return e==e;}",0
+        .byte "intmain(){return e+e;}",0
+        .byte "intmain(){a=99;a=a+1;return a+1;}",0
+        .byte "intmain(){a=99;return 77;}",0
+        .byte "intmain(){return 4711;}",0
+        .byte "intmain(){a=99;return a+1;}",0
+        .byte "voidmain(){a=99;}",0
+        .byte "intmain(){return 1+2+3+4+5;}",0
+;        .byte "intmain(){return 42==e;}",0
+        .byte "intmain(){return e+12305;}",0
+        .byte "intmain(){return e;}",0
+        .byte "intmain(){return 4010+701;}",0
+        .byte "intmain(){return 8421*2;}",0
+        .byte "intmain(){return 8421/2;}",0
+        .byte "intmain(){return 4711;}",0
+;;; garbage (OK)
+        .byte "voidmain(){}",0
 
 vars:
 ;        .res 2*('z'-'a'+2)
