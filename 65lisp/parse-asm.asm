@@ -739,7 +739,7 @@ ruleB:
         .byte "|{",'A'+128,"}"
         .byte 0
 
-;;; Constant/(variable) (simple, lol)
+;;; "Constant"/(variable) (simple, lol)
 ruleC:  
         .byte "%V"
       .byte '['
@@ -755,7 +755,7 @@ ruleC:
 
         .byte 0
 
-;;; 18 *2
+;;; aDDons (::= op %d | op %V)
 ruleD:
 
 ;;; TODO: %V before %D (otherwise not working)
