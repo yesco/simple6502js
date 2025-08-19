@@ -153,9 +153,9 @@ FUNC _init
         sta out+1
 
 ;;; TODO: improve using 'P'
-        lda #<ruleA
+        lda #<ruleP
         sta rule
-        lda #>ruleA
+        lda #>ruleP
         sta rule+1
 
         ;; end-all marker
@@ -579,39 +579,52 @@ secondpage:
 
 bytecodes:      
 
-;;; Rules A-
+;;; Rules 0,A-
 rules:  
-        .word rule0
-        .word ruleA
-        .word ruleB
-        .word ruleC
-        .word ruleD
-        .word ruleE
-        .word 0
+        .word rule0             ; TODO: if we use &and?
+        .word ruleA,ruleB,ruleC,ruleD,ruleE
+        .word ruleF,ruleG,ruleH,ruleI,ruleJ
+        .word ruleK,ruleL,ruleM,ruleN,ruleO
+        .word ruleP,ruleQ,ruleR,ruleS,ruleT
+        .word ruleU,ruleV,ruleW,ruleX,ruleY
+        .word ruleZ
+        .word 0                 ; TODO: needed?
+
+;;; How to access value of variable!
+VAL0= '<' + 256*'>'
+VAL1= '+' + 256*'>'
 
 rule0:
 ruleA:  
-        .byte "voidmain()",'B'+128,""
-      .byte '['
-        PUTC 'E'
-        rts
-        ;; TODO: HOWTO? maybe conflic with 'putchar'
-      .byte ']'
-        .byte 0
-
-ruleB:  
-        .byte "{",'C'+128,"}"
-        .byte 0
-
 ruleC:  
-        .byte "return ",'D'+128,'E'+128,";"
+ruleF:
+ruleG:
+ruleH:  
+ruleI:  
+ruleJ:  
+ruleK:  
+ruleL:  
+ruleM:  
+ruleN:  
+ruleO:  
+ruleQ:
+ruleR:
+ruleT:  
+ruleU:  
+ruleV:  
+ruleW:  
+ruleX:  
+ruleY:  
+ruleZ:  
         .byte 0
-
+;;; Block
+ruleB:  
+        .byte "{",'S'+128,"}"
+        .byte 0
+;;; Digitits/var
 ruleD:  
         .byte "%V"
       .byte '['
-VAL0= '<' + 256*'>'
-VAL1= '+' + 256*'>'
         lda VAL0
         ldx VAL1
       .byte ']'
@@ -624,6 +637,7 @@ VAL1= '+' + 256*'>'
 
         .byte 0
 
+;;; Extension
 ruleE:  
 ;;; 18 *2
 
@@ -811,6 +825,21 @@ ruleE:
 
 
         .byte "|"
+        .byte 0
+
+;;; Program
+ruleP:  
+        .byte "voidmain()",'B'+128,""
+      .byte '['
+        PUTC 'E'
+        rts
+        ;; TODO: HOWTO? maybe conflic with 'putchar'
+      .byte ']'
+        .byte 0
+
+;;; Statement
+ruleS:
+        .byte "return ",'D'+128,'E'+128,";"
         .byte 0
 
 .include "end.asm"
