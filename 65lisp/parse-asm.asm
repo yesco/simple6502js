@@ -14,7 +14,7 @@
 
 ;;; STATS:
 
-;;; TOTAL: 788 bytes = (+ 424 364)
+;;; TOTAL: 802 bytes = (+ 438 364)
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -22,7 +22,8 @@
 ;;;    450 bytes codegen +> and vars! (+ 70 bytes)
 ;;;    424 bytes codegen : %V %A fix recurse
 ;;;         ( moved out bunch of stuff - "not counting" )
-;;;    
+;;;    438 bytes skip spc (<= ' ') on input stream!
+;;;        (really 404? ... )
 
 ;;; not counting: printd, mul10, end: print out
 
@@ -117,15 +118,17 @@
 ;;;       alt: parameterize any constants?
 
 
-
-
-
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
 
 .zeropage
 
 .code
+
+;PRINTHEX=1                     
+PRINTDEC=1
+.include "print.asm"
+
 
 ;;; ========================================
 ;;;                  M A I N
@@ -288,7 +291,7 @@ isdigits:
 FUNC _eq    
 ;;; 9 B
     DEBC '='
-        jsr _incI
+        jsr _incIspc
 exitrule:
         jsr _incR
         jmp _next
@@ -364,6 +367,11 @@ FUNC _fail
 
 ;;; 25 B
 
+.ifdef SHOWINPUT
+        putc '\'
+;        putc 10
+.endif ; SHOWINPUT
+
     DEBC '|'
         ;; - seek next alt in rule
 @loop:
@@ -422,7 +430,7 @@ gotretry:
 
 
 _endall:        
-        jmp _endallfunc
+        jmp endallfunc
 
 
 ;;; ERRORS
@@ -484,7 +492,8 @@ DEBC '$'
         sty dos
         sta dos+1
 @noset:
-        jsr _incI
+        ;; skip read var char
+        jsr _incIspc
         jmp _next
 
 
@@ -599,9 +608,25 @@ digit:
         bcc @noinc
         inc tos+1
 @noinc:
+;;; TODO: this gives memory corruption?
+        ;; lool space delim numbers
+;        jsr _incIspc
         jsr _incI
         jmp nextdigit
 
+
+FUNC _incIspc
+;;; 14 B
+        pha
+@skipspc:
+        jsr _incI
+        lda (0,x)
+        beq @done
+        cmp #' '+1
+        bcc @skipspc
+@done:
+        pla
+        rts
 
 FUNC _incO
 ;;; 3
@@ -611,7 +636,7 @@ FUNC _incR
 ;;; 3
         ldx #rule
         SKIPTWO
-FUNC _incI 
+FUNC _incI
 ;;; 2
         ldx #inp
 FUNC _incRX
@@ -619,7 +644,7 @@ FUNC _incRX
         inc 0,x                 ; 3B
         bne @noinc
         inc 1,x                 ; 3B
-@noinc:  
+@noinc:
         rts
         
 
@@ -635,10 +660,6 @@ FUNC _dummy
 endfirstpage:        
 
 ;;; BEGIN CHEAT? - not count...
-
-;PRINTHEX=1                     
-PRINTDEC=1
-.include "print.asm"
 
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
@@ -660,7 +681,7 @@ _double:
         rol tos+1
         rts
 
-FUNC _endallfunc
+FUNC endallfunc
 ;;; 
         putc 10
         putc 'O'
@@ -690,6 +711,8 @@ FUNC _endallfunc
         putc 'B'
 
         jmp halt
+
+FUNC _dummy4
 
 ;;; END CHEAT?
 
@@ -977,7 +1000,7 @@ ruleT:
 ruleS:
 ;;; TODO: if
 
-        .byte "return ",'E'+128,";"
+        .byte "return",'E'+128,";"
       .byte '['
         rts
       .byte ']'
@@ -1017,7 +1040,7 @@ input:
 
 
 ;;; OK
-        .byte "intmain(){a=99;a=a+1;a=a+100;return a+1;}",0 ;
+        .byte "int main(){ a=99; a=a+1; a=a+100; return a+1; }",0
 
 ;;; TODO: somehow this gives garbage and jumps wrong!
 ;;;  (stack messed up?)
