@@ -24,6 +24,7 @@
 ;;;         ( moved out bunch of stuff - "not counting" )
 ;;;    438 bytes skip spc (<= ' ') on input stream!
 ;;;        (really 404? ... )
+;;;    487 bytes IF ! (no else) (+ 43B)
 
 ;;; not counting: printd, mul10, end: print out
 
@@ -35,6 +36,7 @@
 ;;;   128 bytes -           1+2+3+4+5
 ;;;   262 bytes - +-&|^ %V %D == ... 
 ;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
+;;;   381 bytes - IF(E)S;   (+ 17B)
 ;;; 
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
@@ -174,10 +176,16 @@ _start:
 ;;; DOS (second value)
 dos:    .res 2
 
+;;; POS (Patch ptr)
+pos:    .res 2
+
 ;;; if %V or %A stores 'V' or 'A'
 ;;; 'A' for assigment
 vrule:  .res 1
 
+savea:  .res 1
+savex:  .res 1
+savey:  .res 1
 
 ;;; not pushing all
 ;state:  
@@ -346,6 +354,25 @@ FUNC _acceptrule
         pla
         beq uprule
         bmi _endall
+;;; 2 - PATCH
+        cmp #2
+        bne @gotretry
+    DEBC '}'
+        pla
+        sta pos
+        pla
+        sta pos+1
+        ;; patch to here!
+        ldy #0
+        lda out
+        sta (pos),y
+        iny
+        lda out+1
+        sta (pos),y
+
+        jmp @loop
+
+;;; 1 - RETRY
 @gotretry:
 ;        jsr putchar
     DEBC '.'
@@ -353,6 +380,7 @@ FUNC _acceptrule
         pla
         jmp @loop
 
+;;; 0 - RULE
 uprule: 
     DEBC '_'
         pla
@@ -413,12 +441,22 @@ FUNC _fail
         ;; - move after '|'
         jsr _incR
 
-@done:
+restoreinp:     
         ;; - restore inp
         pla
         pha
         bmi gotendall
         beq gotrule
+
+;;; TODO: at failure... need toget out fast???
+.ifnblank
+;;; TODO: Why this interferes with simple ???
+        cmp #1
+        beq gotretry
+gotpatch:       
+        lda #'P'
+        jmp error
+.endif
 
 gotretry:
     DEBC '!'
@@ -503,25 +541,28 @@ DEBC '$'
 
 FUNC _generate
 ;;; ??? 19 B
+
+;;; TODO: can conflict w data
+
         jsr _incR
         ldy #0
         lda (rule),y
-;;; TODO: can conflict w data
+
+;;; '] - END GEN
         cmp #']'
         bne @skip
-        ;; continue rule parse
 DEBC ']'
         jsr _incR
         jmp _next
 @skip:   
-
+;;; '<' LO %d
         cmp #'<'
         bne @skip2
 DEBC '<'
         lda tos
         jmp @doout
 @skip2: 
-
+;;; '>' HI %d
         cmp #'>'
         bne @skip3
 DEBC '>'
@@ -529,6 +570,7 @@ DEBC '>'
         jmp @doout
 
 @skip3:
+;;; ':' SET tos=dos
         cmp #':'
         bne @skip4
 DEBC ':'
@@ -539,9 +581,25 @@ DEBC ':'
         jmp _generate
 
 @skip4:  
-        cmp #'+'
+;;; '{{' PATCH
+        cmp #'{'
         bne @skip5
-;;; put word+1
+DEBC '{'
+        lda out+1
+        pha
+        lda out
+        pha
+        lda #2
+        pha
+        jsr _incO
+        jsr _incR
+        jsr _incO
+        jmp _generate
+
+@skip5: 
+        cmp #'+'
+        bne @skip6
+;;; "=" PUT %d+1
 DEBC '+'
         ldx tos+1
 
@@ -560,7 +618,7 @@ DEBC '+'
         jsr _incR
         pla
         iny
-@skip5:
+@skip6:
 
 @doout:
         sta (out),y
@@ -782,11 +840,13 @@ rules:
 VAL0= '<' + 256*'>'
 VAL1= '+' + 256*'>'
 
+PUSHLOC= '{' + 256*'{'
+
 rule0:
 ruleF:
 ruleG:
 ruleH:  
-ruleI:  
+ruleI:
 ruleJ:  
 ruleK:  
 ruleL:  
@@ -1039,14 +1099,30 @@ ruleT:
 
 ;;; Statement
 ruleS:
-;;; TODO: if
+        ;; BlOCK!
+;        .byte 'B'+128
 
+        ;; RETURN
+;        .byte "|return",'E'+128,";"
         .byte "return",'E'+128,";"
       .byte '['
         rts
       .byte ']'
 
-        ;; simple assignement, ONLY as statement
+        ;; IF(E)S; // no else
+        .byte "|if(",'E'+128,")"
+      .byte '['
+        stx savex
+        ora savex
+        bne @skipjmp
+        jmp PUSHLOC
+@skipjmp:
+      .byte ']'
+        .byte 'S'+128
+        ;; Auto-patches at exit!
+
+
+        ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
         ;; (unless we use a stack...)
         .byte "|%A=",'E'+128,";"
@@ -1055,9 +1131,9 @@ ruleS:
         stx VAL1
       .byte "]"
 
-;;; Extention to C:
-;;; Forward assignemenbt 3=>a; could work! lol
-;;; TODO: make it multiple 3=>a=>b+7=>c; ...
+        ;; 7=>A; // Extention to C:
+        ;; Forward assignemenbt 3=>a; could work! lol
+        ;; TODO: make it multiple 3=>a=>b+7=>c; ...
         .byte "|",'E'+128,"=>%A;"
       .byte "[:"
         sta VAL0
@@ -1078,6 +1154,33 @@ ruleS:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+
+        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
+
+;;; ERROR
+        .byte "int main(){ if(1) { return 33; } a=a+1; return a;}",0
+
+
+;;; OK (w S not = B | )
+        .byte "int main(){ if(0) return 33; return 22; }",0
+        .byte "int main(){ if(1) return 33; return 22; }",0
+
+
+
+;;; FAIL
+        .byte "int main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
+;;; FAIL
+        .byte "int main(){ if(0) { a=e+50; return a; } a=a+1; return a;}",0
+;;; FAIL
+        .byte "int main(){ if(1) { a=89; return a; } a=a+1; return a;}",0
+
+
+        .byte "int main(){ if(1) return 99; a=a+1; return a;}",0
+        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
+
+
 
         .byte "int main(){ a=2005*2; a=a+700; return a+1; }",0
 
