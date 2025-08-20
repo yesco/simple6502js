@@ -41,7 +41,7 @@
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
 
-;;; 
+;;;
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed.
 
@@ -70,10 +70,16 @@
 ;;; - Rules can have alternatives: E= aa | a | b that are
 ;;;   tried in sequence.
 ;;; - %D - match sequence of digits (number: /\d+/ )
-;;; - %V - match "variable" (name: /[A-Z_][a-z_\d]*/ )
+;;; 
+;;; - %N - define NEW name (forward) TODO: 2x=>err!
+;;; - %V - match "variable"
 ;;; - %A - (for assignment)
 ;;;        same as %V but stored in "dos" (and "tos")
 ;;;        (generative rule ':' will set tos=dos)
+;;; 
+;;; - %n - define NEW LOCAL
+;;; - %v - match LOCAL USAGE of name
+
 
 ;;; Warning: The recursive rule matching is limited by
 ;;;   the hardware stack. (~ 256/6)
@@ -178,6 +184,7 @@ dos:    .res 2
 
 ;;; POS (Patch ptr)
 pos:    .res 2
+gos:    .res 2
 
 ;;; if %V or %A stores 'V' or 'A'
 ;;; 'A' for assigment
@@ -193,9 +200,12 @@ savey:  .res 1
   inp:    .res 2
   out:    .res 2
 ;stateend:       
-        
 
+env:    .res 2
+valid:  .res 1
 
+;;; stackframe for parameter start
+sframe: 
 
 .code
 
@@ -220,6 +230,16 @@ FUNC _init
         sta out
         lda #>output
         sta out+1
+
+        lda #<vnext
+        sta env
+sta tos
+        lda #>vnext
+        sta env+1
+sta tos+1
+putc '#'
+jsr printd
+putc 10
 
 ;;; TODO: improve using 'P'
         lda #<ruleP
@@ -281,21 +301,25 @@ testeq:
 ;;; TODO:
 ;        bne _fail
         beq _eq
+
+;;; %. handle special matchers
         cmp #'%'
         bne _fail
+
         ;; special %?
         jsr _incR
         ldy #0
         lda (rule),y
         ;; assumes A not modified
         jsr _incR
-
+;;; %D - digits
         cmp #'D'
         beq isdigits
 isvar:    
         ;; % anything...
         ;; %V (or %W)
         jmp _var
+
 isdigits:       
         ;; assume it's %D
         jmp _digits
@@ -506,14 +530,40 @@ DEBC '$'
         sta vrule
         ldy #0
         lda (inp),y
-.ifdef DEBUG
-  jsr putchar        
-.endif ; DEBUG
+
+    putc '$'
+        jsr _parsename
+        beq _fail
+        ;; got name
+        jsr _find
+        ;; return address
+    ldy #2
+    lda (pos),y
+    sta tos
+    iny
+    lda (pos),y
+    sta tos
+
+    jsr printd
+    jmp halt
+
+.ifnblank
         sec
         sbc #'a'
         cmp #'z'-'a'+1
         bcs _fail
 
+        lda vrule
+        cmp #'a'
+        bcc @global
+@local:
+        ;; pick local address (a,b,c...)
+        asl
+        sta tos
+;;; TODO: use JSR/RTS loop intead of _next?
+        jmp _next
+
+@global:
         ;; pick global address
         asl
         adc #<vars
@@ -537,7 +587,7 @@ DEBC '$'
         ;; skip read var char
         jsr _incIspc
         jmp _next
-
+.endif
 
 FUNC _generate
 ;;; ??? 19 B
@@ -690,6 +740,10 @@ FUNC _incIspc
         pla
         rts
 
+FUNC _incP
+;;; 3
+        ldx #pos
+        SKIPTWO
 FUNC _incO
 ;;; 3
         ldx #out
@@ -709,6 +763,171 @@ FUNC _incRX
 @noinc:
         rts
         
+
+;;; --- name handling
+
+;;; env pointing to new empty entry
+;;;   but @0 has link to previous
+;;; Result:
+;;;   new entry all linked up
+;;;     with newnew link and 0 value
+;;;   valid byte > 0 if have name
+
+FUNC _parsename
+;;; 62 B
+        ;; pos = env+4
+        lda env
+        clc
+        adc #4
+        sta pos
+        lda env+1
+        adc #0
+        sta pos+1
+        ;; parse name
+        ldy #0
+        sty valid
+
+putc '@'
+lda pos
+sta tos
+lda pos+1
+sta tos+1
+jsr printd
+putc ' '
+
+ldy #0
+@copy:
+        ;; - copy one char
+        lda (inp),y
+        sta (pos),y
+        ;; - is valid char?
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        bcs @notidentchar
+.ifblank
+   lda (inp),y
+   jsr putchar
+.endif
+        ;; - valid
+        inc valid
+        jsr _incI
+        jsr _incP
+        jmp @copy
+        
+@notidentchar:
+        ;; end of ident
+        ;; - zero terminate
+        tya
+        sta (pos),y
+        jsr _incP
+
+putc '@'
+lda pos
+sta tos
+lda pos+1
+sta tos+1
+jsr printd
+putc ' '
+ldy #0
+        ;; prepare next new entry!
+;;; TODO: copyreg?
+        ;; - link to prev
+        lda env
+        sta (pos),y
+sta tos
+        lda env+1
+        iny
+        sta (pos),y
+.ifnblank
+sta tos+1
+jsr printd
+PUTC ' '
+ldy #1
+.endif
+        ;; - zero out value
+        lda #0
+        iny
+        sta (pos),y
+        iny
+        sta (pos),y
+        
+        ;; return valid Z=0
+        lda valid
+        rts
+
+
+;;; word to find: @env+4 (written by parser)
+FUNC _find
+;;; 42 B
+        ldy #3
+
+        lda env
+        sta gos
+        lda env+1
+        sta gos+1
+
+@nextword:
+        ;; go prev
+        ;; - load prev
+;;; TODO: code jsr _link ?
+   PUTC 10
+   PUTC '>'
+        ldy #0
+        lda (gos),y
+        tax
+        iny
+        lda (gos),y
+        sta gos+1
+        stx gos
+        
+  sta tos+1
+  stx tos
+  jsr printd
+        ;; end?
+        ora gos
+        bne @matchword
+@notfound:
+   PUTC '%'
+        ;; - create!
+        ;; - commit - link it in
+        lda pos
+        sta env
+        lda pos+1
+        sta env+1
+;;; TODO: give error
+        rts
+
+@matchword:
+    PUTC '?'
+        ;; match word
+        ldy #3
+@match:
+        iny
+        lda (gos),y
+        beq @endword
+    PUTC ':'
+    jsr putchar 
+    pha
+    lda (env),y
+    jsr putchar
+    pla
+        cmp (env),y
+        beq @match
+
+@notmatch:
+    PUTC '|'
+        jmp @nextword
+        
+@endword:
+        lda (env),y
+        bne @notmatch
+@found:
+    PUTC '!'
+        ;; Z=1
+        rts
+
+
 
 ;;; dummy
 _drop:  rts
@@ -877,7 +1096,21 @@ ruleB:
 
 ;;; "Constant"/(variable) (simple, lol)
 ruleC:  
+
+.ifnblank
+        .byte "%v"
+      .byte '['
+        ldy sframe
+;;; requires zero page wrap around
+        ldx '<',y
+        dey
+        lda '<',y
+      .byte ']'
+
+        .byte "|%V"
+.else
         .byte "%V"
+.endif
       .byte '['
         lda VAL0
         ldx VAL1
@@ -1086,7 +1319,7 @@ ruleE:
 
 ;;; Program
 ruleP:  
-        .byte 'T'+128,"main()",'B'+128
+        .byte 'T'+128,"%N()",'B'+128
       .byte '['
         rts
         ;; TODO: HOWTO? maybe conflic with 'putchar'
@@ -1234,8 +1467,38 @@ vars:
         .word 100,110,120,130,140,150,160,170
         .word 180,190,200,210,220,230,240,250,260
 
+
+
+
+defs:   
+
+;;; test example
+vfoo:   
+        .word 0                 ; linked-list end
+        .word 4711
+        .byte "foo",0
+.ifnblank
+vmain:  
+        .word vfoo
+        .word 0
+        .byte "main",0
+vbar:
+        .word vmain
+.else
+vbar:
+        .word vfoo
+.endif
+imain:  .word 42
+        .byte "bar",0
+vnext:  
+        .word vbar
+        .word 0
+        .byte 0
+
 output:
-        .res 8*1024, 0
+        ;; fill with RTS - "safer"
+        _RTS=$60
+        .res 8*1024, _RTS
 
 
 .end
