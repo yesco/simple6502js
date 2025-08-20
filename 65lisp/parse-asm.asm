@@ -145,9 +145,13 @@ PRINTDEC=1
 ;;; Enable for debug info
 ;DEBUG=1
 
-;;; show input
+;;; show input during parse \=backtrack
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
+
+;;; print input (after compile)
+;
+PRINTINPUT=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -430,7 +434,7 @@ gotretry:
 
 
 _endall:        
-        jmp endallfunc
+        jmp aftercompile
 
 
 ;;; ERRORS
@@ -681,24 +685,45 @@ _double:
         rol tos+1
         rts
 
-FUNC endallfunc
+FUNC aftercompile
+
+        putc 10
+        putc '6'
+        putc '5'
+        putc 'm'
+        putc 'u'
+        putc 'c'
+        putc 'c'
+        putc '0'
+        putc '2'
+        putc 10
+
+.ifdef PRINTINPUT
+        putc 10
+
+        lda #<input
+        sta inp
+        lda #>input
+        sta inp+1
+        jmp @print
+@loop:
+        jsr putchar
+        jsr _incI
+@print:
+        ldy #0
+        lda (inp),y
+        bne @loop
+
+        putc 10
+.endif ; PRINTINPUT
+
 ;;; 
         putc 10
         putc 'O'
         putc 'K'
+        putc ' '
 
-        jsr output
-        sta tos
-        stx tos+1
-
-        putc 10
-        putc '='
-
-        ;; prints tos
-        jsr printd
-
-        putc 10
-        
+        ;; print size in bytes
         sec
         lda out
         sbc #<output
@@ -709,6 +734,22 @@ FUNC endallfunc
         
         jsr printd
         putc 'B'
+        putc 10
+        putc 10
+
+        jsr output
+        sta tos
+        stx tos+1
+
+        putc 10
+        putc '='
+        putc '>'
+        putc ' '
+
+        ;; prints tos
+        jsr printd
+        putc 10
+        
 
         jmp halt
 
@@ -1038,6 +1079,10 @@ ruleS:
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
 
+        .byte "int main(){ a=2005*2; a=a+700; return a+1; }",0
+
+;;; WRONG
+        .byte "int main(){ a=2005*2; b=84; a=a+700; a=b/2+a; return a+1; }",0
 
 ;;; OK
         .byte "int main(){ a=99; a=a+1; a=a+100; return a+1; }",0
@@ -1072,6 +1117,11 @@ input:
         .byte "intmain(){return 4711;}",0
 ;;; garbage (OK)
         .byte "voidmain(){}",0
+
+docs:   
+        .byte "C-Syntax: { a=...; ... return ...; }",10
+        .byte "C-Ops   : *2 /2 + - ==", 10
+        .byte "C-Vars  : a= ... ; ... =>a;", 10
 
 vars:
 ;        .res 2*('z'-'a'+2)
