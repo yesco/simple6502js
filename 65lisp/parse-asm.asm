@@ -25,6 +25,8 @@
 ;;;    438 bytes skip spc (<= ' ') on input stream!
 ;;;        (really 404? ... )
 ;;;    487 bytes IF ! (no else) (+ 43B)
+;;;    513 bytes ... (+ 26 B???) I think more cmp????
+;;;    631 bytes ... long names (+ 122B)
 
 ;;; not counting: printd, mul10, end: print out
 
@@ -133,11 +135,6 @@
 
 .code
 
-;PRINTHEX=1                     
-PRINTDEC=1
-.include "print.asm"
-
-
 ;;; ========================================
 ;;;                  M A I N
 
@@ -158,8 +155,7 @@ PRINTDEC=1
 ;SHOWINPUT=1
 
 ;;; print input (after compile)
-;
-PRINTINPUT=1
+;PRINTINPUT=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -766,6 +762,8 @@ FUNC _incRX
 
 ;;; --- name handling
 
+;DEBNAME=1
+
 ;;; env pointing to new empty entry
 ;;;   but @0 has link to previous
 ;;; Result:
@@ -774,7 +772,7 @@ FUNC _incRX
 ;;;   valid byte > 0 if have name
 
 FUNC _parsename
-;;; 62 B
+;;; 66 B
         ;; pos = env+4
         lda env
         clc
@@ -787,15 +785,19 @@ FUNC _parsename
         ldy #0
         sty valid
 
-putc '@'
-lda pos
-sta tos
-lda pos+1
-sta tos+1
-jsr printd
-putc ' '
+.ifdef DEBNAME
+  putc '@'
+  lda pos
+  sta tos
+  lda pos+1
+  sta tos+1
+  jsr printd
+  putc ' '
 
-ldy #0
+  ldy #0
+.endif ; DEBNAME
+        
+
 @copy:
         ;; - copy one char
         lda (inp),y
@@ -805,10 +807,11 @@ ldy #0
         sbc #'a'
         cmp #'z'-'a'+1
         bcs @notidentchar
-.ifblank
+
+.ifdef DEBNAME
    lda (inp),y
    jsr putchar
-.endif
+.endif ; DEBNAME
         ;; - valid
         inc valid
         jsr _incI
@@ -822,29 +825,34 @@ ldy #0
         sta (pos),y
         jsr _incP
 
-putc '@'
-lda pos
-sta tos
-lda pos+1
-sta tos+1
-jsr printd
-putc ' '
-ldy #0
+.ifdef DEBNAME
+  putc '@'
+  lda pos
+  sta tos
+  lda pos+1
+  sta tos+1
+  jsr printd
+  putc ' '
+  ldy #0
+.endif ; DEBNAME
+
         ;; prepare next new entry!
 ;;; TODO: copyreg?
         ;; - link to prev
         lda env
         sta (pos),y
-sta tos
+.ifdef DEBNAME
+  sta tos
+.endif ; DEBNAME
         lda env+1
         iny
         sta (pos),y
-.ifnblank
-sta tos+1
-jsr printd
-PUTC ' '
-ldy #1
-.endif
+.ifdef DEBNAME
+  sta tos+1
+  jsr printd
+  PUTC ' '
+  ldy #1
+.endif ; DEBNAME
         ;; - zero out value
         lda #0
         iny
@@ -859,7 +867,7 @@ ldy #1
 
 ;;; word to find: @env+4 (written by parser)
 FUNC _find
-;;; 42 B
+;;; 56 B
         ldy #3
 
         lda env
@@ -871,8 +879,11 @@ FUNC _find
         ;; go prev
         ;; - load prev
 ;;; TODO: code jsr _link ?
+.ifdef DEBNAME
    PUTC 10
    PUTC '>'
+.endif ; DEBNAME
+
         ldy #0
         lda (gos),y
         tax
@@ -880,15 +891,19 @@ FUNC _find
         lda (gos),y
         sta gos+1
         stx gos
-        
+
+.ifdef DEBNAME
   sta tos+1
   stx tos
   jsr printd
+.endif ; DEBNAME
         ;; end?
         ora gos
         bne @matchword
 @notfound:
+.ifdef DEBNAME
    PUTC '%'
+.endif ; DEBNAME
         ;; - create!
         ;; - commit - link it in
         lda pos
@@ -899,31 +914,41 @@ FUNC _find
         rts
 
 @matchword:
+.ifdef DEBNAME
     PUTC '?'
+.endif ; DEBNAME
         ;; match word
         ldy #3
 @match:
         iny
         lda (gos),y
         beq @endword
+
+.ifdef DEBNAME
     PUTC ':'
     jsr putchar 
     pha
     lda (env),y
     jsr putchar
     pla
+.endif ; DEBNAME
+
         cmp (env),y
         beq @match
 
 @notmatch:
+.ifdef DEBNAME
     PUTC '|'
+.endif ; DEBNAME
         jmp @nextword
         
 @endword:
         lda (env),y
         bne @notmatch
 @found:
+.ifdef DEBNAME
     PUTC '!'
+.endif ; DEBNAME
         ;; Z=1
         rts
 
@@ -941,6 +966,11 @@ FUNC _dummy
 endfirstpage:        
 
 ;;; BEGIN CHEAT? - not count...
+
+;PRINTHEX=1                     
+PRINTDEC=1
+.include "print.asm"
+
 
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
@@ -964,6 +994,7 @@ _double:
 
 FUNC aftercompile
 
+;;; TODO: printz
         putc 10
         putc '6'
         putc '5'
@@ -1461,7 +1492,7 @@ docs:
 
 vars:
 ;        .res 2*('z'-'a'+2)
-;;; TODO: remove (once have assignement?)
+;;; TODO: remove (once have long names)
         ;;    a  b  c  d  e  f  g  h  i  j
         .word 0,10,20,30,40,50,60,70,80,90
         .word 100,110,120,130,140,150,160,170
@@ -1473,6 +1504,7 @@ vars:
 defs:   
 
 ;;; test example
+;;; TODO: remove?
 vfoo:   
         .word 0                 ; linked-list end
         .word 4711
