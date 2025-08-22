@@ -14,7 +14,7 @@
 
 ;;; STATS:
 
-;;; TOTAL: 868 bytes = (+ 487 381)
+;;; TOTAL: 1010 bytes = (+ 631 379)
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -25,8 +25,11 @@
 ;;;    438 bytes skip spc (<= ' ') on input stream!
 ;;;        (really 404? ... )
 ;;;    487 bytes IF ! (no else) (+ 43B)
-;;;    513 bytes ... (+ 26 B???) I think more cmp????
-;;;    631 bytes ... long names (+ 122B)
+;;;    493 bytes ... (+ 29 B???) I think more cmp????
+;;;    517 bytes highlite error in source! (+ 24 B)
+;;; TODO:  634 bytes ... partial long names (+ 141 B)
+
+
 
 ;;; not counting: printd, mul10, end: print out
 
@@ -38,7 +41,7 @@
 ;;;   128 bytes -           1+2+3+4+5
 ;;;   262 bytes - +-&|^ %V %D == ... 
 ;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
-;;;   381 bytes - IF(E)S;   (+ 17B)
+;;;   379 bytes - IF(E)S;   (+ 17B)
 ;;; 
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
@@ -147,6 +150,13 @@
 .endmacro
 
 
+;;; Long names support
+;;; TODO: make functional
+;LONGNAMES=1
+
+;;; TODO: not yet done, just thinking
+;BNFLONG=1
+
 ;;; Enable for debug info
 ;DEBUG=1
 
@@ -155,7 +165,12 @@
 ;SHOWINPUT=1
 
 ;;; print input (after compile)
-;PRINTINPUT=1
+;
+PRINTINPUT=1
+
+;;; print/hilight ERROR position (with PRINTINPUT)
+;
+ERRPOS=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -197,11 +212,12 @@ savey:  .res 1
   out:    .res 2
 ;stateend:       
 
+erp:    .res 2
 env:    .res 2
 valid:  .res 1
 
 ;;; stackframe for parameter start
-sframe: 
+pframe: 
 
 .code
 
@@ -219,14 +235,20 @@ FUNC _init
 
         lda #<input
         sta inp
+.ifdef ERRPOS
+        sta erp
+.endif
         lda #>input
         sta inp+1
-        
+.ifdef ERRPOS
+        sta erp+1
+.endif        
         lda #<output
         sta out
         lda #>output
         sta out+1
 
+.ifdef LONGNAMES
         lda #<vnext
         sta env
 sta tos
@@ -236,6 +258,7 @@ sta tos+1
 putc '#'
 jsr printd
 putc 10
+.endif ; LONGNAMES
 
 ;;; TODO: improve using 'P'
         lda #<ruleP
@@ -509,6 +532,9 @@ gotendall:
 failrule:
         lda #'Z'
         SKIPTWO
+failed:   
+        lda #'F'
+        SKIPTWO
 gotrule:
         lda #'X'
         ;; fall-through to error
@@ -527,6 +553,7 @@ DEBC '$'
         ldy #0
         lda (inp),y
 
+.ifdef LONGNAMES
     putc '$'
         jsr _parsename
         beq _fail
@@ -543,12 +570,15 @@ DEBC '$'
     jsr printd
     jmp halt
 
-.ifnblank
+.else ; !LONGNAMES
+
         sec
         sbc #'a'
         cmp #'z'-'a'+1
         bcs _fail
 
+;;; LOCAL
+.ifnblank
         lda vrule
         cmp #'a'
         bcc @global
@@ -558,6 +588,8 @@ DEBC '$'
         sta tos
 ;;; TODO: use JSR/RTS loop intead of _next?
         jmp _next
+.endif
+
 
 @global:
         ;; pick global address
@@ -583,7 +615,8 @@ DEBC '$'
         ;; skip read var char
         jsr _incIspc
         jmp _next
-.endif
+.endif ; !LONGNAMES
+
 
 FUNC _generate
 ;;; ??? 19 B
@@ -733,6 +766,28 @@ FUNC _incIspc
         cmp #' '+1
         bcc @skipspc
 @done:
+
+;;; TODO: only update when backtrack/_fail?
+
+.ifdef ERRPOS
+;;; store max input position
+;;; (indicative of error position)
+        lda inp+1
+        cmp erp+1
+        bcc @noupdate
+        bne @update
+        ;; erp.hi == inp.hi
+        lda inp
+        cmp erp
+        bcc @noupdate
+        ;; erp := inp
+@update:
+        sta erp
+        lda inp+1
+        sta erp+1
+@noupdate:
+.endif
+
         pla
         rts
 
@@ -759,6 +814,8 @@ FUNC _incRX
 @noinc:
         rts
         
+
+.ifdef LONGNAMES
 
 ;;; --- name handling
 
@@ -952,7 +1009,7 @@ FUNC _find
         ;; Z=1
         rts
 
-
+.endif ; LONGNAMES
 
 ;;; dummy
 _drop:  rts
@@ -1006,26 +1063,57 @@ FUNC aftercompile
         putc '2'
         putc 10
 
+        ;; failed?
+        ;; (not stand at end of source)
+        ldy #0
+        lda (inp),y
+        beq @OK
+
+.ifdef ERRPOS
+        ;; hibit string near error!
+        ;; (approximated by 
+        ldy #0
+        lda (erp),y
+        ora #128
+        sta (erp),y
+.endif ; ERRPOS
+        ;; print it
+       
 .ifdef PRINTINPUT
+;;; TODO: printz? printR?
         putc 10
 
         lda #<input
-        sta inp
+        sta pos
         lda #>input
-        sta inp+1
+        sta pos+1
         jmp @print
 @loop:
+.ifdef ERRPOS
+        ;; hi-bit set indicate error position
+        bpl @nohi
+        pha
+        lda #1+128              ; red text
         jsr putchar
-        jsr _incI
+        pla
+@nohi:
+.endif ; ERRPOS
+
+        jsr putchar
+
+        jsr _incP
 @print:
         ldy #0
-        lda (inp),y
+        lda (pos),y
         bne @loop
 
         putc 10
 .endif ; PRINTINPUT
 
-;;; 
+        jmp failed
+
+
+@OK:
         putc 10
         putc 'O'
         putc 'K'
@@ -1098,11 +1186,14 @@ ruleG:
 ruleH:  
 ruleI:
 ruleJ:  
-ruleK:  
-ruleL:  
+.ifndef BNFLONG
+  ruleK:  
+  ruleL:  
 ruleM:  
 ruleN:  
+.endif 
 ruleO:  
+
 ruleQ:
 ruleR:
 ruleU:  
@@ -1350,7 +1441,12 @@ ruleE:
 
 ;;; Program
 ruleP:  
+
+.ifdef LONGNAMES
         .byte 'T'+128,"%N()",'B'+128
+.else
+        .byte 'T'+128,"main()",'B'+128
+.endif ; LONGNAMES
       .byte '['
         rts
         ;; TODO: HOWTO? maybe conflic with 'putchar'
@@ -1360,6 +1456,158 @@ ruleP:
 ;;; Type
 ruleT:  
         .byte "int|char|void",0
+
+.ifdef BNFLONG
+
+;;; List of actual paramters
+ruleL:  
+;;; Problem with "E,L|E|" is that E might be generated twice!
+;;; 
+;;; TODO: we could push "out" and restore with "inp" when
+;;;   backtrackging...
+
+;;; instead we gobble ','
+        .byte ",ML|ML|"         ; LOL
+        .byte 0
+
+;;; expression parameter push! (all!)
+ruleM:  
+      .byte '['
+;;; 3 B  9c - program stack!
+        pha
+        txa
+        pha
+;;; 9 B 17c - zero page stack
+        dec spy
+        ldy spy
+        sta losp,y
+        stx hisp,y
+;;; 9 B 22c - split stack
+        dec spy
+        ldy spy
+        sta (losp),y
+        txa
+        sta (hisp),y
+;;; 11 B 24c -- other stack
+        ldy spy
+        dey
+        sta (sp),y
+        dey
+        txa
+        sta (sp),y
+        sta spy
+;;; 16 B -- other stack
+        ldy #1
+        sta (sp),y
+        txa
+        dey
+        sta (sp,y
+        ;; stack grow down
+        dec sp
+        dec sp
+        bne @noinc
+        dec sp+1
+@noinc:
+      .byte ']'
+        .byte 0
+
+;;; Local variable
+ruleN:
+        .byte "%v"
+      .byte '['
+;;; 9 B 14c - program stack
+        tsx
+        ldy VAL0,x          ; lo
+        lda VAL1,x          ; hi
+        tax
+        tya
+;;; 8 B 16c - other stack
+        ldy #'<'
+        lda (sp),y
+        tax
+        dey 
+        lda (sp),y
+      .byte ']'
+
+;;; ++a; // more efficent, no need value
+        .byte "++%v;"
+      .byte '['
+        tsx
+        inc VAL0,x
+        bne @noinc
+        inc VAL1,x
+@noinc:
+      .byte ']'
+
+;;; --a; // more efficent, no need value
+        .byte "--%v;"
+      .byte '['
+        tsx
+        lda VAL0,x
+        bne @nodec
+        dec VAL1,x
+@nodec:
+        dec VAL0,x
+      .byte ']'
+
+;;; ++a+3
+        .byte "++%v"
+      .byte '['
+        tsx
+        inc VAL0,x
+        bne @noinc
+        inc VAL1,x
+        ;; need to load it
+        lda VAL0,x
+        ldx VAL1,x
+@noinc:
+      .byte ']'
+
+        .byte "%v==%D"
+      .byte '['
+        
+      .byte ']'
+
+        .byte "+%v"
+      .byte '['
+;;; 15 B 26c - program stack
+        stx savex
+        tsx
+        ;; lo
+        clc
+        adc VAL0,x
+        tay
+        ;; hi
+        lda savex
+        adc VAL1,x
+        tax
+
+        tya
+      .byte ']'
+        .byte 0
+
+;;; Kall function
+ruleK:
+        ;; Function name
+        .byte "%A("
+      .byte '['
+;;; ? B ?c - program stack
+        lda #
+
+      .byte ']'
+        ;; Parameters
+        'L'+128,")";"
+      .byte '['
+        ;; get %A value to tos
+        .byte ':'
+        jsr VAL0
+;;; TODO: assuming there is no other assignement \%A
+;;;       in parsing List of parameters... LOL (push/pop?)
+;;; TODO: if we add push operator we can do reordering?
+      .byte ']'
+        .byte 0
+
+.endif ; BNFLONG
 
 ;;; Statement
 ruleS:
@@ -1419,7 +1667,7 @@ ruleS:
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
 
-        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+;        .byte "int main(){ if(1) a=10x; a=a+1; return a;}",0
         .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
 
 ;;; ERROR
