@@ -660,7 +660,7 @@ endrule:
 ;;;  (how about patch?)
 
 ;;; TODO: lol wtf?
-     pla
+;     pla
 
         ;; nothing to backtrack
         ;; - get rid of retry
@@ -726,6 +726,41 @@ DEBC '$'
         ldy #0
         lda (inp),y
 
+@global:
+        ;; verify/parse single letter var
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        bcc @skip2
+        jmp failjmp
+@skip2:
+
+        ;; pick global address
+        asl
+        adc #<vars
+;;; TODO: dos and tos??? lol
+;;;    good for a+=5; maybe?
+        sta tos
+        tay
+;;; TODO: simplify
+        lda #>vars
+        adc #0
+        sta tos+1
+        ;; AY = lohi = addr
+
+        ;; vrule='A' >>1 => C=1
+        ;;       'V' >>1 => C=0
+        ror vrule
+        bcc @noset
+        ;; set dos
+        sty dos
+        sta dos+1
+@noset:
+        ;; skip read var char
+        jsr _incIspc
+        jmp _next
+
+
 .ifdef LONGNAMES
     putc '$'
         jsr _parsename
@@ -765,33 +800,8 @@ DEBC '$'
         jmp _next
 .endif
 
-
-@global:
-        ;; pick global address
-        asl
-        adc #<vars
-;;; TODO: dos and tos??? lol
-;;;    good for a+=5; maybe?
-        sta tos
-        tay
-;;; TODO: simplify
-        lda #>vars
-        adc #0
-        sta tos+1
-        ;; AY = lohi = addr
-
-        ;; vrule='A' >>1 => C=1
-        ;;       'V' >>1 => C=0
-        ror vrule
-        bcc @noset
-        ;; set dos
-        sty dos
-        sta dos+1
-@noset:
-        ;; skip read var char
-        jsr _incIspc
-        jmp _next
 .endif ; !LONGNAMES
+
 
 
 FUNC _generate
@@ -857,10 +867,9 @@ DEBC '{'
 ;;; "=" PUT %d+1
 DEBC '+'
         ldx tos+1
-
         ldy tos
         iny
-        tay
+        tya
         bne @noinc
         inx
 @noinc:
@@ -868,11 +877,8 @@ DEBC '+'
         ldy #0
         sta (out),y
         txa
-        pha
         jsr _incO
         jsr _incR
-        pla
-        iny
 @skip6:
 
 @doout:
@@ -923,10 +929,8 @@ digit:
         bcc @noinc
         inc tos+1
 @noinc:
-;;; TODO: this gives memory corruption?
-        ;; lool space delim numbers
-;        jsr _incIspc
-        jsr _incI
+        ;; lol space inside numbers!
+        jsr _incIspc
         jmp nextdigit
 
 failjmp2:        
@@ -1316,7 +1320,6 @@ FUNC aftercompile
         jsr output
         sta tos
         stx tos+1
-jsr printd
         putc 10
         putc '='
         putc '>'
@@ -1328,6 +1331,23 @@ jsr printd
         
         jmp halt
 
+
+FUNC _printvar
+        sta tos
+        stx tos+1
+        putc '@'
+        jsr printh
+        putc '='
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        sta tos
+        stx tos+1
+        jsr printd
+        putc ' '
+        rts     
 
 FUNC printstack
         pha
@@ -1541,6 +1561,12 @@ ruleC:
       .byte '['
         lda VAL0
         ldx VAL1
+      .byte ']'
+
+        .byte "|&%V"
+      .byte '['
+        lda #'<'
+        ldx #'>'
       .byte ']'
 
         .byte "|%D"
@@ -1975,10 +2001,16 @@ ruleS:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
-;;; WRONG 'a' (all) variable not value?
-        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
 
-;; WRONG result - should be 1, error introduced w LONGNAMES (do diff?)
+;;; FAIL
+;        .byte "int main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
+
+;;; OK, fixed var.... lol
+        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "int main(){ return 4711 ; }",0
+        .byte "int main(){ return e ; }",0
+        .byte "int main(){ return &e ; }",0
+        .byte "int main(){ return a ; }",0
         .byte "int main(){ return e; }",0
         .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
 ;;; OK 11
@@ -1988,12 +2020,11 @@ input:
 ;;; OK 
         .byte "int main(){return 4711;}",0
 
-;;; syntax error highlight!
-;        .byte "int main(){ if(1) a=10x; a=a+1; return a;}",0
-
-
 ;;; ERROR
         .byte "int main(){ if(1) { return 33; } a=a+1; return a;}",0
+
+;;; syntax error highlight!
+;        .byte "int main(){ if(1) a=10x; a=a+1; return a;}",0
 
 
 ;;; OK (w S not = B | )
@@ -2002,8 +2033,6 @@ input:
 
 
 
-;;; FAIL
-        .byte "int main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
 ;;; FAIL
         .byte "int main(){ if(0) { a=e+50; return a; } a=a+1; return a;}",0
 ;;; FAIL
