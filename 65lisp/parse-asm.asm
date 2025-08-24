@@ -222,6 +222,8 @@ erp:    .res 2
 env:    .res 2
 valid:  .res 1
 
+rulename:       .res 1
+
 ;;; stackframe for parameter start
 pframe: 
 
@@ -273,7 +275,7 @@ putc 10
         sta rule+1
 
         ;; end-all marker
-        lda #128
+        lda #42
         pha
 
         jsr printstack
@@ -384,11 +386,12 @@ FUNC _enterrule
         pha
         lda rule
         pha
-        lda #0                  ; rule-mark
+        lda rulename
         pha
 
         ;; - load new rule
         lda (rule),y
+        sta rulename
 .ifdef DEBUGRULE
     pha
     putc ' '
@@ -410,7 +413,7 @@ FUNC _enterrule
         pha
         lda inp
         pha
-        lda #'I'
+        lda #'i'
         pha
 
         jmp _next
@@ -425,16 +428,17 @@ FUNC _acceptrule
     putc '<'
 .endif
 @loop:
-        ;; - remove (all) re-tries
+        ;; remove (all) re-tries
         pla
-        beq uprule
-;;; TODO: too far
-        bpl @skip
+        bmi uprule
+        ;; - done?
+        cmp #42
+        bne @skip
         jmp _donecompile
 @skip:
         
-;;; 2 - PATCH
-        cmp #2
+        ;; 'p' - PATCH
+        cmp #'p'
 ;;; TODO: assumes it's 'I''
         bne @gotretry
     DEBC '}'
@@ -469,6 +473,7 @@ uprule:
     putc '_'
 .endif
     DEBC '_'
+        sta rulename
         pla
         sta rule
         pla
@@ -558,8 +563,9 @@ restoreinp:
 ;;; TODO: correct jump? is it error?
 ;;;  (means? still have input?)
 ;        bmi gotendall
-        bmi _donecompile
-        beq gotrule
+        bmi gotrule
+        cmp #42
+        beq _donecompile
 
 ;;; TODO: assume it's 'I'? (how about is patch?)
 
@@ -567,7 +573,7 @@ restoreinp:
 ;;; TODO: not active!!!!
 .ifnblank
 ;;; TODO: Why this interferes with simple ???
-        cmp #'I'
+        cmp #'i'
         beq gotretry
 ;;; otherwise - error
 gotpatch:       
@@ -772,7 +778,7 @@ DEBC '{'
         pha
         lda out
         pha
-        lda #2
+        lda #'p'
         pha
         jsr _incO
         jsr _incR
@@ -1269,6 +1275,9 @@ FUNC printstack
 ;        inx
         inx
         inx
+;        inx                     
+;        inx                    
+;        inx
 
         lda tos+1
         pha
@@ -1287,24 +1296,19 @@ FUNC printstack
 
 @loop:
         putc ' '
-        putc '#'
         ;; print first byte
 
         lda $101,x
-        sta tos
+        jsr putchar
         inx
         beq @err
 
-        lda #0
-        sta tos+1
-        jsr printd
-;jmp @done
-
         ;; end marker?
+.ifnblank
         lda tos
-        cmp #128
+        cmp #42
         beq @done
-        
+.endif        
         putc ' '
         ;; print 1 word
         lda $101,x
