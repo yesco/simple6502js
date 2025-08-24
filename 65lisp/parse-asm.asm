@@ -1258,7 +1258,22 @@ FUNC aftercompile
 
 
 FUNC printstack
+        pha
+        tya
+        pha
+        txa
+        pha
+
         tsx
+;;; LOL
+;        inx
+        inx
+        inx
+
+        lda tos+1
+        pha
+        lda tos
+        pha
         ;; we can use the stack for print
 
         putc 10
@@ -1286,16 +1301,18 @@ FUNC printstack
 ;jmp @done
 
         ;; end marker?
-        lda 100,x
-        bmi @done
+        lda tos
+        cmp #128
+        beq @done
         
         putc ' '
         ;; print 1 word
         lda $101,x
+        sta tos
         inx
         beq @err
-        sta tos
-        lda $100,x
+
+        lda $101,x
         inx
         beq @err
         sta tos+1
@@ -1313,6 +1330,18 @@ FUNC printstack
         putc '>'
         jsr getchar
         putc 10
+
+        pla
+        sta tos
+        pla
+        sta tos+1
+
+        pla
+        tax
+        pla
+        tay
+        pla
+
         rts
         
 
