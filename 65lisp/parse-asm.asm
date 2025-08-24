@@ -269,6 +269,9 @@ putc 10
 .endif ; LONGNAMES
 
 ;;; TODO: improve using 'P'
+        lda #'P'+128
+        sta rulename
+
         lda #<ruleP
         sta rule
         lda #>ruleP
@@ -281,6 +284,16 @@ putc 10
         jsr printstack
         jsr printstack
 
+;;; TODO: but this doesn't work.... lol
+
+.ifnblank
+        lda #42
+        sta rulename
+
+        lda #'P'+128
+        jmp _enterrule
+.endif
+
 ;;; pause before as DEBUG scroll info away, lol
 .ifdef DEBUGKEY
         jsr getchar
@@ -292,6 +305,14 @@ FUNC _next
 ;;; 16 B
         ldy #0
 .ifdef DEBUG
+;    PUTC ' '
+    PUTC 10
+    lda (rule),y
+    jsr putchar
+.endif ; DEBUG
+
+;;; TODO: ;;;;;
+.ifdef xDEBUGRULE
 ;    PUTC ' '
     PUTC 10
     lda (rule),y
@@ -317,6 +338,7 @@ testeq:
     pha
     lda (inp),y
     jsr putchar
+    putc ':'
     pla
 .endif
 
@@ -398,7 +420,6 @@ FUNC _enterrule
     pla
     jsr putchar
     PUTC '>'
-    jsr printstack
 .endif
         and #31
         asl
@@ -416,6 +437,9 @@ FUNC _enterrule
         lda #'i'
         pha
 
+.ifdef DEBUGRULE
+    jsr printstack
+.endif
         jmp _next
 ;;; TODO: use jsr, to know when to stop pop?
 ;;; (maybe don't need marker on stack?)
@@ -439,13 +463,14 @@ FUNC _acceptrule
         
         ;; 'p' - PATCH
         cmp #'p'
-;;; TODO: assumes it's 'I''
+;;; TODO: now assumes it's 'i'
         bne @gotretry
-    DEBC '}'
+    DEBC 'P'
         pla
         sta pos
         pla
         sta pos+1
+
         ;; patch to here!
         ldy #0
         lda out
@@ -487,6 +512,7 @@ uprule:
         sta tos+1
         jsr _printd
         putc 10
+        jsr printstack
 .endif
 
         jmp exitrule
@@ -1259,7 +1285,6 @@ FUNC aftercompile
         jsr printd
         putc 10
         
-
         jmp halt
 
 
@@ -1271,13 +1296,11 @@ FUNC printstack
         pha
 
         tsx
-;;; LOL
-;        inx
         inx
         inx
-;        inx                     
-;        inx                    
-;        inx
+        inx                     
+        inx                    
+        inx
 
         lda tos+1
         pha
@@ -1286,6 +1309,20 @@ FUNC printstack
         ;; we can use the stack for print
 
         putc 10
+        putc '#'
+        lda rulename
+        and #127
+        cmp #' '
+        bcs @noctrl
+        ;; ctrl
+        sta tos
+        lda #0
+        sta tos+1
+        jsr printd
+        lda #':'
+@noctrl:
+        jsr putchar
+        putc ' '
         putc 's'
 
         ;; print S
@@ -1447,6 +1484,8 @@ ruleC:
         ldx #'>'
       .byte ']'
 
+        .byte 0
+        .byte 0
         .byte 0
 
 ;;; aDDons (::= op %d | op %V)
