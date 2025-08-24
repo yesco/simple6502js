@@ -27,13 +27,13 @@
 ;;;    487 bytes IF ! (no else) (+ 43B)
 ;;;    493 bytes ... (+ 29 B???) I think more cmp????
 ;;;    517 bytes highlite error in source! (+ 24 B)
+;;;    550 bytes ...fixed bugs... (lost _var code...)
+
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
-
-
 
 ;;; not counting: printd, mul10, end: print out
 
-;;; C-Rules: (52 bytes is table a-z)
+;;; C-Rules: (56 bytes is table a-z)
 ;;; 
 ;;;    71 bytes - voidmain(){return4711;}
 ;;;   112 bytes - ...return 8421*2; /2, +, -
@@ -42,6 +42,7 @@
 ;;;   262 bytes - +-&|^ %V %D == ... 
 ;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
 ;;;   379 bytes - IF(E)S;   (+ 17B)
+;;;   392 bytes - &a
 ;;; 
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
@@ -149,6 +150,9 @@
         .byte $2c               ; BITabs 3 B
 .endmacro
 
+
+;;; testing data
+;TESTING=1
 
 ;;; Long names support
 ;;; TODO: make functional
@@ -688,7 +692,7 @@ _donecompile:
 .ifdef DEBUGRULE
         jsr printstack
 .endif
-        jmp aftercompile
+        jmp _aftercompile
 
 
 ;;; ERRORS
@@ -721,6 +725,7 @@ halt:
         jmp halt
 
 FUNC _var
+;;; 42 B
 DEBC '$'
         sta vrule
         ldy #0
@@ -1205,278 +1210,27 @@ FUNC _dummy
 
 endfirstpage:        
 
-;;; BEGIN CHEAT? - not count...
-
-PRINTDEC=1
-PRINTHEX=1                     
-.include "print.asm"
-
-
-;;; Isn't it just that AX means more code than
-;;; separate tos?
-FUNC _mul10
-;;; 25
-        lda tos
-        ldx tos+1
-        jsr _double
-        jsr _double
-        clc
-        adc tos
-        sta tos
-        txa
-        adc tos+1
-        sta tos+1
-        ;; double
-_double:        
-        asl tos
-        rol tos+1
-        rts
-
-FUNC aftercompile
-
-;;; TODO: printz
-        putc 10
-        putc '6'
-        putc '5'
-        putc 'm'
-        putc 'u'
-        putc 'c'
-        putc 'c'
-        putc '0'
-        putc '2'
-        putc 10
-
-        ;; failed?
-        ;; (not stand at end of source)
-        ldy #0
-        lda (inp),y
-        beq @OK
-
-.ifdef ERRPOS
-        ;; hibit string near error!
-        ;; (approximated by 
-        ldy #0
-        lda (erp),y
-        ora #128
-        sta (erp),y
-.endif ; ERRPOS
-        ;; print it
-       
-.ifdef PRINTINPUT
-;;; TODO: printz? printR?
-        putc 10
-
-        lda #<input
-        sta pos
-        lda #>input
-        sta pos+1
-        jmp @print
-@loop:
-.ifdef ERRPOS
-        ;; hi-bit set indicate error position
-        bpl @nohi
-        pha
-        lda #1+128              ; red text
-        jsr putchar
-        pla
-@nohi:
-.endif ; ERRPOS
-
-        ;; print source char
-        jsr putchar
-
-        jsr _incP
-@print:
-        ldy #0
-        lda (pos),y
-        bne @loop
-
-        putc 10
-.endif ; PRINTINPUT
-
-        jmp failed
-
-
-@OK:
-        putc 10
-        putc 'O'
-        putc 'K'
-        putc ' '
-
-        ;; print size in bytes
-        sec
-        lda out
-        sbc #<output
-        sta tos
-        lda out+1
-        sbc #>output
-        sta tos+1
-        
-        jsr printd
-        putc 'B'
-        putc 10
-        putc 10
-
-        jsr output
-        sta tos
-        stx tos+1
-        putc 10
-        putc '='
-        putc '>'
-        putc ' '
-
-        ;; prints tos
-        jsr printd
-        putc 10
-        
-        jmp halt
-
-
-FUNC _printvar
-        sta tos
-        stx tos+1
-        putc '@'
-        jsr printh
-        putc '='
-        ldy #1
-        lda (tos),y
-        tax
-        dey
-        lda (tos),y
-        sta tos
-        stx tos+1
-        jsr printd
-        putc ' '
-        rts     
-
-FUNC printstack
-        pha
-        tya
-        pha
-        txa
-        pha
-
-        tsx
-        inx
-        inx
-        inx                     
-        inx                    
-        inx
-
-        lda tos+1
-        pha
-        lda tos
-        pha
-        ;; we can use the stack for print
-
-        putc 10
-        putc '#'
-        lda rulename
-        jsr putchar
-        putc ' '
-        putc 's'
-
-        ;; print S
-        stx tos
-        lda #0
-        sta tos+1
-        jsr printd
-
-@loop:
-        putc ' '
-        ;; print first byte
-
-        lda $101,x
-
-        and #127
-        cmp #' '
-        bcs @noctrl
-        ;; ctrl
-        sta tos
-        lda #0
-        sta tos+1
-        jsr printd
-        lda #':'
-@noctrl:
-
-        jsr putchar
-        inx
-        beq @err
-
-        ;; end marker?
-.ifnblank
-        lda tos
-        cmp #42
-        beq @done
-.endif        
-        putc ' '
-        ;; print 1 word
-        lda $101,x
-        sta tos
-        inx
-        beq @err
-
-        lda $101,x
-        inx
-        beq @err
-        sta tos+1
-        jsr printh
-
-        jmp @loop
-
-@err:
-        putc ' '
-        putc ' '
-        putc 'o'
-        putc 'o'
-        
-@done:
-        putc '>'
-        jsr getchar
-        sta savea
-        putc 10
-
-        pla
-        sta tos
-        pla
-        sta tos+1
-
-        pla
-        tax
-        pla
-        tay
-        pla
-
-        lda savea
-        cmp #';'
-        bne @ret
-        ;; drop one - for debug when messed up
-        pla
-        sta savex
-        pla
-        sta savey
-
-        ;; drop one
-        pla
-
-        lda savey
-        pha
-        lda savex
-        pha
-
-        jmp printstack
-@ret:
-        rts
-        
-
 
 FUNC _dummy4
 
 ;;; END CHEAT?
 
 
-  .res 256-(* .mod 256)
+;;; NO-need align...
+;  .res 256-(* .mod 256)
 secondpage:     
+
+;;; TODO: still part of parse.bin
+;;;    just not in screen display form firstpage/secondpage
+
+;;; BEGIN CHEAT? - not count...
+
+;;; TODO: somehow should be able to put BEFORE begin.asm
+;;;    but not get error, just doesn't work! (hang)
+
+PRINTDEC=1
+PRINTHEX=1
+.include "print.asm"
 
 bytecodes:      
 
@@ -1995,7 +1749,274 @@ ruleS:
 ;;; END rules
 ;;; ========================================
 
+
 .include "end.asm"
+
+
+
+;;; CHEAT - not counted in parse.bin
+
+
+
+;;; Isn't it just that AX means more code than
+;;; separate tos?
+FUNC _mul10
+;;; 25
+        lda tos
+        ldx tos+1
+        jsr _double
+        jsr _double
+        clc
+        adc tos
+        sta tos
+        txa
+        adc tos+1
+        sta tos+1
+        ;; double
+_double:        
+        asl tos
+        rol tos+1
+        rts
+
+FUNC _aftercompile
+
+;;; TODO: printz
+        putc 10
+        putc '6'
+        putc '5'
+        putc 'm'
+        putc 'u'
+        putc 'c'
+        putc 'c'
+        putc '0'
+        putc '2'
+        putc 10
+
+        ;; failed?
+        ;; (not stand at end of source)
+        ldy #0
+        lda (inp),y
+        beq @OK
+
+.ifdef ERRPOS
+        ;; hibit string near error!
+        ;; (approximated by 
+        ldy #0
+        lda (erp),y
+        ora #128
+        sta (erp),y
+.endif ; ERRPOS
+        ;; print it
+       
+.ifdef PRINTINPUT
+;;; TODO: printz? printR?
+        putc 10
+
+        lda #<input
+        sta pos
+        lda #>input
+        sta pos+1
+        jmp @print
+@loop:
+.ifdef ERRPOS
+        ;; hi-bit set indicate error position
+        bpl @nohi
+        pha
+        lda #1+128              ; red text
+        jsr putchar
+        pla
+@nohi:
+.endif ; ERRPOS
+
+        ;; print source char
+        jsr putchar
+
+        jsr _incP
+@print:
+        ldy #0
+        lda (pos),y
+        bne @loop
+
+        putc 10
+.endif ; PRINTINPUT
+
+        jmp failed
+
+
+@OK:
+        putc 10
+        putc 'O'
+        putc 'K'
+        putc ' '
+
+        ;; print size in bytes
+        sec
+        lda out
+        sbc #<output
+        sta tos
+        lda out+1
+        sbc #>output
+        sta tos+1
+        
+        jsr printd
+        putc 'B'
+        putc 10
+        putc 10
+
+        jsr output
+        sta tos
+        stx tos+1
+        putc 10
+        putc '='
+        putc '>'
+        putc ' '
+
+        ;; prints tos
+        jsr printd
+        putc 10
+        
+        jmp halt
+
+
+FUNC printvar
+        sta tos
+        stx tos+1
+        putc '@'
+        jsr printh
+        putc '='
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        sta tos
+        stx tos+1
+        jsr printd
+        putc ' '
+        rts     
+
+FUNC printstack
+        pha
+        tya
+        pha
+        txa
+        pha
+
+        tsx
+        inx
+        inx
+        inx                     
+        inx                    
+        inx
+
+        lda tos+1
+        pha
+        lda tos
+        pha
+        ;; we can use the stack for print
+
+        putc 10
+        putc '#'
+        lda rulename
+        jsr putchar
+        putc ' '
+        putc 's'
+
+        ;; print S
+        stx tos
+        lda #0
+        sta tos+1
+        jsr printd
+
+@loop:
+        putc ' '
+        ;; print first byte
+
+        lda $101,x
+
+        and #127
+        cmp #' '
+        bcs @noctrl
+        ;; ctrl
+        sta tos
+        lda #0
+        sta tos+1
+        jsr printd
+        lda #':'
+@noctrl:
+
+        jsr putchar
+        inx
+        beq @err
+
+        ;; end marker?
+.ifnblank
+        lda tos
+        cmp #42
+        beq @done
+.endif        
+        putc ' '
+        ;; print 1 word
+        lda $101,x
+        sta tos
+        inx
+        beq @err
+
+        lda $101,x
+        inx
+        beq @err
+        sta tos+1
+        jsr printh
+
+        jmp @loop
+
+@err:
+        putc ' '
+        putc ' '
+        putc 'o'
+        putc 'o'
+        
+@done:
+        putc '>'
+        jsr getchar
+        sta savea
+        putc 10
+
+        pla
+        sta tos
+        pla
+        sta tos+1
+
+        pla
+        tax
+        pla
+        tay
+        pla
+
+        lda savea
+        cmp #';'
+        bne @ret
+        ;; drop one - for debug when messed up
+        pla
+        sta savex
+        pla
+        sta savey
+
+        ;; drop one
+        pla
+
+        lda savey
+        pha
+        lda savex
+        pha
+
+        jmp printstack
+@ret:
+        rts
+        
+
+
+
 
 
 ;;; TODO: make it point at screen,
@@ -2007,6 +2028,8 @@ input:
 
 ;;; OK, fixed var.... lol
         .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+
+.ifdef INCTESTS
         .byte "int main(){ return 4711 ; }",0
         .byte "int main(){ return e ; }",0
         .byte "int main(){ return &e ; }",0
@@ -2089,21 +2112,24 @@ docs:
         .byte "C-Ops   : *2 /2 + - ==", 10
         .byte "C-Vars  : a= ... ; ... =>a;", 10
 
+.endif ; INCTESTS
+
 vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
         ;;    a  b  c  d  e  f  g  h  i  j
+.ifdef TESTING
         .word 0,10,20,30,40,50,60,70,80,90
         .word 100,110,120,130,140,150,160,170
         .word 180,190,200,210,220,230,240,250,260
+.endif
 
-
-
-
-defs:   
+defs:
 
 ;;; test example
 ;;; TODO: remove?
+.ifdef TESTING
+.ifdef LONGNAMES
 vfoo:   
         .word 0                 ; linked-list end
         .word 4711
@@ -2126,10 +2152,14 @@ vnext:
         .word 0
         .byte 0
 
+.endif ; LONGNAMES
+.endif ; TESTING
+
+
 output:
         ;; fill with RTS - "safer"
-        _RTS=$60
-        .res 8*1024, _RTS
+;        _RTS=$60
+;        .res 8*1024, _RTS
 
 
 .end
