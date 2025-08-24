@@ -43,6 +43,9 @@
 ;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
 ;;;   379 bytes - IF(E)S;   (+ 17B)
 ;;;   392 bytes - &a
+
+;;; #x188
+
 ;;; 
 ;;; TODO: parameterize the ops?
 ;;; TODO: jsr ... lol
@@ -151,8 +154,11 @@
 .endmacro
 
 
-;;; testing data
-;TESTING=1
+;MINIMAL=1
+
+;;; testing data a=0, b=10, ... e=40, ...
+;
+TESTING=1
 
 ;;; Long names support
 ;;; TODO: make functional
@@ -664,7 +670,7 @@ endrule:
 ;;;  (how about patch?)
 
 ;;; TODO: lol wtf?
-;     pla
+     pla
 
         ;; nothing to backtrack
         ;; - get rid of retry
@@ -721,6 +727,8 @@ error:
         putc '%'
         pla
         jsr putchar
+
+        jmp _aftercompile
 halt:
         jmp halt
 
@@ -1271,7 +1279,9 @@ ruleO:
 
 ruleQ:
 ruleR:
+.ifndef MINIMAL
 ruleU:  
+.endif
 ruleV:  
 ruleW:  
 ruleX:  
@@ -1331,10 +1341,77 @@ ruleC:
 
         .byte 0
 
+.ifdef MINIMAL
+;;; Just save (TODO:push?) AX
+ruleU:
+      .byte '['
+        jsr _SAVE
+      .byte ']'
+        .byte 'C'+128
+        .byte 0
+.endif
+
 ;;; aDDons (::= op %d | op %V)
+
 ruleD:
 
-;;; TODO: %V before %D (otherwise not working)
+.ifdef MINIMAL
+        .byte '+','U'+128
+      .byte '['
+        jsr _PLUS
+      .byte ']'
+        .byte 'D'+128
+
+        .byte '|','+','U'+128
+      .byte '['
+        jsr _MINUS
+      .byte ']'
+        .byte 'D'+128
+
+        .byte '|','&','U'+128
+      .byte '['
+        jsr _AND
+      .byte ']'
+        .byte 'D'+128
+
+        .byte '|',"\|",'U'+128
+      .byte '['
+        jsr _OR
+      .byte ']'
+        .byte 'D'+128
+
+        .byte '|','^','C'+128
+      .byte '['
+        jsr _EOR
+      .byte ']'
+        .byte 'D'+128
+
+        .byte "|/2"
+      .byte '['
+        jsr _SHR
+      .byte ']'
+        .byte 'D'+128
+
+        .byte "|*2"
+      .byte '['
+        jsr _SHL
+      .byte ']'
+        .byte 'D'+128
+
+;;; ==
+
+        .byte "|==",'U'+128
+      .byte '['
+        jsr _EQ
+      .byte ']'
+        .byte 'D'+128
+
+        ;; Empty
+        .byte '|'
+
+
+.else ; !MINIMAL
+
         .byte "+%V"
       .byte '['
         clc
@@ -1516,9 +1593,10 @@ ruleD:
       .byte ']'
         .byte 'D'+128
 
-
-;;; Emtpy - does this trigger bug?
+        ;; Empty
         .byte '|'
+
+.endif ; MINIMAL
 
         .byte 0
 
@@ -1703,12 +1781,22 @@ ruleS:
 
         ;; RETURN
 ;        .byte "|return",'E'+128,";"
-
-;        .byte "return",'E'+128,";"
         .byte "return",'E'+128,";"
+
       .byte '['
         rts
       .byte ']'
+
+;;; FAILS - forever!
+;        .byte '|','B'+128
+;;; works
+        .byte "|{}"
+;;; FAILS - forever!
+;        .byte "|{",'A'+128,"}"
+;;; works
+        .byte "|{",'S'+128,"}"
+;;; FAILS - forever!
+        .byte "|{",'S'+128,'S'+128,"}"
 
         ;; IF(E)S; // no else
         .byte "|if(",'E'+128,")"
@@ -1718,6 +1806,7 @@ ruleS:
         bne @skipjmp
         jmp PUSHLOC
 @skipjmp:
+        ;; THEN-branch
       .byte ']'
         .byte 'S'+128
         ;; Auto-patches at exit!
@@ -1840,7 +1929,9 @@ FUNC _aftercompile
         putc 10
 .endif ; PRINTINPUT
 
-        jmp failed
+        jmp halt
+;        jmp failed
+;;; LOOPS: lol
 
 
 @OK:
@@ -2022,9 +2113,23 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+;;; TODO: LOOP shit - same issue on "MINIMAL - lol"
+        .byte "int main(){return a;}",0
+
+;;; works 1477
+        .byte "int main(){if(1){a=77;a=1400+a;}return a;}",0
+;;; works 0 or "magix"
+        .byte "int main(){if(0){a=77;a=1400+a;}return a;}",0
+
+;;; WORKS (but can't do three as limited {SS} ...
+        .byte "int main(){a=10;if(1){a=a*2;a=a*2;} a=a+1; return a;}",0
 
 ;;; FAIL
 ;        .byte "int main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
+
+;        .byte "int main(){a=10; if(1){a=a*2;} a=a+1; return a;}",0
+;;; WRONG
+        .byte "int main(){ return a; if(0){a=10;} a=a+1; return a;}",0
 
 ;;; OK, fixed var.... lol
         .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
@@ -2161,5 +2266,101 @@ output:
 ;        _RTS=$60
 ;        .res 8*1024, _RTS
 
+;;; Some variants save on codegen by using a library
+
+;;; LIBRARY
+
+library:        
+;;; (- #xdad #xd4d) = 96 B
+
+.ifdef MINIMAL
+
+;;; TODO: use a preexisting VM .include
+_SAVE:  
+        sta tos
+        stx tos
+        rts
+
+_AND: 
+        and tos
+        tay
+        txa
+        and tos+1
+        tax
+        tya
+        rts
+_OR:    
+        ora tos
+        tay
+        txa
+        ora tos+1
+        tax
+        tya
+        rts
+_EOR:   
+        eor tos
+        tay
+        txa
+        eor tos+1
+        tax
+        tya
+        rts
+_PLUS:  
+        clc
+        adc tos
+        tay
+        txa
+        adc tos+1
+        tax
+        tya
+        rts
+_MINUS: 
+        sec
+        eor #$ff
+        adc tos
+        tay
+        txa
+        eor #$ff
+        adc tos+1
+        tax
+        tya
+        rts
+_EQ:    
+        ldy #0
+        cmp tos
+        bne false
+        cpx tos+1
+true:  
+        dey
+false: 
+        tya
+        tax
+        rts
+_LT:    
+        ldy #0
+        cpx tos+1
+        bcc true
+        bne false
+        cmp tos
+        bcc true
+        bcs false
+_SHL:   
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+        rts
+_SHR:   
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+
+.endif ; MINIMAL
 
 .end
