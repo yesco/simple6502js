@@ -163,14 +163,13 @@
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
-;
-DEBUGRULE=1
+;DEBUGRULE=1
 
 ;;; show input during parse \=backtrack
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
 
-;;; print input (after compile)
+;;; print input ON ERROR (after compile)
 ;
 PRINTINPUT=1
 
@@ -281,8 +280,10 @@ putc 10
         lda #42
         pha
 
+.ifdef DEBUGRULE
         jsr printstack
         jsr printstack
+.endif
 
 ;;; TODO: but this doesn't work.... lol
 
@@ -336,9 +337,11 @@ testeq:
 
 .ifdef DEBUGRULE
     pha
+    lda rulename
+    jsr putchar
+;    putc '.'
     lda (inp),y
     jsr putchar
-    putc ':'
     pla
 .endif
 
@@ -452,6 +455,12 @@ FUNC _acceptrule
 @loop:
         ;; remove (all) re-tries
         pla
+.ifdef DEBUGRULE
+    pha
+    jsr putchar
+    jsr printstack
+    pla
+.endif
         bmi uprule
         ;; - done?
         cmp #42
@@ -479,7 +488,7 @@ FUNC _acceptrule
 
         jmp @loop
 
-;;; 1 - RETRY
+;;; 'i' - input restore and RETRY
 @gotretry:
 ;        jsr putchar
     DEBC '.'
@@ -490,10 +499,10 @@ FUNC _acceptrule
         pla
         jmp @loop
 
-;;; 0 - RULE
+;;; hibit - RULE
 uprule: 
 .ifdef DEBUGRULE
-    putc '_'
+    PUTC '_'
 .endif
     DEBC '_'
         sta rulename
@@ -508,7 +517,7 @@ uprule:
         sta tos
         lda rule+1
         sta tos+1
-        jsr _printd
+        jsr printh
         putc 10
         jsr printstack
 .endif
@@ -532,15 +541,24 @@ FUNC _fail
     DEBC '|'
 .ifdef DEBUGRULE
   putc 10
-    putc '|'
+  putc '|'
+  lda rule
+  sta tos
+  lda rule+1
+  sta tos+1
+  jsr printh
+  putc ' '
 .endif
         ;; - seek next alt in rule
 @loop:
-        jsr _incR
+;        jsr _incR
         ldy #0
         lda (rule),y
         beq endrule
 
+;;; TODO: remove! this only catches
+;;;    bad memory location!!!! lol
+;;;    shows address for "bad" byte
 .ifdef DEBUGRULE
    cmp #'U'
    beq @isU
@@ -555,13 +573,16 @@ FUNC _fail
    sta tos
    lda rule+1
    sta tos+1
-   jsr _printd
+   jsr printh
+   putc ' '        
    pla
 @after:
 .endif
     DEBC ','
 
         ;; skip any inline gen
+        cmp #'|'
+        beq @nextalt
         cmp #'['
         bne @notgen
 @skipgen:
@@ -570,13 +591,14 @@ FUNC _fail
         lda (rule),y
         cmp #']'
         bne @skipgen
-        
+        jmp @loop
+
 @notgen:
-        cmp #'|'
+        jsr _incR
         bne @loop
 
+@nextalt:
         ;; try next alterantive
-
         ;; - move after '|'
         jsr _incR
 
@@ -608,6 +630,7 @@ gotpatch:
 gotretry:
 .ifdef DEBUGRULE
     putc '!'
+    putc 10
 .endif
     DEBC '!'
         ;; copy/restore inp from stack
@@ -622,6 +645,11 @@ gotretry:
 
 
 endrule:
+.ifdef DEBUGRULE
+   putc 'E'
+   jsr printstack
+.endif
+
 	;; END - rule
     DEBC 'E'
 ;.ifdef DEBUG
@@ -631,14 +659,25 @@ endrule:
 ;;; TODO: is this always like this?
 ;;;  (how about patch?)
 
+;;; TODO: lol wtf?
+     pla
+
         ;; nothing to backtrack
         ;; - get rid of retry
         pla
+.ifdef DEBUGRULE
+putc '/'
+jsr putchar
+.endif
         pla
         pla
-        ;; - get rid of current rule
 
+        ;; - get rid of current rule
         pla
+.ifdef DEBUGRULE
+putc '/'
+jsr putchar
+.endif
         pla
         pla
 
@@ -1277,7 +1316,7 @@ FUNC aftercompile
         jsr output
         sta tos
         stx tos+1
-
+jsr printd
         putc 10
         putc '='
         putc '>'
@@ -1698,7 +1737,9 @@ ruleD:
         .byte 'D'+128
 
 
-        .byte "|"
+;;; Emtpy - does this trigger bug?
+        .byte '|'
+
         .byte 0
 
 ;;; Exprssion:
@@ -1934,11 +1975,14 @@ ruleS:
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+;;; WRONG 'a' (all) variable not value?
+        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
 
 ;; WRONG result - should be 1, error introduced w LONGNAMES (do diff?)
         .byte "int main(){ return e; }",0
-        .byte "int main(){ a=99; if(0) a=10; a=a+1; return a;}",0
+        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
 ;;; OK 11
+        .byte "int main(){ return 4710+1; }",0
         .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
 
 ;;; OK 
