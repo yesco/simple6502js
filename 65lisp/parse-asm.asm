@@ -415,9 +415,7 @@ FUNC _enterrule
         lda (rule),y
         sta rulename
 .ifdef DEBUGRULE
-    pha
-    putc ' '
-    pla
+    PUTC ' '
     jsr putchar
     PUTC '>'
 .endif
@@ -648,6 +646,9 @@ endrule:
 
 
 _donecompile:   
+.ifdef DEBUGRULE
+        jsr printstack
+.endif
         jmp aftercompile
 
 
@@ -1238,6 +1239,7 @@ FUNC aftercompile
 @nohi:
 .endif ; ERRPOS
 
+        ;; print source char
         jsr putchar
 
         jsr _incP
@@ -1311,16 +1313,6 @@ FUNC printstack
         putc 10
         putc '#'
         lda rulename
-        and #127
-        cmp #' '
-        bcs @noctrl
-        ;; ctrl
-        sta tos
-        lda #0
-        sta tos+1
-        jsr printd
-        lda #':'
-@noctrl:
         jsr putchar
         putc ' '
         putc 's'
@@ -1336,6 +1328,18 @@ FUNC printstack
         ;; print first byte
 
         lda $101,x
+
+        and #127
+        cmp #' '
+        bcs @noctrl
+        ;; ctrl
+        sta tos
+        lda #0
+        sta tos+1
+        jsr printd
+        lda #':'
+@noctrl:
+
         jsr putchar
         inx
         beq @err
