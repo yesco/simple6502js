@@ -160,6 +160,12 @@
 ;;; Enable for debug info
 ;DEBUG=1
 
+;;; wait for input on each new rule invocation
+;DEBUGKEY=1
+
+;
+DEBUGRULE=1
+
 ;;; show input during parse \=backtrack
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
@@ -271,7 +277,7 @@ putc 10
         pha
 
 ;;; pause before as DEBUG scroll info away, lol
-.ifdef DEBUG
+.ifdef DEBUGKEY
         jsr getchar
 .endif ; NDEBUG
 
@@ -301,6 +307,14 @@ FUNC _next
         jmp _generate
 
 testeq: 
+
+.ifdef DEBUGRULE
+    pha
+    lda (inp),y
+    jsr putchar
+    pla
+.endif
+
 .ifdef DEBUG
     pha
     PUTC ':'
@@ -315,6 +329,7 @@ testeq:
     pla
   .endif
 .endif ; DEBUG
+
         ;; lit eq?
         cmp (inp),y
 ;;; TODO:
@@ -323,7 +338,7 @@ testeq:
 
 ;;; %. handle special matchers
         cmp #'%'
-        bne _fail
+        bne failjmp
 
         ;; special %?
         jsr _incR
@@ -338,6 +353,9 @@ isvar:
         ;; % anything...
         ;; %V (or %W)
         jmp _var
+
+failjmp:        
+        jmp _fail
 
 isdigits:       
         ;; assume it's %D
@@ -356,7 +374,7 @@ FUNC _enterrule
         ;; enter rule
         ;; - save current rulepos
     DEBC '>'
-.ifdef DEBUG
+.ifdef DEBUGKEY
         jsr getchar
 .endif ; DEBUG
         lda rule+1
@@ -368,6 +386,13 @@ FUNC _enterrule
 
         ;; - load new rule
         lda (rule),y
+.ifdef DEBUGRULE
+    pha
+    putc ' '
+    pla
+    jsr putchar
+    PUTC '>'
+.endif
         and #31
         asl
         tay
@@ -392,13 +417,21 @@ FUNC _enterrule
 FUNC _acceptrule
 ;;; 19 B
     DEBC '<'
+.ifdef DEBUGRULE
+    putc '<'
+.endif
 @loop:
         ;; - remove (all) re-tries
         pla
         beq uprule
-        bmi _endall
+;;; TODO: too far
+        bpl @skip
+        jmp _donecompile
+@skip:
+        
 ;;; 2 - PATCH
         cmp #2
+;;; TODO: assumes it's 'I''
         bne @gotretry
     DEBC '}'
         pla
@@ -419,17 +452,33 @@ FUNC _acceptrule
 @gotretry:
 ;        jsr putchar
     DEBC '.'
+.ifdef DEBUGRULE
+    putc '.'
+.endif
         pla
         pla
         jmp @loop
 
 ;;; 0 - RULE
 uprule: 
+.ifdef DEBUGRULE
+    putc '_'
+.endif
     DEBC '_'
         pla
         sta rule
         pla
         sta rule+1
+
+.ifdef DEBUGRULE
+        putc '/'
+        lda rule
+        sta tos
+        lda rule+1
+        sta tos+1
+        jsr _printd
+        putc 10
+.endif
 
         jmp exitrule
 
@@ -448,30 +497,42 @@ FUNC _fail
 .endif ; SHOWINPUT
 
     DEBC '|'
+.ifdef DEBUGRULE
+  putc 10
+    putc '|'
+.endif
         ;; - seek next alt in rule
 @loop:
         jsr _incR
         ldy #0
         lda (rule),y
-        bne @notend
-        ;; nothing to backtrack
-        ;; - get rid of retry
-        pla
-        pla
-        pla
-        ;; - get rid of current rule
-        pla
-        pla
-        pla
+        beq endrule
 
-        jmp uprule
-
-@notend:
+.ifdef DEBUGRULE
+   cmp #'U'
+   beq @isU
+   cmp #'U'+128
+   beq @isU
+   jsr putchar
+   jmp @after
+@isU:
+   pha
+   putc 13
+   lda rule
+   sta tos
+   lda rule+1
+   sta tos+1
+   jsr _printd
+   pla
+@after:
+.endif
+    DEBC ','
 
         ;; skip any inline gen
         cmp #'['
         bne @notgen
 @skipgen:
+    DEBC ';'
         jsr _incR
         lda (rule),y
         cmp #']'
@@ -481,29 +542,41 @@ FUNC _fail
         cmp #'|'
         bne @loop
 
+        ;; try next alterantive
+
         ;; - move after '|'
         jsr _incR
 
-restoreinp:     
+restoreinp:
         ;; - restore inp
         pla
         pha
-        bmi gotendall
+;;; TODO: correct jump? is it error?
+;;;  (means? still have input?)
+;        bmi gotendall
+        bmi _donecompile
         beq gotrule
 
-;;; TODO: at failure... need toget out fast???
+;;; TODO: assume it's 'I'? (how about is patch?)
+
+;;; TODO: at failure... need to get out fast???
+;;; TODO: not active!!!!
 .ifnblank
 ;;; TODO: Why this interferes with simple ???
-        cmp #1
+        cmp #'I'
         beq gotretry
+;;; otherwise - error
 gotpatch:       
         lda #'P'
         jmp error
 .endif
 
 gotretry:
+.ifdef DEBUGRULE
+    putc '!'
+.endif
     DEBC '!'
-        ;; copy from stack
+        ;; copy/restore inp from stack
         tsx
         pla
         pla
@@ -514,7 +587,31 @@ gotretry:
         jmp _next
 
 
-_endall:        
+endrule:
+	;; END - rule
+    DEBC 'E'
+;.ifdef DEBUG
+;    putc '.'
+;.endif
+
+;;; TODO: is this always like this?
+;;;  (how about patch?)
+
+        ;; nothing to backtrack
+        ;; - get rid of retry
+        pla
+        pla
+        pla
+        ;; - get rid of current rule
+
+        pla
+        pla
+        pla
+
+        jmp uprule
+
+
+_donecompile:   
         jmp aftercompile
 
 
@@ -556,7 +653,7 @@ DEBC '$'
 .ifdef LONGNAMES
     putc '$'
         jsr _parsename
-        beq _fail
+        beq failjmp2
         ;; got name
         jsr _find
         ;; return address
@@ -575,7 +672,9 @@ DEBC '$'
         sec
         sbc #'a'
         cmp #'z'-'a'+1
-        bcs _fail
+        bcc @skip
+        jmp failjmp
+@skip:
 
 ;;; LOCAL
 .ifnblank
@@ -599,6 +698,7 @@ DEBC '$'
 ;;;    good for a+=5; maybe?
         sta tos
         tay
+;;; TODO: simplify
         lda #>vars
         adc #0
         sta tos+1
@@ -704,8 +804,6 @@ DEBC '+'
         jsr _incO
         jmp _generate
 
-failjmp:        
-        jmp _fail
 
 
 ;;; TODO: doesn't FAIL if not digit!
@@ -719,7 +817,7 @@ DEBC '#'
         sec
         sbc #'0'
         cmp #10
-        bcs failjmp
+        bcs failjmp2
 
         ;; start with 0
         lda #0
@@ -754,6 +852,11 @@ digit:
 ;        jsr _incIspc
         jsr _incI
         jmp nextdigit
+
+failjmp2:        
+        jmp _fail
+
+
 
 
 FUNC _incIspc
@@ -1206,7 +1309,7 @@ ruleZ:
 
 ;;; aggregate statements
 ruleA:  
-        ;; Right-recrusion is "fine"
+        ;; Right-recursion is "fine"
         .byte 'S'+128,'A'+128,"|",0
 
 ;;; Block
@@ -1217,22 +1320,24 @@ ruleB:
         .byte 0
 
 ;;; "Constant"/(variable) (simple, lol)
-ruleC:  
+ruleC: 
 
-.ifnblank
-        .byte "%v"
-      .byte '['
-        ldy sframe
-;;; requires zero page wrap around
-        ldx '<',y
-        dey
-        lda '<',y
-      .byte ']'
+;.ifnblank
+;        .byte "%v"
+;n      .byte '['
+;        ldy sframe
+;;;; requires zero page wrap around
+;        ldx '<',y              
+;        dey
+;        lda '<',y
+;      .byte ']'
+;
+;        .byte "|%V"
+;.else
+;        .byte "%V"
+;.endif
 
-        .byte "|%V"
-.else
         .byte "%V"
-.endif
       .byte '['
         lda VAL0
         ldx VAL1
@@ -1616,6 +1721,8 @@ ruleS:
 
         ;; RETURN
 ;        .byte "|return",'E'+128,";"
+
+;        .byte "return",'E'+128,";"
         .byte "return",'E'+128,";"
       .byte '['
         rts
@@ -1667,8 +1774,18 @@ ruleS:
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
 
+;; WRONG result - should be 1, error introduced w LONGNAMES (do diff?)
+        .byte "int main(){ return e; }",0
+        .byte "int main(){ a=99; if(0) a=10; a=a+1; return a;}",0
+;;; OK 11
+        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+
+;;; OK 
+        .byte "int main(){return 4711;}",0
+
+;;; syntax error highlight!
 ;        .byte "int main(){ if(1) a=10x; a=a+1; return a;}",0
-        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
+
 
 ;;; ERROR
         .byte "int main(){ if(1) { return 33; } a=a+1; return a;}",0
