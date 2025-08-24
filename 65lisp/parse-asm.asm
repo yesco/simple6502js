@@ -1374,6 +1374,7 @@ FUNC printstack
 @done:
         putc '>'
         jsr getchar
+        sta savea
         putc 10
 
         pla
@@ -1387,6 +1388,25 @@ FUNC printstack
         tay
         pla
 
+        lda savea
+        cmp #';'
+        bne @ret
+        ;; drop one - for debug when messed up
+        pla
+        sta savex
+        pla
+        sta savey
+
+        ;; drop one
+        pla
+
+        lda savey
+        pha
+        lda savex
+        pha
+
+        jmp printstack
+@ret:
         rts
         
 
@@ -1456,6 +1476,8 @@ ruleB:
 ;;; TODO: empty?
         .byte "{}"
         .byte "|{",'A'+128,"}"
+
+        .byte 0
         .byte 0
 
 ;;; "Constant"/(variable) (simple, lol)
@@ -1488,8 +1510,6 @@ ruleC:
         ldx #'>'
       .byte ']'
 
-        .byte 0
-        .byte 0
         .byte 0
 
 ;;; aDDons (::= op %d | op %V)
@@ -1695,8 +1715,8 @@ ruleP:
 .endif ; LONGNAMES
       .byte '['
         rts
-        ;; TODO: HOWTO? maybe conflic with 'putchar'
       .byte ']'
+
         .byte 0
 
 ;;; Type
