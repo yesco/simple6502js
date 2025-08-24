@@ -14,7 +14,7 @@
 
 ;;; STATS:
 
-;;; TOTAL: 1010 bytes = (+ 631 379)
+;;; TOTAL: 942 bytes = (+ 550 392)
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
