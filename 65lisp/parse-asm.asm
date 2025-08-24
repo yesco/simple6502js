@@ -276,6 +276,9 @@ putc 10
         lda #128
         pha
 
+        jsr printstack
+        jsr printstack
+
 ;;; pause before as DEBUG scroll info away, lol
 .ifdef DEBUGKEY
         jsr getchar
@@ -392,6 +395,7 @@ FUNC _enterrule
     pla
     jsr putchar
     PUTC '>'
+    jsr printstack
 .endif
         and #31
         asl
@@ -1127,8 +1131,8 @@ endfirstpage:
 
 ;;; BEGIN CHEAT? - not count...
 
-;PRINTHEX=1                     
 PRINTDEC=1
+PRINTHEX=1                     
 .include "print.asm"
 
 
@@ -1251,6 +1255,67 @@ FUNC aftercompile
         
 
         jmp halt
+
+
+FUNC printstack
+        tsx
+        ;; we can use the stack for print
+
+        putc 10
+        putc 's'
+
+        ;; print S
+        stx tos
+        lda #0
+        sta tos+1
+        jsr printd
+
+@loop:
+        putc ' '
+        putc '#'
+        ;; print first byte
+
+        lda $101,x
+        sta tos
+        inx
+        beq @err
+
+        lda #0
+        sta tos+1
+        jsr printd
+;jmp @done
+
+        ;; end marker?
+        lda 100,x
+        bmi @done
+        
+        putc ' '
+        ;; print 1 word
+        lda $101,x
+        inx
+        beq @err
+        sta tos
+        lda $100,x
+        inx
+        beq @err
+        sta tos+1
+        jsr printh
+
+        jmp @loop
+
+@err:
+        putc ' '
+        putc ' '
+        putc 'o'
+        putc 'o'
+        
+@done:
+        putc '>'
+        jsr getchar
+        putc 10
+        rts
+        
+
 
 FUNC _dummy4
 
