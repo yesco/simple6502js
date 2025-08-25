@@ -45,8 +45,9 @@
 ;;;   379 bytes - IF(E)S;   (+ 17B)
 ;;;   392 bytes - &a
 ;;;   425 bytes -  =>a+3=>c; and function calls
+;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
 
-;;; #x188
+;;; #x20d
 
 ;;; 
 ;;; TODO: parameterize the ops?
@@ -156,7 +157,14 @@
 .endmacro
 
 
+;;; Minimal set of rules (+ LIBRARY)
 ;MINIMAL=1
+
+;;; Optimizing rules (bloats but fast!)
+;;; 
+;;; &0xff00 &0xff <<8 >>8 >>v <<v
+;
+OPTRULES=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
 ;
@@ -1503,6 +1511,20 @@ ruleD:
       .byte ']'
         .byte 'D'+128
 
+.ifdef OPTRULES
+        .byte "|&0xff00"
+      .byte '['
+        lda #0
+      .byte ']'
+        .byte 'D'+128
+
+        .byte "|&0xff"
+      .byte '['
+        ldx #0
+      .byte ']'
+        .byte 'D'+128
+.endif ; OPTRULES
+
         .byte "|&%D"
       .byte '['
         and #'<'
@@ -1586,6 +1608,62 @@ ruleD:
         tya
       .byte ']'
         .byte 'D'+128
+
+.ifdef OPTRULES
+        .byte "|>>8"
+      .byte '['
+        txa
+        ldx #0
+      .byte ']'
+        .byte 'D'+128
+
+        .byte "|<<8"
+      .byte '['
+        tax
+        lda #0
+      .byte ']'
+        .byte 'D'+128
+        
+        .byte "|<<%D"
+      .byte '['
+        sta tos
+        stx tos+1
+        ldy #'<'
+:       
+        dey
+        bmi :+
+        
+        asl tos
+        rol tos+1
+
+        sec
+        bcs :-
+:       
+        lda tos
+        ldx tos+1
+      .byte ']'
+        .byte 'D'+128
+
+        .byte "|>>%D"
+      .byte '['
+        sta tos
+        stx tos+1
+        ldy #'<'
+:       
+        dey
+        bmi :+
+        
+        lsr tos+1
+        ror tos
+
+        sec
+        bcs :-
+:       
+        lda tos
+        ldx tos+1
+      .byte ']'
+        .byte 'D'+128
+.endif ; OPTRULES
 
 ;;; ==
 
@@ -2136,6 +2214,11 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+        .byte "int main(){return 65535>>3;}",0
+;;; => 2???
+        .byte "int main(){return 1<<2;}",0
+
+        .byte "int main(){return 517&0xff+42;}",0
 
         .byte "int main(){3+4=>a+3=>b;return a+b;}",0
 
@@ -2246,11 +2329,15 @@ docs:
 
 .endif ; INCTESTS
 
+
 vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
-        ;;    a  b  c  d  e  f  g  h  i  j
 .ifdef TESTING
+;;; FUNS A-Z
+        .res 32*2, 0
+;;; VARS a-z
+        ;;    a  b  c  d  e  f  g  h  i  j
         .word 0,10,20,30,40,50,60,70,80,90
         .word 100,110,120,130,140,150,160,170
         .word 180,190,200,210,220,230,240,250,260
