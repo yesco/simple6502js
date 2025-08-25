@@ -34,7 +34,8 @@
 
 ;;; not counting: printd, mul10, end: print out
 
-;;; C-Rules: (56 bytes is table a-z)
+;;; C-Rules: 469 B (- 593 56 68)
+;;; 
 ;;; 
 ;;;    71 bytes - voidmain(){return4711;}
 ;;;   112 bytes - ...return 8421*2; /2, +, -
@@ -46,16 +47,20 @@
 ;;;   392 bytes - &a
 ;;;   425 bytes -  =>a+3=>c; and function calls
 ;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
-
-;;; #x20d
-
+;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
+;;;   
 ;;; 
-;;; TODO: parameterize the ops?
-;;; TODO: jsr ... lol
+;;; TODO: not really rules...
+;;;    56 B is table ruleA-ruleZ- could remove empty
+;;;    68 B library printd/printh/putc/getchar
+;;;         LONGNAMES: move to init data in env! "externals"
+;;; TODO: 
+;;;  ~256 B parameterize ops (gen)
 
-;;;
+
 ;;; If there is an error a newline '%' letter error-code
-;;; is printed.
+;;; is printed, and with PRINTINPUT ERRPOS defined the
+;;; source is printed, and RED text as far as parsing got.
 
 ;;; How-to use
 ;;; 
@@ -1331,8 +1336,35 @@ ruleC:
 ;        .byte "%V"
 ;.endif
 
+        ;; "IO-lib" hack
+        .byte "printd(",'E'+128,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        jsr printd
+      .byte ']'
+
+        .byte "|printh(",'E'+128,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        jsr printh
+      .byte ']'
+
+        .byte "|putc(",'E'+128,")"
+      .byte '['
+        jsr putchar
+      .byte ']'
+
+        .byte "|getchar()"
+      .byte '['
+        jsr getchar
+        ldx #0
+      .byte ']'
+
+
         ;; function call
-        .byte "%V()"
+        .byte "|%V()"
       .byte '['
         jsr VAL0
         ;; result in AX
@@ -2214,6 +2246,8 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+        .byte "int main(){printd(4711);return getchar();}",0
+
         .byte "int main(){return 65535>>3;}",0
 ;;; => 2???
         .byte "int main(){return 1<<2;}",0
