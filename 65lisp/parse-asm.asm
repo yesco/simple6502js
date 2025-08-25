@@ -753,12 +753,16 @@ DEBC '$'
         sta vrule
         ldy #0
         lda (inp),y
+.ifnblank
+PUTC ':'
+jsr putchar
+.endif
 
 @global:
         ;; verify/parse single letter var
         sec
-        sbc #'a'
-        cmp #'z'-'a'+1
+        sbc #'A'
+        cmp #'z'-'A'+1
         bcc @skip2
         jmp failjmp
 @skip2:
@@ -1279,7 +1283,6 @@ VAL1= '+' + 256*'>'
 PUSHLOC= '{' + 256*'{'
 
 rule0:
-ruleF:
 ruleG:
 ruleH:  
 ruleI:
@@ -1371,7 +1374,7 @@ ruleC:
       .byte ']'
 
         ;; EXTENTION
-        ;; .method call - LOL
+        ;; .method call! - LOL
         .byte "|.%V"
       .byte '['
         ;; parameter already in AX
@@ -1744,8 +1747,43 @@ ruleD:
 ruleE:  
         .byte 'C'+128,'D'+128,0
 
+
+ruleF:  
+;;; works
+;        .byte 'T'+128,"%V(){",'S'+128,"}"
+
+        .byte 'T'+128,"%F()"
+
+;;; TODO: something wrong with 'B'
+;        .byte 'T'+128,"%V(){",'B'+128,"}"
+      .byte '['
+        PUTC '!'
+;;; TODO: remove, for now we skip over function, lol
+;;;   need for compile LONGNAMES and "main" for now
+        jmp PUSHLOC
+      .byte ']'
+        .byte "{",'S'+128,"}"
+      .byte '['
+        PUTC 'F'
+        rts
+      .byte ']'
+        
+        .byte 0
+
+
+
+        .byte "%V()"
+        .byte 'B'+128
+;      .byte '['
+        ;; pretend it's the body
+;        PUTC 'F'
+;      .byte ']'
+
+
 ;;; Program
 ruleP:  
+
+.ifnblank
 
 .ifdef LONGNAMES
         .byte 'T'+128,"%N()",'B'+128
@@ -1756,7 +1794,21 @@ ruleP:
         rts
       .byte ']'
 
+      .byte '|'
+
+.endif
+        .byte 'F'+128
+      .byte '['
+        PUTC 'M'
+
+        ;; TODO: put in main B()
+        jsr output+10
+
+        PUTC 'E'
+        rts
+      .byte ']'
         .byte 0
+        ;; patches jmp to ehere!
 
 ;;; Type
 ruleT:  
@@ -2246,6 +2298,10 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+        .byte "void a(){putc(102);}",0
+
+        .byte "int main(){putc(102);}",0
+
         .byte "int main(){printd(4711);return getchar();}",0
 
         .byte "int main(){return 65535>>3;}",0
