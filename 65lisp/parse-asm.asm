@@ -14,7 +14,7 @@
 
 ;;; STATS:
 
-;;; TOTAL: 942 bytes = (+ 550 392)
+;;; TOTAL: 942 bytes = (+ 597 392)
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -29,6 +29,7 @@
 ;;;    517 bytes highlite error in source! (+ 24 B)
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
 ;;;    554 bytes =>a+3=>c;
+;;;    597 bytes FUNS: more %F and %f codc
 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 
@@ -48,6 +49,7 @@
 ;;;   425 bytes -  =>a+3=>c; and function calls
 ;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
 ;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
+;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
 ;;;   
 ;;; 
 ;;; TODO: not really rules...
@@ -780,12 +782,59 @@ jsr putchar
         sta tos+1
         ;; AY = lohi = addr
 
+        ;; defining function/variable
+        ;; (TODO: if used for var they are inline code)
+        lda vrule
+        cmp #'F'
+        bne @nodef
+        ;; - *FUN = out // *tos= out
+        ldy #0
+        lda out
+        sta (tos),y
+        iny
+        lda out+1
+        sta (tos),y
+
+        jmp @set
+@nodef:
+        ;; if call function
+        cmp #'C'
+        bne @nofun
+        ;; - tos = *tos
+        ldy #1
+        lda (tos),y
+        tax
+        dex
+        lda (tos),y
+
+        ;; TODO: push to auto-gen funcall?!
+.ifnblank
+        ;; hi
+        lda (tos),1
+        pha
+        lda (tos),0
+        pha
+        lda #'f'
+        jmp _next
+.endif
+
+        ;; for now just dos= tos= *tos
+;;; TODO: means inline assignment will f-up!
+        sta tos
+        stx tos+1
+        jmp @set
+@nofun:
+        
+        ;; - is assignment? => set dos
         ;; vrule='A' >>1 => C=1
         ;;       'V' >>1 => C=0
         ror vrule
         bcc @noset
-        ;; set dos
-        sty dos
+        ;; - do set dos
+@set:
+        lda tos
+        sta dos
+        lda tos+1
         sta dos+1
 @noset:
         ;; skip read var char
@@ -1366,8 +1415,9 @@ ruleC:
       .byte ']'
 
 
+.ifdef FUNS
         ;; function call
-        .byte "|%V()"
+        .byte "|%F()"
       .byte '['
         jsr VAL0
         ;; result in AX
@@ -1375,11 +1425,18 @@ ruleC:
 
         ;; EXTENTION
         ;; .method call! - LOL
-        .byte "|.%V"
+        .byte "|.%F"
       .byte '['
         ;; parameter already in AX
         jsr VAL0
         ;; result in AX
+      .byte ']'
+.endif ; FUNS
+
+        .byte "|&%V"
+      .byte '['
+        lda #'<'
+        ldx #'>'
       .byte ']'
 
         ;; variable
@@ -1387,12 +1444,6 @@ ruleC:
       .byte '['
         lda VAL0
         ldx VAL1
-      .byte ']'
-
-        .byte "|&%V"
-      .byte '['
-        lda #'<'
-        ldx #'>'
       .byte ']'
 
         .byte "|%D"
@@ -1783,7 +1834,7 @@ ruleF:
 ;;; Program
 ruleP:  
 
-.ifnblank
+.ifndef FUNS
 
 .ifdef LONGNAMES
         .byte 'T'+128,"%N()",'B'+128
@@ -1794,19 +1845,25 @@ ruleP:
         rts
       .byte ']'
 
-      .byte '|'
+;      .byte '|'
 
-.endif
+.else ; FUNS
+
         .byte 'F'+128
       .byte '['
         PUTC 'M'
 
         ;; TODO: put in main B()
-        jsr output+10
+;        jsr output+10-3         ; MMMM
+        ;; prints F but not 'f'
+;;; TODO: install disasm function...
+        jsr output+17
 
         PUTC 'E'
         rts
       .byte ']'
+.endif ; FUNS
+
         .byte 0
         ;; patches jmp to ehere!
 
@@ -1991,18 +2048,43 @@ ruleS:
 ;;; FAILS - forever!
         .byte "|{",'S'+128,'S'+128,"}"
 
+
         ;; IF(E)S; // no else
         .byte "|if(",'E'+128,")"
       .byte '['
         stx savex
         ora savex
-        bne @skipjmp
+        bne :+
         jmp PUSHLOC
-@skipjmp:
+:       
         ;; THEN-branch
+      .byte ']'
+;;; TODO: move these rules out to another rule
+;;;    then don't need to repeat this one!
+        .byte 'S'+128
+.ifndef MINIMAL
+        ;; for ELSE, make sure value not 0!
+      .byte '['
+        lda #$ff
+      .byte ']'
+.endif ; !MINIMAL
+        ;; Auto-patches at exit!
+
+.ifndef MINIMAL
+        ;; ELSE
+        ;; 13 B
+        .byte "|else"
+      .byte '['
+        ;; either Z is from lda #$ff z=0 => !neq
+        ;; or Z is from the if expression Z=1
+        beq :+
+        jmp PUSHLOC
+:
       .byte ']'
         .byte 'S'+128
         ;; Auto-patches at exit!
+.endif ; !MINIMAL
+
 
         ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
@@ -2298,7 +2380,20 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
-        .byte "void a(){putc(102);}",0
+;;; ELSE 101 or 11
+;;; BUG: TODO: if else because MINIMAL and have LONGNAME
+;;;      elsea=10; might be assigned, lol
+        .byte "int main(){ if(0) a=100; else a=10; return a+1; }",0
+
+
+
+;;; 101/1
+        .byte "int main(){if(1)a=100;return a+1;}",0
+;;; 40
+        .byte "int main(){return e;}",0
+
+
+        .byte "void A(){putc(102);}",0
 
         .byte "int main(){putc(102);}",0
 
@@ -2425,7 +2520,8 @@ vars:
 ;;; TODO: remove (once have long names)
 .ifdef TESTING
 ;;; FUNS A-Z
-        .res 32*2, 0
+        .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
+        .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
 ;;; VARS a-z
         ;;    a  b  c  d  e  f  g  h  i  j
         .word 0,10,20,30,40,50,60,70,80,90
