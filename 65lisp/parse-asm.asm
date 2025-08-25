@@ -28,6 +28,7 @@
 ;;;    493 bytes ... (+ 29 B???) I think more cmp????
 ;;;    517 bytes highlite error in source! (+ 24 B)
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
+;;;    554 bytes =>a+3=>c;
 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 
@@ -43,6 +44,7 @@
 ;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
 ;;;   379 bytes - IF(E)S;   (+ 17B)
 ;;;   392 bytes - &a
+;;;   425 bytes -  =>a+3=>c; and function calls
 
 ;;; #x188
 
@@ -1321,7 +1323,24 @@ ruleC:
 ;        .byte "%V"
 ;.endif
 
-        .byte "%V"
+        ;; function call
+        .byte "%V()"
+      .byte '['
+        jsr VAL0
+        ;; result in AX
+      .byte ']'
+
+        ;; EXTENTION
+        ;; .method call - LOL
+        .byte "|.%V"
+      .byte '['
+        ;; parameter already in AX
+        jsr VAL0
+        ;; result in AX
+      .byte ']'
+
+        ;; variable
+        .byte "|%V"
       .byte '['
         lda VAL0
         ldx VAL1
@@ -1355,8 +1374,19 @@ ruleU:
 
 ruleD:
 
+        ;; 7=>A; // Extention to C:
+        ;; Forward assignemenbt 3=>a; could work! lol
+        ;; TODO: make it multiple 3=>a=>b+7=>c; ...
+        .byte "=>%A"
+      .byte "[:"
+        sta VAL0
+        stx VAL1
+      .byte "]"
+        .byte 'D'+128
+
 .ifdef MINIMAL
-        .byte '+','U'+128
+
+        .byte '|','+','U'+128
       .byte '['
         jsr _PLUS
       .byte ']'
@@ -1412,7 +1442,7 @@ ruleD:
 
 .else ; !MINIMAL
 
-        .byte "+%V"
+        .byte "|+%V"
       .byte '['
         clc
         adc VAL0
@@ -1774,6 +1804,7 @@ ruleK:
 
 .endif ; BNFLONG
 
+
 ;;; Statement
 ruleS:
         ;; BlOCK!
@@ -1811,7 +1842,6 @@ ruleS:
         .byte 'S'+128
         ;; Auto-patches at exit!
 
-
         ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
         ;; (unless we use a stack...)
@@ -1821,14 +1851,7 @@ ruleS:
         stx VAL1
       .byte "]"
 
-        ;; 7=>A; // Extention to C:
-        ;; Forward assignemenbt 3=>a; could work! lol
-        ;; TODO: make it multiple 3=>a=>b+7=>c; ...
-        .byte "|",'E'+128,"=>%A;"
-      .byte "[:"
-        sta VAL0
-        stx VAL1
-      .byte "]"
+        .byte "|",'E'+128,";"
 
         ;; empty statement is legal
         .byte "|;"
@@ -2113,6 +2136,10 @@ FUNC printstack
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 input:
+
+        .byte "int main(){3+4=>a+3=>b;return a+b;}",0
+
+
 ;;; TODO: LOOP shit - same issue on "MINIMAL - lol"
         .byte "int main(){return a;}",0
 
