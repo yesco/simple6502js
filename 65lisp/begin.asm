@@ -60,7 +60,11 @@ tmp1:   .res 2
 
 ;;; TODO: comment to find out changed ORGSTART
 ;;;    (reported as "o$05xx" in _showsize)
-ORGSTART= $054E
+;ORGSTART= $054E
+
+;;; parse.c with disasm.c
+;ORGSTART= $09d9
+
 
 .ifdef ORGSTART
 

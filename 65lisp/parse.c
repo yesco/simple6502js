@@ -7,6 +7,22 @@
 extern void showsize();
 extern void start();
 
+#include "disasm.c"
+
+unsigned char* last= 0;
+extern char *out, *output;
+
+// disasm from last position/call
+extern void dasm() {
+  if (!last) last= output;
+  // TODO: this hangs as printf data in ZP corrupted?
+  // TODO: use my own printf? lol
+  // TODO: define putd(),puth(),put2h()...
+  //printf("\nDASM $%u-$%u!\n", last, out);
+  disasm(last, out, 2);
+  last= out;
+}
+
 // from conio-raw.c
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
 #define SCREENROWS 28

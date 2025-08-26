@@ -213,6 +213,10 @@
 ;;;       alt: parameterize any constants?
 
 
+.import _dasm
+.export _output,_out
+
+
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
 
@@ -311,7 +315,7 @@ savey:  .res 1
 ;state:  
   rule:   .res 2
   inp:    .res 2
-  out:    .res 2
+ _out:    .res 2
 ;stateend:       
 
 erp:    .res 2
@@ -347,10 +351,10 @@ FUNC _init
 .ifdef ERRPOS
         sta erp+1
 .endif        
-        lda #<output
-        sta out
-        lda #>output
-        sta out+1
+        lda #<_output
+        sta _out
+        lda #>_output
+        sta _out+1
 
 .ifdef LONGNAMES
         lda #<vnext
@@ -577,10 +581,10 @@ FUNC _acceptrule
 
         ;; patch to here!
         ldy #0
-        lda out
+        lda _out
         sta (pos),y
         iny
-        lda out+1
+        lda _out+1
         sta (pos),y
 
         jmp @loop
@@ -859,10 +863,10 @@ jsr putchar
         bne @nodef
         ;; - *FUN = out // *tos= out
         ldy #0
-        lda out
+        lda _out
         sta (tos),y
         iny
-        lda out+1
+        lda _out+1
         sta (tos),y
 
         jmp @set
@@ -1001,9 +1005,9 @@ DEBC ':'
         cmp #'{'
         bne @skip5
 DEBC '{'
-        lda out+1
+        lda _out+1
         pha
-        lda out
+        lda _out
         pha
         lda #'p'
         pha
@@ -1026,14 +1030,14 @@ DEBC '+'
 @noinc:
         ;; put
         ldy #0
-        sta (out),y
+        sta (_out),y
         txa
         jsr _incO
         jsr _incR
 @skip6:
 
 @doout:
-        sta (out),y
+        sta (_out),y
         jsr _incO
         jmp _generate
 
@@ -1131,7 +1135,7 @@ FUNC _incP
         SKIPTWO
 FUNC _incO
 ;;; 3
-        ldx #out
+        ldx #_out
         SKIPTWO
 FUNC _incR
 ;;; 3
@@ -1244,7 +1248,7 @@ FUNC _parsename
   PUTC ' '
   ldy #1
 .endif ; DEBNAME
-        ;; - zero out value
+        ;; - zero value
         lda #0
         iny
         sta (pos),y
@@ -1965,10 +1969,10 @@ ruleP:
         PUTC 'M'
 
         ;; TODO: put in main B()
-;        jsr output+10-3         ; MMMM
+;        jsr _output+10-3         ; MMMM
         ;; prints F but not 'f'
 ;;; TODO: install disasm function...
-        jsr output+17
+        jsr _output+17
 
         PUTC 'E'
         rts
@@ -2467,11 +2471,11 @@ FUNC _aftercompile
 
         ;; print size in bytes
         sec
-        lda out
-        sbc #<output
+        lda _out
+        sbc #<_output
         sta tos
-        lda out+1
-        sbc #>output
+        lda _out+1
+        sbc #>_output
         sta tos+1
         
         jsr printd
@@ -2479,7 +2483,7 @@ FUNC _aftercompile
         putc 10
         putc 10
 
-        jsr output
+        jsr _output
         sta tos
         stx tos+1
         putc 10
@@ -2491,6 +2495,11 @@ FUNC _aftercompile
         jsr printd
         putc 10
         
+        ;; prints generated code
+        putc '>'
+        jsr getchar
+        jsr _dasm
+
         jmp halt
 
 
@@ -2837,7 +2846,7 @@ vnext:
 .endif ; TESTING
 
 
-output:
+_output:
         ;; fill with RTS - "safer"
 ;        _RTS=$60
 ;        .res 8*1024, _RTS
