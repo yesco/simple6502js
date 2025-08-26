@@ -2765,8 +2765,18 @@ _edit:
 :       
         ;; - ctrl-L - don't clear screen
         cmp #12
-        beq _edit
+        bne  :+
 
+        jsr clrscr
+        ;; TODO: many places?
+        lda #<input
+        sta tos
+        lda #>input
+        sta tos+1
+;;TODO:
+;        jsr printz
+
+:       
         ;; TODO: getchar already echoes!!!
 ;        jsr putchar
         jmp _edit
