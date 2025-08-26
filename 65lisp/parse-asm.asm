@@ -2715,6 +2715,7 @@ FUNC _aftercompile
         putc 10
         
         ;; prints generated code
+        putc 'D'
         putc '>'
         jsr getchar
         jsr _dasm
@@ -2889,8 +2890,7 @@ input:
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
 
-;
-PRIME=1
+;PRIME=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
