@@ -245,7 +245,8 @@
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
 ;;; &0xff00 &0xff <<8 >>8 >>v <<v
-;OPTRULES=1
+;
+OPTRULES=1
 
 ;;; Byte optimized rules
 ;;; typically used as prefix for BYTE operators
@@ -281,6 +282,10 @@ TESTING=1
 ;;; print input ON ERROR (after compile)
 ;
 PRINTINPUT=1
+
+;;; print characters while parsing (show how fast you get)
+;
+PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -1103,7 +1108,11 @@ failjmp2:
 
 
 FUNC _incIspc
-;;; 14 B
+;;; oops! this was actually important to save all regs!
+        pha
+        txa
+        pha
+        tya
         pha
 @skipspc:
         jsr _incI
@@ -1126,15 +1135,32 @@ FUNC _incIspc
         lda inp
         cmp erp
         bcc @noupdate
+        beq @noupdate
         ;; erp := inp
 @update:
+.ifdef PRINTREAD
+        pha
+
+        ldy #0
+        lda (erp),y
+        jsr putchar
+
+        pla
+.endif
+
         sta erp
         lda inp+1
         sta erp+1
+
 @noupdate:
 .endif
 
         pla
+        tay
+        pla
+        tax
+        pla
+
         rts
 
 FUNC _incP
@@ -2846,6 +2872,99 @@ FUNC printstack
 ;;;   typedef unsigned char byte;
 ;;; 
 input:
+
+
+;;; Byte Sieve Benchmark! (OLD)
+;;; ===========================
+;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
+;;; 
+;;;   202 B     1.16s asm  onthe6502.pdf
+;;;   819 B     5.82s CC65 onthe6502.pdf
+;;; 
+;;;            10s asm (according to Action! doing 10x!)
+;;;            18s Action! (algo/src from there)
+;;;            38m BASIC
+;;; 
+;;; BN16 (use dec mode, no print? store only odd)
+;;;   150ms asm (2023: super opt years later) - 1K ram
+
+
+;
+PRIME=1
+
+;;; From: onthe6502.pdf - by 
+;;;  jsk: modified for single letter var, putchar
+
+.ifdef PRIME
+;;; TODO: need more features:
+;;;   - label A:
+;;;   - goto A;
+;;;   - variable declaration
+;;;   - array declaration
+;;;   - %10 hmmm???
+;;;   - for
+;;;   - do while
+;;;   - while 
+;;;   - to ~ reverse bits (can do ^0xffff)
+;;;   - parenthesis
+;;;   - // comments
+
+        .byte "byte a[256]",10
+        .byte "byte b[4]",10
+        .byte 10
+        .byte "word main(){",10
+        .byte "  word n,i;",10
+        .byte "  byte t;",10
+        .byte "  a[0]=0xff;",10
+        .byte "  for(t=1; t; t++) a[t]=0xff;",10
+        .byte "  for(n=2; n<2048; n++) {",10
+        .byte "    if (a[n>>3] & (1<<(n&7))) {",10
+        .byte "      i=n;",10
+        .byte "      t=0;",10
+        ;;           // simulates printd?
+        .byte "      do {",10
+        .byte "        b[t++]= (i%10)+’0’;",10
+        .byte "        i/=10;",10
+        .byte "      } while(i);",10
+        .byte "      do {",10
+        .byte "        putchar(b[--t]);",10
+        .byte "      } while(t);",10
+        .byte "      putchar(’ ’);",10
+        .byte "      for(i=n+n; i<2048; i+= n) {",10
+        .byte "        a[i>>3]&= ~(1<<(i&7));",10
+        .byte "      }",10
+        .byte "    }",10
+        .byte "  }",10
+        .byte "}"
+        .byte 0
+
+.endif ; PRIME
+
+        .byte "word main(){"
+        ;; 48 => 15s lol - error
+        ;; 40 =>  8s LOL
+;        .repeat 32+8
+
+        ;; 25 statements takes ~2.5s to compile
+        ;; 526 bytes!
+        ;; 
+        ;; 25 is ok: (* 25 6) = 150 recursions (inp,rule)
+        ;; I think two rules deep... not helping...
+        ;; (/ 256 6 2) = 21 ...
+;;; TODO: need *S clenex operator for repeats!
+;        .repeat 16+8+1
+
+        ;; OPTRULES:
+        ;;   a=a+1; // 16 => 3s  337 bytes (/ 337 16) = 21
+        ;;   ++a;   // 16 => 1s  136 bytes 
+        ;;   ++a;   // 32 => 1s  264 bytes (/ 264 32) =  8
+        .repeat 32
+;          .byte "a=a+1;"
+          .byte "++a;"
+        .endrep
+        .byte "return a;"
+        .byte "}",0
+
         .byte "word main(){ return 3<3; }",0
         .byte "word main(){ if(1) a=42; return a;}",0
 
