@@ -9,12 +9,74 @@
 ;;; langauge. The BNF contains generative instructions
 ;;; that directly generates machine code. This code can
 ;;; then be executed.
+;;;
+;;; Goals
+;;; - be a "proper" subset of C
+;;; - on actual machine 6502 compiler running on 6502
+;;; - *minimal* size assembly code for BNF engine
+;;; - fast "enough" to run "on a screen of code"
+;;; - provide on-screen editor
+;;; - "simple" rule-driven
+;;; - many languages (just change rules)
+;;; - have MINIMAL subset
+;;; - have RULEOPT extentions for efficient codegen
+;;; 
+;;; NON-Goals:
+;;; - not be the best super-optimizing compiler
+;;; - not be the fastest
+;;; 
+;;; The MINIMAL C-language subset:
+;;; - only support void, word (uint), byte (uchar)
+;;; - word main() { ... }
+;;; - return ...;
+;;; - if () statement;
+;;; - single letter global variables (no need declare)
+;;; - decimal numbers: 4711 42
+;;; - bin operators: + - *2 /2 & | ^ << >>
+;;; - library to minimize gen code+rules (slowe code)
+;;; 
+;;; OPTIONAL:
+;;; - I/O: getchar putc printd printh
+;;; - else statement;
+;;; - optimized: &0xff00 &0xff >>8 <<8
+;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
+;;; - optimized: ... op const   ... op var
+;;;   
+;;; TODO:
+;;; - { } blocks (BUGS: something lol)
+;;; - hex numbers (alt to decimal?)
+;;; - T F() { ... }
+;;; - F() - function calls
+;;; - parameters
+;;; - recursion?
+;;; 
+;;; Extentions:
+;;; - 42=>x+7=>y;     forward assignement
+;;; - 35.sqr          single arg function call
+;;; 
+;;; Limits
+;;; - only *unsigned* values
+;;; - if supported ops/syntax should (mostly)
+;;;   work the same on normal C-compiler
+;;; - types aren't enforced
+;;; - not using any extensions: same result
+;;; - single lower case letter variable (TODO: fix)
+;;; - single upper case letter functions (TODO: fix)
+;;; - modifying ops cannot be used in expressions
+;;; - NO parenthesis
+;;; - NO priorities on * / (OK, deviates from C)
+;;; - NO generic / or * (unless add library)
+
 
 
 
 ;;; STATS:
 
-;;; TOTAL: 942 bytes = (+ 597 392)
+;;;                          asm rules
+;;; MINIMAL   :   980 bytes = (+ 597  383) inc LIB!
+;;; NORMAL    :  1098 bytes = (+ 597  501)
+;;; OPTRULES  :  1418 bytes = (+ 597  821)
+;;; LONGNAMES : 
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -29,7 +91,7 @@
 ;;;    517 bytes highlite error in source! (+ 24 B)
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
 ;;;    554 bytes =>a+3=>c;
-;;;    597 bytes FUNS: more %F and %f codc
+;;;    597 bytes FUNS: more %F and %f code
 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 
@@ -50,8 +112,14 @@
 ;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
 ;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
 ;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
-;;;   
-;;; 
+;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
+;;;               and changed int=>word char=>byte
+
+;;;   821 bytes = OPTRULES
+;;;   501 bytes = NORMAL
+;;;   383 bytes = MINIMAL (rules + library)
+
+
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
 ;;;    68 B library printd/printh/putc/getchar
@@ -170,8 +238,10 @@
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
 ;;; &0xff00 &0xff <<8 >>8 >>v <<v
-;
-OPTRULES=1
+;OPTRULES=1
+
+;;; Pointers: &v *v= *v
+;POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
 ;
@@ -1373,21 +1443,6 @@ ruleB:
 ;;; "Constant"/(variable) (simple, lol)
 ruleC: 
 
-;.ifnblank
-;        .byte "%v"
-;n      .byte '['
-;        ldy sframe
-;;;; requires zero page wrap around
-;        ldx '<',y              
-;        dey
-;        lda '<',y
-;      .byte ']'
-;
-;        .byte "|%V"
-;.else
-;        .byte "%V"
-;.endif
-
         ;; "IO-lib" hack
         .byte "printd(",'E'+128,")"
       .byte '['
@@ -1433,11 +1488,39 @@ ruleC:
       .byte ']'
 .endif ; FUNS
 
+;.ifndef MINIMAL
+.ifnblank
+;;; TODO: need to have a PUSH ':' and a POP ';' ???
+;;; reverse meaning from now   ^   REVERSE   ^  !!!
+        .byte "|++%A"
+      .byte "[:"
+        .byte "|--%A"
+
+.endif ; !MINIMAL
+
+.ifdef POINTERS
         .byte "|&%V"
       .byte '['
         lda #'<'
         ldx #'>'
       .byte ']'
+
+        .byte "|*%V"
+      .byte '['
+;;; TODO: test
+        lda VAL0
+        sta tos
+        lda VAL1
+        sta tos+1
+
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+      .byte ']'
+
+.endif ; MINIMAL
 
         ;; variable
         .byte "|%V"
@@ -1469,7 +1552,7 @@ ruleU:
 ruleD:
 
         ;; 7=>A; // Extention to C:
-        ;; Forward assignemenbt 3=>a; could work! lol
+        ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
         .byte "=>%A"
       .byte "[:"
@@ -1869,7 +1952,8 @@ ruleP:
 
 ;;; Type
 ruleT:  
-        .byte "int|char|void",0
+;;; TODO: don't use int/char as they can be SIGNED!
+        .byte "word|byte|void",0
 
 .ifdef BNFLONG
 
@@ -2049,9 +2133,55 @@ ruleS:
         .byte "|{",'S'+128,'S'+128,"}"
 
 
+;;; TODO:
+;;; -
+;;; Turns out that adding a "hacky" (but correctly working) ELSE wasn't that difficult!
+;;; Basically, I just made sure that the THEN branch always had the flag Z=0 (value not 0 i.e. true) and then since a false value would jump to after the THEN the ELSE can be implemented by just looking at the flag (so like an opposite THEN).
+;;; Of course, this isn't very optimized: An IF comes out to 9 bytes ; ELSE support adds 2 + 5 more bytes, total 16.
+;;; Currently, only patching long-JMP instructions, maybe just *define* that the if branches can't be too big(?) that is less than 127 bytes... That would make an IF THEN be 6 and ELSE 4 bytes, total 10.
+
+;;; TODO: MINIMAL can limit to 10 bytes instead of 16
+;;; 
+;;; LONG could do fancy patching if >127
+;;; replae BNE XX with JMP to here+3, add code
+;;; 
+.ifnblank
+;;; LNG: 16B   (+ 9 2 5)   - all long
+;;; 
+;;; min: 10B   (+ 6 2 2)   - all short
+;;; med: 18B   (+ 6 2 8 2) - IFF too long THEN
+;;; max: 24B   (+ 6 2 8 8) - IFF also ELSE long
+
+        ;; 6B 5-9c
+        tay
+        bne then
+        txa
+        beq PUSHREL
+then:   
+        ...
+        ;; 2B (for else)
+        lda #$ff
+afterTHEN:      
+        ;; + 8B to do long patch
+        sec
+        bcs 6
+testhere:       
+        beq 3
+        jmp then
+afterIF:        
+elseTEST:       
+        ;; 3B 4-5c
+        bne PUSHREL
+        nop
+else:   
+        ...
+afterELSE:      
+.endif
+
         ;; IF(E)S; // no else
         .byte "|if(",'E'+128,")"
       .byte '['
+        ;; 9B 9-11c
         stx savex
         ora savex
         bne :+
@@ -2062,15 +2192,15 @@ ruleS:
 ;;; TODO: move these rules out to another rule
 ;;;    then don't need to repeat this one!
         .byte 'S'+128
-.ifndef MINIMAL
+.ifdef OPTRULES
         ;; for ELSE, make sure value not 0!
       .byte '['
         lda #$ff
       .byte ']'
-.endif ; !MINIMAL
+.endif ; OPTRULES
         ;; Auto-patches at exit!
 
-.ifndef MINIMAL
+.ifdef OPTRULES
         ;; ELSE
         ;; 13 B
         .byte "|else"
@@ -2083,8 +2213,92 @@ ruleS:
       .byte ']'
         .byte 'S'+128
         ;; Auto-patches at exit!
-.endif ; !MINIMAL
+.endif ; OPTRULE
 
+.ifdef OPTRULES
+;;; TODO make ruleC when %A pushes
+        .byte "|++%A;"
+      .byte "[:"
+        inc VAL0
+        bne :+
+        inc VAL1
+:       
+      .byte "]"
+
+;;; TODO make ruleC when %A pushes
+        .byte "|--%A;"
+      .byte "[:"
+        lda VAL0
+        bne :+
+        dec VAL1
+:       
+        dec VAL0
+      .byte "]"
+
+        ;; NOTE: no need provide: v op= const;
+        ;;       - it would wouldn't save any bytes!
+        .byte "|%A+=",'E'+128,";"
+      .byte "[:"
+        clc
+        adc VAL0
+        sta VAL0
+        txa
+        adc VAL1
+        sta VAL1
+      .byte "]"
+
+        .byte "|%A-=",'E'+128,";"
+      .byte "[:"
+        sec
+        eor #$ff
+        adc VAL0
+        sta VAL0
+        txa
+        eor #$ff
+        adc VAL1
+        sta VAL1
+      .byte "]"
+
+        .byte "|%A&=",'E'+128,";"
+      .byte "[:"
+        and VAL0
+        sta VAL0
+        txa
+        and VAL1
+        sta VAL1
+      .byte "]"
+
+        .byte "|%A\|=",'E'+128,";"
+      .byte "[:"
+        ora VAL0
+        sta VAL0
+        txa
+        ora VAL1
+        sta VAL1
+      .byte "]"
+
+        .byte "|%A^=",'E'+128,";"
+      .byte "[:"
+        eor VAL0
+        sta VAL0
+        txa
+        eor VAL1
+        sta VAL1
+      .byte "]"
+
+        .byte "|%A>>=1;"
+      .byte "[:"
+        lsr VAL1
+        ror VAL0
+      .byte "]"
+
+        .byte "|%A<<=1;"
+      .byte "[:"
+        asl VAL0
+        ror VAL1
+      .byte "]"
+
+.endif ; OPTRULES
 
         ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
@@ -2094,6 +2308,22 @@ ruleS:
         sta VAL0
         stx VAL1
       .byte "]"
+
+.ifdef POINTERS
+        .byte "|*%A=",'E'+128,";"
+      .byte "[:"
+        ldy VAL0
+        sty tos
+        ldy VAL1
+        sty tos+1
+
+        ldy #0
+        sta (tos),y
+        tax
+        iny
+        sta (tos),y
+      .byte "]"
+.endif ; POINTERS
 
         .byte "|",'E'+128,";"
 
@@ -2379,131 +2609,149 @@ FUNC printstack
 
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
-input:
-;;; ELSE 101 or 11
-;;; BUG: TODO: if else because MINIMAL and have LONGNAME
-;;;      elsea=10; might be assigned, lol
-        .byte "int main(){ if(0) a=100; else a=10; return a+1; }",0
 
+;;; Pretend to be prefixed by:
+;;; 
+;;;   typedef unsigned int  word;
+;;;   typedef unsigned char byte;
+;;; 
+input:
+        .byte "word main(){ if(1) a=42; return a;}",0
+
+        .byte "word main(){ if(1) a=42; else a=4711; return a;}",0
+
+        ;; tests for self-modifying v op= const;
+        .byte "word main(){ a=4141; ++a; return a; }",0
+        .byte "word main(){ a=4343; --a; return a; }",0
+        .byte "word main(){ a=512+42+1; a&=42; return a; }",0
+        .byte "word main(){ a=84; a>>=1; return a; }",0
+        .byte "word main(){ a=21; a<<=1; return a; }",0
+        .byte "word main(){ e-=10*2+6; return e; }",0
+        .byte "word main(){ e+=2; return e; }",0
+
+        ;; ELSE 101 or 11
+        ;; BUG: TODO: if else because MINIMAL and have LONGNAME
+        ;; elsea=10; might be assigned, lol
+        .byte "word main(){ if(0) a=100; else a=10; return a+1; }",0
 
 
 ;;; 101/1
-        .byte "int main(){if(1)a=100;return a+1;}",0
+        .byte "word main(){if(1)a=100;return a+1;}",0
 ;;; 40
-        .byte "int main(){return e;}",0
+        .byte "word main(){return e;}",0
 
 
         .byte "void A(){putc(102);}",0
 
-        .byte "int main(){putc(102);}",0
+        .byte "word main(){putc(102);}",0
 
-        .byte "int main(){printd(4711);return getchar();}",0
+        .byte "word main(){printd(4711);return getchar();}",0
 
-        .byte "int main(){return 65535>>3;}",0
+        .byte "word main(){return 65535>>3;}",0
 ;;; => 2???
-        .byte "int main(){return 1<<2;}",0
+        .byte "word main(){return 1<<2;}",0
 
-        .byte "int main(){return 517&0xff+42;}",0
+        .byte "word main(){return 517&0xff+42;}",0
 
-        .byte "int main(){3+4=>a+3=>b;return a+b;}",0
+        .byte "word main(){3+4=>a+3=>b;return a+b;}",0
 
 
 ;;; TODO: LOOP shit - same issue on "MINIMAL - lol"
-        .byte "int main(){return a;}",0
+        .byte "word main(){return a;}",0
 
 ;;; works 1477
-        .byte "int main(){if(1){a=77;a=1400+a;}return a;}",0
+        .byte "word main(){if(1){a=77;a=1400+a;}return a;}",0
 ;;; works 0 or "magix"
-        .byte "int main(){if(0){a=77;a=1400+a;}return a;}",0
+        .byte "word main(){if(0){a=77;a=1400+a;}return a;}",0
 
 ;;; WORKS (but can't do three as limited {SS} ...
-        .byte "int main(){a=10;if(1){a=a*2;a=a*2;} a=a+1; return a;}",0
+        .byte "word main(){a=10;if(1){a=a*2;a=a*2;} a=a+1; return a;}",0
 
 ;;; FAIL
-;        .byte "int main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
+;        .byte "word main(){ if(1) { a=e+50; return a; } a=a+1; return a;}",0
 
-;        .byte "int main(){a=10; if(1){a=a*2;} a=a+1; return a;}",0
+;        .byte "word main(){a=10; if(1){a=a*2;} a=a+1; return a;}",0
 ;;; WRONG
-        .byte "int main(){ return a; if(0){a=10;} a=a+1; return a;}",0
+        .byte "word main(){ return a; if(0){a=10;} a=a+1; return a;}",0
 
 ;;; OK, fixed var.... lol
-        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "word main(){ if(1) a=10; a=a+1; return a;}",0
 
 .ifdef INCTESTS
-        .byte "int main(){ return 4711 ; }",0
-        .byte "int main(){ return e ; }",0
-        .byte "int main(){ return &e ; }",0
-        .byte "int main(){ return a ; }",0
-        .byte "int main(){ return e; }",0
-        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
+        .byte "word main(){ return 4711 ; }",0
+        .byte "word main(){ return e ; }",0
+        .byte "word main(){ return &e ; }",0
+        .byte "word main(){ return a ; }",0
+        .byte "word main(){ return e; }",0
+        .byte "word main(){ if(0) a=10; a=a+1; return a;}",0
 ;;; OK 11
-        .byte "int main(){ return 4710+1; }",0
-        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "word main(){ return 4710+1; }",0
+        .byte "word main(){ if(1) a=10; a=a+1; return a;}",0
 
 ;;; OK 
-        .byte "int main(){return 4711;}",0
+        .byte "word main(){return 4711;}",0
 
 ;;; ERROR
-        .byte "int main(){ if(1) { return 33; } a=a+1; return a;}",0
+        .byte "word main(){ if(1) { return 33; } a=a+1; return a;}",0
 
 ;;; syntax error highlight!
-;        .byte "int main(){ if(1) a=10x; a=a+1; return a;}",0
+;        .byte "word main(){ if(1) a=10x; a=a+1; return a;}",0
 
 
 ;;; OK (w S not = B | )
-        .byte "int main(){ if(0) return 33; return 22; }",0
-        .byte "int main(){ if(1) return 33; return 22; }",0
+        .byte "word main(){ if(0) return 33; return 22; }",0
+        .byte "word main(){ if(1) return 33; return 22; }",0
 
 
 
 ;;; FAIL
-        .byte "int main(){ if(0) { a=e+50; return a; } a=a+1; return a;}",0
+        .byte "word main(){ if(0) { a=e+50; return a; } a=a+1; return a;}",0
 ;;; FAIL
-        .byte "int main(){ if(1) { a=89; return a; } a=a+1; return a;}",0
+        .byte "word main(){ if(1) { a=89; return a; } a=a+1; return a;}",0
 
 
-        .byte "int main(){ if(1) return 99; a=a+1; return a;}",0
-        .byte "int main(){ if(1) a=10; a=a+1; return a;}",0
-        .byte "int main(){ if(0) a=10; a=a+1; return a;}",0
+        .byte "word main(){ if(1) return 99; a=a+1; return a;}",0
+        .byte "word main(){ if(1) a=10; a=a+1; return a;}",0
+        .byte "word main(){ if(0) a=10; a=a+1; return a;}",0
 
 
 
-        .byte "int main(){ a=2005*2; a=a+700; return a+1; }",0
+        .byte "word main(){ a=2005*2; a=a+700; return a+1; }",0
 
 ;;; WRONG
-        .byte "int main(){ a=2005*2; b=84; a=a+700; a=b/2+a; return a+1; }",0
+        .byte "word main(){ a=2005*2; b=84; a=a+700; a=b/2+a; return a+1; }",0
 
 ;;; OK
-        .byte "int main(){ a=99; a=a+1; a=a+100; return a+1; }",0
+        .byte "word main(){ a=99; a=a+1; a=a+100; return a+1; }",0
 
 ;;; TODO: somehow this gives garbage and jumps wrong!
 ;;;  (stack messed up?)
 
 ;;; FAILS
-        .byte "intmain(){return e==40;}",0
+        .byte "wordmain(){return e==40;}",0
 ;;; FAILS
-        .byte "intmain(){return 42==42;}",0
+        .byte "wordmain(){return 42==42;}",0
 
 
 ;;; OKAY:
-        .byte "intmain(){a=42;return a+a;}",0
-        .byte "intmain(){42=>a;return a+a;}",0
-        .byte "intmain(){return 40==e;}",0
-        .byte "intmain(){return e==e;}",0
-        .byte "intmain(){return e+e;}",0
-        .byte "intmain(){a=99;a=a+1;return a+1;}",0
-        .byte "intmain(){a=99;return 77;}",0
-        .byte "intmain(){return 4711;}",0
-        .byte "intmain(){a=99;return a+1;}",0
+        .byte "wordmain(){a=42;return a+a;}",0
+        .byte "wordmain(){42=>a;return a+a;}",0
+        .byte "wordmain(){return 40==e;}",0
+        .byte "wordmain(){return e==e;}",0
+        .byte "wordmain(){return e+e;}",0
+        .byte "wordmain(){a=99;a=a+1;return a+1;}",0
+        .byte "wordmain(){a=99;return 77;}",0
+        .byte "wordmain(){return 4711;}",0
+        .byte "wordmain(){a=99;return a+1;}",0
         .byte "voidmain(){a=99;}",0
-        .byte "intmain(){return 1+2+3+4+5;}",0
-;        .byte "intmain(){return 42==e;}",0
-        .byte "intmain(){return e+12305;}",0
-        .byte "intmain(){return e;}",0
-        .byte "intmain(){return 4010+701;}",0
-        .byte "intmain(){return 8421*2;}",0
-        .byte "intmain(){return 8421/2;}",0
-        .byte "intmain(){return 4711;}",0
+        .byte "wordmain(){return 1+2+3+4+5;}",0
+;        .byte "wordmain(){return 42==e;}",0
+        .byte "wordmain(){return e+12305;}",0
+        .byte "wordmain(){return e;}",0
+        .byte "wordmain(){return 4010+701;}",0
+        .byte "wordmain(){return 8421*2;}",0
+        .byte "wordmain(){return 8421/2;}",0
+        .byte "wordmain(){return 4711;}",0
 ;;; garbage (OK)
         .byte "voidmain(){}",0
 
@@ -2576,6 +2824,7 @@ library:
 .ifdef MINIMAL
 
 ;;; TODO: use a preexisting VM .include
+;;;   preferable one with all stack
 _SAVE:  
         sta tos
         stx tos
