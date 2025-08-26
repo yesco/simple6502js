@@ -2677,7 +2677,7 @@ FUNC _aftercompile
         putc 10
 .endif ; PRINTINPUT
 
-        jmp halt
+        jmp _edit
 ;        jmp failed
 ;;; LOOPS: lol
 
@@ -2714,13 +2714,51 @@ FUNC _aftercompile
         jsr printd
         putc 10
         
-        ;; prints generated code
-        putc 'D'
-        putc '>'
-        jsr getchar
-        jsr _dasm
 
-        jmp halt
+;;; full screen editor on ORIC ATMOS
+;;; - just use BASIC terminal!
+;;; - add "save" (to tape? load from tape?)
+;;; - limit walk out and intercept ctrl-L
+;;; - add features
+;;;   + ^O insert newline
+;;;   + ^K remove line
+;;;   + ^A ^E navigation ^F ^B
+_edit:  
+        ;; TODO: getchar already echoes!!!
+        jsr getchar
+
+        ;; - ctrl-C - compile
+        cmp #3
+        bne :+
+
+;;; TODO: can compile few times, something messed up?
+        jmp _init
+:       
+        ;; - ctrl-R - run
+        cmp #'R'-'@'
+        bne :+
+
+        jmp _aftercompile
+:       
+        ;; - ctrl-q - disasm
+        cmp #'Q'-'@'
+        bne :+
+
+        jsr _dasm
+        jmp _edit
+:       
+        ;; - ctrl-L - don't clear screen
+        cmp #12
+        beq _edit
+
+        ;; TODO: getchar already echoes!!!
+;        jsr putchar
+        jmp _edit
+        
+clrscr: 
+        lda #12
+        jmp putchar
+
 
 
 FUNC printvar
@@ -2958,6 +2996,7 @@ input:
         ;;   a=a+1; // 16 => 3s  337 bytes (/ 337 16) = 21
         ;;   ++a;   // 16 => 1s  136 bytes 
         ;;   ++a;   // 32 => 1s  264 bytes (/ 264 32) =  8
+;        .byte "a=0;"
         .repeat 32
 ;          .byte "a=a+1;"
           .byte "++a;"
