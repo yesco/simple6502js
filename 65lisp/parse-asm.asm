@@ -76,8 +76,8 @@
 ;;;                          asm rules
 ;;; MINIMAL   :   980 bytes = (+ 597  383) inc LIB!
 ;;; NORMAL    :  1098 bytes = (+ 597  501)
+;;; BYTERULES :  1257 bytes = (+ 597  660)
 ;;; OPTRULES  :  1418 bytes = (+ 597  821)
-;;; BYTERULES :
 ;;; LONGNAMES : 
 ;;; 
 ;;;    193 bytes backtrack parse w rule
@@ -116,6 +116,7 @@
 ;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
 ;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
 ;;;               and changed int=>word char=>byte
+;;;   521 bytes
 
 ;;;   383 bytes = MINIMAL   (rules + library)
 ;;;   501 bytes = NORMAL
@@ -1729,11 +1730,11 @@ ruleD:
       .byte '['
         ldy #0
         cmp VAL0
-        bne @neqv
+        bne :+
         ;; eq => -1
         dey
         ;; neq => 0
-@neqv:
+:       
         tya
       .byte ']'
         .byte _D
@@ -1742,11 +1743,24 @@ ruleD:
       .byte '['
         ldy #0
         cmp #'<'
-        bne @neqd
+        bne :+
         ;; eq => -1
         dey
         ;; neq => 0
-@neqd:
+:       
+        tya
+      .byte ']'
+        .byte _D
+
+        .byte "|@<D"
+      .byte '['
+        ldy #$ff
+        cmp #'<'
+        bcc :+
+        ;; < => 0
+        iny
+:       
+        ;; neq => 0
         tya
       .byte ']'
         .byte _D
@@ -2058,6 +2072,23 @@ ruleD:
         dey
         ;; neq => 0
 :       
+        tya
+        tax
+      .byte ']'
+        .byte _D
+
+        .byte "|<%D"
+      .byte '['
+        ;; 13
+        ldy #$ff
+        cmp #'<'
+        bcc :+
+        cpx #'>'
+        bcc :+
+        ;; !< => 0
+        iny
+:       
+        ;;  < => -1
         tya
         tax
       .byte ']'
@@ -2815,6 +2846,7 @@ FUNC printstack
 ;;;   typedef unsigned char byte;
 ;;; 
 input:
+        .byte "word main(){ return 3<3; }",0
         .byte "word main(){ if(1) a=42; return a;}",0
 
         .byte "word main(){ if(1) a=42; else a=4711; return a;}",0
