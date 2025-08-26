@@ -63,7 +63,7 @@ tmp1:   .res 2
 ;ORGSTART= $054E
 
 ;;; parse.c with disasm.c
-;ORGSTART= $09d9
+;ORGSTART= $09db
 
 
 .ifdef ORGSTART

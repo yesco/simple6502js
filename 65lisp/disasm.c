@@ -130,7 +130,7 @@ void disasm(char* mc, char* end, char indent) {
 
 void disasm(char* mc, char* end, char indent) {
   char* p= (char*)mc;
-  printf("\n%*c---CODE[%d]:\n", indent, ' ', end-mc); p= mc;
+  printf("\n%*c---CODE[%u]:\n", indent, ' ', end-mc); p= mc;
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
     printf("%*c%04X:\t", indent, ' ', p);

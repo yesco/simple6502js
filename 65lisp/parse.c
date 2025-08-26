@@ -6,6 +6,7 @@
 
 extern void showsize();
 extern void start();
+extern void* endfirstpage;
 
 #include "disasm.c"
 
@@ -21,6 +22,10 @@ extern void dasm() {
   //printf("\nDASM $%u-$%u!\n", last, out);
   disasm(last, out, 2);
   last= out;
+}
+
+extern void dasmcc() {
+  disasm((void*)start, (void*)&endfirstpage, 0);
 }
 
 // from conio-raw.c

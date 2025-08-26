@@ -216,8 +216,9 @@
 ;;;       alt: parameterize any constants?
 
 
-.import _dasm
-.export _output,_out
+.import _dasm, _dasmcc
+.export _endfirstpage
+.export _output, _out
 
 
 ;;; See template-asm.asm for docs on begin/end.asm
@@ -1393,6 +1394,7 @@ FUNC _dummy
 ;;; ========================================
 
 endfirstpage:        
+_endfirstpage:
 
 
 FUNC _dummy4
@@ -2716,6 +2718,13 @@ FUNC _aftercompile
         
 
 ;;; full screen editor on ORIC ATMOS
+;;; - CTRL-C : compile program & run
+;;; - CTRL-R : run
+;;; - CTRL-Q : disasm
+;;; - CTRL-Z : disasm mucc
+;;; - CTRL-L :
+
+
 ;;; - just use BASIC terminal!
 ;;; - add "save" (to tape? load from tape?)
 ;;; - limit walk out and intercept ctrl-L
@@ -2745,6 +2754,13 @@ _edit:
         bne :+
 
         jsr _dasm
+        jmp _edit
+:       
+        ;; - ctrl-z - disasmccc
+        cmp #'Z'-'@'
+        bne :+
+
+        jsr _dasmcc
         jmp _edit
 :       
         ;; - ctrl-L - don't clear screen
@@ -3201,8 +3217,8 @@ vnext:
 ;;; not physicaly allocated in binary
 .bss
 _output:
-        ;; fill with RTS - "safer"
-;        _RTS=$60
+        ;; initial RTS to make it safe
+        rts
         .res 8*1024
 
 ;;; Some variants save on codegen by using a library
