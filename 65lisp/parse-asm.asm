@@ -1426,16 +1426,44 @@ ruleY:
 ruleZ:  
         .byte 0
 
+
+_A='A'+128
+_B='B'+128
+_C='C'+128
+_D='D'+128
+_E='E'+128
+_F='F'+128
+_G='G'+128
+_H='H'+128
+_I='I'+128
+_J='J'+128
+_K='K'+128
+_L='L'+128
+_M='M'+128
+_N='N'+128
+_O='O'+128
+_P='P'+128
+_Q='Q'+128
+_R='R'+128
+_S='S'+128
+_T='T'+128
+_U='U'+128
+_V='V'+128
+_W='W'+128
+_X='X'+128
+_Y='Y'+128
+_Z='Z'+128
+
 ;;; aggregate statements
 ruleA:  
         ;; Right-recursion is "fine"
-        .byte 'S'+128,'A'+128,"|",0
+        .byte _S,_A,"|",0
 
 ;;; Block
 ruleB:  
 ;;; TODO: empty?
         .byte "{}"
-        .byte "|{",'A'+128,"}"
+        .byte "|{",_A,"}"
 
         .byte 0
         .byte 0
@@ -1444,21 +1472,21 @@ ruleB:
 ruleC: 
 
         ;; "IO-lib" hack
-        .byte "printd(",'E'+128,")"
+        .byte "printd(",_E,")"
       .byte '['
         sta tos
         stx tos+1
         jsr printd
       .byte ']'
 
-        .byte "|printh(",'E'+128,")"
+        .byte "|printh(",_E,")"
       .byte '['
         sta tos
         stx tos+1
         jsr printh
       .byte ']'
 
-        .byte "|putc(",'E'+128,")"
+        .byte "|putc(",_E,")"
       .byte '['
         jsr putchar
       .byte ']'
@@ -1543,7 +1571,7 @@ ruleU:
       .byte '['
         jsr _SAVE
       .byte ']'
-        .byte 'C'+128
+        .byte _C
         .byte 0
 .endif
 
@@ -1559,59 +1587,59 @@ ruleD:
         sta VAL0
         stx VAL1
       .byte "]"
-        .byte 'D'+128
+        .byte _D
 
 .ifdef MINIMAL
 
-        .byte '|','+','U'+128
+        .byte '|','+',_U
       .byte '['
         jsr _PLUS
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
-        .byte '|','+','U'+128
+        .byte '|','+',_U
       .byte '['
         jsr _MINUS
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
-        .byte '|','&','U'+128
+        .byte '|','&',_U
       .byte '['
         jsr _AND
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
-        .byte '|',"\|",'U'+128
+        .byte '|',"\|",_U
       .byte '['
         jsr _OR
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
-        .byte '|','^','C'+128
+        .byte '|','^',_C
       .byte '['
         jsr _EOR
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|/2"
       .byte '['
         jsr _SHR
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|*2"
       .byte '['
         jsr _SHL
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 ;;; ==
 
-        .byte "|==",'U'+128
+        .byte "|==",_U
       .byte '['
         jsr _EQ
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         ;; Empty
         .byte '|'
@@ -1629,7 +1657,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|+%D"
       .byte '['
@@ -1641,7 +1669,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 ;;; 18 *2
         .byte "|-%D"
@@ -1654,7 +1682,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|-%D"
       .byte '['
@@ -1666,7 +1694,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 ;;; 17 *2
         .byte "|&%V"
@@ -1678,20 +1706,20 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 .ifdef OPTRULES
         .byte "|&0xff00"
       .byte '['
         lda #0
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|&0xff"
       .byte '['
         ldx #0
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 .endif ; OPTRULES
 
         .byte "|&%D"
@@ -1703,7 +1731,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 .ifnblank
 ;;; TODO: \ quoting
@@ -1717,7 +1745,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|\|%D"
       .byte '['
@@ -1728,7 +1756,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 .endif ; NBLANK
 
 ;;; 17 *2
@@ -1741,7 +1769,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|^%D"
       .byte '['
@@ -1752,7 +1780,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 ;;; 24
         
@@ -1765,7 +1793,7 @@ ruleD:
         tya
         ror
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|*2"
       .byte '['
@@ -1776,7 +1804,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
 .ifdef OPTRULES
         .byte "|>>8"
@@ -1784,14 +1812,14 @@ ruleD:
         txa
         ldx #0
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|<<8"
       .byte '['
         tax
         lda #0
       .byte ']'
-        .byte 'D'+128
+        .byte _D
         
         .byte "|<<%D"
       .byte '['
@@ -1811,7 +1839,7 @@ ruleD:
         lda tos
         ldx tos+1
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|>>%D"
       .byte '['
@@ -1831,7 +1859,7 @@ ruleD:
         lda tos
         ldx tos+1
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 .endif ; OPTRULES
 
 ;;; ==
@@ -1851,7 +1879,7 @@ ruleD:
         tya
         tax
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         .byte "|==%D"
       .byte '['
@@ -1868,7 +1896,7 @@ ruleD:
         tya
         tax
       .byte ']'
-        .byte 'D'+128
+        .byte _D
 
         ;; Empty
         .byte '|'
@@ -1879,24 +1907,24 @@ ruleD:
 
 ;;; Exprssion:
 ruleE:  
-        .byte 'C'+128,'D'+128,0
+        .byte _C,_D,0
 
 
 ruleF:  
 ;;; works
-;        .byte 'T'+128,"%V(){",'S'+128,"}"
+;        .byte _T,"%V(){",_S,"}"
 
-        .byte 'T'+128,"%F()"
+        .byte _T,"%F()"
 
 ;;; TODO: something wrong with 'B'
-;        .byte 'T'+128,"%V(){",'B'+128,"}"
+;        .byte _T,"%V(){",_B,"}"
       .byte '['
         PUTC '!'
 ;;; TODO: remove, for now we skip over function, lol
 ;;;   need for compile LONGNAMES and "main" for now
         jmp PUSHLOC
       .byte ']'
-        .byte "{",'S'+128,"}"
+        .byte "{",_S,"}"
       .byte '['
         PUTC 'F'
         rts
@@ -1907,7 +1935,7 @@ ruleF:
 
 
         .byte "%V()"
-        .byte 'B'+128
+        .byte _B
 ;      .byte '['
         ;; pretend it's the body
 ;        PUTC 'F'
@@ -1920,9 +1948,9 @@ ruleP:
 .ifndef FUNS
 
 .ifdef LONGNAMES
-        .byte 'T'+128,"%N()",'B'+128
+        .byte _T,"%N()",_B
 .else
-        .byte 'T'+128,"main()",'B'+128
+        .byte _T,"main()",_B
 .endif ; LONGNAMES
       .byte '['
         rts
@@ -1932,7 +1960,7 @@ ruleP:
 
 .else ; FUNS
 
-        .byte 'F'+128
+        .byte _F
       .byte '['
         PUTC 'M'
 
@@ -2094,7 +2122,7 @@ ruleK:
 
       .byte ']'
         ;; Parameters
-        'L'+128,")";"
+        _L,")";"
       .byte '['
         ;; get %A value to tos
         .byte ':'
@@ -2111,26 +2139,26 @@ ruleK:
 ;;; Statement
 ruleS:
         ;; BlOCK!
-;        .byte 'B'+128
+;        .byte _B
 
         ;; RETURN
-;        .byte "|return",'E'+128,";"
-        .byte "return",'E'+128,";"
+;        .byte "|return",_E,";"
+        .byte "return",_E,";"
 
       .byte '['
         rts
       .byte ']'
 
 ;;; FAILS - forever!
-;        .byte '|','B'+128
+;        .byte '|',_B
 ;;; works
         .byte "|{}"
 ;;; FAILS - forever!
-;        .byte "|{",'A'+128,"}"
+;        .byte "|{",_A,"}"
 ;;; works
-        .byte "|{",'S'+128,"}"
+        .byte "|{",_S,"}"
 ;;; FAILS - forever!
-        .byte "|{",'S'+128,'S'+128,"}"
+        .byte "|{",_S,_S,"}"
 
 
 ;;; TODO:
@@ -2179,7 +2207,7 @@ afterELSE:
 .endif
 
         ;; IF(E)S; // no else
-        .byte "|if(",'E'+128,")"
+        .byte "|if(",_E,")"
       .byte '['
         ;; 9B 9-11c
         stx savex
@@ -2191,7 +2219,7 @@ afterELSE:
       .byte ']'
 ;;; TODO: move these rules out to another rule
 ;;;    then don't need to repeat this one!
-        .byte 'S'+128
+        .byte _S
 .ifdef OPTRULES
         ;; for ELSE, make sure value not 0!
       .byte '['
@@ -2211,7 +2239,7 @@ afterELSE:
         jmp PUSHLOC
 :
       .byte ']'
-        .byte 'S'+128
+        .byte _S
         ;; Auto-patches at exit!
 .endif ; OPTRULE
 
@@ -2237,7 +2265,7 @@ afterELSE:
 
         ;; NOTE: no need provide: v op= const;
         ;;       - it would wouldn't save any bytes!
-        .byte "|%A+=",'E'+128,";"
+        .byte "|%A+=",_E,";"
       .byte "[:"
         clc
         adc VAL0
@@ -2247,7 +2275,7 @@ afterELSE:
         sta VAL1
       .byte "]"
 
-        .byte "|%A-=",'E'+128,";"
+        .byte "|%A-=",_E,";"
       .byte "[:"
         sec
         eor #$ff
@@ -2259,7 +2287,7 @@ afterELSE:
         sta VAL1
       .byte "]"
 
-        .byte "|%A&=",'E'+128,";"
+        .byte "|%A&=",_E,";"
       .byte "[:"
         and VAL0
         sta VAL0
@@ -2268,7 +2296,7 @@ afterELSE:
         sta VAL1
       .byte "]"
 
-        .byte "|%A\|=",'E'+128,";"
+        .byte "|%A\|=",_E,";"
       .byte "[:"
         ora VAL0
         sta VAL0
@@ -2277,7 +2305,7 @@ afterELSE:
         sta VAL1
       .byte "]"
 
-        .byte "|%A^=",'E'+128,";"
+        .byte "|%A^=",_E,";"
       .byte "[:"
         eor VAL0
         sta VAL0
@@ -2303,14 +2331,14 @@ afterELSE:
         ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
         ;; (unless we use a stack...)
-        .byte "|%A=",'E'+128,";"
+        .byte "|%A=",_E,";"
       .byte "[:"                ; ':' => tos=dos
         sta VAL0
         stx VAL1
       .byte "]"
 
 .ifdef POINTERS
-        .byte "|*%A=",'E'+128,";"
+        .byte "|*%A=",_E,";"
       .byte "[:"
         ldy VAL0
         sty tos
@@ -2325,7 +2353,7 @@ afterELSE:
       .byte "]"
 .endif ; POINTERS
 
-        .byte "|",'E'+128,";"
+        .byte "|",_E,";"
 
         ;; empty statement is legal
         .byte "|;"
