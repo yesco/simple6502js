@@ -2846,15 +2846,18 @@ vnext:
 .endif ; TESTING
 
 
+;;; not physicaly allocated in binary
+.bss
 _output:
         ;; fill with RTS - "safer"
 ;        _RTS=$60
-;        .res 8*1024, _RTS
+        .res 8*1024
 
 ;;; Some variants save on codegen by using a library
 
 ;;; LIBRARY
 
+.code
 library:        
 ;;; (- #xdad #xd4d) = 96 B
 
