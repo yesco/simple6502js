@@ -53,6 +53,7 @@
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
+;;; - 3 @+ v          byte operator (acts only on A)
 ;;; 
 ;;; Limits
 ;;; - only *unsigned* values
@@ -117,7 +118,7 @@
 ;;;               and changed int=>word char=>byte
 
 ;;;   383 bytes = MINIMAL   (rules + library)
-;;;   501 bytes = NORMAL    
+;;;   501 bytes = NORMAL
 ;;;   660 bytes = BYTERULES (+ 159 B)
 ;;;   821 bytes = OPTRULES  (+ 320 B)
 
@@ -246,8 +247,9 @@
 ;OPTRULES=1
 
 ;;; Byte optimized rules
-;
-BYTERULES=1
+;;; typically used as prefix for BYTE operators
+;;; (only operating on register A, no overflow etc)
+;BYTERULES=1
 
 ;;; Pointers: &v *v= *v
 ;POINTERS=1
