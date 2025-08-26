@@ -76,6 +76,7 @@
 ;;; MINIMAL   :   980 bytes = (+ 597  383) inc LIB!
 ;;; NORMAL    :  1098 bytes = (+ 597  501)
 ;;; OPTRULES  :  1418 bytes = (+ 597  821)
+;;; BYTERULES :
 ;;; LONGNAMES : 
 ;;; 
 ;;;    193 bytes backtrack parse w rule
@@ -115,10 +116,10 @@
 ;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
 ;;;               and changed int=>word char=>byte
 
-;;;   821 bytes = OPTRULES
-;;;   501 bytes = NORMAL
-;;;   383 bytes = MINIMAL (rules + library)
-
+;;;   383 bytes = MINIMAL   (rules + library)
+;;;   501 bytes = NORMAL    
+;;;   660 bytes = BYTERULES (+ 159 B)
+;;;   821 bytes = OPTRULES  (+ 320 B)
 
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
@@ -243,6 +244,10 @@
 ;;; 
 ;;; &0xff00 &0xff <<8 >>8 >>v <<v
 ;OPTRULES=1
+
+;;; Byte optimized rules
+;
+BYTERULES=1
 
 ;;; Pointers: &v *v= *v
 ;POINTERS=1
@@ -1502,6 +1507,40 @@ ruleC:
       .byte ']'
 
 
+.ifdef BYTERULES
+;;; TODO: FUNS?
+
+.ifdef POINTERS
+        .byte "|@*%V"
+      .byte '['
+;;; TODO: test
+        lda VAL0
+        sta tos
+        lda VAL1
+        sta tos+1
+
+        ldy #1
+        lda (tos),y
+        ldx #0
+      .byte ']'
+.endif ; POINTERS
+        
+        ;; variable
+        .byte "|@%V"
+      .byte '['
+        lda VAL0
+        ldx #0
+      .byte ']'
+
+        .byte "|%D"
+      .byte '['
+        lda #'<'
+        ldx #0
+      .byte ']'
+
+.endif ; BYTERULES
+
+
 .ifdef FUNS
         ;; function call
         .byte "|%F()"
@@ -1593,21 +1632,141 @@ ruleD:
       .byte "]"
         .byte _D
 
+
+;;; ----------------------------------------
+.ifdef BYTERULES
+
+        .byte "|@+%V"
+      .byte '['
+        clc
+        adc VAL0
+      .byte ']'
+        .byte _D
+
+        .byte "|@+%D"
+      .byte '['
+        clc
+        adc #'<'
+      .byte ']'
+        .byte _D
+
+;;; 18 *2
+        .byte "|@-%D"
+      .byte '['
+        sec
+        sbc VAL0
+      .byte ']'
+        .byte _D
+
+        .byte "|@-%D"
+      .byte '['
+        sec
+        sbc #'<'
+      .byte ']'
+        .byte _D
+
+;;; 17 *2
+        .byte "@|&%V"
+      .byte '['
+        and VAL0
+      .byte ']'
+        .byte _D
+
+        .byte "|@&%D"
+      .byte '['
+        and #'<'
+      .byte ']'
+        .byte _D
+
+.ifnblank
+;;; TODO: \ quoting
+;;; 17 *2
+        .byte "|@\|%V"
+      .byte '['
+        ora VAL0
+      .byte ']'
+        .byte _D
+
+        .byte "|@\|%D"
+      .byte '['
+        ora #'<'
+      .byte ']'
+        .byte _D
+.endif ; NBLANK
+
+;;; 17 *2
+        .byte "|@^%V"
+      .byte '['
+        eor VAL0
+      .byte ']'
+        .byte _D
+
+        .byte "|@^%D"
+      .byte '['
+        eor #'<'
+      .byte ']'
+        .byte _D
+
+;;; 24
+        
+        .byte "|@/2"
+      .byte '['
+        lsr
+      .byte ']'
+        .byte _D
+
+        .byte "|@*2"
+      .byte '['
+        asl
+      .byte ']'
+        .byte _D
+
+;;; ==
+
+        .byte "|@==%V"
+      .byte '['
+        ldy #0
+        cmp VAL0
+        bne @neqv
+        ;; eq => -1
+        dey
+        ;; neq => 0
+@neqv:
+        tya
+      .byte ']'
+        .byte _D
+
+        .byte "|@==%D"
+      .byte '['
+        ldy #0
+        cmp #'<'
+        bne @neqd
+        ;; eq => -1
+        dey
+        ;; neq => 0
+@neqd:
+        tya
+      .byte ']'
+        .byte _D
+
+.endif ; BYTERULES
+;;; ----------------------------------------
+
 .ifdef MINIMAL
 
-        .byte '|','+',_U
+        .byte "|+",_U
       .byte '['
         jsr _PLUS
       .byte ']'
         .byte _D
 
-        .byte '|','+',_U
+        .byte "|+",_U
       .byte '['
         jsr _MINUS
       .byte ']'
         .byte _D
 
-        .byte '|','&',_U
+        .byte "|&",_U
       .byte '['
         jsr _AND
       .byte ']'
@@ -1619,7 +1778,7 @@ ruleD:
       .byte ']'
         .byte _D
 
-        .byte '|','^',_C
+        .byte "|^",_C
       .byte '['
         jsr _EOR
       .byte ']'
@@ -1873,13 +2032,13 @@ ruleD:
         ;; 15
         ldy #0
         cmp VAL0
-        bne @neqv
+        bne :+
         cpx VAL1
-        bne @neqv
+        bne :+
         ;; eq => -1
         dey
         ;; neq => 0
-@neqv:
+:       
         tya
         tax
       .byte ']'
@@ -1890,13 +2049,13 @@ ruleD:
         ;; 13
         ldy #0
         cmp #'<'
-        bne @neqd
+        bne :+
         cpx #'>'
-        bne @neqd
+        bne :+
         ;; eq => -1
         dey
         ;; neq => 0
-@neqd:
+:       
         tya
         tax
       .byte ']'
@@ -1986,6 +2145,7 @@ ruleP:
 ruleT:  
 ;;; TODO: don't use int/char as they can be SIGNED!
         .byte "word|byte|void",0
+
 
 .ifdef BNFLONG
 
