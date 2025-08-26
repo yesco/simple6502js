@@ -53,3 +53,5 @@ ca65 $name-asm.asm -l $name-asm.s 2>/dev/null 1>/dev/null
 cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -g $name.tap $nam.bin ORIC/$nam.tap
 
 ./map $name
+
+ls -l $name.*

@@ -11,11 +11,11 @@ extern void* endfirstpage;
 #include "disasm.c"
 
 unsigned char* last= 0;
-extern char *out, *output;
+extern char *out, output;
 
 // disasm from last position/call
 extern void dasm() {
-  if (!last) last= output;
+  if (!last || last==out) last= &output;
   // TODO: this hangs as printf data in ZP corrupted?
   // TODO: use my own printf? lol
   // TODO: define putd(),puth(),put2h()...
