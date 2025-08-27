@@ -472,7 +472,9 @@ FUNC _next
 ;;; Actual code to process rule, lol
 
         lda (rule),y
-        beq _acceptrule
+        bne :+
+        jmp _acceptrule
+:       
         bmi _enterrule
         cmp #'\'
         beq quoted
@@ -488,15 +490,53 @@ FUNC _next
         ;; - [ gen-rule
         cmp #'['
 ;beq _generate
-        bne testeq
+        bne :+
         jmp _generate
+:       
+        ;; - *R repeat rule
+        cmp #'*'
+        bne testeq
+        jsr _incR
+        ;; -- put magical things on stack
+        ;; when R finally fails we should skip to next
 
-        ;; \[ for example, match special chars
+;;; TODO: could we just put end marker?
+.ifnblank
+        lda #42
+        pha
+        ;; lol-? hmmm
+        jsr _next
+.endif
+
+        ;; -- push current rule again
+        lda rule+1
+        pha
+        lda rule
+        pha
+        lda rulename
+        pha
+        ;; -- push 'i' inp+1; // after "*R"
+        clc
+        lda #1
+        adc inp
+        tay
+        lda #0
+        adc inp+1
+        pha
+        tay
+        pha
+        lda #'i'
+        pha
+
+        jmp _next
+
+
 quoted:
+        ;; \[ for example, match special chars
         jsr _incR
         lda (rule),y
-testeq: 
 
+testeq: 
         ;; lit eq?
         cmp (inp),y
         beq _eq
@@ -600,6 +640,8 @@ FUNC _acceptrule
         ;; - done?
         cmp #42
         bne @skip
+;;; TODO: rts for *R repeated?
+        lda #0                  ; ok
         jmp _donecompile
 @skip:
         
@@ -745,6 +787,7 @@ restoreinp:
 ;;;  (means? still have input?)
 ;        bmi gotendall
         bmi gotrule
+;;; TODO: RTS for *R repeated?
         cmp #42
         beq _donecompile
 
@@ -819,10 +862,12 @@ jsr putchar
         jmp uprule
 
 
-_donecompile:   
+_donecompile:
 .ifdef DEBUGRULE
         jsr printstack
 .endif
+        ;; no errors
+        lda #0
         jmp _aftercompile
 
 
@@ -846,6 +891,8 @@ failed:
 gotrule:
         lda #'X'
         ;; fall-through to error
+;;; After error, it calls _aftercompile
+;;; A register contains error
 error:
         pha
         putc 10
@@ -853,7 +900,7 @@ error:
         pla
         jsr putchar
 
-        jmp _aftercompile
+        jmp _edit
 halt:
         jmp halt
 
@@ -2736,24 +2783,31 @@ _double:
         rts
 
 FUNC _aftercompile
+;;; doesn't set A!=0 if no match/fail just errors!
+;        sta err
 
-;;; TODO: printz
-        putc 10
-        putc '6'
-        putc '5'
-        putc 'm'
-        putc 'u'
-        putc 'c'
-        putc 'c'
-        putc '0'
-        putc '2'
-        putc 10
+.macro SCREENRC r,c
+        .word $BB80+40*r+c-2
+.endmacro
+
+        .data
+status: 
+        SCREENRC 0,0
+        ;;     ////////////////////////////////////////
+        .byte "65muccC02 (C) '25 jsk@yesco.org",0
+.code
+        lda #<status
+        ldx #>status
+        jsr memcpyz
+
+;        PRINTZ {10,10,"65mucc02",10}
+;        PRINTZ {"(C)2025 Jonas S Karlsson jsk@yesco.org",10}
 
         ;; failed?
         ;; (not stand at end of source)
         ldy #0
         lda (inp),y
-        beq @OK
+        beq _OK
 
 .ifdef ERRPOS
         ;; hibit string near error!
@@ -2767,7 +2821,6 @@ FUNC _aftercompile
        
 .ifdef PRINTINPUT
 ;;; TODO: printz? printR?
-        putc 10
 
         lda #<input
         sta pos
@@ -2802,7 +2855,7 @@ FUNC _aftercompile
 ;;; LOOPS: lol
 
 
-@OK:
+_OK:
         putc 10
         putc 'O'
         putc 'K'
@@ -2838,10 +2891,10 @@ FUNC _aftercompile
 ;;; full screen editor on ORIC ATMOS
 ;;; - CTRL-C : compile program & run
 ;;; - CTRL-R : run
-;;; - CTRL-Q : disasm
+;;; - CTRL-L : display source for editing
+;;; 
+;;; - CTRL-Q : disasm compiled code
 ;;; - CTRL-Z : disasm mucc
-;;; - CTRL-L :
-
 
 ;;; - just use BASIC terminal!
 ;;; - add "save" (to tape? load from tape?)
@@ -2850,6 +2903,30 @@ FUNC _aftercompile
 ;;;   + ^O insert newline
 ;;;   + ^K remove line
 ;;;   + ^A ^E navigation ^F ^B
+
+;;; ORIC terminal magical chars
+;;; -(CTRL-A : copy char under cursor)
+;;; -(CTRL-C : break)
+;;; - CTRL-D : auto double height
+;;; - CTRL-F : toggle keyclick
+;;; - CTRL-G : BELL
+;;; - CTRL-H : backspace
+;;; - CTRL-I : forward
+;;; - CTRL-J : line feed
+;;; - CTRL-K : up
+;;; - CTRL-L : clear screen
+;;; - CTRL-M : carriage return
+;;; - CTRL-N : clear row
+;;; - CTRL-O : toggle screen (disable)
+;;; - CTRL-P : toggle printer
+;;; - CTRL-Q : toggle cursor
+;;; - CTRL-S : toggle screen on/off
+;;; - CTRL-T : toggle CAPS
+;;; -(CTRL-X : cancel line)
+
+;;; - CTRL- toggle protected column ORIC-1 only? (say ^I)
+
+
 _edit:  
         ;; TODO: getchar already echoes!!!
         jsr getchar
@@ -2865,12 +2942,14 @@ _edit:
         cmp #'R'-'@'
         bne :+
 
+        jsr clrscr
         jmp _aftercompile
 :       
         ;; - ctrl-q - disasm
         cmp #'Q'-'@'
         bne :+
 
+        jsr clrscr
         jsr _dasm
         jmp _edit
 :       
@@ -2878,6 +2957,7 @@ _edit:
         cmp #'Z'-'@'
         bne :+
 
+        jsr clrscr
         jsr _dasmcc
         jmp _edit
 :       
@@ -2886,11 +2966,10 @@ _edit:
         bne  :+
 
         jsr clrscr
-        ;; TODO: many places?
         lda #<input
-        sta tos
-        lda #>input
-        sta tos+1
+        ldx #>input
+        jsr _printz
+
 ;;TODO:
 ;        jsr printz
 
@@ -2903,6 +2982,27 @@ clrscr:
         lda #12
         jmp putchar
 
+;;; Copies memory from AX address (+2) to 
+;;; destination address (first two bytes).
+;;; String is zero-terminated.
+memcpyz:
+        sta tos
+        stx tos+1
+
+        ldy #0
+        lda (tos),y
+        sta dos
+        iny
+        lda (tos),y
+        sta dos+1
+copyz:  
+        iny
+        lda (tos),y
+        beq :+
+        sta (dos),y
+        bne copyz
+:       
+        rts
 
 
 FUNC printvar
@@ -3055,13 +3155,10 @@ FUNC printstack
 ;;;   typedef unsigned char byte;
 ;;; 
 input:
-        ;; quoted test
-        .byte "[]",0
-
         ;; byte arrays
-        .byte "byte a[42];"
-        .byte "word main(){ a@[3]=20; a@[7]=22;"
-        .byte "  return a@[3]+a@[3];"
+        .byte "byte a[42];",10
+        .byte "word main(){ a@[3]=20; a@[7]=22;",10
+        .byte "  return a@[3]+a@[3];",10
         .byte "}",0
 
 
@@ -3156,6 +3253,10 @@ input:
         .endrep
         .byte "return a;"
         .byte "}",0
+
+
+        ;; quoted test
+        .byte "[]",0
 
         .byte "word main(){ return 3<3; }",0
         .byte "word main(){ if(1) a=42; return a;}",0

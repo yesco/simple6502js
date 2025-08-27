@@ -206,8 +206,6 @@ printit:
 
 
 
-.ifnblank
-
 ;;; maybe B doesn't pop as well as O?
 ;        .byte DUP,"@",DUP,"B_",+2,0,DUP,"OIB",WRITEZ
 ;;; 12 B (3 dup)
@@ -219,20 +217,33 @@ printit:
 ;;; 
 ;;; nextc: dup @ swap I swap  # 5
 
+.macro PRINTZ msg
+.data
+:       
+        .byte msg,0
+.code
+        lda #<:-
+        ldx #>:-
+        jsr _printz
+.endmacro
+
 ;;; if had an ITERATOR : dup II swap D swasp @ ;
 ;;; 
 ;;; 12 B
-FUNC "_printz"
-_writez: 
+FUNC _printz
+        sta tos
+        stx tos+1
+
         ldy #0
+_writez:        
         lda (tos),y
-        beq _pop
-        jsr _out                ; canNOT uJSR
+        beq :+
+        jsr putchar
         iny
         bne _writez
+:       
+        rts
 
-
-.endif
 
 ;;; TODO: this is duplcated code in test 
 ;;;   maybe do include?
