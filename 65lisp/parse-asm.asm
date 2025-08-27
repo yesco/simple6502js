@@ -191,6 +191,7 @@
 ;;; of printable bytecodes.
 ;;;
 ;;;      "#'+2347:;<>?BCDGKOZ[\\]_bcdgkortwz{|
+;;;      "#' 2347 ;  ?BCDGKOZ \\ _bcdgkortwz{|
 ;;; 
 ;;; The following are used:
 ;;; 
@@ -347,6 +348,7 @@ pframe:
 FUNC _init
 ;;; 21 B
 
+        ;; init/reset stack
         ldx #$ff
         txs
 
@@ -355,6 +357,7 @@ FUNC _init
         putc 10
 .endif ; DEBUG
 
+        ;; init input
         lda #<input
         sta inp
 .ifdef ERRPOS
@@ -365,10 +368,16 @@ FUNC _init
 .ifdef ERRPOS
         sta erp+1
 .endif        
+
+        ;; init _out vector
         lda #<_output
         sta _out
         lda #>_output
         sta _out+1
+        ;; store an rts for safety
+        _RTS=$60
+        lda #_RTS
+        sta _output
 
 .ifdef LONGNAMES
         lda #<vnext
@@ -418,37 +427,7 @@ putc 10
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
 FUNC _next
-;;; 16 B
         ldy #0
-.ifdef DEBUG
-;    PUTC ' '
-    PUTC 10
-    lda (rule),y
-    jsr putchar
-.endif ; DEBUG
-
-;;; TODO: ;;;;;
-.ifdef xDEBUGRULE
-;    PUTC ' '
-    PUTC 10
-    lda (rule),y
-    jsr putchar
-.endif ; DEBUG
-        lda (rule),y
-        beq _acceptrule
-        bmi _enterrule
-
-;;; TODO: reorder
-        ;; also end-rule
-        cmp #'|'
-        beq _acceptrule
-        ;; gen-rule
-        cmp #'['
-;beq _generate
-        bne testeq
-        jmp _generate
-
-testeq: 
 
 .ifdef DEBUGRULE
     pha
@@ -475,31 +454,72 @@ testeq:
   .endif
 .endif ; DEBUG
 
+.ifdef DEBUG
+;    PUTC ' '
+    PUTC 10
+    lda (rule),y
+    jsr putchar
+.endif ; DEBUG
+
+;;; TODO: ;;;;;
+.ifdef xDEBUGRULE
+;    PUTC ' '
+    PUTC 10
+    lda (rule),y
+    jsr putchar
+.endif ; DEBUG
+
+;;; Actual code to process rule, lol
+
+        lda (rule),y
+        beq _acceptrule
+        bmi _enterrule
+        cmp #'\'
+        beq quoted
+
+        ;; - | also end-rule
+        cmp #'|'
+        beq _acceptrule
+
+	;; - % handle special matchers
+        cmp #'%'
+        beq percent
+
+        ;; - [ gen-rule
+        cmp #'['
+;beq _generate
+        bne testeq
+        jmp _generate
+
+        ;; \[ for example, match special chars
+quoted:
+        jsr _incR
+        lda (rule),y
+testeq: 
+
         ;; lit eq?
         cmp (inp),y
-;;; TODO:
-;        bne _fail
         beq _eq
 
-;;; %. handle special matchers
-        cmp #'%'
-        bne failjmp
 
+
+percent:        
         ;; special %?
         jsr _incR
         ldy #0
         lda (rule),y
         ;; assumes A not modified
         jsr _incR
-;;; %D - digits
+
+        ;; %D - digits
         cmp #'D'
         beq isdigits
 isvar:    
         ;; % anything...
-        ;; %V (or %W)
+        ;; %V (or %F %f %...)
         jmp _var
 
-failjmp:        
+failjmp:
         jmp _fail
 
 isdigits:       
@@ -1510,7 +1530,7 @@ ruleB:
 
 ;;; "Constant"/(variable) (simple, lol)
 ruleC: 
-
+        
         ;; "IO-lib" hack
         .byte "printd(",_E,")"
       .byte '['
@@ -1538,9 +1558,63 @@ ruleC:
       .byte ']'
 
 
+        ;; cast to char/byte == &0xff !
+        .byte "|(byte)",_C
+      .byte '['
+        ldx #0
+      .byte ']'
+
+        ;; casting - ignore!
+        ;; (we don't care legal, just accept if correct)
+        .byte "|(%V\*)",_C
+      .byte '['
+
 .ifdef BYTERULES
 ;;; TODO: FUNS?
 
+        ;; 25 B (+ 6 15 4) - byte
+        ;; 29 B            - word
+        .byte "|%V@\["
+      .byte '['
+;;; TODO: this assumes %V gives adress
+;;;   but is just pointer to address, lol...
+;;;   lda (tos),y ... 
+        ;; 6
+        lda #'>'
+        pha
+        lda #'<'
+        pha
+      .byte ']'
+        .byte _E,"]"
+      .byte '['
+;;; TODO: use existing stack library?
+        ;; 15
+        ;; lo
+        sta tos
+        pla
+        clc
+        adc tos
+        sta tos
+        ;; hi
+        stx tos+1
+        pla
+        adc tos+1
+        sta tos+1
+        ;; load
+.ifdef WORD
+        ;; 8
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+.else ; BYTE
+        ;; 4
+        ldy #0
+        lda (tos),y
+.endif
+      .byte ']'
+        
 .ifdef POINTERS
         .byte "|@*%V"
       .byte '['
@@ -2169,6 +2243,7 @@ ruleF:
 ;;; Program
 ruleP:  
 
+
 .ifndef FUNS
 
 .ifdef LONGNAMES
@@ -2578,6 +2653,49 @@ afterELSE:
       .byte "]"
 .endif ; POINTERS
 
+.ifdef BYTERULES
+        ;; TODO: this is now limited to 256 index
+        ;; bytes@[%D]= ... fixed address... hmmm
+        .byte "|%A@\[%D\]="
+      .byte '['
+        ;; prepare index
+        lda '<'
+        pha
+      .byte ']'
+        .byte _E,";"
+      .byte "[:"
+        ;; load index
+        tax
+        pla
+        tay
+        txa
+
+        sta VAL0,y
+      .byte "]"
+.endif ; BYTERULES
+
+        ;; TODO: this is now limited to 128 index
+        ;; word[%D]= ... fixed address... hmmm
+        .byte "|%A\[%D\]="
+      .byte '['
+        ;; prepare index (*2)
+        lda '<'
+        asl
+        pha
+      .byte ']'
+        .byte _E,";"
+      .byte "[:"
+        ;; load index
+        sta savea
+        pla
+        tay
+        lda savea
+
+        sta VAL0,y
+        txa
+        sta VAL1,y
+      .byte "]"
+
         .byte "|",_E,";"
 
         ;; empty statement is legal
@@ -2937,6 +3055,15 @@ FUNC printstack
 ;;;   typedef unsigned char byte;
 ;;; 
 input:
+        ;; quoted test
+        .byte "[]",0
+
+        ;; byte arrays
+        .byte "byte a[42];"
+        .byte "word main(){ a@[3]=20; a@[7]=22;"
+        .byte "  return a@[3]+a@[3];"
+        .byte "}",0
+
 
 
 ;;; Byte Sieve Benchmark! (OLD)
@@ -3227,8 +3354,6 @@ vnext:
 ;;; not physicaly allocated in binary
 .bss
 _output:
-        ;; initial RTS to make it safe
-        rts
         .res 8*1024
 
 ;;; Some variants save on codegen by using a library
