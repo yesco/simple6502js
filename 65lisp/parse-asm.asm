@@ -2794,7 +2794,7 @@ FUNC _aftercompile
 status: 
         SCREENRC 0,0
         ;;     ////////////////////////////////////////
-        .byte "65muccC02 (C) '25 jsk@yesco.org",0
+        .byte "CC02 (C) 2025 jsk@yesco.org",0
 .code
         lda #<status
         ldx #>status
