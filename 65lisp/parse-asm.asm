@@ -2927,6 +2927,30 @@ _OK:
 ;;; - CTRL- toggle protected column ORIC-1 only? (say ^I)
 
 
+;;; #26A -- Oric status byte. Each bit relates to
+;;; one aspect: from high bit to low bit – unused,
+;;; double-height, protected-columns, ESC pressed,
+;;; keyclick, unused, screen-on, cursor-off.
+
+;;; TODO: not working?
+        lda #%00101010
+        sta $26a
+;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
+
+;;; TODO: not working?
+        lda #0
+        sta $24e
+;;; $24F (KBRPT) repeat rate for keyboard repeat, def 4
+
+;;; TODO: not working?
+        lda #0
+        sta $24f
+
+ORIC_ROWADDR=$12
+ORIC_CURROW=$268
+ORIC_CURCOL=$269
+ORIC_CURCALC=$001f              ; ?
+
 _edit:  
         ;; TODO: getchar already echoes!!!
         jsr getchar
@@ -2936,9 +2960,56 @@ _edit:
         bne :+
 
 ;;; TODO: can compile few times, something messed up?
+        jsr clrscr
+        ;; This basically restarts program, lol
         jmp _init
 :       
-        ;; - ctrl-R - run
+        ;; - ctrl-A - beginning of text in line
+        cmp #'A'-'@'
+        bne :+
+
+        lda #'M'-'@'
+        jsr putchar
+
+        ;; move to first nonspace
+ctrla:  
+        ldy ORIC_CURCOL
+        lda (ORIC_ROWADDR),y
+        cmp #' '+1
+        bmi _edit
+        ;; move forward
+        lda #'I'-'@'
+        jsr putchar
+        jmp ctrla
+:       
+        ;; - ctrl-E - end of text in line
+        cmp #'E'-'@'
+        bne :+
+
+        ;; move to end of line, lol
+        lda #'M'-'@'
+        jsr putchar
+        lda #'J'-'@'
+        jsr putchar
+        lda #8
+        jsr putchar
+
+        ;; move to first nonspace
+ctrle:  
+        ldy ORIC_CURCOL
+        lda (ORIC_ROWADDR),y
+        cmp #' '+1
+        bmi doneCE
+        ;; move back
+        lda #8                  ; BS
+        jsr putchar
+        jmp ctrle
+doneCE: 
+        ;; move one forward
+        lda #'I'-'@'
+        jsr putchar
+:       
+        ;; - ctrl-R - run/display error
         cmp #'R'-'@'
         bne :+
 
@@ -2995,13 +3066,19 @@ memcpyz:
         iny
         lda (tos),y
         sta dos+1
-copyz:  
         iny
+copyz:  
         lda (tos),y
-        beq :+
+        beq @done
         sta (dos),y
+        iny
         bne copyz
-:       
+        ;; y overflow
+        inc tos+1
+        inc dos+1
+        jmp copyz
+        bne copyz
+@done:       
         rts
 
 
@@ -3155,14 +3232,6 @@ FUNC printstack
 ;;;   typedef unsigned char byte;
 ;;; 
 input:
-        ;; byte arrays
-        .byte "byte a[42];",10
-        .byte "word main(){ a@[3]=20; a@[7]=22;",10
-        .byte "  return a@[3]+a@[3];",10
-        .byte "}",0
-
-
-
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
 ;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
@@ -3178,7 +3247,8 @@ input:
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
 
-;PRIME=1
+;
+PRIME=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
@@ -3227,6 +3297,13 @@ input:
         .byte 0
 
 .endif ; PRIME
+
+        ;; byte arrays
+        .byte "byte a[42];",10
+        .byte "word main(){ a@[3]=20; a@[7]=22;",10
+        .byte "  return a@[3]+a@[3];",10
+        .byte "}",0
+
 
         .byte "word main(){"
         ;; 48 => 15s lol - error

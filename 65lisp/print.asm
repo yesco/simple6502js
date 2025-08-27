@@ -241,6 +241,8 @@ _writez:
         jsr putchar
         iny
         bne _writez
+        inc tos+1
+        bne _writez
 :       
         rts
 
