@@ -303,8 +303,7 @@ TESTING=1
 ;SHOWINPUT=1
 
 ;;; gives a little bit more context for compile err...
-;
-TRACERULE=1
+;TRACERULE=1
 
 ;;; print input ON ERROR (after compile)
 ;
@@ -312,7 +311,8 @@ PRINTINPUT=1
 
 ;;; print characters while parsing (show how fast you get)
 ;
-;PRINTREAD=1
+;
+PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -3073,19 +3073,18 @@ _OK:
 ;;; one aspect: from high bit to low bit – unused,
 ;;; double-height, protected-columns, ESC pressed,
 ;;; keyclick, unused, screen-on, cursor-off.
+;;; (description sucks!)
 
-;;; TODO: not working?
-        lda #%00001010
+;;; 0,0,protected on=0!,0, 1=off,0,screen=on=1,cursor=on=1
+        lda #%00001011
         sta $26a
 ;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
-
-;;; TODO: not working?
-        lda #0
+        lda #8
         sta $24e
 ;;; $24F (KBRPT) repeat rate for keyboard repeat, def 4
 
 ;;; TODO: not working?
-        lda #0
+        lda #1
         sta $24f
 
 ;;; TODO: why is this not accepted?
