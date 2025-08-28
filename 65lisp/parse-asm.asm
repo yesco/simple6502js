@@ -255,6 +255,8 @@ CURCALC=$001f              ; ? how to update?
 
 ;;; enable stack checking at each _next
 ;;; (save some bytes by turn off)
+
+;;; TODO: if disabled maybe something wrong?
 ;
 CHECKSTACK=1
 
@@ -479,9 +481,10 @@ FUNC _next
 stackerror:     
         putc '%'
         putc 'S'
+        jsr printstack
+
         jmp halt
 :       
-
 .endif ; CHECKSTACK
 
 .ifdef DEBUGRULE
@@ -563,6 +566,9 @@ jmpaccept:
         cmp #'*'
         bne testeq
 
+;;; TODO: we could easily implement
+;;;    tail rule input support, just modify 'i'!
+
         ;; *R
         jsr _incR
         ;; -- put magical things on stack
@@ -608,7 +614,7 @@ testeq:
         ;; lit eq?
         cmp (inp),y
         beq _eq
-        bne _fail
+        bne failjmp
 
 percent:        
         ;; special %?
@@ -942,20 +948,30 @@ _donecompile:
 FUNC _errors
 ;;; 25 B
 
+;;; ? mismatch stack?
+unexpectedrule:
+.ifdef CHECKSTACK
+        putc '%'
+        putc 'R'
+        jmp stackerror
+.else
+        lda #'R'
+        SKIPTWO
+.endif
 illegalvar:     
         lda #'I'
         SKIPTWO
+;; Unexpected End of input
 gotendall:
         lda #'E'
         SKIPTWO
+;;; ???
 failrule:
         lda #'Z'
         SKIPTWO
-failed:   
+;;; Unexpected char?
+failed:
         lda #'F'
-        SKIPTWO
-unexpectedrule:
-        lda #'R'
         ;; fall-through to error
 
 ;;; After error, it calls _aftercompile
@@ -2575,15 +2591,17 @@ ruleK:
 
 ;;; Statement
 ruleS:
-        ;; BlOCK!
-;        .byte _B
+        ;; empty statement is legal
+        .byte ";"
 
         ;; RETURN
-;        .byte "|return",_E,";"
-        .byte "return",_E,";"
+        .byte "|return",_E,";"
       .byte '['
         rts
       .byte ']'
+
+        ;; BlOCK!
+;        .byte _B
 
 ;;; FAILS - forever!
 ;        .byte '|',_B
@@ -2834,9 +2852,6 @@ afterELSE:
       .byte "]"
 
         .byte "|",_E,";"
-
-        ;; empty statement is legal
-        .byte "|;"
 
         .byte 0
 
@@ -3464,6 +3479,7 @@ input:
 
 ;;; TOO high value triggers CHECKSTACK error!
         .repeat 25
+
 ;          .byte "a=a+1;"
           .byte "++a;"
         .endrep
