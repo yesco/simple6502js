@@ -222,6 +222,18 @@
 .export _output, _out
 
 
+;;; ORIC ADDRESSES
+;;; TODO: don't assume oric, lol
+SCREEN=$bb80
+SCREENEND=SCREEN+40*28+0
+ROWADDR=$12
+CURROW=$268
+CURCOL=$269
+CURCALC=$001f              ; ? how to update?
+
+;COMPILESCREEN=1
+
+
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
 
@@ -241,12 +253,17 @@
 .endmacro
 
 
+;;; enable stack checking at each _next
+;;; (save some bytes by turn off)
+;
+CHECKSTACK=1
+
 ;;; Minimal set of rules (+ LIBRARY)
 ;MINIMAL=1
 
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
-;;; &0xff00 &0xff <<8 >>8 >>v <<v
+;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
 ;
 OPTRULES=1
 
@@ -256,6 +273,7 @@ OPTRULES=1
 ;BYTERULES=1
 
 ;;; Pointers: &v *v= *v
+;;; TODO: not working
 ;POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
@@ -351,6 +369,11 @@ FUNC _init
         ;; init/reset stack
         ldx #$ff
         txs
+.ifdef CHECKSTACK
+        ;; sentinel - if these not there stack bad!
+        stx $100
+        stx $101
+.endif
 
 .ifdef DEBUG 
         putc 'S'
@@ -358,15 +381,28 @@ FUNC _init
 .endif ; DEBUG
 
         ;; init input
-        lda #<input
+.ifdef COMPILESCREEN
+        jsr printsrc
+
+        ;; "Zero terminate the screen!" LOL
+        lda #0
+        sta SCREENEND+1
+
+        COMPILESTART= SCREEN+40
+        ;; set screen as input
+.else
+        COMPILESTART= input
+.endif
+
+        lda #<(COMPILESTART-1)
+        ldx #>(COMPILESTART-1)
+
         sta inp
+        stx inp+1
+
 .ifdef ERRPOS
         sta erp
-.endif
-        lda #>input
-        sta inp+1
-.ifdef ERRPOS
-        sta erp+1
+        stx erp+1
 .endif        
 
         ;; init _out vector
@@ -424,16 +460,36 @@ putc 10
         jsr getchar
 .endif ; NDEBUG
 
+;;; TODO: why two?
+;        jsr _incIspc
+        jsr _incIspc
+
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
 FUNC _next
-        ldy #0
+
+.ifdef CHECKSTACK
+	;; check stack sentinel
+        lda #$ff
+        cmp $100
+        bne stackerror
+        cmp $101
+        bne stackerror
+        jmp :+
+stackerror:     
+        putc '%'
+        putc 'S'
+        jmp halt
+:       
+
+.endif ; CHECKSTACK
 
 .ifdef DEBUGRULE
     pha
     lda rulename
     jsr putchar
 ;    putc '.'
+    ldy #0
     lda (inp),y
     jsr putchar
     pla
@@ -442,12 +498,14 @@ FUNC _next
 .ifdef DEBUG
     pha
     PUTC ':'
+    ldy #0
     lda (inp),y
     jsr putchar
     pla
 .else
   .ifdef SHOWINPUT
     pha
+    ldy #0
     lda (inp),y
     jsr putchar
     pla
@@ -457,6 +515,7 @@ FUNC _next
 .ifdef DEBUG
 ;    PUTC ' '
     PUTC 10
+    ldy #0
     lda (rule),y
     jsr putchar
 .endif ; DEBUG
@@ -465,23 +524,31 @@ FUNC _next
 .ifdef xDEBUGRULE
 ;    PUTC ' '
     PUTC 10
+    ldy #0
     lda (rule),y
     jsr putchar
 .endif ; DEBUG
 
 ;;; Actual code to process rule, lol
 
+        ldy #0
         lda (rule),y
+
+        ;; hibit - new rule?
+        bmi _enterrule
+
+        ;; 0 - end?
         bne :+
+jmpaccept:      
         jmp _acceptrule
 :       
-        bmi _enterrule
+        ;; | - also end-rule
+        cmp #'|'
+        beq  jmpaccept
+
+        ;; \ - quoted
         cmp #'\'
         beq quoted
-
-        ;; - | also end-rule
-        cmp #'|'
-        beq _acceptrule
 
 	;; - % handle special matchers
         cmp #'%'
@@ -489,13 +556,14 @@ FUNC _next
 
         ;; - [ gen-rule
         cmp #'['
-;beq _generate
         bne :+
         jmp _generate
 :       
         ;; - *R repeat rule
         cmp #'*'
         bne testeq
+
+        ;; *R
         jsr _incR
         ;; -- put magical things on stack
         ;; when R finally fails we should skip to next
@@ -540,8 +608,7 @@ testeq:
         ;; lit eq?
         cmp (inp),y
         beq _eq
-
-
+        bne _fail
 
 percent:        
         ;; special %?
@@ -786,7 +853,7 @@ restoreinp:
 ;;; TODO: correct jump? is it error?
 ;;;  (means? still have input?)
 ;        bmi gotendall
-        bmi gotrule
+        bmi unexpectedrule
 ;;; TODO: RTS for *R repeated?
         cmp #42
         beq _donecompile
@@ -820,7 +887,6 @@ gotretry:
         sta inp+1
         txs
         jmp _next
-
 
 endrule:
 .ifdef DEBUGRULE
@@ -888,9 +954,10 @@ failrule:
 failed:   
         lda #'F'
         SKIPTWO
-gotrule:
-        lda #'X'
+unexpectedrule:
+        lda #'R'
         ;; fall-through to error
+
 ;;; After error, it calls _aftercompile
 ;;; A register contains error
 error:
@@ -900,7 +967,9 @@ error:
         pla
         jsr putchar
 
+        ;; go edit to fix again!
         jmp _edit
+
 halt:
         jmp halt
 
@@ -1012,6 +1081,8 @@ jsr putchar
     sta tos
 
     jsr printd
+
+    PRINTZ "HALT"
     jmp halt
 
 .else ; !LONGNAMES
@@ -1174,7 +1245,6 @@ failjmp2:
 
 
 
-
 FUNC _incIspc
 ;;; oops! this was actually important to save all regs!
         pha
@@ -1182,7 +1252,18 @@ FUNC _incIspc
         pha
         tya
         pha
+
+        ;; skips any char <= ' ' (incl attributes)
+        ;; this requires input be 1 less when starting
 @skipspc:
+.ifdef COMPILESCREEN
+        ;; mark last read character
+        ldy #0
+        lda (inp),y
+        ora #128
+        sta (inp),y
+.endif
+
         jsr _incI
         lda (0,x)
         beq @done
@@ -1212,7 +1293,16 @@ FUNC _incIspc
         ldy #0
         lda (erp),y
         jsr putchar
-
+.ifnblank
+        lda #'#'
+        jsr putchar
+        sta tos
+        lda #0
+        sta tos+1
+        jsr printd
+        lda #' '
+        jsr putchar
+.endif
         pla
 .endif
 
@@ -1614,7 +1704,7 @@ ruleC:
         ;; casting - ignore!
         ;; (we don't care legal, just accept if correct)
         .byte "|(%V\*)",_C
-      .byte '['
+
 
 .ifdef BYTERULES
 ;;; TODO: FUNS?
@@ -1663,7 +1753,7 @@ ruleC:
       .byte ']'
         
 .ifdef POINTERS
-        .byte "|@*%V"
+        .byte "|@\*%V"
       .byte '['
 ;;; TODO: test
         lda VAL0
@@ -1728,7 +1818,7 @@ ruleC:
         ldx #'>'
       .byte ']'
 
-        .byte "|*%V"
+        .byte "|\*%V"
       .byte '['
 ;;; TODO: test
         lda VAL0
@@ -1867,7 +1957,7 @@ ruleD:
       .byte ']'
         .byte _D
 
-        .byte "|@*2"
+        .byte "|@\*2"
       .byte '['
         asl
       .byte ']'
@@ -1955,7 +2045,7 @@ ruleD:
       .byte ']'
         .byte _D
 
-        .byte "|*2"
+        .byte "|\*2"
       .byte '['
         jsr _SHL
       .byte ']'
@@ -2123,7 +2213,7 @@ ruleD:
       .byte ']'
         .byte _D
 
-        .byte "|*2"
+        .byte "|\*2"
       .byte '['
         asl
         tay
@@ -2491,7 +2581,6 @@ ruleS:
         ;; RETURN
 ;        .byte "|return",_E,";"
         .byte "return",_E,";"
-
       .byte '['
         rts
       .byte ']'
@@ -2502,6 +2591,7 @@ ruleS:
         .byte "|{}"
 ;;; FAILS - forever!
 ;        .byte "|{",_A,"}"
+;;; TODO: fix, this will gen first S twice?
 ;;; works
         .byte "|{",_S,"}"
 ;;; FAILS - forever!
@@ -2786,16 +2876,13 @@ FUNC _aftercompile
 ;;; doesn't set A!=0 if no match/fail just errors!
 ;        sta err
 
-.macro SCREENRC r,c
-        .word $BB80+40*r+c-2
-.endmacro
-
         .data
 status: 
-        SCREENRC 0,0
+        .word $bb80-2
         ;;     ////////////////////////////////////////
         .byte "CC02 (C) 2025 jsk@yesco.org",0
 .code
+        ;; - from
         lda #<status
         ldx #>status
         jsr memcpyz
@@ -2817,6 +2904,13 @@ status:
         ora #128
         sta (erp),y
 .endif ; ERRPOS
+
+.ifdef COMPILESCREEN
+;;; TODO: ....
+        PRINTZ "HALT2"
+        jmp halt
+.endif
+
         ;; print it
        
 .ifdef PRINTINPUT
@@ -2946,10 +3040,9 @@ _OK:
         lda #0
         sta $24f
 
-ORIC_ROWADDR=$12
-ORIC_CURROW=$268
-ORIC_CURCOL=$269
-ORIC_CURCALC=$001f              ; ?
+;;; TODO: why is this not accepted?
+.define SCREENRC(r,c)   SCREEN+40*r+c-2
+
 
 _edit:  
         ;; TODO: getchar already echoes!!!
@@ -2960,6 +3053,34 @@ _edit:
         bne :+
 
 ;;; TODO: can compile few times, something messed up?
+        
+
+;;; TODO: this messes things up, ....more...
+;;;   not work as intended
+.ifnblank
+        ;; savescreen to input
+        ;; - from
+        lda #<$bb80
+        sta tos
+        lda #>$bb80
+        sta tos+1
+        ;; - to
+        lda #<input
+        ldx #>input
+        sta dos
+        stx dos+1
+        ;; 
+        ldy #0
+        jsr copyz
+        ;; zero terminate
+        iny
+        bne :+
+        inc dos+1
+:       
+        lda #0
+        sta (dos),y
+.endif
+
         jsr clrscr
         ;; This basically restarts program, lol
         jmp _init
@@ -2973,8 +3094,8 @@ _edit:
 
         ;; move to first nonspace
 ctrla:  
-        ldy ORIC_CURCOL
-        lda (ORIC_ROWADDR),y
+        ldy CURCOL
+        lda (ROWADDR),y
         cmp #' '+1
         bmi _edit
         ;; move forward
@@ -2996,8 +3117,8 @@ ctrla:
 
         ;; move to first nonspace
 ctrle:  
-        ldy ORIC_CURCOL
-        lda (ORIC_ROWADDR),y
+        ldy CURCOL
+        lda (ROWADDR),y
         cmp #' '+1
         bmi doneCE
         ;; move back
@@ -3033,13 +3154,10 @@ doneCE:
         jmp _edit
 :       
         ;; - ctrl-L - don't clear screen
-        cmp #12
+        cmp #'L'-'@'
         bne  :+
 
-        jsr clrscr
-        lda #<input
-        ldx #>input
-        jsr _printz
+        jsr printsrc
 
 ;;TODO:
 ;        jsr printz
@@ -3049,6 +3167,13 @@ doneCE:
 ;        jsr putchar
         jmp _edit
         
+
+printsrc:
+        jsr clrscr
+        lda #<input
+        ldx #>input
+        jmp _printz
+
 clrscr: 
         lda #12
         jmp putchar
@@ -3066,7 +3191,9 @@ memcpyz:
         iny
         lda (tos),y
         sta dos+1
+
         iny
+;;; if call here set Y=0
 copyz:  
         lda (tos),y
         beq @done
@@ -3076,7 +3203,6 @@ copyz:
         ;; y overflow
         inc tos+1
         inc dos+1
-        jmp copyz
         bne copyz
 @done:       
         rts
@@ -3231,7 +3357,18 @@ FUNC printstack
 ;;;   typedef unsigned int  word;
 ;;;   typedef unsigned char byte;
 ;;; 
+
+
+;;; This is just to keep input safe, lol
+;;; jsrIspc may mark prev as read, and or 
+;;; it could be used by memcpyz that need prefix?
+.byte 0,0
+
 input:
+
+;;; MINIMAL SANITY CHECK
+;;        .byte "word main(){return 4711;}",0
+
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
 ;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
@@ -3247,8 +3384,7 @@ input:
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
 
-;
-PRIME=1
+;PRIME=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
@@ -3298,12 +3434,13 @@ PRIME=1
 
 .endif ; PRIME
 
+.ifdef TESTARRAY
         ;; byte arrays
         .byte "byte a[42];",10
         .byte "word main(){ a@[3]=20; a@[7]=22;",10
         .byte "  return a@[3]+a@[3];",10
         .byte "}",0
-
+.endif
 
         .byte "word main(){"
         ;; 48 => 15s lol - error
@@ -3324,7 +3461,9 @@ PRIME=1
         ;;   ++a;   // 16 => 1s  136 bytes 
         ;;   ++a;   // 32 => 1s  264 bytes (/ 264 32) =  8
 ;        .byte "a=0;"
-        .repeat 32
+
+;;; TOO high value triggers CHECKSTACK error!
+        .repeat 25
 ;          .byte "a=a+1;"
           .byte "++a;"
         .endrep
@@ -3481,6 +3620,14 @@ docs:
         .byte "C-Vars  : a= ... ; ... =>a;", 10
 
 .endif ; INCTESTS
+
+morespace:
+        ;; ORIC SCREEN SIZE
+        ;; (save program/screen before compile to "input")
+        .res 28*40
+
+;;; END INPUT
+;;; ----------------------------------------
 
 
 vars:
