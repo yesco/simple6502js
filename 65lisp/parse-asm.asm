@@ -231,6 +231,7 @@ CURROW=$268
 CURCOL=$269
 CURCALC=$001f              ; ? how to update?
 
+;;; TODO: not good idea?
 ;COMPILESCREEN=1
 
 
@@ -301,13 +302,17 @@ TESTING=1
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
 
+;;; gives a little bit more context for compile err...
+;
+TRACERULE=1
+
 ;;; print input ON ERROR (after compile)
 ;
 PRINTINPUT=1
 
 ;;; print characters while parsing (show how fast you get)
 ;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -463,7 +468,9 @@ putc 10
 .endif ; NDEBUG
 
 ;;; TODO: why two?
-;        jsr _incIspc
+.ifdef COMPILESCREEN
+        jsr _incIspc
+.endif
         jsr _incIspc
 
 ;;; TODO: move this to "the middle" then
@@ -648,6 +655,13 @@ exitrule:
         jmp _next
 
 FUNC _enterrule
+.ifdef TRACERULE
+        putc '>'
+        ldy #0
+        lda (rule),y
+        jsr putchar
+.endif ; TRACEFULE
+
 ;;; 34 B
         ;; enter rule
         ;; - save current rulepos
@@ -695,6 +709,20 @@ FUNC _enterrule
 
 
 FUNC _acceptrule
+.ifdef TRACERULE
+        lda #8
+        jsr putchar
+        jsr putchar
+
+        lda #' '
+        jsr putchar
+        jsr putchar
+
+        lda #8
+        jsr putchar
+        jsr putchar
+.endif ; TRACERULE
+
 ;;; 19 B
     DEBC '<'
 .ifdef DEBUGRULE
@@ -777,10 +805,6 @@ uprule:
 
 
 FUNC _fail
-;;; TODO: test special matchers
-;;;   %D - digits
-;;;   %I - ident
-
 ;;; 25 B
 
 .ifdef SHOWINPUT
@@ -895,6 +919,7 @@ gotretry:
         jmp _next
 
 endrule:
+
 .ifdef DEBUGRULE
    putc 'E'
    jsr printstack
@@ -935,6 +960,9 @@ jsr putchar
 
 
 _donecompile:
+.ifdef TRACERULE
+        putc 10
+.endif
 .ifdef DEBUGRULE
         jsr printstack
 .endif
@@ -1276,12 +1304,18 @@ FUNC _incIspc
         ;; mark last read character
         ldy #0
         lda (inp),y
-        ora #128
+;;; Seems this messes things up a bit?
+;        ora #128
         sta (inp),y
+;;; TODO: this may get messed up when we backtrack!
 .endif
 
         jsr _incI
         lda (0,x)
+.ifdef COMPILESCREEN
+        and #127
+        sta (0,x)
+.endif
         beq @done
         cmp #' '+1
         bcc @skipspc
@@ -1309,23 +1343,22 @@ FUNC _incIspc
         ldy #0
         lda (erp),y
         jsr putchar
+
 .ifnblank
-        lda #'#'
-        jsr putchar
         sta tos
         lda #0
         sta tos+1
+        putc '#'
         jsr printd
-        lda #' '
-        jsr putchar
+        putc ' '
 .endif
+
         pla
 .endif
 
         sta erp
         lda inp+1
         sta erp+1
-
 @noupdate:
 .endif
 
@@ -3042,7 +3075,7 @@ _OK:
 ;;; keyclick, unused, screen-on, cursor-off.
 
 ;;; TODO: not working?
-        lda #%00101010
+        lda #%00001010
         sta $26a
 ;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
 
@@ -3375,7 +3408,7 @@ FUNC printstack
 
 
 ;;; This is just to keep input safe, lol
-;;; jsrIspc may mark prev as read, and or 
+;;; _incIspc may mark prev as read, and or 
 ;;; it could be used by memcpyz that need prefix?
 .byte 0,0
 
