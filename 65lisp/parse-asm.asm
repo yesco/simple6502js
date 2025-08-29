@@ -224,12 +224,13 @@
 
 ;;; ORIC ADDRESSES
 ;;; TODO: don't assume oric, lol
-SCREEN=$bb80
-SCREENEND=SCREEN+40*28+0
-ROWADDR=$12
-CURROW=$268
-CURCOL=$269
-CURCALC=$001f              ; ? how to update?
+SCREEN		= $bb80
+SCREENSIZE	= 40*28+0
+SCREENEND	= SCREEN+SCREENSIZE
+ROWADDR		= $12
+CURROW		= $268
+CURCOL		= $269
+CURCALC		= $001f      ; ? how to update?
 
 ;;; TODO: not good idea?
 ;COMPILESCREEN=1
@@ -3095,38 +3096,20 @@ _edit:
         ;; TODO: getchar already echoes!!!
         jsr getchar
 
+        ;; - ctrl-W - save
+        cmp #'W'-'@'
+        bne :+
+        
+        jsr savescreen
+        jmp _edit
+:       
         ;; - ctrl-C - compile
-        cmp #3
+        cmp #'C'-'@'
         bne :+
 
 ;;; TODO: can compile few times, something messed up?
-        
 
-;;; TODO: this messes things up, ....more...
-;;;   not work as intended
-.ifnblank
-        ;; savescreen to input
-        ;; - from
-        lda #<$bb80
-        sta tos
-        lda #>$bb80
-        sta tos+1
-        ;; - to
-        lda #<input
-        ldx #>input
-        sta dos
-        stx dos+1
-        ;; 
-        ldy #0
-        jsr copyz
-        ;; zero terminate
-        iny
-        bne :+
-        inc dos+1
-:       
-        lda #0
-        sta (dos),y
-.endif
+;;; TODO: detect dirty (?) and require save?
 
         jsr clrscr
         ;; This basically restarts program, lol
@@ -3200,15 +3183,18 @@ doneCE:
         jsr _dasmcc
         jmp _edit
 :       
-        ;; - ctrl-L - don't clear screen
+        ;; ctrl-Print (as source)
+;;; 10B dispatch should be 3B lol
+        cmp #'P'-'@'
+        bne :+
+        jsr printsrc
+        jmp _edit
+:       
+        ;; ctrl-Load
         cmp #'L'-'@'
         bne  :+
 
-        jsr printsrc
-
-;;TODO:
-;        jsr printz
-
+        jsr loadscreen
 :       
         ;; TODO: getchar already echoes!!!
 ;        jsr putchar
@@ -3241,6 +3227,8 @@ memcpyz:
 
         iny
 ;;; if call here set Y=0
+;;; tos= text from (lol)
+;;; dos= destination
 copyz:  
         lda (tos),y
         beq @done
@@ -3254,6 +3242,97 @@ copyz:
 @done:       
         rts
 
+FUNC savescreen
+        ;; from
+        lda #<SCREEN
+        ldx #>SCREEN
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<savedscreen
+        ldx #>savedscreen
+        sta dos
+        stx dos+1
+        ;; copy
+        ldy #<SCREENSIZE
+        ldx #>SCREENSIZE
+        
+memcpy: 
+        dey
+        lda (tos),y
+        sta (dos),y
+        tya
+        bne memcpy
+        txa
+        beq :+
+        dex
+        inc tos+1
+        inc dos+1
+        bne memcpy
+:
+        rts
+        
+FUNC loadscreen
+        ;; from
+        lda #<savedscreen
+        ldx #>savedscreen
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<SCREEN
+        ldx #>SCREEN
+        sta dos
+        stx dos+1
+        ;; copy
+        ldy #<SCREENSIZE
+        ldx #>SCREENSIZE
+
+        jsr memcpy
+
+;;; TODO: this messes things up, ....more...
+;;;   not work as intended
+FUNC savescreen2
+;;; TODO: saved in "compressed" format
+        ;; from
+        lda #<($bb80+40)
+        lda #>($bb80+40)
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<input
+        ldx #>input
+        sta dos
+        stx dos+1
+        ;; copy
+        ldy #0
+        jsr copyz
+        ;; zero terminate
+        iny
+        bne :+
+        inc dos+1
+:       
+        lda #0
+        sta (dos),y
+
+        rts
+
+FUNC loadscreen2
+        ;; from
+        lda #<input
+        ldx #>input
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<($bb80+40)
+        lda #>($bb80+40)
+        sta dos
+        stx dos+1
+        ;; copy
+        ldy #0
+        jsr copyz
+        ;; no need zero terminate
+
+        rts
 
 FUNC printvar
         sta tos
@@ -3669,10 +3748,40 @@ docs:
 
 .endif ; INCTESTS
 
-morespace:
+savedscreen:    
+        .byte "0123456789012345678901234567890123456789"
+        .byte "1111111111222222222233333333334444444444"
+        .byte "2                                       "
+        .byte "3 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "4 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "5 cccccccccccccccccccccccccccccccccccccc"
+        .byte "6 dddddddddddddddddddddddddddddddddddddd"
+        .byte "7 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "8 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "9 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "10 ccccccccccccccccccccccccccccccccccccc"
+        .byte "11 ddddddddddddddddddddddddddddddddddddd"
+        .byte "12 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "13 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "14 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "15 ccccccccccccccccccccccccccccccccccccc"
+        .byte "16 ddddddddddddddddddddddddddddddddddddd"
+        .byte "17 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "18 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "19 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "20 ccccccccccccccccccccccccccccccccccccc"
+        .byte "21 ddddddddddddddddddddddddddddddddddddd"
+        .byte "22 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "23 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "24 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "25 ccccccccccccccccccccccccccccccccccccc"
+        .byte "26 ddddddddddddddddddddddddddddddddddddd"
+        .byte "27 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",0
+        ;; not on sceen!
+        .byte "28 ####################################"
         ;; ORIC SCREEN SIZE
         ;; (save program/screen before compile to "input")
-        .res 28*40
+        .res SCREENSIZE+1
 
 ;;; END INPUT
 ;;; ----------------------------------------
