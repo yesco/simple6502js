@@ -312,8 +312,7 @@ PRINTINPUT=1
 
 ;;; print characters while parsing (show how fast you get)
 ;
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -3096,13 +3095,6 @@ _edit:
         ;; TODO: getchar already echoes!!!
         jsr getchar
 
-        ;; - ctrl-W - save
-        cmp #'W'-'@'
-        bne :+
-        
-        jsr savescreen
-        jmp _edit
-:       
         ;; - ctrl-C - compile
         cmp #'C'-'@'
         bne :+
@@ -3183,11 +3175,20 @@ doneCE:
         jsr _dasmcc
         jmp _edit
 :       
+
+
         ;; ctrl-Print (as source)
 ;;; 10B dispatch should be 3B lol
         cmp #'P'-'@'
         bne :+
         jsr printsrc
+        jmp _edit
+:       
+        ;; - ctrl-W - save
+        cmp #'W'-'@'
+        bne :+
+        
+        jsr savescreen
         jmp _edit
 :       
         ;; ctrl-Load
@@ -3196,6 +3197,8 @@ doneCE:
 
         jsr loadscreen
 :       
+        jmp _edit
+
         ;; TODO: getchar already echoes!!!
 ;        jsr putchar
         jmp _edit
@@ -3287,52 +3290,9 @@ FUNC loadscreen
         ldy #<SCREENSIZE
         ldx #>SCREENSIZE
 
-        jsr memcpy
+        jmp memcpy
+        
 
-;;; TODO: this messes things up, ....more...
-;;;   not work as intended
-FUNC savescreen2
-;;; TODO: saved in "compressed" format
-        ;; from
-        lda #<($bb80+40)
-        lda #>($bb80+40)
-        sta tos
-        stx tos+1
-        ;; to
-        lda #<input
-        ldx #>input
-        sta dos
-        stx dos+1
-        ;; copy
-        ldy #0
-        jsr copyz
-        ;; zero terminate
-        iny
-        bne :+
-        inc dos+1
-:       
-        lda #0
-        sta (dos),y
-
-        rts
-
-FUNC loadscreen2
-        ;; from
-        lda #<input
-        ldx #>input
-        sta tos
-        stx tos+1
-        ;; to
-        lda #<($bb80+40)
-        lda #>($bb80+40)
-        sta dos
-        stx dos+1
-        ;; copy
-        ldy #0
-        jsr copyz
-        ;; no need zero terminate
-
-        rts
 
 FUNC printvar
         sta tos
@@ -3748,6 +3708,7 @@ docs:
 
 .endif ; INCTESTS
 
+.res 128
 savedscreen:    
         .byte "0123456789012345678901234567890123456789"
         .byte "1111111111222222222233333333334444444444"
