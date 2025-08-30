@@ -352,8 +352,7 @@ PRINTINPUT=1
 ;;; print characters while parsing (show how fast you get)
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -3993,6 +3992,7 @@ FUNC printstack
 
 input:
 
+.ifdef GOTOtest
 ;;; MINIMAL SANITY CHECK
 ;;        .byte "word main(){return 4711;}",0
 ;;; minimal error
@@ -4001,8 +4001,17 @@ input:
 ;;; TODO: not found name need better error...
 ;;;      .byte "void main(){xyz(65);}",0
 
+        ;; Speed of Turbo Pascal on z80 (4 MHz)
+        ;; 2000 lines/less than 60s
+        ;; (/ 2000 55) = 36 lines/s
+
         ;; GOTO !
         ;; 
+        ;;      (/ 7 0.052) = 134 op compiles/s
+        ;; 
+        ;;                             7 "ops"/gen
+        ;;                        no PRINTREAD vvv
+        ;; = CC02: 57 bytes 10580c compile: 51796c=0.052s
         ;; = CC02: 57 bytes 10580c compile:  9044c
         ;; = CC02: 57 bytes 2.79cs compile:   24cs
         ;;            100x / 100
@@ -4032,7 +4041,7 @@ input:
         .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
 ;;; TODO: remove spaces crash in parse!!!!
         .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
-
+.endif ; GOOTTEST
 
 
 ;;; Byte Sieve Benchmark! (OLD)
@@ -4145,7 +4154,17 @@ input:
 ;        .byte "a=0;"
 
 ;;; TOO high value triggers CHECKSTACK error!
-        .repeat 25
+        ;; run: T340 compile: T6484
+;        .repeat 25           
+        ;; run: T 84          T26964
+        ;.repeat 12
+
+        ;; run: T 84          T55892
+        ;.repeat 0               ;  6cs
+        ;.repeat 10              ; 15cs
+        .repeat 20              ; 27cs
+        ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
+        ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
 
 ;          .byte "a=a+1;"
           .byte "++a;"
