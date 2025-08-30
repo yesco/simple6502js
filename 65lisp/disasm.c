@@ -105,7 +105,7 @@ void disasm(char* mc, char* end, char indent) {
       }
     }
     putchar('\n');
-  } putchar('\n');
+  } //putchar('\n');
 }
 
 #else

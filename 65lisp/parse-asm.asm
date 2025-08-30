@@ -1760,6 +1760,24 @@ ruleC:
         jsr printh
       .byte ']'
 
+.ifdef OPTRULES
+        ;; putchar constant - saves 2 bytes!
+        .byte "|putchar(%V)"
+      .byte '['
+        lda VAL0
+        jsr putchar
+;;; TODO: about return value...
+      .byte ']'
+
+        ;; putchar variable - saves 2 bytes!
+        .byte "|putchar(%D)"
+      .byte '['
+        lda #'<'
+        jsr putchar
+;;; TODO: about return value...
+      .byte ']'
+.endif ; OPTRULES
+
         .byte "|putchar(",_E,")"
       .byte '['
         jsr putchar
@@ -3780,6 +3798,7 @@ input:
 
         ;; GOTO !
         ;;   CC02: 68 bytes
+        ;;     putchar(%D|%V) => 63 (- 5!)
         ;;   cc65: 50 bytes
 
 
@@ -3788,6 +3807,9 @@ input:
 ;;;; ok
 ;        .byte "void main(){A:putchar(65);goto A;putchar(66);}",0
 ;        .byte "void main(){putchar(64);A:putchar(65);goto A;putchar(66);}",0
+
+;        .byte "void main(){ putchar(65); putchar(66); putchar(67); }",0
+
 ;;; ok
         .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
 ;;; TODO: remove spaces crash in parse!!!!

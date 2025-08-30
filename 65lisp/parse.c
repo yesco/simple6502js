@@ -11,7 +11,9 @@ extern void* endfirstpage;
 #include "disasm.c"
 
 unsigned char* last= 0;
+
 extern char *out, output;
+#pragma zpsym ("out")
 
 // disasm from last position/call
 extern void dasm() {
