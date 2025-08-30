@@ -397,6 +397,8 @@ FUNC _init
         ;; init/reset stack
         ldx #$ff
         txs
+        cld
+
 .ifdef CHECKSTACK
         ;; sentinel - if these not there stack bad!
         stx $100
@@ -2750,6 +2752,35 @@ afterELSE:
         jmp (VAL0)
       .byte "]"
 
+        ;; IF( var < num ) ... saves 9 B (- 63 54)
+        .byte "|if(%A<%D)"
+      .byte "["
+        ;; reverse cmp as <> NUM avail first
+        lda #'<'
+        ldx #'>'
+        ;; cmp with VAR
+        .byte ':'
+
+        cpx VAL1
+        bcc @nah                ; NUM<VAR (num.h<var.h)
+        ;;  NUM>=VAR ... VAR<=NUM
+        cmp VAL0
+        beq @nah
+        bcs @ok                 ; NUM>=VAR
+@nah:
+        jmp PUSHLOC
+@ok:        
+        ;; THEN-branch
+      .byte "]"
+        .byte _S
+.ifdef OPTRULES
+        ;; for ELSE, make sure value not 0!
+      .byte '['
+        lda #$ff
+      .byte ']'
+.endif ; OPTRULES
+      
+
         ;; IF(E)S; // no else
         .byte "|if(",_E,")"
       .byte '['
@@ -3798,7 +3829,8 @@ input:
 
         ;; GOTO !
         ;;   CC02: 68 bytes
-        ;;     putchar(%D|%V) => 63 (- 5!)
+        ;;     putchar(%D|%V) => 63 (- 5 B)
+        ;;     if(%V<%D)      => 54 (- 9 B)
         ;;   cc65: 50 bytes
 
 
