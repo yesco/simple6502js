@@ -272,6 +272,24 @@ CURCALC		= $001f      ; ? how to update?
         .byte $2c               ; BITabs 3 B
 .endmacro
 
+;;; TIMe events: compile/run
+;;; disables interrupts and counts cycles!
+;;; relatively accurately...
+;;; It also seems to make the compiler NOT crash
+;;; when run repeadetly... HMMM? "resetting" stack
+;;; not good when interrupts running????
+;;; (just enables interrupt before getchar)
+;TIM=1
+
+.ifblank
+;.ifnblank
+        .macro TIMER
+          jsr timer
+        .endmacro
+.else
+        .macro TIMER
+        .endmacro
+.endif
 
 ;;; enable stack checking at each _next
 ;;; (save some bytes by turn off)
@@ -400,6 +418,12 @@ FUNC _init
         ldx #$ff
         txs
         cld
+.ifdef TIM
+        sei
+.else
+        ;; let interrupts run like normal
+;        cld
+.endif
 
 .ifdef CHECKSTACK
         ;; sentinel - if these not there stack bad!
@@ -497,6 +521,12 @@ putc 10
         jsr _incIspc
 .endif
         jsr _incIspc
+
+
+;;; crashes, lol
+;        TIMER
+
+
 
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
@@ -985,6 +1015,7 @@ jsr putchar
 
 
 _donecompile:
+        TIMER
 
 .ifdef TRACERULE
         putc 10
@@ -3122,16 +3153,46 @@ _OK:
         putc 10
         putc 10
 
+        TIMER
+
+.zeropage
+runs:   .res 1
+.code
+
+        ;; RUN PROGRAM
+        lda #1
+        sta runs
+again:
         jsr _output
-        sta tos
-        stx tos+1
+
+;;; 2132 - 256 empty loops
+;;; (* 256 (+ 6 3)) = 2304 means (- 2304 2132)
+;;; = 172c overhead ???
+;;; 
+;;; 1108 - 128 empty loops
+;;; (* 128 (+ 6 3)) (- 1152 1108) = 45 overhead ???
+
+        dec runs
+        bne again
+
+        pha
+        txa
+        pha
+
+        TIMER
+
         putc 10
         putc '='
         putc '>'
         putc ' '
 
         ;; prints tos
+        pla
+        sta tos+1
+        pla
+        sta tos
         jsr printd
+
         putc 10
         
 
@@ -3194,8 +3255,15 @@ _OK:
 
 
 FUNC _edit  
+
         ;; TODO: getchar already echoes!!!
+.ifdef TIM
+        cli
         jsr getchar
+        sei
+.else
+        jsr getchar
+.endif
 
         ;; - ctrl-C - compile
         cmp #'C'-'@'
@@ -3208,6 +3276,7 @@ FUNC _edit
 ;;; TODO: detect dirty (?) and require save?
 
         ;; This basically restarts program, lol
+        TIMER
         jmp _init
 :       
         ;; - ctrl-D - delete char forward
@@ -3669,6 +3738,103 @@ nextpage:
 .endif ; MEMMAD
 
 
+TIMER_START	= $ffff
+SETTIMER        = $0306
+READTIMER	= $0304
+CSTIMER         = $0276
+
+
+FUNC timer
+.ifdef TIM
+        lda READTIMER
+        ;; TODO: could just see a flip!
+        ldx READTIMER+1
+        
+        ;; $ffff-AX
+        eor #$ff
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+
+        ;; print it
+        putc 10
+        putc 'T'
+        sta tos
+        stx tos+1
+        jsr printd
+;        putc 10
+        
+        lda #$ff
+        sta READTIMER
+        ;; this write triggers reset
+        sta READTIMER+1
+.endif ; TIM        
+
+
+        ;; software interrupt ORIC timer
+        ;; 100 ticks/s
+        lda CSTIMER
+        ldx CSTIMER+1
+        
+        ;; $ffff-AX
+CSRESET=1
+
+.ifdef CSRESET
+        eor #$ff
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+.else
+  .zeropage
+    lastcs:  .res 2
+  .code
+.ifnblank
+        sec
+        eor #$ff
+        adc lastcs
+        tay
+        txa
+        eor #$ff
+        adc lastcs+1
+        tax
+        tya
+.endif
+.endif
+        ;; print it
+.ifdef TIM
+        PUTC ' '
+.else
+        PUTC 10
+.endif
+        sta tos
+        stx tos+1
+
+        jsr printd
+        putc 'c'
+        putc 's'
+        putc 10
+
+.ifdef CSRESET
+        lda #$ff
+        sta CSTIMER
+        sta CSTIMER+1
+.else
+        sta lastcs
+        stx lastcs+1
+.endif
+
+.ifdef TIM
+        lda #$ff
+        ;; writing hibyte triggers
+        sta READTIMER
+        sta READTIMER+1
+.endif
+        rts
+
 FUNC printvar
         sta tos
         stx tos+1
@@ -3837,7 +4003,10 @@ input:
 
         ;; GOTO !
         ;; 
-        ;; = CC02: 57 bytes
+        ;; = CC02: 57 bytes 10580c compile:  9044c
+        ;; = CC02: 57 bytes 2.79cs compile:   24cs
+        ;;            100x / 100
+        ;; 
         ;;     putchar(%D|%V) => 63 (- 5 B)
         ;;     if(%V<%D)      => 57 (- 6 B)
         ;; 
