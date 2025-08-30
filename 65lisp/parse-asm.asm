@@ -3836,7 +3836,8 @@ input:
 ;;;      .byte "void main(){xyz(65);}",0
 
         ;; GOTO !
-        ;; = CC02: 57 bytes (-17 using byte)
+        ;; 
+        ;; = CC02: 57 bytes
         ;;     putchar(%D|%V) => 63 (- 5 B)
         ;;     if(%V<%D)      => 57 (- 6 B)
         ;; 
@@ -3844,7 +3845,10 @@ input:
         ;;     TODO: zp vars          -7 B
         ;;     jsr .. ; rts           -1 B
         ;;     if no ELSE support     -5 B
-        ;; = cc65: 50 bytes (-20 using byte) = 30 B
+        ;; 
+        ;; = cc65: 50 bytes 12613c compile: 112ms
+        ;;          (-20 using byte) = 30 B
+        ;;        
         ;; = asm:  15 bytes! (using register only)
 
 ;;; ok - AAAAAA
