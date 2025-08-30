@@ -8,7 +8,7 @@
 ;;; 
 ;;;   #x71 == 113
 
-.ifndef FUNC
+.if !.definedmacro(FUNC)
   .macro FUNC name
      .ident(.string(name)):
   .endmacro

@@ -3107,7 +3107,7 @@ _OK:
 .define SCREENRC(r,c)   SCREEN+40*r+c-2
 
 
-_edit:  
+FUNC _edit  
         ;; TODO: getchar already echoes!!!
         jsr getchar
 
@@ -3122,6 +3122,33 @@ _edit:
         jsr clrscr
         ;; This basically restarts program, lol
         jmp _init
+:       
+        ;; - ctrl-D - delete char forward
+        cmp #'D'-'@'
+        bne :+
+
+;;; TODO: remove when getchar not echo
+        jsr putchar
+
+        ;; move chars back til end of line
+        ldy CURCOL
+@copyback:
+        cpy #39
+        bcs @deldone
+        ;; copy one char
+        iny
+        lda (ROWADDR),y
+        dey
+        sta (ROWADDR),y
+        iny
+        jmp @copyback
+
+@deldone:
+        ;; erase last char
+        lda #' '
+        sta (ROWADDR),y
+
+        jmp _edit
 :       
         ;; - ctrl-A - beginning of text in line
         cmp #'A'-'@'
