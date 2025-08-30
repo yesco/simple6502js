@@ -3119,7 +3119,7 @@ FUNC _edit
 
 ;;; TODO: detect dirty (?) and require save?
 
-        jsr clrscr
+        jsr _clrscr
         ;; This basically restarts program, lol
         jmp _init
 :       
@@ -3199,14 +3199,14 @@ doneCE:
         cmp #'R'-'@'
         bne :+
 
-        jsr clrscr
+        jsr _clrscr
         jmp _aftercompile
 :       
         ;; - ctrl-q - disasm
         cmp #'Q'-'@'
         bne :+
 
-        jsr clrscr
+        jsr _clrscr
         jsr _dasm
         jmp _edit
 :       
@@ -3214,7 +3214,7 @@ doneCE:
         cmp #'Z'-'@'
         bne :+
 
-        jsr clrscr
+        jsr _clrscr
         jsr _dasmcc
         jmp _edit
 :       
@@ -3224,21 +3224,21 @@ doneCE:
 ;;; 10B dispatch should be 3B lol
         cmp #'P'-'@'
         bne :+
-        jsr printsrc
+        jsr _printsrc
         jmp _edit
 :       
         ;; - ctrl-W - save
         cmp #'W'-'@'
         bne :+
         
-        jsr savescreen
+        jsr _savescreen
         jmp _edit
 :       
         ;; ctrl-Load
         cmp #'L'-'@'
         bne  :+
 
-        jsr loadscreen
+        jsr _loadscreen
 :       
         jmp _edit
 
@@ -3247,15 +3247,17 @@ doneCE:
         jmp _edit
         
 
-printsrc:
-        jsr clrscr
+FUNC _printsrc
+        jsr _clrscr
         lda #<input
         ldx #>input
         jmp _printz
 
-clrscr: 
+FUNC _clrscr
         lda #12
         jmp putchar
+
+FUNC _dymmy5
 
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
@@ -3288,7 +3290,7 @@ copyz:
 @done:       
         rts
 
-FUNC savescreen
+FUNC _savescreen
         ;; from
         lda #<SCREEN
         ldx #>SCREEN
@@ -3303,7 +3305,34 @@ FUNC savescreen
         lda #<SCREENSIZE
         ldx #>SCREENSIZE
         
+        jmp _memcpy
+
+FUNC _loadscreen
+        ;; from
+        lda #<savedscreen
+        ldx #>savedscreen
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<SCREEN
+        ldx #>SCREEN
+        sta dos
+        stx dos+1
+        ;; copy
+        lda #<SCREENSIZE
+        ldx #>SCREENSIZE
+
         jmp memcpy
+        
+
+
+
+
+
+.ifdef MEM1
+FUNC _memcpy
+
+;;; WORKS!
 
 ;;; memcopy smallest?
 ;;;   tos: FROM
@@ -3344,7 +3373,11 @@ memcpy1:
         bne :-
 @done:
         rts
+.endif ; MEM1
         
+.ifdef MEM2
+FUNC _memcpy
+
 ;;; jsk2: copy forwards
 memcpy2: 
 ;;; 32 (+ 19 13)
@@ -3379,7 +3412,10 @@ memcpy2:
         bne @copyrest
 @done:
         rts
-        
+.endif ; MEM2        
+
+.ifdef MEM3
+FUNC _memcpy
 
 ;;; jsk3: copies forward
 ;;; 26
@@ -3406,9 +3442,11 @@ memcpy3:
 @done:
         rts
 
+.endif ; MEM3
 
+.ifdef MEM4
+FUNC _memcpy
 
-.ifnblank
 ;;; jsk4:
 memcpy4: 
 ;;; 21 B - slow
@@ -3424,8 +3462,13 @@ memcpy4:
 
 @done:
         rts
-.endif
+.endif ; MEM4
 
+
+MEM5=1
+
+.ifdef MEM5
+FUNC _memcpy
 
 ;;; CURRENT choosen one
 memcpy: 
@@ -3458,8 +3501,11 @@ memcpy5:
 
 @done:
         rts
+.endif ; MEM5
 
 
+.ifdef MEM6
+FUNC _memcpy
 
 ;;; jsk6: copies forwards
 ;;;   tos: from
@@ -3492,15 +3538,17 @@ memcpy6:
 
 @done:
         rts
+.endif ; MEM6
 
-
+.ifdef MEMMAD
 ;;; - https://forums.atariage.com/topic/175905-fast-memory-copy/
 ;;; MADS (pascal?) example from D.W. Howerton?
 ;;; A= lo length, @length= hi length
 ;;; 26 B copies forwards
 ;;; 
 ;;; jsk BUG? always copies 1 byte at least
-memcpyMAD:     
+FUNC _memcpy
+memcpyMAD:
 .scope
         tax
 
@@ -3531,25 +3579,7 @@ nextpage:
         rts        ; done
 .endscope
 
-
-
-FUNC loadscreen
-        ;; from
-        lda #<savedscreen
-        ldx #>savedscreen
-        sta tos
-        stx tos+1
-        ;; to
-        lda #<SCREEN
-        ldx #>SCREEN
-        sta dos
-        stx dos+1
-        ;; copy
-        lda #<SCREENSIZE
-        ldx #>SCREENSIZE
-
-        jmp memcpy
-        
+.endif ; MEMMAD
 
 
 FUNC printvar
