@@ -2,6 +2,29 @@
 ;;; 
 ;;; set flags before .include this file
 
+;;; JUST TO GET SIZE
+;;; 
+;;;   ca65 print.asm -l print.s
+;;; 
+;;;   #x71 == 113
+
+.ifndef FUNC
+  .macro FUNC name
+     .ident(.string(name)):
+  .endmacro
+  ;;; fake
+  .zeropage
+    tos:    
+    tmp1:   
+  .code
+  plaputchar:     
+  _drop:  
+  putchar: 
+        rts
+  PRINTDEC=1
+  PRINTHEX=1        
+.endif
+
 .ifnblank
 ;;; COPY THIS:
 

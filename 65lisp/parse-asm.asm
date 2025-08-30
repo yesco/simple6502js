@@ -74,11 +74,13 @@
 ;;; STATS:
 
 ;;;                          asm rules
-;;; MINIMAL   :   980 bytes = (+ 597  383) inc LIB!
-;;; NORMAL    :  1098 bytes = (+ 597  501)
-;;; BYTERULES :  1257 bytes = (+ 597  660)
-;;; OPTRULES  :  1418 bytes = (+ 597  821)
+;;; MINIMAL   :  1025 bytes = (+ 642  383) inc LIB!
+;;; NORMAL    :  1143 bytes = (+ 642  501)
+;;; BYTERULES :  1302 bytes = (+ 642  660)
+;;; OPTRULES  :  1463 bytes = (+ 642  886)
 ;;; LONGNAMES : 
+;;; 
+;;; z= #x6b1 1713 (- 1713 715 113)=> 885
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -94,6 +96,14 @@
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
 ;;;    554 bytes =>a+3=>c;
 ;;;    597 bytes FUNS: more %F and %f code
+
+;;;    642 bytes +R* - not working yet
+;;;    715  +47 == CHECKSTACK
+
+;;; 73 B overhead to subtract (+ 26 47)
+;;;    642 no ERRPOS no CHECKSTACK
+;;;    668  +26 == ERRPOS
+;;;    715  +47 == CHECKSTACK
 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 
@@ -122,7 +132,8 @@
 ;;;   501 bytes = NORMAL
 ;;;   660 bytes = BYTERULES (+ 159 B)
 ;;;   821 bytes = OPTRULES  (+ 320 B)
-
+;;;   886 bytes ...
+;;; 
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
 ;;;    68 B library printd/printh/putc/getchar
@@ -281,6 +292,7 @@ OPTRULES=1
 ;POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
+;;; doesn't take any extra code bytes, or rule bytes
 ;
 TESTING=1
 
@@ -1622,6 +1634,7 @@ secondpage:
 
 ;;; TODO: somehow should be able to put BEFORE begin.asm
 ;;;    but not get error, just doesn't work! (hang)
+;;;    or AFTER 
 
 PRINTDEC=1
 PRINTHEX=1
