@@ -166,18 +166,21 @@
 ;;; 
 ;;; In a BNF-rule
 ;;; - lower case letter is matched literally
+;;; - spaces (or any char <= ' ') won't work!- don't use
 ;;; - a letter with hi-bit set ('R'+128) references
 ;;;   another rule that is matched by recursion
 ;;; - Rules can have alternatives: E= aa | a | b that are
 ;;;   tried in sequence.
 ;;; - %D - match sequence of digits (number: /\d+/ )
+;;; -(%d - TODO: match 0-255 only)
 ;;; 
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
-;;; - %V - match "variable"
-;;; - %A - (for assignment)
+;;; - %U - USE value of NAME (assumed set already)
+;;; - %V - match "VARiable"
+;;; - %A - ADDRESSd of name (for assignment)
 ;;;        same as %V but stored in "dos" (and "tos")
 ;;;        (generative rule ':' will set tos=dos)
-;;; 
+;;; TODO:?
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
 
@@ -242,6 +245,10 @@ ROWADDR		= $12
 CURROW		= $268
 CURCOL		= $269
 CURCALC		= $001f      ; ? how to update?
+
+;;; TODO: why is this not accepted?
+.define SCREENRC(r,c)   SCREEN+40*r+c-2
+
 
 ;;; TODO: not good idea?
 ;COMPILESCREEN=1
@@ -315,16 +322,18 @@ TESTING=1
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
 
-;;; gives a little bit more context for compile err...
+;;; gives a little bit more context for compile err...;
 ;TRACERULE=1
 
 ;;; print input ON ERROR (after compile)
-;PRINTINPUT=1
+;
+PRINTINPUT=1
 
 ;;; print characters while parsing (show how fast you get)
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
-;PRINTREAD=1
+;
+PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -972,6 +981,7 @@ jsr putchar
 
 
 _donecompile:
+
 .ifdef TRACERULE
         putc 10
 .endif
@@ -1065,10 +1075,10 @@ jsr putchar
         sta tos+1
         ;; AY = lohi = addr
 
-        ;; defining function/variable
+        ;; new defining function/variable
         ;; (TODO: if used for var they are inline code)
         lda vrule
-        cmp #'F'
+        cmp #'N'
         bne @nodef
         ;; - *FUN = out // *tos= out
         ldy #0
@@ -1080,8 +1090,10 @@ jsr putchar
 
         jmp @set
 @nodef:
-        ;; if call function
-        cmp #'C'
+        ;; Use value of variable
+        ;; (for functions if forward, may not
+        ;;  have value jmp (ind) more safe!)
+        cmp #'U'
         bne @nofun
         ;; - tos = *tos
         ldy #1
@@ -1748,7 +1760,7 @@ ruleC:
         jsr printh
       .byte ']'
 
-        .byte "|putc(",_E,")"
+        .byte "|putchar(",_E,")"
       .byte '['
         jsr putchar
       .byte ']'
@@ -2710,6 +2722,16 @@ else:
 afterELSE:      
 .endif
 
+        ;; label
+        .byte "|%N:",_S
+        ;; set's variable/name to that address!
+
+        ;; goto
+        .byte "|goto%A;"
+      .byte "[:"
+        jmp (VAL0)
+      .byte "]"
+
         ;; IF(E)S; // no else
         .byte "|if(",_E,")"
       .byte '['
@@ -2900,6 +2922,7 @@ afterELSE:
         sta VAL1,y
       .byte "]"
 
+        ;; Expression; // throw away result
         .byte "|",_E,";"
 
         .byte 0
@@ -2980,19 +3003,28 @@ status:
 .ifdef PRINTINPUT
 ;;; TODO: printz? printR?
 
+;;; TODO: ldx , ldy, jsr _copyR - 6B
+;;; 8 B
         lda #<input
         sta pos
         lda #>input
         sta pos+1
+
         jmp @print
+
 @loop:
 .ifdef ERRPOS
-        ;; hi-bit set indicate error position
+        ;; hi bit on char is indicator of how var it
+        ;; read, next char, or here is the error
+        ;; - print red attribute
         bpl @nohi
         pha
         lda #1+128              ; red text
         jsr putchar
+        ;; - remove hibit from src
         pla
+        and #127
+        sta (pos),y
 @nohi:
 .endif ; ERRPOS
 
@@ -3103,9 +3135,6 @@ _OK:
         lda #1
         sta $24f
 
-;;; TODO: why is this not accepted?
-.define SCREENRC(r,c)   SCREEN+40*r+c-2
-
 
 FUNC _edit  
         ;; TODO: getchar already echoes!!!
@@ -3115,11 +3144,12 @@ FUNC _edit
         cmp #'C'-'@'
         bne :+
 
-;;; TODO: can compile few times, something messed up?
-
-;;; TODO: detect dirty (?) and require save?
 
         jsr _clrscr
+
+;;; TODO: can compile few times, something messed up?
+;;; TODO: detect dirty (?) and require save?
+
         ;; This basically restarts program, lol
         jmp _init
 :       
@@ -3742,6 +3772,28 @@ input:
 
 ;;; MINIMAL SANITY CHECK
 ;;        .byte "word main(){return 4711;}",0
+;;; minimal error
+;        .byte "word main(){return 47x11;}",0
+
+;;; TODO: not found name need better error...
+;;;      .byte "void main(){xyz(65);}",0
+
+        ;; GOTO !
+        ;;   CC02: 68 bytes
+        ;;   cc65: 50 bytes
+
+
+;;; ok - AAAAAA
+;        .byte "void main(){A:putchar(65);goto A;}",0
+;;;; ok
+;        .byte "void main(){A:putchar(65);goto A;putchar(66);}",0
+;        .byte "void main(){putchar(64);A:putchar(65);goto A;putchar(66);}",0
+;;; ok
+        .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
+;;; TODO: remove spaces crash in parse!!!!
+        .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
+
+
 
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
@@ -3823,6 +3875,7 @@ input:
 
 .endif ; PRIME
 
+
 .ifdef TESTARRAY
         ;; byte arrays
         .byte "byte a[42];",10
@@ -3890,9 +3943,9 @@ input:
         .byte "word main(){return e;}",0
 
 
-        .byte "void A(){putc(102);}",0
+        .byte "void A(){putchar(102);}",0
 
-        .byte "word main(){putc(102);}",0
+        .byte "word main(){putchar(102);}",0
 
         .byte "word main(){printd(4711);return getchar();}",0
 
