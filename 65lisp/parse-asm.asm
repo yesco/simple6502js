@@ -288,6 +288,8 @@ CHECKSTACK=1
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
 ;
 OPTRULES=1
+;
+ELSE=1
 
 ;;; Byte optimized rules
 ;;; typically used as prefix for BYTE operators
@@ -2752,7 +2754,9 @@ afterELSE:
         jmp (VAL0)
       .byte "]"
 
-        ;; IF( var < num ) ... saves 9 B (- 63 54)
+.ifdef OPTRULES
+
+        ;; IF( var < num ) ... saves 6 B (- 63 57)
         .byte "|if(%A<%D)"
       .byte "["
         ;; reverse cmp as <> NUM avail first
@@ -2768,18 +2772,24 @@ afterELSE:
         beq @nah
         bcs @ok                 ; NUM>=VAR
 @nah:
+        ;; set value for optional else...
+.ifdef ELSE
+        lda #0
+        tax
+.endif ;ELSE
         jmp PUSHLOC
 @ok:        
         ;; THEN-branch
       .byte "]"
         .byte _S
-.ifdef OPTRULES
+.ifdef ELSE
         ;; for ELSE, make sure value not 0!
       .byte '['
         lda #$ff
       .byte ']'
+.endif ; ELSE
+
 .endif ; OPTRULES
-      
 
         ;; IF(E)S; // no else
         .byte "|if(",_E,")"
@@ -2795,16 +2805,14 @@ afterELSE:
 ;;; TODO: move these rules out to another rule
 ;;;    then don't need to repeat this one!
         .byte _S
-.ifdef OPTRULES
+.ifdef ELSE
         ;; for ELSE, make sure value not 0!
       .byte '['
         lda #$ff
       .byte ']'
-.endif ; OPTRULES
         ;; Auto-patches at exit!
 
-.ifdef OPTRULES
-        ;; ELSE
+        ;; ELSE as independent as is optional! hack!
         ;; 13 B
         .byte "|else"
       .byte '['
@@ -2816,7 +2824,7 @@ afterELSE:
       .byte ']'
         .byte _S
         ;; Auto-patches at exit!
-.endif ; OPTRULE
+.endif ; ELSE
 
 .ifdef OPTRULES
 ;;; TODO make ruleC when %A pushes
@@ -3828,11 +3836,16 @@ input:
 ;;;      .byte "void main(){xyz(65);}",0
 
         ;; GOTO !
-        ;;   CC02: 68 bytes
+        ;; = CC02: 57 bytes (-17 using byte)
         ;;     putchar(%D|%V) => 63 (- 5 B)
-        ;;     if(%V<%D)      => 54 (- 9 B)
-        ;;   cc65: 50 bytes
-
+        ;;     if(%V<%D)      => 57 (- 6 B)
+        ;; 
+        ;;     TODO: byte            -17 B
+        ;;     TODO: zp vars          -7 B
+        ;;     jsr .. ; rts           -1 B
+        ;;     if no ELSE support     -5 B
+        ;; = cc65: 50 bytes (-20 using byte) = 30 B
+        ;; = asm:  15 bytes! (using register only)
 
 ;;; ok - AAAAAA
 ;        .byte "void main(){A:putchar(65);goto A;}",0

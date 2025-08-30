@@ -111,13 +111,13 @@ Current file: Play/a-z.s
 000000r 1               .segment	"BSS"
 000000r 1               
 000000r 1               _a:
-000000r 1  00 00        	.res	2,$00
-000002r 1               
-000002r 1               ; ---------------------------------------------------------------
-000002r 1               ; void __near__ main (void)
-000002r 1               ; ---------------------------------------------------------------
-000002r 1               
-000002r 1               .segment	"CODE"
+000000r 1  00           	.res	1,$00
+000001r 1               
+000001r 1               ; ---------------------------------------------------------------
+000001r 1               ; void __near__ main (void)
+000001r 1               ; ---------------------------------------------------------------
+000001r 1               
+000001r 1               .segment	"CODE"
 000000r 1               
 000000r 1               .proc	_main: near
 000000r 1               
@@ -126,27 +126,19 @@ Current file: Play/a-z.s
 000000r 1               ;
 000000r 1               ; void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }
 000000r 1               ;
-000000r 1  A2 00        	ldx     #$00
-000002r 1  A9 41        	lda     #$41
-000004r 1  8D rr rr     	sta     _a
-000007r 1  8E rr rr     	stx     _a+1
-00000Ar 1  AD rr rr     L0004:	lda     _a
-00000Dr 1  AE rr rr     	ldx     _a+1
-000010r 1  20 rr rr     	jsr     _putchar
-000013r 1  EE rr rr     	inc     _a
-000016r 1  D0 03        	bne     L0009
-000018r 1  EE rr rr     	inc     _a+1
-00001Br 1  AD rr rr     L0009:	lda     _a
-00001Er 1  C9 5B        	cmp     #$5B
-000020r 1  AD rr rr     	lda     _a+1
-000023r 1  E9 00        	sbc     #$00
-000025r 1  50 02        	bvc     L000C
-000027r 1  49 80        	eor     #$80
-000029r 1  30 DF        L000C:	bmi     L0004
-00002Br 1  A2 00        	ldx     #$00
-00002Dr 1  A9 2E        	lda     #$2E
-00002Fr 1  4C rr rr     	jmp     _putchar
-000032r 1               
-000032r 1               .endproc
-000032r 1               
-000032r 1               
+000000r 1  A9 41        	lda     #$41
+000002r 1  8D rr rr     	sta     _a
+000005r 1  AD rr rr     L000E:	lda     _a
+000008r 1  A2 00        	ldx     #$00
+00000Ar 1  20 rr rr     	jsr     _putchar
+00000Dr 1  EE rr rr     	inc     _a
+000010r 1  AD rr rr     	lda     _a
+000013r 1  C9 5B        	cmp     #$5B
+000015r 1  90 EE        	bcc     L000E
+000017r 1  A2 00        	ldx     #$00
+000019r 1  A9 2E        	lda     #$2E
+00001Br 1  4C rr rr     	jmp     _putchar
+00001Er 1               
+00001Er 1               .endproc
+00001Er 1               
+00001Er 1               
