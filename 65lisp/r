@@ -37,6 +37,10 @@ cl65 -Or $OPTS -t sim6502 $name.c -o $name.out -m $name.map 2>/dev/null
 cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
 #cc65 -O $OPTS -T $name.c 2>/dev/null # generate .s file
 
+# genderate listing w \hex
+ca65 $name.s -l $name.lst  2>/dev/null 1>/dev/null
+
+
 ls -l $name.o $name.out $name.tap
 
 # -- enable NON-blocking getchar!!!
