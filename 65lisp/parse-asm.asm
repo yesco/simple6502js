@@ -307,8 +307,7 @@ TESTING=1
 ;TRACERULE=1
 
 ;;; print input ON ERROR (after compile)
-;
-PRINTINPUT=1
+;PRINTINPUT=1
 
 ;;; print characters while parsing (show how fast you get)
 ;
@@ -1031,9 +1030,12 @@ jsr putchar
 
 @global:
         ;; verify/parse single letter var
+;;; range can probably in this case be done
+;;; with XOR #64 ; CMP #('z' & 63) - save 1 b!
         sec
         sbc #'A'
         cmp #'z'-'A'+1
+
         bcc @skip2
         jmp failjmp
 @skip2:

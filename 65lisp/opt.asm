@@ -1,3 +1,8 @@
+;;; tips and tricks
+;;; - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
+
+
+
 ;;; cut-n-paste variants not used?
 
 ;;; set hi-bit of the last char in string

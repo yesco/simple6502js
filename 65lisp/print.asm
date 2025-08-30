@@ -188,11 +188,20 @@ print2h:
         ;; lo
         ;; nice: falls-through to pla!
 .endif ; PRINTHEX
+
 .if .def(PRINTHEX) || .def(PRINTDECDIV)
 plaprint1h:     
 ;;; (14)
         pla
 .proc print1h
+;;; TODO: - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
+;;; 6 B
+;;;   SED
+;;;   CMP #$0A
+;;;   ADC  #"0"
+;;;   CLD
+
+;;; 10 B
         and #$0f
         ora #$30
         cmp #'9'+1
