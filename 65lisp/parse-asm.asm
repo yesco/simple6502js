@@ -357,7 +357,8 @@ PRINTINPUT=1
 ;;; print characters while parsing (show how fast you get)
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
-;PRINTREAD=1
+;
+PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -491,9 +492,9 @@ putc 10
         lda #'P'+128
         sta rulename
 
-        lda #<ruleP
+        lda #<rule0
         sta rule
-        lda #>ruleP
+        lda #>rule0
         sta rule+1
 
         ;; end-all marker
@@ -1714,7 +1715,6 @@ VAL1= '+' + 256*'>'
 
 PUSHLOC= '{' + 256*'{'
 
-rule0:
 ruleG:
 ruleH:  
 ruleI:
@@ -1767,6 +1767,11 @@ _X='X'+128
 _Y='Y'+128
 _Z='Z'+128
 
+;;; Zeroth-rule
+;;; NOTE: can't backtrack here! do directly other rule!
+rule0:  
+        .byte _P,0
+
 ;;; aggregate statements
 ruleA:  
         ;; Right-recursion is "fine"
@@ -1778,7 +1783,6 @@ ruleB:
         .byte "{}"
         .byte "|{",_A,"}"
 
-        .byte 0
         .byte 0
 
 ;;; "Constant"/(variable) (simple, lol)
@@ -2514,17 +2518,32 @@ ruleF:
 ;;; Program
 ruleP:  
 
+;;; TODO: this can EITHER recognize main or F()
+;;;    BUG: but not both, doesn't recurse right?
 
-.ifndef FUNS
-
-.ifdef LONGNAMES
-        .byte _T,"%N()",_B
-.else
         .byte _T,"main()",_B
-.endif ; LONGNAMES
       .byte '['
         rts
       .byte ']'
+        .byte _P
+
+;;; TODO: %N has side-effect, are we *committed* here?
+;;;    what if it is a var decl?
+        .byte "|",_T,"%N()",_B
+      .byte '['
+        rts
+      .byte ']'
+        .byte _P
+        
+        .byte "|"
+
+        .byte 0
+
+
+        .byte 0
+
+
+.ifdef FUNS
 
 ;      .byte '|'
 
@@ -3996,7 +4015,12 @@ FUNC printstack
 .byte 0,0
 
 input:
-        .byte "word main(){ putchar(65); return 4711; }",0
+;;; TODO:  doesn't like 10 newline!!! lol (or space...)
+;        .byte "word F(){ putchar(65); return 4711; }",10
+        .byte "word F(){ putchar(65); return 4711; }"
+;        .byte "word main(){ putchar(65); return 4711; }"
+
+        .byte 0
 
 
 
