@@ -47,8 +47,7 @@ extern void dasmcc() {
 
 unsigned int vars[64];
 
-unsigned int num, addr;
-
+unsigned int num, addr, tmp;
 
 char* parse(char r, char* in) {
   char* rule= rules[r&63];
@@ -66,7 +65,7 @@ char* parse(char r, char* in) {
   case '%': 
     ++rule;
 
-    // digits
+    // %D - digits
     if ((c= *in)=='D') {
       t= num= 0;
       while(1) {
@@ -80,7 +79,7 @@ char* parse(char r, char* in) {
         ++t;
       }
     }
-    // var something
+    // %A %V %N %U - var something
     // TODO: long names
     {
       unsigned v= *in-'@';
@@ -102,13 +101,14 @@ char* parse(char r, char* in) {
       // out gen
     case '<': c= num; break;
     case '>': c= num>>8; break;
-    case '+': {
-      unsigned int t= num+1;
+    case '+':
+      tmp= num+1;
       *out= t; ++out;
       // assume next char is '>'
       c= t>>8;
       nextgen:
-      ++rule; } break;
+      ++rule;
+      break;
     }
     // output
     *out= c; ++out;
@@ -120,8 +120,11 @@ char* parse(char r, char* in) {
   default:
     // rules(?) - ok can't match unicode... lol
     if (c&128) {
-      in= parse(c, in);
-      if (in) goto next; else return NULL;
+      char* r= parse(c, in);
+      if (r) {
+        in= r;
+        goto next;
+      } else goto fail;
     }    
     // letter
     if (c != *in) goto fail;

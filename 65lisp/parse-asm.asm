@@ -3996,6 +3996,9 @@ FUNC printstack
 .byte 0,0
 
 input:
+        .byte "word main(){ putchar(65); return 4711; }",0
+
+
 
 .ifdef GOTOtest
 ;;; MINIMAL SANITY CHECK
