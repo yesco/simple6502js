@@ -12,6 +12,8 @@ extern void* endfirstpage;
 
 unsigned char* last= 0;
 
+extern char** rules;
+
 extern char *out, output;
 #pragma zpsym ("out")
 
@@ -36,6 +38,107 @@ extern void dasmcc() {
 #define SCREENCOLS 40
 #define SCREENSIZE (SCREENROWS*SCREENCOLS)
 #define SCREENLAST (TEXTSCREEN+SCREENSIZE-1)
+
+
+// C implementation of minimal parse-asm.asm in
+// TODO: compare compiled sizes and speed
+
+// (- #x77e #x493) = 747 bytes (asm: 554 bytes, no library)
+
+unsigned int vars[64];
+
+unsigned int num, addr;
+
+
+char* parse(char r, char* in) {
+  char* rule= rules[r&63];
+  char c, t;
+
+  --rule; // lol
+ next:
+  ++rule;
+  switch(*rule) {
+
+    // success!
+  case 0: case '|': return in;
+
+    // matchers
+  case '%': 
+    ++rule;
+
+    // digits
+    if ((c= *in)=='D') {
+      t= num= 0;
+      while(1) {
+        c= *in-'0';
+        if (c>'9') {
+          if (t) goto next;
+          else goto fail;
+        }
+        ++in;
+        num= num*10+c;
+        ++t;
+      }
+    }
+    // var something
+    // TODO: long names
+    {
+      unsigned v= *in-'@';
+      if (v>'z'-'@') goto fail;
+      switch(c) {
+      case 'A': addr= (int)(vars+v); break;
+      case 'V': num= (int)(vars+v); break;
+      case 'N': vars[v]= (int)out; break;
+      case 'U': num= vars[v]; break;
+      default: goto fail;
+      }
+    }
+    // generate
+  case '[':
+  gen:
+    switch((c= *rule)) {
+    case ']': goto next;
+    case ':': num= addr; goto nextgen;
+      // out gen
+    case '<': c= num; break;
+    case '>': c= num>>8; break;
+    case '+': {
+      unsigned int t= num+1;
+      *out= t; ++out;
+      // assume next char is '>'
+      c= t>>8;
+      nextgen:
+      ++rule; } break;
+    }
+    // output
+    *out= c; ++out;
+    goto gen;
+
+    // quoted
+  case '\\': ++rule; c= *rule;
+    // literal
+  default:
+    // rules(?) - ok can't match unicode... lol
+    if (c&128) {
+      in= parse(c, in);
+      if (in) goto next; else return NULL;
+    }    
+    // letter
+    if (c != *in) goto fail;
+    ++in;
+    goto next;
+  }
+
+ fail:
+  // TODO: can we by mistake go past 0 above?
+  do {
+    c= *++rule;
+    if (!c) return NULL;
+  } while (c!='|');
+  goto next;
+}
+
+
 
 // empty main: 284 Bytes (C overhead)
 

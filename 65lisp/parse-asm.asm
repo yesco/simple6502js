@@ -95,6 +95,10 @@
 ;;;    517 bytes highlite error in source! (+ 24 B)
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
 ;;;    554 bytes =>a+3=>c;
+
+;;; C parse() == parse.lst (- #x715 #x463) = 690
+;;; 
+
 ;;;    597 bytes FUNS: more %F and %f code
 
 ;;;    642 bytes +R* - not working yet
@@ -234,6 +238,7 @@
 .import _dasm, _dasmcc
 .export _endfirstpage
 .export _output, _out
+.export _rules
 
 
 ;;; ORIC ADDRESSES
@@ -741,9 +746,9 @@ FUNC _enterrule
         and #31
         asl
         tay
-        lda rules,y
+        lda _rules,y
         sta rule
-        lda rules+1,y
+        lda _rules+1,y
         sta rule+1
 
         ;; - push inp for retries
@@ -1693,7 +1698,7 @@ bytecodes:
 
 
 ;;; Rules 0,A-
-rules:  
+_rules:  
         .word rule0             ; TODO: if we use &and?
         .word ruleA,ruleB,ruleC,ruleD,ruleE
         .word ruleF,ruleG,ruleH,ruleI,ruleJ
