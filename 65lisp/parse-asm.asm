@@ -2573,6 +2573,9 @@ ruleF:
 ;;; Program
 ruleP:  
 
+;;; BUG: TODO: if this is second it fails (for main!)!!!
+;;; OK: if this is first, both fail individually
+
 ;;; TODO: %N has side-effect, are we *committed* here?
 ;;;    what if it is a var decl?
         .byte _T,"%N()",_B
@@ -2581,7 +2584,7 @@ ruleP:
       .byte ']'
         .byte _P
 
-        .byte "|"
+      .byte '|'
 
         .byte _T,"main()",_B
       .byte '['
@@ -2589,7 +2592,8 @@ ruleP:
       .byte ']'
         .byte _P
 
-      .byte '|'
+        ;; empty - no more definitions
+        .byte "|"
 
         .byte 0
 
@@ -4062,7 +4066,12 @@ FUNC printstack
 .byte 0,0
 
 input:
-;;; ok
+;;; FAIL - both as input, in any order...
+        .byte "word main(){return 4711;}"
+        .byte "word F(){return 4711;}"
+        .byte 0
+
+;;; ok - either as input, but not both
         .byte "word main(){return 4711;}",0
         .byte "word F(){return 4711;}",0
 
