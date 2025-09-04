@@ -343,6 +343,9 @@ TESTING=1
 
 ;DEBUGRULE=1
 
+;;; prints when skipping
+;DEBUGRULESKIP=1
+
 ;;; show input during parse \=backtrack
 ;;; Note: some chars are repeated at backtracking!
 ;SHOWINPUT=1
@@ -556,12 +559,13 @@ stackerror:
 
 .ifdef DEBUGRULE
     pha
-    lda rulename
-    jsr putchar
+;    lda rulename
+;    jsr putchar
 ;    putc '.'
     ldy #0
     lda (inp),y
     jsr putchar
+    putc ' '
     pla
 .endif
 
@@ -607,12 +611,12 @@ stackerror:
         ;; hibit - new rule?
         bmi _enterrule
 
-        ;; 0 - end?
+        ;; 0 - end = accept
         bne :+
 jmpaccept:      
         jmp _acceptrule
 :       
-        ;; | - also end-rule
+        ;; | - also accept
         cmp #'|'
         beq  jmpaccept
 
@@ -634,7 +638,7 @@ jmpaccept:
         bne testeq
 
 ;;; TODO: we could easily implement
-;;;    tail rule input support, just modify 'i'!
+;;;    tail rule input support, just modify 'i'?
 
         ;; *R
         jsr _incR
@@ -647,7 +651,6 @@ jmpaccept:
         pha
         ;; lol-? hmmm
         jsr _next
-.endif
 
         ;; -- push current rule again
         lda rule+1
@@ -670,41 +673,45 @@ jmpaccept:
         pha
 
         jmp _next
+.endif
 
 
+        ;; literal equal test match
 quoted:
-        ;; \[ for example, match special chars
+        ;; - \[ for example, match special chars
         jsr _incR
         lda (rule),y
 
 testeq: 
-        ;; lit eq?
+        ;; - lit eq?
         cmp (inp),y
         beq _eq
-        bne failjmp
+failjmp:
+        jmp _fail
 
-percent:        
-        ;; special %?
+
+        ;; percent matchers
+percent:
         jsr _incR
         ldy #0
         lda (rule),y
-        ;; assumes A not modified
+        ;; - skip it assumes A not modified
+        ; pha
         jsr _incR
+        ; pla
 
-        ;; %D - digits
+        ;; - %D - digits
         cmp #'D'
         beq isdigits
-isvar:    
-        ;; % anything...
-        ;; %V (or %F %f %...)
+jmpvar: 
+        ;; - % anything...
+        ;;   %V (or %F %f %...)
         jmp _var
-
-failjmp:
-        jmp _fail
 
 isdigits:       
         ;; assume it's %D
         jmp _digits
+
 
 FUNC _eq    
 ;;; 9 B
@@ -713,6 +720,8 @@ FUNC _eq
 exitrule:
         jsr _incR
         jmp _next
+
+
 
 FUNC _enterrule
 .ifdef TRACERULE
@@ -728,6 +737,19 @@ FUNC _enterrule
     DEBC '>'
 .ifdef DEBUGKEY
         jsr getchar
+        cmp #13
+        bne :+
+        ;; print state
+        putc 10
+        putc '~'
+        jsr putchar
+        lda inp
+        ldx inp+1
+        jsr _printz
+        putc 10
+:       
+        ldy #0
+        
 .endif ; DEBUG
         lda rule+1
         pha
@@ -761,7 +783,7 @@ FUNC _enterrule
         pha
 
 .ifdef DEBUGRULE
-    jsr printstack
+;    jsr printstack
 .endif
         jmp _next
 ;;; TODO: use jsr, to know when to stop pop?
@@ -794,7 +816,7 @@ FUNC _acceptrule
 .ifdef DEBUGRULE
     pha
     jsr putchar
-    jsr printstack
+;    jsr printstack
     pla
 .endif
         bmi uprule
@@ -873,7 +895,7 @@ FUNC _fail
 .endif ; SHOWINPUT
 
     DEBC '|'
-.ifdef DEBUGRULE
+.ifdef DEBUGRULESKIP
   putc 10
   putc '|'
   lda rule
@@ -883,7 +905,7 @@ FUNC _fail
   jsr printh
   putc ' '
 .endif
-        ;; - seek next alt in rule
+        ;; - seek next | alt in rule
 @loop:
 ;        jsr _incR
         ldy #0
@@ -893,7 +915,7 @@ FUNC _fail
 ;;; TODO: remove! this only catches
 ;;;    bad memory location!!!! lol
 ;;;    shows address for "bad" byte
-.ifdef DEBUGRULE
+.ifdef DEBUGRULESKIP
    cmp #'U'
    beq @isU
    cmp #'U'+128
@@ -912,15 +934,16 @@ FUNC _fail
    pla
 @after:
 .endif
-    DEBC ','
+;    DEBC ','
 
-        ;; skip any inline gen
+        ;; skip any inline gen (binary data)
         cmp #'|'
         beq @nextalt
         cmp #'['
         bne @notgen
+;;; TODO: much faster if instead have count and skip?
 @skipgen:
-    DEBC ';'
+;    DEBC ';'
         jsr _incR
         lda (rule),y
         cmp #']'
@@ -929,7 +952,9 @@ FUNC _fail
 
 @notgen:
         jsr _incR
+        ;; _incRX is guaranteed not be be 0!
         bne @loop
+
 
 @nextalt:
         ;; try next alterantive
@@ -937,7 +962,7 @@ FUNC _fail
         jsr _incR
 
 restoreinp:
-        ;; - restore inp
+        ;; - restore inp for alt
         pla
         pha
 ;;; TODO: correct jump? is it error?
@@ -968,7 +993,7 @@ gotretry:
     putc 10
 .endif
     DEBC '!'
-        ;; copy/restore inp from stack
+        ;; copy/restore and leave inp at stack
         tsx
         pla
         pla
@@ -982,7 +1007,7 @@ endrule:
 
 .ifdef DEBUGRULE
    putc 'E'
-   jsr printstack
+;   jsr printstack
 .endif
 
 	;; END - rule
@@ -1226,6 +1251,7 @@ FUNC _generate
 ;;; ??? 19 B
 
 ;;; TODO: can conflict w data
+;;;   write .pl script look at .lst output?
 
         jsr _incR
         ldy #0
@@ -1388,6 +1414,35 @@ FUNC _incIspc
         bcc @skipspc
 @done:
 
+;;; print decimal number of char
+
+.ifdef BAD
+;;; TODO: need save tos, or print should use AX...
+        ;; this changss result? lol
+        sta tos                
+
+        pha
+        txa
+        pha
+        tya
+        pha
+
+        putc '('
+        ldx #0
+        stx tos+1
+        jsr printd
+        putc ':'
+        lda tos
+        jsr putchar
+        putc ')'
+        putc ' '
+
+        pla
+        tay
+        pla
+        tax
+        pla
+.endif
 ;;; TODO: only update when backtrack/_fail?
 
 .ifdef ERRPOS
@@ -2518,8 +2573,15 @@ ruleF:
 ;;; Program
 ruleP:  
 
-;;; TODO: this can EITHER recognize main or F()
-;;;    BUG: but not both, doesn't recurse right?
+;;; TODO: %N has side-effect, are we *committed* here?
+;;;    what if it is a var decl?
+        .byte _T,"%N()",_B
+      .byte '['
+        rts
+      .byte ']'
+        .byte _P
+
+        .byte "|"
 
         .byte _T,"main()",_B
       .byte '['
@@ -2527,27 +2589,11 @@ ruleP:
       .byte ']'
         .byte _P
 
-;;; TODO: %N has side-effect, are we *committed* here?
-;;;    what if it is a var decl?
-        .byte "|",_T,"%N()",_B
-      .byte '['
-        rts
-      .byte ']'
-        .byte _P
-        
-        .byte "|"
+      .byte '|'
 
         .byte 0
-
-
-        .byte 0
-
 
 .ifdef FUNS
-
-;      .byte '|'
-
-.else ; FUNS
 
         .byte _F
       .byte '['
@@ -2566,6 +2612,7 @@ ruleP:
 
         .byte 0
         ;; patches jmp to ehere!
+
 
 ;;; Type
 ruleT:  
@@ -4015,13 +4062,26 @@ FUNC printstack
 .byte 0,0
 
 input:
+;;; ok
+        .byte "word main(){return 4711;}",0
+        .byte "word F(){return 4711;}",0
+
+;;; WTF, a space after '}' makes stack explode?
+;;; TODO: could it be that empty match "...|" gives
+;;;    too much recursion?
+        .byte "word main(){return 4711     ;        } "
+        .byte 0
+
+FUNTEST=1
+.ifdef FUNTEST
+
 ;;; TODO:  doesn't like 10 newline!!! lol (or space...)
-;        .byte "word F(){ putchar(65); return 4711; }",10
-        .byte "word F(){ putchar(65); return 4711; }"
+        .byte "word F(){ putchar(65); return 4711; }",32
+;        .byte "word F(){ putchar(65); return 4711; }"
 ;        .byte "word main(){ putchar(65); return 4711; }"
 
         .byte 0
-
+.endif
 
 
 .ifdef GOTOtest
