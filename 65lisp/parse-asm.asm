@@ -455,7 +455,7 @@ FUNC _init
         COMPILESTART= SCREEN+40
         ;; set screen as input
 .else
-        COMPILESTART= input
+        COMPILESTART= input+1
 .endif
 
         lda #<(COMPILESTART-1)
@@ -528,7 +528,7 @@ putc 10
 .ifdef COMPILESCREEN
         jsr _incIspc
 .endif
-        jsr _incIspc
+;        jsr _incIspc
 
 
 ;;; crashes, lol
@@ -889,6 +889,13 @@ uprule:
 FUNC _fail
 ;;; 25 B
 
+;;; TODO: can save bytes somehow???
+
+        ;; Unexpected end of file?
+        ldy #0
+        lda (inp),y
+        beq gotendall
+
 .ifdef SHOWINPUT
         putc '\'
 ;        putc 10
@@ -1097,6 +1104,12 @@ error:
         putc '%'
         pla
         jsr putchar
+
+        ;; TODO: could printty print stack showing what 
+        ;;   was expected/failed? got "aa" expected "aaa"?
+        ;;   difficult(?), except at END of input
+        ;; Maybe just keep whatever rule got furtherts
+        ;; and pretty print it?
 
         ;; go edit to fix again!
         jmp _edit
@@ -1382,6 +1395,7 @@ failjmp2:
 
 
 
+;;; flags not set in any way, registers untouched
 FUNC _incIspc
 ;;; oops! this was actually important to save all regs!
         pha
@@ -1392,24 +1406,41 @@ FUNC _incIspc
 
         ;; skips any char <= ' ' (incl attributes)
         ;; this requires input be 1 less when starting
+
+        ldx #inp
 @skipspc:
+;;; TODO: maybe too much dupl w loop beq @done too?
+
+;;; TODO: BUG: if enabled crashes stack lol WTF?
+;;; should make it safer as we don't go past end!!!
+.ifblank
+        lda (0,x)
+        beq @done
+;;; TODO: eight bit set? if so...
+.endif
+        
 .ifdef COMPILESCREEN
-        ;; mark last read character
         ldy #0
         lda (inp),y
-;;; Seems this messes things up a bit?
-;        ora #128
+        ;; mark last read character
+        ;; TODO: Seems this messes things up a bit?
+        ora #128
         sta (inp),y
 ;;; TODO: this may get messed up when we backtrack!
 .endif
-
+        ;; TODO: or just jsr _incRX
+putc 'I'
         jsr _incI
+
+;;; TODO: cleanup
         lda (0,x)
 .ifdef COMPILESCREEN
         and #127
         sta (0,x)
 .endif
+        ;; TODO: redundant?
         beq @done
+
         cmp #' '+1
         bcc @skipspc
 @done:
@@ -1482,7 +1513,7 @@ FUNC _incIspc
         lda inp+1
         sta erp+1
 @noupdate:
-.endif
+.endif ; ERRPOS
 
         pla
         tay
@@ -1780,7 +1811,7 @@ ruleJ:
 ruleM:  
 ruleN:  
 .endif 
-ruleO:  
+;;ruleO:  
 
 ruleQ:
 ruleR:
@@ -2570,9 +2601,35 @@ ruleF:
 ;      .byte ']'
 
 
+ruleO:  
+;;; works! aaabbbbaaaaaaabbb
+        .byte "aaa"
+      .byte '['
+        putc 'A'
+      .byte ']'
+        .byte "|"
+        .byte "bbb"
+      .byte '['
+        putc 'B'
+      .byte ']'
+        .byte 0
+        
 ;;; Program
 ruleP:  
+        .byte _O,_P
+        .byte "|"
+      .byte '['
+        rts
+      .byte ']'
+        .byte 0
 
+;;; FAIL to combine
+        .byte "aaa"
+        .byte "|"
+        .byte "bbb"
+        .byte "|"
+        .byte 0
+.byte 0
 ;;; BUG: TODO: if this is second it fails (for main!)!!!
 ;;; OK: if this is first, both fail individually
 
@@ -3147,11 +3204,12 @@ status:
 
 .ifdef ERRPOS
         ;; hibit string near error!
-        ;; (approximated by 
+        ;; (approximated by as far as we read)
         ldy #0
         lda (erp),y
         ora #128
         sta (erp),y
+
 .endif ; ERRPOS
 
 .ifdef COMPILESCREEN
@@ -4066,6 +4124,29 @@ FUNC printstack
 .byte 0,0
 
 input:
+        .byte "bbb"
+        .byte "aaa"
+        .byte "aaa"
+        .byte "aaa"
+        .byte "bbb"
+        .byte "aaa"
+; crashes as partial match???
+;;; TODO: got zero on inp when expect more...
+        .byte "b"
+;        .byte "bb"
+;;; ok, stop compile
+;        .byte "bbx"
+;;; stop compile and detect as error
+;        .byte "xlxkjflksjdflkasdjf"
+        .byte 0
+        ;; TODO: BUG: if not here get's corruption1
+        ;; and getting next bytes and "word main"!
+;        .byte 0
+
+        .byte "ccc"
+        .byte "ccc"
+
+
 ;;; FAIL - both as input, in any order...
         .byte "word main(){return 4711;}"
         .byte "word F(){return 4711;}"
