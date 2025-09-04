@@ -175,56 +175,59 @@
 ;;;   another rule that is matched by recursion
 ;;; - Rules can have alternatives: E= aa | a | b that are
 ;;;   tried in sequence.
+;;; - Put literal/longer matches first in rule alternatives.
 ;;; - %D - match sequence of digits (number: /\d+/ )
 ;;; -(%d - TODO: match 0-255 only)
 ;;; 
-;;; - %N - define NEW name (forward) TODO: 2x=>err!
-;;; - %U - USE value of NAME (assumed set already)
 ;;; - %V - match "VARiable"
 ;;; - %A - ADDRESSd of name (for assignment)
 ;;;        same as %V but stored in "dos" (and "tos")
 ;;;        (generative rule ':' will set tos=dos)
+;;; - %N - define NEW name (forward) TODO: 2x=>err!
+;;; - %U - USE value of NAME (assumed set already)
+;;; 
 ;;; TODO:?
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
 
 
 ;;; Warning: The recursive rule matching is limited by
-;;;   the hardware stack. (~ 256/6)
-
+;;;   the hardware stack: (~ 256/6) ~42 levels
 
 ;;; [ GENERATIVE ]
 ;;; 
 ;;; The generative part of the rule may be invoked
 ;;; several times. Each one will generate code.
 ;;; 
-;;; Note: There is no backtradking/reset of code
+;;; NOTE: There is no backtradking/reset of code
 ;;;       generated, so use with care!
-
+;;;       Typically just generate at end or when sure.
+;;; 
 ;;; Inside the generative brackets normal *relative*
-;;; 6502 asm is assumed to be used.
+;;; 6502 asm is assumed to be used. See example C.
 ;;; 
 ;;; There are directives used that doesn't match
 ;;; any 6502 byte-codes, these come from this set
 ;;; of printable bytecodes.
 ;;;
-;;;      "#'+2347:;<>?BCDGKOZ[\\]_bcdgkortwz{|
-;;;      "#' 2347 ;  ?BCDGKOZ \\ _bcdgkortwz{|
+;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
+;;; free "#' 2347 ;  ?BCDGKOZ \ _bcdgkortwz{|
 ;;; 
 ;;; The following are used:
 ;;; 
+;;;   [   - (redundant - start generative)
 ;;;   ]   - ends the generation
 ;;;   <   - lo byte of last %D number matched
 ;;;   >   - hi byte         - " -
-;;;   <>  - little endian 2 bytes of %D
-;;;   +>  -       - " -           of %D+1
+;;;   <>  - little endian 2 bytes of %D     VAL0
+;;;   +>  -       - " -           of %D+1   VAL1
 ;;;         (actually + and next byte will be replaced)
-;;;   :   - set %D value from %A(ssign)
+;;;   :   - set %D(igits) value from %A(ddr)
 ;;; 
 ;;; NOTE: if any constant being used, such as
 ;;;       address of JSR/JMP (library?) or a
 ;;;       variable/#constant matches any of these
-;;;       characters
+;;;       characters.
 ;;; 
 ;;; NOTE2: This hasn't (?) happened yet, but we don't
 ;;;        test for it so we don't know.
