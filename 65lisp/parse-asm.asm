@@ -74,11 +74,15 @@
 ;;; STATS:
 
 ;;;                          asm rules
-;;; MINIMAL   :  1025 bytes = (+ 642  383) inc LIB!
-;;; NORMAL    :  1143 bytes = (+ 642  501)
-;;; BYTERULES :  1302 bytes = (+ 642  660)
-;;; OPTRULES  :  1463 bytes = (+ 642  886)
+;;; MINIMAL   :  1016 bytes = (+ 633  383) inc LIB!
+;;; NORMAL    :  1134 bytes = (+ 633  501)
+;;; BYTERULES :  1293 bytes = (+ 633  660)
+;;; OPTRULES  :  1463 bytes = (+ 633  886)
 ;;; LONGNAMES : 
+;;; 
+;;; #x2c2 - 706 B
+;;; (- 706 27 46) = 633 (-errpos/-checkstack?) 
+;;;     100 byte more? lol)
 ;;; 
 ;;; z= #x6b1 1713 (- 1713 715 113)=> 885
 ;;; 
@@ -94,7 +98,8 @@
 ;;;    493 bytes ... (+ 29 B???) I think more cmp????
 ;;;    517 bytes highlite error in source! (+ 24 B)
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
-;;;    554 bytes =>a+3=>c;
+;;;    554 bytes =>a+3=>c
+;;;    663 bytes ... ?
 
 ;;; C parse() == parse.lst (- #x715 #x463) = 690
 ;;; 
@@ -137,6 +142,8 @@
 ;;;   660 bytes = BYTERULES (+ 159 B)
 ;;;   821 bytes = OPTRULES  (+ 320 B)
 ;;;   886 bytes ...
+;;; 
+;;; #x40a
 ;;; 
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
@@ -287,6 +294,9 @@ CURCALC		= $001f      ; ? how to update?
 ;;; when run repeadetly... HMMM? "resetting" stack
 ;;; not good when interrupts running????
 ;;; (just enables interrupt before getchar)
+;;; 
+;;; TODO: BUG: i think there is some zeropage overlap
+;;;   with oric timer and vars... lol
 ;TIM=1
 
 .ifblank
@@ -302,7 +312,7 @@ CURCALC		= $001f      ; ? how to update?
 ;;; enable stack checking at each _next
 ;;; (save some bytes by turn off)
 
-;;; TODO: if disabled maybe something wrong?
+;;; TODO: if disabled maybe something wrong? - parse err! lol
 ;
 CHECKSTACK=1
 
@@ -346,6 +356,10 @@ TESTING=1
 
 ;DEBUGRULE=1
 
+;;; at FAIL prints [rulechar][inputchar]/iL[rule]
+;;; 
+;DEBUGRULE2=1
+
 ;;; prints when skipping
 ;DEBUGRULESKIP=1
 
@@ -357,14 +371,16 @@ TESTING=1
 ;TRACERULE=1
 
 ;;; print input ON ERROR (after compile)
+;;; TOOD: also, if disabled then gives stack error,
+;;;   so it has become vital code, lol
 ;
 PRINTINPUT=1
 
+;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -552,8 +568,11 @@ FUNC _next
         bne stackerror
         jmp :+
 stackerror:     
+        putc 10
         putc '%'
         putc 'S'
+        putc '>'
+        jsr getchar
         jsr printstack
 
         jmp halt
@@ -890,14 +909,36 @@ uprule:
 
 
 FUNC _fail
+;;; TODO: somehow this triggers more debug output???? 
+;putc '\'
+;putc 0
+;nop
+
 ;;; 25 B
 
 ;;; TODO: can save bytes somehow???
 
+.ifdef NOTRIGHTERROR
         ;; Unexpected end of file?
         ldy #0
         lda (inp),y
-        beq gotendall
+;;; TODO: not a problem if at end of rule too?
+;;;   but then we shouldn't end up here...
+
+;        beq gotendall
+        bne :+
+        lda (rule),y
+        beq @bothzero
+@rulenotzero:
+        jsr putchar
+        putc 'z'
+        jmp gotendall
+@bothzero:
+        putc '0'
+        jmp gotendall
+:       
+.endif
+
 
 .ifdef SHOWINPUT
         putc '\'
@@ -1022,35 +1063,43 @@ endrule:
 
 	;; END - rule
     DEBC 'E'
-;.ifdef DEBUG
-;    putc '.'
-;.endif
 
 ;;; TODO: is this always like this?
 ;;;  (how about patch?)
 
-;;; TODO: lol wtf?
-     pla
-
         ;; nothing to backtrack
-        ;; - get rid of retry
+
+        ;; - get rid of 'i' retry
         pla
-.ifdef DEBUGRULE
-putc '/'
-jsr putchar
-.endif
+.ifdef DEBUGRULE2
+pha
+putc ' '
+ldy #0
+lda (rule),y
+jsr printchar
+lda (inp),y
+jsr printchar
+pla
+
+PUTC '/'
+jsr printchar
+.endif ; DEBUGRULE2
         pla
         pla
 
-        ;; - get rid of current rule
+        ;; - get rid of _R current rule
         pla
 .ifdef DEBUGRULE
-putc '/'
 jsr putchar
 .endif
+
+;.endif
         pla
         pla
 
+        ;; need to prime uprule with one value
+        ;; (this was mising -> unbalanced before)
+        pla
         jmp uprule
 
 
@@ -1432,7 +1481,6 @@ FUNC _incIspc
 ;;; TODO: this may get messed up when we backtrack!
 .endif
         ;; TODO: or just jsr _incRX
-putc 'I'
         jsr _incI
 
 ;;; TODO: cleanup
@@ -2104,6 +2152,9 @@ ruleD:
 
 ;;; ----------------------------------------
 .ifdef BYTERULES
+;;; TODO: How to automatically detect that a var
+;;;   is byte and use rule, or does C require INT
+;;;   for all calculations?
 
         .byte "|@+%V"
       .byte '['
@@ -2605,39 +2656,125 @@ ruleF:
 
 
 ruleO:  
+.ifdef ALTTEST
 ;;; works! aaabbbbaaaaaaabbb
         .byte "aaa"
       .byte '['
         putc 'A'
       .byte ']'
+
         .byte "|"
+
         .byte "bbb"
       .byte '['
         putc 'B'
       .byte ']'
+
+        .byte 0
+.endif ; ALTTEST
+
+        .byte _T,"%N()",_B
+      .byte '['
+        rts
+      .byte ']'
+
+        .byte '|'
+
+        .byte _T,"main()",_B
+      .byte '['
+        rts
+      .byte ']'
+
         .byte 0
         
 ;;; Program
 ruleP:  
-        .byte _O,_P
+
+.ifdef BB
+
+        .byte _B
+        .byte _P
+
+        .byte "|"
+
+        ;; empty (end)
+      .byte '['
+        putc 'y'
+        rts
+      .byte ']'
+
+        .byte 0
+
+.endif
+
+.ifdef ALTTEST
+;;; NOW this one is CORRECT and get's RTS
+;;; (FAIL to combine)
+        .byte "aaa"
+      .byte '['
+        putc 'A'
+      .byte ']'
+        .byte _P
+
+        .byte "|"
+
+        .byte "bbb"
+      .byte '['
+        putc 'B'
+      .byte ']'
+        .byte _P
+
         .byte "|"
       .byte '['
         rts
       .byte ']'
+
         .byte 0
 
-;;; FAIL to combine
-        .byte "aaa"
-        .byte "|"
-        .byte "bbb"
-        .byte "|"
+;;; NOW this fails! lol, doesn't match last... not RTS ???
+;;;   doesn't. 
+;;; (This works - one extra level of indirection!)
+
+;;; Even this fail.... lol WHY WTF???? 
+;;;    state must be different/wrong after B
+        .byte _O,_O
         .byte 0
-.byte 0
+
+        .byte "|"
+
+        .byte _O,_P
+
+        .byte "|"
+
+      .byte '['
+        rts
+      .byte ']'
+
+        .byte 0
+
+
+.endif ; ALTTEST
+
+
+
 ;;; BUG: TODO: if this is second it fails (for main!)!!!
 ;;; OK: if this is first, both fail individually
 
 ;;; TODO: %N has side-effect, are we *committed* here?
 ;;;    what if it is a var decl?
+        .byte _O,_P
+
+        .byte "|"
+
+      .byte '['
+        rts
+      .byte ']'
+
+        .byte 0
+
+
+
+
         .byte _T,"%N()",_B
       .byte '['
         rts
@@ -2652,8 +2789,12 @@ ruleP:
       .byte ']'
         .byte _P
 
-        ;; empty - no more definitions
         .byte "|"
+
+        ;; empty - no more definitions
+      .byte '['
+        rts
+      .byte ']'
 
         .byte 0
 
@@ -3289,6 +3430,12 @@ _OK:
         putc 10
 
         TIMER
+
+;;; TODO: remove, or make Compile not Run?
+;        jsr _dasm
+;        TIMER
+
+
 
 .zeropage
 runs:   .res 1
@@ -3987,6 +4134,69 @@ FUNC printvar
         putc ' '
         rts     
 
+;;; prints readable otherwise deccode
+.zeropage
+pchar:  .res 1
+ptossave:  .res 2
+.code
+FUNC printchar
+        sta pchar
+        pha
+        tya
+        pha
+        txa
+        pha
+        
+        lda pchar
+        bpl :+
+        ;; hi-bit set '
+        and #127
+        sta pchar
+        lda #'_'
+        jsr putchar
+        lda pchar
+:       
+        cmp #' '
+        bcs @printplain
+@printcode:
+        cmp #0
+        bne :+
+        ;; zero
+        lda #'$'
+        jsr putchar
+        jmp @done
+:       
+        lda tos+1
+        pha
+        lda tos
+        pha
+
+        lda pchar
+        sta tos
+        lda #0
+        sta tos+1
+        
+        putc '['
+        jsr printd
+        putc ']'
+
+        pla
+        sta tos
+        pla
+        sta tos+1
+
+        jmp @done
+@printplain:
+        jsr putchar
+@done:
+
+        pla
+        tax
+        pla
+        tay
+        pla
+        rts
+
 FUNC printstack
         pha
         tya
@@ -4127,20 +4337,53 @@ FUNC printstack
 .byte 0,0
 
 input:
+
+;;; IF sanity
+;        .byte "word main(){a=42;if(a==3)a+=4;printd(a);}",0
+
+.ifdef BB
+        .byte "{}{b=7;}{}",0
+
+        .byte "{}{}{}",0
+
+
+;;; error from (7;)}{}
+        .byte "{}{b=7;}{}",0
+;;; crash (not gen end rule)
+        .byte "{}{b=7;}",0
+;;; ok
+
+        .byte "{}{}{}",0
+        .byte "{}{}",0
+        .byte "{}",0
+;;; error
+        .byte "{a=3;}{b=7;}",0
+        .byte "{a=3;}{}",0
+
+;;; ok need space before printd? lol
+;        .byte "{a=4;a+=3; printd(a);}",0
+
+;;; FAIL - no space?   "printd" fails if first rule!
+;;; ... and now it works....?
+        .byte "{a=4;a+=3;printd(a);}{b=7;}",0
+        .byte "{a=4;a+=3;printd(a);}",0
+.endif ; BB
+
+.ifdef ALTTEST
         .byte "bbb"
         .byte "aaa"
         .byte "aaa"
         .byte "aaa"
         .byte "bbb"
         .byte "aaa"
-; crashes as partial match???
-;;; TODO: got zero on inp when expect more...
-        .byte "b"
+;;; ok, gives error %E - end of input...
+;        .byte "b"
 ;        .byte "bb"
 ;;; ok, stop compile
 ;        .byte "bbx"
 ;;; stop compile and detect as error
 ;        .byte "xlxkjflksjdflkasdjf"
+        .byte 0
         .byte 0
         ;; TODO: BUG: if not here get's corruption1
         ;; and getting next bytes and "word main"!
@@ -4148,11 +4391,15 @@ input:
 
         .byte "ccc"
         .byte "ccc"
+.endif ; ALTTEST
 
+
+.ifdef FFF
+        .byte "word main(){return 4711;}",0
 
 ;;; FAIL - both as input, in any order...
-        .byte "word main(){return 4711;}"
         .byte "word F(){return 4711;}"
+        .byte "word main(){return 4711;}"
         .byte 0
 
 ;;; ok - either as input, but not both
@@ -4164,8 +4411,9 @@ input:
 ;;;    too much recursion?
         .byte "word main(){return 4711     ;        } "
         .byte 0
+.endif ; FFF
 
-FUNTEST=1
+;FUNTEST=1
 .ifdef FUNTEST
 
 ;;; TODO:  doesn't like 10 newline!!! lol (or space...)
@@ -4318,6 +4566,20 @@ FUNTEST=1
         .byte "}",0
 .endif
 
+.ifdef TWEN
+        .byte "word main(){"
+        .byte "++a;++a;++a;++a;++a;"
+        .byte "++a;++a;++a;++a;++a;"
+        .byte "++a;++a;++a;++a;++a;"
+        .byte "++a;++a;++a;++a;++a;"
+        .byte "return a;}",0
+.byte "word main(){a=4700;return a+11;}",0
+.byte "word main(){return 4711;}",0
+.endif ; TWEN
+
+;;; HOW is this NOT the SAME?
+;        .byte "word main(){++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;return a;}",0
+
         .byte "word main(){"
         ;; 48 => 15s lol - error
         ;; 40 =>  8s LOL
@@ -4347,13 +4609,23 @@ FUNTEST=1
         ;; run: T 84          T55892
         ;.repeat 0               ;  6cs
         ;.repeat 10              ; 15cs
+;        .repeat 20              ; 27cs
+;.byte "++a;return a;}",0
+
         .repeat 20              ; 27cs
         ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
         ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
 
 ;          .byte "a=a+1;"
-          .byte "++a;"
+;          .byte "++a;"
+           .byte "++a;"
         .endrep
+        .byte "return a;}",0
+
+.ifdef FOO
+;;; OOO, what comes after here matter???? LOL
+
+;        .byte 0,0,0,0
         .byte "return a;"
         .byte "}",0
 
@@ -4500,6 +4772,7 @@ FUNTEST=1
         .byte "wordmain(){return 4711;}",0
 ;;; garbage (OK)
         .byte "voidmain(){}",0
+.endif ; FOO
 
 docs:   
         .byte "C-Syntax: { a=...; ... return ...; }",10
