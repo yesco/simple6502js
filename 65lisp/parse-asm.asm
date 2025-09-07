@@ -1,20 +1,23 @@
-;;; 6502 parser of BNF that generates machinecode
+;;; 6502 Minimal Universal Compiler - Rule Based Native Compiler
 ;;; 
 ;;; (c) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
-;;; Essentially this is a dynamic compiler.
+;;; Essentially, this is a dynamic rule-based compiler.
 ;;; 
 ;;; It interprets a BNF-description of a programming
-;;; language while reading a source text in that
-;;; langauge. The BNF contains generative instructions
-;;; that directly generates machine code. This code can
-;;; then be executed.
+;;; language while reading and matching it with the
+;;; source text in that langauge. The BNF contains
+;;; generative "templated" bytes of machine code with
+;;; minimal instrumentation to generate runnable machine
+;;; code.
 ;;;
 ;;; Goals
-;;; - be a "proper" subset of C
-;;; - on actual machine 6502 compiler running on 6502
-;;; - *minimal* size assembly code for BNF engine
+;;; - be a "proper" subset of C (at least syntactically)
+;;; - an actual machine 6502 compiler running on 6502
+;;; - *minimal* sized BNF-engine as well as rules
+;;;   keeping the whole compiler in about 1KB!
 ;;; - fast "enough" to run "on a screen of code"
+;;;   (~ 50ish "ops" compiled/s)
 ;;; - provide on-screen editor
 ;;; - "simple" rule-driven
 ;;; - many languages (just change rules)
@@ -24,16 +27,22 @@
 ;;; NON-Goals:
 ;;; - not be the best super-optimizing compiler
 ;;; - not be the fastest
+;;; - no constant folding (yet)
 ;;; 
 ;;; The MINIMAL C-language subset:
-;;; - only support void, word (uint), byte (uchar)
-;;; - word main() { ... }
-;;; - return ...;
-;;; - if () statement;
+;;; - only support types: void, word (uint), byte (uchar)
+;;; -   word main() ...
+;;; -   { block; ... }
+;;; -   return ...;
+;;; -   if () statement; [else statement;]
+;;; -   label: goto label;
+;;; -
 ;;; - single letter global variables (no need declare)
+;;; - pointers (no type checking): *p= *p+1
+;;; - limited char support: *(char*)p=   ... (char)i;
 ;;; - decimal numbers: 4711 42
 ;;; - bin operators: + - *2 /2 & | ^ << >>
-;;; - library to minimize gen code+rules (slowe code)
+;;; - library to minimize gen code+rules (slow code==cc65)
 ;;; 
 ;;; OPTIONAL:
 ;;; - I/O: getchar putc printd printh
@@ -43,29 +52,27 @@
 ;;; - optimized: ... op const   ... op var
 ;;;   
 ;;; TODO:
-;;; - { } blocks (BUGS: something lol)
-;;; - hex numbers (alt to decimal?)
 ;;; - T F() { ... }
 ;;; - F() - function calls
-;;; - parameters
-;;; - recursion?
+;;; - parameters (without stack)
+;;; - recursion? (requires stack)
 ;;; 
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
-;;; - 3 @+ v          byte operator (acts only on A)
+;;; - 3 @+ v          byte operator (acts only on A not AX)
 ;;; 
 ;;; Limits
 ;;; - only *unsigned* values
 ;;; - if supported ops/syntax should (mostly)
 ;;;   work the same on normal C-compiler
+;;; - NO priorities on * / (OK, this deviates from C)
 ;;; - types aren't enforced
 ;;; - not using any extensions: same result
 ;;; - single lower case letter variable (TODO: fix)
 ;;; - single upper case letter functions (TODO: fix)
 ;;; - modifying ops cannot be used in expressions
 ;;; - NO parenthesis
-;;; - NO priorities on * / (OK, deviates from C)
 ;;; - NO generic / or * (unless add library)
 
 
@@ -169,20 +176,30 @@
 ;;; 
 ;;; gives a parse.tap in ORIC folder (symlink)
 
-;;; BNF capabilities
+
+
+;;; 
+;;; BNF DEFINITION
+;;; ==============
 ;;; 
 ;;; The BNF is very simplified and is interpreted
 ;;; using backtracking. It may be ambigious but first
-;;; matching result is accepted. Can be seen as priorities.
+;;; matching result/alternative is accepted.
+;;; (Can this replace priorities?)
 ;;; 
 ;;; In a BNF-rule
 ;;; - lower case letter is matched literally
 ;;; - spaces (or any char <= ' ') won't work!- don't use
-;;; - a letter with hi-bit set ('R'+128) references
-;;;   another rule that is matched by recursion
-;;; - Rules can have alternatives: E= aa | a | b that are
-;;;   tried in sequence.
+;;; - a letter with hi-bit set ('R'+128) is a reference
+;;;   to another rule that is matched by recursion
+;;; - rules can have alternatives: E= aa | a | b that are
+;;;   tried in sequence. Once accepted no backtracking.
 ;;; - Put literal/longer matches first in rule alternatives.
+;;; - Right-recursion might work:
+;;; - Warning: The recursive rule matching is limited by
+;;;   the hardware stack: (~ 256/6) ~42 levels
+;;; - No Kleene operator (*+?[]) just use:
+;;; - TAILREC - to do tail-recursion on current rule!
 ;;; - %D - match sequence of digits (number: /\d+/ )
 ;;; -(%d - TODO: match 0-255 only)
 ;;; 
@@ -196,10 +213,9 @@
 ;;; TODO:?
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
+;;; - %B - match iff datatype is byte
+;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
 
-
-;;; Warning: The recursive rule matching is limited by
-;;;   the hardware stack: (~ 256/6) ~42 levels
 
 ;;; [ GENERATIVE ]
 ;;; 
