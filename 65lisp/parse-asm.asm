@@ -793,16 +793,7 @@ FUNC _enterrule
         ;; - reset rule match to start
 ;;; TODO: @same redundant
         lda rulename
-
-        and #31
-        asl
-        tay
-        lda _rules,y
-        sta rule
-        lda _rules+1,y
-        sta rule+1
-
-        jmp _next
+        jmp @loadruleptr
 
 @pushnewrule:
         lda rule+1
@@ -812,16 +803,25 @@ FUNC _enterrule
         lda rulename
         pha
 
+        ;; - push inp for retries
+        lda inp+1
+        pha
+        lda inp
+        pha
+        lda #'i'
+        pha
+
         ;; - load new rule pointer
-@loadruleptr:
         lda (rule),y
         sta rulename
+
 .ifdef DEBUGRULE
     PUTC ' '
     jsr putchar
     PUTC '>'
 .endif
-@same:
+
+@loadruleptr:
         and #31
         asl
         tay
@@ -830,13 +830,6 @@ FUNC _enterrule
         lda _rules+1,y
         sta rule+1
 
-        ;; - push inp for retries
-        lda inp+1
-        pha
-        lda inp
-        pha
-        lda #'i'
-        pha
 
 .ifdef DEBUGRULE
 ;    jsr printstack
