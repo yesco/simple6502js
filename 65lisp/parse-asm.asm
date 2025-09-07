@@ -297,7 +297,8 @@ CURCALC		= $001f      ; ? how to update?
 ;;; 
 ;;; TODO: BUG: i think there is some zeropage overlap
 ;;;   with oric timer and vars... lol
-;TIM=1
+;;
+TIM=1
 
 .ifblank
 ;.ifnblank
@@ -358,7 +359,8 @@ TESTING=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
-;DEBUGRULE2=1
+;
+DEBUGRULE2=1
 
 ;;; prints when skipping
 ;DEBUGRULESKIP=1
@@ -383,8 +385,7 @@ PRINTINPUT=1
 ;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
-;
-ERRPOS=1
+;ERRPOS=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -436,6 +437,14 @@ rulename:       .res 1
 pframe: 
 
 .code
+
+
+;;; Magical references in [generate]
+VAL0= '<' + 256*'>'
+VAL1= '+' + 256*'>'
+PUSHLOC= '{' + 256*'{'
+TAILREC= '*'+128
+
 
 ;;; parser
 FUNC _init
@@ -773,6 +782,29 @@ FUNC _enterrule
         ldy #0
         
 .endif ; DEBUG
+
+        ;; TAILREC?
+        cmp #TAILREC
+        bne @pushnewrule
+
+.ifdef DEBUGRULE2
+;        putc 'R'
+.endif
+        ;; - reset rule match to start
+;;; TODO: @same redundant
+        lda rulename
+
+        and #31
+        asl
+        tay
+        lda _rules,y
+        sta rule
+        lda _rules+1,y
+        sta rule+1
+
+        jmp _next
+
+@pushnewrule:
         lda rule+1
         pha
         lda rule
@@ -780,7 +812,8 @@ FUNC _enterrule
         lda rulename
         pha
 
-        ;; - load new rule
+        ;; - load new rule pointer
+@loadruleptr:
         lda (rule),y
         sta rulename
 .ifdef DEBUGRULE
@@ -788,6 +821,7 @@ FUNC _enterrule
     jsr putchar
     PUTC '>'
 .endif
+@same:
         and #31
         asl
         tay
@@ -1089,8 +1123,8 @@ jsr printchar
 
         ;; - get rid of _R current rule
         pla
-.ifdef DEBUGRULE
-jsr putchar
+.ifdef DEBUGRULE2
+jsr printchar
 .endif
 
 ;.endif
@@ -1846,12 +1880,6 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
-;;; How to access value of variable!
-VAL0= '<' + 256*'>'
-VAL1= '+' + 256*'>'
-
-PUSHLOC= '{' + 256*'{'
-
 ruleG:
 ruleH:  
 ruleI:
@@ -1912,7 +1940,7 @@ rule0:
 ;;; aggregate statements
 ruleA:  
         ;; Right-recursion is "fine"
-        .byte _S,_A,"|",0
+        .byte _S,TAILREC,"|",0
 
 ;;; Block
 ruleB:  
@@ -2690,6 +2718,7 @@ ruleO:
 ;;; Program
 ruleP:  
 
+;BB=1
 .ifdef BB
 
         .byte _B
@@ -2762,6 +2791,7 @@ ruleP:
 
 ;;; TODO: %N has side-effect, are we *committed* here?
 ;;;    what if it is a var decl?
+.ifdef OO
         .byte _O,_P
 
         .byte "|"
@@ -2771,7 +2801,7 @@ ruleP:
       .byte ']'
 
         .byte 0
-
+.endif ; OO
 
 
 
@@ -2994,15 +3024,16 @@ ruleS:
 
 ;;; FAILS - forever!
 ;        .byte '|',_B
+
 ;;; works
         .byte "|{}"
 ;;; FAILS - forever!
 ;        .byte "|{",_A,"}"
 ;;; TODO: fix, this will gen first S twice?
 ;;; works
-        .byte "|{",_S,"}"
+;        .byte "|{",_S,"}"
 ;;; FAILS - forever!
-        .byte "|{",_S,_S,"}"
+;        .byte "|{",_S,_S,"}"
 
 
 ;;; TODO:
@@ -3365,6 +3396,17 @@ status:
         ;; print it
        
 .ifdef PRINTINPUT
+
+        putc '>'
+;;; TOOD: put in getchar...
+.ifdef TIM
+        cli
+        jsr getchar
+        sei
+.else
+        jsr getchar
+.endif
+
 ;;; TODO: printz? printR?
 
 ;;; TODO: ldx , ldy, jsr _copyR - 6B
@@ -3415,6 +3457,7 @@ _OK:
         putc 'K'
         putc ' '
 
+_run:   
         ;; print size in bytes
         sec
         lda _out
@@ -3639,6 +3682,13 @@ doneCE:
 
         jsr _clrscr
         jmp _aftercompile
+:       
+        ;; - ctrl-X - execute whatever
+        cmp #'X'-'@'
+        bne :+
+
+        jsr _clrscr
+        jmp _run
 :       
         ;; - ctrl-q - disasm
         cmp #'Q'-'@'
@@ -4338,13 +4388,18 @@ FUNC printstack
 
 input:
 
+;        .byte "word main(){++a;++a;return a;}",0
+;        .byte "word main(){return 4711;}",0
+
 ;;; IF sanity
 ;        .byte "word main(){a=42;if(a==3)a+=4;printd(a);}",0
 
 .ifdef BB
-        .byte "{}{b=7;}{}",0
-
+;;; ???
+;;; TODO: it would seem that inp points wrong here!
+;;;   then that causes error
         .byte "{}{}{}",0
+        .byte "{}{b=7;}",0
 
 
 ;;; error from (7;)}{}
@@ -4612,7 +4667,8 @@ input:
 ;        .repeat 20              ; 27cs
 ;.byte "++a;return a;}",0
 
-        .repeat 20              ; 27cs
+;        .repeat 20              ; 27cs
+        .repeat 2000
         ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
         ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
 
