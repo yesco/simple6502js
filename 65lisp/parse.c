@@ -153,7 +153,20 @@ char* parse(char r, char* in) {
 
 // 741 bytes printh (- 741 690) = 51 bytes for printhex
 
+#include <conio.h>
+
 void main() {
+
+  // bgcolor(0);
+  // $26B Paper colour (+16).
+  *(char*)0x26b= 16+0;
+
+  //textcolor(2);
+  // $26C Ink colour.
+  *(char*)0x26c= 2; // green
+
+  clrscr();
+
   //printf("Hello World!\n");
   
   *TEXTSCREEN= 'A';

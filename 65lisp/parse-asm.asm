@@ -199,7 +199,7 @@
 ;;; - Warning: The recursive rule matching is limited by
 ;;;   the hardware stack: (~ 256/6) ~42 levels
 ;;; - No Kleene operator (*+?[]) just use:
-;;; - TAILREC - to do tail-recursion on current rule!
+;;; - TAILREC hibit-* = do tail-recursion on current rule!
 ;;; - %D - match sequence of digits (number: /\d+/ )
 ;;; -(%d - TODO: match 0-255 only)
 ;;; 
@@ -209,6 +209,7 @@
 ;;;        (generative rule ':' will set tos=dos)
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
 ;;; - %U - USE value of NAME (assumed set already)
+;;; - %S - string "...\n\r\"..."
 ;;; 
 ;;; TODO:?
 ;;; - %n - define NEW LOCAL
@@ -234,7 +235,7 @@
 ;;; of printable bytecodes.
 ;;;
 ;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
-;;; free "#' 2347 ;  ?BCDGKOZ \ _bcdgkortwz{|
+;;; free "#' 2347 ;  ?BCDGKOZ \ _bcdgkortwz |
 ;;; 
 ;;; The following are used:
 ;;; 
@@ -245,7 +246,10 @@
 ;;;   <>  - little endian 2 bytes of %D     VAL0
 ;;;   +>  -       - " -           of %D+1   VAL1
 ;;;         (actually + and next byte will be replaced)
-;;;   :   - set %D(igits) value from %A(ddr)
+;;;   {?  - PUSHLOC (push and patc next loc)
+;;;   D   - set %D(igits) value from %A(ddr)
+;;;   :   - TODO: push loc (onto stack)
+;;;   ;   - TOOD: pop loc (from stack) to %D/%A?? (tos)
 ;;; 
 ;;; NOTE: if any constant being used, such as
 ;;;       address of JSR/JMP (library?) or a
@@ -313,7 +317,7 @@ CURCALC		= $001f      ; ? how to update?
 ;;; 
 ;;; TODO: BUG: i think there is some zeropage overlap
 ;;;   with oric timer and vars... lol
-;;
+;
 TIM=1
 
 .ifblank
@@ -375,8 +379,7 @@ TESTING=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
-;
-DEBUGRULE2=1
+;DEBUGRULE2=1
 
 ;;; prints when skipping
 ;DEBUGRULESKIP=1
@@ -391,17 +394,19 @@ DEBUGRULE2=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-;
-PRINTINPUT=1
+;PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
-;PRINTREAD=1
+;;; Requires ERRPOS (?)
+;
+PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
-;ERRPOS=1
+;
+ERRPOS=1
 
 .ifdef DEBUG
   .macro DEBC c
@@ -750,10 +755,43 @@ percent:
         ;; - %D - digits
         cmp #'D'
         beq isdigits
+        cmp #'S'
+        beq isstring
 jmpvar: 
         ;; - % anything...
         ;;   %V (or %F %f %...)
         jmp _var
+
+        ;; - "constant string"
+        ;; (store inline!?)
+isstring:       
+STRING=1
+.ifdef STRING
+        ;; when arrive here %S only reads till "
+        ;; (skipping \"). \n is converted.
+        
+str:    
+        jsr _incI
+        cmp #'"'                ; "
+        beq _next
+        cmp #'\'
+        bne :+
+        ;; quote (next char is raw)
+        jsr _incI
+        ;; \n - except => 10
+        cmp #'n'
+        bne :+
+        lda #10
+:       
+;;; TODO: [just copy byte to out]
+        jmp str
+        ;; have complete string
+;;; TODO: where to store it? haha
+;;; TODO: [0-terminate]
+;;; TODO: [PUSHLOC to here]
+;;; TODO: ldax %D
+        jmp _next
+.endif ; STRING
 
 isdigits:       
         ;; assume it's %D
@@ -1388,7 +1426,7 @@ DEBC '>'
 
 @skip3:
 ;;; ':' SET tos=dos
-        cmp #':'
+        cmp #'D'
         bne @skip4
 DEBC ':'
         lda dos
@@ -1432,7 +1470,29 @@ DEBC '+'
         jsr _incO
         jsr _incR
 @skip6:
-
+	;; ":" PUSH (here '&')
+        cmp #':'
+        bne :+
+        lda _out+1
+        pha
+        lda _out
+        pha
+        lda #'&'
+        pha
+:       
+        ;; ";" POP -> %D (tos)
+        cmp #';'
+        bne :+
+        pla
+.ifdef SANITY
+        cmp #'&'
+;;; TODO: ... bne error
+.endif
+        pla
+        sta tos
+        pla
+        sta tos+1
+:       
 @doout:
         sta (_out),y
         jsr _incO
@@ -1977,6 +2037,11 @@ ruleC:
         jsr printh
       .byte ']'
 
+        .byte "|printz(",_E,")"
+      .byte '['
+        jmp _printz
+      .byte ']'
+
 .ifdef OPTRULES
         ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%V)"
@@ -2118,7 +2183,7 @@ ruleC:
 ;;; TODO: need to have a PUSH ':' and a POP ';' ???
 ;;; reverse meaning from now   ^   REVERSE   ^  !!!
         .byte "|++%A"
-      .byte "[:"
+      .byte "[D"
         .byte "|--%A"
 
 .endif ; !MINIMAL
@@ -2154,12 +2219,29 @@ ruleC:
         ldx VAL1
       .byte ']'
 
+        ;; digits
         .byte "|%D"
       .byte '['
         lda #'<'
         ldx #'>'
       .byte ']'
-
+        
+        ;; string
+        .byte "|",34            ; really "
+      .byte '['
+        jmp PUSHLOC
+        .byte ':'               ; push here
+      .byte ']'
+        ;; copies string inline till "
+        .byte "%S"
+      .byte "["
+        ;; load string from %D value
+        .byte ";"               ; pop here
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+        ;; autopatches jmp to here
+;;; TODO: DAMN - wrong, should be to before "load string"
         .byte 0
 
 .ifdef MINIMAL
@@ -2180,7 +2262,7 @@ ruleD:
         ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
         .byte "=>%A"
-      .byte "[:"
+      .byte "[D"
         sta VAL0
         stx VAL1
       .byte "]"
@@ -3006,7 +3088,7 @@ ruleK:
         _L,")";"
       .byte '['
         ;; get %A value to tos
-        .byte ':'
+        .byte 'D'
         jsr VAL0
 ;;; TODO: assuming there is no other assignement \%A
 ;;;       in parsing List of parameters... LOL (push/pop?)
@@ -3096,7 +3178,7 @@ afterELSE:
 
         ;; goto
         .byte "|goto%A;"
-      .byte "[:"
+      .byte "[D"
         jmp (VAL0)
       .byte "]"
 
@@ -3109,7 +3191,7 @@ afterELSE:
         lda #'<'
         ldx #'>'
         ;; cmp with VAR
-        .byte ':'
+        .byte 'D'
 
         cpx VAL1
         bcc @nah                ; NUM<VAR (num.h<var.h)
@@ -3175,7 +3257,7 @@ afterELSE:
 .ifdef OPTRULES
 ;;; TODO make ruleC when %A pushes
         .byte "|++%A;"
-      .byte "[:"
+      .byte "[D"
         inc VAL0
         bne :+
         inc VAL1
@@ -3184,7 +3266,7 @@ afterELSE:
 
 ;;; TODO make ruleC when %A pushes
         .byte "|--%A;"
-      .byte "[:"
+      .byte "[D"
         lda VAL0
         bne :+
         dec VAL1
@@ -3195,7 +3277,7 @@ afterELSE:
         ;; NOTE: no need provide: v op= const;
         ;;       - it would wouldn't save any bytes!
         .byte "|%A+=",_E,";"
-      .byte "[:"
+      .byte "[D"
         clc
         adc VAL0
         sta VAL0
@@ -3205,7 +3287,7 @@ afterELSE:
       .byte "]"
 
         .byte "|%A-=",_E,";"
-      .byte "[:"
+      .byte "[D"
         sec
         eor #$ff
         adc VAL0
@@ -3217,7 +3299,7 @@ afterELSE:
       .byte "]"
 
         .byte "|%A&=",_E,";"
-      .byte "[:"
+      .byte "[D"
         and VAL0
         sta VAL0
         txa
@@ -3226,7 +3308,7 @@ afterELSE:
       .byte "]"
 
         .byte "|%A\|=",_E,";"
-      .byte "[:"
+      .byte "[D"
         ora VAL0
         sta VAL0
         txa
@@ -3235,7 +3317,7 @@ afterELSE:
       .byte "]"
 
         .byte "|%A^=",_E,";"
-      .byte "[:"
+      .byte "[D"
         eor VAL0
         sta VAL0
         txa
@@ -3244,13 +3326,13 @@ afterELSE:
       .byte "]"
 
         .byte "|%A>>=1;"
-      .byte "[:"
+      .byte "[D"
         lsr VAL1
         ror VAL0
       .byte "]"
 
         .byte "|%A<<=1;"
-      .byte "[:"
+      .byte "[D"
         asl VAL0
         ror VAL1
       .byte "]"
@@ -3261,14 +3343,14 @@ afterELSE:
         ;; and can't be nested or part of expression
         ;; (unless we use a stack...)
         .byte "|%A=",_E,";"
-      .byte "[:"                ; ':' => tos=dos
+      .byte "[D"                ; 'D' => tos=dos
         sta VAL0
         stx VAL1
       .byte "]"
 
 .ifdef POINTERS
         .byte "|*%A=",_E,";"
-      .byte "[:"
+      .byte "[D"
         ldy VAL0
         sty tos
         ldy VAL1
@@ -3292,7 +3374,7 @@ afterELSE:
         pha
       .byte ']'
         .byte _E,";"
-      .byte "[:"
+      .byte "[D"
         ;; load index
         tax
         pla
@@ -3313,7 +3395,7 @@ afterELSE:
         pha
       .byte ']'
         .byte _E,";"
-      .byte "[:"
+      .byte "[D"
         ;; load index
         sta savea
         pla
@@ -4933,10 +5015,28 @@ vnext:
 .endif ; TESTING
 
 
-;;; not physicaly allocated in binary
+;;; 
+;;; 
+
 .bss
+;;; Generated program memory layout:
+;;; 
+;;;   _output: jmp main
+;;;            ...machine code...
+;;;            rts
+;;;    out->
+;;; 
+;;;            ...free...
+;;;
+;;;            TODO:concstants/vars ???
+;;;   _outend: 
+
 _output:
-        .res 8*1024
+;;; not physicaly allocated in binary
+;;; ++a; x 2000
+;;;  free tap inp output
+;;; (- 37 11    8   16  ) = 2K left
+        .res 16*1024
 
 ;;; Some variants save on codegen by using a library
 
