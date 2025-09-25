@@ -5,15 +5,15 @@
 ;;; Essentially, this is a dynamic rule-based compiler.
 ;;; 
 ;;; It interprets a BNF-description of a programming
-;;; language while reading and matching it with the
-;;; source text in that langauge. The BNF contains
+;;; language while reading and matching it with a
+;;; source text of that langauge. The BNF contains
 ;;; generative "templated" bytes of machine code with
 ;;; minimal instrumentation to generate runnable machine
 ;;; code.
 ;;;
 ;;; Goals
-;;; - be a "proper" subset of C (at least syntactically)
 ;;; - an actual machine 6502 compiler running on 6502
+;;; - be a "proper" subset of C (at least syntactically)
 ;;; - *minimal* sized BNF-engine as well as rules
 ;;;   keeping the whole compiler in about 1KB!
 ;;; - fast "enough" to run "on a screen of code"
@@ -286,6 +286,7 @@ CURCALC		= $001f      ; ? how to update?
 
 
 ;;; TODO: not good idea?
+;;; TODO: not working, parse error?
 ;COMPILESCREEN=1
 
 
@@ -379,7 +380,13 @@ TESTING=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
+
 ;DEBUGRULE2=1
+
+;DEB2=1
+
+
+;DEBUGRULE2ADDR=1
 
 ;;; prints when skipping
 ;DEBUGRULESKIP=1
@@ -394,7 +401,8 @@ TESTING=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-;PRINTINPUT=1
+;
+PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
@@ -465,6 +473,7 @@ VAL0= '<' + 256*'>'
 VAL1= '+' + 256*'>'
 PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
+DONE= '$'
 
 
 ;;; parser
@@ -495,13 +504,13 @@ FUNC _init
 
         ;; init input
 .ifdef COMPILESCREEN
-        jsr printsrc
+        jsr _printsrc
 
         ;; "Zero terminate the screen!" LOL
         lda #0
         sta SCREENEND+1
 
-        COMPILESTART= SCREEN+40
+        COMPILESTART= SCREEN+40+1
         ;; set screen as input
 .else
         COMPILESTART= input+1
@@ -550,7 +559,8 @@ putc 10
         sta rule+1
 
         ;; end-all marker
-        lda #42
+;;; TODO: make it 0, can save many tests bytes???
+        lda #DONE
         pha
 
 .ifdef DEBUGRULE
@@ -561,7 +571,7 @@ putc 10
 ;;; TODO: but this doesn't work.... lol
 
 .ifnblank
-        lda #42
+        lda #DONE
         sta rulename
 
         lda #'P'+128
@@ -575,6 +585,7 @@ putc 10
 
 ;;; TODO: why two?
 .ifdef COMPILESCREEN
+        jsr _incIspc
         jsr _incIspc
 .endif
 ;        jsr _incIspc
@@ -602,9 +613,15 @@ stackerror:
         putc '%'
         putc 'S'
         putc '>'
+;;; TODO: this one blocks if TIM
         jsr getchar
         jsr printstack
 
+        ldx #$ff
+        txs
+        jmp _edit
+        
+;;; TODO: remove
         jmp halt
 :       
 .endif ; CHECKSTACK
@@ -622,12 +639,6 @@ stackerror:
 .endif
 
 .ifdef DEBUG
-    pha
-    PUTC ':'
-    ldy #0
-    lda (inp),y
-    jsr putchar
-    pla
 .else
   .ifdef SHOWINPUT
     pha
@@ -639,11 +650,20 @@ stackerror:
 .endif ; DEBUG
 
 .ifdef DEBUG
-;    PUTC ' '
-    PUTC 10
+    ;; RULE
+    putc 10
+    lda rulename
+    jsr putchar
+    putc '.'
     ldy #0
     lda (rule),y
     jsr putchar
+    ;; INPUT
+    putc ':'
+    ldy #0
+    lda (inp),y
+    jsr printchar
+    putc ' '
 .endif ; DEBUG
 
 ;;; TODO: ;;;;;
@@ -668,13 +688,14 @@ stackerror:
 jmpaccept:      
         jmp _acceptrule
 :       
+        ;; \ - quoted
+        ;; (can't quote 0, hmmm)
+        cmp #'\'
+        beq quoted
+
         ;; | - also accept
         cmp #'|'
         beq  jmpaccept
-
-        ;; \ - quoted
-        cmp #'\'
-        beq quoted
 
 	;; - % handle special matchers
         cmp #'%'
@@ -682,51 +703,8 @@ jmpaccept:
 
         ;; - [ gen-rule
         cmp #'['
-        bne :+
-        jmp _generate
-:       
-        ;; - *R repeat rule
-        cmp #'*'
         bne testeq
-
-;;; TODO: we could easily implement
-;;;    tail rule input support, just modify 'i'?
-
-        ;; *R
-        jsr _incR
-        ;; -- put magical things on stack
-        ;; when R finally fails we should skip to next
-
-;;; TODO: could we just put end marker?
-.ifnblank
-        lda #42
-        pha
-        ;; lol-? hmmm
-        jsr _next
-
-        ;; -- push current rule again
-        lda rule+1
-        pha
-        lda rule
-        pha
-        lda rulename
-        pha
-        ;; -- push 'i' inp+1; // after "*R"
-        clc
-        lda #1
-        adc inp
-        tay
-        lda #0
-        adc inp+1
-        pha
-        tay
-        pha
-        lda #'i'
-        pha
-
-        jmp _next
-.endif
-
+        jmp _generate
 
         ;; literal equal test match
 quoted:
@@ -765,7 +743,7 @@ jmpvar:
         ;; - "constant string"
         ;; (store inline!?)
 isstring:       
-STRING=1
+;STRING=1
 .ifdef STRING
         ;; when arrive here %S only reads till "
         ;; (skipping \"). \n is converted.
@@ -849,6 +827,8 @@ FUNC _enterrule
         lda rulename
         jmp @loadruleptr
 
+
+;;; Hi-bit set, and it's not '*'
 @pushnewrule:
         lda rule+1
         pha
@@ -868,6 +848,10 @@ FUNC _enterrule
         ;; - load new rule pointer
         lda (rule),y
         sta rulename
+
+    PUTC ' '
+    jsr printchar
+    PUTC '>'
 
 .ifdef DEBUGRULE
     PUTC ' '
@@ -893,6 +877,11 @@ FUNC _enterrule
 ;;; (maybe don't need marker on stack?)
 
 
+;;; We arrive here once a rule is matched
+;;; successfully. We then cleanup 'i'nput and do
+;;; any needed 'p'atching, until we reach another
+;;; rule to continue parsing (or end).
+
 FUNC _acceptrule
 .ifdef TRACERULE
         lda #8
@@ -913,27 +902,39 @@ FUNC _acceptrule
 .ifdef DEBUGRULE
     putc '<'
 .endif
+
 @loop:
+.ifdef DEB2
+PUTC '.'
+.endif
         ;; remove (all) re-tries
         pla
-.ifdef DEBUGRULE
+
+.ifdef DEBUGRULE2
     pha
-    jsr putchar
+    jsr printchar
 ;    jsr printstack
+
+;;; Doesn't get here....?
+        tsx
+        bne :++
+        PUTC 'X'
+:       jmp :-
+:       
+
     pla
 .endif
+
         bmi uprule
         ;; - done?
-        cmp #42
-        bne @skip
-;;; TODO: rts for *R repeated?
-        lda #0                  ; ok
+        cmp #DONE
+        bne :+
+        ;; yes, done, no error
         jmp _donecompile
-@skip:
+:       
         
         ;; 'p' - PATCH
         cmp #'p'
-;;; TODO: now assumes it's 'i'
         bne @gotretry
     DEBC 'P'
         pla
@@ -952,22 +953,53 @@ FUNC _acceptrule
         jmp @loop
 
 ;;; 'i' - input restore and RETRY
+;;; (it's assumed it's an 'i')
+;;; TODO: check?
 @gotretry:
+.ifdef DEB2
+PUTC '='
+.endif
+
 ;        jsr putchar
     DEBC '.'
 .ifdef DEBUGRULE
     putc '.'
 .endif
+
         pla
         pla
         jmp @loop
 
 ;;; hibit - RULE
-uprule: 
+uprule:
+
+PUTC '^'
+jsr printchar
+
+
+.ifdef DEB2
+PUTC '^'
+.endif
+
+.ifdef DEB2
+sta savea
+
+tsx
+stx tos
+lda #0
+sta tos+1
+jsr printd
+PUTC 10
+
+lda savea
+.endif
+
 .ifdef DEBUGRULE
     PUTC '_'
 .endif
+
     DEBC '_'
+
         sta rulename
         pla
         sta rule
@@ -990,6 +1022,7 @@ uprule:
 
 
 FUNC _fail
+PUTC '\'
 ;;; TODO: somehow this triggers more debug output???? 
 ;putc '\'
 ;putc 0
@@ -999,15 +1032,18 @@ FUNC _fail
 
 ;;; TODO: can save bytes somehow???
 
+;;; TODO: ????
 .ifdef NOTRIGHTERROR
         ;; Unexpected end of file?
         ldy #0
         lda (inp),y
+
 ;;; TODO: not a problem if at end of rule too?
 ;;;   but then we shouldn't end up here...
-
 ;        beq gotendall
+
         bne :+
+;;; TODO: just local rule end... no meaning?
         lda (rule),y
         beq @bothzero
 @rulenotzero:
@@ -1042,6 +1078,7 @@ FUNC _fail
 ;        jsr _incR
         ldy #0
         lda (rule),y
+        ;; or fail if at end of rule (no more alt)
         beq endrule
 
 ;;; TODO: remove! this only catches
@@ -1087,7 +1124,6 @@ FUNC _fail
         ;; _incRX is guaranteed not be be 0!
         bne @loop
 
-
 @nextalt:
         ;; try next alterantive
         ;; - move after '|'
@@ -1101,8 +1137,8 @@ restoreinp:
 ;;;  (means? still have input?)
 ;        bmi gotendall
         bmi unexpectedrule
-;;; TODO: RTS for *R repeated?
-        cmp #42
+        cmp #DONE
+;;; lda #0 ???? if no error
         beq _donecompile
 
 ;;; TODO: assume it's 'I'? (how about is patch?)
@@ -1113,8 +1149,8 @@ restoreinp:
 ;;; TODO: Why this interferes with simple ???
         cmp #'i'
         beq gotretry
-;;; otherwise - error
-gotpatch:       
+;;; otherwise - error 'P'
+gotpatch:
         lda #'P'
         jmp error
 .endif
@@ -1125,6 +1161,7 @@ gotretry:
     putc 10
 .endif
     DEBC '!'
+
         ;; copy/restore and leave inp at stack
         tsx
         pla
@@ -1135,7 +1172,11 @@ gotretry:
         txs
         jmp _next
 
+;;; we come here if FAIL find no '|' alt
 endrule:
+PUTC '/'
+lda rulename
+jsr printchar
 
 .ifdef DEBUGRULE
    putc 'E'
@@ -1152,6 +1193,7 @@ endrule:
 
         ;; - get rid of 'i' retry
         pla
+
 .ifdef DEBUGRULE2
 pha
 putc ' '
@@ -1160,10 +1202,32 @@ lda (rule),y
 jsr printchar
 lda (inp),y
 jsr printchar
-pla
+putc '\'
 
-PUTC '/'
+jsr printstack
+
+putc '/'
+pla
+:       
 jsr printchar
+tsx
+;;; TODO: hmmm
+beq _donecompile                ; or %S TODO:
+cmp #DONE
+;;; TODO: hmmm
+beq _donecompile                ; ???
+;cmp #'i'
+;beq :+
+
+;;; not expected, try sync up...
+
+putc '/'
+pla
+pla
+jmp :-
+
+:
+
 .endif ; DEBUGRULE2
         pla
         pla
@@ -1172,6 +1236,7 @@ jsr printchar
         pla
 .ifdef DEBUGRULE2
 jsr printchar
+PUTC ' '
 .endif
 
 ;.endif
@@ -1180,11 +1245,29 @@ jsr printchar
 
         ;; need to prime uprule with one value
         ;; (this was mising -> unbalanced before)
+:       
         pla
+        bmi :+
+;;; TODO: this fixes parse issue, ^i rule lol
+;;;   but it probably drops a 'P' patch???
+;;;  TODO: loop instead, but why we got here?
+        ;; not rule, go up!
+
+
+;;; TODOTODOTODO:TTTOOODDDOOO fixme!
+
+        pla
+        pla
+        jmp :-
+:       
         jmp uprule
 
 
-_donecompile:
+
+_donecompile:   
+        lda #0
+;;; A contains error code; 0 if no error
+_errcompile:
         TIMER
 
 .ifdef TRACERULE
@@ -2014,6 +2097,7 @@ ruleA:
 ;;; Block
 ruleB:  
 ;;; TODO: empty?
+;;; TODO: remove
         .byte "{}"
         .byte "|{",_A,"}"
 
@@ -2266,7 +2350,7 @@ ruleD:
         sta VAL0
         stx VAL1
       .byte "]"
-        .byte _D
+        .byte TAILREC
 
 
 ;;; ----------------------------------------
@@ -2280,14 +2364,14 @@ ruleD:
         clc
         adc VAL0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@+%D"
       .byte '['
         clc
         adc #'<'
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 18 *2
         .byte "|@-%D"
@@ -2295,27 +2379,27 @@ ruleD:
         sec
         sbc VAL0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@-%D"
       .byte '['
         sec
         sbc #'<'
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 17 *2
         .byte "@|&%V"
       .byte '['
         and VAL0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@&%D"
       .byte '['
         and #'<'
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 .ifnblank
 ;;; TODO: \ quoting
@@ -2324,13 +2408,13 @@ ruleD:
       .byte '['
         ora VAL0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@\|%D"
       .byte '['
         ora #'<'
       .byte ']'
-        .byte _D
+        .byte TAILREC
 .endif ; NBLANK
 
 ;;; 17 *2
@@ -2338,13 +2422,13 @@ ruleD:
       .byte '['
         eor VAL0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@^%D"
       .byte '['
         eor #'<'
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 24
         
@@ -2352,13 +2436,13 @@ ruleD:
       .byte '['
         lsr
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@\*2"
       .byte '['
         asl
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; ==
 
@@ -2373,7 +2457,7 @@ ruleD:
 :       
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@==%D"
       .byte '['
@@ -2386,7 +2470,7 @@ ruleD:
 :       
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|@<D"
       .byte '['
@@ -2399,7 +2483,7 @@ ruleD:
         ;; neq => 0
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 .endif ; BYTERULES
 ;;; ----------------------------------------
@@ -2410,43 +2494,43 @@ ruleD:
       .byte '['
         jsr _PLUS
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|+",_U
       .byte '['
         jsr _MINUS
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|&",_U
       .byte '['
         jsr _AND
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte '|',"\|",_U
       .byte '['
         jsr _OR
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|^",_C
       .byte '['
         jsr _EOR
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|/2"
       .byte '['
         jsr _SHR
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|\*2"
       .byte '['
         jsr _SHL
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; ==
 
@@ -2454,7 +2538,7 @@ ruleD:
       .byte '['
         jsr _EQ
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         ;; Empty
         .byte '|'
@@ -2472,7 +2556,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|+%D"
       .byte '['
@@ -2484,10 +2568,10 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 18 *2
-        .byte "|-%D"
+        .byte "|-%V"
       .byte '['
         sec
         sbc VAL0
@@ -2497,7 +2581,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|-%D"
       .byte '['
@@ -2509,7 +2593,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 17 *2
         .byte "|&%V"
@@ -2521,20 +2605,20 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 .ifdef OPTRULES
         .byte "|&0xff00"
       .byte '['
         lda #0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|&0xff"
       .byte '['
         ldx #0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 .endif ; OPTRULES
 
         .byte "|&%D"
@@ -2546,7 +2630,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 .ifnblank
 ;;; TODO: \ quoting
@@ -2560,7 +2644,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|\|%D"
       .byte '['
@@ -2571,7 +2655,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 .endif ; NBLANK
 
 ;;; 17 *2
@@ -2584,7 +2668,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|^%D"
       .byte '['
@@ -2595,7 +2679,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 ;;; 24
         
@@ -2608,9 +2692,9 @@ ruleD:
         tya
         ror
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
-        .byte "|\*2"
+        .byte "|*2"
       .byte '['
         asl
         tay
@@ -2619,7 +2703,7 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
 .ifdef OPTRULES
         .byte "|>>8"
@@ -2627,14 +2711,14 @@ ruleD:
         txa
         ldx #0
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|<<8"
       .byte '['
         tax
         lda #0
       .byte ']'
-        .byte _D
+        .byte TAILREC
         
         .byte "|<<%D"
       .byte '['
@@ -2654,7 +2738,7 @@ ruleD:
         lda tos
         ldx tos+1
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|>>%D"
       .byte '['
@@ -2674,7 +2758,7 @@ ruleD:
         lda tos
         ldx tos+1
       .byte ']'
-        .byte _D
+        .byte TAILREC
 .endif ; OPTRULES
 
 ;;; ==
@@ -2694,7 +2778,7 @@ ruleD:
         tya
         tax
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|==%D"
       .byte '['
@@ -2711,7 +2795,7 @@ ruleD:
         tya
         tax
       .byte ']'
-        .byte _D
+        .byte TAILREC
 
         .byte "|<%D"
       .byte '['
@@ -2728,12 +2812,12 @@ ruleD:
         tya
         tax
       .byte ']'
-        .byte _D
+        .byte TAILREC
+
+.endif ; MINIMAL
 
         ;; Empty
         .byte '|'
-
-.endif ; MINIMAL
 
         .byte 0
 
@@ -2808,99 +2892,11 @@ ruleO:
         
 ;;; Program
 ruleP:  
-
-;BB=1
-.ifdef BB
-
-        .byte _B
-        .byte _P
-
-        .byte "|"
-
-        ;; empty (end)
-      .byte '['
-        putc 'y'
-        rts
-      .byte ']'
-
-        .byte 0
-
-.endif
-
-.ifdef ALTTEST
-;;; NOW this one is CORRECT and get's RTS
-;;; (FAIL to combine)
-        .byte "aaa"
-      .byte '['
-        putc 'A'
-      .byte ']'
-        .byte _P
-
-        .byte "|"
-
-        .byte "bbb"
-      .byte '['
-        putc 'B'
-      .byte ']'
-        .byte _P
-
-        .byte "|"
-      .byte '['
-        rts
-      .byte ']'
-
-        .byte 0
-
-;;; NOW this fails! lol, doesn't match last... not RTS ???
-;;;   doesn't. 
-;;; (This works - one extra level of indirection!)
-
-;;; Even this fail.... lol WHY WTF???? 
-;;;    state must be different/wrong after B
-        .byte _O,_O
-        .byte 0
-
-        .byte "|"
-
-        .byte _O,_P
-
-        .byte "|"
-
-      .byte '['
-        rts
-      .byte ']'
-
-        .byte 0
-
-
-.endif ; ALTTEST
-
-
-
-;;; BUG: TODO: if this is second it fails (for main!)!!!
-;;; OK: if this is first, both fail individually
-
-;;; TODO: %N has side-effect, are we *committed* here?
-;;;    what if it is a var decl?
-.ifdef OO
-        .byte _O,_P
-
-        .byte "|"
-
-      .byte '['
-        rts
-      .byte ']'
-
-        .byte 0
-.endif ; OO
-
-
-
         .byte _T,"%N()",_B
       .byte '['
         rts
       .byte ']'
-        .byte _P
+        .byte TAILREC
 
       .byte '|'
 
@@ -2908,9 +2904,9 @@ ruleP:
       .byte '['
         rts
       .byte ']'
-        .byte _P
+        .byte TAILREC
 
-        .byte "|"
+      .byte '|'
 
         ;; empty - no more definitions
       .byte '['
@@ -2919,30 +2915,9 @@ ruleP:
 
         .byte 0
 
-.ifdef FUNS
-
-        .byte _F
-      .byte '['
-        PUTC 'M'
-
-        ;; TODO: put in main B()
-;        jsr _output+10-3         ; MMMM
-        ;; prints F but not 'f'
-;;; TODO: install disasm function...
-        jsr _output+17
-
-        PUTC 'E'
-        rts
-      .byte ']'
-.endif ; FUNS
-
-        .byte 0
-        ;; patches jmp to ehere!
-
-
 ;;; Type
 ruleT:  
-;;; TODO: don't use int/char as they can be SIGNED!
+        ;; don't use SIGNED int/char
         .byte "word|byte|void",0
 
 
@@ -3088,7 +3063,7 @@ ruleK:
         _L,")";"
       .byte '['
         ;; get %A value to tos
-        .byte 'D'
+        .byte TAILREC
         jsr VAL0
 ;;; TODO: assuming there is no other assignement \%A
 ;;;       in parsing List of parameters... LOL (push/pop?)
@@ -3185,13 +3160,15 @@ afterELSE:
 .ifdef OPTRULES
 
         ;; IF( var < num ) ... saves 6 B (- 63 57)
+        ;; note: this is safe as if it doesn't match,
+        ;;   not code has been emitted! If use subrule... no
         .byte "|if(%A<%D)"
       .byte "["
         ;; reverse cmp as <> NUM avail first
         lda #'<'
         ldx #'>'
         ;; cmp with VAR
-        .byte 'D'
+        .byte TAILREC
 
         cpx VAL1
         bcc @nah                ; NUM<VAR (num.h<var.h)
@@ -3478,7 +3455,7 @@ status:
 
 .endif ; ERRPOS
 
-.ifdef COMPILESCREEN
+.ifdef xCOMPILESCREEN
 ;;; TODO: ....
         PRINTZ "HALT2"
         jmp halt
@@ -4361,11 +4338,11 @@ FUNC printstack
         putc 10
         putc '#'
         lda rulename
-        jsr putchar
+        jsr printchar
         putc ' '
         putc 's'
 
-        ;; print S
+        ;; print s
         stx tos
         lda #0
         sta tos+1
@@ -4377,28 +4354,19 @@ FUNC printstack
 
         lda $101,x
 
-        and #127
-        cmp #' '
-        bcs @noctrl
-        ;; ctrl
-        sta tos
-        lda #0
-        sta tos+1
-        jsr printd
-        lda #':'
-@noctrl:
-
-        jsr putchar
+        jsr printchar
         inx
         beq @err
 
         ;; end marker?
 .ifnblank
         lda tos
-        cmp #42
+        cmp #DONE
         beq @done
 .endif        
-        putc ' '
+
+.ifdef DEBUGRULE2ADDR
+        putc '-'
         ;; print 1 word
         lda $101,x
         sta tos
@@ -4410,6 +4378,12 @@ FUNC printstack
         beq @err
         sta tos+1
         jsr printh
+.else
+        inx
+        beq @err
+        inx
+        beq @err
+.endif ; DEBUGRULE2ADDR
 
         jmp @loop
 
@@ -4421,7 +4395,10 @@ FUNC printstack
         
 @done:
         putc '>'
+;;; TODO: 
+.ifndef TIM
         jsr getchar
+.endif
         sta savea
         putc 10
 
@@ -4467,8 +4444,8 @@ FUNC printstack
 
 ;;; Pretend to be prefixed by:
 ;;; 
-;;;   typedef unsigned int  word;
-;;;   typedef unsigned char byte;
+;;;   typedef unsigned uint16_t word;
+;;;   typedef unsigned uing8_t  byte;
 ;;; 
 
 
@@ -4478,6 +4455,26 @@ FUNC printstack
 .byte 0,0
 
 input:
+
+;        .byte "word main() { }",0
+
+;        .byte "word main() { a= 4700; a+= 11; return a; }",0
+
+;ATOZ=1
+
+.ifdef ATOZ
+        .byte "word main() {",10
+        .byte "  a=65;",10
+        .byte "A:",10
+        .byte "  putchar(a);",10
+        .byte "  ++a;",10
+        .byte "  if (a<91) goto A;",10
+        .byte "  putchar(46);",10
+;    .byte "  ++a;",10
+        .byte "  return 42;",10
+        .byte "}",10
+        .byte 0
+.endif ; ATOZ
 
 ;        .byte "word main(){++a;++a;return a;}",0
 ;        .byte "word main(){return 4711;}",0
@@ -4759,9 +4756,14 @@ input:
 ;.byte "++a;return a;}",0
 
 ;        .repeat 20              ; 27cs
-        .repeat 2000
+        .repeat 2000 ; MAX!
+;        .repeat 200
         ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
         ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
+        ;; w print  24s (/ 2000 24) =  83 ops/s
+        ;; NO print 15s (/ 2000 15) = 133 ops/s
+        ;; "an if is maybe 7 ops => (/ 133 7) = 19l/s
+        ;; (* 60 19) = 1140 lines/60s nonoptimized!
 
 ;          .byte "a=a+1;"
 ;          .byte "++a;"
@@ -5036,7 +5038,7 @@ _output:
 ;;; ++a; x 2000
 ;;;  free tap inp output
 ;;; (- 37 11    8   16  ) = 2K left
-        .res 16*1024
+        .res 16*1000+50
 
 ;;; Some variants save on codegen by using a library
 
