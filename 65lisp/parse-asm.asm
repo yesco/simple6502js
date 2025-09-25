@@ -849,9 +849,11 @@ FUNC _enterrule
         lda (rule),y
         sta rulename
 
+.ifdef DEB3
     PUTC ' '
     jsr printchar
     PUTC '>'
+.endif
 
 .ifdef DEBUGRULE
     PUTC ' '
@@ -973,9 +975,10 @@ PUTC '='
 ;;; hibit - RULE
 uprule:
 
+.ifdef DEB3
 PUTC '^'
 jsr printchar
-
+.endif
 
 .ifdef DEB2
 PUTC '^'
@@ -1022,7 +1025,9 @@ lda savea
 
 
 FUNC _fail
+.ifdef DEB3
 PUTC '\'
+.endif
 ;;; TODO: somehow this triggers more debug output???? 
 ;putc '\'
 ;putc 0
@@ -1174,9 +1179,11 @@ gotretry:
 
 ;;; we come here if FAIL find no '|' alt
 endrule:
+.ifdef DEB3
 PUTC '/'
 lda rulename
 jsr printchar
+.endif
 
 .ifdef DEBUGRULE
    putc 'E'
@@ -1194,8 +1201,10 @@ jsr printchar
         ;; - get rid of 'i' retry
         pla
 
+.ifdef DEB3
 PUTC '&'
 jsr printchar
+.endif
 
 .ifdef DEBUGRULE2
 pha
@@ -1255,11 +1264,15 @@ PUTC ' '
         bmi :+
 ;;; TODO: this fixes parse issue, ^i rule lol
 ;;;   but it probably drops a 'P' patch???
+
+;;; NO, that's not the case....
+
 ;;;  TODO: loop instead, but why we got here?
         ;; not rule, go up!
 
 
 ;;; TODOTODOTODO:TTTOOODDDOOO fixme!
+;;;    or not, what does it break?
 
         pla
         pla
