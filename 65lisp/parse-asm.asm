@@ -1194,6 +1194,9 @@ jsr printchar
         ;; - get rid of 'i' retry
         pla
 
+PUTC '&'
+jsr printchar
+
 .ifdef DEBUGRULE2
 pha
 putc ' '
@@ -1229,11 +1232,13 @@ jmp :-
 :
 
 .endif ; DEBUGRULE2
+
         pla
         pla
 
         ;; - get rid of _R current rule
         pla
+
 .ifdef DEBUGRULE2
 jsr printchar
 PUTC ' '
@@ -3153,7 +3158,7 @@ afterELSE:
 
         ;; goto
         .byte "|goto%A;"
-      .byte "[D"
+      .byte "[D"                ; get aDdress
         jmp (VAL0)
       .byte "]"
 
@@ -3168,7 +3173,7 @@ afterELSE:
         lda #'<'
         ldx #'>'
         ;; cmp with VAR
-        .byte TAILREC
+        .byte 'D'               ; get aDdress
 
         cpx VAL1
         bcc @nah                ; NUM<VAR (num.h<var.h)
@@ -4460,7 +4465,8 @@ input:
 
 ;        .byte "word main() { a= 4700; a+= 11; return a; }",0
 
-;ATOZ=1
+;
+ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
@@ -4756,8 +4762,9 @@ input:
 ;.byte "++a;return a;}",0
 
 ;        .repeat 20              ; 27cs
-        .repeat 2000 ; MAX!
-;        .repeat 200
+;        .repeat 2000 ; MAX!
+
+        .repeat 20
         ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
         ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
         ;; w print  24s (/ 2000 24) =  83 ops/s
