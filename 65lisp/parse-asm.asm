@@ -1564,52 +1564,48 @@ jsr putchar
 
 
 
-FUNC _generate
-;;; ??? 19 B
-
 ;;; TODO: can conflict w data
 ;;;   write .pl script look at .lst output?
-
+FUNC _generate
+;;; ??? 19 B
         jsr _incR
         ldy #0
         lda (rule),y
 
 ;;; '] - END GEN
         cmp #']'
-        bne @skip
+        bne :+
 DEBC ']'
         jsr _incR
         jmp _next
-@skip:   
+:       
 ;;; '<' LO %d
         cmp #'<'
-        bne @skip2
+        bne :+
 DEBC '<'
         lda tos
         jmp @doout
-@skip2: 
+:       
 ;;; '>' HI %d
         cmp #'>'
-        bne @skip3
+        bne :+
 DEBC '>'
         lda tos+1
         jmp @doout
-
-@skip3:
+:       
 ;;; ':' SET tos=dos
         cmp #'D'
-        bne @skip4
-DEBC ':'
+        bne :+
+DEBC 'D'
         lda dos
         sta tos
         lda dos+1
         sta tos+1
         jmp _generate
-
-@skip4:  
+:  
 ;;; '{{' PATCH
         cmp #'{'
-        bne @skip5
+        bne :+
 DEBC '{'
         lda _out+1
         pha
@@ -1621,11 +1617,37 @@ DEBC '{'
         jsr _incR
         jsr _incO
         jmp _generate
+:       
+;;; ":" PUSH (here '&')
+        cmp #':'
+        bne :+
 
-@skip5: 
+        lda _out+1
+        pha
+        lda _out
+        pha
+        lda #'&'
+        pha
+        jmp _generate
+:       
+;;; ";" POP -> %D (tos)
+        cmp #';'
+        bne :+
+
+        pla
+.ifdef SANITY
+        cmp #'&'
+;;; TODO: ... bne error
+.endif
+        pla
+        sta tos
+        pla
+        sta tos+1
+        jmp _generate
+:       
+;;; "+" PUT %d+1
         cmp #'+'
-        bne @skip6
-;;; "=" PUT %d+1
+        bne @doout              ; raw byte - no special
 DEBC '+'
         ldx tos+1
         ldy tos
@@ -1640,30 +1662,7 @@ DEBC '+'
         txa
         jsr _incO
         jsr _incR
-@skip6:
-	;; ":" PUSH (here '&')
-        cmp #':'
-        bne :+
-        lda _out+1
-        pha
-        lda _out
-        pha
-        lda #'&'
-        pha
-:       
-        ;; ";" POP -> %D (tos)
-        cmp #';'
-        bne :+
-        pla
-.ifdef SANITY
-        cmp #'&'
-;;; TODO: ... bne error
-.endif
-        pla
-        sta tos
-        pla
-        sta tos+1
-:       
+        ;; fall-through @doout
 @doout:
         sta (_out),y
         jsr _incO
@@ -2137,8 +2136,8 @@ ruleR:
 .ifndef MINIMAL
 ruleU:  
 .endif
-ruleV:  
-ruleW:  
+ruleV:
+ruleW:
 ruleX:  
 ruleY:  
 ruleZ:  
@@ -3522,6 +3521,22 @@ afterELSE:
         sta VAL1,y
       .byte "]"
 
+;;; WHILE
+;ruleW:  
+        .byte "|do"
+      .byte "[:]"
+        .byte _S
+
+        .byte "while(",_E,");"
+      .byte "["
+        stx savex
+        ora savex
+        .byte ";"
+        beq :+
+        jmp VAL0
+:       
+      .byte "]"
+
         ;; Expression; // throw away result
         .byte "|",_E,";"
 
@@ -3677,6 +3692,8 @@ _run:
         putc 'B'
         putc 10
         putc 10
+
+        jsr _dasm
 
         TIMER
 
@@ -4598,6 +4615,9 @@ FUNC printstack
 .byte 0,0
 
 input:
+        ;; cc65 : 31B 21c loop 
+        ;; parse: 37B 30c loop (while end 15B)
+        .byte "word main() { a=1000; do { --a; } while(a); }",0
 
 ;        .byte "word main() { }",0
 
