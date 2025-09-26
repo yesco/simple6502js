@@ -220,7 +220,24 @@
 ;;; - %v - match LOCAL USAGE of name
 ;;; - %B - match iff datatype is byte
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
-
+;;; 
+;;; %{ IMMEDIATE CODE (need to enable IMMEDIATE, takes 26B)
+;
+IMMEDIATE=1
+;;; 
+;;; Code can be executed inline *while* parsing.
+;;; It's prefixed like this
+;;; 
+;;; RuleX:
+;;;        .byte "foo"
+;;;      .byte "%{"
+;;;        putc '%'                ; print debug info!
+;;;        jsr immret              ; HOW TO RETURN!
+;;;      .byte ""
+;;;        .byte "bar"
+;;;        .byte 0                 ;
+;;; 
+;;; This will parse foo, then print %, then parse bar
 
 ;;; [ GENERATIVE ]
 ;;; 
@@ -348,7 +365,8 @@ CHECKSTACK=1
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
-;OPTRULES=1
+;
+OPTRULES=1
 ;
 ELSE=1
 
@@ -400,6 +418,9 @@ TESTING=1
 
 ;;; gives a little bit more context for compile err...;
 ;TRACERULE=1
+;;; backspaces out of rules done
+;;; (works best if PRINTREAD not enabled)
+;TRACEDEL=1
 
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
@@ -412,8 +433,7 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -733,6 +753,34 @@ percent:
         jsr _incR
         ; pla
 
+.ifdef IMMEDIATE
+;;; 26 B
+        ;; - immediate code!
+        cmp #'{'
+        bne noimm
+        ;; copy rule address
+        lda rule
+        sta imm+1
+        ldx rule+1
+        stx imm+2
+
+        ;; jump to the rule inline code!
+;        putc 'I'
+imm:    jmp $ffff
+        ;; that code "returns" by jsr immret!
+        ;; (this puts after the code on stack)
+immret: 
+;        putc 'R'
+        pla
+        sta rule
+        pla
+        sta rule+1
+        jsr _incR
+        jmp _next
+        
+noimm:
+.endif ; IMMEDIATE
+
         ;; - %D - digits
         cmp #'D'
         beq isdigits
@@ -791,10 +839,23 @@ exitrule:
 
 FUNC _enterrule
 .ifdef TRACERULE
+        pha
+;;; not totally correct
+.ifdef TRACEDEL
+        cmp #TAILREC
+        beq :+
+.endif
         putc '>'
         ldy #0
         lda (rule),y
         jsr putchar
+        cmp #TAILREC
+        bne :+
+        lda rulename
+        jsr putchar
+;        jsr printstack
+:       
+        pla
 .endif ; TRACEFULE
 
 ;;; 34 B
@@ -889,6 +950,8 @@ FUNC _enterrule
 
 FUNC _acceptrule
 .ifdef TRACERULE
+
+.ifdef TRACEDEL
         lda #8
         jsr putchar
         jsr putchar
@@ -900,6 +963,10 @@ FUNC _acceptrule
         lda #8
         jsr putchar
         jsr putchar
+.else
+        putc '<'
+.endif ; TRACEDEL
+
 .endif ; TRACERULE
 
 ;;; 19 B
@@ -2117,8 +2184,6 @@ ruleA:
 
 ;;; Block
 ruleB:  
-;;; TODO: empty?
-;;; TODO: remove
         .byte "{}"
         .byte "|{",_A,"}"
 
@@ -2293,6 +2358,37 @@ ruleC:
 
 .endif ; !MINIMAL
 
+        ;; variable
+        .byte "|%V"
+      .byte '['
+        lda VAL0
+        ldx VAL1
+      .byte ']'
+
+        ;; digits
+        .byte "|%D"
+      .byte '['
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+        
+        ;; string
+        .byte "|",34            ; really >"<
+      .byte '['
+        jmp PUSHLOC
+        .byte ':'               ; push here
+      .byte ']'
+        ;; copies string inline till "
+        .byte "%S"
+      .byte "["
+        ;; load string from %D value
+        .byte ";"               ; pop here
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+        ;; autopatches jmp to here
+;;; TODO: DAMN - wrong, should be to before "load string"
+
 .ifdef POINTERS
         .byte "|&%V"
       .byte '['
@@ -2315,38 +2411,8 @@ ruleC:
         lda (tos),y
       .byte ']'
 
-.endif ; MINIMAL
+.endif ; POINTERS
 
-        ;; variable
-        .byte "|%V"
-      .byte '['
-        lda VAL0
-        ldx VAL1
-      .byte ']'
-
-        ;; digits
-        .byte "|%D"
-      .byte '['
-        lda #'<'
-        ldx #'>'
-      .byte ']'
-        
-        ;; string
-        .byte "|",34            ; really "
-      .byte '['
-        jmp PUSHLOC
-        .byte ':'               ; push here
-      .byte ']'
-        ;; copies string inline till "
-        .byte "%S"
-      .byte "["
-        ;; load string from %D value
-        .byte ";"               ; pop here
-        lda #'<'
-        ldx #'>'
-      .byte ']'
-        ;; autopatches jmp to here
-;;; TODO: DAMN - wrong, should be to before "load string"
         .byte 0
 
 .ifdef MINIMAL
@@ -2355,13 +2421,64 @@ ruleU:
       .byte '['
         jsr _SAVE
       .byte ']'
-        .byte _C
         .byte 0
 .endif
 
 ;;; aDDons (::= op %d | op %V)
 
 ruleD:
+
+;FORDEBUG=1
+.ifdef FORDEBUG
+        .byte "&%D"
+.byte "%{"
+        putc '#'
+        jsr immret
+
+      .byte '['
+        and #'<'
+        tay
+        txa
+        and #'>'
+        tax
+        tya
+      .byte ']'
+
+.byte "%{"
+        putc '!'
+        putc '@'
+        jsr immret
+
+.byte "%{"
+        putc '@'
+        putc '!'
+        jsr immret
+
+        .byte TAILREC
+
+
+
+        .byte "|+%D"
+      .byte '['
+        clc
+        adc #'<'
+        tay
+        txa
+        adc #'>'
+        tax
+        tya
+      .byte ']'
+        .byte TAILREC
+
+        ;; allow empty (to end it)
+        .byte "|"
+      .byte "%{"
+        putc '%'
+        jsr immret
+
+        .byte 0
+.endif ; FORDEBUG
+
 
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
@@ -2651,7 +2768,10 @@ ruleD:
         tax
         tya
       .byte ']'
-        .byte TAILREC
+;;; TODO: see FORDEBUG
+;;;    if have this enabled then prase will loop >D>*>*>*...
+;;;       why? we have and empty alt at end...
+;        .byte TAILREC
 
 .ifnblank
 ;;; TODO: \ quoting
@@ -2782,7 +2902,7 @@ ruleD:
         .byte TAILREC
 .endif ; OPTRULES
 
-;;; ==
+;;; COMPARISIONS
 
         .byte "|==%V"
       .byte '['
@@ -2835,7 +2955,7 @@ ruleD:
       .byte ']'
         .byte TAILREC
 
-.endif ; MINIMAL
+.endif ; !MINIMAL
 
         ;; Empty
         .byte '|'
@@ -3106,21 +3226,17 @@ ruleS:
         rts
       .byte ']'
 
+
+
         ;; BlOCK!
-;        .byte _B
+;;; TODO: this gives inifinte loop! >S>B>* ...
+;       .byte "|",_B
 
-;;; FAILS - forever!
-;        .byte '|',_B
-
-;;; works
+;;; TODO: this however works! 
+;;;   which is just inline of _B ... HMMM :-(
         .byte "|{}"
-;;; FAILS - forever!
-;        .byte "|{",_A,"}"
-;;; TODO: fix, this will gen first S twice?
-;;; works
-;        .byte "|{",_S,"}"
-;;; FAILS - forever!
-;        .byte "|{",_S,_S,"}"
+        .byte "|{",_A,"}"
+
 
 
 ;;; TODO:
@@ -3218,6 +3334,7 @@ afterELSE:
 .endif ; OPTRULES
 
         ;; IF(E)S; // no else
+;;; TODO: "if (a&1)" gives error before ')' ????
         .byte "|if(",_E,")"
       .byte '['
         ;; 9B 9-11c
@@ -4336,6 +4453,11 @@ FUNC printchar
         pla
         rts
 
+FUNC printaxh
+        sta tos
+        stx tos+1
+        jmp printh
+
 FUNC printstack
         pha
         tya
@@ -4479,8 +4601,46 @@ input:
 
 ;        .byte "word main() { }",0
 
+;;; TAILREC broken for ruleD ????? (loops forever)
+;        .byte "word main() { a= 4700; a= a+11; return a; }",0
+;;; WORKS
 ;        .byte "word main() { a= 4700; a+= 11; return a; }",0
 
+
+;        .byte "word main() { if (a&1) ++b; }",0
+
+;;; WORKS (w inline _B)
+;        .byte "word main() { if(a&1) {--a;;--a;--a;} else {++a;++a;++a;++a;++a;} return a;}",0
+
+;;; TODO: can't handle TAILREC, parser goes there but loops forefer!
+;        .byte "word main() { if (a&1&2) ; }",0
+;        .byte "word main() { if (a&1) ; }",0
+
+; fails with TAILREC
+;        .byte "word main(){ return b+1+2+3+4+5+6; }",0
+
+;        .byte "word main() { if (a&1&2) putchar(65); else putchar(66); }",0
+
+;        .byte "word main() { if (a&1) putchar(65); else putchar(66); }",0
+
+
+;;; Fine, loops
+;FOUR=1
+
+.ifdef FOUR
+        .byte "word main() {",10
+        .byte "  a= 470; b= 11;",10
+        .byte "A:",10
+        .byte "  if (a&1) { ++b;++b;++b;++b;b+=6; }",10
+        .byte "  else { b+=8; ++b; ++b; }",10
+        .byte "  --a;",10
+        .byte "  if (a) goto A;",10
+        .byte "  printd(b);",10
+        .byte "}",10
+        .byte 0
+.endif ; FOUR
+
+;
 ;
 ATOZ=1
 
