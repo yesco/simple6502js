@@ -81,17 +81,21 @@
 ;;; STATS:
 
 ;;;                          asm rules
-;;; MINIMAL   :  1016 bytes = (+ 633  383) inc LIB!
-;;; NORMAL    :  1134 bytes = (+ 633  501)
-;;; BYTERULES :  1293 bytes = (+ 633  660)
-;;; OPTRULES  :  1463 bytes = (+ 633  886)
+;;; MINIMAL   :  1016 bytes = (+ 685  383) inc LIB!
+;;; NORMAL    :  1134 bytes = (+ 685  501)
+;;; BYTERULES :  1293 bytes = (+ 685  660)
+;;; OPTRULES  :  1463 bytes = (+ 685  1090)
 ;;; LONGNAMES : 
 ;;; 
-;;; #x2c2 - 706 B
-;;; (- 706 27 46) = 633 (-errpos/-checkstack?) 
+;;; v= #x2f6 = 758
+;;; (- 758 27 46) = 685 (-errpos/-checkstack?) 
 ;;;     100 byte more? lol)
 ;;; 
-;;; z= #x6b1 1713 (- 1713 715 113)=> 885
+;;; w= #x458 = 1112 bytes rules? OPTRULES
+;;; w= #x2a4 =  676 bytes plain rules (!OPTRULES)
+;;; 
+;;; z= #x77e 1918 (- 1918 758 113)=> 1047
+;;; z= #x60a 1546 (- 1546 758 113)=>  675
 ;;; 
 ;;;    193 bytes backtrack parse w rule
 ;;;    239 bytes codegen with []
@@ -344,8 +348,7 @@ CHECKSTACK=1
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
-;
-OPTRULES=1
+;OPTRULES=1
 ;
 ELSE=1
 
@@ -4486,7 +4489,11 @@ ATOZ=1
         .byte "  a=65;",10
         .byte "A:",10
         .byte "  putchar(a);",10
+.ifdef OPTRULES
         .byte "  ++a;",10
+.else
+        .byte "  a=3+4;",10
+.endif
         .byte "  if (a<91) goto A;",10
         .byte "  putchar(46);",10
 ;    .byte "  ++a;",10
