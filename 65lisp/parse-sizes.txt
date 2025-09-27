@@ -1,0 +1,63 @@
+BNF-parser:	 746 B
+inc...:           69 B 	         ; (+ 746 69)= 815
+
+RULES:           747 B 
+OPTRULES:	1187 B           ; (+ 440)
+
+IDE:             403 B
+
+screen:          196 B
+
+C-COMPILER:     2002 B !
+
+TOTAL:          2601 B          ; (+ 746 69 1187 403 196)
+(+ 746 69 1187) = 2002 hmmmm????
+
+parse.bin:      2108 B (org SET)
+parse.bin:      4449 B (org NOT set)
+parse.tap:     11138 B
+
+
+
+
+51	_start
+145	_next
+9	_eq
+48	_enterrule
+50	_acceptrule
+81	_fail
+45	_errors
+95	_var
+168	_generate
+54	_digits
+(+ 51 145 9 48 50 81 45 95 168 54) = 746
+
+50	_incIspc
+3	_incP
+3	_incO
+3	_incR
+2	_incI
+8	_incRX
+(+ 50 3 3 3 2 8) = 69
+
+1187	_rules
+
+;; ???
+34	_dummy
+
+;; -- IDE
+198	_aftercompile
+195	_edit
+10	_printsrc
+(+ 198 195 10) = 403
+
+5	_clrscr
+23	_savescreen
+23	_loadscreen
+78	_printz
+25	_mul10
+30	_memcpy
+12	_putchar
+(+ 5 23 23 78 25 30 12) = 196
+
+

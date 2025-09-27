@@ -87,10 +87,12 @@
 ;;; OPTRULES  :  1463 bytes = (+ 685  1090)
 ;;; LONGNAMES : 
 ;;; 
+;;; v= #x32f = 815 (+75 D d : ; # d - WHILE!) :-(
 ;;; v= #x2f6 = 758
 ;;; (- 758 27 46) = 685 (-errpos/-checkstack?) 
 ;;;     100 byte more? lol)
 ;;; 
+;;; w= #x49d = 1181 bytes DO...WHILE/WHILE... (+ 69B)
 ;;; w= #x458 = 1112 bytes rules? OPTRULES
 ;;; w= #x2a4 =  676 bytes plain rules (!OPTRULES)
 ;;; 
@@ -3620,6 +3622,7 @@ afterELSE:
       .byte "]"
         ;; autopatches jump to here if false (PUSHLOC)
 
+
 ;;; TODO: remove?
 .ifnblank
         ;; - swap the two locs!
@@ -3655,6 +3658,26 @@ afterELSE:
         ;; autopatch 'p' at end to go condition
 
         
+.ifdef OPTRULES
+;;; OPT: DO ... WHILE(a);
+        .byte "|do"
+        .byte "[:]"
+        .byte _S
+
+        .byte "while(%V);"
+      .byte "["
+        lda VAL0
+        ora VAL1
+        .byte ";"               ; pop tos
+        ;; don't loop if not true
+;;; TODO: potentially "b" to generate relative jmp
+        bne :+
+        jmp VAL0
+:        
+      .byte "]"
+
+.endif
+
 ;;; DO...WHILE
 ;ruleW:  
         .byte "|do"
@@ -3675,33 +3698,6 @@ afterELSE:
         .byte "|",_E,";"
 
         .byte 0
-
-.ifnblank
-ruleW:  
-        .byte "while(%V);"
-      .byte "["
-        lda VAL0
-        ora VAL1
-;;; The value is up one level... 
-;;; unless have different stack....
-        .byte ";"
-        beq :+
-        jmp VAL0
-:       
-      .byte "]"
-
-        .byte '|'
-
-        .byte "while(",_E,");"
-      .byte "["
-        stx savex
-        ora savex
-        .byte ";"
-        beq :+
-        jmp VAL0
-:       
-      .byte "]"
-.endif
 
 ;;; END rules
 ;;; ========================================
@@ -4129,6 +4125,7 @@ FUNC _clrscr
         lda #12
         jmp putchar
 
+;;; TODO: ???
 FUNC _dymmy5
 
 ;;; Copies memory from AX address (+2) to 
@@ -4776,14 +4773,20 @@ FUNC printstack
 .byte 0,0
 
 input:
+;;; MINIMAL
+;        .byte "word main(){}",0
+
         ;; cc65:  36B !
         ;; parse: 40B 33108c          30x faster than basic
         ;; OPT:   36B 26964c 27c loop 37x faster ...
+;;; OPTRULES works, --a not in other and TAILREC bug
         .byte "word main() { a=1000; while(a) { --a; } }",0
 
         ;; cc65:  a=100; => 23B !!!
-        ;; cc65 : 31B        21c loop
+        ;; cc65 : 33B        25c loop
         ;; parse: 37B 32804c 30c loop (while end 15B)
+        ;; OPT:   33B 15956  26c 
+;;; OPTRULES works
         .byte "word main() { a=1000; do { --a; } while(a); }",0
 
 ;        .byte "word main() { }",0
