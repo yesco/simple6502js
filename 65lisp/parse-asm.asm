@@ -218,7 +218,8 @@
 ;;; TODO:?
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
-;;; - %B - match iff datatype is byte
+;;; - %B or %d - match iff datatype is byte
+;;; - %r - the branch can be relative
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
 ;;; 
 ;;; %{ IMMEDIATE CODE (need to enable IMMEDIATE, takes 26B)
@@ -256,7 +257,10 @@ IMMEDIATE=1
 ;;; of printable bytecodes.
 ;;;
 ;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
-;;; free "#' 2347 ;  ?BCDGKOZ \ _bcdgkortwz |
+;;; free "#' 2347    ?BC GKOZ \ _bc gkortwz |
+;;; 
+;;; TODO: consider not using | to allow for faster skip!
+;;;       using less byte code (?) (quoting problem?)
 ;;; 
 ;;; The following are used:
 ;;; 
@@ -268,9 +272,17 @@ IMMEDIATE=1
 ;;;   +>  -       - " -           of %D+1   VAL1
 ;;;         (actually + and next byte will be replaced)
 ;;;   {?  - PUSHLOC (push and patc next loc)
-;;;   D   - set %D(igits) value from %A(ddr)
-;;;   :   - TODO: push loc (onto stack)
-;;;   ;   - TOOD: pop loc (from stack) to %D/%A?? (tos)
+;;;   D   - set %D(igits) value (tos) from %A(ddr) (pos)
+;;;   :   - push loc (onto stack)
+;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
+
+;;;   d   - set pos from tos
+;;;   #   - TODO: push tos
+
+;;; maybe not needed
+;;;   Z   - TODO: swap 2 loc
+;;;   \   - TODO: slash it, pos= pop(); tos= pop(); push(pos)
+
 ;;; 
 ;;; NOTE: if any constant being used, such as
 ;;;       address of JSR/JMP (library?) or a
@@ -1593,7 +1605,7 @@ DEBC '>'
         lda tos+1
         jmp @doout
 :       
-;;; ':' SET tos=dos
+;;; 'D' SET tos=dos
         cmp #'D'
         bne :+
 DEBC 'D'
@@ -1603,6 +1615,30 @@ DEBC 'D'
         sta tos+1
         jmp _generate
 :  
+;;; 25B
+;;; 'd' pos=tos
+        cmp #'d'
+        bne :+
+DEBC 'd'
+        lda tos
+        sta dos
+        ldx tos+1
+        stx dos+1
+        jmp _generate
+:       
+;;; '#' push tos
+        ;; dos=tos
+        cmp #'#'
+        bne :+
+DEBC '#'
+        lda tos+1
+        pha
+        lda tos
+        pha
+        lda #'p'
+        pha
+        jmp _generate
+:       
 ;;; '{{' PATCH
         cmp #'{'
         bne :+
@@ -1618,7 +1654,7 @@ DEBC '{'
         jsr _incO
         jmp _generate
 :       
-;;; ":" PUSH (here '&')
+;;; ":" PUSH HERE
         cmp #':'
         bne :+
 
@@ -3529,13 +3565,28 @@ afterELSE:
       .byte "["
         stx savex
         ora savex
+        ;; jmp to end if false
         bne :+
         jmp PUSHLOC
 :       
       .byte "]"
-
         .byte _S
+
+;;; 10B
+;;; A kind of "complicated swap"
+      .byte "[;d"               ; pop tos, dos=tos
+        .byte ";"               ; pop tos
+        ;; jump to beginning of loop (:)
+        jmp VAL0
+        .byte "D"               ; tos= dos
+        .byte "#"               ; push tos (to patch)
+      .byte "]"
+        ;; autopatches jump to here if false (PUSHLOC)
+
+;;; TODO: remove?
+.ifnblank
         ;; - swap the two locs!
+;;; 28B
       .byte "%{"
         pla
         pla
@@ -3562,6 +3613,7 @@ afterELSE:
       .byte "["
         jmp VAL0
       .byte "]"
+.endif
         
         ;; autopatch 'p' at end to go condition
 
