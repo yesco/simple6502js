@@ -271,6 +271,9 @@ IMMEDIATE=1
 ;;;   <>  - little endian 2 bytes of %D     VAL0
 ;;;   +>  -       - " -           of %D+1   VAL1
 ;;;         (actually + and next byte will be replaced)
+;;; 
+
+;;; TODO: too many ops - consider "pickN" and patch only
 ;;;   {?  - PUSHLOC (push and patc next loc)
 ;;;   D   - set %D(igits) value (tos) from %A(ddr) (pos)
 ;;;   :   - push loc (onto stack)
@@ -3557,6 +3560,37 @@ afterELSE:
         sta VAL1,y
       .byte "]"
 
+.ifdef OPTRULES
+;;; OPT: WHILE(a)...
+;;; TODO: while(--a) ???
+        .byte "|while(%V)"
+        .byte "[:]"
+
+      .byte "["
+        lda VAL0
+        ora VAL1
+        ;; jmp to end if false
+        bne :+
+        jmp PUSHLOC
+:       
+      .byte "]"
+        .byte _S
+
+;;; 10B
+;;; A kind of "complicated swap"
+;;; TODO: maybe just a generic "pickN"???
+;;;   'p' get's patched like normal and other manual
+      .byte "[;d"               ; pop tos, dos=tos
+        .byte ";"               ; pop tos
+        ;; jump to beginning of loop (:)
+;;; TODO: %j
+        jmp VAL0
+        .byte "D"               ; tos= dos
+        .byte "#"               ; push tos (to patch)
+      .byte "]"
+        ;; autopatches jump to here if false (PUSHLOC)
+.endif
+
 ;;; WHILE()...
         .byte "|while("
         .byte "[:]"
@@ -3574,9 +3608,12 @@ afterELSE:
 
 ;;; 10B
 ;;; A kind of "complicated swap"
+;;; TODO: maybe just a generic "pickN"???
+;;;   'p' get's patched like normal and other manual
       .byte "[;d"               ; pop tos, dos=tos
         .byte ";"               ; pop tos
         ;; jump to beginning of loop (:)
+;;; TODO: %j
         jmp VAL0
         .byte "D"               ; tos= dos
         .byte "#"               ; push tos (to patch)
@@ -4739,11 +4776,13 @@ FUNC printstack
 .byte 0,0
 
 input:
-        ;; cc65:  
-        ;; parse: 40B 33108c 30x faster than basic
+        ;; cc65:  36B !
+        ;; parse: 40B 33108c          30x faster than basic
+        ;; OPT:   36B 26964c 27c loop 37x faster ...
         .byte "word main() { a=1000; while(a) { --a; } }",0
 
-        ;; cc65 : 31B    21c loop 
+        ;; cc65:  a=100; => 23B !!!
+        ;; cc65 : 31B        21c loop
         ;; parse: 37B 32804c 30c loop (while end 15B)
         .byte "word main() { a=1000; do { --a; } while(a); }",0
 
