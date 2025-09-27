@@ -3835,7 +3835,6 @@ _OK:
         putc 'K'
         putc ' '
 
-_run:   
         ;; print size in bytes
         sec
         lda _out
@@ -3850,7 +3849,11 @@ _run:
         putc 10
         putc 10
 
-        jsr _dasm
+_run:   
+
+;;; Enable to always show generated code
+;;; TODO: make it do inline while PRINTREAD
+;        jsr _dasm
 
         TIMER
 
@@ -4067,7 +4070,7 @@ doneCE:
         cmp #'X'-'@'
         bne :+
 
-        jsr _clrscr
+;        jsr _clrscr
         jmp _run
 :       
         ;; - ctrl-q - disasm
@@ -4457,6 +4460,10 @@ READTIMER	= $0304
 CSTIMER         = $0276
 
 
+.zeropage
+  lastcs:  .res 2
+.code
+
 FUNC timer
 .ifdef TIM
         lda READTIMER
@@ -4473,18 +4480,21 @@ FUNC timer
 
         ;; print it
         putc 10
-        putc 'T'
+        putc '['
+;        putc 'T'
         sta tos
         stx tos+1
         jsr printd
+
+        putc 'u'
+        putc 's'
 ;        putc 10
         
         lda #$ff
         sta READTIMER
         ;; this write triggers reset
         sta READTIMER+1
-.endif ; TIM        
-
+.else
 
         ;; software interrupt ORIC timer
         ;; 100 ticks/s
@@ -4502,9 +4512,6 @@ CSRESET=1
         tax
         tya
 .else
-  .zeropage
-    lastcs:  .res 2
-  .code
 .ifnblank
         sec
         eor #$ff
@@ -4515,20 +4522,25 @@ CSRESET=1
         adc lastcs+1
         tax
         tya
-.endif
-.endif
+.endif ; BLANK
+.endif ; CSRESET
+
+.endif ; TIM
+
         ;; print it
 .ifdef TIM
-        PUTC ' '
+;        PUTC ' '
 .else
         PUTC 10
-.endif
         sta tos
         stx tos+1
 
         jsr printd
         putc 'c'
         putc 's'
+
+.endif
+        putc ']'
         putc 10
 
 .ifdef CSRESET
@@ -4780,14 +4792,14 @@ input:
         ;; parse: 40B 33108c          30x faster than basic
         ;; OPT:   36B 26964c 27c loop 37x faster ...
 ;;; OPTRULES works, --a not in other and TAILREC bug
-        .byte "word main() { a=1000; while(a) { --a; } }",0
+;        .byte "word main() { a=1000; while(a) { --a; } }",0
 
         ;; cc65:  a=100; => 23B !!!
         ;; cc65 : 33B        25c loop
         ;; parse: 37B 32804c 30c loop (while end 15B)
         ;; OPT:   33B 15956  26c 
 ;;; OPTRULES works
-        .byte "word main() { a=1000; do { --a; } while(a); }",0
+;        .byte "word main() { a=1000; do { --a; } while(a); }",0
 
 ;        .byte "word main() { }",0
 
