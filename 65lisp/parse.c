@@ -19,13 +19,12 @@ extern char *out, output;
 
 // disasm from last position/call
 extern void dasm() {
-  if (!last || last==out) last= &output;
+  if (!last) last= &output;
   // TODO: this hangs as printf data in ZP corrupted?
   // TODO: use my own printf? lol
   // TODO: define putd(),puth(),put2h()...
   //printf("\nDASM $%u-$%u!\n", last, out);
-  disasm(last, out, 2);
-  last= out;
+  last= disasm(last, out, 2);
 }
 
 extern void dasmcc() {

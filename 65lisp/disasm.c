@@ -110,12 +110,15 @@ void disasm(char* mc, char* end, char indent) {
 
 #else
 
-void disasm(char* mc, char* end, char indent) {
+char* disasm(char* mc, char* end, char indent) {
   char* p= (char*)mc;
+  int maxlines= 25;
   printf("\n%*c---CODE[%u]:\n", indent, ' ', end-mc); p= mc;
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
     printf("%*c%04X:\t", indent, ' ', p);
+
+    if (!--maxlines) return p;
     ++p;
 
     // exception modes
@@ -147,6 +150,7 @@ void disasm(char* mc, char* end, char indent) {
     }
     putchar('\n');
   } putchar('\n');
+  return 0;
 }
 
 #endif // NEWP

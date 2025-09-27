@@ -67,7 +67,7 @@ ctmp1:  .res 1
 ;;; parse.c with disasm.c
 ;ORGSTART= $09db
 
-ORGSTART= $0ce4
+;ORGSTART= $0ce4
 
 .ifdef ORGSTART
 
