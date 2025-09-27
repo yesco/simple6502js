@@ -3521,7 +3521,52 @@ afterELSE:
         sta VAL1,y
       .byte "]"
 
-;;; WHILE
+;;; WHILE()...
+        .byte "|while("
+        .byte "[:]"
+        .byte _E,")"
+
+      .byte "["
+        stx savex
+        ora savex
+        bne :+
+        jmp PUSHLOC
+:       
+      .byte "]"
+
+        .byte _S
+        ;; - swap the two locs!
+      .byte "%{"
+        pla
+        pla
+        sta pos
+        pla
+        sta pos+1
+        
+        pla
+        pla
+        sta tos
+        pla
+        sta tos+1
+        
+        lda pos+1
+        pha
+        lda pos
+        pha
+        lda #'p'                ; patch and end
+        pha
+        
+        jsr immret
+
+        ;; TOS is now before condition
+      .byte "["
+        jmp VAL0
+      .byte "]"
+        
+        ;; autopatch 'p' at end to go condition
+
+        
+;;; DO...WHILE
 ;ruleW:  
         .byte "|do"
       .byte "[:]"
@@ -3541,6 +3586,33 @@ afterELSE:
         .byte "|",_E,";"
 
         .byte 0
+
+.ifnblank
+ruleW:  
+        .byte "while(%V);"
+      .byte "["
+        lda VAL0
+        ora VAL1
+;;; The value is up one level... 
+;;; unless have different stack....
+        .byte ";"
+        beq :+
+        jmp VAL0
+:       
+      .byte "]"
+
+        .byte '|'
+
+        .byte "while(",_E,");"
+      .byte "["
+        stx savex
+        ora savex
+        .byte ";"
+        beq :+
+        jmp VAL0
+:       
+      .byte "]"
+.endif
 
 ;;; END rules
 ;;; ========================================
@@ -4615,8 +4687,12 @@ FUNC printstack
 .byte 0,0
 
 input:
-        ;; cc65 : 31B 21c loop 
-        ;; parse: 37B 30c loop (while end 15B)
+        ;; cc65:  
+        ;; parse: 40B 33108c 30x faster than basic
+        .byte "word main() { a=1000; while(a) { --a; } }",0
+
+        ;; cc65 : 31B    21c loop 
+        ;; parse: 37B 32804c 30c loop (while end 15B)
         .byte "word main() { a=1000; do { --a; } while(a); }",0
 
 ;        .byte "word main() { }",0
