@@ -2408,15 +2408,76 @@ ruleC:
       .byte ']'
 .endif ; FUNS
 
-;.ifndef MINIMAL
-.ifnblank
-;;; TODO: need to have a PUSH ':' and a POP ';' ???
-;;; reverse meaning from now   ^   REVERSE   ^  !!!
-        .byte "|++%A"
-      .byte "[D"
-        .byte "|--%A"
+        ;; Surprisingly ++v and --v
+        ;; isn't smalller or faster than v++ and v-- !
+        .byte "|++%V"
+      .byte '['
+;;; 14B 17c
+        inc VAL0
+        bne :+
+        inc VAL1
+:       
+        lda VAL0
+        ldx VAL1
+      .byte ']'
 
-.endif ; !MINIMAL
+        .byte "|--%V"
+      .byte '['
+.ifnblank
+;;; 17B 21c
+        lda VAL0
+        bne :+
+        dec VAL1
+:       
+        dec VAL0
+        lda VAL0
+        ldx VAL1
+.endif
+;;; 17B 19c
+        ldx VAL1
+        ldy VAL0
+        bne :+
+        dex
+        stx VAL1
+:       
+        dey
+        tya
+        sta VAL0
+      .byte ']'
+
+        .byte "|%V++"
+      .byte '['
+;;; 14B ! 17c ! - no extra cost!
+        lda VAL0
+        ldx VAL1
+        inc VAL0
+        bne :+
+        inc VAL1
+:       
+      .byte ']'
+
+        .byte "|%V--"
+      .byte '['
+;;; 14B ! 17c
+        ldx VAL1
+        lda VAL0
+        bne :+
+        dec VAL1
+:       
+        dec VAL0
+.ifnblank
+;;; 17B 19c - faster
+        ldx VAL1
+        ldy VAL0
+        dey
+        tya
+        bne :+
+        dex
+        stx VAL1
+:       
+        sta VAL0
+.endif
+      .byte ']'
 
         ;; variable
         .byte "|%V"
@@ -4946,6 +5007,9 @@ FUNC printstack
 .byte 0,0
 
 input:
+
+        .byte "word main(){b=512;a=--b; printd(b); return a;}",0
+
 ;;; TODO: not working because TAILREC ruleD?
 ;        .byte "word main(){a=1;return a<<1;}",0
 ;        .byte "word main(){a=65535;a>>=8;return a;}",0
