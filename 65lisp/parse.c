@@ -17,14 +17,27 @@ extern char** rules;
 extern char *out, output;
 #pragma zpsym ("out")
 
+// incremental disasm from last position/call
+extern void iasmstart() {
+  last= &output;
+  if (out-last) printf("---CODE[%u]:\n", out-last);
+}
+
+extern void iasm() {
+  if (out<=last) return;
+  putchar('\n');
+  last = disasm(last, out, 2);
+  putchar(128+2); // green code text
+}
+
 // disasm from last position/call
 extern void dasm() {
-  if (!last) last= &output;
+  if (!last || last==out) iasmstart();
   // TODO: this hangs as printf data in ZP corrupted?
   // TODO: use my own printf? lol
   // TODO: define putd(),puth(),put2h()...
   //printf("\nDASM $%u-$%u!\n", last, out);
-  last= disasm(last, out, 2);
+  iasm();
 }
 
 extern void dasmcc() {

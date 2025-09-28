@@ -303,7 +303,7 @@ IMMEDIATE=1
 ;;;       alt: parameterize any constants?
 
 
-.import _dasm, _dasmcc
+.import _iasmstart, _iasm, _dasm, _dasmcc
 .export _endfirstpage
 .export _output, _out
 .export _rules
@@ -450,7 +450,10 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
+;
+PRINTREAD=1
+;
+PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -465,9 +468,9 @@ ERRPOS=1
   .endmacro
 .endif
 
-
 .export _start
 _start:
+
 
 .zeropage
         
@@ -506,7 +509,6 @@ rulename:       .res 1
 pframe: 
 
 .code
-
 
 ;;; Magical references in [generate]
 VAL0= '<' + 256*'>'
@@ -630,6 +632,10 @@ putc 10
 .endif
 ;        jsr _incIspc
 
+
+.ifdef PRINTASM
+        jsr _iasmstart
+.endif ; PRINTASM
 
 ;;; crashes, lol
 ;        TIMER
@@ -966,6 +972,18 @@ FUNC _enterrule
 ;;; rule to continue parsing (or end).
 
 FUNC _acceptrule
+
+.ifdef PRINTASM
+        putc 128+5              ; magnenta RULE
+
+        lda rulename
+        jsr putchar
+
+        putc 128+2              ; green code text
+
+        jsr _iasm
+.endif ; PRINTASM
+
 .ifdef TRACERULE
 
 .ifdef TRACEDEL
