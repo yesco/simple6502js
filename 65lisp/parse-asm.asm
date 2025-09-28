@@ -2886,6 +2886,7 @@ ruleD:
         
         .byte "|/2"
       .byte '['
+;;; 6B 12c
         tay
         txa
         lsr
@@ -2897,7 +2898,7 @@ ruleD:
 
         .byte "|*2"
       .byte '['
-;;; 6
+;;; 6B 12c
         asl
         tay
         txa
