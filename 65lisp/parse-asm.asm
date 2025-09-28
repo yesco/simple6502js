@@ -156,6 +156,8 @@
 ;;;   821 bytes = OPTRULES  (+ 320 B)
 ;;;   886 bytes ...
 ;;; 
+;;;  1393 bytes - OPT: << >> <<= >>=
+;;; 
 ;;; #x40a
 ;;; 
 ;;; TODO: not really rules...
@@ -2895,6 +2897,7 @@ ruleD:
 
         .byte "|*2"
       .byte '['
+;;; 6
         asl
         tay
         txa
@@ -2919,42 +2922,118 @@ ruleD:
       .byte ']'
         .byte TAILREC
         
+        .byte "|<<2"
+      .byte '['
+;;; 10B
+        stx tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        ldx tos+1
+      .byte ']'
+
+        .byte "|<<3"
+      .byte '['
+;;; 13B= 4+3*n    15=4+3*n => n=11/3=4-
+        stx tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        ldx tos+1
+      .byte ']'
+
+        .byte "|<<4"
+      .byte '['
+;;; 16B
+        stx tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        asl
+        rol tos+1
+        ldx tos+1
+      .byte ']'
+
+        .byte "|>>2"
+      .byte '['
+;;; 10B
+        stx tos+1
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        ldx tos+1
+      .byte ']'
+
+        .byte "|>>3"
+      .byte '['
+;;; 13B
+        stx tos+1
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        ldx tos+1
+      .byte ']'
+
+        .byte "|>>4"
+      .byte '['
+;;; 16B
+        stx tos+1
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        lsr tos+1
+        ror
+        ldx tos+1
+      .byte ']'
+
         .byte "|<<%D"
       .byte '['
-        sta tos
+;;; 15B (breakeven: D=4-)
         stx tos+1
         ldy #'<'
 :       
         dey
         bmi :+
         
-        asl tos
+        asl
         rol tos+1
 
         sec
         bcs :-
 :       
-        lda tos
         ldx tos+1
       .byte ']'
         .byte TAILREC
 
         .byte "|>>%D"
       .byte '['
-        sta tos
+;;; 15B (breakeven: D=4-)
         stx tos+1
         ldy #'<'
 :       
         dey
         bmi :+
         
-        lsr tos+1
+        lsr
         ror tos
 
         sec
         bcs :-
 :       
-        lda tos
         ldx tos+1
       .byte ']'
         .byte TAILREC
@@ -3277,6 +3356,12 @@ ruleK:
 ruleS:
         ;; empty statement is legal
         .byte ";"
+      .byte '['
+        ;; for expects empty statement to be "true"
+;;; TODO: move to for
+        lda #42
+      .byte ']'
+        
 
         ;; RETURN
         .byte "|return",_E,";"
@@ -3500,14 +3585,68 @@ afterELSE:
 
         .byte "|%A>>=1;"
       .byte "[D"
+;;; 6B
         lsr VAL1
         ror VAL0
       .byte "]"
 
         .byte "|%A<<=1;"
       .byte "[D"
+;;; 6B
         asl VAL0
-        ror VAL1
+        rol VAL1
+      .byte "]"
+
+        .byte "|%A>>=2;"
+      .byte "[D"
+;;; 12B
+        lsr VAL1
+        ror VAL0
+        lsr VAL1
+        ror VAL0
+      .byte "]"
+
+        .byte "|%A<<=2;"
+      .byte "[D"
+;;; 12B
+        asl VAL0
+        rol VAL1
+        asl VAL0
+        rol VAL1
+      .byte "]"
+
+        .byte "|%A>>=%D;"
+      .byte "["
+;;; 14B (tradeoff 14=6*d => d=2+)
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAL1
+        ror VAL0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        .byte "|%A<<=%D;"
+      .byte "["
+;;; 14B
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAL0
+        rol VAL1
+
+        sec
+        bcs :-
+:       
       .byte "]"
 
 .endif ; OPTRULES
@@ -4099,6 +4238,7 @@ doneCE:
         jsr _dasm
         jmp _edit
 :       
+.ifnblank
         ;; - ctrl-z - disasmccc
         cmp #'Z'-'@'
         bne :+
@@ -4107,7 +4247,7 @@ doneCE:
         jsr _dasmcc
         jmp _edit
 :       
-
+.endif
 
         ;; ctrl-Print (as source)
 ;;; 10B dispatch should be 3B lol
@@ -4498,6 +4638,7 @@ FUNC timer
 
         ;; print it
         putc 10
+        putc 128+7
         putc '['
 ;        putc 'T'
         sta tos
@@ -4559,6 +4700,7 @@ CSRESET=1
 
 .endif
         putc ']'
+        putc 128+2
         putc 10
 
 .ifdef CSRESET
@@ -4803,6 +4945,10 @@ FUNC printstack
 .byte 0,0
 
 input:
+;;; TODO: not working because TAILREC ruleD?
+;        .byte "word main(){a=1;return a<<1;}",0
+;        .byte "word main(){a=65535;a>>=8;return a;}",0
+
 ;;; MINIMAL
 ;        .byte "word main(){}",0
 
@@ -4872,7 +5018,8 @@ ATOZ=1
 .ifdef OPTRULES
         .byte "  ++a;",10
 .else
-        .byte "  a=3+4;",10
+;;; TODO: 
+        .byte "  a=a+1;",10
 .endif
         .byte "  if (a<91) goto A;",10
         .byte "  putchar(46);",10
@@ -5062,32 +5209,42 @@ ATOZ=1
 
 .ifdef PRIME
 ;;; TODO: need more features:
-;;;   - label A:
-;;;   - goto A;
-;;;   - variable declaration
+;;;   x label A:
+;;;   x goto A;
+;;;   x do while
 ;;;   - array declaration
-;;;   - %10 hmmm???
-;;;   - for
-;;;   - do while
-;;;   - while 
-;;;   - to ~ reverse bits (can do ^0xffff)
+;;;   - array access/set
 ;;;   - parenthesis
-;;;   - // comments
+;;; 
+;;;  (- hex numbers)
+;;;  (- char constants 'c')
+;;;  (- t++)
+;;;  (- --t)
+;;;  (- // comments)
+;;;  (- variable declaration)
+;;;  (- %10 hmmm???)
+;;;  (- for)
+;;;  (- to ~ reverse bits)
 
 ;;; TODO: there might be hi-bit chars here???
         .byte "byte a[256];",10
         .byte "byte b[4];",10
         .byte 10
         .byte "word main(){",10
-        .byte "  word n,i;",10
-        .byte "  byte t;",10
-        .byte "  a[0]=0xff;",10
-        .byte "  for(t=1; t; t++) a[t]=0xff;",10
-        .byte "  for(n=2; n<2048; n++) {",10
+;       .byte "  word n,i;",10
+;       .byte "  byte t;",10
+;       .byte "  a[0]=0xff;",10
+        .byte "  a[0]=255;",10
+;       .byte "  for(t=1; t; ++t) a[t]=0xff;",10
+        .byte "  for(t=1; t; ++t) a[t]=255;",10
+        .byte "  for(n=2; n<2048; ++n) {",10
         .byte "    if (a[n>>3] & (1<<(n&7))) {",10
         .byte "      i=n;",10
         .byte "      t=0;",10
         ;;           // simulates printd?
+.ifblank
+        .byte "      printd(i);",10
+.else
         .byte "      do {",10
         .byte "        b[t++]= (i%10)+'0';",10
         .byte "        i/=10;",10
@@ -5095,9 +5252,13 @@ ATOZ=1
         .byte "      do {",10
         .byte "        putchar(b[--t]);",10
         .byte "      } while(t);",10
-        .byte "      putchar(' ');",10
+.endif
+;       .byte "      putchar(' ');",10
+        .byte "      putchar(32);",10
         .byte "      for(i=n+n; i<2048; i+= n) {",10
-        .byte "        a[i>>3]&= ~(1<<(i&7));",10
+;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
+;       .byte "        a[i>>3]&= (1<<(i&7))^0xffff;",10
+        .byte "        a[i>>3]&= (1<<(i&7))^65535;",10
         .byte "      }",10
         .byte "    }",10
         .byte "  }",10
@@ -5338,7 +5499,6 @@ docs:
 .endif ; INCTESTS
 
 savedscreen:    
-;;; Soemthing corrupts lines 3-7!!! 
         .byte "0123456789012345678901234567890123456789"
         .byte "1111111111222222222233333333334444444444"
 ;        .byte "2                                       "
@@ -5382,10 +5542,10 @@ vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
 .ifdef TESTING
-;;; FUNS A-Z
+;;; FUNS A-Z / 32
         .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
         .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-;;; VARS a-z
+;;; VARS a-z / 26
         ;;    a  b  c  d  e  f  g  h  i  j
         .word 0,10,20,30,40,50,60,70,80,90
         .word 100,110,120,130,140,150,160,170

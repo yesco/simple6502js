@@ -141,8 +141,10 @@ orgaddr:
 ;;; pad to new page, put "BEFORE>" just before page start
 .ifdef ORGSTART
   .res 256-(* .mod 256)-7
-  .byte "BEFORE>"
 .endif
+.byte "BEFORE>"
+;;; The data between "BEFORE>" ... and "<AFTER"
+;;; is the CORE PROJECT (not counting BIOS/INFO/PRINT/TEST)
 
 
 ;;;          DON'T put anything here

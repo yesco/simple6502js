@@ -3,6 +3,7 @@ inc...:           69 B 	         ; (+ 746 69)= 815
 
 RULES:           747 B 
 OPTRULES:	1187 B           ; (+ 440)
+OPTRULES<<:     1393 B           ; (+ 206)
 
 IDE:             403 B
 
