@@ -15,9 +15,11 @@
 ;;; - an actual machine 6502 compiler running on 6502
 ;;; - be a "proper" subset of C (at least syntactically)
 ;;; - *minimal* sized BNF-engine as well as rules
-;;;   keeping the whole compiler in about 1KB!
+;;;   keeping the whole compiler in about 1-2KB!
 ;;; - fast "enough" to run "on a screen of code"
-;;;   (~ 50ish "ops" compiled/s)
+;;;   (~ 133 "ops" compiled/s ~ 19 lines/s)
+;;;   (Turbo Pascal did 2000 lines in less than 60s)
+;;;   (== 33 lines/s)
 ;;; - provide on-screen editor
 ;;; - "simple" rule-driven
 ;;; - many languages (just change rules)
@@ -30,38 +32,31 @@
 ;;; - no constant folding (yet)
 ;;; 
 ;;; The MINIMAL C-language subset:
-;;; - only support types: void, word (uint), byte (uchar)
-;;; -   word main() ...
-;;; -   { block; ... }
-;;; -   return ...;
-;;; -   if () statement; [else statement;]
-;;; -   label: goto label;
-;;; -
+;;; - only support types: word (uint_16)
+;;; - word main() ...
+;;; - { block; ... }
+;;; - return ...;
+;;; - if () statement; [else statement;]
+;;; - label:
+;;; - goto label;
+;;; - do ... while();
+;;; - while() ...
+;;; 
 ;;; - single letter global variables (no need declare)
-;;; - pointers (no type checking): *p= *p+1
 ;;; - limited char support: *(char*)p=   ... (char)i;
 ;;; - decimal numbers: 4711 42
 ;;; - bin operators: + - *2 /2 & | ^ << >>
+;;; - "strings" constants (for printing)
+;;; 
 ;;; - library to minimize gen code+rules (slow code==cc65)
 ;;; 
-;;; OPTIONAL:
-;;; - I/O: getchar putc printd printh
-;;; - else statement;
-;;; - optimized: &0xff00 &0xff >>8 <<8
-;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
-;;; - optimized: ... op const   ... op var
-;;;   
 ;;; TODO:
 ;;; - T F() { ... }
 ;;; - F() - function calls
 ;;; - parameters (without stack)
 ;;; - recursion? (requires stack)
 ;;; 
-;;; Extentions:
-;;; - 42=>x+7=>y;     forward assignement
-;;; - 35.sqr          single arg function call
-;;; - 3 @+ v          byte operator (acts only on A not AX)
-;;; 
+
 ;;; Limits
 ;;; - only *unsigned* values
 ;;; - if supported ops/syntax should (mostly)
@@ -74,6 +69,22 @@
 ;;; - modifying ops cannot be used in expressions
 ;;; - NO parenthesis
 ;;; - NO generic / or * (unless add library)
+
+
+;;; OPTIONAL:
+;;; - byte datatype
+;;; - pointers (no type checking): *p= *p+1
+;;; - I/O: getchar putc printd printh
+;;; - else statement;
+;;; - optimized: &0xff00 &0xff >>8 <<8
+;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
+;;; - optimized: ... op const   ... op var
+;;;   
+;;; Extentions:
+;;; - 42=>x+7=>y;     forward assignement
+;;; - 35.sqr          single arg function call
+;;; - 3 @+ v          byte operator (acts only on A not AX)
+
 
 
 
