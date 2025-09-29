@@ -919,24 +919,10 @@ FUNC _enterrule
         cmp #TAILREC
         bne @pushnewrule
 
-;;; TODO: cleanup x REMOVE!
-
-        jmp _acceptrule
-
 .ifdef DEBUGRULE2
 ;        putc 'R'
 .endif
-;;; TODO: maybe TAILREC is more like
-;;;   accept rule!
-
-;;; TODO: acceptrule
-;;; TODO: run same rule again, lol
-
-        ;; - reset rule match to start
-;;; TODO: @same redundant
-        lda rulename
-        jmp loadruleptr
-
+        jmp _acceptrule
 
 ;;; Hi-bit set, and it's not '*'
 @pushnewrule:
