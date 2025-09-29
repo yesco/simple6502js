@@ -11,6 +11,19 @@
 ;;; minimal instrumentation to generate runnable machine
 ;;; code.
 ;;;
+;;; 
+;;; Implementation Notes
+;;; 
+;;; The BNF parser is implemented as a giant statemachine,
+;;; i.e., a pushdown automata. The program stack is used
+;;; as a data-stack, mixed with *some* subroutine calls.
+;;; However, one needs to be careful as you can't use
+;;; subroutine to modify the "stack". This means, that
+;;; the current rule/input char is read several times.
+;;; 
+;;; TODO: store them in ZP when stepping
+;;; 
+;;; 
 ;;; Goals
 ;;; - an actual machine 6502 compiler running on 6502
 ;;; - be a "proper" subset of C (at least syntactically)
@@ -1087,12 +1100,10 @@ PUTC '='
 
 ;;; hibit - RULE
 uprule:
-        
-        ;; TAILREC intervention!
-;;; TODO: clean this up/ pha/pla/pha/pla
         ;; put it back
         pha
 
+        ;; is it TAILREC?
         ldy #0
         lda (rule),y
         cmp #TAILREC
@@ -1108,7 +1119,6 @@ uprule:
         ;; - reset current rule to beginning
         lda rulename
         jmp loadruleptr
-        
 
 yesgoup:
         pla
@@ -5043,6 +5053,8 @@ input:
 
 ;;; TODO: enable this one compiles correctly but 
 ;;;   give garbage rule names and %S...
+;
+FUN=1
 .ifdef FUN
         .byte "word F() { return 4711; }",10
         .byte "word G() { return 42; }",10
