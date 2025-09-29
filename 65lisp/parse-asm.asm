@@ -233,17 +233,17 @@
 ;;; - No Kleene operator (*+?[]) just use:
 ;;; - TAILREC hibit-* = do tail-recursion on current rule!
 ;;; - %D - match sequence of digits (number: /\d+/ )
-;;; -(%d - TODO: match 0-255 only)
+;;; - %S - string "...\n\r\"..."
 ;;; 
 ;;; - %V - match "VARiable"
 ;;; - %A - ADDRESSd of name (for assignment)
 ;;;        same as %V but stored in "dos" (and "tos")
-;;;        (generative rule ':' will set tos=dos)
+;;;        (generative rule 'D' will set tos=dos)
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
-;;; - %U - USE value of NAME (assumed set already)
-;;; - %S - string "...\n\r\"..."
+;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
 ;;; TODO:?
+;;; -(%d - TODO: match 0-255 only)
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
 ;;; - %B or %d - match iff datatype is byte
@@ -420,7 +420,8 @@ ELSE=1
 
 ;;; Pointers: &v *v= *v
 ;;; TODO: not working
-;POINTERS=1
+;
+POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
 ;;; doesn't take any extra code bytes, or rule bytes
@@ -1528,9 +1529,9 @@ jsr putchar
 
 ;        cmp #'Z'-'A'+1
 
-        bcc @skip2
+        bcc :+
         jmp failjmp
-@skip2:
+:
 
         ;; pick global address
         asl
@@ -1549,31 +1550,31 @@ jsr putchar
         ;; (TODO: if used for var they are inline code)
         lda vrule
         cmp #'N'
-        bne @nodef
+        bne :+
 
         ;; - *FUN = out // *tos= out
-        ldy #0
         lda _out
+        ldy #0
         sta (tos),y
         iny
         lda _out+1
         sta (tos),y
 
         jmp @set
-@nodef:
+:
         ;; Use value of variable
         ;; (for functions if forward, may not
         ;;  have value jmp (ind) more safe!)
         cmp #'U'
         bne @nofun
-        ;; - tos = *tos
+        ;; - tos = *tos !
         ldy #1
         lda (tos),y
         tax
-        dex
+        dey
         lda (tos),y
 
-        ;; TODO: push to auto-gen funcall?!
+        ;; TODO: idea: push to auto-gen funcall?!
 .ifnblank
         ;; hi
         lda (tos),1
@@ -2442,9 +2443,8 @@ ruleC:
 .endif ; BYTERULES
 
 
-.ifdef FUNS
         ;; function call
-        .byte "|%F()"
+        .byte "|%U()"
       .byte '['
         jsr VAL0
         ;; result in AX
@@ -2452,13 +2452,12 @@ ruleC:
 
         ;; EXTENTION
         ;; .method call! - LOL
-        .byte "|.%F"
+        .byte "|.%U"
       .byte '['
         ;; parameter already in AX
         jsr VAL0
         ;; result in AX
       .byte ']'
-.endif ; FUNS
 
         ;; Surprisingly ++v and --v
         ;; isn't smalller or faster than v++ and v-- !
@@ -2562,6 +2561,7 @@ ruleC:
         ;; autopatches jmp to here
 ;;; TODO: DAMN - wrong, should be to before "load string"
 
+
 .ifdef POINTERS
         .byte "|&%V"
       .byte '['
@@ -2600,59 +2600,6 @@ ruleU:
 ;;; aDDons (::= op %d | op %V)
 
 ruleD:
-
-;FORDEBUG=1
-.ifdef FORDEBUG
-        .byte "&%D"
-.byte "%{"
-        putc '#'
-        jsr immret
-
-      .byte '['
-        and #'<'
-        tay
-        txa
-        and #'>'
-        tax
-        tya
-      .byte ']'
-
-.byte "%{"
-        putc '!'
-        putc '@'
-        jsr immret
-
-.byte "%{"
-        putc '@'
-        putc '!'
-        jsr immret
-
-        .byte TAILREC
-
-
-
-        .byte "|+%D"
-      .byte '['
-        clc
-        adc #'<'
-        tay
-        txa
-        adc #'>'
-        tax
-        tya
-      .byte ']'
-;;; Remove this and 4700+11 works
-        .byte TAILREC
-
-        ;; allow empty (to end it)
-        .byte "|"
-      .byte "%{"
-        putc '%'
-        jsr immret
-
-        .byte 0
-.endif ; FORDEBUG
-
 
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
@@ -5056,9 +5003,10 @@ input:
 ;
 FUN=1
 .ifdef FUN
-        .byte "word F() { return 4711; }",10
-        .byte "word G() { return 42; }",10
-        .byte "word main(){b=512;a=--b; printd(b); return a;}",0
+        .byte "word F() { return 4700; }",10
+        .byte "word G() { return F()+11; }",10
+        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return G(); }",0
+;        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return F(); }",0
 .endif
 
 ;;; TODO: not working because TAILREC ruleD?
