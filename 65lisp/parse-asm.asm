@@ -919,13 +919,23 @@ FUNC _enterrule
         cmp #TAILREC
         bne @pushnewrule
 
+;;; TODO: cleanup x REMOVE!
+
+        jmp _acceptrule
+
 .ifdef DEBUGRULE2
 ;        putc 'R'
 .endif
+;;; TODO: maybe TAILREC is more like
+;;;   accept rule!
+
+;;; TODO: acceptrule
+;;; TODO: run same rule again, lol
+
         ;; - reset rule match to start
 ;;; TODO: @same redundant
         lda rulename
-        jmp @loadruleptr
+        jmp loadruleptr
 
 
 ;;; Hi-bit set, and it's not '*'
@@ -961,7 +971,7 @@ FUNC _enterrule
     PUTC '>'
 .endif
 
-@loadruleptr:
+loadruleptr:
         and #31
         asl
         tay
@@ -1048,6 +1058,7 @@ PUTC '.'
         bmi uprule
         ;; - done?
         cmp #DONE
+;;; TODO: what to do if have data left?
         bne :+
         ;; yes, done, no error
         jmp _donecompile
@@ -1055,7 +1066,7 @@ PUTC '.'
         
         ;; 'p' - PATCH
         cmp #'p'
-        bne @gotretry
+        bne @dropone
     DEBC 'P'
         pla
         sta pos
@@ -1072,10 +1083,8 @@ PUTC '.'
 
         jmp @loop
 
-;;; 'i' - input restore and RETRY
-;;; (it's assumed it's an 'i')
-;;; TODO: check?
-@gotretry:
+;;; typically an 'i' but could be an '&'
+@dropone:
 .ifdef DEB2
 PUTC '='
 .endif
@@ -1092,6 +1101,31 @@ PUTC '='
 
 ;;; hibit - RULE
 uprule:
+        
+        ;; TAILREC intervention!
+;;; TODO: clean this up/ pha/pla/pha/pla
+        ;; put it back
+        pha
+
+        ldy #0
+        lda (rule),y
+        cmp #TAILREC
+        bne yesgoup
+        
+        ;; - commit inp so far
+        lda inp+1
+        pha
+        lda inp
+        pha
+        lda #'i'
+        pha
+        ;; - reset current rule to beginning
+        lda rulename
+        jmp loadruleptr
+        
+
+yesgoup:
+        pla
 
 .ifdef DEB3
 PUTC '^'
@@ -1121,6 +1155,7 @@ lda savea
 
     DEBC '_'
 
+        ;; - restore partial parsed rule
         sta rulename
         pla
         sta rule
@@ -2610,6 +2645,7 @@ ruleD:
         tax
         tya
       .byte ']'
+;;; Remove this and 4700+11 works
         .byte TAILREC
 
         ;; allow empty (to end it)
@@ -3228,7 +3264,7 @@ ruleN:
       .byte ']'
 ;;; TODO: this TAILREC messes with ruleP and several F
 ;;;   TAILREC does something wrong!
-;        .byte TAILREC
+        .byte TAILREC
         
         .byte "|"
 
@@ -3250,6 +3286,9 @@ ruleP:
 
         .byte _T,"main()",_B
       .byte '['
+        ;; if main not return, return 0
+        lda #0
+        tax
         rts
       .byte ']'
 ;        .byte TAILREC
@@ -5013,11 +5052,16 @@ FUNC printstack
 
 input:
 
+;;; TAILREC
+;        .byte "word main(){ return 4700+11; }",0
+
 ;;; TODO: enable this one compiles correctly but 
 ;;;   give garbage rule names and %S...
-;        .byte "word F() { return 4711; }",10
-;        .byte "word G() { return 42; }",10
+.ifdef FUN
+        .byte "word F() { return 4711; }",10
+        .byte "word G() { return 42; }",10
         .byte "word main(){b=512;a=--b; printd(b); return a;}",0
+.endif
 
 ;;; TODO: not working because TAILREC ruleD?
 ;        .byte "word main(){a=1;return a<<1;}",0
