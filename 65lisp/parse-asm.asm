@@ -24,7 +24,7 @@
 ;;; TODO: store them in ZP when stepping
 ;;; 
 ;;; 
-;;; Goals
+;;; GOALS:
 ;;; - an actual machine 6502 compiler running on 6502
 ;;; - be a "proper" subset of C (at least syntactically)
 ;;; - *minimal* sized BNF-engine as well as rules
@@ -38,6 +38,8 @@
 ;;; - many languages (just change rules)
 ;;; - have MINIMAL subset
 ;;; - have RULEOPT extentions for efficient codegen
+;;; - somewhat useful error messages
+;;;   (difficult w recursive descent BNF style parsing)
 ;;; 
 ;;; NON-Goals:
 ;;; - not be the best super-optimizing compiler
@@ -45,9 +47,19 @@
 ;;; - no constant folding (yet)
 ;;; 
 ;;; The MINIMAL C-language subset:
-;;; - only support types: word (uint_16)
-;;; - word main() ...
-;;; - { block; ... }
+;;; - types: word (uint_16) [limited: byte (uint_8) void]
+;;; - casting syntax
+;;; 
+;;; - decimal numbers: 4711 42
+;;; - "string" constants (== number for printing)
+;;; 
+;;; - word main() ... - no args
+;;; - { ... }
+;;; 
+;;; - a= b+10;
+;;; - + - *2 /2 >> << & | ^ == <   (TODO: ! && || ? != > <= >=)
+;;; - &v *v
+;;; 
 ;;; - return ...;
 ;;; - if () statement; [else statement;]
 ;;; - label:
@@ -55,31 +67,35 @@
 ;;; - do ... while();
 ;;; - while() ...
 ;;; 
+;;; - putchar(c); getchar();
+;;; - printd(42); printh(666); printz("foo");
+;;; 
+;;; - word F() { ... } - function definitions
+;;; - F() G() - function calls (no parameters)
+;;; 
 ;;; - single letter global variables (no need declare)
 ;;; - limited char support: *(char*)p=   ... (char)i;
-;;; - decimal numbers: 4711 42
-;;; - bin operators: + - *2 /2 & | ^ << >>
-;;; - "strings" constants (for printing)
 ;;; 
 ;;; - library to minimize gen code+rules (slow code==cc65)
-;;; 
+
+
 ;;; TODO:
-;;; - T F() { ... }
-;;; - F() - function calls
 ;;; - parameters (without stack)
 ;;; - recursion? (requires stack)
-;;; 
+;;;   1) use program stack (no tailrec)
+;;;   2) separate stack ops/MINIMAL
 
-;;; Limits
+
+;;; Limits:
 ;;; - only *unsigned* values
 ;;; - if supported ops/syntax should (mostly)
 ;;;   work the same on normal C-compiler
 ;;; - NO priorities on * / (OK, this deviates from C)
-;;; - types aren't enforced
-;;; - not using any extensions: same result
-;;; - single lower case letter variable (TODO: fix)
-;;; - single upper case letter functions (TODO: fix)
-;;; - modifying ops cannot be used in expressions
+;;; - mostly no error messages uneless get stuck
+;;;   and can't complete compilation
+;;; - "types" aren't enforced
+;;; - single lower case letter variable
+;;; - single upper case letter functions
 ;;; - NO parenthesis
 ;;; - NO generic / or * (unless add library)
 
@@ -92,105 +108,12 @@
 ;;; - optimized: &0xff00 &0xff >>8 <<8
 ;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
 ;;; - optimized: ... op const   ... op var
-;;;   
+
+  
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
 ;;; - 3 @+ v          byte operator (acts only on A not AX)
-
-
-
-
-
-;;; STATS:
-
-;;;                          asm rules
-;;; MINIMAL   :  1016 bytes = (+ 685  383) inc LIB!
-;;; NORMAL    :  1134 bytes = (+ 685  501)
-;;; BYTERULES :  1293 bytes = (+ 685  660)
-;;; OPTRULES  :  1463 bytes = (+ 685  1090)
-;;; LONGNAMES : 
-;;; 
-;;; v= #x32f = 815 (+75 D d : ; # d - WHILE!) :-(
-;;; v= #x2f6 = 758
-;;; (- 758 27 46) = 685 (-errpos/-checkstack?) 
-;;;     100 byte more? lol)
-;;; 
-;;; w= #x49d = 1181 bytes DO...WHILE/WHILE... (+ 69B)
-;;; w= #x458 = 1112 bytes rules? OPTRULES
-;;; w= #x2a4 =  676 bytes plain rules (!OPTRULES)
-;;; 
-;;; z= #x77e 1918 (- 1918 758 113)=> 1047
-;;; z= #x60a 1546 (- 1546 758 113)=>  675
-;;; 
-;;;    193 bytes backtrack parse w rule
-;;;    239 bytes codegen with []
-;;;    349 bytes codegen <> and  (+25 +36 mul10 digits)
-;;;    450 bytes codegen +> and vars! (+ 70 bytes)
-;;;    424 bytes codegen : %V %A fix recurse
-;;;         ( moved out bunch of stuff - "not counting" )
-;;;    438 bytes skip spc (<= ' ') on input stream!
-;;;        (really 404? ... )
-;;;    487 bytes IF ! (no else) (+ 43B)
-;;;    493 bytes ... (+ 29 B???) I think more cmp????
-;;;    517 bytes highlite error in source! (+ 24 B)
-;;;    550 bytes ...fixed bugs... (lost _var code...)
-;;;    554 bytes =>a+3=>c
-;;;    663 bytes ... ?
-
-;;; C parse() == parse.lst (- #x715 #x463) = 690
-;;; 
-
-;;;    597 bytes FUNS: more %F and %f code
-
-;;;    642 bytes +R* - not working yet
-;;;    715  +47 == CHECKSTACK
-
-;;; 73 B overhead to subtract (+ 26 47)
-;;;    642 no ERRPOS no CHECKSTACK
-;;;    668  +26 == ERRPOS
-;;;    715  +47 == CHECKSTACK
-
-;;; TODO:  634 bytes ... partial long names (+ 141 B)
-
-;;; not counting: printd, mul10, end: print out
-
-;;; C-Rules: 469 B (- 593 56 68)
-;;; 
-;;; 
-;;;    71 bytes - voidmain(){return4711;}
-;;;   112 bytes - ...return 8421*2; /2, +, -
-;;;   124 bytes - ...return e+12305;
-;;;   128 bytes -           1+2+3+4+5
-;;;   262 bytes - +-&|^ %V %D == ... 
-;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
-;;;   379 bytes - IF(E)S;   (+ 17B)
-;;;   392 bytes - &a
-;;;   425 bytes -  =>a+3=>c; and function calls
-;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
-;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
-;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
-;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
-;;;               and changed int=>word char=>byte
-;;;   521 bytes
-
-;;;   383 bytes = MINIMAL   (rules + library)
-;;;   501 bytes = NORMAL
-;;;   660 bytes = BYTERULES (+ 159 B)
-;;;   821 bytes = OPTRULES  (+ 320 B)
-;;;   886 bytes ...
-;;; 
-;;;  1393 bytes - OPT: << >> <<= >>=
-;;; 
-;;; #x40a
-;;; 
-;;; TODO: not really rules...
-;;;    56 B is table ruleA-ruleZ- could remove empty
-;;;    68 B library printd/printh/putc/getchar
-;;;         LONGNAMES: move to init data in env! "externals"
-;;; TODO: 
-;;;  ~256 B parameterize ops (gen)
-
 
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed, and with PRINTINPUT ERRPOS defined the
@@ -210,7 +133,97 @@
 
 
 
+
+;;; STATS:
+
+;;;                          asm rules
+;;; MINIMAL   :  1016 bytes = (+ 685  383) inc LIB!
+;;; NORMAL    :  1134 bytes = (+ 685  501)
+;;; BYTERULES :  1293 bytes = (+ 685  660)
+;;; OPTRULES  :  1463 bytes = (+ 685  1090)
+;;; LONGNAMES :  
 ;;; 
+;;; v= #x363 = 867 (+52 %U TAILREC-fix)
+;;; v= #x32f = 815 (+75 D d : ; # d - WHILE!) :-(
+;;; v= #x2f6 = 758
+;;; (- 758 27 46) = 685 (-errpos/-checkstack?) 
+;;;     100 byte more? lol)
+;;; 
+;;;    193 bytes backtrack parse w rule
+;;;    239 bytes codegen with []
+;;;    349 bytes codegen <> and  (+25 +36 mul10 digits)
+;;;    450 bytes codegen +> and vars! (+ 70 bytes)
+;;;    424 bytes codegen : %V %A fix recurse
+;;;         ( moved out bunch of stuff - "not counting" )
+;;;    438 bytes skip spc (<= ' ') on input stream!
+;;;        (really 404? ... )
+;;;    487 bytes IF ! (no else) (+ 43B)
+;;;    493 bytes ... (+ 29 B???) I think more cmp????
+;;;    517 bytes highlite error in source! (+ 24 B)
+;;;    550 bytes ...fixed bugs... (lost _var code...)
+;;;    554 bytes =>a+3=>c
+;;;    663 bytes ... ?
+;;; 
+;;; 73 B overhead to subtract (+ 26 47)
+;;;    642 no ERRPOS no CHECKSTACK
+;;;    668  +26 == ERRPOS
+;;;    715  +47 == CHECKSTACK
+;;; 
+;;; TODO:  634 bytes ... partial long names (+ 141 B)
+;;; 
+;;; not counting: printd, mul10, end: print out
+;;; 
+;;; C parse() == parse.lst (- #x715 #x463) = 690
+
+
+
+
+;;; C-Rules: 469 B (- 593 56 68)
+;;; 
+;;;   383 bytes = MINIMAL   (rules + library)
+;;;   501 bytes = NORMAL
+;;;   660 bytes = BYTERULES (+ 159 B)
+;;;   821 bytes = OPTRULES  (+ 320 B)
+;;; 
+;;; 
+;;; 
+;;;    71 bytes - voidmain(){return4711;}
+;;;   112 bytes - ...return 8421*2; /2, +, -
+;;;   124 bytes - ...return e+12305;
+;;;   128 bytes -           1+2+3+4+5
+;;;   262 bytes - +-&|^ %V %D == ... 
+;;;   364 bytes - int,table,recurse,a=...; ...=>a; statements
+;;;   379 bytes - IF(E)S;   (+ 17B)
+;;;   392 bytes - &a
+;;;   425 bytes -  =>a+3=>c; and function calls
+;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
+;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
+;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
+;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
+;;;               and changed int=>word char=>byte
+;;;   521 bytes
+;;;   597 bytes FUNS: more %F and %f code
+;;;   642 bytes +R* - not working yet
+;;;   676 bytes plain rules (!OPTRULES)
+;;;   715  +47 == CHECKSTACK
+;;;   886 bytes ...
+;;; 
+;;;  1112 bytes rules? OPTRULES
+;;;  1181 bytes DO...WHILE/WHILE... (+ 69B)
+;;;  1393 bytes - OPT: << >> <<= >>=
+;;;  1481 bytes FUNCTIONS/TAILREC/FUNCDEF (+ 300B)
+;;;  1544 bytes FUNCTIONS+POINTERS (+ 63B)
+;;; 
+
+;;; TODO: not really rules...
+;;;    56 B is table ruleA-ruleZ- could remove empty
+;;;    68 B library printd/printh/putc/getchar
+;;;         LONGNAMES: move to init data in env! "externals"
+;;; TODO: 
+;;;  ~256 B parameterize ops (gen)
+
+
+
 ;;; BNF DEFINITION
 ;;; ==============
 ;;; 
@@ -420,8 +433,7 @@ ELSE=1
 
 ;;; Pointers: &v *v= *v
 ;;; TODO: not working
-;
-POINTERS=1
+;POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
 ;;; doesn't take any extra code bytes, or rule bytes
@@ -4994,6 +5006,8 @@ FUNC printstack
 .byte 0,0
 
 input:
+
+        .byte "word main(){ }",0
 
 ;;; TAILREC
 ;        .byte "word main(){ return 4700+11; }",0
