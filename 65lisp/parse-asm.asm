@@ -1486,7 +1486,16 @@ jsr putchar
 ;;; with XOR #64 ; CMP #('z' & 63) - save 1 b!
         sec
         sbc #'A'
+;;; TODO: enable for a-z too, now only F
         cmp #'z'-'A'+1
+;;; If we limit to A-F suddenly "word main()" doesn't
+;;; parse. Since we take only char (first) "ain"
+;;; doesn't match so it'll backtrack up to ruleP word main
+;;; 
+;;; TODO: but why is that fail different from this?
+;;;   this causes ruleP: "word main(){...}" to fail!
+
+;        cmp #'Z'-'A'+1
 
         bcc @skip2
         jmp failjmp
@@ -1510,6 +1519,7 @@ jsr putchar
         lda vrule
         cmp #'N'
         bne @nodef
+
         ;; - *FUN = out // *tos= out
         ldy #0
         lda _out
@@ -2199,7 +2209,7 @@ ruleJ:
   ruleK:  
   ruleL:  
 ruleM:  
-ruleN:  
+;;ruleN:
 .endif 
 ;;ruleO:  
 
@@ -3209,57 +3219,41 @@ ruleF:
 ;      .byte ']'
 
 
-ruleO:  
-.ifdef ALTTEST
-;;; works! aaabbbbaaaaaaabbb
-        .byte "aaa"
-      .byte '['
-        putc 'A'
-      .byte ']'
-
-        .byte "|"
-
-        .byte "bbb"
-      .byte '['
-        putc 'B'
-      .byte ']'
-
-        .byte 0
-.endif ; ALTTEST
-
+;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
+ruleN:
+        ;; Define function
         .byte _T,"%N()",_B
       .byte '['
         rts
       .byte ']'
-
-        .byte '|'
-
-        .byte _T,"main()",_B
-      .byte '['
-        rts
-      .byte ']'
+;;; TODO: this TAILREC messes with ruleP and several F
+;;;   TAILREC does something wrong!
+;        .byte TAILREC
+        
+        .byte "|"
 
         .byte 0
         
-;;; Program
-ruleP:  
-        .byte _T,"%N()",_B
+;;; DEFSSKIP ::= jmp main; DEFS <here>
+ruleO:  
       .byte '['
-        rts
+        jmp PUSHLOC
       .byte ']'
-        .byte TAILREC
+        .byte _N
+        .byte 0
+        ;; Autopatches skip over definitions in N
 
-      .byte '|'
+
+;;; PROGRAM ::= DEFSSKIP TYPE main() BLOCK | 
+ruleP:  
+        .byte _O
 
         .byte _T,"main()",_B
       .byte '['
         rts
       .byte ']'
-        .byte TAILREC
+;        .byte TAILREC
 
-      .byte '|'
-
-        ;; empty - no more definitions
       .byte '['
         rts
       .byte ']'
@@ -5019,6 +5013,10 @@ FUNC printstack
 
 input:
 
+;;; TODO: enable this one compiles correctly but 
+;;;   give garbage rule names and %S...
+;        .byte "word F() { return 4711; }",10
+;        .byte "word G() { return 42; }",10
         .byte "word main(){b=512;a=--b; printd(b); return a;}",0
 
 ;;; TODO: not working because TAILREC ruleD?
