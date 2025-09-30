@@ -2917,6 +2917,20 @@ ruleD:
         ldx #0
       .byte ']'
         .byte TAILREC
+
+        .byte "|&%D"
+      .byte "%{"
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:       
+        jsr immret
+
+      .byte "["
+        and #'<'
+        ldx #0
+      .byte "]"
 .endif ; OPTRULES
 
         .byte "|&%D"
@@ -5085,7 +5099,8 @@ input:
 ;;; 119B     : c=0; // optimized (-1B)
 ;;; 118B     : return M(); // tail calls -1B
 ;;; 117B     : removed extra rts after main -1B
-;;; 114B     : a=111=>b; // lol, -4B
+;;; 113B     : 111=>a=>b; // lol, -5B
+;;; 109B 603c: &byte; // %{ made it possible! -5B!
 
 MUL=1
 .ifdef MUL
@@ -5118,7 +5133,7 @@ MUL=1
 ;        .byte "  a= 111; b= 111;",10
 ;;; TODO:
 ;       .byte "  a=b=111;",10 ;; save 4 bytes
-        .byte "  a= 111=>b;",10
+        .byte "  111=>a=>b;",10
 
         .byte "  return M();",10
         .byte "}",10
