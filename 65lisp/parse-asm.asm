@@ -137,16 +137,17 @@
 ;;; STATS:
 
 ;;;                          asm rules
-;;; MINIMAL   :  1016 bytes = (+ 685  383) inc LIB!
-;;; NORMAL    :  1134 bytes = (+ 685  501)
-;;; BYTERULES :  1293 bytes = (+ 685  660)
-;;; OPTRULES  :  1463 bytes = (+ 685  1090)
+;;; MINIMAL   :  1016 bytes = (+ 771  383) inc LIB!
+;;; NORMAL    :  1134 bytes = (+ 771  501)
+;;; BYTERULES :  1293 bytes = (+ 771  660)
+;;; OPTRULES  :  1463 bytes = (+ 771 1090)
 ;;; LONGNAMES :  
 ;;; 
+;;; v- #x34c = 844 bytes!
 ;;; v= #x363 = 867 (+52 %U TAILREC-fix)
 ;;; v= #x32f = 815 (+75 D d : ; # d - WHILE!) :-(
 ;;; v= #x2f6 = 758
-;;; (- 758 27 46) = 685 (-errpos/-checkstack?) 
+;;; (- 844 27 46) = 771 (-errpos/-checkstack?) 
 ;;;     100 byte more? lol)
 ;;; 
 ;;;    193 bytes backtrack parse w rule
@@ -163,11 +164,11 @@
 ;;;    550 bytes ...fixed bugs... (lost _var code...)
 ;;;    554 bytes =>a+3=>c
 ;;;    663 bytes ... ?
-;;; 
 ;;; 73 B overhead to subtract (+ 26 47)
 ;;;    642 no ERRPOS no CHECKSTACK
 ;;;    668  +26 == ERRPOS
 ;;;    715  +47 == CHECKSTACK
+;;;    844  +... ??? wtf? lol
 ;;; 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 ;;; 
@@ -213,7 +214,9 @@
 ;;;  1393 bytes - OPT: << >> <<= >>=
 ;;;  1481 bytes FUNCTIONS/TAILREC/FUNCDEF (+ 300B)
 ;;;  1544 bytes FUNCTIONS+POINTERS (+ 63B)
+;;;  1582 bytes various opts for MUL (+ 38B)
 ;;; 
+;;; w= #x62e 1582
 
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
