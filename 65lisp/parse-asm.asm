@@ -3273,11 +3273,6 @@ ruleP:
         tax
         rts
       .byte ']'
-;        .byte TAILREC
-
-      .byte '['
-        rts
-      .byte ']'
 
         .byte 0
 
@@ -3450,6 +3445,13 @@ ruleS:
         lda #42
       .byte ']'
         
+.ifdef OPTRULES
+        .byte "|return%U();"
+      .byte '['
+        ;; TAILCALL save 1 byte
+        jmp VAL0
+      .byte ']'
+.endif ; OPTRULES
 
         ;; RETURN
         .byte "|return",_E,";"
@@ -5081,6 +5083,8 @@ input:
 ;;;    TODO:   abc zeropage would save 18B
 ;;;    TODO:   b&1 byteopt would save 4B(6/9)
 ;;; 119B     : c=0; // optimized (-1B)
+;;; 118B     : return M(); // tail calls -1B
+;;; 117B     : removed extra rts after main -1B
 
 MUL=1
 .ifdef MUL
