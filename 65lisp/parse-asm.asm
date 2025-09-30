@@ -2446,6 +2446,7 @@ ruleC:
         ldx #0
       .byte ']'
 
+        ;; TODO: hmmm 
         .byte "|%D"
       .byte '['
         lda #'<'
@@ -2547,6 +2548,12 @@ ruleC:
       .byte '['
         lda VAL0
         ldx VAL1
+      .byte ']'
+
+        .byte "|0"
+      .byte '['
+        lda #0
+        tax
       .byte ']'
 
         ;; digits
@@ -3541,12 +3548,26 @@ afterELSE:
 ;;; TODO: "if (a&1)" gives error before ')' ????
         .byte "|if(",_E,")"
       .byte '['
+.ifnblank
         ;; 9B 9-11c
+        ;; 111*111 => 859us
         stx savex
         ora savex
         bne :+
         jmp PUSHLOC
 :       
+.else
+        ;; 9B 5-9-11c
+        ;; 111*111 => 859us same????
+        ;; TODO: no savings for 111*111 ???
+        ;;    609c if just make jmp PUSHLOC
+        tay
+        bne :+
+        txa
+        bne :+
+        jmp PUSHLOC
+:       
+.endif
         ;; THEN-branch
       .byte ']'
 ;;; TODO: move these rules out to another rule
@@ -5006,6 +5027,47 @@ FUNC printstack
 .byte 0,0
 
 input:
+
+;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
+
+;;; 133 naive, c=0+a+c;
+;;; 131 opt: 0
+
+MUL=1
+.ifdef MUL
+        .byte "word M() {",10
+        .byte "  c= 0;",10
+        .byte "  while(b) {",10
+;;; TODO: some bug, lol
+;        .byte "    if (b&1) c+= a;",10
+;        .byte "    if (b&1) c= 1000+a;",10
+        .byte "    if (b&1) c= 0+a+c;",10
+;        .byte "    printd(a); putchar(32) ; printd(b); putchar(32); printd(c); putchar(10);",10
+        .byte "    a<<= 1;",10
+        .byte "    b>>= 1;",10
+        .byte "  }",10
+        .byte "  return c;",10
+        .byte "}",10
+        .byte "",10
+        .byte "word main(){",10
+.ifdef FFFF
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111; M();",10
+.endif
+;;; TODO: somehow this here crashes? LOL
+;        .byte "  a= 111; b= 111; M();",10
+        .byte "  a= 111; b= 111;",10
+;        .byte "  putchar(99);",10
+        .byte "  return M();",10
+        .byte "}",10
+        .byte 0
+.endif ; MUL
 
         .byte "word main(){ }",0
 
