@@ -3614,6 +3614,14 @@ afterELSE:
         ;; Auto-patches at exit!
 .endif ; ELSE
 
+.ifdef OPTRULES
+        .byte "|%A=0;"
+      .byte "[D"
+        lda #0
+        sta VAL0
+        sta VAL1
+      .byte "]"
+.endif ; OPTRULES
 
 
         ;; A=7; // simple assignement, ONLY as statement
@@ -5065,9 +5073,14 @@ input:
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
+;;;    cc65: 80B M()
+
 ;;; 133B 849c: naive, c=0+a+c;
 ;;; 131B 849c: opt: 0
-;;; 120B 603c: c+= a; works (+ etc) again 
+;;; 120B 603c: c+= a; works (+ etc) again  (85B M())
+;;;    TODO:   abc zeropage would save 18B
+;;;    TODO:   b&1 byteopt would save 4B(6/9)
+;;; 119B     : c=0; // optimized (-1B)
 
 MUL=1
 .ifdef MUL
@@ -5101,7 +5114,6 @@ MUL=1
         .byte "}",10
         .byte 0
 .endif ; MUL
-
         .byte "word main(){ }",0
 
 ;;; TAILREC
