@@ -5085,6 +5085,7 @@ input:
 ;;; 119B     : c=0; // optimized (-1B)
 ;;; 118B     : return M(); // tail calls -1B
 ;;; 117B     : removed extra rts after main -1B
+;;; 114B     : a=111=>b; // lol, -4B
 
 MUL=1
 .ifdef MUL
@@ -5112,8 +5113,13 @@ MUL=1
 .endif
 ;;; TODO: somehow this here crashes? LOL
 ;        .byte "  a= 111; b= 111; M();",10
-        .byte "  a= 111; b= 111;",10
-;        .byte "  putchar(99);",10
+;        .byte "  a= 111; b= 111;",10
+
+;        .byte "  a= 111; b= 111;",10
+;;; TODO:
+;       .byte "  a=b=111;",10 ;; save 4 bytes
+        .byte "  a= 111=>b;",10
+
         .byte "  return M();",10
         .byte "}",10
         .byte 0
