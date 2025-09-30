@@ -3547,6 +3547,7 @@ afterELSE:
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
         .byte "|if(%A<%D)"
+.scope        
       .byte "["
         ;; reverse cmp as <> NUM avail first
         lda #'<'
@@ -3577,6 +3578,44 @@ afterELSE:
         lda #$ff
       .byte ']'
 .endif ; ELSE
+.endscope
+
+        .byte "|if(%A&%D)"
+      .byte "%{"
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:       
+        jsr immret
+
+.scope        
+      .byte "["
+        lda #'<'
+        ;; cmp with VAR
+        .byte 'D'               ; get aDdress
+
+        and VAL0
+        bne @ok
+@nah:
+        ;; set value for optional else...
+.ifdef ELSE
+        ;; A is 0
+        tax
+.endif ;ELSE
+        jmp PUSHLOC
+@ok:        
+        ;; THEN-branch
+      .byte "]"
+        .byte _S
+.ifdef ELSE
+        ;; for ELSE, make sure value not 0!
+      .byte '['
+        lda #$ff
+      .byte ']'
+.endif ; ELSE
+.endscope
+
 
 .endif ; OPTRULES
 
@@ -5089,7 +5128,7 @@ input:
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
-;;;    cc65: 80B M()
+;;; 101B    cc65:  80B M()
 
 ;;; 133B 849c: naive, c=0+a+c;
 ;;; 131B 849c: opt: 0
@@ -5101,6 +5140,7 @@ input:
 ;;; 117B     : removed extra rts after main -1B
 ;;; 113B     : 111=>a=>b; // lol, -5B
 ;;; 109B 603c: &byte; // %{ made it possible! -5B!
+;;; 101B 603c: if(%A & byte) - 8B! (74B! M())
 
 MUL=1
 .ifdef MUL
