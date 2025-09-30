@@ -37,7 +37,7 @@
 ;;; - "simple" rule-driven
 ;;; - many languages (just change rules)
 ;;; - have MINIMAL subset
-;;; - have RULEOPT extentions for efficient codegen
+;;; - have OPTRULES extentions for efficient codegen
 ;;; - somewhat useful error messages
 ;;;   (difficult w recursive descent BNF style parsing)
 ;;; 
@@ -1578,7 +1578,7 @@ jsr putchar
         ;;  have value jmp (ind) more safe!)
         cmp #'U'
         bne @nofun
-PUTC 'U'
+;PUTC 'U'                       
         ;; - tos = *tos !
         ldy #1
         lda (tos),y
@@ -1621,14 +1621,10 @@ PUTC 'U'
 .endif
         
 @set:
-lda vrule
-jsr printchar
         lda tos
         sta dos
         lda tos+1
         sta dos+1
-jsr printh
-PUTC ' '
 
 @noset:
         ;; skip read var char
@@ -2335,6 +2331,7 @@ ruleC:
         ;; "IO-lib" hack
         .byte "printd(",_E,")"
       .byte '['
+;;; TODO: change printers to use AX
         sta tos
         stx tos+1
         jsr printd
@@ -2342,6 +2339,7 @@ ruleC:
 
         .byte "|printh(",_E,")"
       .byte '['
+;;; TODO: change printers to use AX
         sta tos
         stx tos+1
         jsr printh
@@ -2472,10 +2470,6 @@ ruleC:
 
         ;; function call
         .byte "|%U()"
-      .byte "%{"
-        PUTC '?'
-        jsr immret
-
       .byte '['
         jsr VAL0
         ;; result in AX
@@ -2561,37 +2555,26 @@ ruleC:
 .endif
       .byte ']'
 
-.ifnblank
-;;; FUN?
-;;; %V gets here
-        .byte "|%V()"
-;;; %U doesn't match?
-        .byte "|%U()"
-
-      .byte "%{"
-        PUTC '/'
-        jsr immret
-.endif
         ;; variable
         .byte "|%V"
 
-      .byte "%{"
-        PUTC '!'
-        jsr immret
+;      .byte "%{"
+;        PUTC '!'
+;        jsr immret
 
       .byte '['
         lda VAL0
         ldx VAL1
       .byte ']'
 
-.ifdef RULEOPT
+.ifdef OPTRULES
         ;; load 0 saves 1 byte
         .byte "|0"
       .byte '['
         lda #0
         tax
       .byte ']'
-.endif ; RULEOPT
+.endif ; OPTRULES
 
         ;; digits
         .byte "|%D"
@@ -2862,33 +2845,6 @@ ruleD:
 .else ; !MINIMAL
 
         .byte "|+%V"
-
-      .byte "%{"
-        ldy tos
-        sty savea
-        ldy tos+1
-        sty savex
-
-        ldy dos
-        sty tos
-        ldy dos+1
-        sty tos+1
-
-        pha
-        txa
-        pha
-        jsr printh
-        pla
-        tax
-        pla
-
-        ldy savea
-        sty tos
-        ldy savex
-        sty tos+1
-
-        jsr immret
-
       .byte '['
         clc
         adc VAL0
@@ -5096,7 +5052,7 @@ FUNC printstack
 
 input:
 
-FUN=1
+;FUN=1
 .ifdef FUN
         .byte "word F() { return 4700; }",10
         .byte "word G() { return F()+11; }",10
@@ -5109,18 +5065,16 @@ FUN=1
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
-;;; 133 naive, c=0+a+c;
-;;; 131 opt: 0
+;;; 133B 849c: naive, c=0+a+c;
+;;; 131B 849c: opt: 0
+;;; 120B 603c: c+= a; works (+ etc) again 
 
 MUL=1
 .ifdef MUL
         .byte "word M() {",10
         .byte "  c= 0;",10
         .byte "  while(b) {",10
-;;; TODO: some bug, lol
-;        .byte "    if (b&1) c+= a;",10
-;        .byte "    if (b&1) c= 1000+a;",10
-        .byte "    if (b&1) c= 0+a+c;",10
+        .byte "    if (b&1) c+= a;",10
 ;        .byte "    printd(a); putchar(32) ; printd(b); putchar(32); printd(c); putchar(10);",10
         .byte "    a<<= 1;",10
         .byte "    b>>= 1;",10
