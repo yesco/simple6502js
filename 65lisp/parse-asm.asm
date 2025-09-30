@@ -1578,6 +1578,7 @@ jsr putchar
         ;;  have value jmp (ind) more safe!)
         cmp #'U'
         bne @nofun
+PUTC 'U'
         ;; - tos = *tos !
         ldy #1
         lda (tos),y
@@ -1599,7 +1600,7 @@ jsr putchar
         ;; tos= *tos (get value of var/fun)
         sta tos
         stx tos+1
-        jmp _next
+        jmp @noset
 
 @nofun:
         
@@ -2435,7 +2436,7 @@ ruleC:
         ;; 4
         ldy #0
         lda (tos),y
-.endif
+.endif ; WORD
       .byte ']'
         
 .ifdef POINTERS
@@ -2471,6 +2472,10 @@ ruleC:
 
         ;; function call
         .byte "|%U()"
+      .byte "%{"
+        PUTC '?'
+        jsr immret
+
       .byte '['
         jsr VAL0
         ;; result in AX
@@ -2556,8 +2561,24 @@ ruleC:
 .endif
       .byte ']'
 
+.ifnblank
+;;; FUN?
+;;; %V gets here
+        .byte "|%V()"
+;;; %U doesn't match?
+        .byte "|%U()"
+
+      .byte "%{"
+        PUTC '/'
+        jsr immret
+.endif
         ;; variable
         .byte "|%V"
+
+      .byte "%{"
+        PUTC '!'
+        jsr immret
+
       .byte '['
         lda VAL0
         ldx VAL1
@@ -5075,6 +5096,15 @@ FUNC printstack
 
 input:
 
+FUN=1
+.ifdef FUN
+        .byte "word F() { return 4700; }",10
+        .byte "word G() { return F()+11; }",10
+;        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return G(); }",0
+        .byte "word main(){ return G(); }",0
+.endif
+
+
 ;        .byte "word main(){a=b+c;return a;}",0
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
@@ -5123,16 +5153,6 @@ MUL=1
 ;;; TAILREC
 ;        .byte "word main(){ return 4700+11; }",0
 
-;;; TODO: enable this one compiles correctly but 
-;;;   give garbage rule names and %S...
-;
-FUN=1
-.ifdef FUN
-        .byte "word F() { return 4700; }",10
-        .byte "word G() { return F()+11; }",10
-        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return G(); }",0
-;        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return F(); }",0
-.endif
 
 ;;; TODO: not working because TAILREC ruleD?
 ;        .byte "word main(){a=1;return a<<1;}",0
