@@ -489,10 +489,8 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
-;
-PRINTASM=1
+;PRINTREAD=1
+;PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -850,7 +848,7 @@ noimm:
         beq isstring
 jmpvar: 
         ;; - % anything...
-        ;;   %V (or %F %f %...)
+        ;;   %V (or %A %N %U %...)
         jmp _var
 
         ;; - "constant string"
@@ -1520,7 +1518,7 @@ DEBC '$'
         ldy #0
         lda (inp),y
 .ifnblank
-PUTC ':'
+PUTC '%'
 jsr putchar
 .endif
 
@@ -1545,6 +1543,7 @@ jsr putchar
         jmp failjmp
 :
 
+;;; TODO: move a-z A-Z to zp
         ;; pick global address
         asl
         adc #<vars
@@ -1558,7 +1557,7 @@ jsr putchar
         sta tos+1
         ;; AY = lohi = addr
 
-        ;; new defining function/variable
+        ;; %N = new defining function/variable
         ;; (TODO: if used for var they are inline code)
         lda vrule
         cmp #'N'
@@ -1574,7 +1573,7 @@ jsr putchar
 
         jmp @set
 :
-        ;; Use value of variable
+        ;; %U = Use value of variable
         ;; (for functions if forward, may not
         ;;  have value jmp (ind) more safe!)
         cmp #'U'
@@ -1597,24 +1596,39 @@ jsr putchar
         jmp _next
 .endif
 
-        ;; for now just dos= tos= *tos
-;;; TODO: means inline assignment will f-up!
+        ;; tos= *tos (get value of var/fun)
         sta tos
         stx tos+1
-        jmp @set
+        jmp _next
+
 @nofun:
         
+.ifnblank
         ;; - is assignment? => set dos
         ;; vrule='A' >>1 => C=1
         ;;       'V' >>1 => C=0
         ror vrule
         bcc @noset
         ;; - do set dos
+.else
+        cmp #'A'
+        beq @set
+        cmp #'V'
+        beq @noset
+        ;; err
+        jmp error
+.endif
+        
 @set:
+lda vrule
+jsr printchar
         lda tos
         sta dos
         lda tos+1
         sta dos+1
+jsr printh
+PUTC ' '
+
 @noset:
         ;; skip read var char
         jsr _incIspc
@@ -2455,7 +2469,6 @@ ruleC:
 
 .endif ; BYTERULES
 
-
         ;; function call
         .byte "|%U()"
       .byte '['
@@ -2550,11 +2563,14 @@ ruleC:
         ldx VAL1
       .byte ']'
 
+.ifdef RULEOPT
+        ;; load 0 saves 1 byte
         .byte "|0"
       .byte '['
         lda #0
         tax
       .byte ']'
+.endif ; RULEOPT
 
         ;; digits
         .byte "|%D"
@@ -2825,6 +2841,33 @@ ruleD:
 .else ; !MINIMAL
 
         .byte "|+%V"
+
+      .byte "%{"
+        ldy tos
+        sty savea
+        ldy tos+1
+        sty savex
+
+        ldy dos
+        sty tos
+        ldy dos+1
+        sty tos+1
+
+        pha
+        txa
+        pha
+        jsr printh
+        pla
+        tax
+        pla
+
+        ldy savea
+        sty tos
+        ldy savex
+        sty tos+1
+
+        jsr immret
+
       .byte '['
         clc
         adc VAL0
@@ -3594,6 +3637,19 @@ afterELSE:
         ;; Auto-patches at exit!
 .endif ; ELSE
 
+
+
+        ;; A=7; // simple assignement, ONLY as statement
+        ;; and can't be nested or part of expression
+        ;; (unless we use a stack...)
+        .byte "|%A=",_E,";"
+      .byte "[D"                ; 'D' => tos=dos
+        sta VAL0
+        stx VAL1
+      .byte "]"
+
+
+
 .ifdef OPTRULES
 ;;; TODO make ruleC when %A pushes
         .byte "|++%A;"
@@ -3732,15 +3788,6 @@ afterELSE:
       .byte "]"
 
 .endif ; OPTRULES
-
-        ;; A=7; // simple assignement, ONLY as statement
-        ;; and can't be nested or part of expression
-        ;; (unless we use a stack...)
-        .byte "|%A=",_E,";"
-      .byte "[D"                ; 'D' => tos=dos
-        sta VAL0
-        stx VAL1
-      .byte "]"
 
 .ifdef POINTERS
         .byte "|*%A=",_E,";"
@@ -5028,6 +5075,8 @@ FUNC printstack
 
 input:
 
+;        .byte "word main(){a=b+c;return a;}",0
+
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
 ;;; 133 naive, c=0+a+c;
@@ -5241,6 +5290,8 @@ ATOZ=1
 ;;; ok - either as input, but not both
         .byte "word main(){return 4711;}",0
         .byte "word F(){return 4711;}",0
+
+
 
 ;;; WTF, a space after '}' makes stack explode?
 ;;; TODO: could it be that empty match "...|" gives
