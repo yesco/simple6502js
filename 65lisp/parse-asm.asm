@@ -418,6 +418,10 @@ TIM=1
 ;
 CHECKSTACK=1
 
+;;; Zeropage vars should save many byes!
+;
+ZPVARS=1
+
 ;;; Minimal set of rules (+ LIBRARY)
 ;MINIMAL=1
 
@@ -553,10 +557,18 @@ pframe:
 ;;; Magical references in [generate]
 VAL0= '<' + 256*'>'
 VAL1= '+' + 256*'>'
+
+.ifdef ZPVARS
+  VAR0= '<'
+  VAR1= '+'
+.else
+  VAR0= VAL0
+  VAR1= VAL1
+.endif
+
 PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
 DONE= '$'
-
 
 ;;; parser
 FUNC _init
@@ -1799,12 +1811,22 @@ DEBC '+'
         ;; put
         ldy #0
         sta (_out),y
+        ;; - is second R char '>'?
+.ifblank
+        iny
+        lda (rule),y
+        cmp #'>'
+        bne @done
+        dey
+.endif
+        ;; output '>' hibyte
         txa
-        jsr _incO
         jsr _incR
+        jsr _incO
         ;; fall-through @doout
 @doout:
         sta (_out),y
+@done:
         jsr _incO
         jmp _generate
 
@@ -2357,7 +2379,7 @@ ruleC:
         ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%V)"
       .byte '['
-        lda VAL0
+        lda VAR0
         jsr putchar
 ;;; TODO: about return value...
       .byte ']'
@@ -2444,7 +2466,7 @@ ruleC:
         .byte "|@\*%V"
       .byte '['
 ;;; TODO: test
-        lda VAL0
+        lda VAR0
         sta tos
         lda VAL1
         sta tos+1
@@ -2458,7 +2480,7 @@ ruleC:
         ;; variable
         .byte "|@%V"
       .byte '['
-        lda VAL0
+        lda VAR0
         ldx #0
       .byte ']'
 
@@ -2492,71 +2514,80 @@ ruleC:
         .byte "|++%V"
       .byte '['
 ;;; 14B 17c
-        inc VAL0
+        inc VAR0
         bne :+
-        inc VAL1
+        inc VAR1
 :       
-        lda VAL0
-        ldx VAL1
+        lda VAR0
+        ldx VAR1
       .byte ']'
 
         .byte "|--%V"
       .byte '['
 .ifnblank
 ;;; 17B 21c
-        lda VAL0
+        lda VAR0
         bne :+
-        dec VAL1
+        dec VAR1
 :       
-        dec VAL0
-        lda VAL0
-        ldx VAL1
+        dec VAR0
+        lda VAR0
+        ldx VAR1
 .endif
 ;;; 17B 19c
-        ldx VAL1
-        ldy VAL0
+        ldx VAR1
+        ldy VAR0
         bne :+
         dex
-        stx VAL1
+        stx VAR1
 :       
         dey
         tya
-        sta VAL0
+        sta VAR0
       .byte ']'
 
         .byte "|%V++"
       .byte '['
 ;;; 14B ! 17c ! - no extra cost!
-        lda VAL0
-        ldx VAL1
-        inc VAL0
+        lda VAR0
+        ldx VAR1
+        inc VAR0
         bne :+
-        inc VAL1
+        inc VAR1
 :       
       .byte ']'
 
         .byte "|%V--"
       .byte '['
 ;;; 14B ! 17c
-        ldx VAL1
-        lda VAL0
+        ldx VAR1
+        lda VAR0
         bne :+
-        dec VAL1
+        dec VAR1
 :       
-        dec VAL0
+        dec VAR0
 .ifnblank
 ;;; 17B 19c - faster
-        ldx VAL1
-        ldy VAL0
+        ldx VAR1
+        ldy VAR0
         dey
         tya
         bne :+
         dex
-        stx VAL1
+        stx VAR1
 :       
-        sta VAL0
+        sta VAR0
 .endif
       .byte ']'
+
+
+;;; cc65: get parameter value from subroutine
+;000055r 1  A0 01        	ldy     #$01
+;000057r 1  B1 rr        	lda     (sp),y
+;000059r 1  88           	dey
+;00005Ar 1  11 rr        	ora     (sp),y
+;;; probably have to turn it around
+
 
         ;; variable
         .byte "|%V"
@@ -2566,8 +2597,8 @@ ruleC:
 ;        jsr immret
 
       .byte '['
-        lda VAL0
-        ldx VAL1
+        lda VAR0
+        ldx VAR1
       .byte ']'
 
 .ifdef OPTRULES
@@ -2614,9 +2645,9 @@ ruleC:
         .byte "|\*%V"
       .byte '['
 ;;; TODO: test
-        lda VAL0
+        lda VAR0
         sta tos
-        lda VAL1
+        lda VAR1
         sta tos+1
 
         ldy #1
@@ -2648,8 +2679,8 @@ ruleD:
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
         .byte "=>%A"
       .byte "[D"
-        sta VAL0
-        stx VAL1
+        sta VAR0
+        stx VAR1
       .byte "]"
         .byte TAILREC
 
@@ -2663,7 +2694,7 @@ ruleD:
         .byte "|@+%V"
       .byte '['
         clc
-        adc VAL0
+        adc VAR0
       .byte ']'
         .byte TAILREC
 
@@ -2678,7 +2709,7 @@ ruleD:
         .byte "|@-%D"
       .byte '['
         sec
-        sbc VAL0
+        sbc VAR0
       .byte ']'
         .byte TAILREC
 
@@ -2692,7 +2723,7 @@ ruleD:
 ;;; 17 *2
         .byte "@|&%V"
       .byte '['
-        and VAL0
+        and VAR0
       .byte ']'
         .byte TAILREC
 
@@ -2707,7 +2738,7 @@ ruleD:
 ;;; 17 *2
         .byte "|@\|%V"
       .byte '['
-        ora VAL0
+        ora VAR0
       .byte ']'
         .byte TAILREC
 
@@ -2721,7 +2752,7 @@ ruleD:
 ;;; 17 *2
         .byte "|@^%V"
       .byte '['
-        eor VAL0
+        eor VAR0
       .byte ']'
         .byte TAILREC
 
@@ -2750,7 +2781,7 @@ ruleD:
         .byte "|@==%V"
       .byte '['
         ldy #0
-        cmp VAL0
+        cmp VAR0
         bne :+
         ;; eq => -1
         dey
@@ -2850,10 +2881,10 @@ ruleD:
         .byte "|+%V"
       .byte '['
         clc
-        adc VAL0
+        adc VAR0
         tay
         txa
-        adc VAL1
+        adc VAR1
         tax
         tya
       .byte ']'
@@ -2875,10 +2906,10 @@ ruleD:
         .byte "|-%V"
       .byte '['
         sec
-        sbc VAL0
+        sbc VAR0
         tay
         txa
-        sbc VAL1
+        sbc VAR1
         tax
         tya
       .byte ']'
@@ -2899,10 +2930,10 @@ ruleD:
 ;;; 17 *2
         .byte "|&%V"
       .byte '['
-        and VAL0
+        and VAR0
         tay
         txa
-        and VAL1
+        and VAR1
         tax
         tya
       .byte ']'
@@ -2955,10 +2986,10 @@ ruleD:
 ;;; 17 *2
         .byte "|\|%V"
       .byte '['
-        ora VAL0
+        ora VAR0
         tay
         txa
-        ora VAL1
+        ora VAR1
         tax
         tya
       .byte ']'
@@ -2979,10 +3010,10 @@ ruleD:
 ;;; 17 *2
         .byte "|^%V"
       .byte '['
-        eor VAL0
+        eor VAR0
         tay
         txa
-        eor VAL1
+        eor VAR1
         tax
         tya
       .byte ']'
@@ -3163,9 +3194,9 @@ ruleD:
       .byte '['
         ;; 15
         ldy #0
-        cmp VAL0
+        cmp VAR0
         bne :+
-        cpx VAL1
+        cpx VAR1
         bne :+
         ;; eq => -1
         dey
@@ -3561,7 +3592,7 @@ afterELSE:
         cpx VAL1
         bcc @nah                ; NUM<VAR (num.h<var.h)
         ;;  NUM>=VAR ... VAR<=NUM
-        cmp VAL0
+        cmp VAR0
         beq @nah
         bcs @ok                 ; NUM>=VAR
 @nah:
@@ -3598,7 +3629,8 @@ afterELSE:
         ;; cmp with VAR
         .byte 'D'               ; get aDdress
 
-        and VAL0
+        and VAR0 ; ->  58 ?
+;        and VAL0 ; -> 111 ?
         bne @ok
 @nah:
         ;; set value for optional else...
@@ -3623,7 +3655,6 @@ afterELSE:
 .endif ; OPTRULES
 
         ;; IF(E)S; // no else
-;;; TODO: "if (a&1)" gives error before ')' ????
         .byte "|if(",_E,")"
       .byte '['
 .ifnblank
@@ -3676,8 +3707,8 @@ afterELSE:
         .byte "|%A=0;"
       .byte "[D"
         lda #0
-        sta VAL0
-        sta VAL1
+        sta VAR0
+        sta VAR1
       .byte "]"
 .endif ; OPTRULES
 
@@ -3687,8 +3718,8 @@ afterELSE:
         ;; (unless we use a stack...)
         .byte "|%A=",_E,";"
       .byte "[D"                ; 'D' => tos=dos
-        sta VAL0
-        stx VAL1
+        sta VAR0
+        stx VAR1
       .byte "]"
 
 
@@ -3697,103 +3728,105 @@ afterELSE:
 ;;; TODO make ruleC when %A pushes
         .byte "|++%A;"
       .byte "[D"
-        inc VAL0
+        inc VAR0
         bne :+
-        inc VAL1
+        inc VAR1
 :       
       .byte "]"
 
 ;;; TODO make ruleC when %A pushes
         .byte "|--%A;"
       .byte "[D"
-        lda VAL0
+        lda VAR0
         bne :+
-        dec VAL1
+        dec VAR1
 :       
-        dec VAL0
+        dec VAR0
       .byte "]"
+
+;;; NOTE: ops are done last, is that ok (except for -)?
 
         ;; NOTE: no need provide: v op= const;
         ;;       - it would wouldn't save any bytes!
         .byte "|%A+=",_E,";"
       .byte "[D"
         clc
-        adc VAL0
-        sta VAL0
+        adc VAR0
+        sta VAR0
         txa
-        adc VAL1
-        sta VAL1
+        adc VAR1
+        sta VAR1
       .byte "]"
 
         .byte "|%A-=",_E,";"
       .byte "[D"
         sec
         eor #$ff
-        adc VAL0
-        sta VAL0
+        adc VAR0
+        sta VAR0
         txa
         eor #$ff
-        adc VAL1
-        sta VAL1
+        adc VAR1
+        sta VAR1
       .byte "]"
 
         .byte "|%A&=",_E,";"
       .byte "[D"
-        and VAL0
-        sta VAL0
+        and VAR0
+        sta VAR0
         txa
-        and VAL1
-        sta VAL1
+        and VAR1
+        sta VAR1
       .byte "]"
 
         .byte "|%A\|=",_E,";"
       .byte "[D"
-        ora VAL0
-        sta VAL0
+        ora VAR0
+        sta VAR0
         txa
-        ora VAL1
-        sta VAL1
+        ora VAR1
+        sta VAR1
       .byte "]"
 
         .byte "|%A^=",_E,";"
       .byte "[D"
-        eor VAL0
-        sta VAL0
+        eor VAR0
+        sta VAR0
         txa
-        eor VAL1
-        sta VAL1
+        eor VAR1
+        sta VAR1
       .byte "]"
 
         .byte "|%A>>=1;"
       .byte "[D"
 ;;; 6B
-        lsr VAL1
-        ror VAL0
+        lsr VAR1
+        ror VAR0
       .byte "]"
 
         .byte "|%A<<=1;"
       .byte "[D"
 ;;; 6B
-        asl VAL0
-        rol VAL1
+        asl VAR0
+        rol VAR1
       .byte "]"
 
         .byte "|%A>>=2;"
       .byte "[D"
 ;;; 12B
-        lsr VAL1
-        ror VAL0
-        lsr VAL1
-        ror VAL0
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
       .byte "]"
 
         .byte "|%A<<=2;"
       .byte "[D"
 ;;; 12B
-        asl VAL0
-        rol VAL1
-        asl VAL0
-        rol VAL1
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
       .byte "]"
 
         .byte "|%A>>=%D;"
@@ -3805,8 +3838,8 @@ afterELSE:
         dey
         bmi :+
 
-        lsr VAL1
-        ror VAL0
+        lsr VAR1
+        ror VAR0
 
         sec
         bcs :-
@@ -3822,8 +3855,8 @@ afterELSE:
         dey
         bmi :+
 
-        asl VAL0
-        rol VAL1
+        asl VAR0
+        rol VAR1
 
         sec
         bcs :-
@@ -3835,7 +3868,7 @@ afterELSE:
 .ifdef POINTERS
         .byte "|*%A=",_E,";"
       .byte "[D"
-        ldy VAL0
+        ldy VAR0
         sty tos
         ldy VAL1
         sty tos+1
@@ -3865,7 +3898,7 @@ afterELSE:
         tay
         txa
 
-        sta VAL0,y
+        sta VAR0,y
       .byte "]"
 .endif ; BYTERULES
 
@@ -3886,7 +3919,7 @@ afterELSE:
         tay
         lda savea
 
-        sta VAL0,y
+        sta VAR0,y
         txa
         sta VAL1,y
       .byte "]"
@@ -3898,8 +3931,8 @@ afterELSE:
         .byte "[:]"
 
       .byte "["
-        lda VAL0
-        ora VAL1
+        lda VAR0
+        ora VAR1
         ;; jmp to end if false
         bne :+
         jmp PUSHLOC
@@ -3995,8 +4028,8 @@ afterELSE:
 
         .byte "while(%V);"
       .byte "["
-        lda VAL0
-        ora VAL1
+        lda VAR0              
+        ora VAR1
         .byte ";"               ; pop tos
         ;; don't loop if not true
 ;;; TODO: potentially "b" to generate relative jmp
@@ -5131,20 +5164,39 @@ input:
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
-;;; 101B    cc65:  80B M()
+;;; 101B      80B: cc65
+;;;           83B: oscar64 no opt
+;;;          118B: oscar64 -O3
+;;;        
+;;;  63B         : asm simple expected
+;;;  47B         : asm optimal zp
 
-;;; 133B 849c: naive, c=0+a+c;
-;;; 131B 849c: opt: 0
-;;; 120B 603c: c+= a; works (+ etc) again  (85B M())
-;;;    TODO:   abc zeropage would save 18B
-;;;    TODO:   b&1 byteopt would save 4B(6/9)
-;;; 119B     : c=0; // optimized (-1B)
-;;; 118B     : return M(); // tail calls -1B
-;;; 117B     : removed extra rts after main -1B
-;;; 113B     : 111=>a=>b; // lol, -5B
-;;; 109B 603c: &byte; // %{ made it possible! -5B!
-;;; 101B 603c: if(%A & byte) - 8B! (74B! M())
+;;;           33B: 16x16->16 MUL
 
+;;;           57B: cc65 Mul(a,b) recursive 11 calls
+;;;           68B: oscal64 -O3 main+M in one!
+;;;          126B: oscar64 Mul(a,b) 
+
+;;; .tap M()  M.size
+;;; 133B 849c 99B: naive, c=0+a+c;
+;;; 131B 849c 86B: opt: 0 -1B
+;;; 120B 603c 85B: c+= a; works (+ etc) again
+;;; 119B         : c=0; // optimized (-1B)
+;;; 118B         : return M(); // tail calls -1B
+;;; 117B         : removed extra rts after main -1B
+;;; 113B         : 111=>a=>b; // lol, -5B
+;;; 109B 603c 82B: &byte; // %{ made it possible! -5B!
+;;; 101B 603c 74B: if(%A & byte) - 8B!
+;;;  80B 603c 58B: ZPVARS=1 -16B!
+
+;;;  92B 603c 58B: ZPVARS=1 -16B!
+
+;;; TODO: ZPVARS saves bytes but no CYCLES ??? WTF?
+
+
+;;;    TODO:   b&1 oscar64: lsr+bcc cheaper! (-1B)
+
+;
 MUL=1
 .ifdef MUL
         .byte "word M() {",10
@@ -5176,13 +5228,17 @@ MUL=1
 ;        .byte "  a= 111; b= 111;",10
 ;;; TODO:
 ;       .byte "  a=b=111;",10 ;; save 4 bytes
-        .byte "  111=>a=>b;",10
+        .byte "  111=>a=>b;",10 ; 603us
+;        .byte "  1=>a=>b;",10   ;  91us
+;        .byte "  200=>a=>b;",10   ; 347us (603us !zp)
 
         .byte "  return M();",10
         .byte "}",10
         .byte 0
 .endif ; MUL
-        .byte "word main(){ }",0
+
+
+;        .byte "word main(){ }",0
 
 ;;; TAILREC
 ;        .byte "word main(){ return 4700+11; }",0
@@ -5783,6 +5839,10 @@ savedscreen:
 ;;; ----------------------------------------
 
 
+.ifdef ZPVARS
+  .zeropage
+.endif
+
 vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
@@ -5795,6 +5855,10 @@ vars:
         .word 0,10,20,30,40,50,60,70,80,90
         .word 100,110,120,130,140,150,160,170
         .word 180,190,200,210,220,230,240,250,260
+.endif
+
+.ifdef ZPVARS
+  .code
 .endif
 
 defs:
