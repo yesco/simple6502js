@@ -5164,18 +5164,18 @@ input:
 
 ;        .byte "word main(){b=1; if (b&1) putchar(65); }",0
 
-;;; 101B      80B: cc65
+;;; 101B      80B: cc65 -Oirs
 ;;;           83B: oscar64 no opt
-;;;          118B: oscar64 -O3
+;;;           64B: oscal64 -Oz -Os main+M in one!
+;;;          118B: oscar64 -O3 haha or -Os
 ;;;        
 ;;;  63B         : asm simple expected
 ;;;  47B         : asm optimal zp
 
-;;;           33B: 16x16->16 MUL
+;;;           33B: 16x16->16 MUL (plain algo)
 
 ;;;           57B: cc65 Mul(a,b) recursive 11 calls
-;;;           68B: oscal64 -O3 main+M in one!
-;;;          126B: oscar64 Mul(a,b) 
+;;;          126B: oscar64 Mul(a,b)  no opt
 
 ;;; .tap M()  M.size
 ;;; 133B 849c 99B: naive, c=0+a+c;
@@ -5188,8 +5188,6 @@ input:
 ;;; 109B 603c 82B: &byte; // %{ made it possible! -5B!
 ;;; 101B 603c 74B: if(%A & byte) - 8B!
 ;;;  80B 603c 58B: ZPVARS=1 -16B!
-
-;;;  92B 603c 58B: ZPVARS=1 -16B!
 
 ;;; TODO: ZPVARS saves bytes but no CYCLES ??? WTF?
 
