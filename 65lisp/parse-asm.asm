@@ -496,8 +496,10 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
-;PRINTASM=1
+;
+PRINTREAD=1
+;
+PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2588,6 +2590,14 @@ ruleC:
 ;00005Ar 1  11 rr        	ora     (sp),y
 ;;; probably have to turn it around
 
+        ;; array index
+;;; TODO: simulated
+        .byte "|arr\[",_E,"\]"
+      .byte '['
+        tax
+        lda arr,x
+        ldx #0
+      .byte ']'
 
         ;; variable
         .byte "|%V"
@@ -3168,11 +3178,54 @@ ruleD:
       .byte ']'
         .byte TAILREC
 
+;;; TODO: so many duplicates...
+;;;   can just do _C or _E ? priorities?
+        .byte "|<<%V"
+      .byte '['
+;;; 15B (breakeven: D=4-)
+        stx tos+1
+;;; TODO: this is only difference...
+;;;   IDEA: emit subroutine and remember;
+;;;         incremental library buildup?
+        ldy VAR0
+:       
+        dey
+        bmi :+
+        
+        asl
+        rol tos+1
+
+        sec
+        bcs :-
+:       
+        ldx tos+1
+      .byte ']'
+        .byte TAILREC
+
         .byte "|>>%D"
       .byte '['
 ;;; 15B (breakeven: D=4-)
         stx tos+1
         ldy #'<'
+:       
+        dey
+        bmi :+
+        
+        lsr
+        ror tos
+
+        sec
+        bcs :-
+:       
+        ldx tos+1
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|>>%V"
+      .byte '['
+;;; 15B (breakeven: D=4-)
+        stx tos+1
+        ldy VAR0
 :       
         dey
         bmi :+
@@ -3296,6 +3349,16 @@ ruleN:
 ;;;   TAILREC does something wrong!
         .byte TAILREC
         
+        .byte "|"
+
+        ;; TODO: Define variable
+
+        ;; Define array
+;; TODO: now is dummy
+        .byte "bytearr\[256\];"
+;;; for now just simulate
+        .byte TAILREC
+
         .byte "|"
 
         .byte 0
@@ -3722,6 +3785,20 @@ afterELSE:
         stx VAR1
       .byte "]"
 
+        ;; array index
+;;; TODO: simulated
+        .byte "|arr\[",_E,"\]="
+      .byte '['
+        pha
+      .byte ']'
+        .byte _E
+      .byte '['
+        tay
+        pla
+        tax
+        tya
+        sta arr,x
+      .byte ']'
 
 
 .ifdef OPTRULES
@@ -3846,10 +3923,44 @@ afterELSE:
 :       
       .byte "]"
 
+        .byte "|%A>>=%V;"
+      .byte "["
+;;; 14B (tradeoff 14=6*d => d=2+)
+        ldy VAR0
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAR1
+        ror VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
         .byte "|%A<<=%D;"
       .byte "["
 ;;; 14B
         ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAR0
+        rol VAR1
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        .byte "|%A<<=%V;"
+      .byte "["
+;;; 14B
+        ldy VAR0
         .byte "D"
 :       
         dey
@@ -5166,7 +5277,7 @@ input:
 
 ;;; 101B      80B: cc65 -Oirs
 ;;;           83B: oscar64 no opt
-;;;           64B: oscal64 -Oz -Os main+M in one!
+;;;           64B: oscal64 -Oz -Os main+M in one! (62?)
 ;;;          118B: oscar64 -O3 haha or -Os
 ;;;        
 ;;;  63B         : asm simple expected
@@ -5194,8 +5305,7 @@ input:
 
 ;;;    TODO:   b&1 oscar64: lsr+bcc cheaper! (-1B)
 
-;
-MUL=1
+;MUL=1
 .ifdef MUL
         .byte "word M() {",10
         .byte "  c= 0;",10
@@ -5303,9 +5413,9 @@ MUL=1
         .byte 0
 .endif ; FOUR
 
-;
-;
-ATOZ=1
+;;; prints A-Z.
+;;; 
+;ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
@@ -5501,7 +5611,8 @@ ATOZ=1
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
 
-;PRIME=1
+;
+PRIME=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
@@ -5526,18 +5637,27 @@ ATOZ=1
 ;;;  (- to ~ reverse bits)
 
 ;;; TODO: there might be hi-bit chars here???
-        .byte "byte a[256];",10
-        .byte "byte b[4];",10
-        .byte 10
+        .byte "byte arr[256];",10
+;        .byte "byte b[4];",10
+;        .byte 10
         .byte "word main(){",10
 ;       .byte "  word n,i;",10
 ;       .byte "  byte t;",10
-;       .byte "  a[0]=0xff;",10
-        .byte "  a[0]=255;",10
-;       .byte "  for(t=1; t; ++t) a[t]=0xff;",10
-        .byte "  for(t=1; t; ++t) a[t]=255;",10
-        .byte "  for(n=2; n<2048; ++n) {",10
-        .byte "    if (a[n>>3] & (1<<(n&7))) {",10
+;       .byte "  arr[0]=0xff;",10
+        .byte "  arr[0]=255;",10
+;;; TODO: for!
+;       .byte "  for(t=1; t; ++t) arr[t]=0xff;",10
+;        .byte "  for(t=1; t; ++t) arr[t]=255;",10
+        .byte "  t=1; while(t<256) { arr[t]=255; ++t; }",10
+
+;        .byte "  for(n=2; n<2048; ++n) {",10
+        .byte "  n=2; while(n<2048) {",10
+
+;;; TODO: no paren
+;        .byte "    if (arr[n>>3] & (1<<(n&7))) {",10
+        .byte "    z=n&7; z=1<<z;",10
+        .byte "    if (arr[n>>3] & z) {",10
+
         .byte "      i=n;",10
         .byte "      t=0;",10
         ;;           // simulates printd?
@@ -5554,12 +5674,25 @@ ATOZ=1
 .endif
 ;       .byte "      putchar(' ');",10
         .byte "      putchar(32);",10
-        .byte "      for(i=n+n; i<2048; i+= n) {",10
+
+;        .byte "      for(i=n+n; i<2048; i+= n) {",10
+        .byte "      i=n+n; while(i<2048) {",10
+
 ;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
 ;       .byte "        a[i>>3]&= (1<<(i&7))^0xffff;",10
-        .byte "        a[i>>3]&= (1<<(i&7))^65535;",10
+
+;        .byte "        arr[i>>3]&= (1<<(i&7))^65535;",10
+        .byte "        z=i&7; z<<=z; z^=65535;",10
+;        .byte "        arr[i>>3]&= z;",10
+        .byte "        z&=arr[i>>3];",10
+        .byte "        arr[i>>3]= z;",10
+
+.byte "        i+=n;",10
+
         .byte "      }",10
         .byte "    }",10
+;;; TODO: no for-loop
+.byte "    ++n;"
         .byte "  }",10
         .byte "}"
         .byte 0
@@ -5836,6 +5969,9 @@ savedscreen:
 ;;; END INPUT
 ;;; ----------------------------------------
 
+
+;;; TODO: simulated arr, only one! lol
+arr:    .res 256
 
 .ifdef ZPVARS
   .zeropage
