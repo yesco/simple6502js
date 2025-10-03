@@ -3722,6 +3722,7 @@ afterELSE:
 
         cpx VAL1
         bcc @nah                ; NUM<VAR (num.h<var.h)
+        bne @ok                 ; NUM>VAR
         ;;  NUM>=VAR ... VAR<=NUM
         cmp VAR0
         beq @nah
@@ -4227,8 +4228,33 @@ afterELSE:
 
 
 
-;;TODO: save bytes
-;;        .byte "|while(%V<%D)"
+        .byte "|while(%A<%D)"
+        ;; similar to if(%A<%D)
+      .byte "["
+        ;; reverse cmp as <> NUM avail first
+        .byte ":"
+        lda #'<'
+        ldx #'>'
+        ;; cmp with VAR
+        .byte "D"               ; get aDdress
+        cpx VAR1
+        bcc @nahwhile           ; NUM<VAR (num.h<var.h)
+        bne @okwhile            ; NUM>VAR
+        ;;  hi = equal
+        cmp VAR0
+        beq @nahwhile
+        bcs @okwhile            ; NUM>=VAR
+@nahwhile:
+        ;; jmp to end if false
+        jmp PUSHLOC
+@okwhile:
+      .byte "]"
+        .byte _S
+      .byte "[;d;"              ; pop tos, dos=tos; pop tos
+        ;; jump to beginning of loop (:)
+        jmp VAL0
+      .byte "D#]"               ; tos= dos, push tos (patch)
+        ;; autopatches jump to here if false (PUSHLOC)
 
 
 
@@ -4537,7 +4563,7 @@ runs:   .res 1
 
         ;; RUN PROGRAM a TIMES
         lda #1
-;        lda #10
+        lda #10
         sta runs
 again:
         jsr _output
@@ -5822,6 +5848,9 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   350B      3.543 while(%A<%D) (- 14B)
+;;;               15% FASTER than cc65!
+;;;                1.6% faster than Tigger C
 ;;;   364B      4.445 measure wrong? ( arr[i]=const; )
 ;;;   377B      4.414s PRIME (for, init, save bytes)
 ;;;                5.9% slower than cc65
