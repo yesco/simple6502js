@@ -502,8 +502,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -1892,17 +1891,14 @@ ischar:
         lda (inp),y
         sta tos
         sty tos+1
-PUTC ':'
-jsr printchar
 ;;; TODO: quoted \n \r \0 \... ? \' \\
 ;        cmp #'\'
         jsr _incI
-        jsr _incIspc            ; skip '
+        jsr _incI
         jmp _next
 
 failjmp2:        
         jmp _fail
-
 
 
 ;;; flags not set in any way, registers untouched
@@ -3450,10 +3446,6 @@ ruleP:
         .byte _O
 
         .byte _T,"main()",_B
-.byte "%{"
-        putc '?'
-        jsr immret
-
       .byte '['
         ;; if main not return, return 0
         lda #0
