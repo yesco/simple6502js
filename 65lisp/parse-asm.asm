@@ -3856,10 +3856,10 @@ afterELSE:
 
 .ifdef OPTRULES
         ;; arr[i]=constant;
-        .byte "|arr\[%V\]=[#]%D;"
-      .byte "[d;"
+        .byte "|arr\[%A\]=%D;"
+      .byte "[#D"
         ldx VAR0
-        .byte "D"
+        .byte ";"
         lda #'<'
 ;;; TODO: get address of array...
         sta arr,x
@@ -5848,6 +5848,9 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   340b      3.461 j=i>>3; (-10B)
+;;;               17% faster than cc65
+;;;                4% faster than Tigger C
 ;;;   350B      3.543 while(%A<%D) (- 14B)
 ;;;               15% FASTER than cc65!
 ;;;                1.6% faster than Tigger C
@@ -5913,7 +5916,8 @@ PRIME=1
         .byte "        putchar(b[--t]);",10
         .byte "      } while(t);",10
 .endif
-;       .byte "      putchar(' ');",10
+;; TODO: LOL loops forever, WTF!
+;        .byte "      putchar(' ');",10
         .byte "      putchar(32);",10
 
 ;        .byte "      for(i=n+n; i<2048; i+= n) {",10
@@ -5924,9 +5928,8 @@ PRIME=1
 
 ;        .byte "        arr[i>>3]&= (1<<(i&7))^65535;",10
         .byte "        z=i&7; z=1<<z; z^=65535;",10
-;        .byte "        arr[i>>3]&= z;",10
-        .byte "        z&=arr[i>>3];",10
-        .byte "        arr[i>>3]= z;",10
+        .byte "        j=i>>3;",10
+        .byte "        arr[j]= arr[j] & z;",10
 
 .byte "        i+=n;",10
 
