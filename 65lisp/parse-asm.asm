@@ -5387,7 +5387,8 @@ input:
 ;        .byte "word main(){}",0
 
 ;        .byte "word main(){ i=0;while(i<8){putchar(i+65);++i;}}",0
-        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
+;;; TODO: can optimized more as we know %D != 0 (check)
+;        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
 
 
 ;FUN=1
@@ -5543,8 +5544,7 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;
-ATOZ=1
+;ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
