@@ -5,7 +5,8 @@
 
 6741 frogmove.c
 
-2098 cc65-frogmove.tap
+2098 cc65-frogmove.tap             ;; 1134B array + 748B code
+4149 cc65 plain...
 2187 gcc-6502-frogmove.tap
 1554 kickc-frogmove.tap
 1750 llvm-mos-frogmove.tap
@@ -14,6 +15,20 @@
 2233 vbcc-frogmove.tap
 
 */
+
+// dummy for ./tap script
+char T,nil,doapply1,print;
+
+void poke(int a, unsigned char v) {
+  *(char*)a= v;
+}
+
+unsigned char peek(int a) {
+  return *(char*)a;
+}
+
+
+
 
 #include <conio.h>
 

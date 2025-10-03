@@ -319,11 +319,11 @@ IMMEDIATE=1
 
 ;;; TODO: too many ops - consider "pickN" and patch only
 ;;;   {?  - PUSHLOC (push and patc next loc)
-;;;   D   - set %D(igits) value (tos) from %A(ddr) (pos)
+;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
 ;;;   :   - push loc (onto stack)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 
-;;;   d   - set pos from tos
+;;;   d   - set dos from tos
 ;;;   #   - TODO: push tos
 
 ;;; maybe not needed
@@ -2400,12 +2400,63 @@ ruleC:
         jsr putchar
       .byte ']'
 
+.ifdef OPTRULES
+        .byte "|poke(%D[d],%D);"
+      .byte '['
+        lda VAL0
+        .byte 'D'
+        sta VAL0
+      .byte ']'
+
+        .byte "|poke(%D"
+      .byte "[d]"
+        .byte ",",_E,");"
+      .byte "[D"
+        sta VAL0
+      .byte ']'
+.endif ; OPTRULES
+
+        .byte "|poke(",_E
+      .byte '['
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte ",",_E,");"
+      .byte '['
+        sta savea
+        pla
+        sta tos+1
+        pla
+        sta tos
+        lda savea
+
+        ldy #0
+        sta (tos),y
+      .byte ']'
+
+.ifdef OPTRULES
+        .byte "|peek(%D)"
+      .byte '['
+        lda VAL0
+        ldx #0
+      .byte ']'
+.endif ; OPTRULES
+
+        .byte "|peek(",_E,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        ldy #0
+        lda (tos),y
+        ldx #0
+      .byte ']'
+
         .byte "|getchar()"
       .byte '['
         jsr getchar
         ldx #0
       .byte ']'
-
 
         ;; cast to char/byte == &0xff !
         .byte "|(byte)",_C
