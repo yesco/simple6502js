@@ -3450,6 +3450,10 @@ ruleP:
         .byte _O
 
         .byte _T,"main()",_B
+.byte "%{"
+        putc '?'
+        jsr immret
+
       .byte '['
         ;; if main not return, return 0
         lda #0
@@ -4108,6 +4112,53 @@ afterELSE:
       .byte "]"
 
 .ifdef OPTRULES
+        .byte "|for(i=0;i<%D[d];++%V)"
+;;; 22B (is less than while!!! 40B!)
+      .byte "%{"
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:       
+        jsr immret
+
+      .byte "["
+        ;; start not with 0 but with 
+        lda #255
+        sta VAR0
+        lda #0
+        sta VAR1
+
+        ;; We moved inc here
+        .byte ":"
+        inc VAR0
+
+        lda VAR0
+        .byte "D"
+        cmp #'<'
+        bcc :+
+        jmp PUSHLOC
+:       
+      .byte "]"
+        .byte _S
+      .byte "["
+        .byte ";d"
+;        jsr VAL0
+        .byte ";"
+;        jsr VAL0
+        ;; jump to inc+test
+        jmp VAL0
+        .byte "D#"
+      .byte "]"
+        ;; autopatches jump to here if false (PUSHLOC)
+
+
+
+;;TODO: save bytes
+;;        .byte "|while(%V<%D)"
+
+
+
 ;;; OPT: WHILE(a)...
 ;;; TODO: while(--a) ???
         .byte "|while(%V)"
@@ -4122,7 +4173,6 @@ afterELSE:
 :       
       .byte "]"
         .byte _S
-
 ;;; 10B
 ;;; A kind of "complicated swap"
 ;;; TODO: maybe just a generic "pickN"???
@@ -5335,6 +5385,10 @@ FUNC printstack
 
 input:
 ;        .byte "word main(){}",0
+
+;        .byte "word main(){ i=0;while(i<8){putchar(i+65);++i;}}",0
+        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
+
 
 ;FUN=1
 .ifdef FUN
