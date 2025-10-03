@@ -51,6 +51,7 @@
 ;;; - casting syntax
 ;;; 
 ;;; - decimal numbers: 4711 42
+;;; - char constants: 'x' ''' (lol) '\' hmmm TODO: fix
 ;;; - "string" constants (== number for printing)
 ;;; 
 ;;; - word main() ... - no args
@@ -143,7 +144,9 @@
 ;;; OPTRULES  :  1463 bytes = (+ 771 1090)
 ;;; LONGNAMES :  
 ;;; 
-;;; v- #x34c = 844 bytes!
+;;; v= #x392 = 914 (- 914 882) = 32 (but I count 22B, hmm)
+;;; v= #x372 = 882 
+;;; v= #x34c = 844 bytes!
 ;;; v= #x363 = 867 (+52 %U TAILREC-fix)
 ;;; v= #x32f = 815 (+75 D d : ; # d - WHILE!) :-(
 ;;; v= #x2f6 = 758
@@ -169,6 +172,7 @@
 ;;;    668  +26 == ERRPOS
 ;;;    715  +47 == CHECKSTACK
 ;;;    844  +... ??? wtf? lol
+;;;    914  +32B 'c' small char constants
 ;;; 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 ;;; 
@@ -1834,7 +1838,6 @@ DEBC '+'
 
 
 
-;;; TODO: doesn't FAIL if not digit!
 FUNC _digits
 DEBC '#'
 ;;; 36 B (+ 36 25) = 61
@@ -1842,7 +1845,10 @@ DEBC '#'
         ;; valid initial digit or fail?
         ldy #0
         lda (inp),y
-        sec
+        cmp #'''               ; 'c' is a char "digit"
+        beq ischar
+;;; TODO: C=1 from cmp if digit, ahum (but not otherwise...)
+        sec                    
         sbc #'0'
         cmp #10
         bcs failjmp2
@@ -1878,6 +1884,21 @@ digit:
         ;; lol space inside numbers!
         jsr _incIspc
         jmp nextdigit
+
+ischar: 
+        ;; get char
+        jsr _incI
+        ;; y is retained by _incI
+        lda (inp),y
+        sta tos
+        sty tos+1
+PUTC ':'
+jsr printchar
+;;; TODO: quoted \n \r \0 \... ? \' \\
+;        cmp #'\'
+        jsr _incI
+        jsr _incIspc            ; skip '
+        jmp _next
 
 failjmp2:        
         jmp _fail
@@ -5313,6 +5334,7 @@ FUNC printstack
 .byte 0,0
 
 input:
+;        .byte "word main(){}",0
 
 ;FUN=1
 .ifdef FUN
@@ -5467,11 +5489,12 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;ATOZ=1
+;
+ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
-        .byte "  a=65;",10
+        .byte "  a='A';",10
         .byte "A:",10
         .byte "  putchar(a);",10
 .ifdef OPTRULES
@@ -5480,8 +5503,8 @@ input:
 ;;; TODO: 
         .byte "  a=a+1;",10
 .endif
-        .byte "  if (a<91) goto A;",10
-        .byte "  putchar(46);",10
+        .byte "  if (a<'[') goto A;",10
+        .byte "  putchar('.');",10
 ;    .byte "  ++a;",10
         .byte "  return 42;",10
         .byte "}",10
