@@ -4564,8 +4564,8 @@ runs:   .res 1
 .code
 
         ;; RUN PROGRAM a TIMES
-        lda #1
-        lda #10
+;        lda #1
+        lda #10               
         sta runs
 again:
         jsr _output
@@ -5850,6 +5850,8 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   321B      3.426 moved i=n;
+;;;               SMALLER! than cc65!!!
 ;;;   329B            while not long-for (256) init arr
 ;;;               close to 326B cc65
 ;;;   335B      3.432 ^65535 (-5B)
@@ -5915,11 +5917,11 @@ PRIME=1
         .byte "    z=n&7; z=1<<z;",10
         .byte "    if (arr[n>>3] & z) {",10
 
-        .byte "      i=n;",10
         ;;           // simulates printd?
 .ifblank
-        .byte "      printd(i);",10
+        .byte "      printd(n);",10
 .else
+        .byte "      i=n;",10
         .byte "      t=0;",10
         .byte "      do {",10
         .byte "        b[t++]= (i%10)+'0';",10
@@ -5941,7 +5943,8 @@ PRIME=1
         .byte "        j=i>>3;",10
         .byte "        arr[j]= arr[j] & z;",10
 
-.byte "        i+=n;",10
+        ;; for the while
+        .byte "        i+=n;",10
 
         .byte "      }",10
         .byte "    }",10
