@@ -5848,7 +5848,8 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
-;;;   340b      3.461 j=i>>3; (-10B)
+;;;   335B      3.432 ^65535 (-5B)
+;;;   340B      3.461 j=i>>3; (-10B)
 ;;;               17% faster than cc65
 ;;;                4% faster than Tigger C
 ;;;   350B      3.543 while(%A<%D) (- 14B)
@@ -5924,10 +5925,7 @@ PRIME=1
         .byte "      i=n*2; while(i<2048) {",10
 
 ;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
-;       .byte "        a[i>>3]&= (1<<(i&7))^0xffff;",10
-
-;        .byte "        arr[i>>3]&= (1<<(i&7))^65535;",10
-        .byte "        z=i&7; z=1<<z; z^=65535;",10
+        .byte "        z=i&7; z=1<<z ^65535;",10
         .byte "        j=i>>3;",10
         .byte "        arr[j]= arr[j] & z;",10
 
