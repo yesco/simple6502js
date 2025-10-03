@@ -4105,8 +4105,8 @@ afterELSE:
 
 .ifdef OPTRULES
 
-        .byte "|for(i=0         ;i<%D[d] ;++%V)"
-;;; ; 22B (is less than while!!! 40B!)
+        .byte "|for(i=0;i<%D[d] ;++%V)"
+;;; 22B (is less than while!!! 40B!)
       .byte "%{"
 ;;;  make sure %D <256
         lda tos+1
@@ -4143,10 +4143,8 @@ afterELSE:
         .byte _S
       .byte "["
         .byte "                 ;d"
-        ;;         jsr VAL0
         .byte "                 ;"
-        ;;         jsr VAL0
-;;;  jump to inc+test
+        ;;  jump to inc+test
         jmp VAL0
         .byte "D#"
       .byte "]"
@@ -4156,7 +4154,7 @@ afterELSE:
         ;; i > 255
         ;; (saves 20B for PRIME for)
         .byte "|for(i=0;i<%D[d];++%V)"
-;;; ??B (is less than while!!! 40B!)
+;;; 40B (is less than while!!!
       .byte "["
         lda #0
         sta VAR0
@@ -4207,9 +4205,7 @@ afterELSE:
         .byte _S
       .byte "["
         .byte ";d"
-;        jsr VAL0
         .byte ";"
-;        jsr VAL0
         ;; jump to inc+test
         jmp VAL0
         .byte "D#"
