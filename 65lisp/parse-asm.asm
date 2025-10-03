@@ -3518,6 +3518,7 @@ ruleM:
 ;;; Local variable
 ruleN:
         .byte "%v"
+
       .byte '['
 ;;; 9 B 14c - program stack
         tsx
@@ -3534,6 +3535,7 @@ ruleN:
       .byte ']'
 
 ;;; ++a; // more efficent, no need value
+alll wrong no | or
         .byte "++%v;"
       .byte '['
         tsx
@@ -5848,6 +5850,8 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   329B            while not long-for (256) init arr
+;;;               close to 326B cc65
 ;;;   335B      3.432 ^65535 (-5B)
 ;;;   340B      3.461 j=i>>3; (-10B)
 ;;;               17% faster than cc65
@@ -5893,10 +5897,18 @@ PRIME=1
 ;;; TODO: for!
 ;        .byte "  arr[0]=255;",10
 ;       .byte "  for(t=1; t; ++t) arr[t]=0xff;",10
-        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
+
+;
+;;; 335B for loop has overhead >255
+;        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
+;;; 329B !!! closer to cc65... (326B)
+        .byte "  i=0; while(i<256) { arr[i]=255; ++i; }",10
+;;; 338B ???
+;        .byte "  i=0; while(i<256) { arr[i++]=255; }",10
 
 ;        .byte "  for(n=2; n<2048; ++n) {",10
         .byte "  n=2; while(n<2048) {",10
+;        .byte "  n=1; while(++n<2048) {",10 ; worse!
 
 ;;; TODO: no paren
 ;        .byte "    if (arr[n>>3] & (1<<(n&7))) {",10
