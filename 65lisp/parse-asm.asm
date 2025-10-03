@@ -4104,25 +4104,33 @@ afterELSE:
       .byte "]"
 
 .ifdef OPTRULES
-        .byte "|for(i=0;i<%D[d];++%V)"
-;;; 22B (is less than while!!! 40B!)
+
+        .byte "|for(i=0         ;i<%D[d] ;++%V)"
+;;; ; 22B (is less than while!!! 40B!)
       .byte "%{"
-        ;; make sure %D <256
+;;;  make sure %D <256
         lda tos+1
         beq :+
         jmp _fail
-:       
+:              
         jsr immret
 
       .byte "["
-        ;; start not with 0 but with 
-        lda #255
-        sta VAR0
+;;;  start not with 0 but with 
         lda #0
+        sta VAR0
         sta VAR1
+        ;; skip inc first time
+.ifdef ZPVARS
+        ;beq 2
+        .byte $f0,2
+.else
+        ;beq 3
+        .byte $f0,3
+.endif
 
-        ;; We moved inc here
-        .byte ":"
+;;;  We moved inc here
+        .byte ":"               ; note: this generates no byte
         inc VAR0
 
         lda VAR0
@@ -4130,7 +4138,71 @@ afterELSE:
         cmp #'<'
         bcc :+
         jmp PUSHLOC
+:              
+      .byte "]"
+        .byte _S
+      .byte "["
+        .byte "                 ;d"
+        ;;         jsr VAL0
+        .byte "                 ;"
+        ;;         jsr VAL0
+;;;  jump to inc+test
+        jmp VAL0
+        .byte "D#"
+      .byte "]"
+;;;  autopatches jump to here if false (PUSHLOC)
+
+
+        ;; i > 255
+        ;; (saves 20B for PRIME for)
+        .byte "|for(i=0;i<%D[d];++%V)"
+;;; ??B (is less than while!!! 40B!)
+      .byte "["
+        lda #0
+        sta VAR0
+        sta VAR1
+        ;; skip inc first time
+.ifdef ZPVARS
+        ;beq 2+2+2
+        .byte $f0,2+2+2
+.else
+        ;beq 3+2+3
+        .byte $f0,3+2+3
+.endif
+        ;; We moved inc here
+        .byte ":"               ; note this generates no byte
+        inc VAR0
+        bne :+
+        inc VAR1
 :       
+.ifnblank
+        putc 'i'
+        lda VAR0
+        sta tos
+        lda VAR1
+        sta tos+1
+        jsr printd
+.endif
+        ;; test i<%D
+        lda VAR0
+        pha
+        lda VAR1
+        .byte "D"
+        cmp #'>'
+        beq @eq
+        bcc @lt
+        pla
+@eqorgt:
+        jmp PUSHLOC
+@eq:       
+        ;; hi equal
+        pla
+        cmp #'<'
+        bcs @eqorgt
+        bcc @ok
+@lt:
+        pla
+@ok:
       .byte "]"
         .byte _S
       .byte "["
@@ -5772,11 +5844,10 @@ PRIME=1
 ;       .byte "  word n,i;",10
 ;       .byte "  byte t;",10
 ;       .byte "  arr[0]=0xff;",10
-        .byte "  arr[0]=255;",10
 ;;; TODO: for!
+;        .byte "  arr[0]=255;",10
 ;       .byte "  for(t=1; t; ++t) arr[t]=0xff;",10
-;        .byte "  for(t=1; t; ++t) arr[t]=255;",10
-        .byte "  t=1; while(t<256) { arr[t]=255; ++t; }",10
+        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
 
 ;        .byte "  for(n=2; n<2048; ++n) {",10
         .byte "  n=2; while(n<2048) {",10
@@ -5820,7 +5891,7 @@ PRIME=1
         .byte "      }",10
         .byte "    }",10
 ;;; TODO: no for-loop
-.byte "    ++n;"
+.byte "    ++n;",10
         .byte "  }",10
         .byte "}"
         .byte 0
