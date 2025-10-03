@@ -3853,18 +3853,31 @@ afterELSE:
         stx VAR1
       .byte "]"
 
+.ifdef OPTRULES
+        ;; arr[i]=constant;
+        .byte "|arr\[%V\]=[#]%D;"
+      .byte "[d;"
+        ldx VAR0
+        .byte "D"
+        lda #'<'
+;;; TODO: get address of array...
+        sta arr,x
+      .byte "]"
+.endif ;OPTRULES
+
         ;; array index
 ;;; TODO: simulated
         .byte "|arr\[",_E,"\]="
       .byte '['
         pha
       .byte ']'
-        .byte _E
+        .byte _E,";"
       .byte '['
         tay
         pla
         tax
         tya
+;;; TODO: get address of array...
         sta arr,x
       .byte ']'
 
@@ -5809,8 +5822,12 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   364B      4.445 measure wrong? ( arr[i]=const; )
+;;;   377B      4.414s PRIME (for, init, save bytes)
+;;;                5.9% slower than cc65
 ;;;   397B      4.477s PRIME (correct result)
 ;;;                7% slower than cc65
+
 ;;; (+ 397 33 10)=440 B ; estimate: main + printd + putchar
 ;;;  (/ 4.477 4.17) 7%
 
