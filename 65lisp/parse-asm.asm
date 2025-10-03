@@ -4340,8 +4340,9 @@ _run:
 runs:   .res 1
 .code
 
-        ;; RUN PROGRAM
+        ;; RUN PROGRAM a TIMES
         lda #1
+;        lda #10
         sta runs
 again:
         jsr _output
@@ -5591,12 +5592,13 @@ input:
 ;;; 
 ;;;   326 B     4.17s CC65 -O Play/byte-sieve-prime.c
 ;;;                   (-Cl static locaL) (-Or 5.37s)
+;;; (1045 B     -"- in the byte-sieve-prime.out sim65)
+
 ;;;      (normalixed)
 ;;;             1.8s  action (see below)
 ;;;           228s    BASIC (according to action)
 ;;;             3.6s  Tigger C
 ;;;            16.s   "BASIC" says Tigger C video
-;;; 
 ;;; 
 ;;;      10 X
 ;;;             
@@ -5610,14 +5612,20 @@ input:
 ;;; BN16 (use dec mode, no print? store only odd)
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
-
 ;
 PRIME=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
 
+;;; also in Play/prime.c
+
 .ifdef PRIME
+;;;   397B      4.477s PRIME (correct result)
+;;;                7% slower than cc65
+;;; (+ 397 33 10)=440 B ; estimate: main + printd + putchar
+;;;  (/ 4.477 4.17) 7%
+
 ;;; TODO: need more features:
 ;;;   x label A:
 ;;;   x goto A;
@@ -5659,11 +5667,11 @@ PRIME=1
         .byte "    if (arr[n>>3] & z) {",10
 
         .byte "      i=n;",10
-        .byte "      t=0;",10
         ;;           // simulates printd?
 .ifblank
         .byte "      printd(i);",10
 .else
+        .byte "      t=0;",10
         .byte "      do {",10
         .byte "        b[t++]= (i%10)+'0';",10
         .byte "        i/=10;",10
@@ -5676,13 +5684,13 @@ PRIME=1
         .byte "      putchar(32);",10
 
 ;        .byte "      for(i=n+n; i<2048; i+= n) {",10
-        .byte "      i=n+n; while(i<2048) {",10
+        .byte "      i=n*2; while(i<2048) {",10
 
 ;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
 ;       .byte "        a[i>>3]&= (1<<(i&7))^0xffff;",10
 
 ;        .byte "        arr[i>>3]&= (1<<(i&7))^65535;",10
-        .byte "        z=i&7; z<<=z; z^=65535;",10
+        .byte "        z=i&7; z=1<<z; z^=65535;",10
 ;        .byte "        arr[i>>3]&= z;",10
         .byte "        z&=arr[i>>3];",10
         .byte "        arr[i>>3]= z;",10
