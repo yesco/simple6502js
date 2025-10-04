@@ -1,47 +1,4 @@
-// frogmove ascii game compiler benchmark by iss
-// - https://forum.defence-force.org/viewtopic.php?p=26978&hilit=Kickc#p26978
-
-/*
-
-cl65 -Cl -Oirs -t atmos Play/frogmove.c -o frogmove.tap && ls -l frogmove.tap
-
-6741 frogmove.c
-
-2098 cc65-frogmove.tap             ;; 1134B array + 748B code
-2635 cc65 plain...
-
-2187 gcc-6502-frogmove.tap
-1554 kickc-frogmove.tap
-1750 llvm-mos-frogmove.tap
-2707 osdk-lcc65-frogmove.tap
-3117 sdcc-frogmove.tap
-2233 vbcc-frogmove.tap
-
-*/
-
-// dummy for ./tap script
-char T,nil,doapply1,print;
-
-void poke(int a, unsigned char v) {
-  *(char*)a= v;
-}
-
-unsigned char peek(int a) {
-  return *(char*)a;
-}
-
-
-
-
-#include <conio.h>
-
-void moveLeft(unsigned int addr);
-void moveRight(unsigned int addr);
-void printTimer(void);
-
-unsigned char copyright[] = "rax@sofia2021";
-
-unsigned char board[] =
+byte arr[] =
 {
   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
@@ -104,97 +61,94 @@ unsigned char board[] =
   32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
 };
 
-static void* xmemcpy(void* dest, const void* src, unsigned int count)
+word X()
 {
-  char* d;
-  const char* s;
-  for(d = dest, s = src; count; d++, s++, --count)
-    *d = *s;
-  return dest;
-}
-
-typedef void (*voidfnptr)(void);
-static voidfnptr sei_ = (voidfnptr)0x0400;
-
-static char running;
-
-int main(void)
-{
-  poke(0x0400,0x78);
-  poke(0x0401,0x60);
-  sei_();
-
-  poke(0x0307,0xff);
-  poke(0x0306,0xff);
-
-  xmemcpy((void*)0xbb80, board, sizeof(board));
-
-  running = 0;
-  while(!running)
-  {
-    moveLeft(0xbb82 + 4 * 40);
-    moveLeft(0xbb82 + 10 * 40);
-    moveLeft(0xbb82 + 16 * 40);
-    moveLeft(0xbb82 + 22 * 40);
-
-    moveRight(0xbb80 + 39 + 7 * 40);
-    moveRight(0xbb80 + 39 + 19 * 40);
-
-    printTimer();
+  d=a; e=b; while(c) {
+    *(byte*)d = *(byte*)e;
+    d++; e++; --c;
   }
-
-  return 0;
+  return a;
 }
 
-static unsigned char hex[] = "FEDCBA9876543210";
-void printTimer(void)
+word H() {
+  v&= 0x0f;
+  if (v<10) return v+'0';
+  else return v-10+'A';
+}
+
+void T()
 {
-  unsigned char valhi, vallo;
+  a = peek(0x0304);
+  b = peek(0x0305);
 
-  vallo = peek(0x0304);
-  valhi = peek(0x0305);
-
-  poke(0xbba7-0, hex[vallo&0x0f]);
-  vallo >>= 4;
-  poke(0xbba7-1, hex[vallo&0x0f]);
-  poke(0xbba7-2, hex[valhi&0x0f]);
-  valhi >>= 4;
-  poke(0xbba7-3, hex[valhi&0x0f]);
+  v= a; poke(0xbba7-0, H());
+  a >>= 4;
+  v= a; poke(0xbba7-1, H());
+  v= b; poke(0xbba7-2, H());
+  b >>= 4;
+  v= b; poke(0xbba7-3, H());
 
   poke(0x0305,0xff);
   poke(0x0304,0xff);
 }
 
-void moveLeft(unsigned int addr)
+void L()
 {
-  unsigned int addr2 = addr + 40;
-  unsigned char i;
-  unsigned char char1 = peek(addr);
-  unsigned char char2 = peek(addr2);
+  b = a + 40;
+  c = peek(a);
+  d = peek(b);
   for(i = 1; i < 37; ++i)
   {
-    poke(addr, peek(addr + 1));
-    poke(addr2, peek(addr2 + 1));
-    ++addr;
-    ++addr2;
+    poke(a, peek(a + 1));
+    poke(b, peek(b + 1));
+    ++a;
+    ++b;
   }
-  poke(addr, char1);
-  poke(addr2, char2);
+  poke(a, c);
+  poke(b, d);
 }
 
-void moveRight(unsigned int addr)
+void R()
 {
-  unsigned int addr2 = addr + 40;
-  unsigned char i;
-  unsigned char char1 = peek(addr);
-  unsigned char char2 = peek(addr2);
+  b = a + 40;
+  c = peek(a);
+  d = peek(b);
   for(i = 1; i < 37; ++i)
   {
-    poke(addr, peek(addr - 1));
-    poke(addr2, peek(addr2 - 1));
-    --addr;
-    --addr2;
+    poke(a, peek(a - 1));
+    poke(b, peek(b - 1));
+    --a;
+    --b;
   }
-  poke(addr, char1);
-  poke(addr2, char2);
+  poke(a, c);
+  poke(b, c);
+}
+
+word main()
+{
+  poke(0x0400,0x78);
+  poke(0x0401,0x60);
+
+  asm("sei");
+
+  poke(0x0307,0xff);
+  poke(0x0306,0xff);
+
+  a= (void*)0xbb80; b= arr; c= sizeof(arr); X();
+
+  r = 0;
+  while(!r)
+  {
+    a= 0xbb82 + 160; L();
+    a= 0xbb82 + 400; L();
+    a= 0xbb82 + 640; L();
+    a= 0xbb82 + 880; L();
+
+    a= 0xbb80 + 39 + 280; R();
+    a= 0xbb80 + 39 + 760; R();
+
+    T();
+  }
+
+  return 0;
 }

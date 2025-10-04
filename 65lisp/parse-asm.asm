@@ -75,7 +75,7 @@
 ;;; - F() G() - function calls (no parameters)
 ;;; 
 ;;; - single letter global variables (no need declare)
-;;; - limited char support: *(char*)p=   ... (char)i;
+;;; - limited char support: *(byte*)p=   ... *(byte)i;
 ;;; 
 ;;; - library to minimize gen code+rules (slow code==cc65)
 
@@ -110,7 +110,7 @@
 ;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
 ;;; - optimized: ... op const   ... op var
 
-  
+        
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
@@ -271,8 +271,8 @@
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
 ;;; 
 ;;; %{ IMMEDIATE CODE (need to enable IMMEDIATE, takes 26B)
-;
-IMMEDIATE=1
+                                ;
+        IMMEDIATE=1
 ;;; 
 ;;; Code can be executed inline *while* parsing.
 ;;; It's prefixed like this
@@ -500,8 +500,7 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 ;PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
@@ -717,7 +716,6 @@ stackerror:
         putc 'S'
         putc '>'
 ;;; TODO: this one blocks if TIM
-        jsr getchar
         jsr printstack
 
         ldx #$ff
@@ -2312,7 +2310,7 @@ ruleM:
 .endif 
 ;;ruleO:  
 
-ruleQ:
+;;ruleQ: - array data
 ruleR:
 .ifndef MINIMAL
 ruleU:  
@@ -2666,6 +2664,13 @@ ruleC:
         lda arr,x
         ldx #0
       .byte ']'
+
+        ;; byte
+        .byte "|*(byte*)%V"
+      .byte "["
+        lda VAR0
+        ldx #0
+      .byte "]"
 
         ;; variable
         .byte "|%V"
@@ -3406,6 +3411,36 @@ ruleF:
 ;      .byte ']'
 
 
+;;; (byte)Array data,data,data
+ruleQ:
+        ;; end
+        .byte "};"
+
+        .byte "|,",TAILREC
+
+        .byte "|%D"
+;TODO: data inline!
+;      .byte "[<]"
+;;; TODO: ohoh, how to skip over!!!! LOL
+      .byte "%{"
+        ;; TODO: remove as this is hack
+        lda tos
+        ldy #0
+        sta (pos),y
+        jsr _incP
+        jsr immret
+
+        .byte TAILREC
+
+        .byte "|"
+      .byte "%{"
+        PRINTZ "got arr end"
+        jsr immret
+
+        .byte 0
+
+        
+
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
 ruleN:
         ;; Define function
@@ -3421,6 +3456,7 @@ ruleN:
 
         ;; TODO: Define variable
 
+
         ;; Define array
 ;; TODO: now is dummy
         .byte "bytearr\[256\];"
@@ -3429,10 +3465,30 @@ ruleN:
 
         .byte "|"
 
+
+        ;; Define array
+;; TODO: now is hack
+        .byte "bytearr\[\]={"
+      .byte "%{"
+        ;; set pos to array
+        ;; TODO: get real array addr
+        lda #<arr
+        sta pos
+        lda #>arr
+        sta pos+1
+        jsr immret
+
+;        .byte _Q,"};"
+        .byte _Q
+;;; for now just simulate
+        .byte TAILREC
+
+        .byte "|"
+
         .byte 0
-        
+
 ;;; DEFSSKIP ::= jmp main; DEFS <here>
-ruleO:  
+ruleO:
       .byte '['
         jmp PUSHLOC
       .byte ']'
@@ -3458,7 +3514,12 @@ ruleP:
 ;;; Type
 ruleT:  
         ;; don't use SIGNED int/char
+.ifdef FROGMOVE
+        .byte "static",TAILREC
+        .byte "|word|byte|void|void*|int",0
+.else
         .byte "word|byte|void",0
+.endif
 
 
 .ifdef BNFLONG
@@ -3836,6 +3897,13 @@ afterELSE:
         .byte _S
         ;; Auto-patches at exit!
 .endif ; ELSE
+
+        ;; simple write byte to memory
+        .byte "|*(byte*)%A=",_E,";"
+      .byte "[D"
+        sta VAR0
+      .byte "]"
+
 
 .ifdef OPTRULES
         .byte "|%A=0;"
@@ -4471,6 +4539,8 @@ status:
        
 .ifdef PRINTINPUT
 
+        putc 10
+        PRINTZ "ERROR"
         putc '>'
 ;;; TOOD: put in getchar...
 .ifdef TIM
@@ -4480,6 +4550,7 @@ status:
 .else
         jsr getchar
 .endif
+        putc 12
 
 ;;; TODO: printz? printR?
 
@@ -4499,12 +4570,31 @@ status:
         ;; - print red attribute
         bpl @nohi
         pha
-        lda #1+128              ; red text
-        jsr putchar
+
+.ifnblank
+        putc 16+7+128           ; white background
+        putc 1+128              ; red text
+.else
+        putc 7+128              ; white text
+        putc 16+1+128           ; red background
+.endif
         ;; - remove hibit from src
         pla
         and #127
         sta (pos),y
+
+        ;; - print more chars for context
+        ldy #1
+@printmore:
+        jsr putchar
+        lda (pos),y
+        iny
+        cpy #32
+        bcc @printmore
+
+        putc 10
+        jmp _edit
+        
 @nohi:
 .endif ; ERRPOS
 
@@ -5492,6 +5582,13 @@ input:
 ;        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
 
 
+;
+FROGMOVE=1
+.ifdef FROGMOVE
+        .incbin "Play/frogmove-simple.c"
+        .byte 0
+.endif
+
 ;FUN=1
 .ifdef FUN
         .byte "word F() { return 4700; }",10
@@ -5914,7 +6011,11 @@ PRIME=1
 
 ;;; TODO: no paren
 ;        .byte "    if (arr[n>>3] & (1<<(n&7))) {",10
+.ifndef BYTERULES
         .byte "    z=n&7; z=1<<z;",10
+.else
+        .byte "    z@=@n@&7; bb=1@<<z;",10
+.endif
         .byte "    if (arr[n>>3] & z) {",10
 
         ;;           // simulates printd?
@@ -5939,17 +6040,24 @@ PRIME=1
         .byte "      i=n*2; while(i<2048) {",10
 
 ;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
+
+.ifndef BYTERULES
         .byte "        z=i&7; z=1<<z ^65535;",10
         .byte "        j=i>>3;",10
-        .byte "        arr[j]= arr[j] & z;",10
-
+        .byte "        arr[j]= arr[j] @& z;",10
+;        .byte "        arr[j]= arr[j] & z;",10
+.else
+        .byte "        z@=@i@&7; z=1@<<z @^255;",10
+        .byte "        j=i>>3;",10
+        .byte "        arr[j]= arr[j] @& z;",10
+.endif
         ;; for the while
         .byte "        i+=n;",10
 
         .byte "      }",10
         .byte "    }",10
-;;; TODO: no for-loop
-.byte "    ++n;",10
+        ;; for the while
+        .byte "    ++n;",10
         .byte "  }",10
         .byte "}"
         .byte 0
@@ -6228,7 +6336,12 @@ savedscreen:
 
 
 ;;; TODO: simulated arr, only one! lol
+.ifdef FROGMOVE
+arr:    .res 1200
+.else
+;PRIME
 arr:    .res 256
+.endif
 
 .ifdef ZPVARS
   .zeropage
@@ -6305,7 +6418,13 @@ _output:
 ;;; ++a; x 2000
 ;;;  free tap inp output
 ;;; (- 37 11    8   16  ) = 2K left
+
+.ifndef FROGMOVE
+        ;; basically 2000x ++a; lol
         .res 16*1000+50
+.else
+        .res 8*1000+50
+.endif
 
 ;;; Some variants save on codegen by using a library
 
