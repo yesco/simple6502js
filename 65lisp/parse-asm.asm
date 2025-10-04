@@ -2473,6 +2473,16 @@ ruleC:
         ldx #0
       .byte ']'
 
+        .byte "|asm(",'"',"sei",'"',")"
+      .byte '['
+        sei
+      .byte ']'
+
+        .byte "|asm(",'"',"cli",'"',")"
+      .byte '['
+        cli
+      .byte ']'
+
         ;; cast to char/byte == &0xff !
         .byte "|(byte)",_C
       .byte '['
