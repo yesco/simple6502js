@@ -4978,6 +4978,7 @@ FUNC _savescreen
         jmp _memcpy
 
 FUNC _loadscreen
+;;; 20+3B params+call
         ;; from
         lda #<savedscreen
         ldx #>savedscreen
@@ -5592,8 +5593,7 @@ input:
 ;        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
 
 
-;
-FROGMOVE=1
+;FROGMOVE=1
 .ifdef FROGMOVE
         .incbin "Play/frogmove-simple.c"
         .byte 0
@@ -5948,8 +5948,16 @@ FROGMOVE=1
 ;;; BN16 (use dec mode, no print? store only odd)
 ;;;   150ms asm (2023: super opt years later) - 1K ram
 
+;;; Byte sieve from Byte magaxine:
+;;; ==============================
+;;; char prime[8192]={0}; // simplier code: no bitshift
+;;; 
+;;;   287B          UCSD PASCAL, APPLE II, 6502
+
+
 ;
 PRIME=1
+;NOPRINT=1
 
 ;;; From: onthe6502.pdf - by 
 ;;;  jsk: modified for single letter var, putchar
@@ -5957,6 +5965,7 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;  (305B)     1.9s NOPRINT! (printd(),putchar())
 ;;;   321B      3.426 moved i=n;
 ;;;               SMALLER! than cc65!!!
 ;;;   329B            while not long-for (256) init arr
@@ -6029,6 +6038,7 @@ PRIME=1
         .byte "    if (arr[n>>3] & z) {",10
 
         ;;           // simulates printd?
+.ifndef NOPRINT
 .ifblank
         .byte "      printd(n);",10
 .else
@@ -6045,7 +6055,7 @@ PRIME=1
 ;; TODO: LOL loops forever, WTF!
 ;        .byte "      putchar(' ');",10
         .byte "      putchar(32);",10
-
+.endif
 ;        .byte "      for(i=n+n; i<2048; i+= n) {",10
         .byte "      i=n*2; while(i<2048) {",10
 
@@ -6054,8 +6064,7 @@ PRIME=1
 .ifndef BYTERULES
         .byte "        z=i&7; z=1<<z ^65535;",10
         .byte "        j=i>>3;",10
-        .byte "        arr[j]= arr[j] @& z;",10
-;        .byte "        arr[j]= arr[j] & z;",10
+        .byte "        arr[j]= arr[j] & z;",10
 .else
         .byte "        z@=@i@&7; z=1@<<z @^255;",10
         .byte "        j=i>>3;",10

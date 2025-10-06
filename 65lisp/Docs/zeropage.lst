@@ -1,0 +1,275 @@
+STA   $0C 	Content of #0C is added to the
+STA   $0C 	Content of #0C is added to the
+STX   $0C 	Set initial value to 0.
+STA   $0C 	This routine does an
+STA   $0C 	and multiply it by 8 since
+STA   $0C 	loaded yet.
+STY   $0D 	$B900 and $BAFF.
+STA   $0D 	Set up the variables for the
+STY   $0D 	Subject to the content of
+STX   $0D 	arithmetic shift right on the
+STA   $0D 	code. #0D=0 indicates paper.
+STA   $0D 	code. #0D=1 indicates ink.
+STA   $0D 	each byte in turn. $0C is used
+STA   $0D 	ends up in #10 and #11.
+STA   $0D 	for that character.
+STA   $0D 	halves with A counting from
+STA   $0D 	pattern information.
+STA   $0E 	$0E used as a counter.
+STA   $0E 	Save A/E - start/end indicator.
+STA   $0E 	Store bit pattern for row.
+STA   $0E 	slope of the line on target.
+STA   $0F 	Divisor is in #0200/1 and
+STY   $0F 	bit pattern start address is
+STA   $0F 	extent of RAM.
+STA   $0F 	the calling routine misses
+STA   $10 	Set cursor address to #A000.
+STA   $10 	hires cursor and pixel
+STA   $10 	line above.
+STA   $10 	line below.
+STA   $10 	screen and the position of the
+STA   $11 	positions. Used in
+STA   $12 	line.
+STA   $12 	of top line of text.
+STX   $14 	the start address of a table
+STY   $15 	to send data to the sound
+STA   $17 	Reset CTRL C flag.
+STA   $18 	1 byte before keyword list.
+STA   $18 	point to byte before start of
+STA   $19 	Increment the pointer at $18/
+STA   $1B 	be able to print "Ready"
+STY   $1C 	messages.
+STA   $1D 	Reset line count.
+STA   $1F 	Add in start address of screen
+STY   $20 	ROW ON SCREEN
+STA   $21 	and numeric function executer.
+STA   $22 	Set up default USR address -
+STY   $23 	to give ILLEGAL QUANTITY
+STA   $24 	OR operator.
+STX   $24 	Set $24 and $25 to ASCII value
+STA   $25 	Save character.
+STY   $25 	Swap match characters - colon
+STA   $25 	Transfer chars until same char
+STX   $25 	of double quote.
+STA   $26 	Get number of dimensions into $26
+STY   $26 	Initialise $26.
+STY   $26 	Save line length.
+STY   $26 	Save subscript number.
+STY   $26 	Zero Y and reset token number.
+STX   $27 	Save X register.
+STX   $28 	(MSB) and Y into main EPA.
+STX   $28 	Clear string flag.
+STA   $28 	Clear string type flag.
+STX   $28 	Clear type flags.
+STA   $28 	Restore variable type flags.
+STY   $28 	Set string type flag.
+STA   $28 	Set string type.
+STA   $29 	Set integer flag.
+STA   $2A 	collection has been done.
+STY   $2A 	flag.
+STA   $2B 	Clear variable flag.
+STA   $2B 	Set 'no integer variables' flag.
+STX   $2B 	Set no integer flag.
+STA   $2E 	Clear CTRL O flag.
+STX   $2E 	Clear CTRL O flag.
+STA   $2F 	Clear next byte to tape.
+STA   $2F 	OUTPUT BYTE TO CASSETTE
+STX   $2F 	Set leading zero flag.
+STA   $30 	Set Basic's cursor column.
+STX   $30 	Update Basic's cursor column.
+STA   $30 	position.
+STA   $30 	position.
+STA   $31 	and set content of $32 to the
+STA   $33 	#34 to original state.
+STA   $33 	Transfer pointer.
+STX   $33 	Zero result.
+STX   $85 	Save string stack pointer.
+STX   $86 	Set address of string block.
+STA   $87 	Clear top active string pointer.
+STA   $91 	Accumulator and then push it
+STY   $91 	MULTIPLY $E0/$E1 BY DIMENSION SIZE
+STA   $91 	Pointer set to string stack
+STA   $91 	Save pointer and find next
+STX   $91 	Save pointer.
+STX   $91 	Set pointer to start of
+STX   $91 	Set pointer to string and
+STA   $91 	Set up action address.
+STX   $91 	Set up pointer to string.
+STA   $91 	UNPACK FP NUMBER POINTED TO BY
+STA   $91 	UNPACK WORK FPA FROM MEMORY
+STA   $91 	new end of block).
+STA   $91 	pointer.
+STA   $91 	size of new string.
+STA   $91 	space is free.
+STA   $91 	value into Y.
+STA   $91 	work byte.
+STY   $92 	A,Y
+STY   $92 	Save pointer to variable.
+STX   $92 	array.
+STX   $92 	base.
+STY   $92 	exit.
+STA   $92 	following line.
+STY   $92 	on to the stack.
+STA   $93 	COMPARE MAIN FPA WITH NUMBER
+STA   $93 	adjusted accordingly.
+STA   $93 	result in $93,$94.
+STY   $94 	IN MEMORY
+STA   $97 	Transfer dimension size into
+STA   $9C 	parameter and then MSB is
+STA   $9E 	Update end of Variables
+STA   $9E 	held in End Basic Pointer.
+STY   $9F 	This deletes all variables and
+STY   $9F 	pointer.
+STA   $A0 	Save top of arrays.
+STA   $A0 	arrays.
+STA   $A0 	space in memory to store
+STY   $A1 	new variables.
+STA   $A2 	Set new bottom of strings
+STX   $A2 	initially set to HIMEM.
+STA   $A2 	remove temporary string.
+STA   $A2 	the current value in Himem.
+STY   $A3 	pointer.
+STA   $A4 	Add length to content of $A4,
+STA   $A4 	Set address for string to be
+STY   $A5 	inserted.
+STA   $A6 	Update current HIMEM pointer.
+STA   $A8 	Returning from GOSUB so
+STA   $A8 	and position in text from the
+STA   $A8 	be executed. This is now the
+STA   $A8 	position off stack so that
+STX   $A9 	Set immediate mode.
+STA   $A9 	after the FOR statement.
+STA   $A9 	program position counter.
+STA   $AC 	Save current position in
+STA   $AC 	Save current position in the
+STA   $AD 	Executed Program pointer.
+STY   $AD 	program.
+STY   $AD 	program.
+STA   $AE 	pointer.
+STA   $B4 	Put first char in $64.
+STA   $B4 	Restore address of last
+STA   $B6 	Save it.
+STY   $B6 	Save it.
+STA   $B6 	cell offset.
+STA   $B7 	Save result.
+STA   $B7 	Set A and Y to point to the
+STY   $B8 	Save Y.
+STA   $B8 	Save address of pointer.
+STA   $B8 	Save location.
+STA   $B8 	Save pointer to variable.
+STY   $B8 	save A and Y.
+STA   $B9 	Set stack to position where
+STY   $BA 	Save operator code.
+STA   $BC 	Save relation mask.
+STA   $BC 	mark.
+STA   $BD 	Save pointer to variable.
+STA   $BD 	descriptor.
+STA   $BF 	string.
+STA   $C2 	This section sets up a series
+STA   $C2 	arrays.
+STA   $C3 	Set up jump opcodes for USR, &amp;
+STA   $C4 	Calculate end address of the
+STA   $C5 	Save copy of rounding byte.
+STX   $C5 	Save rounding byte.
+STA   $C7 	Set current variable position.
+STA   $C7 	inserted.
+STA   $C8 	address of start of array.
+STA   $C9 	Copy end of Arrays pointer.
+STA   $C9 	to be shifted and by how far
+STA   $CA 	$C7,$C8 - new end of data.
+STA   $CC 	Set initial E value to -9.
+STA   $CD 	Save total exponent.
+STA   $CE 	Copy end of variables pointer.
+STA   $CE 	If end variables reached then
+STX   $CE 	Point to next line.
+STX   $CE 	Save pointer to string ready
+STA   $CE 	Set up pointer into line.
+STA   $CF 	for transfer.
+STY   $D0 	Save string length.
+STX   $D0 	Set exponent to X.
+STA   $D0 	Store block in main FPA.
+STA   $D0 	for exponent.
+STY   $D0 	skip change. Put work exponent
+STA   $D0 	then its length.
+STA   $D1 	Adjust exponent.
+STA   $D1 	Convert 2 byte integer in A
+STA   $D1 	FPA.
+STA   $D1 	PRINT INTEGER IN A,X
+STA   $D1 	Put A and Y into mantissa.
+STA   $D1 	Save MSB.
+STA   $D1 	Set main FPA to signed single
+STA   $D1 	Set up pointer to start of
+STX   $D1 	Shift by whole byte.
+STX   $D1 	Store data in block, LSB and
+STA   $D1 	Zero the mantissa of main FPA.
+STA   $D1 	and inverting sign bit.
+STY   $D2 	(MSB) and Y (LSB) into
+STY   $D2 	MSB of pointer to string and
+STX   $D2 	Save integer in mantissa of
+STY   $D2 	string.
+STX   $D3 	Set $D3/$D4 to point to it.
+STA   $D3 	variable and set up pointer.
+STA   $D4 	(depending on number added)
+STA   $D4 	mantissa in ascending order
+STA   $D4 	memory starting with the LSB
+STA   $D5 	Clear sign.
+STA   $D5 	Number now positive.
+STA   $D5 	Save length difference flag.
+STA   $D5 	Transfer sign byte.
+STA   $D5 	byte.
+STA   $D5 	put it in FPA sign byte.
+STY   $D5 	work FPA into main FPA.
+STX   $D6 	Set sign to #FF If -ve.
+STA   $D7 	Clear sign extend byte.
+STY   $D7 	Clear sign extend byte.
+STY   $D7 	Clear sign extend byte.
+STA   $D7 	Invert sign extend byte and
+STA   $D8 	accumulator from stack.
+STA   $D9 	Set up MSB.
+STX   $DB 	Store block in work FPA and X.
+STX   $DE 	Clear sign difference byte.
+STA   $DE 	Restore pointer to first
+STA   $DE 	Set sign difference byte.
+STA   $DE 	Set sign difference flag.
+STA   $DE 	Set sign difference flag.
+STA   $DE 	Set sign difference flag.
+STA   $DE 	Set up pointer to start of
+STY   $DF 	Clear rounding byte.
+STY   $DF 	Clear rounding byte.
+STA   $DF 	Clear sign and rounding bytes.
+STY   $DF 	Copy LSB into rounding byte.
+STA   $DF 	Restore rounding byte.
+STX   $DF 	Set Founding byte.
+STX   $DF 	Set rounding byte.
+STA   $DF 	Store rounding byte.
+STY   $DF 	Zero sign and rounding bytes.
+STY   $DF 	Zero the rounding byte.
+STA   $DF 	byte.
+STY   $DF 	string.
+STX   $E0 	Copy text pointer.
+STX   $E0 	LSB and set new cell number.
+STA   $E0 	SERIES EVALUATION
+STY   $E0 	Save digit pointer.
+STY   $E0 	Save pointer.
+STY   $E0 	Save pointer.
+STY   $E0 	Save pointer.
+STA   $E0 	Set LSB of cell number to 0.
+STA   $E0 	Set pointer.
+STX   $E0 	of dimension.
+STA   $E0 	string in $E0/$E1.
+STA   $E1 	Save size.
+STA   $E1 	Set MSB of cell number to 0.
+STA   $E1 	Set final cell number MSB.
+STY   $E1 	Set pointer to data.
+STX   $E9 	$E9,$EA.
+STA   $E9 	Basic.
+STA   $E9 	FN definition.
+STX   $E9 	Save pointer.
+STX   $E9 	Save start of line.
+STA   $E9 	and exit.
+STA   $E9 	line.
+STA   $E9 	pointer into current position
+STY   $EA 	Set position of input.
+STY   $EA 	pointer. Do the same for the
+STA   $FF 	indicate hexadecimal.
+STATUS LINE

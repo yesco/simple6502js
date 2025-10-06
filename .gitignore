@@ -5,6 +5,7 @@
 65lisp/*
 !65lisp/Play
 !65lisp/*.*
+!65lisp/Docs
 
 
 

@@ -1,0 +1,1 @@
+grep -in 'st.   $.. ' Oric_Atmos_ROM_1.1b_Disassembly.html  | sed -r 's/^.*(ST[AXY])/\1/' | sed 's/                              //' | sort -k2 | less
