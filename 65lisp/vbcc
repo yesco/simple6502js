@@ -4,12 +4,13 @@ export PATH=$VBCC/bin:"$PATH"
 
 #vbcc6502 -ic1 -ic2 "$@"
 #vbcc6502 -speed "$@.c" -o prime.out
-vbcc6502 -size "$@.c" -o prime.out
+#vbcc6502 -ic1 -ic2 "$@.c" -o vbcc.out
+#vbcc6502 -ic1 -ic2 "$@.c" -o vbcc.out
 #vbcc6502 -k -size -ic1 -ic2 "$@.c" -o prime.vbcc.out
 #vbcc6502 -ic1 -ic2 "$@.c"
 
 #vbcc6502 "$@"
-#vc +Atmos -ic1 -ic2 $@
+vc +xAtmos -S -ic1 -ic2 $@
 ls -l $1.*
 
 

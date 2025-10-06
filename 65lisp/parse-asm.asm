@@ -419,6 +419,8 @@ TIM=1
 ;;; (save some bytes by turn off)
 
 ;;; TODO: if disabled maybe something wrong? - parse err! lol
+;;; checking every _next gives 30% overhead? lol
+;;; TODO: find better location? enterrule?
 ;
 CHECKSTACK=1
 
@@ -703,6 +705,7 @@ putc 10
 FUNC _next
 
 .ifdef CHECKSTACK
+;;; TODO: measure overhead
 	;; check stack sentinel
         lda #$ff
         cmp $100
@@ -712,18 +715,19 @@ FUNC _next
         jmp :+
 stackerror:     
         putc 10
+        jsr printstack
+
+        ;; reset stacck
+        ldx #$ff
+        txs
+
+        putc 10
         putc '%'
         putc 'S'
         putc '>'
-;;; TODO: this one blocks if TIM
-        jsr printstack
 
-        ldx #$ff
-        txs
         jmp _edit
         
-;;; TODO: remove
-        jmp halt
 :       
 .endif ; CHECKSTACK
 
@@ -4664,8 +4668,8 @@ runs:   .res 1
 .code
 
         ;; RUN PROGRAM a TIMES
-;        lda #1
-        lda #10               
+        lda #1
+;        lda #10                
         sta runs
 again:
         jsr _output
