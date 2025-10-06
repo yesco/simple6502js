@@ -24,6 +24,7 @@ char T,nil,doapply1,print;
 
 
 #include <conio.h>
+#include <string.h>
 
 void moveLeft(char* addr);
 void moveRight(char* addr);
@@ -155,38 +156,30 @@ void printTimer(void)
   *(char*)(0x0304)= 0xff;
 }
 
+// So essentially this benchmark tries to see
+// how good the compiler is at recreating an
+// optimized memmove... lol
 void moveLeft(char* addr)
 {
   char* addr2 = addr + 40;
-  unsigned char i;
   unsigned char char1 = *addr;
   unsigned char char2 = *addr2;
-  for(i = 1; i < 37; ++i)
-  {
-    *addr= addr[1];
-    *addr2= addr2[1];
-    ++addr;
-    ++addr2;
-  }
-  *addr= char1;
-  *addr2= char2;
+  memmove(addr, addr+1, 36);
+  memmove(addr2, addr2+1, 36);
+  addr [36]= char1;
+  addr2[36]= char2;
 }
 
 void moveRight(char* addr)
 {
   char* addr2 = addr + 40;
-  unsigned char i;
   unsigned char char1 = *addr;
   unsigned char char2 = *addr2;
-  --addr;
-  --addr2;
-  for(i = 1; i < 37; ++i)
-  {
-    addr[1]= *addr;
-    addr2[1]= *addr2;
-    --addr;
-    --addr2;
-  }
-  addr[1]= char1;
-  addr2[1]= char2;
+  addr-= 36;
+  addr2-= 36;
+  memmove(addr,  addr-1,  36);
+  memmove(addr2, addr2-1, 36);
+  // pos wrong
+  addr [0]= char1;
+  addr2[0]= char2;
 }
