@@ -140,7 +140,7 @@
 ;;;                          asm rules
 ;;; MINIMAL   :  1016 bytes = (+ 771  383) inc LIB!
 ;;; NORMAL    :  1134 bytes = (+ 771  501)
-;;; BYTERULES :  1293 bytes = (+ 771  660)
+;;; OLDBYTERULES :  1293 bytes = (+ 771  660)
 ;;; OPTRULES  :  1463 bytes = (+ 771 1090)
 ;;; LONGNAMES :  
 ;;; 
@@ -187,7 +187,7 @@
 ;;; 
 ;;;   383 bytes = MINIMAL   (rules + library)
 ;;;   501 bytes = NORMAL
-;;;   660 bytes = BYTERULES (+ 159 B)
+;;;   660 bytes = OLDBYTERULES (+ 159 B)
 ;;;   821 bytes = OPTRULES  (+ 320 B)
 ;;; 
 ;;; 
@@ -280,6 +280,8 @@
 ;;; RuleX:
 ;;;        .byte "foo"
 ;;;      .byte "%{"
+;;;;;;;;;; TODO: this may not be easily skippable
+;;; 
 ;;;        putc '%'                ; print debug info!
 ;;;        jsr immret              ; HOW TO RETURN!
 ;;;      .byte ""
@@ -413,7 +415,7 @@ TIM=1
 .else
         .macro TIMER
         .endmacro
-.endif
+ .endif
 
 ;;; enable stack checking at each _next
 ;;; (save some bytes by turn off)
@@ -442,7 +444,8 @@ ELSE=1
 ;;; Byte optimized rules
 ;;; typically used as prefix for BYTE operators
 ;;; (only operating on register A, no overflow etc)
-;BYTERULES=1
+;
+BYTERULES=1
 
 ;;; Pointers: &v *v= *v
 ;;; TODO: not working
@@ -2316,10 +2319,11 @@ ruleM:
 
 ;;ruleQ: - array data
 ruleR:
-.ifndef MINIMAL
-ruleU:  
-.endif
-ruleV:
+;;.ifndef MINIMAL
+;;ruleU:  
+;;.endif
+;;ruleU: - BYTERULES "ruleC"
+;;ruleV: - BYTERULES "ruleD"
 ruleW:
 ruleX:  
 ruleY:  
@@ -2477,6 +2481,7 @@ ruleC:
         ldx #0
       .byte ']'
 
+        ;; TODO: more like statement
         .byte "|asm(",'"',"sei",'"',")"
       .byte '['
         sei
@@ -2486,6 +2491,7 @@ ruleC:
       .byte '['
         cli
       .byte ']'
+
 
         ;; cast to char/byte == &0xff !
         .byte "|(byte)",_C
@@ -2497,83 +2503,6 @@ ruleC:
         ;; (we don't care legal, just accept if correct)
         .byte "|(%V\*)",_C
 
-
-.ifdef BYTERULES
-;;; TODO: FUNS?
-
-        ;; 25 B (+ 6 15 4) - byte
-        ;; 29 B            - word
-        .byte "|%V@\["
-      .byte '['
-;;; TODO: this assumes %V gives adress
-;;;   but is just pointer to address, lol...
-;;;   lda (tos),y ... 
-        ;; 6
-        lda #'>'
-        pha
-        lda #'<'
-        pha
-      .byte ']'
-        .byte _E,"]"
-      .byte '['
-;;; TODO: use existing stack library?
-        ;; 15
-        ;; lo
-        sta tos
-        pla
-        clc
-        adc tos
-        sta tos
-        ;; hi
-        stx tos+1
-        pla
-        adc tos+1
-        sta tos+1
-        ;; load
-.ifdef WORD
-        ;; 8
-        ldy #1
-        lda (tos),y
-        tax
-        dey
-        lda (tos),y
-.else ; BYTE
-        ;; 4
-        ldy #0
-        lda (tos),y
-.endif ; WORD
-      .byte ']'
-        
-.ifdef POINTERS
-        .byte "|@\*%V"
-      .byte '['
-;;; TODO: test
-        lda VAR0
-        sta tos
-        lda VAL1
-        sta tos+1
-
-        ldy #1
-        lda (tos),y
-        ldx #0
-      .byte ']'
-.endif ; POINTERS
-        
-        ;; variable
-        .byte "|@%V"
-      .byte '['
-        lda VAR0
-        ldx #0
-      .byte ']'
-
-        ;; TODO: hmmm 
-        .byte "|%D"
-      .byte '['
-        lda #'<'
-        ldx #0
-      .byte ']'
-
-.endif ; BYTERULES
 
         ;; function call
         .byte "|%U()"
@@ -2591,8 +2520,10 @@ ruleC:
         ;; result in AX
       .byte ']'
 
-        ;; Surprisingly ++v and --v
-        ;; isn't smalller or faster than v++ and v-- !
+
+
+        ;; Surprisingly ++v and --v expression w value
+        ;; arn't smalller or faster than v++ and v-- !
         .byte "|++%V"
       .byte '['
 ;;; 14B 17c
@@ -2615,7 +2546,7 @@ ruleC:
         dec VAR0
         lda VAR0
         ldx VAR1
-.endif
+.else
 ;;; 17B 19c
         ldx VAR1
         ldy VAR0
@@ -2626,6 +2557,7 @@ ruleC:
         dey
         tya
         sta VAR0
+.endif
       .byte ']'
 
         .byte "|%V++"
@@ -2641,6 +2573,7 @@ ruleC:
 
         .byte "|%V--"
       .byte '['
+.ifblank
 ;;; 14B ! 17c
         ldx VAR1
         lda VAR0
@@ -2648,7 +2581,7 @@ ruleC:
         dec VAR1
 :       
         dec VAR0
-.ifnblank
+.else
 ;;; 17B 19c - faster
         ldx VAR1
         ldy VAR0
@@ -2670,29 +2603,37 @@ ruleC:
 ;00005Ar 1  11 rr        	ora     (sp),y
 ;;; probably have to turn it around
 
+;;; TDOO: $ arr\[\] ... redundant?
+;;; TODO: store addresss of arr in variable
+
+        ;; arr[i]=constant;
+        .byte "|$arr\[%A\]=%D;"
+      .byte "[#D"
+        ldx VAR0
+        .byte ";"
+        lda #'<'
+;;; TODO: get address of array...
+        sta arr,x
+      .byte "]"
+
         ;; array index
 ;;; TODO: simulated
-        .byte "|arr\[",_E,"\]"
+        .byte "|$arr\[",_E,"\]="
       .byte '['
-        tax
-        lda arr,x
-        ldx #0
+        pha
       .byte ']'
-
-        ;; byte
-        .byte "|*(byte*)%V"
-      .byte "["
-        lda VAR0
-        ldx #0
-      .byte "]"
+        .byte _U,";"
+      .byte '['
+        tay
+        pla
+        tax
+        tya
+;;; TODO: get address of array...
+        sta arr,x
+      .byte ']'
 
         ;; variable
         .byte "|%V"
-
-;      .byte "%{"
-;        PUTC '!'
-;        jsr immret
-
       .byte '['
         lda VAR0
         ldx VAR1
@@ -2714,6 +2655,11 @@ ruleC:
         ldx #'>'
       .byte ']'
         
+.ifdef BYTERULES
+        ;; BYTERULES
+        .byte "|", _U
+.endif
+
         ;; string
         .byte "|",34            ; really >"<
       .byte '['
@@ -2760,6 +2706,7 @@ ruleC:
 
 .ifdef MINIMAL
 ;;; Just save (TODO:push?) AX
+;;; TODO: remove!!!!
 ruleU:
       .byte '['
         jsr _SAVE
@@ -2783,149 +2730,17 @@ ruleD:
 
 
 ;;; ----------------------------------------
-.ifdef BYTERULES
-;;; TODO: How to automatically detect that a var
-;;;   is byte and use rule, or does C require INT
-;;;   for all calculations?
-
-        .byte "|@+%V"
-      .byte '['
-        clc
-        adc VAR0
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@+%D"
-      .byte '['
-        clc
-        adc #'<'
-      .byte ']'
-        .byte TAILREC
-
-;;; 18 *2
-        .byte "|@-%D"
-      .byte '['
-        sec
-        sbc VAR0
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@-%D"
-      .byte '['
-        sec
-        sbc #'<'
-      .byte ']'
-        .byte TAILREC
-
-;;; 17 *2
-        .byte "@|&%V"
-      .byte '['
-        and VAR0
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@&%D"
-      .byte '['
-        and #'<'
-      .byte ']'
-        .byte TAILREC
-
-.ifnblank
-;;; TODO: \ quoting
-;;; 17 *2
-        .byte "|@\|%V"
-      .byte '['
-        ora VAR0
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@\|%D"
-      .byte '['
-        ora #'<'
-      .byte ']'
-        .byte TAILREC
-.endif ; NBLANK
-
-;;; 17 *2
-        .byte "|@^%V"
-      .byte '['
-        eor VAR0
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@^%D"
-      .byte '['
-        eor #'<'
-      .byte ']'
-        .byte TAILREC
-
-;;; 24
-        
-        .byte "|@/2"
-      .byte '['
-        lsr
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@\*2"
-      .byte '['
-        asl
-      .byte ']'
-        .byte TAILREC
-
-;;; ==
-
-        .byte "|@==%V"
-      .byte '['
-        ldy #0
-        cmp VAR0
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
-:       
-        tya
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@==%D"
-      .byte '['
-        ldy #0
-        cmp #'<'
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
-:       
-        tya
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|@<D"
-      .byte '['
-        ldy #$ff
-        cmp #'<'
-        bcc :+
-        ;; < => 0
-        iny
-:       
-        ;; neq => 0
-        tya
-      .byte ']'
-        .byte TAILREC
-
-.endif ; BYTERULES
-;;; ----------------------------------------
 
 .ifdef MINIMAL
 
+;;; TODO: _U used elsewhere...
         .byte "|+",_U
       .byte '['
         jsr _PLUS
       .byte ']'
         .byte TAILREC
 
-        .byte "|+",_U
+        .byte "|-",_U
       .byte '['
         jsr _MINUS
       .byte ']'
@@ -3051,6 +2866,7 @@ ruleD:
 
         .byte "|&%D"
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         ;; make sure %D <256
         lda tos+1
         beq :+
@@ -3388,9 +3204,356 @@ ruleD:
 
         .byte 0
 
+;;; BYTERULES variant of ruleC:
+ruleU:  
+
+.ifdef BYTERULES
+        ;; array index
+;;; TODO: simulated
+;;; TODO: _E or _V ???
+        .byte "$arr\[",_E,"\]"
+      .byte '['
+        tax
+        lda arr,x
+        ldx #0
+      .byte ']'
+
+      .byte "%{"
+        ;; TODO: this may not be easily skippable
+        PRINTZ "<here>"
+        jsr immret
+        .byte _V
+
+        ;; variable
+        .byte "|$%V"
+      .byte '['
+        lda VAR0
+        ldx #0
+      .byte ']'
+        .byte _V
+
+        ;; constant
+        .byte "|%D"
+      .byte '['
+        lda #'<'
+        ldx #0
+      .byte ']'
+        .byte _V
+
+
+        ;; byte
+        .byte "|*(byte*)%V"
+      .byte "["
+        lda VAR0
+        ldx #0
+      .byte "]"
+        .byte _V
+.endif ; BYTERULES
+
+        .byte 0
+
+
+;;; BYTERULES variant of ruleD:
+ruleV:  
+        ;; TODO:        // .byte "=>
+        
+.ifdef BYTERULES
+        .byte "|+$%V"
+      .byte '['
+        clc
+        adc VAR0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|+%D"
+      .byte '['
+        clc
+        adc #'<'
+      .byte ']'
+        .byte TAILREC
+
+;;; 18 *2
+        .byte "|-%D"
+      .byte '['
+        sec
+        sbc VAR0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|-%D"
+      .byte '['
+        sec
+        sbc #'<'
+      .byte ']'
+        .byte TAILREC
+
+      .byte "%{"
+        ;; TODO: this may not be easily skippable
+        PRINTZ "<HERE>"
+        jsr immret
+
+;;; 17 *2
+        .byte "|&$%V"
+      .byte '['
+        and VAR0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|&$%D"
+      .byte '['
+        and #'<'
+      .byte ']'
+        .byte TAILREC
+
+.ifnblank
+;;; TODO: \ quoting
+;;; 17 *2
+        .byte "|\|$%V"
+      .byte '['
+        ora VAR0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|\|%D"
+      .byte '['
+        ora #'<'
+      .byte ']'
+        .byte TAILREC
+.endif ; NBLANK
+
+;;; 17 *2
+        .byte "|^$%V"
+      .byte '['
+        eor VAR0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|^%D"
+      .byte '['
+        eor #'<'
+      .byte ']'
+        .byte TAILREC
+
+;;; 24
+        
+        .byte "|/2"
+      .byte '['
+        lsr
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|\*2"
+      .byte '['
+        asl
+      .byte ']'
+        .byte TAILREC
+
+;;; ==
+
+        .byte "|==$%V"
+      .byte '['
+        ldy #0
+        cmp VAR0
+        bne :+
+        ;; eq => -1
+        dey
+        ;; neq => 0
+:       
+        tya
+        ldx #0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|==%D"
+      .byte '['
+        ldy #0
+        cmp #'<'
+        bne :+
+        ;; eq => -1
+        dey
+        ;; neq => 0
+:       
+        tya
+        ldx #0
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|<%D"
+      .byte '['
+        ldy #$ff
+        cmp #'<'
+        bcc :+
+        ;; < => 0
+        iny
+:       
+        ;; neq => 0
+        tya
+        ldx #0
+      .byte ']'
+        .byte TAILREC
+
+       .byte "<<1"
+      .byte '['
+        asl
+      .byte ']'                  
+
+       .byte ">>1"
+      .byte '['
+        lsr
+      .byte ']'                  
+
+       .byte "<<2"
+      .byte '['
+        asl
+        asl
+      .byte ']'                  
+
+       .byte ">>2"
+      .byte '['
+        lsr
+        lsr
+      .byte ']'                  
+
+       .byte "<<3"
+      .byte '['
+        asl
+        asl
+        asl
+      .byte ']'                  
+
+       .byte ">>3"
+      .byte '['
+        lsr
+        lsr
+        lsr
+      .byte ']'                  
+
+       .byte "<<4"
+      .byte '['
+        asl
+        asl
+        asl
+        asl
+      .byte ']'                  
+
+       .byte ">>4"
+      .byte '['
+        lsr
+        lsr
+        lsr
+        lsr
+      .byte ']'                  
+
+       .byte "<<5"
+      .byte '['
+        asl
+        asl
+        asl
+        asl
+        asl
+      .byte ']'                  
+
+       .byte ">>5"
+      .byte '['
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+      .byte ']'                  
+
+       .byte "<<6"
+      .byte '['
+.ifblank
+;;; 5B 8c
+        ror
+        ror
+        ror
+        and #128+64
+.else
+;;; 6B 12c
+        asl
+        asl
+        asl
+        asl
+        asl
+        asl
+.endif
+      .byte ']'                  
+
+       .byte ">>6"
+      .byte '['
+.ifblank
+;;; 5B 8c
+        rol
+        rol
+        rol
+        and #1+2
+.else
+;;; 6B 12c
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+.endif
+      .byte ']'                  
+
+       .byte "<<7"
+      .byte '['
+        ror
+        ror
+        and #128
+      .byte ']'
+
+       .byte ">>7"
+      .byte '['
+        rol
+        rol
+        and #1
+      .byte ']'
+
+
+        .byte ">>%V"
+      .byte '['
+        ldy VAR0
+:       
+        dey
+        bmi :+
+        lsr
+        jmp :-
+:       
+        .byte ">>%D"
+      .byte '['
+        ldy #'<'
+:       
+        dey
+        bmi :+
+        lsr
+        jmp :-
+:       
+      .byte ']'
+
+
+.endif ; BYTERULES
+        
+        .byte "|"
+
+        .byte 0
+
+
+
 ;;; Exprssion:
 ruleE:  
-        .byte _C,_D,0
+        .byte _C,_D
+        
+.ifdef BYTERULES
+        .byte "|"
+        .byte _U,_V
+.endif ; BYTERULES
+        
+        .byte 0
 
 
 ruleF:  
@@ -3437,6 +3600,7 @@ ruleQ:
 ;      .byte "[<]"
 ;;; TODO: ohoh, how to skip over!!!! LOL
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         ;; TODO: remove as this is hack
         lda tos
         ldy #0
@@ -3448,6 +3612,7 @@ ruleQ:
 
         .byte "|"
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         PRINTZ "got arr end"
         jsr immret
 
@@ -3484,6 +3649,7 @@ ruleN:
 ;; TODO: now is hack
         .byte "bytearr\[\]={"
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         ;; set pos to array
         ;; TODO: get real array addr
         lda #<arr
@@ -3825,6 +3991,7 @@ afterELSE:
 
         .byte "|if(%A&%D)"
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         ;; make sure %D <256
         lda tos+1
         beq :+
@@ -3912,14 +4079,34 @@ afterELSE:
         ;; Auto-patches at exit!
 .endif ; ELSE
 
+;;; TODO: 3 things same result, save bytes?
         ;; simple write byte to memory
         .byte "|*(byte*)%A=",_E,";"
       .byte "[D"
         sta VAR0
       .byte "]"
 
+.ifdef BYTERULES
+        .byte "|$%A=",_E,";"
+      .byte "[D"
+        sta VAR0
+      .byte "]"
+.endif
+
 
 .ifdef OPTRULES
+        .byte "|$%A=0;"
+      .byte "[D"
+        sta VAR0
+      .byte "]"
+
+        .byte "|%A=0;"
+      .byte "[D"
+        lda #0
+        sta VAR0
+        sta VAR1
+      .byte "]"
+
         .byte "|%A=0;"
       .byte "[D"
         lda #0
@@ -3938,34 +4125,255 @@ afterELSE:
         stx VAR1
       .byte "]"
 
-.ifdef OPTRULES
-        ;; arr[i]=constant;
-        .byte "|arr\[%A\]=%D;"
-      .byte "[#D"
-        ldx VAR0
-        .byte ";"
-        lda #'<'
-;;; TODO: get address of array...
-        sta arr,x
+
+.ifdef BYTERULES
+;;; TODO: is it OPTRULES
+        .byte "|++$%A"
+      .byte "[D"
+        inc VAR0
       .byte "]"
-.endif ;OPTRULES
 
-        ;; array index
-;;; TODO: simulated
-        .byte "|arr\[",_E,"\]="
-      .byte '['
-        pha
-      .byte ']'
-        .byte _E,";"
-      .byte '['
-        tay
-        pla
-        tax
-        tya
-;;; TODO: get address of array...
-        sta arr,x
-      .byte ']'
+        .byte "|--$%A"
+      .byte "[D"
+        dec VAR0
+      .byte "]"
 
+        ;; NOTE: no need provide: v op= const;
+        ;;       - it would wouldn't save any bytes!
+        .byte "|$%A+=",_U,";"
+      .byte "[D"
+        clc
+        adc VAR0
+        sta VAR0
+      .byte "]"
+
+        .byte "|%A-=",_U,";"
+      .byte "[D"
+        sec
+        eor #$ff
+        adc VAR0
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A&=",_U,";"
+      .byte "[D"
+        and VAR0
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A\|=",_U,";"
+      .byte "[D"
+        ora VAR0
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A^=",_U,";"
+      .byte "[D"
+        eor VAR0
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A>>=1;"
+      .byte "[D"
+        lsr VAR0
+      .byte "]"
+
+        .byte "|$%A<<=1;"
+      .byte "[D"
+        asl VAR0
+      .byte "]"
+
+        .byte "|$%A>>=2;"
+      .byte "[D"
+        lsr VAR0
+        lsr VAR0
+      .byte "]"
+
+        .byte "|$%A<<=2;"
+      .byte "[D"
+        asl VAR0
+        asl VAR0
+      .byte "]"
+
+        .byte "|$%A>>=3;"
+      .byte "[D"
+        lsr VAR0
+        lsr VAR0
+        lsr VAR0
+      .byte "]"
+
+        .byte "|$%A<<=3;"
+      .byte "[D"
+;;; 6B 15c
+        asl VAR0
+        asl VAR0
+        asl VAR0
+      .byte "]"
+
+        .byte "|$%A>>=4;"
+      .byte "[D"
+;;; 8B 14c
+.ifblank
+        lda VAR0
+        lsr
+        lsr
+        lsr
+        lsr
+        sta VAR0
+.else
+;;; 8B 20c
+        lsr VAR0
+        lsr VAR0
+        lsr VAR0
+        lsr VAR0
+.endif
+      .byte "]"
+
+        .byte "|$%A<<=4;"
+      .byte "[D"
+        lda VAR0
+        asl
+        asl
+        asl
+        asl
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A>>=5;"
+      .byte "[D"
+;;; 9B 16c
+        lda VAR0
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A<<=5;"
+      .byte "[D"
+        lda VAR0
+        asl
+        asl
+        asl
+        asl
+        asl
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A>>=6;"
+      .byte "[D"
+;;; 10B 16c
+        lda VAR0
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A<<=6;"
+      .byte "[D"
+        lda VAR0
+        asl
+        asl
+        asl
+        asl
+        asl
+        asl
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A>>=7;"
+      .byte "[D"
+;;; 8B 12c
+        lda VAR0
+        rol
+        rol
+        and #1
+        sta VAR0
+      .byte "]"
+
+        .byte "|$%A<<=7;"
+      .byte "[D"
+        lda VAR0
+        ror
+        ror
+        and #128
+        sta VAR0
+      .byte "]"
+
+.ifnblank
+        .byte "|$%A>>=%D;"
+      .byte "["
+;;; 11B (tradeoff 
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+.endif
+
+        .byte "|$%A>>=%V;"
+      .byte "["
+        ldy VAR0
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+.ifnblank
+        .byte "|$%A<<=%D;"
+      .byte "["
+;;; 11B
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+.endif
+
+        .byte "|$%A<<=%V;"
+      .byte "["
+;;; 14B
+        ldy VAR0
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAR0
+        rol VAR1
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+.endif ; BYTERULES
 
 .ifdef OPTRULES
 ;;; TODO make ruleC when %A pushes
@@ -4161,7 +4569,7 @@ afterELSE:
 .ifdef BYTERULES
         ;; TODO: this is now limited to 256 index
         ;; bytes@[%D]= ... fixed address... hmmm
-        .byte "|%A@\[%D\]="
+        .byte "|$%A\[%D\]="
       .byte '['
         ;; prepare index
         lda '<'
@@ -4203,9 +4611,12 @@ afterELSE:
 
 .ifdef OPTRULES
 
+;;; TODO: BYTERULES for $ i
+
         .byte "|for(i=0;i<%D[d] ;++%V)"
 ;;; 22B (is less than while!!! 40B!)
       .byte "%{"
+        ;; TODO: this may not be easily skippable
 ;;;  make sure %D <256
         lda tos+1
         beq :+
@@ -4406,6 +4817,7 @@ afterELSE:
         ;; - swap the two locs!
 ;;; 28B
       .byte "%{"
+        ;; TODO: this may not be easily skippable
         pla
         pla
         sta pos
@@ -4554,6 +4966,8 @@ status:
 .ifdef PRINTINPUT
 
         putc 10
+;;; no use as error after backtracking all way up
+;;        jsr printstack
         PRINTZ "ERROR"
         putc '>'
 ;;; TOOD: put in getchar...
@@ -5646,7 +6060,8 @@ input:
 
 ;;;    TODO:   b&1 oscar64: lsr+bcc cheaper! (-1B)
 
-;MUL=1
+;
+MUL=1
 .ifdef MUL
         .byte "word M() {",10
         .byte "  c= 0;",10
@@ -5961,6 +6376,7 @@ input:
 
 ;
 PRIME=1
+
 ;NOPRINT=1
 
 ;;; From: onthe6502.pdf - by 
@@ -6024,7 +6440,7 @@ PRIME=1
 ;;; 335B for loop has overhead >255
 ;        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
 ;;; 329B !!! closer to cc65... (326B)
-        .byte "  i=0; while(i<256) { arr[i]=255; ++i; }",10
+        .byte "  i=0; while(i<256) { $ arr[i]=255; ++i; }",10
 ;;; 338B ???
 ;        .byte "  i=0; while(i<256) { arr[i++]=255; }",10
 
@@ -6036,10 +6452,11 @@ PRIME=1
 ;        .byte "    if (arr[n>>3] & (1<<(n&7))) {",10
 .ifndef BYTERULES
         .byte "    z=n&7; z=1<<z;",10
-.else
-        .byte "    z@=@n@&7; bb=1@<<z;",10
-.endif
         .byte "    if (arr[n>>3] & z) {",10
+.else
+        .byte "    $ z= n&7; $ z=1<<z;",10 ;
+        .byte "    if ($ arr[n>>3] & $ z) {",10
+.endif
 
         ;;           // simulates printd?
 .ifndef NOPRINT
@@ -6070,9 +6487,9 @@ PRIME=1
         .byte "        j=i>>3;",10
         .byte "        arr[j]= arr[j] & z;",10
 .else
-        .byte "        z@=@i@&7; z=1@<<z @^255;",10
+        .byte "        $ z=$ i&7; $ z=1<<z ^255;",10
         .byte "        j=i>>3;",10
-        .byte "        arr[j]= arr[j] @& z;",10
+        .byte "        $ arr[j]= $ arr[j] & $ z;",10
 .endif
         ;; for the while
         .byte "        i+=n;",10
