@@ -5015,7 +5015,7 @@ afterELSE:
         ORIC "paper",  $f204
         ORIC "ink",    $f210
         ORIC "circle", $f37f
-        ORIC "point",  $f1c8
+        ORIC "point",  $f1c8    ; verify output?
 
         .byte "|pattern(",_E,")"
       .byte "["
@@ -5220,13 +5220,16 @@ store_filename:
 ;;; - oric paramters
 ruleY:  
         .byte "("
+;;; Don't care?
+.ifnblank
       .byte "["
         ;; store 0 for no error
         lda #0
         sta $02e0
       .byte "]"
+.endif
       .byte "%{"
-PUTC 'C'        
+;PUTC 'C'        
         ;; oric parameters start
         lda #$02
         sta pos+1
@@ -5242,14 +5245,14 @@ ruleZ:
 
         ;; end
         .byte "|)"
-        .byte "%{"
-PUTC 'F'
-        jsr immret
+;        .byte "%{"
+;PUTC 'F'
+;        jsr immret
 
         ;; parse next paramter
         .byte "|",_E
       .byte "%{"
-PUTC 'D'        
+;PUTC 'D'        
         lda pos
         sta tos
         lda pos+1
@@ -5260,7 +5263,7 @@ PUTC 'D'
         stx VAL1
       .byte "]"
       .byte "%{"
-PUTC 'E'        
+;PUTC 'E'        
         ;; move to next paramter addr
         jsr _incP
         jsr _incP
