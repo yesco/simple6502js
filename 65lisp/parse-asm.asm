@@ -2554,7 +2554,6 @@ ruleC:
         cli
       .byte ']'
 
-
         ;; cast to char/byte == &0xff !
         .byte "|(byte)",_C
       .byte '['
@@ -5002,7 +5001,7 @@ afterELSE:
 .endmacro
 
 .macro OJSR fun, addr
-        .byte .concat("|", fun)
+        .byte .concat("|", fun, "()")
       .byte "["
         jsr addr
       .byte "]"
@@ -5055,20 +5054,161 @@ afterELSE:
         ldx #0
       .byte "]"
 
+
+;;; from cc65 - libsrc/atmos/atmos_save.s (orig: Twilite)
+
+JOINFLAG    = $025A        ; 0 = don't joiu, $4A = join BASIC programs
+VERIFYFLAG  = $025B        ; 0 = load, 1 = verify
+
+CFILE_NAME  = $027F
+CFOUND_NAME = $0293
+FILESTART   = $02A9
+FILEEND     = $02AB
+AUTORUN     = $02AD        ; $00 = only load, $C7 = autorun
+LANGFLAG    = $02AE        ; $00 = BASIC, $80 = machine code
+LOADERR     = $02B1
+
         ;; .byte "|cwritehdr();" - $e607
         ;; .byte "|creadsync();" - $e735 
 
+.ifdef ATMOS_FIX
+        ;; void csave(char* name, void* s,, void* end)
+        .byte "|csave(",_E,","
+      .byte "["
+        sei
+        jsr     store_filename
+      .byte "]"
+
+        .byte _E,","
+      .byte "["
+        sta     FILESTART
+        stx     FILESTART+1
+      .byte "]"
+
+        .byte _E,");"
+      .byte "["
+        sta     FILEEND
+        stx     FILEEND+1
+
+        lda     #0
+        sta     AUTORUN
+        jsr     csave_bit
+        cli
+      .byte "]"
+
+
+;;; TODO: move to somewhere safe
+csave_bit:      
+        php
+        jmp     $e92c
+
+cload_bit:      
+        pha
+        jmp     $e874
+
+
+store_filename: 
+        sta     tos
+        stx     tos+1
+        ldy     #FNAME_LEN - 1  ; store filename
+: 
+        lda     (tos),y
+        sta     CFILE_NAME,y
+        dey
+        bpl     :-
+        rts
+
+
+        ;; void cload(char* name);
+        .byte "|cload(",E,");"
+      .byte "["
+        ;; 22B
+        sei
+        jsr     store_filename
+        ldx     #$00
+        stx     AUTORUN       ; don't try to run the file
+        stx     LANGFLAG      ; BASIC
+        stx     JOINFLAG      ; don't join it to another BASIC program
+        stx     VERIFYFLAG    ; load the file
+        jsr     cload_bit
+        cli
+      .byte "]"
+
+.endif ; ATMOS_FIX
+
+
+;;; memcpy len<=256
+;;; Function call with 3 constants:
+;;;   cost:   23 B (3x lda/ldx, 2x sta/stx, 1x jsr)
+;;;   inline: 16 B !
+
+        .byte "|memcpy(%D[d],%D,"
+      .byte "["
+;;; 8B
+        ldy #0
+
+        .byte ":"
+
+        lda VAL0,y
+        .byte "D"
+        sta VAL1,y
+
+      .byte "]"
+;;; TODO: verify small <= 256
+;;;   and/or generate one that copies pages (+7 B!)
+        .byte "%D);"
+      .byte "["
+;;; 8B
+        iny
+        cpy #'<'
+        .byte ";"
+        bcs :+
+        jmp VAL0
+:       
+      .byte "]"
+        
+        .byte "|memcpy("
+;;; (8+) 15B =(23B params+) copy
+        .byte _E,","
+      .byte "["
+        sta dos
+        stx dos+1
+      .byte "]"
+
+        .byte _E,","
+      .byte "["
+        sta tos
+        stx tos+1
+      .byte "]"
+        
+        .byte _E,");"
+      .byte "["
+;;; 8
+        tay
+:       
+        lda (tos),y
+        sta (dos),y
+        iny
+        bne :-
+
+;;; TODO: not generate this part if X=0!!!
+        ;; next page
+;;; 7B
+        inc tos+1
+        inc dos+1
+        dex
+        bpl :-
+:       
+      .byte "]"
 
 
 ;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
-;;; TODO: math
+;;; TODO: math - floating point??? LOL
 ;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
 ;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
 ;;; rand, random(), srandom()
 ;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
 
-;;; TODO: chars
-;;; isalpha(), isupper(), islower(), isdigit(), isxdigit(), isspace(), ispunct(), isalnum(), isprint(), iscntrl(), isascii()
 ;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
 ;;; 
 
