@@ -113,14 +113,24 @@ void disasm(char* mc, char* end, char indent) {
 char* disasm(char* mc, char* end, char indent) {
   char* p= (char*)mc;
   int maxlines= 25;
+
   if (!(end-mc)) return p;
 //  printf("\n%*c---CODE[%u]:\n", indent, ' ', end-mc);
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
 
-#define ADDR "\x83"
-#define MNIC "\x86"
-#define ARG  "\x87"
+#ifdef __ATMOS
+  #define ADDR "\x83"
+  #define MNIC "\x86"
+  #define ARG  "\x87"
+#else
+  #define ADDR " "
+  #define MNIC " "
+  #define ARG  " "
+#endif // __ATMOS__
+
+    // TODO: remove
+    indent= 2;
 
     printf(ADDR"%*c%04X"MNIC, indent, ' ', p);
 
@@ -158,11 +168,13 @@ char* disasm(char* mc, char* end, char indent) {
     putchar('\n');
   } //putchar('\n');
 
+#ifdef __ATMOS__
   // currow>24
 //  if (*(char*)0x268>24) {
 //    putchar(' '); putchar(' '); putchar('>');
 //    asm("cli"); getchar(); asm("sei");
 //  }
+#endif __ATMOS__
 
   return p;
 }

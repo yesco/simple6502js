@@ -169,6 +169,7 @@ char* parse(char r, char* in) {
 
 void main() {
 
+#ifdef __ATMOS__
   // bgcolor(0);
   // $26B Paper colour (+16).
   *(char*)0x26b= 16+0;
@@ -176,15 +177,16 @@ void main() {
   //textcolor(2);
   // $26C Ink colour.
   *(char*)0x26c= 2; // green
+#endif // __ATMOS__
 
   clrscr();
 
-  //printf("Hello World!\n");
+  printf("Hello World!\n");
+  //exit(42);
   
   *TEXTSCREEN= 'A';
 
   showsize();
-
   start();
 
   TEXTSCREEN[2]= 'C';

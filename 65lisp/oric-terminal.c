@@ -44,6 +44,22 @@ void fullputc(int c) {
     printf("\n    "); break;
   case '\r':
     printf("\r    "); break;
+
+  // TODO:
+  // not correct as when new line on oric colors white on black
+
+  // text colors
+  case (128)...(128+7):
+    printf("\e[%dm  ", c-128+30);
+    break;
+  // background colors
+  case (128+16)...(128+16+7):
+    printf("\e[%dm  ", c-128-16+40);
+    break;
+
+  // double up
+  case 8:
+    putchar(c);
   default:
     putchar(c);
     //printf("%02x", c); break;
@@ -61,9 +77,10 @@ int main(void) {
   clear();
   fullputs("\nORIC 65LISP>02                     CAPS");
 
-  printf("\e[30;47;1m\n    "); // background white, black text bold
+//  printf("\e[30;47;1m\n    "); // background white, black text bold
+
   clearend();
-  printf("\e[3;29r"); // set scroll region
+//  printf("\e[3;29r"); // set scroll region
   gotorc(1, 1);
 
   for(int i=1; i<28; i++) {
@@ -86,3 +103,4 @@ int main(void) {
   gotorc(34, 1);
   return 0;
 }
+
