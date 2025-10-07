@@ -116,6 +116,44 @@
 ;;; - 35.sqr          single arg function call
 ;;; - 3 @+ v          byte operator (acts only on A not AX)
 
+
+
+;;; ORIC ATMOS API
+;;; ==============
+;;; Refer to the ORIC ATMOS MANUAL for parameters.
+;;;
+;;; GRAPHICS: x=0..239 y=0..199 c=0..2
+;;;   hires()
+;;;   text()
+;;;   curset(x, y, c)
+;;;   curmov(dx, dy, c)
+;;;   draw(dx, dy, c)
+;;;   circle(r, c)
+;;;   point(x, y)
+;;;   hchar(...)
+;;;   fill(...) 
+;;;   paper(0-7)
+;;;   ink(0-7)
+;;;   pattern(0-255)
+;;;
+;;; SOUND:
+;;;   play(...)
+;;;   music(...)
+;;;   sound(...)
+;;;   ping(), shoot(), zap(), explode(),
+;;;   kbdclick1(), kbdclick2()
+;;;   
+;;; FILE:
+;;;   ; cload(...) - TODO
+;;;   ; csave(...) - TODO
+;;;   cwrite(0..255)
+;;;   cread()->0..255 - TODO: erh, should be function
+;;;   ; cwritehdr() - TODO
+;;;   ; creadsync() - TODO
+
+
+
+
 ;;; If there is an error a newline '%' letter error-code
 ;;; is printed, and with PRINTINPUT ERRPOS defined the
 ;;; source is printed, and RED text as far as parsing got.
@@ -131,7 +169,6 @@
 ;;;    ./rasm parse
 ;;; 
 ;;; gives a parse.tap in ORIC folder (symlink)
-
 
 
 
@@ -214,12 +251,16 @@
 ;;;   886 bytes ...
 ;;; 
 ;;;  1112 bytes rules? OPTRULES
-;;;  1181 bytes DO...WHILE/WHILE... (+ 69B)
+;;;  1181 bytes DO...WHILE/WHILE... (+ 69 B)
 ;;;  1393 bytes - OPT: << >> <<= >>=
-;;;  1481 bytes FUNCTIONS/TAILREC/FUNCDEF (+ 300B)
-;;;  1544 bytes FUNCTIONS+POINTERS (+ 63B)
-;;;  1582 bytes various opts for MUL (+ 38B)
+;;;  1481 bytes FUNCTIONS/TAILREC/FUNCDEF (+ 300 B)
+;;;  1544 bytes FUNCTIONS+POINTERS (+ 63 B)
+;;;  1582 bytes various opts for MUL (+ 38 B)
 ;;; 
+;;;  3026 bytes BYTERULES (opt)
+;;;  3434 bytes ORIC ATMOS API (+ 408 B)
+;;; 
+
 ;;; w= #x62e 1582
 
 ;;; TODO: not really rules...
@@ -507,7 +548,8 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2330,11 +2372,11 @@ ruleJ:
 .ifndef BNFLONG
   ruleK:  
   ruleL:  
-ruleM:  
-;;ruleN:
-.endif 
+  ruleM:
+;  ruleN:
+.endif
 ;;ruleO:  
-
+;;ruleP: - program
 ;;ruleQ: - array data
 ruleR:
 ;;.ifndef MINIMAL
@@ -2342,12 +2384,11 @@ ruleR:
 ;;.endif
 ;;ruleU: - BYTERULES "ruleC"
 ;;ruleV: - BYTERULES "ruleD"
-ruleW:
-ruleX:  
-ruleY:  
-ruleZ:  
+ruleW:   ;;;  while?
+ruleX:
+;;ruleY: -   parameters init
+;;ruleZ: -   list of parameters
         .byte 0
-
 
 _A='A'+128
 _B='B'+128
@@ -3908,8 +3949,6 @@ ruleS:
         rts
       .byte ']'
 
-
-
         ;; BlOCK!
 ;;; TODO: this gives inifinte loop! >S>B>* ...
 ;       .byte "|",_B
@@ -4951,10 +4990,147 @@ afterELSE:
 :       
       .byte "]"
 
+
+
+        ;; ORIC ATMOS API
+
+.macro ORIC fun, addr
+        .byte .concat("|", fun), _Y
+      .byte "["
+        jsr addr
+      .byte "]"
+.endmacro
+
+.macro OJSR fun, addr
+        .byte .concat("|", fun)
+      .byte "["
+        jsr addr
+      .byte "]"
+.endmacro
+
+        ORIC "curset", $f0c8
+        ORIC "curmov", $f0fd
+        ORIC "draw",   $f110
+        ORIC "hchar",  $f12d
+        ORIC "fill",   $f268
+        ORIC "paper",  $f204
+        ORIC "ink",    $f210
+        ORIC "circle", $f37f
+        ORIC "point",  $f1c8
+
+        .byte "|pattern(",_E,")"
+      .byte "["
+        sta $213
+      .byte "]"
+
+        OJSR "hires",   $ec33
+        OJSR "text",    $ec21
+
+        ORIC "play",    $fbd0
+        ORIC "music",   $fc18
+        ORIC "sound",   $fb40
+
+        OJSR "ping",    $fa9f
+        OJSR "shoot",   $fab5
+        OJSR "zap",     $fae1
+        OJSR "explode", $facb
+        OJSR "click1",  $fb14
+        OJSR "click2",  $fb2a
+
+        OJSR "cls",     $ccce
+        OJSR "lores0",  $d9ed
+        OJSR "lores1",  $d9ea
+
+        .byte "|cwrite(",_E,")"
+      .byte "["
+        ;; value in A
+        jsr $e65e
+      .byte "]"
+
+;;; TODO: function - MOVE!
+        .byte "|cread()"
+      .byte "["
+        jsr $e6c9
+        lda $02e0
+        ldx #0
+      .byte "]"
+
+        ;; .byte "|cwritehdr();" - $e607
+        ;; .byte "|creadsync();" - $e735 
+
+
+
+;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
+;;; TODO: math
+;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
+;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
+;;; rand, random(), srandom()
+;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
+
+;;; TODO: chars
+;;; isalpha(), isupper(), islower(), isdigit(), isxdigit(), isspace(), ispunct(), isalnum(), isprint(), iscntrl(), isascii()
+;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
+;;; 
+
         ;; Expression; // throw away result
         .byte "|",_E,";"
 
         .byte 0
+
+;;; - oric paramters
+ruleY:  
+        .byte "("
+      .byte "["
+        ;; store 0 for no error
+        lda #0
+        sta $02e0
+      .byte "]"
+      .byte "%{"
+PUTC 'C'        
+        ;; oric parameters start
+        lda #$02
+        sta pos+1
+        lda #$e1
+        sta pos
+        jsr immret
+
+        .byte _Z
+        .byte 0
+
+ruleZ:  
+        .byte ",",TAILREC
+
+        ;; end
+        .byte "|)"
+        .byte "%{"
+PUTC 'F'
+        jsr immret
+
+        ;; parse next paramter
+        .byte "|",_E
+      .byte "%{"
+PUTC 'D'        
+        lda pos
+        sta tos
+        lda pos+1
+        sta tos+1
+        jsr immret
+      .byte "["
+        sta VAL0
+        stx VAL1
+      .byte "]"
+      .byte "%{"
+PUTC 'E'        
+        ;; move to next paramter addr
+        jsr _incP
+        jsr _incP
+        jsr immret
+        ;; get next param
+        .byte TAILREC
+        
+        .byte 0
+
+endrules:       
 
 ;;; END rules
 ;;; ========================================
@@ -6073,6 +6249,18 @@ FUNC printstack
 input:
 ;        .byte "word main(){}",0
 
+
+;
+CIRCLE=1
+.ifdef CIRCLE
+        .byte "word main(){",10
+        .byte "  hires();",10
+        .byte "  curset(120,100,0);",10
+        .byte "  circle(75,2);",10
+        .byte "  text();",10
+        .byte "}",10
+        .byte 0
+.endif ; CIRCLE
 
 ;        .byte "word main(){z=0; ++i; ++i; z=arr[i]; ++j; ++j; }",0
 ;        .byte "word main(){arr[i]=42; ++i;}",0
