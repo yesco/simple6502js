@@ -924,6 +924,23 @@ exitrule:
 
 
 FUNC _enterrule
+.ifdef PRINTASM
+        pha
+        txa
+        pha
+        tya
+        pha
+
+        jsr _iasm
+        pla
+        tay
+        pla
+        tax
+        pla
+.endif ;PRINTASM
+
+
+
 .ifdef TRACERULE
         pha
 ;;; not totally correct
@@ -2645,6 +2662,11 @@ ruleC:
         ;; BYTERULES
 ;;; TODO: if no match backtrack not propagated UP????
         .byte "|", _U
+      .byte '['
+;;; PRIMEBYTE: TODO: this adds 10bytes!!!! lol 313->323
+;;; but sim: correct, and oric!
+        ldx #0
+      .byte ']'
 .endif
 
         ;; string
@@ -5128,7 +5150,7 @@ runs:   .res 1
 
         ;; RUN PROGRAM a TIMES
         lda #1
-        lda #10                
+;        lda #10                
         sta runs
 again:
         jsr _output
