@@ -154,8 +154,16 @@ char* disasm(char* mc, char* end, char indent) {
       case 0b110: printf("$%04x,%c", m&1?'y':'x', *((int*)p)++); break;
       }
     }
+
     putchar('\n');
   } //putchar('\n');
+
+  // currow>24
+//  if (*(char*)0x268>24) {
+//    putchar(' '); putchar(' '); putchar('>');
+//    asm("cli"); getchar(); asm("sei");
+//  }
+
   return p;
 }
 

@@ -2512,10 +2512,6 @@ ruleC:
 ;;; TODO: simulated
 ;;; TODO: _E or _V ???
         .byte "|arr\[",_E,"\]"
-        .byte "%{"
-        PRINTZ "<HMMM>"
-        jsr immret
-
       .byte '['
         tax
         lda arr,x
@@ -3236,11 +3232,6 @@ ruleU:
         lda arr,x
         ldx #0
       .byte ']'
-
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        PRINTZ "<here>"
-        jsr immret
         .byte _V
 
         ;; variable
@@ -3305,11 +3296,6 @@ ruleV:
         sbc #'<'
       .byte ']'
         .byte TAILREC
-
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        PRINTZ "<HERE>"
-        jsr immret
 
 ;;; 17 *2
         .byte "|&$%V"
@@ -4116,13 +4102,7 @@ afterELSE:
 
 .ifdef OPTRULES
         ;; arr[i]=constant;
-;        .byte "|arr\[%A\]=%D;"
-        .byte "|arr"
-      .byte "%{"
-        PRINTZ "<FISH>"
-        jsr immret
-        
-        .byte "\[%A\]=%D;"
+        .byte "|arr\[%A\]=%D;"
       .byte "["
         lda #'<'
         .byte "D"
@@ -4139,9 +4119,6 @@ afterELSE:
         ;; array index
 ;;; TODO: simulated
         .byte "|arr\[",_E,"\]="
-        .byte "%{"
-        PRINTZ "<GURKA>"
-        jsr immret
       .byte '['
         ;; save index
         pha
@@ -4444,10 +4421,6 @@ afterELSE:
 
 ;;; TODO make ruleC when %A pushes
         .byte "|"
-        
-        .byte "%{"
-        PRINTZ "<++>"
-        jsr immret
 
         .byte "++%A;"
       .byte "[D"
