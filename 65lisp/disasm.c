@@ -119,7 +119,8 @@ char* disasm(char* mc, char* end, char indent) {
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
 
-#ifdef __ATMOS
+//#ifdef __ATMOS__
+#if 1
   #define ADDR "\x83"
   #define MNIC "\x86"
   #define ARG  "\x87"

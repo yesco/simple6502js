@@ -14,6 +14,8 @@
 ;;; 
 ;;; A after putchar is assumed to be A before.
 
+.ifdef __ATMOS__
+
 .zeropage
 
 saveaputchar:   .res 1
@@ -73,7 +75,20 @@ notnl:
 .endproc
 
 
-;;; for DEBUGGING only!
+.else
+;;; Generic IO names with cc65 (conio.h)
+        .import _getchar
+        .import _putchar
+
+putchar=_putchar
+getchar=_getchar
+
+plaputchar:
+        pla
+        jmp putchar
+
+.endif ; __ATMOS__
+
 
 ;;; putchar (leaves char in A)
 ;;; 5B

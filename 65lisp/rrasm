@@ -19,7 +19,6 @@ name=$1
 shift
 
 rm $name.map  2>/dev/null
-rm $name.tap  2>/dev/null
 rm $name.o    2>/dev/null
 rm $name.s    2>/dev/null
 rm fil
@@ -39,21 +38,16 @@ echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 
 #cl65 -vm -m $name.map $name.o
 
-ls -g $name.o $name.tap
+ls -g $name.o $name.sim
 
 # make it autostart and copy to download directory
 
 nam=$(basename $name)
 echo "NAME: $nam"
 
-# extract "sector" from tap file
-perl -e '$_=join("",<>);s/^[\s\S]*BEFORE>//m;s/<AFTER[\s\S]*//m;print;' $nam.tap > $nam.bin
-
 # generate listing w \hex
 ca65 $name-asm.asm -l $name-asm.s 2>/dev/null 1>/dev/null
 ca65 $name.s -l $name.lst 2>/dev/null 1>/dev/null
-
-cat $name.sim | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -g $name.tap $nam.bin ORIC/$nam.tap
 
 ./map $name
 
@@ -65,10 +59,11 @@ clang oric-terminal.c -o oric-terminal || exit
 #echo "=== RUN ==="
 #(time sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
 
-# with oric-terminal
-#(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log | ./oric-terminal
-# NO oric-terminal
-(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
+# -- run with oric-terminal
+(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log | ./oric-terminal
+
+# --- run NO oric-terminal
+#(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
 
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time");

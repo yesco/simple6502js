@@ -3,6 +3,8 @@
 
 int fullwidth= 0xFF00; // "space"
 
+//#define DOUBLE
+
 // UTF-8 in this range 1110xxxx10xxxxxx10xxxxxx
 void u8put_r(int uc, int m) {
   if (m==128 && uc<128) { putchar(uc); return; }
@@ -36,9 +38,17 @@ void fullputc(int c) {
   case 12:
     clear(); break;
   case ' ':
+#ifdef DOUBLE
     printf("  "); break;
+#else
+    printf("  "); break;
+#endif
   case 33 ... 126:
+#ifdef DOUBLE
     u8put(fullwidth-32+c); break;
+#else
+    putchar(c); break;
+#endif
   case '\n':
     clearend();
     printf("\n    "); break;
@@ -49,13 +59,26 @@ void fullputc(int c) {
   // not correct as when new line on oric colors white on black
 
   // text colors
-  case (128)...(128+7):
-    printf("\e[%dm  ", c-128+30);
-    break;
+  case (128) ... (128+7):
+    // ORIC attributes take up one space
+#ifdef DOUBLE
+    printf("\e[%dm  ", c-128+30); break;
+#else
+    printf("\e[%dm ", c-128+30); break;
+#endif
   // background colors
-  case (128+16)...(128+16+7):
-    printf("\e[%dm  ", c-128-16+40);
-    break;
+  case (128+16) ... (128+16+7):
+#ifdef DOUBLE
+    printf("\e[%dm  ", c-128-16+40); break;
+#else
+    printf("\e[%dm ", c-128-16+40); break;
+#endif
+
+  // inverse
+  case (128+32)...255:
+//    printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
+    // ORIC console doesn't invert, just print chars
+    fullputc(c&0x7f); break;
 
   // double up
   case 8:
