@@ -444,8 +444,7 @@ ELSE=1
 ;;; Byte optimized rules
 ;;; typically used as prefix for BYTE operators
 ;;; (only operating on register A, no overflow etc)
-;
-BYTERULES=1
+;BYTERULES=1
 
 ;;; Pointers: &v *v= *v
 ;;; TODO: not working
@@ -505,7 +504,8 @@ PRINTINPUT=1
 ;
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
+;
+PRINTREAD=1
 ;PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
@@ -2375,9 +2375,12 @@ ruleB:
 
         .byte 0
 
+;;; stater of expression:
 ;;; "Constant"/(variable) (simple, lol)
 ruleC: 
         
+;;; TODO: these are "more" statements...
+
         ;; "IO-lib" hack
         .byte "printd(",_E,")"
       .byte '['
@@ -2424,7 +2427,7 @@ ruleC:
       .byte ']'
 
 .ifdef OPTRULES
-        .byte "|poke(%D[d],%D);"
+        .byte "|poke(%D[d],%D)"
       .byte '['
         lda VAL0
         .byte 'D'
@@ -2433,7 +2436,7 @@ ruleC:
 
         .byte "|poke(%D"
       .byte "[d]"
-        .byte ",",_E,");"
+        .byte ",",_E,")"
       .byte "[D"
         sta VAL0
       .byte ']'
@@ -2445,7 +2448,7 @@ ruleC:
         txa
         pha
       .byte ']'
-        .byte ",",_E,");"
+        .byte ",",_E,")"
       .byte '['
         sta savea
         pla
@@ -2501,8 +2504,22 @@ ruleC:
 
         ;; casting - ignore!
         ;; (we don't care legal, just accept if correct)
+;;; TODO: lol funny way of skipping name/id/type
         .byte "|(%V\*)",_C
 
+        ;; array index
+;;; TODO: simulated
+;;; TODO: _E or _V ???
+        .byte "|arr\[",_E,"\]"
+        .byte "%{"
+        PRINTZ "<HMMM>"
+        jsr immret
+
+      .byte '['
+        tax
+        lda arr,x
+        ldx #0
+      .byte ']'
 
         ;; function call
         .byte "|%U()"
@@ -2519,8 +2536,6 @@ ruleC:
         jsr VAL0
         ;; result in AX
       .byte ']'
-
-
 
         ;; Surprisingly ++v and --v expression w value
         ;; arn't smalller or faster than v++ and v-- !
@@ -2606,32 +2621,6 @@ ruleC:
 ;;; TDOO: $ arr\[\] ... redundant?
 ;;; TODO: store addresss of arr in variable
 
-        ;; arr[i]=constant;
-        .byte "|$arr\[%A\]=%D;"
-      .byte "[#D"
-        ldx VAR0
-        .byte ";"
-        lda #'<'
-;;; TODO: get address of array...
-        sta arr,x
-      .byte "]"
-
-        ;; array index
-;;; TODO: simulated
-        .byte "|$arr\[",_E,"\]="
-      .byte '['
-        pha
-      .byte ']'
-        .byte _U,";"
-      .byte '['
-        tay
-        pla
-        tax
-        tya
-;;; TODO: get address of array...
-        sta arr,x
-      .byte ']'
-
         ;; variable
         .byte "|%V"
       .byte '['
@@ -2657,6 +2646,7 @@ ruleC:
         
 .ifdef BYTERULES
         ;; BYTERULES
+;;; TODO: if no match backtrack not propagated UP????
         .byte "|", _U
 .endif
 
@@ -3208,6 +3198,34 @@ ruleD:
 ruleU:  
 
 .ifdef BYTERULES
+.ifdef OPTRULES
+        ;; arr[i]=constant;
+        .byte "|$arr\[%A\]=%D;"
+      .byte "[#D"
+        ldx VAR0
+        .byte ";"
+        lda #'<'
+;;; TODO: get address of array...
+        sta arr,x
+      .byte "]"
+.endif ; OPTRULES
+
+        ;; array index
+;;; TODO: simulated
+        .byte "|$arr\[",_E,"\]="
+      .byte '['
+        pha
+      .byte ']'
+        .byte _U,";"
+      .byte '['
+        tay
+        pla
+        tax
+        tya
+;;; TODO: get address of array...
+        sta arr,x
+      .byte ']'
+
         ;; array index
 ;;; TODO: simulated
 ;;; TODO: _E or _V ???
@@ -3944,8 +3962,9 @@ afterELSE:
         ;; set's variable/name to that address!
 
         ;; goto
+;;; TODO: %A can be %V ???
         .byte "|goto%A;"
-      .byte "[D"                ; get aDdress
+      .byte "["                ; get aDdress
         jmp (VAL0)
       .byte "]"
 
@@ -4027,8 +4046,8 @@ afterELSE:
 .endif ; ELSE
 .endscope
 
-
 .endif ; OPTRULES
+
 
         ;; IF(E)S; // no else
         .byte "|if(",_E,")"
@@ -4095,6 +4114,52 @@ afterELSE:
 
 
 .ifdef OPTRULES
+        ;; arr[i]=constant;
+;        .byte "|arr\[%A\]=%D;"
+        .byte "|arr"
+      .byte "%{"
+        PRINTZ "<FISH>"
+        jsr immret
+        
+        .byte "\[%A\]=%D;"
+      .byte "["
+        lda #'<'
+        .byte "D"
+        ldx VAR0
+;;; TODO: get address of array...
+        sta arr,x
+      .byte "]"
+
+;;; this makes it work, but isn't correct?
+;        .byte TAILREC
+
+.endif ; OPTRULES
+
+        ;; array index
+;;; TODO: simulated
+        .byte "|arr\[",_E,"\]="
+        .byte "%{"
+        PRINTZ "<GURKA>"
+        jsr immret
+      .byte '['
+        ;; save index
+        pha
+      .byte ']'
+;;; TODO: _U in other rule???
+        .byte _E,";"
+      .byte '['
+        ;; save value to store
+        tay
+        ;; get index
+        pla
+        tax
+        tya
+;;; TODO: get address of array...
+        sta arr,x
+      .byte ']'
+
+
+.ifdef OPTRULES
         .byte "|$%A=0;"
       .byte "[D"
         sta VAR0
@@ -4115,7 +4180,6 @@ afterELSE:
       .byte "]"
 .endif ; OPTRULES
 
-
         ;; A=7; // simple assignement, ONLY as statement
         ;; and can't be nested or part of expression
         ;; (unless we use a stack...)
@@ -4128,13 +4192,13 @@ afterELSE:
 
 .ifdef BYTERULES
 ;;; TODO: is it OPTRULES
-        .byte "|++$%A"
-      .byte "[D"
+        .byte "|++$%V;"
+      .byte "["
         inc VAR0
       .byte "]"
 
-        .byte "|--$%A"
-      .byte "[D"
+        .byte "|--$%V;"
+      .byte "["
         dec VAR0
       .byte "]"
 
@@ -4376,8 +4440,15 @@ afterELSE:
 .endif ; BYTERULES
 
 .ifdef OPTRULES
+
 ;;; TODO make ruleC when %A pushes
-        .byte "|++%A;"
+        .byte "|"
+        
+        .byte "%{"
+        PRINTZ "<++>"
+        jsr immret
+
+        .byte "++%A;"
       .byte "[D"
         inc VAR0
         bne :+
@@ -6006,6 +6077,17 @@ FUNC printstack
 input:
 ;        .byte "word main(){}",0
 
+
+;        .byte "word main(){z=0; ++i; ++i; z=arr[i]; ++j; ++j; }",0
+;        .byte "word main(){arr[i]=42; ++i;}",0
+
+
+;        .byte "word main(){",10
+;        .byte "  i=0; while(i<256) { arr[i]=255; ++i; }",10
+;        .byte "}",0
+
+
+
 ;        .byte "word main(){ i=0;while(i<8){putchar(i+65);++i;}}",0
 ;;; TODO: can optimized more as we know %D != 0 (check)
 ;        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
@@ -6060,8 +6142,9 @@ input:
 
 ;;;    TODO:   b&1 oscar64: lsr+bcc cheaper! (-1B)
 
-;
-MUL=1
+;;; 80B
+
+;MUL=1
 .ifdef MUL
         .byte "word M() {",10
         .byte "  c= 0;",10
@@ -6100,6 +6183,9 @@ MUL=1
         .byte "}",10
         .byte 0
 .endif ; MUL
+
+
+
 
 
 ;        .byte "word main(){ }",0
@@ -6376,6 +6462,7 @@ MUL=1
 
 ;
 PRIME=1
+;PRIMBYTE=1
 
 ;NOPRINT=1
 
@@ -6440,7 +6527,13 @@ PRIME=1
 ;;; 335B for loop has overhead >255
 ;        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
 ;;; 329B !!! closer to cc65... (326B)
+
+.ifndef PRIMEBYTE
+        .byte "  i=0; while(i<256) { arr[i]=255; ++i; }",10
+.else
         .byte "  i=0; while(i<256) { $ arr[i]=255; ++i; }",10
+.endif
+
 ;;; 338B ???
 ;        .byte "  i=0; while(i<256) { arr[i++]=255; }",10
 
@@ -6450,7 +6543,7 @@ PRIME=1
 
 ;;; TODO: no paren
 ;        .byte "    if (arr[n>>3] & (1<<(n&7))) {",10
-.ifndef BYTERULES
+.ifndef PRIMBYTE
         .byte "    z=n&7; z=1<<z;",10
         .byte "    if (arr[n>>3] & z) {",10
 .else
@@ -6482,7 +6575,7 @@ PRIME=1
 
 ;       .byte "        a[i>>3]&= ~(1<<(i&7));",10
 
-.ifndef BYTERULES
+.ifndef PRIMBYTE
         .byte "        z=i&7; z=1<<z ^65535;",10
         .byte "        j=i>>3;",10
         .byte "        arr[j]= arr[j] & z;",10
