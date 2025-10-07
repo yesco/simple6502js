@@ -444,7 +444,8 @@ ELSE=1
 ;;; Byte optimized rules
 ;;; typically used as prefix for BYTE operators
 ;;; (only operating on register A, no overflow etc)
-;BYTERULES=1
+;
+BYTERULES=1
 
 ;;; Pointers: &v *v= *v
 ;;; TODO: not working
@@ -5154,7 +5155,7 @@ runs:   .res 1
 
         ;; RUN PROGRAM a TIMES
         lda #1
-;        lda #10                
+        lda #10                
         sta runs
 again:
         jsr _output
@@ -6462,7 +6463,8 @@ input:
 
 ;
 PRIME=1
-;PRIMBYTE=1
+;
+PRIMBYTE=1
 
 ;NOPRINT=1
 
@@ -6472,6 +6474,9 @@ PRIME=1
 ;;; also in Play/prime.c
 
 .ifdef PRIME
+;;;   313B      3.337s BYTERULES PRIMBYTE
+;;;               2.5% smaller
+;;;              20% faster than cc65 
 ;;;  (305B)     1.9s NOPRINT! (printd(),putchar())
 ;;;   321B      3.426 moved i=n;
 ;;;               SMALLER! than cc65!!!
@@ -6528,11 +6533,11 @@ PRIME=1
 ;        .byte "  for(i=0; i<256; ++i) arr[i]=255;",10
 ;;; 329B !!! closer to cc65... (326B)
 
-.ifndef PRIMEBYTE
+;.ifndef PRIMEBYTE
         .byte "  i=0; while(i<256) { arr[i]=255; ++i; }",10
-.else
-        .byte "  i=0; while(i<256) { $ arr[i]=255; ++i; }",10
-.endif
+;.else
+;        .byte "  i=0; while(i<256) { $ arr[i]=255; ++i; }",10
+;.endif
 
 ;;; 338B ???
 ;        .byte "  i=0; while(i<256) { arr[i++]=255; }",10
@@ -6548,7 +6553,8 @@ PRIME=1
         .byte "    if (arr[n>>3] & z) {",10
 .else
         .byte "    $ z= n&7; $ z=1<<z;",10 ;
-        .byte "    if ($ arr[n>>3] & $ z) {",10
+        .byte "    if (arr[n>>3] & z) {",10
+;        .byte "    if ($ arr[n>>3] & $ z) {",10
 .endif
 
         ;;           // simulates printd?
@@ -6580,9 +6586,10 @@ PRIME=1
         .byte "        j=i>>3;",10
         .byte "        arr[j]= arr[j] & z;",10
 .else
-        .byte "        $ z=$ i&7; $ z=1<<z ^255;",10
+        .byte "        $ z= i&7; $ z=1<<z ^255;",10
         .byte "        j=i>>3;",10
-        .byte "        $ arr[j]= $ arr[j] & $ z;",10
+;        .byte "        $ arr[j]= $ arr[j] & $ z;",10
+        .byte "        arr[j]= arr[j] & z;",10
 .endif
         ;; for the while
         .byte "        i+=n;",10
