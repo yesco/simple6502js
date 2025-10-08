@@ -141,7 +141,7 @@
 ;;;   music(...)
 ;;;   sound(...)
 ;;;   ping(), shoot(), zap(), explode(),
-;;;   kbdclick1(), kbdclick2()
+;;;   tick(), tock()
 ;;;   
 ;;; FILE:
 ;;;   ; cload(...) - TODO
@@ -5033,8 +5033,8 @@ afterELSE:
         OJSR "shoot",   $fab5
         OJSR "zap",     $fae1
         OJSR "explode", $facb
-        OJSR "click1",  $fb14
-        OJSR "click2",  $fb2a
+        OJSR "tick",    $fb14
+        OJSR "tock",    $fb2a
 
         OJSR "cls",     $ccce
         OJSR "lores0",  $d9ed
@@ -5273,6 +5273,7 @@ ruleZ:
         .byte 0
 
 endrules:       
+        .byte "|",$ff
 
 ;;; END rules
 ;;; ========================================
@@ -5693,18 +5694,57 @@ doneCE:
 :       
 ;;; - ESC - print HELP
         cmp #27
-        bne :+
+        bne noesc
 
         jsr _savescreen
         lda #<help
         ldx #>help
         jsr _printz
 
-        jsr getchar
-        ;; TODO: display function names from ruleS???
+        jsr waitesc
+
+        ;; display names from ruleS
+        PRINTZ {12,10, DOUBLE,YELLOW,"Symbols found",10, DOUBLE,YELLOW,"Symbols found",10, 10}
+        
+        lda #<_rules
+        sta pos
+        lda #>_rules
+        sta pos+1
+        
+@nextbar:       
+        ldy #0
+        lda (pos),y
+        jsr _incP
+        cmp #'|'
+        bne @nextbar
+        ;; next char
+        ldy #0
+        lda (pos),y
+        ;; end of rules ( endrules!)
+        cmp #$ff
+        beq @donelist
+        ;; standing at name (maybe)
+        PUTC ' '
+@nextchar:       
+        cmp #'a'
+        bcc @nextbar
+        cmp #'z'+1
+        bcs @nextbar
+        jsr putchar
+        jsr _incP
+        ldy #0
+        lda (pos),y
+        jmp @nextchar
+
+@donelist:
+        jsr waitesc
 ;;; TODO: restore cursor
         jmp _loadscreen
-:       
+waitesc:
+        PRINTZ "     ESC>"
+        jmp getchar
+
+noesc:
 ;;; - ctrl-W - save
         cmp #'W'-'@'
         bne :+
@@ -6464,7 +6504,7 @@ GROUP=YELLOW
 .byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"(",GROUP,"OP S",MEAN,")..",CODE,";",MEAN,"or",GROUP,"V OP",CODE,"=",GROUP,"S",CODE,";",10
 .byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == <",10
 .byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
-.byte GROUP,"FN:",CODE,"word A() {...}",10
+.byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
 .byte "    ",CODE,"if (...) ++s;    else {...}",10
 .byte "    ",CODE,"while(...) ...",10
 .byte "    ",CODE,"do ... while(...);",10
@@ -6702,7 +6742,8 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;ATOZ=1
+;
+ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
