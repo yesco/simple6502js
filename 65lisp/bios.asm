@@ -64,7 +64,8 @@ plaputchar:
 ;;; (saves X, A retains value, Y not used)
 ;;; 
 ;;; 12B
-.proc putchar
+.export putchar
+putchar:        
         stx savexputchar
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
@@ -74,11 +75,12 @@ plaputchar:
         jsr $0238
         pla
 notnl:  
+rawputc:        
         tax
         jsr $0238
         ldx savexputchar
         rts
-.endproc
+
 
 
 .else

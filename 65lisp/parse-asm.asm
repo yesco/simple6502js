@@ -5198,7 +5198,6 @@ store_filename:
         inc dos+1
         dex
         bpl :-
-:       
       .byte "]"
 
 
@@ -5308,6 +5307,8 @@ _double:
         rts
 
 FUNC _aftercompile
+;;; TODO: reset S stackpointer! (editaction C-C goes here)
+
 ;;; doesn't set A!=0 if no match/fail just errors!
 ;        sta err
 
@@ -5568,6 +5569,10 @@ FUNC _edit
         ;; TODO: getchar already echoes!!!
         jsr getchar
 
+        jsr editaction
+        jmp _edit
+
+editaction:     
 ;;; - ctrl-C - compile
         cmp #'C'-'@'
         bne :+
@@ -5577,7 +5582,6 @@ FUNC _edit
         TIMER
         jmp _init
 :       
-
 ;;; - DEL - delete backwards
         cmp #127
         bne :+
@@ -5609,9 +5613,9 @@ FUNC _edit
         lda #' '
         sta (ROWADDR),y
 
-        jmp _edit
+ret:
+        rts
 :       
-
 ;;; - ctrl-A - beginning of text in line
         cmp #'A'-'@'
         bne :+
@@ -5620,15 +5624,19 @@ FUNC _edit
 
         ;; move to first nonspace
 ctrla:  
+        ;; end of screen - don't!
+        lda CURROW
+        cmp #27
+        beq ret                 
+        ;; stand on (white)space?
         ldy CURCOL
         lda (ROWADDR),y
         cmp #' '+1
-        bmi _edit
+        bmi ret
         ;; move forward
         putc 'I'-'@'
         jmp ctrla
 :       
-
 ;;; - ctrl-E - end of text in line
         cmp #'E'-'@'
         bne :+
@@ -5636,21 +5644,27 @@ ctrla:
         ;; move to end of line, lol
         putc 'M'-'@'            ; beginning of line
         putc 'J'-'@'            ; next line
-        putc 8                  ; back one!
+;        putc 8                  ; back one!
 
         ;; move to first nonspace
 ctrle:  
+        ;; beginning of screen - don't!
+        lda CURROW
+        cmp #1
+        beq ret                 
+        ;; move back
+        putc 8
+        ;; stand on space?
         ldy CURCOL
         lda (ROWADDR),y
         cmp #' '+1
         bmi doneCE
-        ;; move back
-        putc 8
         jmp ctrle
 doneCE: 
-        jmp _edit
+        ;; forward one (after last char)
+        putc 'I'-'@'
+        rts
 :
-       
 ;;; - ctrl-R - run/display error
         cmp #'R'-'@'
         bne :+
@@ -5658,63 +5672,73 @@ doneCE:
         jsr _clrscr
         jmp _aftercompile
 :       
-
 ;;; - ctrl-X - execute whatever
         cmp #'X'-'@'
         bne :+
 
-;        jsr _clrscr
+;;; TODO: save edit screen?
         jmp _run
 :       
-
 ;;; - ctrl-q - disasm
         cmp #'Q'-'@'
         bne :+
 
         jsr _clrscr
-        jsr _dasm
-        jmp _edit
+        jmp _dasm
 :       
-
-.ifnblank
-;;; - ctrl-z - disasmccc
+;;; - ctrl-Zource (as print source)
         cmp #'Z'-'@'
         bne :+
-
-        jsr _clrscr
-        jsr _dasmcc
-        jmp _edit
+        jmp _printsrc
 :       
-.endif
-
-;;; - ctrl-Print (as source)
-        cmp #'P'-'@'
-        bne :+
-        jsr _printsrc
-        jmp _edit
-:       
-
 ;;; - ctrl-W - save
         cmp #'W'-'@'
         bne :+
         
-        jsr _savescreen
-        jmp _edit
+        jmp _savescreen
 :       
-
-;;; - ctrl-Load
+;;; - ctrl-Load/edit
         cmp #'L'-'@'
         bne  :+
 
-        jsr _loadscreen
-        jmp _edit
+        jmp _loadscreen
 :       
+;;; - RETURN goes next line indented as prev!
+        cmp #'M'-'@'
+        bne :+
 
+        lda #'A'-'@'
+        jsr editaction
+        lda #'N'-'@'
+:       
+;;; - ctrl-Forward (emacs)
+        cmp #'F'-'@'
+        bne :+
+
+        lda #'I'-'@'
+:       
+;;; - ctrl-Backwars (emacs)
+        cmp #'B'-'@'
+        bne :+
+
+        lda #'H'-'@'
+:       
+;;; - ctrl-Next line (emacs)
+        cmp #'N'-'@'
+        bne :+
+
+        lda #'J'-'@'
+:       
+;;; - ctrl-Previous line (emacs)
+        cmp #'P'-'@'
+        bne :+
+
+        lda #'K'-'@'
+:       
 ;;; - control char - just print it
         cmp #' '
         bcc editprint
 
-:       
 ;;; - printables
         pha
         ;; insert - need to push other chars on line right
@@ -5731,9 +5755,8 @@ doneCE:
         pla
 editprint:      
         ;; print it
-        jsr putchar
-        jmp _edit
-        
+        jmp rawputc
+
 
 FUNC _printsrc
         jsr _clrscr
