@@ -6392,9 +6392,33 @@ FUNC printstack
 input:
 ;        .byte "word main(){}",0
 
-
 ;
-CIRCLE=1
+LINEBENCH=1
+.ifdef LINEBENCH
+        .byte "word main(){",10
+        .byte "  return 3;",10
+        .byte "  hires();",10
+        .byte "  for(i=0; i<239; ++i) {",10
+        .byte "    curset(239-i, 199, 3);",10
+        .byte "    draw(i*2-239, 0-199, 2);",10
+        .byte "  }",10
+        .byte "  for(i=0; i<199; ++i) {",10
+        .byte "    curset(0, i, 3);",10
+        .byte "    draw(239, 199-i-i, 2);",10
+        .byte "  }",10
+        .byte "  curset(120, 100, 3);",10
+        .byte "  for(i=0; i<99; ++i) {",10
+        .byte "    circle(i, 2);",10
+        .byte "  }",10
+        .byte "  asm(",'"',"cli",'"',");",10
+        .byte "  getchar();",10
+        .byte "  asm(",'"',"sei",'"',");",10
+        .byte "  text();",10
+        .byte "}",10
+        .byte 0
+.endif ; LINEBENCH
+
+;CIRCLE=1
 .ifdef CIRCLE
         .byte "word main(){",10
         .byte "  hires();",10
