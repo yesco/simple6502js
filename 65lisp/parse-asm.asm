@@ -549,8 +549,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -5579,10 +5578,19 @@ FUNC _edit
         jmp _init
 :       
 
+;;; - DEL - delete backwards
+        cmp #127
+        bne :+
+        
+        ;; back one, delete forward!
+        putc 8
+        ;; always true
+        bne @bs
+:       
 ;;; - ctrl-D - delete char forward
         cmp #'D'-'@'
         bne :+
-
+@bs:
         ;; move chars back til end of line
         ldy CURCOL
 @copyback:
@@ -5640,8 +5648,7 @@ ctrle:
         putc 8
         jmp ctrle
 doneCE: 
-        ;; move one forward
-;        putc 'I'-'@'
+        jmp _edit
 :
        
 ;;; - ctrl-R - run/display error
@@ -5700,9 +5707,30 @@ doneCE:
         bne  :+
 
         jsr _loadscreen
+        jmp _edit
 :       
 
-;;; - any other char - print it
+;;; - control char - just print it
+        cmp #' '
+        bcc editprint
+
+:       
+;;; - printables
+        pha
+        ;; insert - need to push other chars on line right
+        ldy #38
+:       
+        lda (ROWADDR),y
+        iny
+        sta (ROWADDR),y
+        dey
+        dey
+        cpy CURCOL
+        bcs :-
+
+        pla
+editprint:      
+        ;; print it
         jsr putchar
         jmp _edit
         
