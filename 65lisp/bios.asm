@@ -34,6 +34,9 @@ biostart:
 ;;;
 ;;; 10B
 .proc getchar      
+.ifdef TIM
+        cli
+.endif ; TIM
         stx savexputchar
         sty saveyputchar
 
@@ -41,11 +44,14 @@ biostart:
         bpl getchar             ; no char - loop
         tax
         ;; TODO: optional?
-        jsr $0238               ; echo char
+;        jsr $0238               ; echo char
 
         ldy saveyputchar
         ldx savexputchar
 
+.ifdef TIM
+        sei
+.endif ; TIM
         rts
 .endproc
 

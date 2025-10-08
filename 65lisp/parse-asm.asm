@@ -416,6 +416,19 @@ CURCALC		= $001f      ; ? how to update?
 ;;; TODO: not working, parse error?
 ;COMPILESCREEN=1
 
+;;; TIMe events: compile/run
+;;; disables interrupts and counts cycles!
+;;; relatively accurately...
+;;; It also seems to make the compiler NOT crash
+;;; when run repeadetly... HMMM? "resetting" stack
+;;; not good when interrupts running????
+;;; (just enables interrupt before getchar)
+;;; 
+;;; TODO: BUG: i think there is some zeropage overlap
+;;;   with oric timer and vars... lol
+;
+TIM=1
+
 
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
@@ -435,18 +448,6 @@ CURCALC		= $001f      ; ? how to update?
         .byte $2c               ; BITabs 3 B
 .endmacro
 
-;;; TIMe events: compile/run
-;;; disables interrupts and counts cycles!
-;;; relatively accurately...
-;;; It also seems to make the compiler NOT crash
-;;; when run repeadetly... HMMM? "resetting" stack
-;;; not good when interrupts running????
-;;; (just enables interrupt before getchar)
-;;; 
-;;; TODO: BUG: i think there is some zeropage overlap
-;;;   with oric timer and vars... lol
-;
-TIM=1
 
 .ifblank
 ;.ifnblank
@@ -5563,37 +5564,24 @@ again:
         sta $24f
 
 
-FUNC _edit  
+FUNC _edit
 
         ;; TODO: getchar already echoes!!!
-.ifdef TIM
-        cli
         jsr getchar
-        sei
-.else
-        jsr getchar
-.endif
 
-        ;; - ctrl-C - compile
+;;; - ctrl-C - compile
         cmp #'C'-'@'
         bne :+
 
-
         jsr _clrscr
-
-;;; TODO: can compile few times, something messed up?
-;;; TODO: detect dirty (?) and require save?
-
         ;; This basically restarts program, lol
         TIMER
         jmp _init
 :       
-        ;; - ctrl-D - delete char forward
+
+;;; - ctrl-D - delete char forward
         cmp #'D'-'@'
         bne :+
-
-;;; TODO: remove when getchar not echo
-        jsr putchar
 
         ;; move chars back til end of line
         ldy CURCOL
@@ -5615,12 +5603,12 @@ FUNC _edit
 
         jmp _edit
 :       
-        ;; - ctrl-A - beginning of text in line
+
+;;; - ctrl-A - beginning of text in line
         cmp #'A'-'@'
         bne :+
 
-        lda #'M'-'@'
-        jsr putchar
+        putc 'M'-'@'
 
         ;; move to first nonspace
 ctrla:  
@@ -5629,21 +5617,18 @@ ctrla:
         cmp #' '+1
         bmi _edit
         ;; move forward
-        lda #'I'-'@'
-        jsr putchar
+        putc 'I'-'@'
         jmp ctrla
 :       
-        ;; - ctrl-E - end of text in line
+
+;;; - ctrl-E - end of text in line
         cmp #'E'-'@'
         bne :+
 
         ;; move to end of line, lol
-        lda #'M'-'@'
-        jsr putchar
-        lda #'J'-'@'
-        jsr putchar
-        lda #8
-        jsr putchar
+        putc 'M'-'@'            ; beginning of line
+        putc 'J'-'@'            ; next line
+        putc 8                  ; back one!
 
         ;; move to first nonspace
 ctrle:  
@@ -5652,29 +5637,30 @@ ctrle:
         cmp #' '+1
         bmi doneCE
         ;; move back
-        lda #8                  ; BS
-        jsr putchar
+        putc 8
         jmp ctrle
 doneCE: 
         ;; move one forward
-        lda #'I'-'@'
-        jsr putchar
-:       
-        ;; - ctrl-R - run/display error
+;        putc 'I'-'@'
+:
+       
+;;; - ctrl-R - run/display error
         cmp #'R'-'@'
         bne :+
 
         jsr _clrscr
         jmp _aftercompile
 :       
-        ;; - ctrl-X - execute whatever
+
+;;; - ctrl-X - execute whatever
         cmp #'X'-'@'
         bne :+
 
 ;        jsr _clrscr
         jmp _run
 :       
-        ;; - ctrl-q - disasm
+
+;;; - ctrl-q - disasm
         cmp #'Q'-'@'
         bne :+
 
@@ -5682,8 +5668,9 @@ doneCE:
         jsr _dasm
         jmp _edit
 :       
+
 .ifnblank
-        ;; - ctrl-z - disasmccc
+;;; - ctrl-z - disasmccc
         cmp #'Z'-'@'
         bne :+
 
@@ -5693,30 +5680,30 @@ doneCE:
 :       
 .endif
 
-        ;; ctrl-Print (as source)
-;;; 10B dispatch should be 3B lol
+;;; - ctrl-Print (as source)
         cmp #'P'-'@'
         bne :+
         jsr _printsrc
         jmp _edit
 :       
-        ;; - ctrl-W - save
+
+;;; - ctrl-W - save
         cmp #'W'-'@'
         bne :+
         
         jsr _savescreen
         jmp _edit
 :       
-        ;; ctrl-Load
+
+;;; - ctrl-Load
         cmp #'L'-'@'
         bne  :+
 
         jsr _loadscreen
 :       
-        jmp _edit
 
-        ;; TODO: getchar already echoes!!!
-;        jsr putchar
+;;; - any other char - print it
+        jsr putchar
         jmp _edit
         
 
@@ -6095,9 +6082,9 @@ FUNC timer
 ;        putc 10
         
         lda #$ff
-        sta READTIMER
+;        sta READTIMER
         ;; this write triggers reset
-        sta READTIMER+1
+;        sta READTIMER+1
 .else
 
         ;; software interrupt ORIC timer
@@ -6160,8 +6147,8 @@ CSRESET=1
 .ifdef TIM
         lda #$ff
         ;; writing hibyte triggers
-        sta READTIMER
-        sta READTIMER+1
+;        sta READTIMER
+;        sta READTIMER+1
 .endif
         rts
 
@@ -6392,11 +6379,9 @@ FUNC printstack
 input:
 ;        .byte "word main(){}",0
 
-;
-LINEBENCH=1
+;LINEBENCH=1
 .ifdef LINEBENCH
         .byte "word main(){",10
-        .byte "  return 3;",10
         .byte "  hires();",10
         .byte "  for(i=0; i<239; ++i) {",10
         .byte "    curset(239-i, 199, 3);",10
@@ -6408,11 +6393,9 @@ LINEBENCH=1
         .byte "  }",10
         .byte "  curset(120, 100, 3);",10
         .byte "  for(i=0; i<99; ++i) {",10
-        .byte "    circle(i, 2);",10
+        .byte "    circle(i, 0);",10
         .byte "  }",10
-        .byte "  asm(",'"',"cli",'"',");",10
         .byte "  getchar();",10
-        .byte "  asm(",'"',"sei",'"',");",10
         .byte "  text();",10
         .byte "}",10
         .byte 0
