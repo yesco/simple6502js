@@ -5691,16 +5691,33 @@ doneCE:
         bne :+
         jmp _printsrc
 :       
+;;; - ESC - print HELP
+        cmp #27
+        bne :+
+
+        jsr _savescreen
+        lda #<help
+        ldx #>help
+        jsr _printz
+
+        jsr getchar
+        ;; TODO: display function names from ruleS???
+;;; TODO: restore cursor
+        jmp _loadscreen
+:       
 ;;; - ctrl-W - save
         cmp #'W'-'@'
         bne :+
         
+;;; TODO: save cursor
         jmp _savescreen
 :       
 ;;; - ctrl-Load/edit
         cmp #'L'-'@'
+;        beq _loadscreen
         bne  :+
 
+;;; TODO: restore cursor
         jmp _loadscreen
 :       
 ;;; - RETURN goes next line indented as prev!
@@ -6408,9 +6425,52 @@ FUNC printstack
         rts
         
 
+BLACK    =128+0
+RED      =128+1
+GREEN    =128+2
+YELLOW   =128+3
+BLUE     =128+4
+MAGNENTA =128+5
+CYAN     =128+6
+WHITE    =128+7
+BG       =16                    ; BG+WHITE
+NORMAL   =128+8
+DOUBLE   =128+10
 
+help:   
 
+MEAN=WHITE
+KEY=GREEN
+CODE=GREEN
+GROUP=YELLOW
 
+.byte 12,10
+.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
+.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
+.byte "",10
+.byte MEAN,"You are always in the EDITOR",10
+.byte KEY,"ESC",MEAN,"Help",10
+.byte KEY," ^C",MEAN,"ompile",10
+.byte KEY," ^R",MEAN,"un    ",KEY," ^X",MEAN,"ecute",10
+.byte KEY," ^Q",MEAN,"asm  - shows compiled code",10
+.byte KEY," ^W",MEAN,"rite - save screen/source",10
+.byte KEY," ^L",MEAN,"oad  - load screen/source",10
+.byte "",10
+.byte MEAN,"Editor:",KEY,"arrow DEL ^H",MEAN,"bs",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
+.byte MEAN,"(line)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte "",10
+.byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
+.byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
+.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"(",GROUP,"OP S",MEAN,")..",CODE,";",MEAN,"or",GROUP,"V OP",CODE,"=",GROUP,"S",CODE,";",10
+.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == <",10
+.byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
+.byte GROUP,"FN:",CODE,"word A() {...}",10
+.byte "    ",CODE,"if (...) ++s;    else {...}",10
+.byte "    ",CODE,"while(...) ...",10
+.byte "    ",CODE,"do ... while(...);",10
+.byte "    ",CODE,"for(i=0; i<NUM; ++i)...",MEAN,"ONLY i!",10
+.byte "    ",CODE,"L: ... goto L;"
+.byte 0
 
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
