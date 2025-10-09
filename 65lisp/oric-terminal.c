@@ -91,6 +91,7 @@ void fullputc(int c) {
 
 char* fullputs(char* s) {
   while(*s) fullputc(*s++);
+  return s;
 }
 
 int main(void) {

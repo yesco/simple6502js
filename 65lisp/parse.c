@@ -14,8 +14,14 @@ unsigned char* last= 0;
 
 extern char** rules;
 
-extern char *out, output;
+extern char *out, output, OK;
+
 #pragma zpsym ("out")
+
+extern int myfun(int a, int b) {
+  printf("\nmyfun(%d, %d)\n", a, b);
+  return a+b;
+}
 
 // incremental disasm from last position/call
 extern void iasmstart() {
@@ -41,7 +47,8 @@ extern void dasm() {
 }
 
 extern void dasmcc() {
-  disasm((void*)start, (void*)&endfirstpage, 0);
+//  disasm((void*)start, (void*)&endfirstpage, 0);
+  disasm((int)&OK, ((int)&OK)+20, 0);
 }
 
 // from conio-raw.c
@@ -167,7 +174,28 @@ char* parse(char r, char* in) {
 
 #include <conio.h>
 
+// cc65 library functions are week and can be overwritten
+void gotoxy(char x, char y) {
+#define CURROW *(char*)0x268
+#define CURCOL *(char*)0x269
+#define ROWADDR *(int*)0x12
+#define SCREEN 0xbb80
+//TODO: cursor off
+  putchar('Q'-'@');
+  CURCOL= x;
+  CURROW= y;
+  ROWADDR= 40*y+SCREEN;
+  putchar('Q'-'@');
+//TODO: cursor on
+}
+
 void main() {
+#ifdef FIHS
+  int i;
+  printf("%d\n", myfun(17, 42));
+  for(i=0; i<26; ++i) { gotoxy(i,i); putchar('A'+i); }
+  getchar();
+#endif
 
 #ifdef __ATMOS__
   // bgcolor(0);

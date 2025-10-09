@@ -14,6 +14,9 @@
 ;;; 
 ;;; A after putchar is assumed to be A before.
 
+;;; enable to invers on hibit
+;HIBIT=1
+
 .ifdef __ATMOS__
 
 .zeropage
@@ -120,6 +123,7 @@ rawputc:
         tax
         jsr $0238
 
+.ifdef HIBIT
         ;; printable with hibit?
         cmp #128+' '
         bcc :+
@@ -132,6 +136,7 @@ rawputc:
         ldy saveyputchar
 :       
 
+.endif ; HIBIT
         ldx savexputchar
         rts
 
@@ -144,6 +149,7 @@ rawputc:
 
 putchar=_putchar
 getchar=_getchar
+rawputc=_putchar
 
 plaputchar:
         pla

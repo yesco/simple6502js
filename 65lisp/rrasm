@@ -59,11 +59,18 @@ clang oric-terminal.c -o oric-terminal || exit
 #echo "=== RUN ==="
 #(time sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
 
+# -- enable NON-blocking getchar!!!
+
+##stty cbreak raw -echo min 0
+stty cbreak -echo
+
 # -- run with oric-terminal
-(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log | ./oric-terminal
+#sim65 -c $name.sim "$@"
+(sim65 -c $name.sim "$@"; echo "--- EXIT=$? ---") | tee $name.log | ./oric-terminal 
+stty sane
 
 # --- run NO oric-terminal
-#(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
+#(sim65 -c $name.sim "$@"; echo "--- EXIT=$? ---") | tee $name.log
 
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time");

@@ -111,7 +111,7 @@ void disasm(char* mc, char* end, char indent) {
 #else
 
 char* disasm(char* mc, char* end, char indent) {
-  char* p= (char*)mc;
+  char * p= (char*)mc, c;
   int maxlines= 25;
 
   if (!(end-mc)) return p;
@@ -135,7 +135,10 @@ char* disasm(char* mc, char* end, char indent) {
 
     printf(ADDR"%*c%04X"MNIC, indent, ' ', p);
 
+#ifdef __ATMOS__    
     if (!--maxlines) return p;
+#endif
+
     ++p;
 
     // exception modes
@@ -157,7 +160,8 @@ char* disasm(char* mc, char* end, char indent) {
       switch(m) { // addressing modes
       case 0b000: printf(i&1?"($%02x,x)":"#$%02x", *p++); break;
       case 0b001: printf("$%02x zp", *p++); break;
-      case 0b010: printf(i&1?"#$%02x":"a", *p++); break;
+      case 0b010: c=*p++; printf(i&1?"#$%02x":"a", c);
+       if (i&1 && ((char)((c&0x7f)-' ')<128-' ')) printf("  '%c'", c);   break;
     //case 0b011: printf(i&1?" $%04x":" a", *((int*)p)++); break; // wrong for STX ?
       case 0b011: printf(i&3?"$%04x":"a", *((int*)p)++); break; // hmmm, seems to work, lol
       case 0b100: printf("($%02x),y", *p++); break;
@@ -170,10 +174,10 @@ char* disasm(char* mc, char* end, char indent) {
   } //putchar('\n');
 
 #ifdef __ATMOS__
-  // currow>24
+// press return for one more line
+// currow>24
 //  if (*(char*)0x268>24) {
-//    putchar(' '); putchar(' '); putchar('>');
-//    asm("cli"); getchar(); asm("sei");
+//    putchar(' '); putchar(' '); putchar('>'); getchar();
 //  }
 #endif __ATMOS__
 

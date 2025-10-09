@@ -1,6 +1,140 @@
 ;;; tips and tricks
 ;;; - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
 
+pushax: 
+;;; 14B 15c-28c
+        dec sp
+        beq @onemoredec
+        dec sp
+        beq @done
+        bne @underflow 
+@onemoredec:
+        dec sp
+@underflow:
+        dec sp+1
+@done:
+;;; 7B 
+        ldy #0
+        sta (sp),y
+        txa
+        sta (sp),y
+
+        rts
+
+pushax: 
+;;; 18B 31c- +6cret
+
+;;; 11B 15-c
+        dec spy
+        dec spy
+        ldy spy
+        ;; underflow?
+        bpl :+
+        jsr fixspy
+:       
+;;; 6B 16c
+        sta (sp),y
+        txa
+        iny
+        sta (sp),y
+        
+        rts
+
+pushax: 
+;;; 18B 29c- +6cret
+
+;;; 11B 13c
+        ldy spy
+        dey
+        dey
+        sty spy
+        ;; underflow?
+        bpl :+
+        jsr fixspy
+:       
+;;; 6B 16c
+        sta (sp),y
+        txa
+        iny
+        sta (sp),y
+
+        rts
+
+pushax: 
+;;; 16B 29c- +6c
+        ldy #0
+        sta (sp),y
+        dex sp
+        tax
+        sta (sp),y
+        dex sp
+        bpl :+
+        jsr fixspy
+:       
+
+pushax: 
+;;; 10B 22c
+
+;;; 5B 8c
+        ldy spy
+        dey
+        sty sty
+;;; 5B 12c
+        sta (sp),y
+        tax
+        sta (sp),y
+
+pushax: 
+;;; 11B 20c
+        dec spy
+        ldx spy
+        sta LOSTACK,y
+        tax
+        sta HISTACK,y
+        
+
+
+
+pushax: 
+;;; 16B 27c + 6cret == 33!!!
+        ;; hi
+        ldy spy
+        sta (sp),y
+        ;; lo
+        tax
+        iny
+        sta (sp),y
+        ;; this may flip over if spy
+        iny
+        sty spy
+        bne :+
+        jsr fixspy
+:       
+
+pushax: 
+;;; 23B 38c-42c +6cret
+
+;;; 12B 16c-20c
+        pha       
+        lda     sp
+        sec       
+        sbc     #2
+        sta     sp
+        bcs     :+
+        dec     sp+1
+;;; 10B 22c
+:       
+        ldy     #1     
+        txa            
+        sta     (sp),y 
+        pla            
+        dey            
+        sta     (sp),y          ; (38)
+
+        rts                     ; (44)
+
+
+
 
 
 ;;; cut-n-paste variants not used?

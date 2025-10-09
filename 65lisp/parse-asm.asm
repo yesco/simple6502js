@@ -365,7 +365,7 @@
 ;;; 
 
 ;;; TODO: too many ops - consider "pickN" and patch only
-;;;   {?  - PUSHLOC (push and patc next loc)
+;;;   {{  - PUSHLOC (push and patc next loc)
 ;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
 ;;;   :   - push loc (onto stack)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
@@ -571,7 +571,8 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -1127,16 +1128,13 @@ FUNC _acceptrule
 .ifdef TRACERULE
 
 .ifdef TRACEDEL
-        lda #8
-        jsr putchar
-        jsr putchar
-
-        lda #' '
-        jsr putchar
+        jsr bs
         jsr putchar
 
-        lda #8
+        jsr spc
         jsr putchar
+
+        jsr bs
         jsr putchar
 .else
         putc '<'
@@ -1799,19 +1797,57 @@ DEBC ']'
         jsr _incR
         jmp _next
 :       
+;;; ' '- JSR skip 2 bytes (QUOTE THEM!)
+        cmp #' '                ; JSR xx xx 
+;        ldx #1
+        bne :+
+        ;; out JSR (' ')
+;;; 28B
+        sta (_out),y
+        jsr _incO
+
+        jsr _incR
+        lda (rule),y
+        sta (_out),y
+        jsr _incO
+
+        jsr _incR
+        lda (rule),y
+        sta (_out),y
+        jsr _incO
+
+        jmp _generate
+
+;;; TODO: hmmm
+;;; 21...?
+        sta (_out),y
+        jsr _incO
+
+        ;; Y stil 0
+        ;; lo: read next
+        jsr _incR
+        lda (rule),y
+        pha
+        ;; hi: read next (inc in genoutAX)
+        jsr _incR            
+        lda (rule),y
+        tax
+        pla
+        jmp genoutAX
+:       
 ;;; '<' LO %d
         cmp #'<'
         bne :+
 DEBC '<'
         lda tos
-        jmp @doout
+        jmp doout
 :       
 ;;; '>' HI %d
         cmp #'>'
         bne :+
 DEBC '>'
         lda tos+1
-        jmp @doout
+        jmp doout
 :       
 ;;; 'D' SET tos=dos
         cmp #'D'
@@ -1891,7 +1927,7 @@ DEBC '{'
 :       
 ;;; "+" PUT %d+1
         cmp #'+'
-        bne @doout              ; raw byte - no special
+        bne doout               ; raw byte - no special
 DEBC '+'
         ldx tos+1
         ldy tos
@@ -1900,6 +1936,8 @@ DEBC '+'
         bne @noinc
         inx
 @noinc:
+
+genoutAX: 
         ;; put
         ldy #0
         sta (_out),y
@@ -1908,17 +1946,19 @@ DEBC '+'
         iny
         lda (rule),y
         cmp #'>'
-        bne @done
+        bne gendone
         dey
 .endif
         ;; output '>' hibyte
         txa
+        ;; these don't touch A
+        ;; X changed, but that's ok!
         jsr _incR
         jsr _incO
-        ;; fall-through @doout
-@doout:
+        ;; fall-through doout
+doout:
         sta (_out),y
-@done:
+gendone:
         jsr _incO
         jmp _generate
 
@@ -2406,8 +2446,8 @@ ruleR:
 ;;.endif
 ;;ruleU: - BYTERULES "ruleC"
 ;;ruleV: - BYTERULES "ruleD"
-ruleW:   ;;;  while?
-ruleX:
+ruleW:
+;ruleX:  -   cc65 parameter list
 ;;ruleY: -   parameters init
 ;;ruleZ: -   list of parameters
         .byte 0
@@ -2786,7 +2826,7 @@ ruleC:
       .byte '['
 ;;; PRIMEBYTE: TODO: this adds 10bytes!!!! lol 313->323
 ;;; but sim: correct, and oric!
-        ldx #0
+;        ldx #0
       .byte ']'
 .endif
 
@@ -4009,11 +4049,6 @@ ruleK:
 ruleS:
         ;; empty statement is legal
         .byte ";"
-      .byte '['
-        ;; for expects empty statement to be "true"
-;;; TODO: move to for
-        lda #42
-      .byte ']'
         
 .ifdef OPTRULES
         .byte "|return%U();"
@@ -4799,6 +4834,8 @@ afterELSE:
 
 ;;; TODO: BYTERULES for $ i
 
+;;; TODO: for expects empty statement to be "true"!
+
         .byte "|for(i=0;i<%D[d] ;++%V)"
 ;;; 22B (is less than while!!! 40B!)
       .byte "%{"
@@ -5271,6 +5308,78 @@ store_filename:
 .endif ; ATMOS_FIX
 
 
+.macro CHARCHECK addr,char
+  .assert (<addr <> char),error,"%% XJSR addr - bad lo']'"
+  .assert (>addr <> char),error,"%% XJSR addr - bad hi']'"
+.endmacro
+
+.macro CHECK addr
+;;; can't give good error message...
+;;        CHARCHECK(addr,']')
+
+  .assert (<addr <> '<'),error,"%% RULE addr - bad lo'<'"
+  .assert (>addr <> '<'),error,"%% RULE addr - bad hi'<'"
+
+  .assert (<addr <> '>'),error,"%% RULE addr - bad lo'>'"
+  .assert (>addr <> '>'),error,"%% RULE addr - bad hi'>'"
+
+  .assert (<addr <> '+'),error,"%% RULE addr - bad lo'+'"
+  .assert (>addr <> '+'),error,"%% RULE addr - bad hi'+'"
+
+  .assert (<addr <> 'D'),error,"%% RULE addr - bad lo'D'"
+  .assert (>addr <> 'D'),error,"%% RULE addr - bad hi'D'"
+
+  .assert (<addr <> 'd'),error,"%% RULE addr - bad lo'd'"
+  .assert (>addr <> 'd'),error,"%% RULE addr - bad hi'd'"
+
+  .assert (<addr <> ':'),error,"%% RULE addr - bad lo':'"
+  .assert (>addr <> ':'),error,"%% RULE addr - bad hi':'"
+
+  .assert (<addr <> ';'),error,"%% RULE addr - bad lo';'"
+  .assert (>addr <> ';'),error,"%% RULE addr - bad hi';'"
+
+  .assert (<addr <> '#'),error,"%% RULE addr - bad lo'#'"
+  .assert (>addr <> '#'),error,"%% RULE addr - bad hi'#'"
+
+  .assert (<addr <> '{'),error,"%% RULE addr - bad lo'{'"
+  .assert (>addr <> '{'),error,"%% RULE addr - bad hi'{'"
+
+  .assert (<addr <> '?'),error,"%% RULE addr - bad lo'?'"
+  .assert (>addr <> '?'),error,"%% RULE addr - bad hi'?'"
+
+.endmacro
+
+.macro XJSR addr
+        CHECK(addr)
+        jsr addr
+.endmacro
+        
+
+
+
+;;; ----------------------------------------
+;;; "borrowing" cc65 as stdlib!
+
+
+;;; TODO: furk!
+;;;   thsi worked, when it shouldn't have!
+;;;   HAHA: 5555555
+;;; 
+;;; void gotoxy(unsigned char, unsigned char);
+;;;    somehow by pure "Luck" it worked...
+;;;   but datastack is messed up!
+
+;;; todo:
+;        .BYTE "|gotoxy(",_BYTEPARM,",",_BYTEPARAM,");"
+
+;;; void gotoxy(unsigned char, unsigned char);
+.import _gotoxy
+
+        .byte "|gotoxy",_X
+      .byte "["
+        jsr _gotoxy
+      .byte "]"
+
 ;;; memcpy len<=256
 ;;; Function call with 3 constants:
 ;;;   cost:   23 B (3x lda/ldx, 2x sta/stx, 1x jsr)
@@ -5405,6 +5514,118 @@ ruleZ:
         .byte TAILREC
         
         .byte 0
+
+;;; cc65 AX _fastcall_ calling convention
+.import pushax, popax, pusha0, pusha, popa
+
+.ifnblank ;.ifdef __CC65__
+ruleX:
+        .byte 0
+.else
+;;; TODO: think hard, does it handle nesting correctly?
+ruleX:  
+        .byte "("
+;      .byte "%{"
+;        PUTC 'B'
+;        jsr immret
+        .byte TAILREC
+
+        .byte "|)"
+;      .byte "%{"
+;        PUTC 'E'
+;        jsr immret
+
+        .byte "|,"
+      .byte "["
+        jsr pushax
+;;; problem here, depend on address???
+      .byte "]"
+;      .byte "%{"
+;        PUTC 'P'
+;        jsr immret
+        .byte TAILREC
+
+        ;; one byte constant paramter 0-255
+        .byte "|%D,"
+      .byte "%{"
+        ;; TODO: this may not be easily skippable
+;;;  make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:              
+        jsr immret
+      .byte "["
+        ;; saves 2 bytes!
+        lda  #'<'
+        jsr pusha0
+      .byte "]"
+        .byte TAILREC
+
+        .byte "|",_E
+;;; TODO: can we optimize if same constant twice? (10,10)??
+;      .byte "%{"
+;        PUTC 'E'
+;        jsr immret
+        .byte TAILREC
+        
+        .byte 0
+
+;;; TODO: fails on foo(42,(93),35) ???
+        .byte "("
+       .byte "%{"
+PUTC 'B'
+        ;; counter for args
+        lda #0
+        jsr pusha
+        jsr immret
+
+        .byte TAILREC
+
+
+        .byte "|,"
+      .byte "%{"
+PUTC 'P'
+        putc '?'
+        jsr immret
+
+      .byte "["
+        jsr pushax
+      .byte "]"
+        .byte TAILREC
+        
+        .byte "|)"
+      .byte "%{"
+PUTC 'E'
+        jsr popa
+        sta tos
+        jsr immret
+      .byte "["
+        ;; vararg always generated, lol
+        ;; (however vararg f needs call jsr pushax
+        ;;  for the last argument before jsr FUN)
+        ldy #'<'
+      .byte "]"
+
+
+        .byte "|",_E
+        ;; parse E leaves value in AX
+.ifnblank
+      .byte "%{"
+PUTC 'A'
+        ;; +2 for each arg
+        jsr popa
+        clc
+        adc #02
+        jsr pusha
+        putc 'B'
+        jsr immret
+.endif
+        .byte TAILREC
+
+
+        .byte 0
+.endif ; __CC65__
 
 endrules:       
         .byte "|",$ff
@@ -5565,6 +5786,7 @@ status:
 ;;; LOOPS: lol
 
 
+.export _OK
 _OK:
         putc 10
         putc 'O'
@@ -5585,17 +5807,16 @@ _OK:
         putc 10
         putc 10
 
+        jmp _edit
+
 _run:   
 
 ;;; Enable to always show generated code
 ;;; TODO: make it do inline while PRINTREAD
 ;        jsr _dasm
-
+;        jsr getchar             
+        
         TIMER
-
-;;; TODO: remove, or make Compile not Run?
-;        jsr _dasm
-;        TIMER
 
 
 
@@ -5606,6 +5827,7 @@ runs:   .res 1
         ;; RUN PROGRAM a TIMES
         lda #1
 ;        lda #10                
+;        lda #100
         sta runs
 again:
         jsr _output
@@ -5708,11 +5930,12 @@ FUNC _edit
         jmp _edit
 
 editaction:     
+.define CTRL(c) c-'@'
 ;;; - ctrl-C - compile
-        cmp #'C'-'@'
+        cmp #CTRL('C')
         bne :+
 
-        jsr _clrscr
+        jsr clrscr
         ;; This basically restarts program, lol
         TIMER
         jmp _init
@@ -5722,12 +5945,12 @@ editaction:
         bne :+
         
         ;; back one, delete forward!
-        putc 8
+        jsr bs
         ;; always true
         bne @bs
 :       
 ;;; - ctrl-D - delete char forward
-        cmp #'D'-'@'
+        cmp #CTRL('D')
         bne :+
 @bs:
         ;; move chars back til end of line
@@ -5752,10 +5975,10 @@ ret:
         rts
 :       
 ;;; - ctrl-A - beginning of text in line
-        cmp #'A'-'@'
+        cmp #CTRL('A')
         bne :+
 
-        putc 'M'-'@'
+        putc CTRL('M')
 
         ;; move to first nonspace
 ctrla:  
@@ -5769,17 +5992,16 @@ ctrla:
         cmp #' '+1
         bmi ret
         ;; move forward
-        putc 'I'-'@'
+        jsr forward
         jmp ctrla
 :       
 ;;; - ctrl-E - end of text in line
-        cmp #'E'-'@'
+        cmp #CTRL('E')
         bne :+
 
         ;; move to end of line, lol
-        putc 'M'-'@'            ; beginning of line
-        putc 'J'-'@'            ; next line
-;        putc 8                  ; back one!
+        putc CTRL('M')          ; beginning of line
+        jsr nl
 
         ;; move to first nonspace
 ctrle:  
@@ -5788,7 +6010,7 @@ ctrle:
         cmp #1
         beq ret                 
         ;; move back
-        putc 8
+        jsr bs
         ;; stand on space?
         ldy CURCOL
         lda (ROWADDR),y
@@ -5797,43 +6019,161 @@ ctrle:
         jmp ctrle
 doneCE: 
         ;; forward one (after last char)
-        putc 'I'-'@'
+        jsr forward
         rts
 :
 ;;; - ctrl-R - run/display error
-        cmp #'R'-'@'
+        cmp #CTRL('R')
         bne :+
 
-        jsr _clrscr
+        jsr clrscr
         jmp _aftercompile
 :       
 ;;; - ctrl-X - execute whatever
-        cmp #'X'-'@'
+        cmp #CTRL('X')
         bne :+
 
 ;;; TODO: save edit screen?
         jmp _run
 :       
 ;;; - ctrl-q - disasm
-        cmp #'Q'-'@'
+        cmp #CTRL('Q')
         bne :+
 
-        jsr _clrscr
+        jsr _savescreen
+        jsr clrscr
+        jmp _dasm
+:       
+;;; - ctrl-Qasm - disasm
+        cmp #CTRL('Q')
+        bne :+
+
+        jsr _savescreen
+        jsr clrscr
         jmp _dasm
 :       
 ;;; - ctrl-Zource (as print source)
-        cmp #'Z'-'@'
+        cmp #CTRL('Z')
         bne :+
         jmp _printsrc
 :       
 ;;; - ESC - print HELP
         cmp #27
-        bne noesc
+        bne :+
 
         jsr _savescreen
+        jsr _help
+        jmp _loadscreen
 
-        lda #<help
-        ldx #>help
+:
+;;; - ctrl-W - save
+        cmp #CTRL('W')
+        bne :+
+        
+        jmp _savescreen
+:       
+;;; - ctrl-Load/edit
+        cmp #CTRL('L')
+        bne  :+
+
+        jmp _loadscreen
+:       
+;;; - ctrl-Youit
+        cmp #CTRL('Y')
+        bne  :+
+
+        jsr _savescreen
+        jsr nl
+
+.import _exit
+        lda #0
+        tax
+        jsr _exit
+
+:       
+;;; - RETURN goes next line indented as prev!
+        cmp #CTRL('M')
+        bne :+
+
+        lda #CTRL('A')
+        jsr editaction
+
+        lda #CTRL('N')
+:       
+;;; - ctrl-Forward (emacs)
+        cmp #CTRL('F')
+        bne :+
+
+        jsr forward
+:       
+;;; - ctrl-Backwards (emacs)
+        cmp #CTRL('B')
+        bne :+
+
+        lda #CTRL('H')
+:       
+;;; - ctrl-Next line (emacs)
+        cmp #CTRL('N')
+        bne :+
+
+        lda #CTRL('J')
+:       
+;;; - ctrl-Previous line (emacs)
+        cmp #CTRL('P')
+        bne :+
+
+        lda #CTRL('K')
+:       
+
+;;; - control char - just print it
+        cmp #' '
+        bcc editprint
+
+;;; - printables
+        pha
+        ;; insert - need to push other chars on line right
+        ldy #38
+:       
+        lda (ROWADDR),y
+        iny
+        sta (ROWADDR),y
+        dey
+        dey
+        cpy CURCOL
+        bcs :-
+
+        pla
+editprint:
+        ;; print it
+        jmp rawputc
+
+
+FUNC _printsrc
+        jsr clrscr
+        lda #<input
+        ldx #>input
+        jmp _printz
+.export _clrscr
+_clrscr:        
+clrscr:        
+        lda #12
+        SKIPTWO
+forward:        
+        lda #'I'-'@'
+        SKIPTWO
+bs:
+        lda #10
+        SKIPTWO
+spc:
+        lda #' '
+        SKIPTWO
+nl:    
+        lda #10
+        jmp putchar
+
+FUNC _help
+        lda #<helptext
+        ldx #>helptext
         jsr _printz
 
         jsr waitesc
@@ -5864,7 +6204,7 @@ doneCE:
         lda (ROWADDR),y
         cmp #' '+1
         bcc :+
-        putc ' '
+        jsr spc
 :       
         pla
 @nextchar:       
@@ -5880,92 +6220,10 @@ doneCE:
         
 @donelist:
         jsr waitesc
-;;; TODO: restore cursor
         jmp _loadscreen
 waitesc:
         PRINTZ "    ESC>"
         jmp getchar
-
-noesc:
-;;; - ctrl-W - save
-        cmp #'W'-'@'
-        bne :+
-        
-;;; TODO: save cursor
-        jmp _savescreen
-:       
-;;; - ctrl-Load/edit
-        cmp #'L'-'@'
-;        beq _loadscreen
-        bne  :+
-
-;;; TODO: restore cursor
-        jmp _loadscreen
-:       
-;;; - RETURN goes next line indented as prev!
-        cmp #'M'-'@'
-        bne :+
-
-        lda #'A'-'@'
-        jsr editaction
-        lda #'N'-'@'
-:       
-;;; - ctrl-Forward (emacs)
-        cmp #'F'-'@'
-        bne :+
-
-        lda #'I'-'@'
-:       
-;;; - ctrl-Backwars (emacs)
-        cmp #'B'-'@'
-        bne :+
-
-        lda #'H'-'@'
-:       
-;;; - ctrl-Next line (emacs)
-        cmp #'N'-'@'
-        bne :+
-
-        lda #'J'-'@'
-:       
-;;; - ctrl-Previous line (emacs)
-        cmp #'P'-'@'
-        bne :+
-
-        lda #'K'-'@'
-:       
-;;; - control char - just print it
-        cmp #' '
-        bcc editprint
-
-;;; - printables
-        pha
-        ;; insert - need to push other chars on line right
-        ldy #38
-:       
-        lda (ROWADDR),y
-        iny
-        sta (ROWADDR),y
-        dey
-        dey
-        cpy CURCOL
-        bcs :-
-
-        pla
-editprint:      
-        ;; print it
-        jmp rawputc
-
-
-FUNC _printsrc
-        jsr _clrscr
-        lda #<input
-        ldx #>input
-        jmp _printz
-
-FUNC _clrscr
-        lda #12
-        jmp putchar
 
 ;;; TODO: ???
 FUNC _dymmy5
@@ -6002,6 +6260,10 @@ copyz:
         rts
 
 FUNC _savescreen
+.ifndef __ATMOS__
+        rts
+.endif
+
         ;; from
         lda #<SCREEN
         ldx #>SCREEN
@@ -6019,6 +6281,10 @@ FUNC _savescreen
         jmp _memcpy
 
 FUNC _loadscreen
+.ifndef __ATMOS__
+        rts
+.endif
+
 ;;; 20+3B params+call
         ;; from
         lda #<savedscreen
@@ -6319,7 +6585,7 @@ FUNC timer
         tya
 
         ;; print it
-        putc 10
+        jsr nl
         putc 128+7
         putc '['
 ;        putc 'T'
@@ -6329,7 +6595,7 @@ FUNC timer
 
         putc 'u'
         putc 's'
-;        putc 10
+;        jsr nl
         
         lda #$ff
 ;        sta READTIMER
@@ -6370,9 +6636,9 @@ CSRESET=1
 
         ;; print it
 .ifdef TIM
-;        PUTC ' '
+;        jsr spc
 .else
-        PUTC 10
+        jsr nl
         sta tos
         stx tos+1
 
@@ -6383,7 +6649,7 @@ CSRESET=1
 .endif
         putc ']'
         putc 128+2
-        putc 10
+        jsr nl
 
 .ifdef CSRESET
         lda #$ff
@@ -6416,7 +6682,7 @@ FUNC printvar
         sta tos
         stx tos+1
         jsr printd
-        putc ' '
+        jsr spc
         rts     
 
 ;;; prints readable otherwise deccode
@@ -6507,11 +6773,11 @@ FUNC printstack
         pha
         ;; we can use the stack for print
 
-        putc 10
+        jsr nl
         putc '#'
         lda rulename
         jsr printchar
-        putc ' '
+        jsr spc
         putc 's'
 
         ;; print s
@@ -6521,7 +6787,7 @@ FUNC printstack
         jsr printd
 
 @loop:
-        putc ' '
+        jsr spc
         ;; print first byte
 
         lda $101,x
@@ -6560,8 +6826,8 @@ FUNC printstack
         jmp @loop
 
 @err:
-        putc ' '
-        putc ' '
+        jsr spc
+        jsr spc
         putc 'o'
         putc 'o'
         
@@ -6572,7 +6838,7 @@ FUNC printstack
         jsr getchar
 .endif
         sta savea
-        putc 10
+        jsr nl
 
         pla
         sta tos
@@ -6619,7 +6885,7 @@ BG       =16                    ; BG+WHITE
 NORMAL   =128+8
 DOUBLE   =128+10
 
-help:   
+helptext:   
 
 ;;; 10. If a print line starts with control characters
 ;;;     – e.g., ESC N, etc. – then the protected columns
@@ -6632,6 +6898,7 @@ KEY=GREEN
 CODE=GREEN
 GROUP=YELLOW
 
+.byte 'A'
 .byte 12,10
 ;.byte 12,128+'A',128+'B',128+'C',10
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
@@ -6646,7 +6913,7 @@ GROUP=YELLOW
 .byte KEY," ^W",MEAN,"rite - save screen/source",10
 .byte KEY," ^L",MEAN,"oad  - load screen/source",10
 .byte "",10
-.byte MEAN,"Editor:",KEY,"arrow DEL ^H",MEAN,"bs",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
+.byte MEAN,"Editor:",KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
 .byte MEAN,"(line)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
 .byte "",10
 .byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
@@ -6679,6 +6946,15 @@ GROUP=YELLOW
 
 input:
 ;        .byte "word main(){}",0
+
+;        .byte "word main(){ for(i=0; i<26; ++i) { gotoxy(i/2,i); putchar('A'+i); } }",0
+;        .byte "word main(){ putchar('a'); }",0
+
+;        .byte "word main(){ ;;; }",0
+;        .byte "word main(){ gotoxy(4711,666); putchar('a'); putchar('b'); }",0
+;        .byte "word main(){ gotoxy(10,10); putchar('a'); putchar('b'); }",0
+
+;        .byte "word main(){ gotoxy(10,10); printd(4711); }",0
 
 ;LINEBENCH=1
 .ifdef LINEBENCH
@@ -6892,8 +7168,7 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;
-ATOZ=1
+;ATOZ=1
 
 .ifdef ATOZ
         .byte "word main() {",10
@@ -7098,8 +7373,8 @@ ATOZ=1
 
 ;
 PRIME=1
-;
-PRIMBYTE=1
+;;; TODO: this crashes in ORIC ????
+;PRIMBYTE=1
 
 ;NOPRINT=1
 
