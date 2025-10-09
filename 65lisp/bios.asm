@@ -26,7 +26,48 @@ saveyputchar:   .res 1
 
 biostart:       
 
-;;; TODO: move before startaddr!
+;;; USEFUL ROM ADDRESSES
+;;; 
+;;; When fast key action is not required, a machine
+;;; code program can quickly get the ASCII code
+;;; of the last keypress with one of two calls:
+;;; 
+;;; 1. To read a key without waiting, returning
+;;; the ASCII code in the accumulator, call
+;;; subroutine #E905 (version 1.0) or
+;;; #EB78 (version 1.1).
+;;; This is identical to using KEY$ in BASIC.
+;;;
+;;; 2. To wait for a key to be pressed (i.e., like GET
+;;; in BASIC), call either #C5F8 (version 1.0)
+;;; or #C5E8 (version 1.1).
+
+.ifnblank
+;;; ORIC "Read keyboard subroutine
+;;; - retro8bitcomputers.co.uk/Content/downloads/manuals/oric-graphics-and-machine-code-techniques.pdf
+;;; 
+;;; A row 0-7, X $ff-columnbit $ff-1 $ff-2 -4 -8 -16...
+readkey:        
+        php
+        sei
+        pha
+        lda #$0e
+        jsr #f590
+        pla
+        ora #$b8
+        sta $0300
+        ldx #$04
+        dex
+        bne $4010
+        lda $0300
+        and #$08
+        tax
+        plp
+        txa
+        rts
+.endif
+
+;;; TODO: move before startaddr! (begin.asm)
 
 ;;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
 

@@ -416,6 +416,28 @@ CURCALC		= $001f      ; ? how to update?
 ;;; TODO: not working, parse error?
 ;COMPILESCREEN=1
 
+
+;;; ORIC ATMOS
+;;; 
+;;; #228 ( 4244) is the address of the ‘fast’ interrupt
+;;; jump. By altering the jump address at #229,A
+;;; 
+;;; (#245,6) you can provide your own interrupt handler.
+;;; 
+;;; #230 ( #24A) is the address of the ‘slow’ interrupt
+;;; routine. Control is passed to here at the end
+;;; of the fast interrupt routine. Although 3 bytes are
+;;; eserved here, there is only the single-byte
+;;; instruction RTI present normally.
+;;; 
+;;; #228(4247) contains the jump vector for the NMI
+;;; (Non-Maskable Interrupt) routine, which on
+;;; the Oric connects to the ‘Reset button’.
+
+;;; TODO: replace NMI with _edit, lol!
+;;; TODO: 
+
+
 ;;; TIMe events: compile/run
 ;;; disables interrupts and counts cycles!
 ;;; relatively accurately...
@@ -5070,10 +5092,10 @@ afterELSE:
         ORIC "curmov", $f0fd
         ORIC "draw",   $f110
         ORIC "hchar",  $f12d
-        ORIC "fill",   $f268
+        ORIC "fill",   $f268    ; (rows,cols,char)
         ORIC "paper",  $f204
         ORIC "ink",    $f210
-        ORIC "circle", $f37f
+        ORIC "circle", $f37f    
         ORIC "point",  $f1c8    ; verify output?
 
         .byte "|pattern(",_E,")"
@@ -5131,6 +5153,59 @@ LOADERR     = $02B1
         ;; .byte "|creadsync();" - $e735 
 
 .ifdef ATMOS_FIX
+;;; ORIC routines can use for MINIMAL
+;;; C3F8 (C3F4) - A block move.
+;;; C483 (C47C) - Input and process a line.
+;;; C59C (C58C) - Input a line.Input a line.
+;;; DDA3 (DDA7) - 
+
+;;; 4.3 Saving an area of memory
+;;; 
+;;; The sequence of events when saving a block of
+;;; memory (remember that a BASIC program is
+;;; ust a block of memory) is:
+;;; 
+;;; 1. Disable interrupts and change the 6522 into
+;;; cassette mode.
+;;; 
+;;; 2. Print the message ‘SAVING’ and the filename
+;;; on the top line of the screen.
+;;; 
+;;; 3. Save a header record, composed of:
+;;;    (a) 259 occurrences of #16 (this is the actual
+;;;        ‘header’).
+;;;    (b) The value #24 to indicate the start of
+;;;        the record.
+;;;    (c) For version 1.0 – #5E to #66 – or for
+;;;        version 1.1 – #2A0 to #2B0. This information
+;;;        is saved backwards and includes the start
+;;;        and end addresses and other flags.
+;;;    (d) A filename, ending with #0 – this is either
+;;;        #35 onwards, for version 1.0, or #27F
+;;;        onwards, for version 1.1.
+;;; 4. Save the block of memory, byte by byte.
+;;; 5. Re-enable interrupts and reset the 6522 back
+;;; to its normal mode.
+;;; 
+;;; 2. For version 1.1:
+;;; 
+;;; JSR E76A (interrupts off)
+;;; JSR E585 (print ‘saving’)
+;;; JSR E607 (save header record)
+;;; JSR E62E (save area of memory)
+;;; JSR E93D (interrupts on)
+;;; 
+;;; The filename on tape is stored at #49 to #56
+;;; (version 1.0) or #293 to #2A2 (version 1.1
+;;; 
+;;; JSR E76A (disable interrupts, etc.)
+;;; JSR E57D (print ‘searching’ message)
+;;; JSR E4AC (find file)
+;;; JSR E59B (print ‘loading’)
+;;; JSR E4E0 (load file, or verify)
+;;; JSR E93D (enable interrupts)
+
+
         ;; void csave(char* name, void* s,, void* end)
         .byte "|csave(",_E,","
       .byte "["
