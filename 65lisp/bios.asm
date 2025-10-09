@@ -78,6 +78,19 @@ notnl:
 rawputc:        
         tax
         jsr $0238
+
+        ;; printable with hibit?
+        cmp #128+' '
+        bcc :+
+        ;; put directly in mem
+;;; TODO: BUG: first char on line looses hibit?
+        sty saveyputchar
+        ldy CURCOL
+        dey
+        sta (ROWADDR),y
+        ldy saveyputchar
+:       
+
         ldx savexputchar
         rts
 

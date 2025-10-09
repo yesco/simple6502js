@@ -5697,6 +5697,7 @@ doneCE:
         bne noesc
 
         jsr _savescreen
+
         lda #<help
         ldx #>help
         jsr _printz
@@ -5710,21 +5711,28 @@ doneCE:
         sta pos
         lda #>_rules
         sta pos+1
-        
-@nextbar:       
+@nextbar:
         ldy #0
         lda (pos),y
         jsr _incP
         cmp #'|'
         bne @nextbar
         ;; next char
-        ldy #0
         lda (pos),y
         ;; end of rules ( endrules!)
         cmp #$ff
         beq @donelist
         ;; standing at name (maybe)
-        PUTC ' '
+        ;; - print space if no have
+        pha
+        ldy CURCOL
+        dey
+        lda (ROWADDR),y
+        cmp #' '+1
+        bcc :+
+        putc ' '
+:       
+        pla
 @nextchar:       
         cmp #'a'
         bcc @nextbar
@@ -5735,13 +5743,13 @@ doneCE:
         ldy #0
         lda (pos),y
         jmp @nextchar
-
+        
 @donelist:
         jsr waitesc
 ;;; TODO: restore cursor
         jmp _loadscreen
 waitesc:
-        PRINTZ "     ESC>"
+        PRINTZ "    ESC>"
         jmp getchar
 
 noesc:
@@ -6485,8 +6493,10 @@ CODE=GREEN
 GROUP=YELLOW
 
 .byte 12,10
+;.byte 12,128+'A',128+'B',128+'C',10
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
+;.byte 128+'D',128+'E'
 .byte "",10
 .byte MEAN,"You are always in the EDITOR",10
 .byte KEY,"ESC",MEAN,"Help",10
