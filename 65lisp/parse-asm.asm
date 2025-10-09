@@ -2485,6 +2485,7 @@ ruleC:
         jsr putchar
       .byte ']'
 
+;;; ORIC peek/poke deek/doke
 .ifdef OPTRULES
         .byte "|poke(%D[d],%D)"
       .byte '['
@@ -2493,11 +2494,28 @@ ruleC:
         sta VAL0
       .byte ']'
 
+        .byte "|doke(%D[d],%D)"
+      .byte '['
+        lda VAL0
+        ldx VAL1
+        .byte 'D'
+        sta VAL0
+        stx VAL1
+      .byte ']'
+
         .byte "|poke(%D"
       .byte "[d]"
         .byte ",",_E,")"
       .byte "[D"
         sta VAL0
+      .byte ']'
+
+        .byte "|doke(%D"
+      .byte "[d]"
+        .byte ",",_E,")"
+      .byte "[D"
+        sta VAL0
+        stx VAL1
       .byte ']'
 .endif ; OPTRULES
 
@@ -2520,11 +2538,39 @@ ruleC:
         sta (tos),y
       .byte ']'
 
+        .byte "|doke(",_E
+      .byte '['
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte ",",_E,")"
+      .byte '['
+        sta savea
+        pla
+        sta tos+1
+        pla
+        sta tos
+        lda savea
+
+        ldy #1
+        sta (tos),y
+        tax
+        dey
+        sta (tos),y
+      .byte ']'
+
 .ifdef OPTRULES
         .byte "|peek(%D)"
       .byte '['
         lda VAL0
         ldx #0
+      .byte ']'
+
+        .byte "|deek(%D)"
+      .byte '['
+        lda VAL0
+        ldx VAL1
       .byte ']'
 .endif ; OPTRULES
 
@@ -2536,6 +2582,19 @@ ruleC:
         lda (tos),y
         ldx #0
       .byte ']'
+
+        .byte "|deek(",_E,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y 
+      .byte ']'
+
+
 
         .byte "|getchar()"
       .byte '['
@@ -6487,6 +6546,12 @@ DOUBLE   =128+10
 
 help:   
 
+;;; 10. If a print line starts with control characters
+;;;     – e.g., ESC N, etc. – then the protected columns
+;;;     0 and 1 are used, overwriting any PAPER and INK
+;;;     attributes. Always start the line with a
+;;;     non-attribute character, such as space.
+
 MEAN=WHITE
 KEY=GREEN
 CODE=GREEN
@@ -7432,8 +7497,34 @@ vnext:
 .endif ; TESTING
 
 
+;;; ORIC MEMORY free
+;;; - retro8bitcomputers.co.uk/Content/downloads/manuals/oric-graphics-and-machine-code-techniques.pdf
+
+;;; From #400 to #4FF, 256 bytes are available.
+;;; Be warned, however, that the Oric disk system
+;;; makes use of this area.
 ;;; 
+;;; 3. The first 256 bytes of each character set
+;;; are unused, so programs can be put at
+;;; #B400 to #B4FF and #B800 to #B8FF
+;;; (or in HIRES mode at #9800 to #98FF
+;;; and #9C00 to #9CFF).
 ;;; 
+;;; Although the Reset button on the Oric causes
+;;; the character set to be regenerated these
+;;; areas are not affected.
+;;;
+;;; 4. Since the alternate character set is rarely
+;;; used the entire area between #B800 and #BB7F
+;;; is available for a machine code program.
+;;; This area of RAM is ideal for facilities like
+;;; Renumber.
+;;; 
+;;; 5. Another ‘hidden’ area lies between
+;;; #BFEO and #BFFF. This area will only be overwritten
+;;; if HIMEM is incorrectly set, and survives the
+;;; commands ‘HIRES’, ‘TEXT’, and the Reset button.
+
 
 .bss
 ;;; Generated program memory layout:
