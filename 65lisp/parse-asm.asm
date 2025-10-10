@@ -60,6 +60,13 @@
 ;;; - a= b+10;
 ;;; - + - *2 /2 >> << & | ^ == <   (TODO: ! && || ? != > <= >=)
 ;;; - &v *v
+;;; - since we don't have priorities, maybe require
+;;;   parenthesis around each operator if nested?
+;;;      n=r*40;
+;;;      n=r>>2+r>>3;       // 40 Bytes
+;;;      n=(((r>>2)+r)>>3); // "compatible C"
+;;;      n := r>>2+r>>3;    // PASCALish
+;;;      n := r.>>2.+r.>>3;    // PASCALish
 ;;; 
 ;;; - return ...;
 ;;; - if () statement; [else statement;]
@@ -92,6 +99,9 @@
 ;;; - if supported ops/syntax should (mostly)
 ;;;   work the same on normal C-compiler
 ;;; - NO priorities on * / (OK, this deviates from C)
+;;;   TODO: could force to write:
+;;;       a+3<<24+3*2+r<<2;
+;;;       ((((((a+3)<<2)+3)*2)+r)<<2)
 ;;; - mostly no error messages uneless get stuck
 ;;;   and can't complete compilation
 ;;; - "types" aren't enforced
@@ -4410,12 +4420,10 @@ afterELSE:
         sta VAR0
       .byte "]"
 
-        .byte "|%A=0;"
-      .byte "[D"
-        lda #0
-        sta VAR0
-        sta VAR1
-      .byte "]"
+        ;; "|%A=%V;" (or even %A=%V _E)
+        ;; TODO: if keep track of AX= var/value
+        ;;   (and reset whenver we have : PUSHLOC etc)
+        ;;   we may be able to save 4 bytes!
 
         .byte "|%A=0;"
       .byte "[D"
@@ -4785,16 +4793,41 @@ afterELSE:
 
         .byte "|%A<<=2;"
       .byte "[D"
-;;; 12B
+;;; 12B (zp: 8B)
         asl VAR0
         rol VAR1
         asl VAR0
         rol VAR1
       .byte "]"
 
+.ifdef ZPVARS
+        .byte "|%A>>=3;"
+      .byte "[D"
+;;; 8B
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=3;"
+      .byte "[D"
+;;; 8B
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+      .byte "]"
+.endif ; ZPVARS
+
         .byte "|%A>>=%D;"
       .byte "["
 ;;; 14B (tradeoff 14=6*d => d=2+)
+;;; (zp: 12B)
         ldy #'<'
         .byte "D"
 :       
@@ -5451,6 +5484,32 @@ store_filename:
 ;;; ----------------------------------------
 ;;; "borrowing" cc65 as stdlib!
 
+;;; TODO:
+;;; - exit
+;;; - clock difftime
+;;; - div -> struct div,mod
+;;; - rand srand 
+;;; - va_start va_arg va_copy va_end
+;;; - signal (irq timer?)
+;;; - assert
+;;; STRING:
+;;; - atoi 
+;;; - strcpy strcat strncpy strncat
+;;; - strlen
+;;; - strcmp strncmp 
+;;; - strchr strrchr strstr strpbrk strspn strtok
+;;; - memcpy memmove memset memcmp memchr
+;;; IO-ish:
+;;; - sscanf printf sprintf
+;;; CHAR:
+;;; - toupper tolower isupper islower
+;;; - isalnum isalpha ispunct isdigit isspace isblank iscntrl 
+;;;  (isprint isxdigit isgraph)
+
+;;; ORIC:
+;;; - wait
+;;; - plot scrn
+;;; - plots
 
 
 ;;; TODO: furk!
@@ -5730,30 +5789,6 @@ endrules:
 
 
 
-;;; CHEAT - not counted in parse.bin
-
-
-
-;;; Isn't it just that AX means more code than
-;;; separate tos?
-FUNC _mul10
-;;; 25
-        lda tos
-        ldx tos+1
-        jsr _double
-        jsr _double
-        clc
-        adc tos
-        sta tos
-        txa
-        adc tos+1
-        sta tos+1
-        ;; double
-_double:        
-        asl tos
-        rol tos+1
-        rts
-
 FUNC _aftercompile
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
 
@@ -5880,6 +5915,7 @@ _OK:
 
         ;; print size in bytes
         ;; (save in gos, too)
+;;; TODO: gos gets overwritten by dasm(?)
         sec
         lda _out
         sbc #<_output
@@ -5899,18 +5935,11 @@ _OK:
 
 _run:   
 
-;;; Enable to always show generated code
-;;; TODO: make it do inline while PRINTREAD
-;        jsr _dasm
-;        jsr getchar             
-        
-;        TIMER
-
 .zeropage
 runs:   .res 1
 .code
 
-        ;; RUN PROGRAM a TIMES
+        ;; RUN PROGRAM n TIMES
 RUNTIMES=100
 ;RUNTIMES=1
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
@@ -5958,6 +5987,7 @@ TIMPER=8
         putc '['
 
         ;; print "47B "
+;;; TODO: gos gets overwritten by dasm(?)
         lda gos
         sta tos
         ldx gos+1
@@ -6442,6 +6472,30 @@ FUNC _loadscreen
 
         jmp memcpy
         
+
+
+
+;;; CHEAT - not counted in parse.bin
+
+;;; Isn't it just that AX means more code than
+;;; separate tos?
+FUNC _mul10
+;;; 25
+        lda tos
+        ldx tos+1
+        jsr _double
+        jsr _double
+        clc
+        adc tos
+        sta tos
+        txa
+        adc tos+1
+        sta tos+1
+        ;; double
+_double:        
+        asl tos
+        rol tos+1
+        rts
 
 
 
@@ -7087,12 +7141,11 @@ GROUP=YELLOW
 
 input:
 
-        ;; 23c TIMER 91 overhead
-        ;;    100x 3163 us
-        ;;          (- 3163 91) 100.0) = 30.72/loop 31-8=23
-        ;;     10x  347 us
-        ;;      1x   91 us - lol ??    overhead: 13c + 8c/loop
-        .byte "word main(){4;}",0
+        ;; MINIMAL PROGRAM
+        ;; 7B 19c
+;        .byte "word main(){}",0
+
+;        .byte "word main(){a=r;}",0
 
 ;        .byte "word main(){ for(i=0; i<26; ++i) { gotoxy(i/2,i); putchar('A'+i); } }",0
 ;        .byte "word main(){ putchar('a'); }",0
@@ -7104,20 +7157,33 @@ input:
 ;        .byte "word main(){ gotoxy(10,10); printd(4711); }",0
 
 
+;;; x3  =  n=r*2+r;
+;;; x5  =  n=r<<2+r;
+;;; x7  =  n=r<<3-r;
+;;; x9  =  n=r*2+r;n=r*2+r;   or n=r<<2+r*2-r;
+;;; x10 =  n=r<<2+r*2;     n=((r<<2)+r)*2;
+
+
+;;; Conclusion 44B 106c to x40
+;;; optimal is 33B (grok managed eventuall, store tmp in A and Y)
 ;
 FOURTY=1
+;;; 62B 119c (program 16B overhead)
 .ifdef FOURTY
         .byte "word main(){",10
-        .byte "  r=0; while(r<28) {",10
+;        .byte "  r=17;",10
+;        .byte "  while(r<28) {",10
 
-;;; 83 B  57,179 us - 4.9% slightly faster (/ 57179 59483.0)
-        .byte "    n=r; n<<=2; n+=r; r<<=3;",10
-;;; 81 B  59,483 us
+;;; 42 B   84c
+        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
+
+;;; 40 B   75c
 ;        .byte "    n=r<<2+r<<3;",10
 
 ;        .byte "    printd(n); putchar(' ');",10
-        .byte "    ++r;",10 
-        .byte "  }",10
+;        .byte "    ++r;",10 
+;        .byte "  }",10
+;        .byte "  return n;",10
         .byte "}",10
         .byte 0
 .endif ; FOURTY
