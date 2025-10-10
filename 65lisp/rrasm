@@ -61,8 +61,12 @@ clang oric-terminal.c -o oric-terminal || exit
 
 # -- enable NON-blocking getchar!!!
 
+# +ignbrk = make it behave good at exit (restore stty sane)!
+
 ##stty cbreak raw -echo min 0
-stty cbreak -echo
+#stty cbreak -echo
+#stty -raw -echo +ignbrk
+stty cbreak -echo +ignbrk
 
 # -- run with oric-terminal
 #sim65 -c $name.sim "$@"

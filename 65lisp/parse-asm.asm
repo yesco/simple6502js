@@ -566,13 +566,14 @@ PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
-;
+;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
+;PRINTREAD=1
+;PRINTASM=1
+;;; Prints a dot for each line compiled
 ;
-PRINTREAD=1
-;
-PRINTASM=1
+PRINTDOTS=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2060,7 +2061,7 @@ FUNC _incIspc
         ora #128
         sta (inp),y
 ;;; TODO: this may get messed up when we backtrack!
-.endif
+.endif ; COMPILESCREEN
         ;; TODO: or just jsr _incRX
         jsr _incI
 
@@ -2069,10 +2070,19 @@ FUNC _incIspc
 .ifdef COMPILESCREEN
         and #127
         sta (0,x)
-.endif
+.endif ; COMPILESCREEN
         ;; TODO: redundant?
         beq @done
 
+.ifdef PRINTDOTS
+        ;; at each newline print a dot
+        cmp #10
+        bne :+
+        PUTC '.'
+:       
+.endif ;PRINTDOTS
+
+        ;; CTRL characters/space skip
         cmp #' '+1
         bcc @skipspc
 @done:
@@ -6005,13 +6015,12 @@ editaction:
         jmp _init
 :       
 ;;; - DEL - delete backwards
-        cmp #127
+        cmp #127                ; DEL-key
         bne :+
         
         ;; back one, delete forward!
         jsr bs
-        ;; always true
-        bne @bs
+        lda #CTRL('D')
 :       
 ;;; - ctrl-D - delete char forward
         cmp #CTRL('D')
@@ -6167,14 +6176,15 @@ doneCE:
 ;;; - ctrl-Forward (emacs)
         cmp #CTRL('F')
         bne :+
+;;; TODO: relative jmp save bytes!
 
-        jsr forward
+        jmp forward
 :       
 ;;; - ctrl-Backwards (emacs)
         cmp #CTRL('B')
         bne :+
 
-        lda #CTRL('H')
+        jmp bs
 :       
 ;;; - ctrl-Next line (emacs)
         cmp #CTRL('N')
@@ -6226,7 +6236,7 @@ forward:
         lda #'I'-'@'
         SKIPTWO
 bs:
-        lda #10
+        lda #8
         SKIPTWO
 spc:
         lda #' '
@@ -7441,19 +7451,28 @@ NOPRINT=1
 
 ; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
 ;;; 1899 primes:
-;;;   51,962,632 cycles - cc65    ./r Play/byte-sieve-prime
-;;;   44.92s            - sim65   ./rrasm parse    BYTESIEVE=1
-;;;   44.82s                          i+i => i*2
-;;;     (/ 44.82 51.96) => 13.74% faster than cc65
-;;;   28,322,714        - cc65    using -Cl     SAD!!!!!!
+;;;   cy,cles      bytes
+;;;  -----------   -----
+;;;   51,962,632    2627    - cc65    ./r Play/byte-sieve-prime
+;;;   95,097,713     287           -DPROGSIZE
+;;;   28,322,714     322           -Cl
+
+;;; === my compiler ===
+;;;   36.3           363    - sim65   ./rrasm parse    BYTESIEVE=1
+;;;   43s            363    - ORIC    ./rasm parse     BYTESIEVE=1
+
+;;;  #x142 322 
+;;;  #x11f 287
 
 .ifdef BYTESIEVE
         .byte "word main(){",10
-        .byte "  m= 8192;",10
-        .byte "  a= malloc(m);",10
+        .byte "  m=8192;",10
+        .byte "  a=malloc(m);",10
         .byte "n=0; while(n<10) {",10
-        .byte "  c= 0;",10
+        .byte "  c=0;",10
         .byte "  i=0; while(i<m) { poke(a+i, 1); ++i; }",10
+;;; NOPE
+;        .byte "  i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
         .byte "  i=0; while(i<m) {",10
         .byte "    if (peek(a+i)) {",10
         .byte "      p= i*2+3;",10
@@ -7472,6 +7491,7 @@ NOPRINT=1
         .byte "  printd(c);",10
         .byte "  ++n;",10
         .byte "}",10
+        .byte "  free(a);",10
         .byte "  return c;",10
         .byte "}"
         .byte 0

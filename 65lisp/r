@@ -1,4 +1,6 @@
 OPTS=" -DPROGSIZE "
+OPTS=" -DPROGSIZE -Cl -Or "
+OPTS=" -Cl "
 
 echo "unix> ./r $*"
 
@@ -23,19 +25,18 @@ rm $name.s    2>/dev/null
 
 # "Since the stack is emulated in software, this gives shorter and usually faster code, but the code is no longer reentrant. "
 
-# generating .s too
-cl65 -Cl -O -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
-#cl65 $OPTS -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
+# -- generating .s too
+cl65 $OPTS -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
 
 # Optimize inline more - creates errornious code
 #time cl65 -Or $OPTS -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
 
-#cl65 --codesize 10 -D__AUTORUN__=$C7 -O -t atmos $name.c -o $name.tap || exit 72
-( cl65 -Or $OPTS -D__AUTORUN__=$C7 -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
+cl65 --codesize 10 -D__AUTORUN__=$C7 -O -t atmos $name.c -o $name.tap || exit 72
+#( cl65 -Or $OPTS -D__AUTORUN__=$C7 -t atmos $name.c vm-asm.s -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
 #( cl65 -Or $OPTS -t atmos $name.c -o $name.tap 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || exit 72
 
-cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
-#cc65 -O $OPTS -T $name.c 2>/dev/null # generate .s file
+#cc65 -O $OPTS -T $name.c vm-asm.s 2>/dev/null # generate .s file
+cc65 -O $OPTS -T $name.c 2>/dev/null # generate .s file
 
 # generate listing w \hex
 ca65 $name.s -l $name.lst  2>/dev/null 1>/dev/null
