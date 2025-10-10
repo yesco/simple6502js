@@ -3226,6 +3226,7 @@ ruleD:
         rol tos+1
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|<<3"
       .byte '['
@@ -3239,6 +3240,7 @@ ruleD:
         rol tos+1
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|<<4"
       .byte '['
@@ -3254,6 +3256,7 @@ ruleD:
         rol tos+1
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|>>2"
       .byte '['
@@ -3265,6 +3268,7 @@ ruleD:
         ror
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|>>3"
       .byte '['
@@ -3278,6 +3282,7 @@ ruleD:
         ror
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|>>4"
       .byte '['
@@ -3293,6 +3298,7 @@ ruleD:
         ror
         ldx tos+1
       .byte ']'
+        .byte TAILREC
 
         .byte "|<<%D"
       .byte '['
@@ -5890,51 +5896,89 @@ _run:
 ;        jsr _dasm
 ;        jsr getchar             
         
-        TIMER
-
-
+;        TIMER
 
 .zeropage
 runs:   .res 1
 .code
 
         ;; RUN PROGRAM a TIMES
-        lda #1
-;        lda #10                
-;        lda #100
+RUNTIMES=100
+.assert (RUNTIMES<256),error,"%% RUNTIMES too large"
+
+        lda #RUNTIMES
         sta runs
+
+        ;; initiate CYCLE EXACT MEASUREMENT!
+        lda #$ff
+        sta READTIMER
+        sta READTIMER+1
 again:
         jsr _output
-
-;;; 2132 - 256 empty loops
-;;; (* 256 (+ 6 3)) = 2304 means (- 2304 2132)
-;;; = 172c overhead ???
-;;; 
-;;; 1108 - 128 empty loops
-;;; (* 128 (+ 6 3)) (- 1152 1108) = 45 overhead ???
 
         dec runs
         bne again
 
+        ;; save result
         pha
         txa
         pha
 
-        TIMER
+        ;; 13617
+        lda READTIMER
+        ldx READTIMER+1
 
-        putc 10
+        ;; adjust, one time overhead 9c, each loop 9c
+        TIMCOST=$ffff-9-(RUNTIMES*9)
+        ;; saved lo, hi
+        sec
+        eor #$ff
+        adc #<TIMCOST
+        pha
+        txa
+        eor #$ff
+        adc #>TIMCOST
+        pha
+
+        ;; print "100x [4711us]"
+        jsr nl
+        putc WHITE
+
+        lda #<RUNTIMES
+        sta tos
+        ldx #>RUNTIMES
+        stx tos+1
+        jsr printd
+        putc 'x'
+
+        jsr spc
+        putc '['
+
+        ;; restore timing
+        pla
+        sta tos+1
+        pla
+        sta tos
+
+        jsr printd
+
+        putc 'u'
+        putc 's'
+        putc ']'
+        jsr nl
+        
+        ;; prints return code
         putc '='
         putc '>'
         putc ' '
 
-        ;; prints tos
         pla
         sta tos+1
         pla
         sta tos
         jsr printd
 
-        putc 10
+        jsr nl
         
 
 ;;; full screen editor on ORIC ATMOS
@@ -6671,6 +6715,7 @@ FUNC timer
         putc 's'
 ;        jsr nl
         
+        ;; CLEAR TIMER
         lda #$ff
 ;        sta READTIMER
         ;; this write triggers reset
@@ -6737,8 +6782,8 @@ CSRESET=1
 .ifdef TIM
         lda #$ff
         ;; writing hibyte triggers
-;        sta READTIMER
-;        sta READTIMER+1
+        sta READTIMER
+        sta READTIMER+1
 .endif
         rts
 
@@ -7019,7 +7064,13 @@ GROUP=YELLOW
 .byte 0,0
 
 input:
-;        .byte "word main(){}",0
+
+        ;; 23c TIMER 91 overhead
+        ;;    100x 3163 us
+        ;;          (- 3163 91) 100.0) = 30.72/loop 31-8=23
+        ;;     10x  347 us
+        ;;      1x   91 us - lol ??    overhead: 13c + 8c/loop
+        .byte "word main(){4;}",0
 
 ;        .byte "word main(){ for(i=0; i<26; ++i) { gotoxy(i/2,i); putchar('A'+i); } }",0
 ;        .byte "word main(){ putchar('a'); }",0
@@ -7029,6 +7080,26 @@ input:
 ;        .byte "word main(){ gotoxy(10,10); putchar('a'); putchar('b'); }",0
 
 ;        .byte "word main(){ gotoxy(10,10); printd(4711); }",0
+
+
+;
+FOURTY=1
+.ifdef FOURTY
+        .byte "word main(){",10
+        .byte "  r=0; while(r<28) {",10
+
+;;; 83 B  57,179 us - 4.9% slightly faster (/ 57179 59483.0)
+        .byte "    n=r; n<<=2; n+=r; r<<=3;",10
+;;; 81 B  59,483 us
+;        .byte "    n=r<<2+r<<3;",10
+
+;        .byte "    printd(n); putchar(' ');",10
+        .byte "    ++r;",10 
+        .byte "  }",10
+        .byte "}",10
+        .byte 0
+.endif ; FOURTY
+
 
 ;LINEBENCH=1
 .ifdef LINEBENCH
@@ -7468,29 +7539,29 @@ NOPRINT=1
         .byte "word main(){",10
         .byte "  m=8192;",10
         .byte "  a=malloc(m);",10
-        .byte "n=0; while(n<10) {",10
-        .byte "  c=0;",10
-        .byte "  i=0; while(i<m) { poke(a+i, 1); ++i; }",10
+        .byte "  n=0; while(n<10) {",10
+        .byte "    c=0;",10
+        .byte "    i=0; while(i<m){poke(a+i,1);++i;}",10
 ;;; NOPE
-;        .byte "  i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
-        .byte "  i=0; while(i<m) {",10
-        .byte "    if (peek(a+i)) {",10
-        .byte "      p= i*2+3;",10
+;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
+        .byte "    i=0; while(i<m) {",10
+        .byte "      if (peek(a+i)) {",10
+        .byte "        p= i*2+3;",10
 .ifndef NOPRINT
-        .byte "      printd(p);",10
-        .byte "      putchar(32);",10
+        .byte "        printd(p);",10
+        .byte "        putchar(32);",10
 .endif
-        .byte "      k=i+p; while(k<m) {",10
-        .byte "        poke(a+k, 0);",10
-        .byte "        k+=p;",10
+        .byte "        k=i+p; while(k<m) {",10
+        .byte "          poke(a+k, 0);",10
+        .byte "          k+=p;",10
+        .byte "        }",10
+        .byte "        ++c;",10
         .byte "      }",10
-        .byte "      ++c;",10
+        .byte "      ++i;",10
         .byte "    }",10
-        .byte "    ++i;",10
+        .byte "    printd(c);",10
+        .byte "    ++n;",10
         .byte "  }",10
-        .byte "  printd(c);",10
-        .byte "  ++n;",10
-        .byte "}",10
         .byte "  free(a);",10
         .byte "  return c;",10
         .byte "}"
