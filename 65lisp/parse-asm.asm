@@ -2664,6 +2664,40 @@ ruleC:
         ldx #0
       .byte ']'
 
+
+.import _malloc
+        .byte "|malloc",_X
+      .byte "["
+        jsr _malloc
+      .byte "]"
+
+.import _free
+        .byte "|free",_X
+      .byte "["
+        jsr _free
+      .byte "]"
+
+.import _realloc
+        .byte "|realloc",_X
+      .byte "["
+        jsr _realloc
+      .byte "]"
+
+.ifdef NOTDEFINEDIN_CC65 ; ???
+.import _heapmemavail
+        .byte "|heapmemevail",_X
+      .byte "["
+        jsr _heapmemavail
+      .byte "]"
+
+.import _heapmaxavail
+        .byte "|heapmaxavail",_X
+      .byte "["
+        jsr _heapmaxavail
+      .byte "]"
+.endif
+
+
         ;; TODO: more like statement
         .byte "|asm(",'"',"sei",'"',")"
       .byte '['
@@ -2674,6 +2708,24 @@ ruleC:
       .byte '['
         cli
       .byte ']'
+
+
+;;; TODO: a&!b .. hmmmm
+        ;; ! - NOT
+        .byte "|!",_E
+      .byte "["
+;;; 12B
+        ldy #0
+        cmp #0
+        bne @false
+        txa
+        bne @false
+@true:  
+        dey
+@false:
+        tya
+        tax
+      .byte "]"
 
         ;; cast to char/byte == &0xff !
         .byte "|(byte)",_C
@@ -3357,6 +3409,24 @@ ruleD:
         cmp #'<'
         bcc :+
         cpx #'>'
+        bcc :+
+        ;; !< => 0
+        iny
+:       
+        ;;  < => -1
+        tya
+        tax
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|<%V"
+      .byte '['
+        ;; 13
+        ldy #$ff
+        cmp VAR0
+        bcc :+
+
+        cpx VAR1
         bcc :+
         ;; !< => 0
         iny
@@ -5361,6 +5431,7 @@ store_filename:
 ;;; "borrowing" cc65 as stdlib!
 
 
+
 ;;; TODO: furk!
 ;;;   thsi worked, when it shouldn't have!
 ;;;   HAHA: 5555555
@@ -5713,15 +5784,8 @@ status:
 ;;        jsr printstack
         PRINTZ "ERROR"
         putc '>'
-;;; TOOD: put in getchar...
-.ifdef TIM
-        cli
         jsr getchar
-        sei
-.else
-        jsr getchar
-.endif
-        putc 12
+        jsr clrscr
 
 ;;; TODO: printz? printR?
 
@@ -6919,7 +6983,7 @@ GROUP=YELLOW
 .byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
 .byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
 .byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"(",GROUP,"OP S",MEAN,")..",CODE,";",MEAN,"or",GROUP,"V OP",CODE,"=",GROUP,"S",CODE,";",10
-.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == <",10
+.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
 .byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
 .byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
 .byte "    ",CODE,"if (...) ++s;    else {...}",10
@@ -7370,6 +7434,71 @@ input:
 ;;; 
 ;;;   287B          UCSD PASCAL, APPLE II, 6502
 
+;
+BYTESIEVE=1
+; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
+
+
+.ifdef BYTESIEVE
+        .byte "word main(){",10
+        .byte "  m= 8192;",10
+        .byte "  c= 0;",10
+        .byte "  a= malloc(m);",10
+        .byte "  i=0; while(i<m) { poke(a+i, 1); ++i; }",10
+        .byte "  i=0; while(i<m) {",10
+        .byte "    if (peek(a+i)) {",10
+.ifndef NOPRINT
+        .byte "      p= i+i+3;",10
+        .byte "      printd(p);",10
+        .byte "      putchar(32);",10
+.endif
+        .byte "      k=i+p; while(k<m) {",10
+        .byte "        poke(a+k, 0);",10
+        .byte "        k+=p;",10
+        .byte "      }",10
+        .byte "      ++c;",10
+        .byte "    }",10
+        .byte "    ++i;",10
+        .byte "  }",10
+        .byte "  return c;",10
+        .byte "}"
+        .byte 0
+.endif ; BYTESEIVE
+;
+
+
+
+MALLOC=1
+.ifdef MALLOC
+        .byte "word main() {",10
+;        .byte "  printd(heapmemavail()); putchar(10);",10
+;       .byte "  printd(heapmaxavail()); putchar(10);",10
+        .byte "  z= 32768;",10
+        .byte "  a= 0;",10
+
+;;        .byte "  do {",10
+        .byte "X:",10
+
+        .byte "    p= malloc(z);",10
+        .byte "    if (p) {",10
+        .byte "      a+= z;",10
+        .byte "      printd(a); putchar(' '); printh(p); putchar(' '); printd(z); putchar(10);",10
+        .byte "    }",10
+
+        .byte "    z>>=1;",10
+
+;        .byte "    if (z==0) return a;",10
+        .byte "    if (!z) return a;",10
+
+;;; crash! errror "1" lol
+;        .byte "  } while(1);",10
+;;; NOT TRUE????
+        .byte "  goto X;",10
+;        .byte "  } while(z);",10
+
+        .byte "}",10
+        .byte 0
+.endif
 
 ;
 PRIME=1
@@ -7897,7 +8026,8 @@ _output:
 
 .ifndef FROGMOVE
         ;; basically 2000x ++a; lol
-        .res 16*1000+50
+        ;.res 16*1000+50
+        .res 4*1024
 .else
         .res 8*1000+50
 .endif
