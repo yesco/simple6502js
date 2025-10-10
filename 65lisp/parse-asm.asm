@@ -7436,19 +7436,28 @@ input:
 
 ;
 BYTESIEVE=1
-; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
+;
+NOPRINT=1
 
+; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
+;;; 1899 primes:
+;;;   51,962,632 cycles - cc65    ./r Play/byte-sieve-prime
+;;;   44.92s            - sim65   ./rrasm parse    BYTESIEVE=1
+;;;   44.82s                          i+i => i*2
+;;;     (/ 44.82 51.96) => 13.74% faster than cc65
+;;;   28,322,714        - cc65    using -Cl     SAD!!!!!!
 
 .ifdef BYTESIEVE
         .byte "word main(){",10
         .byte "  m= 8192;",10
-        .byte "  c= 0;",10
         .byte "  a= malloc(m);",10
+        .byte "n=0; while(n<10) {",10
+        .byte "  c= 0;",10
         .byte "  i=0; while(i<m) { poke(a+i, 1); ++i; }",10
         .byte "  i=0; while(i<m) {",10
         .byte "    if (peek(a+i)) {",10
+        .byte "      p= i*2+3;",10
 .ifndef NOPRINT
-        .byte "      p= i+i+3;",10
         .byte "      printd(p);",10
         .byte "      putchar(32);",10
 .endif
@@ -7460,6 +7469,9 @@ BYTESIEVE=1
         .byte "    }",10
         .byte "    ++i;",10
         .byte "  }",10
+        .byte "  printd(c);",10
+        .byte "  ++n;",10
+        .byte "}",10
         .byte "  return c;",10
         .byte "}"
         .byte 0
