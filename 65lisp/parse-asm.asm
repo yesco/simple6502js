@@ -523,6 +523,10 @@ TESTING=1
 ;;; Long names support
 ;;; TODO: make functional
 ;LONGNAMES=1
+;;; TODO: IDEA !!!!!!!!!!!!!!!!
+;;; DONt... JUST CREATE new parse rule that maps to data
+;;;           can generate address!
+
 
 ;;; TODO: not yet done, just thinking
 ;BNFLONG=1
@@ -602,6 +606,7 @@ dos:    .res 2
 
 ;;; POS (Patch ptr)
 pos:    .res 2
+;;; GOS search long names
 gos:    .res 2
 
 ;;; if %V or %A stores 'V' or 'A'
@@ -5874,13 +5879,16 @@ _OK:
         putc ' '
 
         ;; print size in bytes
+        ;; (save in gos, too)
         sec
         lda _out
         sbc #<_output
         sta tos
+        sta gos
         lda _out+1
         sbc #>_output
         sta tos+1
+        sta gos+1
         
         jsr printd
         putc 'B'
@@ -5904,6 +5912,7 @@ runs:   .res 1
 
         ;; RUN PROGRAM a TIMES
 RUNTIMES=100
+;RUNTIMES=1
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
 
         lda #RUNTIMES
@@ -5928,8 +5937,11 @@ again:
         lda READTIMER
         ldx READTIMER+1
 
-        ;; adjust, one time overhead 9c, each loop 9c
-        TIMCOST=$ffff-9-(RUNTIMES*9)
+        ;; adjust, one time overhead 10c, each loop 8
+        ;; (may depend on code-location/page boundary?)
+TIMONCE=10
+TIMPER=8
+        TIMCOST=$ffff - TIMONCE - TIMPER*RUNTIMES
         ;; saved lo, hi
         sec
         eor #$ff
@@ -5940,19 +5952,29 @@ again:
         adc #>TIMCOST
         pha
 
-        ;; print "100x [4711us]"
+        ;; print "[47B 100x: 4711us]"
         jsr nl
         putc WHITE
+        putc '['
 
+        ;; print "47B "
+        lda gos
+        sta tos
+        ldx gos+1
+        stx tos+1
+        jsr printd
+        putc 'B'
+        jsr spc
+
+        ;; print "100x: "
         lda #<RUNTIMES
         sta tos
         ldx #>RUNTIMES
         stx tos+1
         jsr printd
         putc 'x'
-
+        putc ':'
         jsr spc
-        putc '['
 
         ;; restore timing
         pla
