@@ -583,7 +583,8 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
+;
+PRINTREAD=1
 ;PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
@@ -3231,6 +3232,26 @@ ruleD:
       .byte ']'
         .byte TAILREC
         
+        .byte "|<<1"
+      .byte '['
+.ifblank
+;;; 6B 12c
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+.else
+;;; 7B 13c
+        stx tos+1
+        asl
+        rol tos+1
+        ldx tos+1
+.endif
+      .byte ']'
+        .byte TAILREC
+
         .byte "|<<2"
       .byte '['
 ;;; 10B
@@ -3270,6 +3291,26 @@ ruleD:
         asl
         rol tos+1
         ldx tos+1
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|>>1"
+      .byte '['
+.ifblank
+;;; 6B 12c
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+.else
+;;; 7B 13c
+        stx tos+1
+        lsr tos+1
+        ror
+        ldx tos+1
+.endif
       .byte ']'
         .byte TAILREC
 
@@ -3360,6 +3401,7 @@ ruleD:
 
         .byte "|>>%D"
       .byte '['
+PUTC '/'
 ;;; 15B (breakeven: D=4-)
         stx tos+1
         ldy #'<'
@@ -3367,8 +3409,8 @@ ruleD:
         dey
         bmi :+
         
-        lsr
-        ror tos
+        lsr tos
+        ror
 
         sec
         bcs :-
@@ -3386,8 +3428,8 @@ ruleD:
         dey
         bmi :+
         
-        lsr
-        ror tos
+        lsr tos
+        ror
 
         sec
         bcs :-
@@ -3681,6 +3723,8 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
+;;; TODO: fail if <<1????
+;;; TODO: need a guard %b (break char) for matcher!
        .byte "<<1"
       .byte '['
         asl
@@ -3835,6 +3879,105 @@ ruleV:
 
 ;;; Exprssion:
 ruleE:  
+
+;FOLD=1
+.ifdef FOLD
+        ;; constant folding?
+;        .byte "%D[d]+%D"
+      .byte "%{"
+        ;; save current gen
+        lda _out
+        sta gos
+        ldx _out+1
+        stx gos+1
+        ;; TODO: should set a flag
+        PUTC '@'
+        ;; cheat: artificual fail!
+        jmp _fail
+        jsr immret
+
+        ;; cheat!
+      .byte "|"
+;.ifdef FFF
+      .byte "%{"
+        PUTC '?'
+;        jsr _iasm
+        lda inp
+        ldx inp+1
+        jsr _printz
+        jsr nl
+        jsr immret
+;.endif
+        .byte _C,_D
+        .byte ";"
+      .byte "["
+        ;; make sure we get back!
+        rts
+      .byte "]"
+      .byte "%{"
+        PUTC '$'
+;        jsr _iasm
+        jsr immret
+        ;; TODO: if flag set
+
+      .byte "%{"
+;        jsr _iasm
+        PUTC '#'
+        ;; print address to call
+        lda gos
+        sta tos
+        lda gos+1
+        sta tos+1
+        jsr printh
+        ;; JSR (gos) !
+        lda #$4c                ; trampoline: jmp
+        sta gos-1
+        jsr gos-1
+        ;; store result
+        sta tos
+        stx tos+1
+        ;; print for debug
+        jsr printd
+        ;; remove code run!
+        lda gos
+        sta _out
+        ldx gos+1
+        stx _out+1
+        ;; continue
+        jsr immret
+        
+      .byte "["
+        ;; finally generate code to load result!
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+
+        .byte "|"
+.endif ; FOLD
+
+;FOLDPLUS=1
+.ifdef FOLDPLUS
+        ;; constant folding?
+        .byte "%D[d]+%D"
+      .byte "%{"
+        clc
+        lda tos
+        adc dos
+        sta tos
+        lda tos+1
+        adc dos+1
+        sta tos+1
+        jsr printd
+        jsr immret
+
+      .byte "["
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+
+        .byte "|"
+.endif ; FOLDPLUS
+
         .byte _C,_D
         
 .ifdef BYTERULES
@@ -5956,6 +6099,7 @@ runs:   .res 1
         ;; RUN PROGRAM n TIMES
 ;RUNTIMES=100
 RUNTIMES=1
+;RUNTIMES=10
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
 
         lda #RUNTIMES
@@ -6007,6 +6151,7 @@ TIMPER=8
         ldx gos+1
         stx tos+1
         jsr printd
+        jsr spc
         putc 'B'
         jsr spc
 
@@ -6028,6 +6173,7 @@ TIMPER=8
 
         jsr printd
 
+        jsr spc
         putc 'u'
         putc 's'
         putc ']'
@@ -7160,6 +7306,37 @@ input:
 ;        .byte "word main(){}",0
 
 
+.ifdef FOLD
+;;; Parse problem need %b word boundary check!!!
+;        .byte |<<1%b"
+
+        .byte "1<<10;",0
+
+
+
+;;; WOW! (108)
+;        .byte "3+4+100+1;",0
+
+;; fail
+;        .byte "3+4+100+1<<3>>1>>1>>1;",0
+; ok
+;        .byte "3+4+100+1<<1>>1;",0;
+
+; 300?
+;        .byte "return 3+4+100+1<<2>>1>>1;",0
+;;; wrong?
+;        .byte "3+4+100+1<<2>>1>>1;",0 
+        .byte "printd(3+4+100+1<<1<<1>>1);",0 
+
+        .byte "printd(3+4+100+1<<1<<1);",0 
+        .byte "printd(3+4+100+1<<1<<1>>1>>1);",0 
+
+;;; loops forever! lol
+        .byte "r=17;"
+;        .byte "n=r<<2+r<<3;"
+        .byte 0
+.endif ;FOLD
+
         ;; single expression!
 ;        .byte "4+3;",0
 ;        .byte "a=4+3;printd(a);putchar('0'+a);",0
@@ -7185,8 +7362,7 @@ input:
 
 ;;; Conclusion 44B 106c to x40
 ;;; optimal is 33B (grok managed eventually, store tmp in A and Y)
-;
-FOURTY=1
+;FOURTY=1
 ;;; 62B 119c (program 16B overhead)
 .ifdef FOURTY
         .byte "word main(){",10
@@ -7624,8 +7800,39 @@ FOURTY=1
 ;;; Byte sieve from Byte magaxine:
 ;;; ==============================
 ;;; char prime[8192]={0}; // simplier code: no bitshift
+
+
+;;;    bytes
+;;; FILE   MAIN seconds  WHAT
+;;; ----   ---- ----.--  ------------------------
+
+;;; === Byte magazine ===
+;;;   287                UCSD PASCAL, APPLE II, 6502
+
+;;; === BCPL (bytecode) === ( https:projects.drogon.net/retro-basic-and-bcpl-benchmarks/ )
 ;;; 
-;;;   287B          UCSD PASCAL, APPLE II, 6502
+;;;     NOTE: this is size=4095 (half of BYTE BENCHMARK!)
+;;;     NOTE: this is 1x run!!
+;;; 
+;;;               96.96  BBC BASIC 1-3 (6.06s on 16Mhz)
+;;;               81.12  BBC BASIC 4   (5.07s)
+;;;              134.4   CBM2 (* 8.40 16)
+;;;              135.86  EhBASIC (* 8.48 16)
+;;;               10.352 BCPL (INT) (* 0.647 16)
+;;; 
+;;; === jsk: 1x = 4096 = (don't compare with 8192...)
+;;;         363    2.104s ORIC    my compiler
+
+
+;;; === jsk tests === (1x run, 8192)
+;;; FILE,  MAIN bytes 
+;;;   2627  322    5.196  CC65   ./r Play/byte-sieve-prime
+;;;         287    9.510  CC65   -DPROGSIZE
+;;;         322    2.8323 CC65   -Cl
+;;; === my compiler ===
+;;;         363    3.63   sim65  ./rrasm parse BYTESIEVE
+;;;         363    4.8s   ORIC   ./rasm parse  BYTESIEVE=1
+;;; 
 
 ;
 BYTESIEVE=1
@@ -7633,6 +7840,7 @@ BYTESIEVE=1
 NOPRINT=1
 
 ; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
+;;; = 10x == 10x == 10x == 10x == 10x == 10x == 10x =
 ;;; 1899 primes:
 ;;;   cy,cles      bytes
 ;;;  -----------   -----
@@ -7651,53 +7859,37 @@ NOPRINT=1
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
         .byte "word main(){",10
-        ;; BC: (+ 3 2 1 3 2) 11
+
+        ;; BYTE MAGAZINE 8192 => 1899
         .byte "  m=8192;",10
+        ;; used by Bench/Byte Sieve - BCPL/BBC
+;        .byte "  m=4096;",10
+
         .byte "  a=malloc(m);",10
-        ;; BC: (+ 1 2 1 1 2 2) = 9
         .byte "  n=0; while(n<10) {",10
-        ;; BC: 3
         .byte "    c=0;",10
-        ;; BC: (+ 9 4 1 2) = 16 
         .byte "    i=0; while(i<m){poke(a+i,1);++i;}",10
 ;;; NOPE
 ;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
-        ;; BC: 9
         .byte "    i=0; while(i<m) {",10
-        ;; BC: 6
         .byte "      if (peek(a+i)) {",10
-        ;; BC: 7
         .byte "        p= i*2+3;",10
 .ifndef NOPRINT
-        ;; BC: (+ 2 1) = 3
         .byte "        printd(p);",10
         .byte "        putchar(32);",10
 .endif
-        ;; BC: (+ 5 9) = 14
         .byte "        k=i+p; while(k<m) {",10
-        ;; BC: 5
         .byte "          poke(a+k, 0);",10
-        ;; BC: 5
         .byte "          k+=p;",10
-        ;; BC: 1
         .byte "        }",10
-        ;; BC: 2
         .byte "        ++c;",10
-        ;; BC: 1
         .byte "      }",10
-        ;; BC: 2
         .byte "      ++i;",10
-        ;; BC: 1
         .byte "    }",10
-        ;; BC: 2
         .byte "    printd(c);",10
-        ;; BC: 2
         .byte "    ++n;",10
-        ;; BC: 1
         .byte "  }",10
-        ;; BC: 2
         .byte "  free(a);",10
-        ;; BC: 2
         .byte "  return c;",10
         .byte "}"
         .byte 0
