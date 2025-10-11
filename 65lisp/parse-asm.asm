@@ -3970,7 +3970,10 @@ ruleO:
 ruleP:  
         .byte _O
 
-        .byte _T,"main()",_B
+        ;; TODO: works with _S
+        ;; (reason is _T error doesn't propagate up
+;        .byte _T,"main()",_B
+        .byte "word","main()",_B
       .byte '['
         ;; if main not return, return 0
         lda #0
@@ -3978,6 +3981,17 @@ ruleP:
         rts
       .byte ']'
 
+        .byte "|"
+
+        .byte _A
+      .byte "["
+        rts
+      .byte "]"            
+
+;        .byte "|",_E,TAILREC
+;        .byte "|;",TAILREC
+;        .byte "|{",_A,"}",TAILREC
+        
         .byte 0
 
 ;;; Type
@@ -5940,8 +5954,8 @@ runs:   .res 1
 .code
 
         ;; RUN PROGRAM n TIMES
-RUNTIMES=100
-;RUNTIMES=1
+;RUNTIMES=100
+RUNTIMES=1
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
 
         lda #RUNTIMES
@@ -7145,6 +7159,11 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+
+        ;; single expression!
+;        .byte "4+3;",0
+;        .byte "a=4+3;printd(a);putchar('0'+a);",0
+
 ;        .byte "word main(){a=r;}",0
 
 ;        .byte "word main(){ for(i=0; i<26; ++i) { gotoxy(i/2,i); putchar('A'+i); } }",0
@@ -7165,7 +7184,7 @@ input:
 
 
 ;;; Conclusion 44B 106c to x40
-;;; optimal is 33B (grok managed eventuall, store tmp in A and Y)
+;;; optimal is 33B (grok managed eventually, store tmp in A and Y)
 ;
 FOURTY=1
 ;;; 62B 119c (program 16B overhead)
@@ -7174,11 +7193,16 @@ FOURTY=1
 ;        .byte "  r=17;",10
 ;        .byte "  while(r<28) {",10
 
-;;; 42 B   84c
-        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
+;;; 49B => 42 B   84c
+;        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
 
-;;; 40 B   75c
-;        .byte "    n=r<<2+r<<3;",10
+;;; 47B => 40 B   75c
+;;;  8B extra for << to store and retrieve x
+        .byte "    n=r<<2+r<<3;",10
+
+;;; 
+;        .byte "    n= PIPE r<<2+r<<3;",01
+;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
 
 ;        .byte "    printd(n); putchar(' ');",10
 ;        .byte "    ++r;",10 
@@ -7624,37 +7648,60 @@ NOPRINT=1
 ;;;  #x11f 287
 
 .ifdef BYTESIEVE
+;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
+;;; so 104 bytecodes is substantially lower than MC: 365...
         .byte "word main(){",10
+        ;; BC: (+ 3 2 1 3 2) 11
         .byte "  m=8192;",10
         .byte "  a=malloc(m);",10
+        ;; BC: (+ 1 2 1 1 2 2) = 9
         .byte "  n=0; while(n<10) {",10
+        ;; BC: 3
         .byte "    c=0;",10
+        ;; BC: (+ 9 4 1 2) = 16 
         .byte "    i=0; while(i<m){poke(a+i,1);++i;}",10
 ;;; NOPE
 ;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
+        ;; BC: 9
         .byte "    i=0; while(i<m) {",10
+        ;; BC: 6
         .byte "      if (peek(a+i)) {",10
+        ;; BC: 7
         .byte "        p= i*2+3;",10
 .ifndef NOPRINT
+        ;; BC: (+ 2 1) = 3
         .byte "        printd(p);",10
         .byte "        putchar(32);",10
 .endif
+        ;; BC: (+ 5 9) = 14
         .byte "        k=i+p; while(k<m) {",10
+        ;; BC: 5
         .byte "          poke(a+k, 0);",10
+        ;; BC: 5
         .byte "          k+=p;",10
+        ;; BC: 1
         .byte "        }",10
+        ;; BC: 2
         .byte "        ++c;",10
+        ;; BC: 1
         .byte "      }",10
+        ;; BC: 2
         .byte "      ++i;",10
+        ;; BC: 1
         .byte "    }",10
+        ;; BC: 2
         .byte "    printd(c);",10
+        ;; BC: 2
         .byte "    ++n;",10
+        ;; BC: 1
         .byte "  }",10
+        ;; BC: 2
         .byte "  free(a);",10
+        ;; BC: 2
         .byte "  return c;",10
         .byte "}"
         .byte 0
-.endif ; BYTESEIVE
+.endif ; BYTESIEVE
 ;
 
 
