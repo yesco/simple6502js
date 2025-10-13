@@ -1,3 +1,246 @@
+;;; jsk's asm minimal implementation....
+
+        jsr nl
+
+        ldy #0
+        sty savey
+:       
+.ifnblank
+        sty tos
+        ldx #0
+        stx tos+1
+        jsr printd
+        putc ':'
+.endif
+        ldy savey
+        lda chars,y
+        beq :+
+
+        jsr putchar
+        putc '-'
+        putc '>'
+
+        ldy savey
+        lda chars,y
+;        jsr isalpha
+;        jsr isdigit
+        jsr isxdigit
+
+        sta tos
+        ldx #0
+        stx tos+1
+        jsr printd
+        jsr nl
+
+        inc savey
+        ldy savey
+        jmp :-
+:       
+        jmp halt
+
+
+;;; IDEA
+;;;        Z=1 means TRUE!
+;;; TWO RULES:
+;;; 
+;;; testsGivingZ: == isblank
+;;; testsGivingC: <  isalpha isdigit isxdigit isspace
+;;; 
+;;; can have two "IF" rules C=0 for < !!!
+;;; 
+;;; C=1 == false LDA #0; ROL => Z=0   !!!
+;;; C=0 == true  LDA #0; ROL => Z=1   !!!
+
+isspace:        
+;;; 2 + 4 + 1
+        cmp #' '+1
+isblank:        
+;;; 6 Z=0
+        cmp #' '
+        beq :+
+        cmp #'I'-'@'
+:       
+;;; 10 C=0
+        clc
+        cmp #' '
+        beq :+
+        cmp #'I'-'@'
+        bne :++
+:       
+        sec
+:       
+isxdigit:       
+;;; 11 (saves 2 by reusing isdigit)
+;;; 'a'<=tolower(x)<='z'
+        pha
+        ora #32                 ; lower-case
+        sec
+        sbc #'a'
+        cmp #6
+        pla
+        bcc :+
+        ;; fallthrough
+isdigit:        
+;;; 5 + 4 + 1 (C=0, A=255, rts)
+        sec
+        sbc #'0'
+        cmp #10
+:       
+        lda #0
+        sbc #0
+
+        rts
+isxdigitFULL:   
+;;; 13 + 4 + 1 (C=0
+        sec
+        sbc #'0'
+        cmp #10
+
+        bcc :+
+        ;; hex?
+        ora #32                 ; lower-case
+        sbc #49
+        cmp #6
+:       
+
+;        rts
+
+        lda #0
+        sbc #0
+
+        rts
+isalpha:        
+;;; 7 + 4 + 1 (C=0, A=255, rts)
+;;; x doesn't matter, if x return result undefined!
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+
+        lda #0
+        sbc #0
+
+        rts
+
+;;; 8C C=0 isalpha
+        ora #32
+        eor #64+32
+        tax
+        dex
+        cpx #'z'-'a'+1
+        
+        lda #0
+        rol
+        rts
+;;; 7C
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        ;; C=0 if 
+        rts
+;;; 18 B
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        ;; C=0 if 
+
+        ldx #0
+        txa
+
+        ;; reverse C: 5 B
+        bcs :+
+        sec
+        SKIPONE
+:       
+        clc
+
+        adc #0
+
+        rts
+;;; 14+1
+.ifnblank
+        ldx #1
+        ora #32
+        eor #64+32
+        beq :+
+        cmp #'z'-'a'
+:
+        txa
+        bcc :+
+        dex
+:       
+        rts
+.endif
+;;; 15+1
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        ;; C=0 if 
+        ldx #0
+        txa
+        bcs :+
+        adc #1
+:       
+        dex
+        rts
+;;; 15+1
+        ldx #1
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        txa
+        tax
+        dex
+
+        rts
+;;; 15+1
+        ldx #1
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        txa
+        bcc :+
+        sbc #1
+:       
+        dex
+
+        rts
+;;; 14+1
+        ldx #0
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        txa
+        bcs @zero
+        lda #1
+@zero:
+        rts
+
+       
+chars:  
+        .byte '8','A'-1,'A','O','Z','Z'+1
+        .byte     'a'-1,'a','o','z','z'+1,'}'
+        .byte '0'-1,'0','9','9'+1,'a'-1,'a','f','f'+1
+        .byte                     'A'-1,'A','F','F'+1
+        .byte 0
+
+
+
+
+
+
+
+
+
+
+
+
 // according to grok
 
 int isspace(int c) {

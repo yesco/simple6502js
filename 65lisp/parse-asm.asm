@@ -458,8 +458,24 @@ CURCALC		= $001f      ; ? how to update?
 ;;; 
 ;;; TODO: BUG: i think there is some zeropage overlap
 ;;;   with oric timer and vars... lol
-;
-TIM=1
+;TIM=1
+
+;TTY=1
+
+;;; 
+;;; $0244: jmp ?
+;;; points to $ee22 (ROM interrupt handler)
+;ORICINTVEC=$0245
+;;; doesn't matter?
+;INTCOUNT=10000                  ; 100x/s
+INTCOUNT=50000                  ; 100x/s
+
+;INTERRUPT=1
+
+TIMER_START	= $ffff
+SETTIMER        = $0306
+READTIMER	= $0304
+CSTIMER         = $0276
 
 
 ;;; See template-asm.asm for docs on begin/end.asm
@@ -481,8 +497,7 @@ TIM=1
 .endmacro
 
 
-.ifblank
-;.ifnblank
+.ifnblank
         .macro TIMER
           jsr timer
         .endmacro
@@ -664,24 +679,122 @@ DONE= '$'
 
 ;;; parser
 FUNC _init
+        
+;;; INTERRUPT DEBUG TESTING
+;        lda #$40                ; RTI
+;        sta $0245
+
+
 ;;; 21 B
+
+        sei
 
         ;; init/reset stack
         ldx #$ff
         txs
         cld
-.ifdef TIM
-        sei
-.else
-        ;; let interrupts run like normal
-;        cld
-.endif
-
 .ifdef CHECKSTACK
         ;; sentinel - if these not there stack bad!
         stx $100
         stx $101
 .endif
+        ;; X=$ff still for init!
+
+
+;;; Init ORIC
+.ifdef __ATMOS__
+;;; #26A -- Oric status byte. Each bit relates to
+;;; one aspect: from high bit to low bit – unused,
+;;; double-height, protected-columns, ESC pressed,
+;;; keyclick, unused, screen-on, cursor-off.
+;;; (description sucks!)
+
+;;; 0,0,protected on=0!,0, 1=off,0,screen=on=1,cursor=on=1
+        lda #%00001011
+        sta $26a
+;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
+        lda #8
+        sta $24e
+;;; $24F (KBRPT) repeat rate for keyboard repeat, def 4
+
+;;; TODO: not working?
+        lda #1
+        sta $24f
+.endif
+
+
+.ifdef TIM
+        sei
+.endif ; TIM
+
+
+.ifdef INTERRUPT
+ORICINTVEC=$0245
+        ;; 
+.zeropage
+centis:     .res 1              ; 1/100ths of seconds
+seconds:    .res 2              ; (/ 65536 3600)= 18h
+.code
+
+initinterrupts:
+
+
+        sei
+
+XYZ=1
+.ifdef XYZ
+        lda ORICINTVEC-1
+        sta tos
+        ldx #0
+        stx tos
+        jsr printh
+        
+        ;; save old vector
+        lda ORICINTVEC
+        sta origint
+        ldx ORICINTVEC+1
+        stx origint+1
+
+        sta tos
+        stx tos+1
+        jsr printh
+
+        ;; install interrupt vector
+        lda #<_interrupt
+        sta ORICINTVEC
+        ldx #>_interrupt
+        stx ORICINTVEC+1
+
+        lda #0
+        sta centis
+        sta seconds
+        sta seconds+1
+
+.ifnblank
+.ifblank
+        ;; set timers for 100x a second
+        lda #<INTCOUNT
+        sta READTIMER
+        lda #>INTCOUNT
+        ;; this write starts the timer
+        sta READTIMER
+.else
+        lda #<INTCOUNT
+        sta SETTIMER
+        lda #>INTCOUNT
+        ;; this write starts the timer
+        sta SETTIMER+1
+.endif
+.endif ; BLANK
+
+        ;; go!
+        cli
+
+.endif ; XYZ
+
+.endif ; INTERRUPT
+
+
 
 .ifdef DEBUG 
         putc 'S'
@@ -5992,13 +6105,11 @@ status:
        
 .ifdef PRINTINPUT
 
-        putc 10
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ "ERROR"
-        putc '>'
-        jsr getchar
-        jsr clrscr
+        PRINTZ {10,"ERROR>"}
+;        jsr getchar
+;        jsr clrscr
 
 ;;; TODO: printz? printR?
 
@@ -6023,6 +6134,12 @@ status:
         putc 16+7+128           ; white background
         putc 1+128              ; red text
 .else
+;.ifdef INTERRUPT
+        putc ' '
+        putc '>'
+        putc ' '
+;.endif
+
         putc 7+128              ; white text
         putc 16+1+128           ; red background
 .endif
@@ -6070,6 +6187,10 @@ _OK:
         putc 'K'
         putc ' '
 
+.ifdef INTERRUPT
+        jmp _run
+.endif
+
         ;; print size in bytes
         ;; (save in gos, too)
 ;;; TODO: gos gets overwritten by dasm(?)
@@ -6105,10 +6226,13 @@ RUNTIMES=1
         lda #RUNTIMES
         sta runs
 
+.ifdef TIM
         ;; initiate CYCLE EXACT MEASUREMENT!
         lda #$ff
         sta READTIMER
         sta READTIMER+1
+.endif ; TIM
+
 again:
         jsr _output
 
@@ -6120,6 +6244,7 @@ again:
         txa
         pha
 
+.ifdef TIM
         ;; 13617
         lda READTIMER
         ldx READTIMER+1
@@ -6178,7 +6303,8 @@ TIMPER=8
         putc 's'
         putc ']'
         jsr nl
-        
+.endif ; TIM
+
         ;; prints return code
         putc '='
         putc '>'
@@ -6232,30 +6358,29 @@ TIMPER=8
 ;;; - CTRL- toggle protected column ORIC-1 only? (say ^I)
 
 
-;;; #26A -- Oric status byte. Each bit relates to
-;;; one aspect: from high bit to low bit – unused,
-;;; double-height, protected-columns, ESC pressed,
-;;; keyclick, unused, screen-on, cursor-off.
-;;; (description sucks!)
-
-;;; 0,0,protected on=0!,0, 1=off,0,screen=on=1,cursor=on=1
-        lda #%00001011
-        sta $26a
-;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
-        lda #8
-        sta $24e
-;;; $24F (KBRPT) repeat rate for keyboard repeat, def 4
-
-;;; TODO: not working?
-        lda #1
-        sta $24f
-
 
 FUNC _edit
+        
+.ifdef INTERRUPT
+.ifnblank
+        ;; print time
+        putc 'M'-'@'
+        lda seconds
+        sta tos
+        lda seconds+1
+        sta tos+1
+        jsr printd
+        putc ' '
+
+        jmp _edit
+.endif
+.endif ; INTERRUPT
 
         ;; TODO: getchar already echoes!!!
-        jsr getchar
 
+;jmp _run
+
+        jsr getchar
         jsr editaction
         jmp _edit
 
@@ -6478,6 +6603,129 @@ editprint:
         jmp rawputc
 
 
+origint:        .res 2
+        
+.ifdef INTERRUPT
+FUNC _interrupt
+; nah
+;        rti
+; nah
+;        jmp (origint)
+
+; better - LOL - WTF? how is this not equivalent?
+;;; getting %R means somethingon stack messed up!!!
+;        jmp $ee22
+
+;;; doesn't get back to main code...
+
+;;; copy of $ee22 routine...
+        pha
+        lda $0300
+        and #$40
+        beq :+
+        sta $0300
+        jsr $ee34
+:       
+
+;;; doesn't help much more
+;        pla
+;        rti
+
+;;; gets called but no normal work done
+;        PUTC '*'
+        pla
+        ;; basically jump to an changable rti!
+        jmp $024a
+
+;;
+        
+        pha
+        txa
+        pha
+        tya
+        pha
+
+        PUTC '*'
+
+        pla
+        tay
+        pla
+        tax
+        pla
+
+        rti
+
+        jmp (origint)
+;        rti
+
+        pha
+        txa
+        pha
+        tya
+        pha
+
+;;; even this doesn't work...
+        pha
+
+        ;; count till hundred
+        inc centis
+;;; 85s if nothing
+;;; (/ 85 34.45) = 2.46 ... 
+
+;;; 34.4s
+;        lda centis              ; if reversecount save 2c
+;        cmp #100
+        bne @done
+        ;; update seconds
+        inc seconds
+        bne @next
+        bne :+
+        inc seconds+1
+:       
+PUTC '*'
+.ifdef DOIT
+        ;; print
+        lda tos
+        pha
+        lda tos+1
+        pha
+
+        putc 'M'-'@'
+        lda seconds
+        sta tos
+        lda seconds+1
+        sta tos+1
+        jsr printd
+        putc ' '
+
+        pla
+        sta tos+1
+        pla
+        sta tos
+
+.endif ; DOIT
+@next:
+        ;; reset centis
+        lda #0
+        sta centis
+
+@done:
+        pla
+        tay
+        pla
+        tax
+        pla
+;;; lol?
+;        rts
+
+;;; no effect?
+;        cli
+
+        rti
+
+.endif ; INTERRUPT
+
+
 FUNC _printsrc
         jsr clrscr
         lda #<input
@@ -6502,8 +6750,8 @@ nl:
         jmp putchar
 
 FUNC _help
-        lda #<helptext
-        ldx #>helptext
+        lda #<_helptext
+        ldx #>_helptext
         jsr _printz
 
         jsr waitesc
@@ -6914,11 +7162,6 @@ nextpage:
 .endif ; MEMMAD
 
 
-TIMER_START	= $ffff
-SETTIMER        = $0306
-READTIMER	= $0304
-CSTIMER         = $0276
-
 
 .zeropage
   lastcs:  .res 2
@@ -7240,7 +7483,7 @@ BG       =16                    ; BG+WHITE
 NORMAL   =128+8
 DOUBLE   =128+10
 
-helptext:   
+FUNC _helptext
 
 ;;; 10. If a print line starts with control characters
 ;;;     – e.g., ESC N, etc. – then the protected columns
@@ -7298,6 +7541,8 @@ GROUP=YELLOW
 ;;; _incIspc may mark prev as read, and or 
 ;;; it could be used by memcpyz that need prefix?
 .byte 0,0
+
+FUNC _input
 
 input:
 
@@ -8304,6 +8549,8 @@ docs:
 
 .endif ; INCTESTS
 
+FUNC _savedscreen
+
 savedscreen:    
         .byte "0123456789012345678901234567890123456789"
         .byte "1111111111222222222233333333334444444444"
@@ -8353,6 +8600,7 @@ arr:    .res 256
 .endif
 
 .ifdef ZPVARS
+;;; TODO: don't initialize zp variables...
   .zeropage
 .endif
 
@@ -8373,6 +8621,11 @@ vars:
 .ifdef ZPVARS
   .code
 .endif
+
+
+;;; variable defs
+;;; TODO: rework to generate BNF parse rules!
+FUNC _defs
 
 defs:
 
@@ -8449,6 +8702,7 @@ vnext:
 ;;;   _outend: 
 
 _output:
+.bss
 ;;; not physicaly allocated in binary
 ;;; ++a; x 2000
 ;;;  free tap inp output
@@ -8467,6 +8721,8 @@ _output:
 ;;; LIBRARY
 
 .code
+FUNC _library
+
 library:        
 ;;; (- #xdad #xd4d) = 96 B
 

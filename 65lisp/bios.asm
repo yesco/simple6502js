@@ -77,27 +77,52 @@ readkey:
 ;;; input char from keyboard
 ;;;
 ;;; 10B
-.proc getchar      
-.ifdef TIM
+xgetchar:       
+.proc getchar
+;        lda #'A'
+;        rts
+
+;;; TODO: replace by my own...
+.ifdef TTYxxxxxxLOL
+        jmp halt
+        lda #'A'
+        rts
+.endif ; TTY
+
+;.ifdef TIM
         cli
-.endif ; TIM
+;.endif ; TIM
         stx savexputchar
         sty saveyputchar
 
+:       
         jsr $023B               ; ORIC ATMOS only
-        bpl getchar             ; no char - loop
+        bpl :-                  ; hibit set when ready
         tax
+
         ;; TODO: optional?
 ;        jsr $0238               ; echo char
 
         ldy saveyputchar
         ldx savexputchar
 
-.ifdef TIM
+;.ifdef TIM
         sei
-.endif ; TIM
+;.endif ; TIM
+
         rts
 .endproc
+
+
+;.zeropage                     
+;sos:    .word SCREEN
+;.code
+
+sos:    .byte 0
+
+SCR=$bb80
+SCREND=SCR+40*28
+
 
 ;;; platputchar used to delay print A
 ;;; (search usage in printd)
@@ -109,7 +134,27 @@ plaputchar:
 ;;; 
 ;;; 12B
 .export putchar
+
 putchar:        
+
+.ifdef TTY
+rawputc:                        ; well...
+        stx savexputchar
+        
+        ;; minimal screen w putchar!, lol
+        ldx sos
+        and #127
+        cmp #' '
+        bcc :+
+        sta $bb80,x
+        inc sos
+:    
+
+        ldx savexputchar
+        rts
+
+.else
+
         stx savexputchar
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
@@ -139,8 +184,7 @@ rawputc:
 .endif ; HIBIT
         ldx savexputchar
         rts
-
-
+.endif ; TTY
 
 .else
 ;;; Generic IO names with cc65 (conio.h)
@@ -155,7 +199,8 @@ plaputchar:
         pla
         jmp putchar
 
-.endif ; __ATMOS__
+.endif ; !__ATMOS__
+
 
 
 ;;; putchar (leaves char in A)
