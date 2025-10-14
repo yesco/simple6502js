@@ -6210,8 +6210,7 @@ _run:
         lda #WHITE&127
         sta $026c               ; ink
 
-        jsr nl
-;        GOTOXY 2, 27
+        jsr _eos
 .endif        
 
 .zeropage
@@ -6251,7 +6250,8 @@ again:
         sta $026b               ; paper
         lda #GREEN&127
         sta $026c               ; ink
-;        GOTOXY 2, 27
+
+        jsr nl
 .endif        
 
 .ifdef TIM
@@ -6386,13 +6386,10 @@ FUNC _edit
 .endif
 .endif ; INTERRUPT
 
-        ;; TODO: getchar already echoes!!!
-
-;jmp _run
-
         jsr getchar
         jsr editaction
         jmp _edit
+
 
 editaction:     
 
@@ -6400,7 +6397,8 @@ editaction:
         cmp #CTRL('C')
         bne :+
 
-        jsr clrscr
+        jsr _savescreen
+        jsr _eos
         ;; This basically restarts program, lol
         TIMER
         jmp _init
@@ -6490,14 +6488,15 @@ doneCE:
         cmp #CTRL('R')
         bne :+
 
-        jsr clrscr
+        jsr _savescreen
+        jsr _eos
         jmp _aftercompile
 :       
 ;;; - ctrl-X - execute whatever
         cmp #CTRL('X')
         bne :+
 
-;;; TODO: save edit screen?
+        jsr _savescreen
         jmp _run
 :       
 ;;; - ctrl-q - disasm
@@ -6519,11 +6518,15 @@ doneCE:
 ;;; - ctrl-Zource (as print source)
         cmp #CTRL('Z')
         bne :+
+
         jmp _printsrc
 :       
 ;;; - ctrl-Utilities (as print source)
         cmp #CTRL('U')
         bne :+
+        
+        jsr _savescreen
+        jsr _eos
         jmp _listfiles
 :       
 ;;; - ESC - print HELP
@@ -6533,7 +6536,6 @@ doneCE:
         jsr _savescreen
         jsr _help
         jmp _loadscreen
-
 :
 ;;; - ctrl-W - save
         cmp #CTRL('W')
@@ -6553,13 +6555,22 @@ doneCE:
 
         jsr _savescreen
         jsr nl
+.ifdef __ATMOS__
+
+        ;; NOP
+        rts
+.else
 
 .import _exit
         lda #0
         tax
         jsr _exit
+.endif
 
 :       
+
+;;; === MAPPING EMACS commands to ORIC control codes
+
 ;;; - RETURN goes next line indented as prev!
         cmp #CTRL('M')
         bne :+
@@ -6594,12 +6605,10 @@ doneCE:
 
         lda #CTRL('K')
 :       
-
 ;;; - control char - just print it
         cmp #' '
         bcc editprint
-
-;;; - printables
+;;; - INSERT CHAR (shift line + putchar)
         pha
         ;; insert - need to push other chars on line right
         ldy #38
@@ -6740,6 +6749,10 @@ PUTC '*'
 
 .endif ; INTERRUPT
 
+
+FUNC _eos
+        GOTOXY 2,27
+        jmp nl
 
 FUNC _printsrc
         jsr clrscr
@@ -8640,6 +8653,8 @@ endinput:
 FUNC _savedscreen
 
 savedscreen:    
+.ifdef JUNK
+  .code
         .byte "0123456789012345678901234567890123456789"
         .byte "1111111111222222222233333333334444444444"
 ;        .byte "2                                       "
@@ -8671,9 +8686,14 @@ savedscreen:
         .byte "27 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",0
         ;; not on sceen!
         .byte "28 ####################################"
+
+.else
+.bss
         ;; ORIC SCREEN SIZE
         ;; (save program/screen before compile to "input")
         .res SCREENSIZE+1
+
+.endif ; JUNK
 
 ;;; END INPUT
 ;;; ----------------------------------------

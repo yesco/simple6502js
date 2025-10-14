@@ -394,29 +394,25 @@ rawputc:
 
 .endif ; TTY
 
-.ifnblank
-.macro GOTOXY x
+.macro GOTOXY xx,yy
         ;; CURROW ATMOS
-        ldx #x
+        ldx #xx
         stx $0269
-        ldy #y
+        ldy #yy
         sty $0268
         ;; ROWADDR
-        lda #<($bb80 + y*40)
-        ldx #>($bb80 + y*40)
+        lda #<($bb80 + yy*40)
+        ldx #>($bb80 + yy*40)
 ;;; TODO: overlap w CC02 variables!!
         sta $12
         stx $13
 .endmacro
-.endif
 
 .else
 
-.ifnblank
-.macro GOTOXY x,y
+.macro GOTOXY xx,yy
 ;;; TODO: generate string with ANSI terminal code
 .endmacro
-.endif
 
 newline:        
 nl:     
