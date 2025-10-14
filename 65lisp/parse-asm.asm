@@ -2280,6 +2280,10 @@ jsr printchar
         rts
 
 
+FUNC _incT
+;;; 3
+        ldx #tos
+        SKIPTWO
 FUNC _incP
 ;;; 3
         ldx #pos
@@ -6199,6 +6203,17 @@ _OK:
 
 _run:   
 
+.ifdef __ATMOS__
+        ;; set ink for new rows
+        lda #BLACK+16
+        sta $026b               ; paper
+        lda #WHITE&127
+        sta $026c               ; ink
+
+        jsr nl
+;        GOTOXY 2, 27
+.endif        
+
 .zeropage
 runs:   .res 1
 .code
@@ -6229,6 +6244,15 @@ again:
         pha
         txa
         pha
+
+.ifdef __ATMOS__
+        ;; set ink for new rows
+        lda #BLACK&127+16
+        sta $026b               ; paper
+        lda #GREEN&127
+        sta $026c               ; ink
+;        GOTOXY 2, 27
+.endif        
 
 .ifdef TIM
         ;; 13617
@@ -6497,6 +6521,11 @@ doneCE:
         bne :+
         jmp _printsrc
 :       
+;;; - ctrl-Utilities (as print source)
+        cmp #CTRL('U')
+        bne :+
+        jmp _listfiles
+:       
 ;;; - ESC - print HELP
         cmp #27
         bne :+
@@ -6718,6 +6747,56 @@ FUNC _printsrc
         ldx #>input
         jmp _printz
 
+FUNC _listfiles
+        ;; init
+        lda #<input
+        ldx #>input
+        sta tos
+        stx tos+1
+
+        lda #'a'
+        sta savea
+@nextfile:       
+        ;; last file?
+        ldy #0 
+        lda (tos),y
+        beq @done
+
+        pha
+        ;; print 'letter'
+        putc WHITE
+        lda savea
+        jsr putchar
+        putc GREEN
+        jsr spc
+
+        pla
+        ;; print first line
+:       
+        jsr putchar
+        jsr _incT
+        lda (tos),y
+        beq @endfile
+        cmp #10
+        bne :-
+
+        ;; skip till end of file
+:       
+        jsr _incT
+        ldy #0 
+        lda (tos),y
+        bne :-
+
+        ;; go next pos
+@endfile:
+        jsr _incT
+        jsr nl
+        inc savea
+        jmp @nextfile
+
+@done:
+        rts
+
 
 FUNC _help
         lda #<_helptext
@@ -6726,6 +6805,7 @@ FUNC _help
 
         jsr waitesc
 
+FUNC _listsymbols
         ;; display names from ruleS
         PRINTZ {12,10, DOUBLE,YELLOW,"Symbols found",10, DOUBLE,YELLOW,"Symbols found",10, 10}
         
@@ -6770,7 +6850,7 @@ FUNC _help
         jsr waitesc
         jmp _loadscreen
 waitesc:
-        PRINTZ "    ESC>"
+        PRINTZ {CYAN,"    ESC>"}
         jmp getchar
 
 ;;; TODO: ???
@@ -6855,10 +6935,23 @@ FUNC _loadscreen
 
 ;;; CHEAT - not counted in parse.bin
 
+;;; (+ 8 21 9) = 38 
+;;; now: a generic multiplication is ... 32 .. 38 bytes...
+
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
 FUNC _mul10
-;;; 25
+;;; 8
+        jsr _mul5
+        ;; double
+_double:
+        asl tos
+        rol tos+1
+        rts
+
+
+FUNC _mul5
+;;; 21
         lda tos
         ldx tos+1
         jsr _double
@@ -6869,14 +6962,13 @@ FUNC _mul10
         txa
         adc tos+1
         sta tos+1
-        ;; double
-_double:        
-        asl tos
-        rol tos+1
         rts
 
-
-
+FUNC _mul40
+;;; 9
+        jsr _mul10
+        jsr _double             ; 20
+        jmp _double             ; 40
 
 
 .ifdef MEM1
@@ -7473,20 +7565,19 @@ GROUP=YELLOW
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
 ;.byte 128+'D',128+'E'
 .byte "",10
-.byte MEAN,"You are always in the EDITOR",10
 .byte KEY,"ESC",MEAN,"Help",10
-.byte KEY," ^C",MEAN,"ompile",10
-.byte KEY," ^R",MEAN,"un    ",KEY," ^X",MEAN,"ecute",10
+.byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
+.byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
 .byte KEY," ^Q",MEAN,"asm  - shows compiled code",10
 .byte KEY," ^W",MEAN,"rite - save screen/source",10
 .byte KEY," ^L",MEAN,"oad  - load screen/source",10
-.byte "",10
-.byte MEAN,"Editor:",KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
-.byte MEAN,"(line)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte MEAN,"// You are in the EDITOR (comment!)",10
+.byte KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
+.byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
 .byte "",10
 .byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
 .byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
-.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"(",GROUP,"OP S",MEAN,")..",CODE,";",MEAN,"or",GROUP,"V OP",CODE,"=",GROUP,"S",CODE,";",10
+.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S",MEAN,"]..",CODE,";",MEAN,"or",CODE,"a",GROUP,"OP",CODE,"=",GROUP,"S",CODE,";",10
 .byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
 .byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
 .byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
@@ -7522,6 +7613,7 @@ input:
 
 
 .ifdef FOLD
+        .byte "// Folding constants",10
 ;;; Parse problem need %b word boundary check!!!
 ;        .byte |<<1%b"
 
@@ -7580,6 +7672,7 @@ input:
 ;FOURTY=1
 ;;; 62B 119c (program 16B overhead)
 .ifdef FOURTY
+        .byte "// MUL40",10
         .byte "word main(){",10
 ;        .byte "  r=17;",10
 ;        .byte "  while(r<28) {",10
@@ -7606,6 +7699,7 @@ input:
 
 ;LINEBENCH=1
 .ifdef LINEBENCH
+        .byte "// LINEBENCH",10
         .byte "word main(){",10
         .byte "  hires();",10
         .byte "  for(i=0; i<239; ++i) {",10
@@ -7628,6 +7722,7 @@ input:
 
 ;CIRCLE=1
 .ifdef CIRCLE
+        .byte "// CIRCLE",10
         .byte "word main(){",10
         .byte "  hires();",10
         .byte "  curset(120,100,0);",10
@@ -7654,12 +7749,14 @@ input:
 
 ;FROGMOVE=1
 .ifdef FROGMOVE
+        .byte "// frogmove-simple.c",10
         .incbin "Play/frogmove-simple.c"
         .byte 0
 .endif
 
 ;FUN=1
 .ifdef FUN
+        .byte "// Functions",10
         .byte "word F() { return 4700; }",10
         .byte "word G() { return F()+11; }",10
 ;        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return G(); }",0
@@ -7705,6 +7802,7 @@ input:
 
 ;MUL=1
 .ifdef MUL
+        .byte "// MJL",10
         .byte "word M() {",10
         .byte "  c= 0;",10
         .byte "  while(b) {",10
@@ -7802,6 +7900,7 @@ input:
 ;FOUR=1
 
 .ifdef FOUR
+        .byte "// FOUR",10
         .byte "word main() {",10
         .byte "  a= 470; b= 11;",10
         .byte "A:",10
@@ -7816,9 +7915,11 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;ATOZ=1
+;
+ATOZ=1
 
 .ifdef ATOZ
+        .byte "// A-Z.",10
         .byte "word main() {",10
         .byte "  a='A';",10
         .byte "A:",10
@@ -7977,9 +8078,17 @@ input:
 ;        .byte "void main(){ putchar(65); putchar(66); putchar(67); }",0
 
 ;;; ok
-        .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
+        .byte "// GOTO test A-Z.",10
+        .byte "void main()",10
+        .byte "  a=65;",10
+        .byte "A:putchar(a);",10
+        .byte "  ++a;",10
+        .byte "  if (a<91) goto A;",10
+        .byte "  putchar(46);",10
+        .byte "}",10
+        .byte 0
 ;;; TODO: remove spaces crash in parse!!!!
-        .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
+;        .byte "void main(){ a=65; A: putchar(a); ++a; if (a<91) goto A; putchar(46); }",0
 .endif ; GOOTTEST
 
 
@@ -8116,6 +8225,7 @@ NOPRINT=1
 
 MALLOC=1
 .ifdef MALLOC
+        .byte "// malloc() test",10
         .byte "word main() {",10
 ;        .byte "  printd(heapmemavail()); putchar(10);",10
 ;       .byte "  printd(heapmaxavail()); putchar(10);",10
@@ -8202,6 +8312,7 @@ PRIME=1
 ;;;  (- to ~ reverse bits)
 
 ;;; TODO: there might be hi-bit chars here???
+        .byte "// PRIME test; byte arr+bitshift",10
         .byte "byte arr[256];",10
 ;        .byte "byte b[4];",10
 ;        .byte 10
@@ -8292,6 +8403,7 @@ PRIME=1
 
 .ifdef TESTARRAY
         ;; byte arrays
+        .byte "// byte array",10
         .byte "byte a[42];",10
         .byte "word main(){ a@[3]=20; a@[7]=22;",10
         .byte "  return a@[3]+a@[3];",10
@@ -8299,6 +8411,7 @@ PRIME=1
 .endif
 
 .ifdef TWEN
+        .byte "// many ++a;",10
         .byte "word main(){"
         .byte "++a;++a;++a;++a;++a;"
         .byte "++a;++a;++a;++a;++a;"
@@ -8312,6 +8425,8 @@ PRIME=1
 ;;; HOW is this NOT the SAME?
 ;        .byte "word main(){++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;return a;}",0
 
+.ifdef REP
+        .byte "// MANY statements test: repeat ++a",10
         .byte "word main(){"
         ;; 48 => 15s lol - error
         ;; 40 =>  8s LOL
@@ -8360,6 +8475,7 @@ PRIME=1
            .byte "++a;"
         .endrep
         .byte "return a;}",0
+.endif ; REP
 
 .ifdef FOO
 ;;; OOO, what comes after here matter???? LOL
@@ -8511,14 +8627,15 @@ PRIME=1
         .byte "wordmain(){return 4711;}",0
 ;;; garbage (OK)
         .byte "voidmain(){}",0
+        .byte 0
 .endif ; FOO
 
-docs:   
-        .byte "C-Syntax: { a=...; ... return ...; }",10
-        .byte "C-Ops   : *2 /2 + - ==", 10
-        .byte "C-Vars  : a= ... ; ... =>a;", 10
-
 .endif ; INCTESTS
+
+endinput:       
+        ;; two zeroes ends input sequence of files
+        .byte 0,0
+
 
 FUNC _savedscreen
 

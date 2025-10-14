@@ -267,13 +267,15 @@ FUNC _printz
         stx tos+1
 
         ldy #0
-_writez:        
+_writez:
         lda (tos),y
         beq :+
         jsr putchar
-        iny
+
+        inc tos
         bne _writez
         inc tos+1
+
         bne _writez
 :       
         rts

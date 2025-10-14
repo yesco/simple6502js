@@ -164,6 +164,28 @@ cury:           .res 1
         ;; lf
         lda #13
 :       
+        ;; col==2, rewrite colors!
+        lda $269                ; CURCOL
+;        cmp #2
+        bne :+
+
+changecolors:   
+        sty saveyputchar
+
+        lda $026b               ; paper
+        ldy #0
+        sta ($12),y             ; ROWADDR
+
+        lda $026c               ; color
+        iny
+        sta ($12),y             ; ROWADDR
+
+        ldx saveyputchar
+
+        pla
+        pha
+:       
+
         jsr rawputc
 
         pla
@@ -372,7 +394,29 @@ rawputc:
 
 .endif ; TTY
 
+.ifnblank
+.macro GOTOXY x
+        ;; CURROW ATMOS
+        ldx #x
+        stx $0269
+        ldy #y
+        sty $0268
+        ;; ROWADDR
+        lda #<($bb80 + y*40)
+        ldx #>($bb80 + y*40)
+;;; TODO: overlap w CC02 variables!!
+        sta $12
+        stx $13
+.endmacro
+.endif
+
 .else
+
+.ifnblank
+.macro GOTOXY x,y
+;;; TODO: generate string with ANSI terminal code
+.endmacro
+.endif
 
 newline:        
 nl:     
