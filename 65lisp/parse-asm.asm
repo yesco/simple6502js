@@ -426,6 +426,10 @@ CURCALC		= $001f      ; ? how to update?
 ;;; TODO: not working, parse error?
 ;COMPILESCREEN=1
 
+;;; enable ORIC ATMOS raw TTY replacement
+;;; 
+;;; TTY=1
+
 
 ;;; ORIC ATMOS
 ;;; 
@@ -478,6 +482,16 @@ READTIMER	= $0304
 CSTIMER         = $0276
 
 
+.macro SKIPONE
+        .byte $24               ; BITzp 2 B
+.endmacro
+
+.macro SKIPTWO
+        .byte $2c               ; BITabs 3 B
+.endmacro
+
+
+
 ;;; See template-asm.asm for docs on begin/end.asm
 .include "begin.asm"
 
@@ -487,14 +501,6 @@ CSTIMER         = $0276
 
 ;;; ========================================
 ;;;                  M A I N
-
-.macro SKIPONE
-        .byte $24               ; BITzp 2 B
-.endmacro
-
-.macro SKIPTWO
-        .byte $2c               ; BITabs 3 B
-.endmacro
 
 
 .ifnblank
@@ -6385,7 +6391,7 @@ FUNC _edit
         jmp _edit
 
 editaction:     
-.define CTRL(c) c-'@'
+
 ;;; - ctrl-C - compile
         cmp #CTRL('C')
         bne :+
@@ -6731,23 +6737,7 @@ FUNC _printsrc
         lda #<input
         ldx #>input
         jmp _printz
-.export _clrscr
-_clrscr:        
-clrscr:        
-        lda #12
-        SKIPTWO
-forward:        
-        lda #'I'-'@'
-        SKIPTWO
-bs:
-        lda #8
-        SKIPTWO
-spc:
-        lda #' '
-        SKIPTWO
-nl:    
-        lda #10
-        jmp putchar
+
 
 FUNC _help
         lda #<_helptext

@@ -17,6 +17,8 @@
 ;;; enable to invers on hibit
 ;HIBIT=1
 
+.define CTRL(c) c-'@'
+
 .ifdef __ATMOS__
 
 .zeropage
@@ -124,36 +126,219 @@ SCR=$bb80
 SCREND=SCR+40*28
 
 
+;;; putchar(c) print char from A
+;;;   10= cr/lf unix-style \n
+;;;   A,X,Y retains values
+;;; 
+.export putchar
+
+.export _xputchar
+_xputchar:
+
+newline:        
+nl:     
+        lda #10
+        SKIPONE
 ;;; platputchar used to delay print A
 ;;; (search usage in printd)
 plaputchar:    
         pla
-
-;;; putchar(c) print char from A
-;;; (saves X, A retains value, Y not used)
-;;; 
-;;; 12B
-.export putchar
-
 putchar:        
+;;; Test if really called? lol
+;       jsr self
+;self:                          
 
 .ifdef TTY
-rawputc:                        ; well...
-        stx savexputchar
-        
-        ;; minimal screen w putchar!, lol
-        ldx sos
-        and #127
-        cmp #' '
-        bcc :+
-        sta $bb80,x
-        inc sos
-:    
+.zeropage
+curlineptr:     .res 2
+curx:           .res 1
+cury:           .res 1
+.code
+        pha
 
+        ;; new line? => cr/lf
+        cmp #10
+        bne :+
+        ;; cr
+        jsr rawputc
+        ;; lf
+        lda #13
+:       
+        jsr rawputc
+
+        pla
+        rts
+
+;;; TODO: 20B (5 ctrl-chars) dispatch code
+;;;   at 32+9=41 41/4=10 ctrls break-even point!
+;;;   i.e., when adding EMACS then it's worth it!
+
+;;; rawputc saves X,Y trashes A
+;;; 
+;;; bs lf up forward clrscr  scrollup clrln
+;;;   may trash A,X,Y!
+;;; 
+spc:    
+        lda #' '
+rawputc:
+        stx savexputchar
+        sty saveyputchar
+
+        cmp #' '
+;        bcs putcnocontrol
+        bcc control
+        jmp putcwriteit
+
+control:        
+        ;; special control characters
+
+        ;; - clearline (^O)
+        cmp #CTRL('O')
+        beq clrln
+
+        ;; - cr
+        cmp #CTRL('M')          ; 10
+        bne :+
+cr:     
+;;; TODO: protected columns?
+        ldx #0
+        stx curx
+
+        ;; - lf
+        cmp #CTRL('J')          ; 10
+        bne :+
+lf:     
+        inc cury
+        lda cury
+        cmp #28
+        beq @scrollup
+        ;; - inc line ptr
+;;; 11 B TODO: subroutine? (so far not used elsewhere!)
+        clc
+        lda curlineptr
+        adc #40
+        sta curlineptr
+        bcc @noinc
+        inc curlineptr+1
+@noinc:
+        jmp rawputret
+@scrollup:
+        ;; TODO: scrollup
+        ;; (for now, wrap around!)
+        jsr home
+        jsr cr
+        ;; - clear line
+clrln: 
+        lda #' '
+        ldy #39
+@loop:       
+        sta (curlineptr),y
+        dey
+        bpl @loop
+        bmi rawputret
+:       
+        ;; - bs
+        cmp #CTRL('H')
+        bne :+
+bs:     
+        ldx curx
+        beq @bswrap
+        dec curx
+        ;; always
+        bpl rawputret
+@bswrap:
+        ldx #39
+        stx curx
+up:     
+        ;; at top, no up
+        ldx cury
+        beq rawputret
+        ;; up
+        dec cury
+;;; TODO: -CONST == add (^CONST): use one routine!
+;;; 11B (15 full add routine, 6B to call x 2) - save 6B?
+        sec
+        lda curlineptr
+        sbc #40
+        sta curlineptr
+        bcs @nodec
+        dec curlineptr+1
+@nodec:
+        ;; always
+        bne rawputret
+:       
+        ;; - right (9) - no tab? lol
+        cmp #CTRL('I')
+        bne :+
+forward:        
+        inc curx
+        ldx curx
+        cmp #40
+        ;; wrap around at end
+        jsr lf
+        jmp cr
+:       
+        ;; - home cursor
+        cmp #30
+        beq home
+        ;; - clear screen
+        cmp #12
+        bne :+
+clrscr: 
+        jsr home
+        ldx #27
+        stx savexputchar
+@nextrow:
+        ;; these "restore" savexputchar but don't save!
+        jsr clrln
+        jsr lf
+        dec savexputchar
+        bne @nextrow
+        ;; fall-through to home
+home:   
+;;; TODO: protected first row?
+;;; TODO: protected two cols?
+        ldx #0
+        sta curx
+        sta cury
+
+        ldx #<SCR
+        stx curlineptr
+        ldx #>SCR
+        stx curlineptr+1
+        ;; always 
+        bne rawputret
+:       
+
+;;; FREE:  @ABCDEFGHIJKLMNOPQRSTUVWXYZ 27 28 29 30 31
+;;; USED:          HIJKLM O    t      (27)      30
+;;; EMACS:  ab defg  jk  nop  s uvw y             (ins)
+;;; 
+;;; legend:       (UPPER=impl, lower/()=TODO:)
+
+putcwriteit:    
+        ;; write it
+        ldy #0
+        sta (curlineptr),y
+
+        ;; inc pos
+        inc curx
+        lda curx
+        cmp #40
+        bne :+
+        jmp newline
+:       
+
+rawputret:      
+        ldy saveyputchar
         ldx savexputchar
         rts
 
-.else
+.export _dummyputc
+_dummyputc:     
+
+
+.else ; !__ATMOS__
 
         stx savexputchar
         ;; '\n' -> '\n\r' = CRLF
@@ -184,9 +369,16 @@ rawputc:
 .endif ; HIBIT
         ldx savexputchar
         rts
+
 .endif ; TTY
 
 .else
+
+newline:        
+nl:     
+        lda #10
+        jmp putchar
+
 ;;; Generic IO names with cc65 (conio.h)
         .import _getchar
         .import _putchar
@@ -223,3 +415,24 @@ plaputchar:
 .macro NEWLINE
         PUTC 10
 .endmacro
+
+
+.ifndef TTY
+
+;;; Good to haves!
+.export _clrscr
+_clrscr:        
+clrscr:        
+        lda #12
+        SKIPTWO
+forward:        
+        lda #'I'-'@'
+        SKIPTWO
+bs:
+        lda #8
+        SKIPTWO
+spc:
+        lda #' '
+        jmp putchar
+
+.endif ; !TTY
