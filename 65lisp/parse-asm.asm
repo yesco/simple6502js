@@ -815,14 +815,14 @@ XYZ=1
         lda #0
         sta SCREENEND+1
 
-        COMPILESTART= SCREEN+40+1
+        COMPILESTART= SCREEN+40
         ;; set screen as input
 .else
-        COMPILESTART= input+1
+        COMPILESTART= input
 .endif
 
-        lda #<(COMPILESTART-1)
-        ldx #>(COMPILESTART-1)
+        lda #<COMPILESTART
+        ldx #>COMPILESTART
 
         sta inp
         stx inp+1
@@ -888,26 +888,22 @@ putc 10
         jsr getchar
 .endif ; NDEBUG
 
-;;; TODO: why two?
-.ifdef COMPILESCREEN
-        jsr _incIspc
-        jsr _incIspc
-.endif
-;        jsr _incIspc
-
-
 .ifdef PRINTASM
         jsr _iasmstart
 .endif ; PRINTASM
 
-;;; crashes, lol
-;        TIMER
 
 
-
+        jsr nextInp
+        
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
 FUNC _next
+
+;;; TODO: potentially very expensive here
+;;;   can put before and after _incI === _incIspc!
+
+; jsr nextInp ????
 
 .ifdef CHECKSTACK
 ;;; TODO: measure overhead
@@ -1201,6 +1197,8 @@ FUNC _enterrule
         lda rulename
         pha
 
+        ;; save re-skipping!
+        jsr nextInp
         ;; - push inp for retries
         lda inp+1
         pha
@@ -2148,15 +2146,17 @@ digit:
         jmp nextdigit
 
 ischar: 
-        ;; get char
+        ;; - get char
         jsr _incI
-        ;; y is retained by _incI
+        ;; - y is retained by _incI
         lda (inp),y
         sta tos
         sty tos+1
 ;;; TODO: quoted \n \r \0 \... ? \' \\
 ;        cmp #'\'
+        ;; - skip char
         jsr _incI
+        ;; - skip '
         jsr _incI
         jmp _next
 
@@ -2166,6 +2166,12 @@ failjmp2:
 
 ;;; flags not set in any way, registers untouched
 FUNC _incIspc
+        jsr _incI
+
+;;; makes sure inp is pointing at relevant char
+;;; - skips any char <= ' ' (incl attributes)
+;;; - skips "// comment till nl"
+FUNC nextInp
 ;;; oops! this was actually important to save all regs!
         pha
         txa
@@ -2173,40 +2179,9 @@ FUNC _incIspc
         tya
         pha
 
-        ;; skips any char <= ' ' (incl attributes)
-        ;; this requires input be 1 less when starting
-
-        ldx #inp
-@skipspc:
-;;; TODO: maybe too much dupl w loop beq @done too?
-
-;;; TODO: BUG: if enabled crashes stack lol WTF?
-;;; should make it safer as we don't go past end!!!
-.ifblank
-        lda (0,x)
-        beq @done
-;;; TODO: eight bit set? if so...
-.endif
-        
-.ifdef COMPILESCREEN
+@nextc:
         ldy #0
         lda (inp),y
-        ;; mark last read character
-        ;; TODO: Seems this messes things up a bit?
-        ora #128
-        sta (inp),y
-;;; TODO: this may get messed up when we backtrack!
-.endif ; COMPILESCREEN
-        ;; TODO: or just jsr _incRX
-        jsr _incI
-
-;;; TODO: cleanup
-        lda (0,x)
-.ifdef COMPILESCREEN
-        and #127
-        sta (0,x)
-.endif ; COMPILESCREEN
-        ;; TODO: redundant?
         beq @done
 
 .ifdef PRINTDOTS
@@ -2220,38 +2195,42 @@ FUNC _incIspc
         ;; CTRL characters/space skip
         cmp #' '+1
         bcc @skipspc
+
+
+;;; Add more cases here!
+
+
+        ;; // comment till NL
+        cmp #'/'
+        bne @done
+
+        ;; look-ahead 1 is '/'?
+        iny
+        lda (inp),y
+        ;; second /
+        cmp #'/'
+        bne @done
+
+        ;; - is comment, skip till NL
+@tillNL:
+        jsr _incI
+        ldy #0
+        lda (inp),y
+        beq @done
+        cmp #10
+        bne @tillNL
+
+@skipspc:
+        jsr _incI
+        jmp @nextc
+
 @done:
-
-;;; print decimal number of char
-
-.ifdef BAD
-;;; TODO: need save tos, or print should use AX...
-        ;; this changss result? lol
-        sta tos                
-
-        pha
-        txa
-        pha
-        tya
-        pha
-
-        putc '('
-        ldx #0
-        stx tos+1
-        jsr printd
-        putc ':'
-        lda tos
-        jsr putchar
-        putc ')'
-        putc ' '
-
-        pla
-        tay
-        pla
-        tax
-        pla
+.ifnblank
+ldy #0
+lda (inp),y
+putc '@'
+jsr printchar
 .endif
-;;; TODO: only update when backtrack/_fail?
 
 .ifdef ERRPOS
 ;;; store max input position
@@ -2299,6 +2278,7 @@ FUNC _incIspc
         pla
 
         rts
+
 
 FUNC _incP
 ;;; 3
@@ -5274,8 +5254,8 @@ afterELSE:
       .byte "]"
         .byte _S
       .byte "["
-        .byte "                 ;d"
-        .byte "                 ;"
+        .byte ";d"
+        .byte ";"
         ;;  jump to inc+test
         jmp VAL0
         .byte "D#"
@@ -8093,6 +8073,7 @@ NOPRINT=1
 .ifdef BYTESIEVE
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
+        .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "word main(){",10
 
         ;; BYTE MAGAZINE 8192 => 1899
