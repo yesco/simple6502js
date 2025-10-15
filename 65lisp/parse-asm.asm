@@ -2766,6 +2766,13 @@ ruleC:
       .byte ']'
 
         ;; putchar variable - saves 2 bytes!
+        .byte "|putchar('\\n')" ;      double \\???
+      .byte '['
+        jsr nl
+;;; TODO: about return value...
+      .byte ']'
+
+        ;; putchar variable - saves 2 bytes!
         .byte "|putchar(%D)"
       .byte '['
         lda #'<'
@@ -3006,7 +3013,7 @@ ruleC:
         inc VAR1
 :       
         lda VAR0
-        ldx VAR1
+       ldx VAR1
       .byte ']'
 
         .byte "|--%V"
@@ -3086,6 +3093,49 @@ ruleC:
         lda VAR0
         ldx VAR1
       .byte ']'
+
+        .byte "|'\\n'"
+      .byte "%{"
+        putc '!'
+        jsr immret
+
+      .byte '['
+        lda #10
+        ldx #0
+      .byte ']'
+
+.ifnblank
+        .byte "|"
+      .byte "%{"
+        putc '?'
+        jsr immret
+
+        .byte "'"
+      .byte "%{"
+        putc '1'
+        jsr immret
+
+        .byte "\\"               ; "
+      .byte "%{"
+        putc '2'
+        jsr immret
+
+        .byte "n"
+      .byte "%{"
+        putc '3'
+        jsr immret
+
+        .byte "'"
+        
+      .byte "%{"
+        putc '!'
+        jsr immret
+
+      .byte '['
+        lda #10
+        ldx #0
+      .byte ']'
+.endif
 
 .ifdef OPTRULES
         ;; load 0 saves 1 byte
@@ -3681,18 +3731,30 @@ PUTC '/'
       .byte ']'
         .byte TAILREC
 
+;;; TODO: signed?
+;;;    v < -42      => signed comparison
+;;;    v < 32767    => SIGNED!
+;;;    v < 40000    => UNSIGNED !
+;;; 
+;;;    v > 0        ?? impllies test for negative?
+;;; 
+;;; How to ipmlement signed comparison on 6502
+;;; - just eor #$80 hi-byte of both values?
+;;; 
+
         .byte "|<%D"
       .byte '['
         ;; 13
         ldy #$ff
-        cmp #'<'
-        bcc :+
         cpx #'>'
+        bne :+
+        cmp #'<'
+:       
         bcc :+
-        ;; !< => 0
+        ;; FAIL !< => 0
         iny
 :       
-        ;;  < => -1
+        ;; TRUE < => -1
         tya
         tax
       .byte ']'
@@ -3702,10 +3764,10 @@ PUTC '/'
       .byte '['
         ;; 13
         ldy #$ff
-        cmp VAR0
-        bcc :+
-
         cpx VAR1
+        bne :+
+        cmp VAR0
+:       
         bcc :+
         ;; !< => 0
         iny
@@ -4603,6 +4665,7 @@ afterELSE:
         .byte "|if(%A<%D)"
 .scope        
       .byte "["
+        ;; 14
         ;; reverse cmp as <> NUM avail first
         lda #'<'
         ldx #'>'
@@ -4610,8 +4673,7 @@ afterELSE:
         .byte 'D'               ; get aDdress
 
         cpx VAL1
-        bcc @nah                ; NUM<VAR (num.h<var.h)
-        bne @ok                 ; NUM>VAR
+        bne :+
         ;;  NUM>=VAR ... VAR<=NUM
         cmp VAR0
         beq @nah
@@ -6202,7 +6264,7 @@ status:
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ {10,"ERROR>"}
+        PRINTZ {10,"ERROR>",10}
 ;        jsr getchar
 ;        jsr clrscr
 
@@ -6219,25 +6281,18 @@ status:
 
 @loop:
 .ifdef ERRPOS
+;;; TODO: on sim65 somehow this goes bad when there's an error
+;;;   it'll print same character forever!
+
         ;; hi bit on char is indicator of how var it
         ;; read, next char, or here is the error
         ;; - print red attribute
         bpl @nohi
         pha
 
-.ifnblank
-        putc 16+7+128           ; white background
-        putc 1+128              ; red text
-.else
-;.ifdef INTERRUPT
-        putc ' '
-        putc '>'
-        putc ' '
-;.endif
+        putc WHITE
+        putc BG+RED
 
-        putc 7+128              ; white text
-        putc 16+1+128           ; red background
-.endif
         ;; - remove hibit from src
         pla
         and #127
@@ -7740,6 +7795,17 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+
+.ifdef CHARNL
+        .byte "word main(){",10
+        .byte "putchar('a');",10
+        .byte "a=10;",10
+        .byte "b='q';",10
+        .byte "a='\n';",10
+        .byte "putchar(a);putchar(b);putchar('\n');putchar('b');",10
+        .byte "}",10
+        .byte 0
+.endif ; CHARNL
 
 .ifdef FOLD
         .byte "// Folding constants",10
