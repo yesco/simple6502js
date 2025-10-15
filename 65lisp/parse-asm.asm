@@ -6521,6 +6521,16 @@ doneCE:
 
         jmp _printsrc
 :       
+;;; - ctrl-Garnish source - pretty print
+        cmp #CTRL('G')
+        bne :+
+
+.import _prettyprint
+        jsr clrscr
+        lda #<input
+        ldx #>input
+        jmp _prettyprint
+:       
 ;;; - ctrl-Utilities (as print source)
         cmp #CTRL('U')
         bne :+
@@ -7709,7 +7719,6 @@ input:
         .byte 0
 .endif ; FOURTY
 
-
 ;LINEBENCH=1
 .ifdef LINEBENCH
         .byte "// LINEBENCH",10
@@ -7928,8 +7937,7 @@ input:
 
 ;;; prints A-Z.
 ;;; 
-;
-ATOZ=1
+;ATOZ=1
 
 .ifdef ATOZ
         .byte "// A-Z.",10
@@ -8206,7 +8214,9 @@ NOPRINT=1
         .byte "  a=malloc(m);",10
         .byte "  n=0; while(n<10) {",10
         .byte "    c=0;",10
-        .byte "    i=0; while(i<m){poke(a+i,1);++i;}",10
+        .byte "    i=0; while(i<m) {",10
+        .byte "      poke(a+i, 1); ++i",10
+        .byte "    }",10
 ;;; NOPE
 ;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
         .byte "    i=0; while(i<m) {",10
