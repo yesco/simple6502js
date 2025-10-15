@@ -606,7 +606,8 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;PRINTASM=1
+;
+PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
 PRINTDOTS=1
@@ -5533,10 +5534,10 @@ afterELSE:
         ;; cmp with VAR
         .byte "D"               ; get aDdress
         cpx VAR1
-        bcc @nahwhile           ; NUM<VAR (num.h<var.h)
-        bne @okwhile            ; NUM>VAR
+        bne @decide
         ;;  hi = equal
         cmp VAR0
+@decide:
         beq @nahwhile
         bcs @okwhile            ; NUM>=VAR
 @nahwhile:
