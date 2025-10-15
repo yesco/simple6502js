@@ -76,7 +76,7 @@
 ;;; - while() ...
 ;;; 
 ;;; - putchar(c); getchar();
-;;; - printd(42); printh(666); printz("foo");
+;;; - putu(42); puth(666); printz("foo");
 ;;; 
 ;;; - word F() { ... } - function definitions
 ;;; - F() G() - function calls (no parameters)
@@ -114,7 +114,7 @@
 ;;; OPTIONAL:
 ;;; - byte datatype
 ;;; - pointers (no type checking): *p= *p+1
-;;; - I/O: getchar putc printd printh
+;;; - I/O: getchar putc putu puth
 ;;; - else statement;
 ;;; - optimized: &0xff00 &0xff >>8 <<8
 ;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
@@ -223,7 +223,7 @@
 ;;; 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 ;;; 
-;;; not counting: printd, mul10, end: print out
+;;; not counting: printu, mul10, end: print out
 ;;; 
 ;;; C parse() == parse.lst (- #x715 #x463) = 690
 
@@ -249,7 +249,7 @@
 ;;;   392 bytes - &a
 ;;;   425 bytes -  =>a+3=>c; and function calls
 ;;;   525 bytes - &0xff00 &0xff >>8 <<8 (+ 44B) >>v <<v
-;;;   593 bytes - printd printh putc getchar +68B TOOD: rem!
+;;;   593 bytes - putu puth putc getchar +68B TOOD: rem!
 ;;;   627 bytes - FUNS (=+21 partial) and ELSE!(=+13 B)
 ;;;   821 bytes - ++ -- += -= &= |= ^= >>=1 <<=1
 ;;;               and changed int=>word char=>byte
@@ -275,7 +275,7 @@
 
 ;;; TODO: not really rules...
 ;;;    56 B is table ruleA-ruleZ- could remove empty
-;;;    68 B library printd/printh/putc/getchar
+;;;    68 B library putu/puth/putc/getchar
 ;;;         LONGNAMES: move to init data in env! "externals"
 ;;; TODO: 
 ;;;  ~256 B parameterize ops (gen)
@@ -753,7 +753,7 @@ XYZ=1
         sta tos
         ldx #0
         stx tos
-        jsr printh
+        jsr puth
         
         ;; save old vector
         lda ORICINTVEC
@@ -763,7 +763,7 @@ XYZ=1
 
         sta tos
         stx tos+1
-        jsr printh
+        jsr puth
 
         ;; install interrupt vector
         lda #<_interrupt
@@ -850,7 +850,7 @@ sta tos
         sta env+1
 sta tos+1
 putc '#'
-jsr printd
+jsr printu
 putc 10
 .endif ; LONGNAMES
 
@@ -1389,7 +1389,7 @@ tsx
 stx tos
 lda #0
 sta tos+1
-jsr printd
+jsr printu
 PUTC 10
 
 lda savea
@@ -1414,7 +1414,7 @@ lda savea
         sta tos
         lda rule+1
         sta tos+1
-        jsr printh
+        jsr puth
         putc 10
         jsr printstack
 .endif
@@ -1474,7 +1474,7 @@ PUTC '\'
   sta tos
   lda rule+1
   sta tos+1
-  jsr printh
+  jsr puth
   putc ' '
 .endif
         ;; - seek next | alt in rule
@@ -1502,7 +1502,7 @@ PUTC '\'
    sta tos
    lda rule+1
    sta tos+1
-   jsr printh
+   jsr puth
    putc ' '        
    pla
 @after:
@@ -1885,7 +1885,7 @@ jsr putchar
     lda (pos),y
     sta tos
 
-    jsr printd
+    jsr printu
 
     PRINTZ "HALT"
     jmp halt
@@ -2258,7 +2258,7 @@ jsr printchar
         lda #0
         sta tos+1
         putc '#'
-        jsr printd
+        jsr printu
         putc ' '
 .endif
 
@@ -2341,7 +2341,7 @@ FUNC _parsename
   sta tos
   lda pos+1
   sta tos+1
-  jsr printd
+  jsr printu
   putc ' '
 
   ldy #0
@@ -2381,7 +2381,7 @@ FUNC _parsename
   sta tos
   lda pos+1
   sta tos+1
-  jsr printd
+  jsr printu
   putc ' '
   ldy #0
 .endif ; DEBNAME
@@ -2399,7 +2399,7 @@ FUNC _parsename
         sta (pos),y
 .ifdef DEBNAME
   sta tos+1
-  jsr printd
+  jsr printu
   PUTC ' '
   ldy #1
 .endif ; DEBNAME
@@ -2445,7 +2445,7 @@ FUNC _find
 .ifdef DEBNAME
   sta tos+1
   stx tos
-  jsr printd
+  jsr putu
 .endif ; DEBNAME
         ;; end?
         ora gos
@@ -2535,9 +2535,112 @@ secondpage:
 ;;;    but not get error, just doesn't work! (hang)
 ;;;    or AFTER 
 
-PRINTDEC=1
-PRINTHEX=1
+PUTDEC=1
+PUTHEX=1
 .include "print.asm"
+
+
+;;; (inp) => AX, inp points at next (not digit) char
+;;; 
+;;; TODO: too big! just use parse rules!!!
+.ifdef ATOI
+FUNC _atoiXR
+        lda #0
+        sta tos
+        sta tos+1
+        ;; base
+        sta dos
+        lda #10
+        sta base
+
+        ;; 0x 'c' -
+        lda (0,x)
+        ;; ' - char constant
+        cmp #'''
+        bne :+
+        
+        jsr _incXR
+        lda (0,x)
+        ;; TODO: handle \' \n \b \t ???
+        jsr _incXR
+        ;; - should be '-' lol
+        jsr _incXR
+        jmp @retA
+:       
+        ;; "-" negative
+        cmp #'-'
+        bne :+
+
+        jsr _incXR
+        jsr _atoiXR
+        jmp _negate
+:       
+        ;; "0x" - hex
+        cmp #'0'
+        bne :+                  ; 1-9
+        jsr _incXR
+        ora #32
+        cmp #'X'
+        bne @ret                ; zero! (no octal...)
+        
+        lda #16
+        sta base
+:       
+        lda (0,x)
+        ;; isdigit? '0' <= a <= '9'
+        sec
+        sbc #'0'
+        cmp #'9'+1-'0'
+        bcs @notdigit
+        ;; digit
+        sta savea
+        lda base
+        sta dos
+        lda #0
+        ;; tos= tos * dos; // mul16 destroys tos&dos
+        jsr _mul16bits
+        ;; c=0 from cmp
+        adc savea
+        tay
+
+@ret:
+        lda tos
+@retA:
+        ldx tos+1
+        rts
+.endif ; ATOI
+
+
+.ifdef SIGNED
+func _negate
+;;; 12 b
+        sec
+        eor #$ff
+        adc #0
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+        rts
+
+;;; print signed decimal
+func _putd
+putd:
+;;; 19 b
+        cpx #0
+        bpl :+
+        putc '-'
+:       
+        ;; negate
+        jsr _negate
+        
+        sta tos
+        stx tos+1
+        jmp putu
+
+FUNC _dummyd
+.endif ; SIGNED
 
 bytecodes:      
 
@@ -2632,20 +2735,20 @@ ruleC:
 ;;; TODO: these are "more" statements...
 
         ;; "IO-lib" hack
-        .byte "printd(",_E,")"
+        .byte "putu(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
         sta tos
         stx tos+1
-        jsr printd
+        jsr putu
       .byte ']'
 
-        .byte "|printh(",_E,")"
+        .byte "|puth(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
         sta tos
         stx tos+1
-        jsr printh
+        jsr puth
       .byte ']'
 
         .byte "|printz(",_E,")"
@@ -4031,7 +4134,7 @@ ruleE:
         sta tos
         lda gos+1
         sta tos+1
-        jsr printh
+        jsr puth
         ;; JSR (gos) !
         lda #$4c                ; trampoline: jmp
         sta gos-1
@@ -4040,7 +4143,7 @@ ruleE:
         sta tos
         stx tos+1
         ;; print for debug
-        jsr printd
+        jsr putu
         ;; remove code run!
         lda gos
         sta _out
@@ -4070,7 +4173,7 @@ ruleE:
         lda tos+1
         adc dos+1
         sta tos+1
-        jsr printd
+        jsr putu
         jsr immret
 
       .byte "["
@@ -5295,7 +5398,7 @@ afterELSE:
         sta tos
         lda VAR1
         sta tos+1
-        jsr printd
+        jsr puth
 .endif
         ;; test i<%D
         lda VAR0
@@ -6196,7 +6299,7 @@ _OK:
         sta tos+1
         sta gos+1
         
-        jsr printd
+        jsr putu
         putc 'B'
         putc 10
         putc 10
@@ -6287,7 +6390,7 @@ TIMPER=8
         sta tos
         ldx gos+1
         stx tos+1
-        jsr printd
+        jsr putu
         jsr spc
         putc 'B'
         jsr spc
@@ -6297,7 +6400,7 @@ TIMPER=8
         sta tos
         ldx #>RUNTIMES
         stx tos+1
-        jsr printd
+        jsr putu
         putc 'x'
         putc ':'
         jsr spc
@@ -6308,7 +6411,7 @@ TIMPER=8
         pla
         sta tos
 
-        jsr printd
+        jsr putu
 
         jsr spc
         putc 'u'
@@ -6326,7 +6429,7 @@ TIMPER=8
         sta tos+1
         pla
         sta tos
-        jsr printd
+        jsr putu
 
         jsr nl
         
@@ -6381,7 +6484,7 @@ FUNC _edit
         sta tos
         lda seconds+1
         sta tos+1
-        jsr printd
+        jsr putu
         putc ' '
 
         jmp _edit
@@ -6731,7 +6834,7 @@ PUTC '*'
         sta tos
         lda seconds+1
         sta tos+1
-        jsr printd
+        jsr putu
         putc ' '
 
         pla
@@ -7275,7 +7378,7 @@ FUNC timer
 ;        putc 'T'
         sta tos
         stx tos+1
-        jsr printd
+        jsr putu
 
         putc 'u'
         putc 's'
@@ -7327,7 +7430,7 @@ CSRESET=1
         sta tos
         stx tos+1
 
-        jsr printd
+        jsr putu
         putc 'c'
         putc 's'
 
@@ -7357,7 +7460,7 @@ FUNC printvar
         sta tos
         stx tos+1
         putc '@'
-        jsr printh
+        jsr puth
         putc '='
         ldy #1
         lda (tos),y
@@ -7366,7 +7469,7 @@ FUNC printvar
         lda (tos),y
         sta tos
         stx tos+1
-        jsr printd
+        jsr putu
         jsr spc
         rts     
 
@@ -7413,7 +7516,7 @@ FUNC printchar
         sta tos+1
         
         putc '['
-        jsr printd
+        jsr putu
         putc ']'
 
         pla
@@ -7436,7 +7539,7 @@ FUNC printchar
 FUNC printaxh
         sta tos
         stx tos+1
-        jmp printh
+        jmp puth
 
 FUNC printstack
         pha
@@ -7469,7 +7572,7 @@ FUNC printstack
         stx tos
         lda #0
         sta tos+1
-        jsr printd
+        jsr putu
 
 @loop:
         jsr spc
@@ -7500,7 +7603,7 @@ FUNC printstack
         inx
         beq @err
         sta tos+1
-        jsr printh
+        jsr puth
 .else
         inx
         beq @err
@@ -7659,10 +7762,10 @@ input:
 ;        .byte "return 3+4+100+1<<2>>1>>1;",0
 ;;; wrong?
 ;        .byte "3+4+100+1<<2>>1>>1;",0 
-        .byte "printd(3+4+100+1<<1<<1>>1);",0 
+        .byte "putu(3+4+100+1<<1<<1>>1);",0 
 
-        .byte "printd(3+4+100+1<<1<<1);",0 
-        .byte "printd(3+4+100+1<<1<<1>>1>>1);",0 
+        .byte "putu(3+4+100+1<<1<<1);",0 
+        .byte "putu(3+4+100+1<<1<<1>>1>>1);",0 
 
 ;;; loops forever! lol
         .byte "r=17;"
@@ -7672,7 +7775,7 @@ input:
 
         ;; single expression!
 ;        .byte "4+3;",0
-;        .byte "a=4+3;printd(a);putchar('0'+a);",0
+;        .byte "a=4+3;putu(a);putchar('0'+a);",0
 
 ;        .byte "word main(){a=r;}",0
 
@@ -7683,7 +7786,7 @@ input:
 ;        .byte "word main(){ gotoxy(4711,666); putchar('a'); putchar('b'); }",0
 ;        .byte "word main(){ gotoxy(10,10); putchar('a'); putchar('b'); }",0
 
-;        .byte "word main(){ gotoxy(10,10); printd(4711); }",0
+;        .byte "word main(){ gotoxy(10,10); putu(4711); }",0
 
 
 ;;; x3  =  n=r*2+r;
@@ -7714,7 +7817,7 @@ input:
 ;        .byte "    n= PIPE r<<2+r<<3;",01
 ;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
 
-;        .byte "    printd(n); putchar(' ');",10
+;        .byte "    putu(n); putchar(' ');",10
 ;        .byte "    ++r;",10 
 ;        .byte "  }",10
 ;        .byte "  return n;",10
@@ -7784,7 +7887,7 @@ input:
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10
         .byte "word G() { return F()+11; }",10
-;        .byte "word main(){ printh(F); printh(&F); putchar(10); printh(G); printh(&G); putchar(10); return G(); }",0
+;        .byte "word main(){ puth(F); puth(&F); putchar(10); puth(G); puth(&G); putchar(10); return G(); }",0
         .byte "word main(){ return G(); }",0
 .endif
 
@@ -7832,7 +7935,7 @@ input:
         .byte "  c= 0;",10
         .byte "  while(b) {",10
         .byte "    if (b&1) c+= a;",10
-;        .byte "    printd(a); putchar(32) ; printd(b); putchar(32); printd(c); putchar(10);",10
+;        .byte "    putu(a); putchar(32) ; putu(b); putchar(32); putu(c); putchar(10);",10
         .byte "    a<<= 1;",10
         .byte "    b>>= 1;",10
         .byte "  }",10
@@ -7933,7 +8036,7 @@ input:
         .byte "  else { b+=8; ++b; ++b; }",10
         .byte "  --a;",10
         .byte "  if (a) goto A;",10
-        .byte "  printd(b);",10
+        .byte "  putu(b);",10
         .byte "}",10
         .byte 0
 .endif ; FOUR
@@ -7966,7 +8069,7 @@ input:
 ;        .byte "word main(){return 4711;}",0
 
 ;;; IF sanity
-;        .byte "word main(){a=42;if(a==3)a+=4;printd(a);}",0
+;        .byte "word main(){a=42;if(a==3)a+=4;putu(a);}",0
 
 .ifdef BB
 ;;; ???
@@ -7989,13 +8092,13 @@ input:
         .byte "{a=3;}{b=7;}",0
         .byte "{a=3;}{}",0
 
-;;; ok need space before printd? lol
-;        .byte "{a=4;a+=3; printd(a);}",0
+;;; ok need space before putu? lol
+;        .byte "{a=4;a+=3; putu(a);}",0
 
-;;; FAIL - no space?   "printd" fails if first rule!
+;;; FAIL - no space?   "putu" fails if first rule!
 ;;; ... and now it works....?
-        .byte "{a=4;a+=3;printd(a);}{b=7;}",0
-        .byte "{a=4;a+=3;printd(a);}",0
+        .byte "{a=4;a+=3;putu(a);}{b=7;}",0
+        .byte "{a=4;a+=3;putu(a);}",0
 .endif ; BB
 
 .ifdef ALTTEST
@@ -8177,10 +8280,18 @@ input:
 ;;;   2627  322    5.196  CC65   ./r Play/byte-sieve-prime
 ;;;         287    9.510  CC65   -DPROGSIZE
 ;;;         322    2.8323 CC65   -Cl
-;;; === my compiler ===
+;;; === my compiler === ("no library!")
 ;;;         363    3.63   sim65  ./rrasm parse BYTESIEVE
 ;;;         363    4.8s   ORIC   ./rasm parse  BYTESIEVE=1
 ;;; 
+
+;;; TODO: at some point it got to 361 bytes
+;;;    now increased to 365... INVESTIGATE
+;;;    
+;;; From https://github.com/yesco/simple6502js
+;;;    4b6bac9..4e41cbd  main       -> origin/main
+;;;; Updating 4b6bac9..4e41cbd
+;;; Fast-forward
 
 ;
 BYTESIEVE=1
@@ -8226,7 +8337,7 @@ NOPRINT=1
         .byte "      if (peek(a+i)) {",10
         .byte "        p= i*2+3;",10
 .ifndef NOPRINT
-        .byte "        printd(p);",10
+        .byte "        putu(p);",10
         .byte "        putchar(32);",10
 .endif
         .byte "        k=i+p; while(k<m) {",10
@@ -8237,7 +8348,7 @@ NOPRINT=1
         .byte "      }",10
         .byte "      ++i;",10
         .byte "    }",10
-        .byte "    printd(c);",10
+        .byte "    putu(c);",10
         .byte "    ++n;",10
         .byte "  }",10
         .byte "  free(a);",10
@@ -8253,8 +8364,8 @@ MALLOC=1
 .ifdef MALLOC
         .byte "// malloc() test",10
         .byte "word main() {",10
-;        .byte "  printd(heapmemavail()); putchar(10);",10
-;       .byte "  printd(heapmaxavail()); putchar(10);",10
+;        .byte "  putu(heapmemavail()); putchar(10);",10
+;       .byte "  putu(heapmaxavail()); putchar(10);",10
         .byte "  z= 32768;",10
         .byte "  a= 0;",10
 
@@ -8264,7 +8375,7 @@ MALLOC=1
         .byte "    p= malloc(z);",10
         .byte "    if (p) {",10
         .byte "      a+= z;",10
-        .byte "      printd(a); putchar(' '); printh(p); putchar(' '); printd(z); putchar(10);",10
+        .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
         .byte "    }",10
 
         .byte "    z>>=1;",10
@@ -8298,7 +8409,7 @@ PRIME=1
 ;;;   313B      3.337s BYTERULES PRIMBYTE
 ;;;               2.5% smaller
 ;;;              20% faster than cc65 
-;;;  (305B)     1.9s NOPRINT! (printd(),putchar())
+;;;  (305B)     1.9s NOPRINT! (putu(),putchar())
 ;;;   321B      3.426 moved i=n;
 ;;;               SMALLER! than cc65!!!
 ;;;   329B            while not long-for (256) init arr
@@ -8316,7 +8427,7 @@ PRIME=1
 ;;;   397B      4.477s PRIME (correct result)
 ;;;                7% slower than cc65
 
-;;; (+ 397 33 10)=440 B ; estimate: main + printd + putchar
+;;; (+ 397 33 10)=440 B ; estimate: main + putu + putchar
 ;;;  (/ 4.477 4.17) 7%
 
 ;;; TODO: need more features:
@@ -8379,10 +8490,10 @@ PRIME=1
 ;        .byte "    if ($ arr[n>>3] & $ z) {",10
 .endif
 
-        ;;           // simulates printd?
+        ;;           // simulates putu?
 .ifndef NOPRINT
 .ifblank
-        .byte "      printd(n);",10
+        .byte "      putu(n);",10
 .else
         .byte "      i=n;",10
         .byte "      t=0;",10
@@ -8544,7 +8655,7 @@ PRIME=1
 
         .byte "word main(){putchar(102);}",0
 
-        .byte "word main(){printd(4711);return getchar();}",0
+        .byte "word main(){putu(4711);return getchar();}",0
 
         .byte "word main(){return 65535>>3;}",0
 ;;; => 2???

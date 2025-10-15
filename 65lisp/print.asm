@@ -21,8 +21,8 @@
   _drop:  
   putchar: 
         rts
-  PRINTDEC=1
-  PRINTHEX=1        
+  PUTDEC=1
+  PUTHEX=1        
 .endif
 
 .ifnblank
@@ -34,17 +34,17 @@
 
 ;;; Enable to print decimal numbers by default
 ;;; (this one wll use and prefer DIVMOD impl)
-;PRINTDEC=1
+;PUTDEC=1
 
 ;;; Enable to print decimal numbers by default
-;;; (this one uses dedicated printd 35 bytes)
-;PRINTDECFAST=1
+;;; (this one uses dedicated putu 35 bytes)
+;PUTDECFAST=1
 
 ;;; Enable to print hexadecimal numbers by default
-;PRINTHEX=1
+;PUTHEX=1
 
 ;;; Default to use $abcd notation
-;PRINTHEXNODOLLAR=1
+;PUTHEXNODOLLAR=1
 
 .include "print.asm"
 ;;; END PRINT.ASM --------------------
@@ -53,23 +53,23 @@
 
 ;;; --- these prints the TOS value and pops it
 ;;; _printn - pop prints using choosen format
-;;; _printd - pop prints in decimal
-;;; _printh - pop prints in hex
+;;; _putu - pop prints in decimal
+;;; _puth - pop prints in hex
 
 ;;; --- these prints and leaves value on TOS/stack
 ;;; (typically used for debugging?)
 ;;; printn - print a number using choosen format
-;;; printh - prints hex
-;;; printd - prints 
+;;; puth - prints hex
+;;; putu - prints 
 
 ;;; ----------------------------------------
 
-.ifdef PRINTHEX
+.ifdef PUTHEX
         PRINTER=1
 
-.endif ; PRINTHEX
+.endif ; PUTHEX
 
-.ifdef PRINTDEC
+.ifdef PUTDEC
   .ifndef PRINTER
         PRINTER=1
   .endif
@@ -77,34 +77,34 @@
   .ifdef SAVEBYTES
 
     .ifdef DIVMOD
-      .ifdef PRINTDECFAST
-        .error "%% Conflic PRINTDECFAST & SAVEBYTES"
+      .ifdef PUTDECFAST
+        .error "%% Conflic PUTDECFAST & SAVEBYTES"
       .endif
 
-        PRINTDECDIV=1
+        PUTDECDIV=1
     .else ; NDIVMOD
-        ;; actually smaller than div+printd
-        PRINTDECFAST=1
+        ;; actually smaller than div+putu
+        PUTDECFAST=1
     .endif ; NDIVMOD
 
   .else
     .ifdef DIVMOD
-        PRINTDECDIV=1
+        PUTDECDIV=1
     .else    
-        PRINTDECFAST=1
+        PUTDECFAST=1
     .endif
   .endif ; SAVEBYTES
-.endif ; PRINTDEC
+.endif ; PUTDEC
 
 .ifndef PRINTER
-  .ifdef PRINTDECFAST
+  .ifdef PUTDECFAST
         PRINTER=1
   .endif
 .endif
 
 .ifnblank
 
-.proc _printd
+.proc _putu
 ;;; 14 B
         BYTECODE
 
@@ -112,7 +112,7 @@ next:   LIT 10
         DO _divmod
         ;; Recurse to print higher value digits first!
         DO _swap
-        DO _printd
+        DO _putu
 
         DO print1h              ; maybe CALL?
         DO _drop
@@ -125,7 +125,7 @@ next:   LIT 10
 .endif ; BLANK
 
 
-.ifdef PRINTDECDIV
+.ifdef PUTDECDIV
 ;;; print decimal
 ;;; 
 ;;; TODO: ironically, the fastest routine to print is 
@@ -133,7 +133,7 @@ next:   LIT 10
 ;;;   so 35 B or 29 B requiring _div and is much slower...
 ;;;           6 B difference...
 ;;; 
-;;; TODO: too big! (might as well use xprintd...)
+;;; TODO: too big! (might as well use xputu...)
 ;;; 
 ;;; Maybe can write as OP16?
 
@@ -147,10 +147,10 @@ BASE=10
 printn: 
         jsr _dup
 
-;;; TODO: FUNC "_printd"
+;;; TODO: FUNC "_putu"
 .align 2, $ea                   ; NOP
-.export _printd
-.proc _printd
+.export _putu
+.proc _putu
         ;; divide by BASE
         lda #BASE
         jsr _pushA
@@ -169,28 +169,28 @@ printn:
         ;; p => done
         lda tos
         ora tos
-        bne _printd
+        bne _putu
 done:
         jmp _drop
 .endproc
 
-.endif ; PRINTDECDIV
+.endif ; PUTDECDIV
         
 
-.ifdef PRINTHEX
+.ifdef PUTHEX
 
 debugprintn:
-debugprinth:
+debugputh:
 
 .ifndef print_for_debug
   printn:
-  printh:
+  puth:
 .endif
 
 ;;; print hex
 ;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
 ;;; 5
-.ifndef PRINTHEXNODOLLAR
+.ifndef PUTHEXNODOLLAR
         lda #'$'
         jsr putchar
 .endif
@@ -210,9 +210,9 @@ print2h:
         jsr print1h
         ;; lo
         ;; nice: falls-through to pla!
-.endif ; PRINTHEX
+.endif ; PUTHEX
 
-.if .def(PRINTHEX) || .def(PRINTDECDIV)
+.if .def(PUTHEX) || .def(PUTDECDIV)
 plaprint1h:     
 ;;; (14)
         pla
@@ -234,7 +234,7 @@ printit:
         jmp putchar
 .endproc
 
-.endif ; PRINTDECDIV || PRINTHEX
+.endif ; PUTUDCDIV || PUTHEX
 
 
 
@@ -284,33 +284,33 @@ _writez:
 ;;; TODO: this is duplcated code in test 
 ;;;   maybe do include?
 
-;;; printd print a decimal value from AX (retained, Y trashed)
+;;; putu print a decimal value from AX (retained, Y trashed)
 
-.ifdef PRINTDECFAST
+.ifdef PUTDECFAST
 
-  debugprintd:
+  debugputu:
 
 .ifndef debugprintn
   debugprintn:   
-  debugprinth:    
+  debugputh:
 .endif
 
 .ifndef print_for_debug
   
   _printn:        
-  _printd:        
-      jsr xprintd
+  _putu:
+      jsr xputu
       jmp _drop
 
   .ifndef printn
     printn:
   .endif
 
-  printd: 
+;  putu:
 
 .endif
 
-.proc xprintd
+.proc xputu
         PHA
         TXA
         PHA
@@ -318,7 +318,7 @@ _writez:
         lda tos
         ldx tos+1
 
-        jsr _voidprintd
+        jsr _voidputu
 
         PLA
         TAX
@@ -326,10 +326,10 @@ _writez:
         rts
 .endproc
 
-;;; _voidprintd print a decimal value from AX (+Y trashed)
+;;; _voidputu print a decimal value from AX (+Y trashed)
 ;;; 37B
 ;;; 
-;;; _voidprintdptr1
+;;; _voidputuptr1
 ;;; 33B - this is a very "minimal" sized routine
 ;;;       slow, one loop per bit/16
 ;;;       (+ 4B for store AX)
@@ -341,7 +341,7 @@ _writez:
 ;;; Optimized by J. Brooks & qkubma 7/8/2017
 ;;; This implementation by jsk@yesco.org 2025-06-08
 
-_voidprintd:    
+_voidputu:    
         sta tmp1
         stx tmp1+1
         
@@ -382,5 +382,8 @@ under10:
         rts
 .endproc
 
-.endif ; PRINTDECFAST
+.endif ; PUTDECFAST
 
+.ifdef PUTDEC
+        putu=_putu
+.endif
