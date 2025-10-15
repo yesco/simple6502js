@@ -381,7 +381,7 @@
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 
 ;;;   d   - set dos from tos
-;;;   #   - TODO: push tos
+;;;   #   - push tos
 
 ;;; maybe not needed
 ;;;   Z   - TODO: swap 2 loc
@@ -606,8 +606,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;
-PRINTASM=1
+;PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
 PRINTDOTS=1
@@ -2763,6 +2762,14 @@ ruleC:
       .byte '['
         lda VAR0
         jsr putchar
+;;; TODO: about return value...
+      .byte ']'
+
+        ;; putchar variable - saves 2 bytes!
+;;; TODO: parser skips space, hahahaha!
+        .byte "|putchar('')"    ; LOL!!!!
+      .byte '['
+        jsr spc
 ;;; TODO: about return value...
       .byte ']'
 
@@ -5523,16 +5530,18 @@ afterELSE:
         ;; autopatches jump to here if false (PUSHLOC)
 
 
-
-        .byte "|while(%A<%D)"
-        ;; similar to if(%A<%D)
+        .byte "|while(%A<"
+        ;; similar to while(%A<%D)
       .byte "["
         ;; reverse cmp as <> NUM avail first
-        .byte ":"
-        lda #'<'
-        ldx #'>'
+        .byte ":"               ; loop back location
+        .byte "#"               ; push var address
+      .byte "]"
+.scope        
+        .byte _E,")"
         ;; cmp with VAR
-        .byte "D"               ; get aDdress
+      .byte "["
+        .byte ";"               ; pop address of var
         cpx VAR1
         bne @decide
         ;;  hi = equal
@@ -5544,6 +5553,7 @@ afterELSE:
         ;; jmp to end if false
         jmp PUSHLOC
 @okwhile:
+.endscope
       .byte "]"
         .byte _S
       .byte "[;d;"              ; pop tos, dos=tos; pop tos
@@ -5551,7 +5561,6 @@ afterELSE:
         jmp VAL0
       .byte "D#]"               ; tos= dos, push tos (patch)
         ;; autopatches jump to here if false (PUSHLOC)
-
 
 
 ;;; OPT: WHILE(a)...
@@ -7901,10 +7910,21 @@ FUNC _input
 
 input:
 
+
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+.ifdef WHILEVLTV
+        .byte "word main(){",10
+        .byte "  i=0; m=10;",10
+        .byte "  while(i<m) {",10
+        .byte "    putu(i); putchar(' ');",10
+        .byte "    ++i;",10
+        .byte "  }",10
+        .byte "}",10
+        .byte 0
+.endif
 
 .ifdef CHARNL
         .byte "word main(){",10
@@ -8453,9 +8473,11 @@ input:
 ;;;              135.86  EhBASIC (* 8.48 16)
 ;;;               10.352 BCPL (INT) (* 0.647 16)
 ;;; 
-;;; === jsk: 1x = 4096 = (don't compare with 8192...)
+;;; === jsk: 1x = 4096 = (don't compare with 8192...) BYTESIEVE
 ;;;         363    2.104s ORIC    my compiler
-
+;;;         336    1.630s ORIC    my compiler better WHILE
+;;;         336    1.551s ORIC    1000x loop
+;;;            (/ 10.352 1.551) = 6.67
 
 ;;; === jsk tests === (1x run, 8192)
 ;;; FILE,  MAIN bytes 
@@ -8465,7 +8487,10 @@ input:
 ;;; === my compiler === ("no library!")
 ;;;         363    3.63   sim65  ./rrasm parse BYTESIEVE
 ;;;         363    4.8s   ORIC   ./rasm parse  BYTESIEVE=1
-;;; 
+;;;         336    3.185s ORIC   ./rrams WHILE(a<_E)
+;;;             12% faster than before
+;;;             12% slower than cc65 -Cl
+
 
 ;;; TODO: at some point it got to 361 bytes
 ;;;    now increased to 365... INVESTIGATE
