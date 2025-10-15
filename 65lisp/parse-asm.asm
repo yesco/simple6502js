@@ -6059,7 +6059,9 @@ FUNC _aftercompile
 status: 
         .word $bb80-2
         ;;     ////////////////////////////////////////
-        .byte "CC02 (C) 2025 jsk@yesco.org",0
+        .byte "CC02 `2025 jsk@yesco.org"
+        .byte               127&YELLOW,"ESC=help",127&WHITE
+        .byte 0
 .code
         ;; - from
         lda #<status
@@ -7605,9 +7607,9 @@ GROUP=YELLOW
 .byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
 .byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
 .byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
-.byte "    ",CODE,"if (...) ++s;    else {...}",10
+.byte "    ",CODE,"if (...) ...;    else {...}",10
 .byte "    ",CODE,"while(...) ...",10
-.byte "    ",CODE,"do ... while(...);",10
+.byte "    ",CODE,"do ... while(...);",MEAN,"most efficient!",10
 .byte "    ",CODE,"for(i=0; i<NUM; ++i)...",MEAN,"ONLY i!",10
 .byte "    ",CODE,"L: ... goto L;"
 .byte 0
