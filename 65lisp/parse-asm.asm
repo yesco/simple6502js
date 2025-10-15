@@ -7591,9 +7591,10 @@ GROUP=YELLOW
 .byte KEY,"ESC",MEAN,"Help",10
 .byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
 .byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
-.byte KEY," ^Q",MEAN,"asm  - shows compiled code",10
-.byte KEY," ^W",MEAN,"rite - save screen/source",10
-.byte KEY," ^L",MEAN,"oad  - load screen/source",10
+.byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
+.byte KEY," ^W",MEAN,"rite   - save screen/source",10
+.byte KEY," ^L",MEAN,"oad    - load screen/source",10
+.byte KEY," ^G",MEAN,"arnish - pretty print source",10
 .byte MEAN,"// You are in the EDITOR (comment!)",10
 .byte KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
 .byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10

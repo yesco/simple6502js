@@ -237,6 +237,8 @@ void pc(char c) {
   } else putchar(lastc=c);
 }
 
+// BUG: compile again (1 or many times)
+//      then ^Garnish it - CRASH!
 extern void prettyprint(char* s) {
   char c, i, *x, found;
 
