@@ -888,12 +888,12 @@ putc 10
         jsr getchar
 .endif ; NDEBUG
 
-.ifdef PRINTASM
+;.ifdef PRINTASM
         jsr _iasmstart
-.endif ; PRINTASM
+;.endif ; PRINTASM
 
 
-
+        ;; skip any space/comments
         jsr nextInp
         
 ;;; TODO: move this to "the middle" then
@@ -4147,105 +4147,6 @@ ruleV:
 
 ;;; Exprssion:
 ruleE:  
-
-;FOLD=1
-.ifdef FOLD
-        ;; constant folding?
-;        .byte "%D[d]+%D"
-      .byte "%{"
-        ;; save current gen
-        lda _out
-        sta gos
-        ldx _out+1
-        stx gos+1
-        ;; TODO: should set a flag
-        PUTC '@'
-        ;; cheat: artificual fail!
-        jmp _fail
-        jsr immret
-
-        ;; cheat!
-      .byte "|"
-;.ifdef FFF
-      .byte "%{"
-        PUTC '?'
-;        jsr _iasm
-        lda inp
-        ldx inp+1
-        jsr _printz
-        jsr nl
-        jsr immret
-;.endif
-        .byte _C,_D
-        .byte ";"
-      .byte "["
-        ;; make sure we get back!
-        rts
-      .byte "]"
-      .byte "%{"
-        PUTC '$'
-;        jsr _iasm
-        jsr immret
-        ;; TODO: if flag set
-
-      .byte "%{"
-;        jsr _iasm
-        PUTC '#'
-        ;; print address to call
-        lda gos
-        sta tos
-        lda gos+1
-        sta tos+1
-        jsr puth
-        ;; JSR (gos) !
-        lda #$4c                ; trampoline: jmp
-        sta gos-1
-        jsr gos-1
-        ;; store result
-        sta tos
-        stx tos+1
-        ;; print for debug
-        jsr putu
-        ;; remove code run!
-        lda gos
-        sta _out
-        ldx gos+1
-        stx _out+1
-        ;; continue
-        jsr immret
-        
-      .byte "["
-        ;; finally generate code to load result!
-        lda #'<'
-        ldx #'>'
-      .byte "]"
-
-        .byte "|"
-.endif ; FOLD
-
-;FOLDPLUS=1
-.ifdef FOLDPLUS
-        ;; constant folding?
-        .byte "%D[d]+%D"
-      .byte "%{"
-        clc
-        lda tos
-        adc dos
-        sta tos
-        lda tos+1
-        adc dos+1
-        sta tos+1
-        jsr putu
-        jsr immret
-
-      .byte "["
-        lda #'<'
-        ldx #'>'
-      .byte "]"
-
-        .byte "|"
-.endif ; FOLDPLUS
-
         .byte _C,_D
         
 .ifdef BYTERULES
@@ -4322,6 +4223,117 @@ ruleQ:
 
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
 ruleN:
+
+;FOLD=1
+.ifdef FOLD
+        ;; constant partial evaluation!
+        ;; TODO: expand to constant folding
+;        .byte "const",_T,"%A="
+        .byte "const","word","%A="
+
+      .byte "%{"
+        putc '{'
+        jsr immret
+
+      .byte "%{"
+        ;; save address
+        lda dos
+        ldx dos+1
+        jsr pushax
+        ;; save current gen
+        lda _out
+        sta gos
+        ldx _out+1
+        stx gos+1
+        ;; TODO: should set a flag
+        PUTC '@'
+        ;; cheat: artificual fail!
+        jmp _fail
+        jsr immret
+
+;;; TODO: why needed? was it for constant folding?
+
+;        ;; cheat!
+;        ;; (it will next rule next!)
+;      .byte "|"
+
+;        .byte "const",_T,"%A="
+;        .byte "const","word","%A="
+
+.ifdef FFF
+      .byte "%{"
+        PUTC '?'
+;        jsr _iasm
+        lda inp
+        ldx inp+1
+        jsr _printz
+        jsr nl
+        jsr immret
+.endif
+        .byte _C,_D
+        .byte ";"
+      .byte "["
+        ;; make sure we get back!
+        rts
+      .byte "]"
+      .byte "%{"
+        PUTC '$'
+;        jsr _iasm
+        jsr immret
+        ;; TODO: if flag set
+
+      .byte "%{"
+;        jsr _iasm
+        PUTC '#'
+        ;; print address to call
+        lda gos
+        sta tos
+        lda gos+1
+        sta tos+1
+        jsr puth
+        ;; JSR (gos) !
+        lda #$4c                ; trampoline: jmp
+        sta gos-1
+        jsr gos-1
+        ;; store result in variable from DSTACK
+        sta dos
+        stx dos+1
+        jsr popax
+        sta tos
+        stx tos+1
+        PUTC '@'
+        jsr puth
+        ;; store in var
+        ldy #0
+        lda dos
+        sta (tos),y
+        iny
+        lda dos+1
+        sta (tos),y
+        ;; print for debug
+        putc '='
+        lda dos
+        ldx dos+1
+        sta tos
+        stx tos+1
+        jsr putu
+        ;; remove code run!
+        lda gos
+        sta _out
+        ldx gos+1
+        stx _out+1
+        ;; continue
+        jsr immret
+
+      .byte "%{"
+        putc '}'
+        jsr immret
+
+        .byte TAILREC
+
+        .byte "|"
+.endif ; FOLD
+
         ;; Define function
         .byte _T,"%N()",_B
       .byte '['
@@ -4373,12 +4385,24 @@ ruleO:
         jmp PUSHLOC
       .byte ']'
         .byte _N
+
+.ifnblank
+      .byte "%{"
+        putc '_'
+        jsr printstack
+        jsr immret
+.endif
         .byte 0
         ;; Autopatches skip over definitions in N
 
 
 ;;; PROGRAM ::= DEFSSKIP TYPE main() BLOCK | 
 ruleP:  
+      .byte "%{"
+;        jsr _iasmstart
+        jsr immret
+
+        ;; this rule with jump over definitions and arrive at main
         .byte _O
 
         ;; TODO: works with _S
@@ -4391,6 +4415,10 @@ ruleP:
         tax
         rts
       .byte ']'
+
+      .byte "%{"
+;        jsr _iasm
+        jsr immret
 
         .byte "|"
 
@@ -7123,22 +7151,105 @@ FUNC _loadscreen
 
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
-FUNC _mul10
-;;; 8
-        jsr _mul5
-        ;; double
-_double:
-        asl tos
-        rol tos+1
-        rts
 
+
+
+.ifdef FASTERMULX
+;;; AX => AX
+
+;;; (+ 8 3 21) = 32 B (+2 B on each call MUL10,MUL5)
+;;; (+ 17 7 37) = 61c
+;;; mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B
+
+;;; tradeoff not clear ... this doesn't have routines...
+
+.macro MUL10
+;;; 5 15c (+ 15 44) = 59c
+        stx savex
+        jsr _xmul10
+.endmacro
+
+.macro MULT5
+;;; 5 15c (+ 15 37) = 52c
+        stx savex
+        jsr _xmul5
+
+FUNC MUL40
+;;; 8 17c (+ 17 44) = 61c +12= 73c
+        stx savex
+_xmul40:        
+        ;; double
+        asl
+        rol savex
+        ;; double
+        asl
+        rol savex
+
+FUNC _xmul10
+;;; 3 7c (+ 7 37) = 44c
+        ;; double
+        asl
+        rol savex
 
 FUNC _mul5
-;;; 21
+;;; 21 37c 
+        sta tos
+        stx tos+1
+        ;; double
+        asl
+        rol savex
+        ;; double
+        asl
+        rol savex
+        
+        ;; add 1+4
+        clc
+        adc tos
+        tay
+        lda savex
+        adc tos+1
+        tax
+        tya
+
+        rts
+
+.else ; !FASTERMULX
+;;; TOS => TOS
+
+;;; (+ 8 4 23) = 35 B
+;;; (+ 20 10 42) = 72c
+
+;;;(mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B )
+;;; mul5:     54c  mul10:     64c  mul40: 84c     35 B
+
+;;; (/ 1000000 100)
+
+FUNC _mul40
+;;; 8 20c (+ 20 52) = 72  +12= 84c
+        ;; double
+        asl tos
+        rol tos+1
+        ;; double
+        asl tos
+        rol tos+1
+
+FUNC _mul10                     
+;;; 4 10c (+ 42 10) = 52c   +12= 64c
+        ;; double
+        asl tos
+        rol tos+1
+
+FUNC _mul5
+;;; 23 42c   +12= 54c
         lda tos
         ldx tos+1
-        jsr _double
-        jsr _double
+        ;; double
+        asl tos
+        rol tos+1
+        ;; double
+        asl tos
+        rol tos+1
+
         clc
         adc tos
         sta tos
@@ -7147,11 +7258,9 @@ FUNC _mul5
         sta tos+1
         rts
 
-FUNC _mul40
-;;; 9
-        jsr _mul10
-        jsr _double             ; 20
-        jmp _double             ; 40
+.endif ; !FASTERMULX
+
+
 
 
 .ifdef MEM1
@@ -7807,12 +7916,18 @@ input:
         .byte 0
 .endif ; CHARNL
 
-.ifdef FOLD
+.ifdef FOLDx
         .byte "// Folding constants",10
 ;;; Parse problem need %b word boundary check!!!
 ;        .byte |<<1%b"
 
-        .byte "1<<10;",0
+;        .byte "1<<10;",0
+
+        .byte "const word a=40+2;",10
+        .byte "word main(){",10
+        .byte "  putu(a);",10
+        .byte "}",10
+        .byte 0
 
 
 

@@ -1,6 +1,160 @@
 ;;; tips and tricks
 ;;; - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
 
+
+
+.ifdef FASTERMULX
+;;; AX => AX
+
+;;; (+ 8 3 21) = 32 B (+2 B on each call MUL10,MUL5)
+;;; (+ 17 7 37) = 61c
+;;; mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B
+
+;;; tradeoff not clear ... this doesn't have routines...
+
+.macro MUL10
+;;; 5 15c (+ 15 44) = 59c
+        stx savex
+        jsr _xmul10
+.endmacro
+
+.macro MULT5
+;;; 5 15c (+ 15 37) = 52c
+        stx savex
+        jsr _xmul5
+
+FUNC MUL40
+;;; 8 17c (+ 17 44) = 61c +12= 73c
+        stx savex
+_xmul40:        
+        ;; double
+        asl
+        rol savex
+        ;; double
+        asl
+        rol savex
+
+FUNC _xmul10
+;;; 3 7c (+ 7 37) = 44c
+        ;; double
+        asl
+        rol savex
+
+FUNC _mul5
+;;; 21 37c 
+        sta tos
+        stx tos+1
+        ;; double
+        asl
+        rol savex
+        ;; double
+        asl
+        rol savex
+        
+        ;; add 1+4
+        clc
+        adc tos
+        tay
+        lda savex
+        adc tos+1
+        tax
+        tya
+
+        rts
+
+.else ; !FASTERMULX
+;;; TOS => TOS
+
+;;; (+ 8 4 23) = 35 B
+;;; (+ 20 10 42) = 72c
+
+;;;(mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B )
+;;; mul5:     54c  mul10:     64c  mul40: 84c     35 B
+
+;;; (/ 1000000 100)
+
+FUNC _mul40
+;;; 8 20c (+ 20 52) = 72  +12= 84c
+        ;; double
+        asl tos
+        rol tos+1
+        ;; double
+        asl tos
+        rol tos+1
+
+FUNC _mul10                     
+;;; 4 10c (+ 42 10) = 52c   +12= 64c
+        ;; double
+        asl tos
+        rol tos+1
+
+FUNC _mul5
+;;; 23 42c   +12= 54c
+        lda tos
+        ldx tos+1
+        ;; double
+        asl tos
+        rol tos+1
+        ;; double
+        asl tos
+        rol tos+1
+
+        clc
+        adc tos
+        sta tos
+        txa
+        adc tos+1
+        sta tos+1
+        rts
+
+.endif ; !FASTERMULX
+
+
+
+
+;;; - use many sub to save 2 bytes!
+;;;   ... double time per call!
+;;; 
+;;; (+ 3 5 3 4 18) = 33 B
+;;;                 131c (_mul40)
+
+FUNC _mul4
+;;; 3 12c => (+ 12 10 10) = 32c
+        jsr _mul2
+FUNC _mul2
+;;; 5 10c
+        asl tos
+        rol tos+1
+
+        rts
+
+FUNC _mul40
+;;; 3 12c => (+ 12 32 87) = 131c
+        jsr _mul4
+
+FUNC _mul10         
+;;; 4 10c => (+ 12 10 65) = 87c
+        jsr _mul2
+
+FUNC _mul5
+;;; 18 33c => (+ 33 32) = 65c
+        lda tos
+        ldx tos+1
+
+        jsr _mul4
+
+        clc
+        adc tos
+        sta tos
+        txa
+        adc tos+1
+        sta tos+1
+        rts
+
+
+
+
+
 pushax: 
 ;;; 14B 15c-28c
         dec sp
