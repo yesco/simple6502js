@@ -2612,7 +2612,8 @@ FUNC _atoiXR
 
 
 .ifdef SIGNED
-func _negate
+;;; 31B
+FUNC _negate
 ;;; 12 b
         sec
         eor #$ff
@@ -2625,7 +2626,7 @@ func _negate
         rts
 
 ;;; print signed decimal
-func _putd
+FUNC _putd
 putd:
 ;;; 19 b
         cpx #0
@@ -2742,6 +2743,31 @@ ruleC:
         stx tos+1
         jsr putu
       .byte ']'
+
+        .byte "|printf(",34,"\%u",34,",",_E,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        jsr putu
+      .byte ']'
+
+.ifdef SIGNED
+        .byte "|printf(",34,"\%d",34,",",_E,")"
+      .byte '['
+        sta tos
+        stx tos+1
+        jsr putd
+      .byte ']'
+
+        ;; "IO-lib" hack
+        .byte "|putd(",_E,")"
+      .byte '['
+;;; TODO: change printers to use AX
+        sta tos
+        stx tos+1
+        jsr putd
+      .byte ']'
+.endif ; SIGNED
 
         .byte "|puth(",_E,")"
       .byte '['
@@ -7914,6 +7940,12 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+
+        .byte "word main(){printf(",34,"%u",34,",6502);}"
+        .byte 0
+        .byte 0
+
 
 .ifdef WHILEVLTV
         .byte "word main(){",10
