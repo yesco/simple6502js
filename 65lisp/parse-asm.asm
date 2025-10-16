@@ -403,6 +403,8 @@
 ;;; TODO: detect this and give assert error?
 ;;;       alt: parameterize any constants?
 
+.export _asmstart
+_asmstart:      
 
 .import _iasmstart, _iasm, _dasm, _dasmcc
 .export _endfirstpage
@@ -422,7 +424,6 @@ CURCALC		= $001f      ; ? how to update?
 
 ;;; TODO: why is this not accepted?
 .define SCREENRC(r,c)   SCREEN+40*r+c-2
-
 
 ;;; TODO: not good idea?
 ;;; TODO: not working, parse error?
@@ -504,6 +505,7 @@ CSTIMER         = $0276
 ;;; ========================================
 ;;;                  M A I N
 
+FUNC _bnfinterpstart
 
 .ifnblank
         .macro TIMER
@@ -2523,10 +2525,13 @@ FUNC _dummy4
 
 ;;; END CHEAT?
 
+FUNC _bnfinterpend
 
 ;;; NO-need align...
 ;  .res 256-(* .mod 256)
 secondpage:     
+
+FUNC _librarystart
 
 ;;; TODO: still part of parse.bin
 ;;;    just not in screen display form firstpage/secondpage
@@ -2645,11 +2650,15 @@ putd:
 FUNC _dummyd
 .endif ; SIGNED
 
+FUNC _libraryend
+
 bytecodes:      
 
 ;;; ========================================
 ;;; START rules
 
+
+FUNC _rulesstart
 
 ;;; Rules 0,A-
 _rules:  
@@ -2736,7 +2745,7 @@ ruleB:
 ruleC: 
         
 ;;; TODO: these are "more" statements...
-
+FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "putu(",_E,")"
       .byte '['
@@ -2811,6 +2820,18 @@ ruleC:
       .byte '['
         jsr putchar
       .byte ']'
+
+
+
+        .byte "|getchar()"
+      .byte '['
+        jsr getchar
+        ldx #0
+      .byte ']'
+FUNC _iorulesend
+
+
+FUNC _memoryrulesstart
 
 ;;; ORIC peek/poke deek/doke
 .ifdef OPTRULES
@@ -2889,15 +2910,6 @@ ruleC:
         lda (tos),y 
       .byte ']'
 
-
-
-        .byte "|getchar()"
-      .byte '['
-        jsr getchar
-        ldx #0
-      .byte ']'
-
-
 .import _malloc
         .byte "|malloc",_X
       .byte "["
@@ -2930,7 +2942,6 @@ ruleC:
       .byte "]"
 .endif
 
-
         ;; TODO: more like statement
         .byte "|asm(",'"',"sei",'"',")"
       .byte '['
@@ -2941,7 +2952,7 @@ ruleC:
       .byte '['
         cli
       .byte ']'
-
+FUNC _memoryrulesend
 
 ;;; TODO: a&!b .. hmmmm
         ;; ! - NOT
@@ -2997,6 +3008,7 @@ ruleC:
         ;; result in AX
       .byte ']'
 
+FUNC _postprerulesstart
         ;; Surprisingly ++v and --v expression w value
         ;; arn't smalller or faster than v++ and v-- !
         .byte "|++%V"
@@ -3069,6 +3081,7 @@ ruleC:
         sta VAR0
 .endif
       .byte ']'
+FUNC _postprerulesend
 
 
 ;;; cc65: get parameter value from subroutine
@@ -3216,6 +3229,7 @@ ruleU:
 
 ruleD:
 
+FUNC _oprulesstart
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
@@ -3778,6 +3792,7 @@ PUTC '/'
         .byte '|'
 
         .byte 0
+FUNC _oprulesend
 
 ;;; BYTERULES variant of ruleC:
 ruleU:  
@@ -3852,6 +3867,8 @@ ruleU:
 
 
 ;;; BYTERULES variant of ruleD:
+FUNC _byterulesstart
+
 ruleV:  
         ;; TODO:        // .byte "=>
         
@@ -4136,7 +4153,7 @@ ruleV:
         .byte "|"
 
         .byte 0
-
+FUNC _byterulesend
 
 ;;; same as ruleE but protects AX (leaving it in tos, in the end)
 ruleG:
@@ -4632,7 +4649,7 @@ ruleK:
 
 .endif ; BNFLONG
 
-
+FUNC _stmtrulesstart
 ;;; Statement
 ruleS:
         ;; empty statement is legal
@@ -5722,6 +5739,8 @@ afterELSE:
 
 
 
+FUNC _oricstart
+
         ;; ORIC ATMOS API
 
 .macro ORIC fun, addr
@@ -5920,6 +5939,7 @@ store_filename:
 
 .endif ; ATMOS_FIX
 
+FUNC _oricend
 
 .macro CHARCHECK addr,char
   .assert (<addr <> char),error,"%% XJSR addr - bad lo']'"
@@ -6099,6 +6119,9 @@ store_filename:
 
         .byte 0
 
+FUNC _stmtrulesend
+
+FUNC _parametersstart
 ;;; - oric paramters
 ruleY:  
         .byte "("
@@ -6266,6 +6289,7 @@ PUTC 'A'
 
         .byte 0
 .endif ; __CC65__
+FUNC _parametersend
 
 endrules:       
         .byte "|",$ff
@@ -6273,10 +6297,12 @@ endrules:
 ;;; END rules
 ;;; ========================================
 
+FUNC _rulesend
 
 .include "end.asm"
 
 
+FUNC _idestart
 
 FUNC _aftercompile
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
@@ -6396,10 +6422,11 @@ status:
 
 .export _OK
 _OK:
-        putc 10
+        jsr nl
+        jsr nl
         putc 'O'
         putc 'K'
-        putc ' '
+        jsr spc
 
 .ifdef INTERRUPT
         jmp _run
@@ -6426,6 +6453,12 @@ _OK:
         jmp _edit
 
 _run:   
+
+.import _info
+        lda _out
+        ldx _out+1
+        jsr axputh
+        jsr _info
 
 .ifdef __ATMOS__
         ;; set ink for new rows
@@ -6542,7 +6575,7 @@ TIMPER=8
         ;; prints return code
         putc '='
         putc '>'
-        putc ' '
+        jsr spc
 
         pla
         sta tos+1
@@ -6591,7 +6624,7 @@ TIMPER=8
 
 ;;; - CTRL- toggle protected column ORIC-1 only? (say ^I)
 
-
+FUNC _editorstart
 
 FUNC _edit
         
@@ -6604,7 +6637,7 @@ FUNC _edit
         lda seconds+1
         sta tos+1
         jsr putu
-        putc ' '
+        jsr spc
 
         jmp _edit
 .endif
@@ -6860,6 +6893,9 @@ editprint:
         ;; print it
         jmp rawputc
 
+FUNC _editorend
+
+;;; TODO: move somewhere else?
 
 origint:        .res 2
         
@@ -6954,7 +6990,7 @@ PUTC '*'
         lda seconds+1
         sta tos+1
         jsr putu
-        putc ' '
+        jsr spc
 
         pla
         sta tos+1
@@ -7099,9 +7135,7 @@ FUNC _listsymbols
 waitesc:
         PRINTZ {CYAN,"    ESC>"}
         jmp getchar
-
-;;; TODO: ???
-FUNC _dymmy5
+FUNC _helpend
 
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
@@ -7860,6 +7894,9 @@ FUNC printstack
 @ret:
         rts
         
+FUNC _ideend
+
+
 
 BLACK    =128+0
 RED      =128+1
@@ -7917,6 +7954,8 @@ GROUP=YELLOW
 .byte "    ",CODE,"L: ... goto L;"
 .byte 0
 
+FUNC _helptextend
+
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
 
@@ -7926,13 +7965,12 @@ GROUP=YELLOW
 ;;;   typedef unsigned uing8_t  byte;
 ;;; 
 
-
 ;;; This is just to keep input safe, lol
 ;;; _incIspc may mark prev as read, and or 
 ;;; it could be used by memcpyz that need prefix?
 .byte 0,0
 
-FUNC _input
+FUNC _inputstart
 
 input:
 
@@ -9016,6 +9054,9 @@ PRIME=1
 .endif ; INCTESTS
 
 endinput:       
+
+FUNC _inputend
+
         ;; two zeroes ends input sequence of files
         .byte 0,0
 
@@ -9179,6 +9220,8 @@ vnext:
 ;;;            TODO:concstants/vars ???
 ;;;   _outend: 
 
+FUNC _outputstart
+
 _output:
 .bss
 ;;; not physicaly allocated in binary
@@ -9194,13 +9237,15 @@ _output:
         .res 8*1000+50
 .endif
 
+FUNC _outputend
+
 ;;; Some variants save on codegen by using a library
 
 ;;; LIBRARY
 
 .code
-FUNC _library
 
+FUNC _minimallibrarystart
 library:        
 ;;; (- #xdad #xd4d) = 96 B
 
@@ -9293,6 +9338,15 @@ _SHR:
         ror
         rts
 
+
 .endif ; MINIMAL
+FUNC _minimallibraryend
+
+
+FUNC _asmend
+
+
+
 
 .end
+

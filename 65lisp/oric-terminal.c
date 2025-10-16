@@ -41,7 +41,7 @@ void fullputc(int c) {
 #ifdef DOUBLE
     printf("  "); break;
 #else
-    printf("  "); break;
+    printf(" "); break;
 #endif
   case 33 ... 126:
 #ifdef DOUBLE

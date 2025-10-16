@@ -17,6 +17,9 @@
 ;;; enable to invers on hibit
 ;HIBIT=1
 
+.export _biosstart
+_biosstart:     
+
 .define CTRL(c) c-'@'
 
 .ifdef __ATMOS__
@@ -476,3 +479,9 @@ spc:
         jmp putchar
 
 .endif ; !TTY
+
+.export _biosend
+_biosend:
+
+
+

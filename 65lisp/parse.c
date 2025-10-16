@@ -4,35 +4,33 @@
 // 2434 bytes with printf, 
 // #include <stdio.h>
 
-extern void showsize();
-extern void start();
-extern void* endfirstpage;
+void Cstart(){}
+
+void disasmStart(){}
 
 #include "disasm.c"
 
-unsigned char* last= 0;
-
+extern void showsize();
+extern void start();
+extern void* endfirstpage;
 extern char** rules;
-
-extern char *out, output, OK;
-
+extern unsigned int out;
 #pragma zpsym ("out")
+extern char output, OK;
 
-extern int myfun(int a, int b) {
-  printf("\nmyfun(%d, %d)\n", a, b);
-  return a+b;
-}
+//unsigned char* last= 0;
+unsigned int last= 0;
 
 // incremental disasm from last position/call
 extern void iasmstart() {
-  last= &output;
+  last= (int)&output;
   if (out-last) printf("---CODE[%u]:\n", out-last);
 }
 
 extern void iasm() {
   if (out<=last) return;
   putchar('\n');
-  last = disasm(last, out, 2);
+  last = (int)disasm((char*)last, (char*)out, 2);
   putchar(128+2); // green code text
 }
 
@@ -51,6 +49,15 @@ extern void dasmcc() {
   disasm((int)&OK, ((int)&OK)+20, 0);
 }
 
+void disasmEnd(){}
+
+
+
+extern int myfun(int a, int b) {
+  printf("\nmyfun(%d, %d)\n", a, b);
+  return a+b;
+}
+
 // from conio-raw.c
 #define TEXTSCREEN ((char*)0xBB80) // $BB80-BF3F
 #define SCREENROWS 28
@@ -59,6 +66,10 @@ extern void dasmcc() {
 #define SCREENLAST (TEXTSCREEN+SCREENSIZE-1)
 
 
+void CparseStart(){}
+
+// OLD: fix it...
+//
 // C implementation of minimal parse-asm.asm in
 // TODO: compare compiled sizes and speed
 
@@ -115,6 +126,7 @@ char* parse(char r, char* in) {
   case '[':
   gen:
     switch((c= *rule)) {
+// TODO: ; # D d ...
     case ']': goto next;
     case ':': num= addr; goto nextgen;
       // out gen
@@ -122,7 +134,8 @@ char* parse(char r, char* in) {
     case '>': c= num>>8; break;
     case '+':
       tmp= num+1;
-      *out= t; ++out;
+//TODO: fix
+//      *out= t; ++out;
       // assume next char is '>'
       c= t>>8;
       nextgen:
@@ -130,7 +143,8 @@ char* parse(char r, char* in) {
       break;
     }
     // output
-    *out= c; ++out;
+//TODO: fix
+//    *out= c; ++out;
     goto gen;
 
     // quoted
@@ -160,6 +174,7 @@ char* parse(char r, char* in) {
   goto next;
 }
 
+void CparseEnd(){}
 
 
 // empty main: 284 Bytes (C overhead)
@@ -188,6 +203,9 @@ void gotoxy(char x, char y) {
   putchar('Q'-'@');
 //TODO: cursor on
 }
+
+
+void prettyprintStart(){}
 
 #define NTYPES 8
 
@@ -298,6 +316,11 @@ next:
     ++s;
   }
 }
+void prettyprintEnd(){}
+
+
+extern void info();
+
 
 void main() {
 #ifdef FIHS
@@ -320,12 +343,127 @@ void main() {
   clrscr();
 
   printf("Hello World!\n");
+
   //exit(42);
   
   *TEXTSCREEN= 'A';
 
   showsize();
+  info();
+
   start();
 
   TEXTSCREEN[2]= 'C';
 }
+
+// show sizes info
+
+extern char asmstart,asmend;
+extern char bnfinterpstart,bnfinterpend;
+extern char rulesstart,rulesend;
+extern char   iorulesstart,iorulesend;
+extern char   memoryrulesstart,memoryrulesend;
+extern char   postprerulesstart,postprerulesend;
+extern char   oprulesstart,oprulesend;
+extern char   parametersstart,parametersend;
+extern char   stmtrulesstart,stmtrulesend;
+extern char   byterulesstart,byterulesend;
+extern char   oricstart,oricend;
+extern char idestart,ideend;
+extern char   editorstart,editorend;
+extern char   helptext,helptextend,help,helpend;
+extern char   inputstart,inputend;
+extern char   biosstart,biosend;
+extern char   librarystart,libraryend;
+extern char   minimallibrarystart,minimallibraryend;
+extern char   outputstart,outputend;
+
+extern void Cend();
+extern void infoEnd();
+
+void info() {
+    //----------------------------------------
+  printf
+    ("--- CC02 (65-MUCC-02 w C-rules) ---\n"
+     "C               %6u - used as 'loader'\n"
+     "  disasm        %6u - ^Q disasm code\n"
+     "  parse         %6u - alt impl.\n"
+     "  prettyprint   %6u - ^G colorize\n"
+     "  info          %6u - *this* page!\n"
+     "  main          %6u - main/loader\n"
+     "asm             %6u (bytes)\n"
+     "  C-compiler    %6u\n"
+     "    BNF-intrp   %6u - BNF interpreter\n"
+     "    C-rules     %6u - C lang rules\n"
+     "      iorules   %6u - printf/put,get-char\n"
+     "      memrules  %6u - peek/poke/malloc\n"
+     "      ++--rules %6u - ++a; --b; ...\n"
+     "      op-rules  %6u - + / * ... == <\n"
+     "      paramsrul %6u (3,4,a,b)\n"
+     "      stmsrules %6u - if do while a+=3;\n"
+     "        oric    %6u - ORIC ATMOS API!\n"
+     "   (byterules   %6u)- optional: byte ops\n"
+//   "  symbols           \n"
+     "  IDE           %6u\n"
+     "    editor      %6u\n"
+     "    help        %6u - help text+code\n"
+     "    input       %6u - input/test files\n"
+     "  tap-file      %6u - estimated .tap-file\n"
+     "    bios        %6u - getchar/putchar\n"
+     "    library     %6u - try to keep minimal\n"
+     "    minilib     %6u\n"
+     "    output      %6u - (%4x-%4x) gen code\n"
+     "    /reserv     %6u - total area reserved\n"
+     "\n\n\n"
+     , (char*)Cend-(char*)Cstart
+       , (char*)disasmEnd-(char*)disasmStart
+       , (char*)CparseEnd-(char*)CparseStart
+       , (char*)prettyprintEnd-(char*)prettyprintStart
+       , (char*)infoEnd-(char*)info
+       , (char*)Cend-(char*)Cstart-(0
+          + (char*)disasmEnd-(char*)disasmStart
+          + (char*)CparseEnd-(char*)CparseStart
+          + (char*)prettyprintEnd-(char*)prettyprintStart
+          + (char*)infoEnd-(char*)info
+          )
+     , &asmend-&asmstart
+       , (0
+          + &bnfinterpend-&bnfinterpstart
+          + &rulesend-&rulesstart
+          )
+         , &bnfinterpend-&bnfinterpstart
+         , &rulesend-&rulesstart
+           , &iorulesend-&iorulesstart
+           , &memoryrulesend-&memoryrulesstart
+           , &postprerulesend-&postprerulesstart
+           , &oprulesend-&oprulesstart
+           , &parametersend-&parametersstart
+           , &stmtrulesend-&stmtrulesstart
+             , &oricend-&oricstart
+           , &byterulesend-&byterulesstart
+       // TODO: , symbols...
+       , &ideend-&idestart
+       , &editorend-&editorstart
+       , (0
+          + &helptextend-&helptext
+          + &helpend-&help
+          )
+       , &inputend-&inputstart
+       , (0
+          + (&biosend-&biosstart)
+          + (&libraryend-&librarystart)
+          + (&minimallibraryend-&minimallibrarystart)
+          + (out-(int)&output)
+          )
+         , &biosend-&biosstart
+         , &libraryend-&librarystart
+         , &minimallibraryend-&minimallibrarystart
+         , out-(int)&output, out, (int)&output
+         , &outputend-&outputstart
+     );
+}
+void infoEnd(){}
+
+// difficult to refer to!
+void Cend() {}
+
