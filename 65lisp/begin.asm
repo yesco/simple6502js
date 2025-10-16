@@ -80,6 +80,8 @@ orgaddr:
 
 .include "bios.asm"
 
+.ifndef NOSHOWSIZE
+
 .export _showsize
 .proc _showsize
 
@@ -134,6 +136,7 @@ orgaddr:
 
         rts
 .endproc
+.endif ; NOSHOWSIZE
 
 ;;; ========================================
 ;;;             I N T E R L U D E

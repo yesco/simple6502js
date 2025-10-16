@@ -10,7 +10,7 @@ void disasmStart(){}
 
 #include "disasm.c"
 
-extern void showsize();
+//extern void showsize();
 extern void start();
 extern void* endfirstpage;
 extern char** rules;
@@ -348,7 +348,7 @@ void main() {
   
   *TEXTSCREEN= 'A';
 
-  showsize();
+//  showsize();
   info();
   printf("\n\n");
 
@@ -384,41 +384,41 @@ extern void infoEnd();
 
 void info() {
   unsigned int outsize= out-(int)&output;
-  if (outsize>16384) outsize= out;
+  if (outsize>16384) outsize= 0;
 
    //--------------------------------------
   printf
     ("--- CC02 (65-MUCC-02 w C-rules) ---\n"
      "C            %6u - use as 'loader'\n"
-     " disasm      %6u - ^Q disasm code\n"
-     " parse       %6u - alt impl.\n"
-     " prettyprint %6u - ^G colorize\n"
-     " info        %6u - *this* page!\n"
-     " main        %6u - main/loader\n"
-     "asm          %6u (bytes)\n"
-     " C-compiler  %6u\n"
-     "  BNF-intrp  %6u - BNF interpreter\n"
-     "  C-rules    %6u - C lang rules\n"
-     "   iorules   %6u - put,get-char\n"
-     "   memrules  %6u - peek/malloc\n"
-     "   ++--rules %6u - ++a; --b; ...\n"
-     "   op-rules  %6u - + / * ... == <\n"
-     "   paramsrul %6u (3,4,a,b)\n"
-     "   stmsrules %6u - if while a+=3;\n"
-     "    oric     %6u - ORIC ATMOS API!\n"
-     "   (byteruls %6u)- opt: byte ops\n"
-//   "  symbols           \n"
-     " IDE         %6u\n"
-     "  editor     %6u\n"
+     "  disasm     %6u - ^Q disasm code\n"
+     "  parse      %6u - alt impl.\n"
+     "  prettyprnt %6u - ^G colorize\n"
+     "  info       %6u - *this* page!\n"
+     "  main       %6u - main/loader\n"
    //--------------------------------------
+     "ASM          %6u (bytes)\n"
+     "  IDE        %6u\n"
+     "    editor   %6u\n"
      "  help       %6u - help text+code\n"
      " FILES       %6u - input/files\n"
+     " C-compiler  %6u\n"
+     "   BNF-intrp %6u - BNF interpreter\n"
+     "   C-rules   %6u - C lang rules\n"
+     "     I/O     %6u - put,get-char\n"
+     "     mem     %6u - peek/malloc\n"
+     "     ++--    %6u - ++a; --b; ...\n"
+     "     ops     %6u - + / * ... == <\n"
+     "     params  %6u (3,4,a,b)\n"
+     "     stms    %6u - if while a+=3;\n"
+     "        oric %6u - ORIC ATMOS API!\n"
+     "     (byte   %6u)- opt: byte ops\n"
+//   "  symbols           \n"
    //--------------------------------------
-     " tap-file    %6u - est: .tap-file\n"
-     "  bios       %6u - getchar/putchar\n"
-     "  library    %6u - keep minimal\n"
-//     "  minilib    %6u\n"
-     "  output     %6u - gen code " // no \n to fit!
+     "/ bios       %6u - getchar/putchar\n"
+     "| library    %6u - keep minimal\n"
+     // "  minilib    %6u\n"
+     "}-tap-file   %6u - bios+lib+out\n"
+     "\\ output     %6u - gen code" // no \n to fit!
 //     "  /reserv    %6u - area reserved"
      , (char*)Cend-(char*)Cstart
        , (char*)disasmEnd-(char*)disasmStart
@@ -432,6 +432,13 @@ void info() {
           + (char*)infoEnd-(char*)info
           )
      , &asmend-&asmstart
+       , &ideend-&idestart
+         , &editorend-&editorstart
+         , (0
+          + &helptextend-&helptext
+          + &helpend-&help
+          )
+       , &inputend-&inputstart
        , (0
           + &bnfinterpend-&bnfinterpstart
           + &rulesend-&rulesstart
@@ -447,24 +454,16 @@ void info() {
              , &oricend-&oricstart
            , &byterulesend-&byterulesstart
        // TODO: , symbols...
-       , &ideend-&idestart
-         , &editorend-&editorstart
-         , (0
-          + &helptextend-&helptext
-          + &helpend-&help
-          )
-       , &inputend-&inputstart
+       , &biosend-&biosstart
+       , &libraryend-&librarystart
+         // , &minimallibraryend-&minimallibrarystart
        , (0
           + (&biosend-&biosstart)
           + (&libraryend-&librarystart)
-//          + (&minimallibraryend-&minimallibrarystart)
+          // + (&minimallibraryend-&minimallibrarystart)
           + outsize
           )
-         , &biosend-&biosstart
-         , &libraryend-&librarystart
-         , &minimallibraryend-&minimallibrarystart
-         , outsize
-//         , &outputend-&outputstart
+       , outsize
      );
 }
 void infoEnd(){}

@@ -496,6 +496,7 @@ CSTIMER         = $0276
 
 
 ;;; See template-asm.asm for docs on begin/end.asm
+NOSHOWSIZE=1
 .include "begin.asm"
 
 .zeropage
@@ -6661,6 +6662,7 @@ editaction:
         bne :+
 
         jsr _savescreen
+        jsr nl
         jsr _eos
         ;; This basically restarts program, lol
         TIMER
@@ -7163,7 +7165,7 @@ GROUP=YELLOW
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
 ;.byte 128+'D',128+'E'
 .byte "",10
-.byte KEY,"ESC",MEAN,"Help",10
+.byte KEY,"ESC",MEAN,"Help  ",KEY," ^V",MEAN,"info",10
 .byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
 .byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
 .byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
