@@ -382,38 +382,40 @@ extern void Cend();
 extern void infoEnd();
 
 void info() {
-    //----------------------------------------
+   //--------------------------------------
   printf
     ("--- CC02 (65-MUCC-02 w C-rules) ---\n"
-     "C               %6u - used as 'loader'\n"
-     "  disasm        %6u - ^Q disasm code\n"
-     "  parse         %6u - alt impl.\n"
-     "  prettyprint   %6u - ^G colorize\n"
-     "  info          %6u - *this* page!\n"
-     "  main          %6u - main/loader\n"
-     "asm             %6u (bytes)\n"
-     "  C-compiler    %6u\n"
-     "    BNF-intrp   %6u - BNF interpreter\n"
-     "    C-rules     %6u - C lang rules\n"
-     "      iorules   %6u - printf/put,get-char\n"
-     "      memrules  %6u - peek/poke/malloc\n"
-     "      ++--rules %6u - ++a; --b; ...\n"
-     "      op-rules  %6u - + / * ... == <\n"
-     "      paramsrul %6u (3,4,a,b)\n"
-     "      stmsrules %6u - if do while a+=3;\n"
-     "        oric    %6u - ORIC ATMOS API!\n"
-     "   (byterules   %6u)- optional: byte ops\n"
+     "C            %6u - use as 'loader'\n"
+     " disasm      %6u - ^Q disasm code\n"
+     " parse       %6u - alt impl.\n"
+     " prettyprint %6u - ^G colorize\n"
+     " info        %6u - *this* page!\n"
+     " main        %6u - main/loader\n"
+     "asm          %6u (bytes)\n"
+     " C-compiler  %6u\n"
+     "  BNF-intrp  %6u - BNF interpreter\n"
+     "  C-rules    %6u - C lang rules\n"
+     "   iorules   %6u - put,get-char\n"
+     "   memrules  %6u - peek/poke/malloc\n"
+     "   ++--rules %6u - ++a; --b; ...\n"
+     "   op-rules  %6u - + / * ... == <\n"
+     "   paramsrul %6u (3,4,a,b)\n"
+     "   stmsrules %6u - if while a+=3;\n"
+     "    oric     %6u - ORIC ATMOS API!\n"
+     "   (byteruls %6u)- opt: byte ops\n"
 //   "  symbols           \n"
-     "  IDE           %6u\n"
-     "    editor      %6u\n"
-     "    help        %6u - help text+code\n"
-     "    input       %6u - input/test files\n"
-     "  tap-file      %6u - estimated .tap-file\n"
-     "    bios        %6u - getchar/putchar\n"
-     "    library     %6u - try to keep minimal\n"
-     "    minilib     %6u\n"
-     "    output      %6u - (%4x-%4x) gen code\n"
-     "    /reserv     %6u - total area reserved\n"
+     " IDE         %6u\n"
+     "  editor     %6u\n"
+   //--------------------------------------
+     "  help       %6u - help text+code\n"
+     "  input      %6u - input/files\n"
+   //--------------------------------------
+     " tap-file    %6u - est: .tap-file\n"
+     "  bios       %6u - getchar/putchar\n"
+     "  library    %6u - keep minimal\n"
+     "  minilib    %6u\n"
+     "  output     %6u - gen code\n"
+     "  /reserv    %6u - area reserved\n"
      "\n\n\n"
      , (char*)Cend-(char*)Cstart
        , (char*)disasmEnd-(char*)disasmStart
@@ -458,7 +460,7 @@ void info() {
          , &biosend-&biosstart
          , &libraryend-&librarystart
          , &minimallibraryend-&minimallibrarystart
-         , out-(int)&output, out, (int)&output
+         , out-(int)&output
          , &outputend-&outputstart
      );
 }

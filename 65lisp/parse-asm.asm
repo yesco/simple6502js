@@ -6454,11 +6454,14 @@ _OK:
 
 _run:   
 
+.ifnblank
 .import _info
         lda _out
         ldx _out+1
         jsr axputh
+;;; crashews second time on oric...
         jsr _info
+.endif
 
 .ifdef __ATMOS__
         ;; set ink for new rows
