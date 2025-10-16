@@ -1,6 +1,8 @@
-;;; 6502 Minimal Universal Compiler - Rule Based Native Compiler
-;;; 
-;;; (c) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; ALL RIGHTS RESERVED
+;;; - Free to use for non-commercial purpose subject to
+;;;   credit of original authorship please!
+;;; - Generated code/tap-files are free!
 ;;; 
 ;;; Essentially, this is a dynamic rule-based compiler.
 ;;; 
@@ -2660,7 +2662,7 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
-ruleG:
+;ruleG: like ruleG but saves AX safely in tos
 ruleH:  
 ruleI:
 ruleJ:  
@@ -2739,47 +2741,37 @@ ruleC:
         .byte "putu(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
-        sta tos
-        stx tos+1
-        jsr putu
+        jsr axputu
       .byte ']'
 
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
-        sta tos
-        stx tos+1
-        jsr putu
+        jsr axputu
       .byte ']'
 
 .ifdef SIGNED
         .byte "|printf(",34,"\%d",34,",",_E,")"
       .byte '['
-        sta tos
-        stx tos+1
-        jsr putd
+        jsr axputd
       .byte ']'
 
         ;; "IO-lib" hack
         .byte "|putd(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
-        sta tos
-        stx tos+1
-        jsr putd
+        jsr axputd
       .byte ']'
 .endif ; SIGNED
 
         .byte "|puth(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
-        sta tos
-        stx tos+1
-        jsr puth
+        jsr axputh
       .byte ']'
 
         .byte "|printz(",_E,")"
       .byte '['
-        jmp _printz
+        jsr _printz
       .byte ']'
 
 .ifdef OPTRULES
@@ -2822,78 +2814,46 @@ ruleC:
 
 ;;; ORIC peek/poke deek/doke
 .ifdef OPTRULES
-        .byte "|poke(%D[d],%D)"
-      .byte '['
-        lda VAL0
-        .byte 'D'
+        .byte "|poke(%D[#],",_E,")"
+      .byte "[;"
         sta VAL0
-      .byte ']'
+      .byte "]"
 
-        .byte "|doke(%D[d],%D)"
-      .byte '['
+        .byte "|doke(%D[#],",_E,")"
+      .byte "[;"
         lda VAL0
         ldx VAL1
         .byte 'D'
         sta VAL0
         stx VAL1
-      .byte ']'
-
-        .byte "|poke(%D"
-      .byte "[d]"
-        .byte ",",_E,")"
-      .byte "[D"
-        sta VAL0
-      .byte ']'
-
-        .byte "|doke(%D"
-      .byte "[d]"
-        .byte ",",_E,")"
-      .byte "[D"
-        sta VAL0
-        stx VAL1
-      .byte ']'
+      .byte "]"
 .endif ; OPTRULES
 
-        .byte "|poke(",_E
-      .byte '['
-        pha
-        txa
-        pha
-      .byte ']'
-        .byte ",",_E,")"
-      .byte '['
-        sta savea
-        pla
-        sta tos+1
-        pla
-        sta tos
-        lda savea
+
+        .byte "|poke(",_E,",",_G,")"
+      .byte "["
+        ;; AX: value of _G to poke
+        ;; tos: destination _E
+        ldy #0
+        sta (tos),y
+      .byte "]"
+
+        .byte "|poke(",_E,",",_G,")"
+      .byte "["
+        ;; AX: value of _G to poke
+        ;; tos: destination _E
+      .byte "["
+        lda #'<'
+        ldx #'<'
 
         ldy #0
         sta (tos),y
-      .byte ']'
 
-        .byte "|doke(",_E
-      .byte '['
-        pha
         txa
-        pha
-      .byte ']'
-        .byte ",",_E,")"
-      .byte '['
-        sta savea
-        pla
-        sta tos+1
-        pla
-        sta tos
-        lda savea
+        iny
+        sta (tos),y
+      .byte "]"
 
-        ldy #1
-        sta (tos),y
-        tax
-        dey
-        sta (tos),y
-      .byte ']'
 
 .ifdef OPTRULES
         .byte "|peek(%D)"
@@ -4178,6 +4138,46 @@ ruleV:
         .byte 0
 
 
+;;; same as ruleE but protects AX (leaving it in tos, in the end)
+ruleG:
+;;; TODO: 8bit $
+        .byte "%D"
+      .byte '['
+        sta tos
+        stx tos+1
+
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+
+        .byte "|%V"
+      .byte '['
+        sta tos
+        stx tos+1
+
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+
+        ;; Nothing else than Expression could come now
+        .byte "|"
+      .byte "["
+        ;; reverse save A,X
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte _E
+      .byte '['
+        tay
+        ;; reverse pop X,A
+        pla
+        stx tos+1
+        pla
+        sta tos
+        ;; 
+        tya
+      .byte "]"
 
 ;;; Exprssion:
 ruleE:  
@@ -7942,10 +7942,11 @@ input:
 ;        .byte "word main(){}",0
 
 
+.ifdef PRINTF
         .byte "word main(){printf(",34,"%u",34,",6502);}"
         .byte 0
         .byte 0
-
+.endif ; PRINTF
 
 .ifdef WHILEVLTV
         .byte "word main(){",10
@@ -8506,10 +8507,12 @@ input:
 ;;;               10.352 BCPL (INT) (* 0.647 16)
 ;;; 
 ;;; === jsk: 1x = 4096 = (don't compare with 8192...) BYTESIEVE
-;;;         363    2.104s ORIC    my compiler
-;;;         336    1.630s ORIC    my compiler better WHILE
-;;;         336    1.551s ORIC    1000x loop
+;;;         363    2.104s CC02    my compiler
+;;;         336    1.630s CC02    my compiler better WHILE
+;;;         336    1.551s CC02    1000x loop
 ;;;            (/ 10.352 1.551) = 6.67
+;;;         319    1.327s CC02    poke optimized
+;;;            (/ 10.352 1.327) = 7.80
 
 ;;; === jsk tests === (1x run, 8192)
 ;;; FILE,  MAIN bytes 
@@ -8518,11 +8521,15 @@ input:
 ;;;         322    2.8323 CC65   -Cl
 ;;; === my compiler === ("no library!")
 ;;;         363    3.63   sim65  ./rrasm parse BYTESIEVE
-;;;         363    4.8s   ORIC   ./rasm parse  BYTESIEVE=1
-;;;         336    3.185s ORIC   ./rrams WHILE(a<_E)
+;;;         363    4.8s   CC02   ./rasm parse  BYTESIEVE=1
+;;;         336    3.185s CC02   ./rrams WHILE(a<_E)
 ;;;             12% faster than before
 ;;;             12% slower than cc65 -Cl
-
+;;;         319    2.665s CC02   ./rrasm 100x (- 17B!)
+;;;              6% FASTER than cc65 -Cl
+;;;              1% BEAT cc65 default! SMALLER! (- 3 bytes!)
+;;;             11% bigger than smallest (slowest) cc65 (287)
+;;;         315    same   CC02   axputu
 
 ;;; TODO: at some point it got to 361 bytes
 ;;;    now increased to 365... INVESTIGATE
@@ -8559,7 +8566,7 @@ NOPRINT=1
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "word main(){",10
 
-        ;; BYTE MAGAZINE 8192 => 1899
+       ;; BYTE MAGAZINE 8192 => 1899
         .byte "  m=8192;",10
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10

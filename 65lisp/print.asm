@@ -387,3 +387,21 @@ under10:
 .ifdef PUTDEC
         putu=_putu
 .endif
+
+axputu:   
+        sta tos
+        stx tos+1
+        jmp putu
+
+axputh: 
+        sta tos
+        stx tos+1
+        jmp puth
+
+.ifdef putd
+axputd: 
+        sta tos
+        stx tos+1
+        jmp putd
+.endif
+        
