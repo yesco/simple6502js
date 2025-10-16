@@ -609,12 +609,10 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 ;PRINTASM=1
 ;;; Prints a dot for each line compiled
-;
-PRINTDOTS=1
+;PRINTDOTS=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2836,10 +2834,15 @@ FUNC _memoryrulesstart
 
 ;;; ORIC peek/poke deek/doke
 .ifdef OPTRULES
+
+;;; TODO: instead of _E use byte context _?
+
         .byte "|poke(%D[#],",_E,")"
       .byte "[;"
         sta VAL0
       .byte "]"
+
+;;; TODO: instead of _E use byte context _?
 
         .byte "|doke(%D[#],",_E,")"
       .byte "[;"
@@ -2852,6 +2855,7 @@ FUNC _memoryrulesstart
 .endif ; OPTRULES
 
 
+;;; TODO: instead of _G use byte context _?
         .byte "|poke(",_E,",",_G,")"
       .byte "["
         ;; AX: value of _G to poke
@@ -2860,7 +2864,7 @@ FUNC _memoryrulesstart
         sta (tos),y
       .byte "]"
 
-        .byte "|poke(",_E,",",_G,")"
+        .byte "|doke(",_E,",",_G,")"
       .byte "["
         ;; AX: value of _G to poke
         ;; tos: destination _E
@@ -3315,8 +3319,32 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+.ifdef OPTRULES
+        ;; +BYTE
+        .byte "|+%D"
+      .byte "%{"
+        ;; TODO: this may not be easily skippable
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:       
+        jsr immret
+
+      .byte '['
+;;; 6 B
+        clc
+        adc #'<'
+        bcc :+
+        inx
+:
+      .byte ']'
+        .byte TAILREC
+.endif ; OPTRULES
+
         .byte "|+%D"
       .byte '['
+;;; 9 B
         clc
         adc #'<'
         tay
@@ -3340,8 +3368,31 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+.ifdef OPTRULES
+        ;; -BYTE
+        .byte "|-%D"
+      .byte "%{"
+        ;; TODO: this may not be easily skippable
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:       
+        jsr immret
+      .byte '['
+;;; 6 B
+        sec
+        sbc #'<'
+        bcs :+
+        dex
+:       
+      .byte ']'
+        .byte TAILREC
+.endif ; OPTRULES
+
         .byte "|-%D"
       .byte '['
+;;; 9 B
         sec
         sbc #'<'
         tay
@@ -4159,8 +4210,21 @@ FUNC _byterulesend
 ;;; same as ruleE but protects AX (leaving it in tos, in the end)
 ruleG:
 ;;; TODO: 8bit $
-        .byte "%D"
+.ifdef OPTRULES
+        .byte "0"
       .byte '['
+;;; 7
+        sta tos
+        stx tos+1
+
+        lda #0
+        tax
+      .byte ']'
+.endif ; OPTRULES
+
+        .byte "|%D"
+      .byte '['
+;;; 8
         sta tos
         stx tos+1
 
@@ -5590,8 +5654,9 @@ afterELSE:
         bne @decide
         ;;  hi = equal
         cmp VAR0
-@decide:
         beq @nahwhile
+@decide:
+;;; TODO: seems longer than needed?
         bcs @okwhile            ; NUM>=VAR
 @nahwhile:
         ;; jmp to end if false
@@ -6850,10 +6915,45 @@ doneCE:
         cmp #CTRL('M')
         bne :+
 
+.ifdef DOO
+        ;; remember here
+        ldx CURCOL
+        stx savex
+        ;; save current row ptr
+        lda ROWADDR
+        sta sos
+        lda ROWADDR+1
+        sta sos+1
+        ;; indent like this line
         lda #CTRL('A')
         jsr editaction
-
+        ldy CURCOL
+        sty savey
+        ;; - move down
         lda #CTRL('N')
+        ;; - scroll these lines down
+        ;;   = from 
+        lda #<SCREENEND-40
+        sta tos
+        lda #>SCREENEND-40
+        sta tos+1
+        ;;   = to
+        lda #<SCREENEND
+        sta dos
+        lda #>SCREENEND
+        sta dos+1
+        ;;; copy line down
+        ldy #39
+:       
+        lda (tos),y
+        sta (dos),y
+        dey
+        bpl :-
+        ;; dec lines
+        
+.endif ; DOO
+        
+
 :       
 ;;; - ctrl-Forward (emacs)
         cmp #CTRL('F')
@@ -8578,6 +8678,22 @@ input:
 ;;;             11% bigger than smallest (slowest) cc65 (287)
 ;;;         315    same   CC02   axputu
 
+;;; https://thred.github.io/c-bench-64/
+;;;         240j means jsk extracted main from .asm
+;;; 
+;;;  4.3K          2.12s  Calpyso (21.4s size opt, 4.3K)
+;;;  3.2K          2.05s  cc65 (2.10s, 3.2K))
+;;;  7.1K          1.90s  LLVM-mos (21.8s, 6.4K))
+;;;  2.5K   240j   0.94s  Oscar64 (10.3s, 1.6K)
+;;;  2.4K          2.13s  SDCC (21.3s, 2.4K)
+;;;  5.8K          1.33s  VBCC (15.9s, 3.4K)
+;;; 
+;;;         315    2.60s  CC02 10K runs
+;;;         307    2.53s  CC02   while-speed,++i(;),+BYTE,-BYTE
+;;; 
+
+
+
 ;;; TODO: at some point it got to 361 bytes
 ;;;    now increased to 365... INVESTIGATE
 ;;;    
@@ -8622,7 +8738,7 @@ NOPRINT=1
         .byte "  n=0; while(n<10) {",10
         .byte "    c=0;",10
         .byte "    i=0; while(i<m) {",10
-        .byte "      poke(a+i, 1); ++i",10
+        .byte "      poke(a+i, 1); ++i;",10
         .byte "    }",10
 ;;; NOPE
 ;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10

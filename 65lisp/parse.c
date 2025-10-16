@@ -349,8 +349,8 @@ void main() {
   *TEXTSCREEN= 'A';
 
 //  showsize();
-  info();
-  printf("\n\n");
+//  info();
+//  printf("\n\n");
 
   start();
 
@@ -383,7 +383,8 @@ extern void Cend();
 extern void infoEnd();
 
 void info() {
-  unsigned int outsize= out-(int)&output;
+  static unsigned int outsize;
+  outsize= out-(int)&output;
   if (outsize>16384) outsize= 0;
 
    //--------------------------------------
