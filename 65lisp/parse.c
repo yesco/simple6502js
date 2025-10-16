@@ -350,6 +350,7 @@ void main() {
 
   showsize();
   info();
+  printf("\n\n");
 
   start();
 
@@ -382,6 +383,9 @@ extern void Cend();
 extern void infoEnd();
 
 void info() {
+  unsigned int outsize= out-(int)&output;
+  if (outsize>16384) outsize= out;
+
    //--------------------------------------
   printf
     ("--- CC02 (65-MUCC-02 w C-rules) ---\n"
@@ -396,7 +400,7 @@ void info() {
      "  BNF-intrp  %6u - BNF interpreter\n"
      "  C-rules    %6u - C lang rules\n"
      "   iorules   %6u - put,get-char\n"
-     "   memrules  %6u - peek/poke/malloc\n"
+     "   memrules  %6u - peek/malloc\n"
      "   ++--rules %6u - ++a; --b; ...\n"
      "   op-rules  %6u - + / * ... == <\n"
      "   paramsrul %6u (3,4,a,b)\n"
@@ -408,15 +412,14 @@ void info() {
      "  editor     %6u\n"
    //--------------------------------------
      "  help       %6u - help text+code\n"
-     "  input      %6u - input/files\n"
+     " FILES       %6u - input/files\n"
    //--------------------------------------
      " tap-file    %6u - est: .tap-file\n"
      "  bios       %6u - getchar/putchar\n"
      "  library    %6u - keep minimal\n"
-     "  minilib    %6u\n"
-     "  output     %6u - gen code\n"
-     "  /reserv    %6u - area reserved\n"
-     "\n\n\n"
+//     "  minilib    %6u\n"
+     "  output     %6u - gen code " // no \n to fit!
+//     "  /reserv    %6u - area reserved"
      , (char*)Cend-(char*)Cstart
        , (char*)disasmEnd-(char*)disasmStart
        , (char*)CparseEnd-(char*)CparseStart
@@ -445,8 +448,8 @@ void info() {
            , &byterulesend-&byterulesstart
        // TODO: , symbols...
        , &ideend-&idestart
-       , &editorend-&editorstart
-       , (0
+         , &editorend-&editorstart
+         , (0
           + &helptextend-&helptext
           + &helpend-&help
           )
@@ -454,14 +457,14 @@ void info() {
        , (0
           + (&biosend-&biosstart)
           + (&libraryend-&librarystart)
-          + (&minimallibraryend-&minimallibrarystart)
-          + (out-(int)&output)
+//          + (&minimallibraryend-&minimallibrarystart)
+          + outsize
           )
          , &biosend-&biosstart
          , &libraryend-&librarystart
          , &minimallibraryend-&minimallibrarystart
-         , out-(int)&output
-         , &outputend-&outputstart
+         , outsize
+//         , &outputend-&outputstart
      );
 }
 void infoEnd(){}

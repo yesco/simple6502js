@@ -6454,15 +6454,6 @@ _OK:
 
 _run:   
 
-.ifnblank
-.import _info
-        lda _out
-        ldx _out+1
-        jsr axputh
-;;; crashews second time on oric...
-        jsr _info
-.endif
-
 .ifdef __ATMOS__
         ;; set ink for new rows
         lda #BLACK+16
@@ -6653,6 +6644,18 @@ FUNC _edit
 
 editaction:     
 
+;;; - ctrl-@ - info
+        cmp #CTRL('V')
+        bne :+
+
+        .import _info
+
+;;; TODO: crashews second time on oric...
+;        jsr _savescreen
+
+        jsr _eos
+        jmp _info
+:       
 ;;; - ctrl-C - compile
         cmp #CTRL('C')
         bne :+
@@ -7139,6 +7142,52 @@ waitesc:
         PRINTZ {CYAN,"    ESC>"}
         jmp getchar
 FUNC _helpend
+
+FUNC _helptext
+
+;;; 10. If a print line starts with control characters
+;;;     – e.g., ESC N, etc. – then the protected columns
+;;;     0 and 1 are used, overwriting any PAPER and INK
+;;;     attributes. Always start the line with a
+;;;     non-attribute character, such as space.
+
+MEAN=WHITE
+KEY=GREEN
+CODE=GREEN
+GROUP=YELLOW
+
+.byte 'A'
+.byte 12,10
+;.byte 12,128+'A',128+'B',128+'C',10
+.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
+.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
+;.byte 128+'D',128+'E'
+.byte "",10
+.byte KEY,"ESC",MEAN,"Help",10
+.byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
+.byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
+.byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
+.byte KEY," ^W",MEAN,"rite   - save screen/source",10
+.byte KEY," ^L",MEAN,"oad    - load screen/source",10
+.byte KEY," ^G",MEAN,"arnish - pretty print source",10
+.byte MEAN,"// You are in the EDITOR (comment!)",10
+.byte KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
+.byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte "",10
+.byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
+.byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
+.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S",MEAN,"]..",CODE,";",MEAN,"or",CODE,"a",GROUP,"OP",CODE,"=",GROUP,"S",CODE,";",10
+.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
+.byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
+.byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
+.byte "    ",CODE,"if (...) ...;    else {...}",10
+.byte "    ",CODE,"while(...) ...",10
+.byte "    ",CODE,"do ... while(...);",MEAN,"most efficient!",10
+.byte "    ",CODE,"for(i=0; i<NUM; ++i)...",MEAN,"ONLY i!",10
+.byte "    ",CODE,"L: ... goto L;"
+.byte 0
+
+FUNC _helptextend
 
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
@@ -7913,51 +7962,6 @@ BG       =16                    ; BG+WHITE
 NORMAL   =128+8
 DOUBLE   =128+10
 
-FUNC _helptext
-
-;;; 10. If a print line starts with control characters
-;;;     – e.g., ESC N, etc. – then the protected columns
-;;;     0 and 1 are used, overwriting any PAPER and INK
-;;;     attributes. Always start the line with a
-;;;     non-attribute character, such as space.
-
-MEAN=WHITE
-KEY=GREEN
-CODE=GREEN
-GROUP=YELLOW
-
-.byte 'A'
-.byte 12,10
-;.byte 12,128+'A',128+'B',128+'C',10
-.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
-.byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
-;.byte 128+'D',128+'E'
-.byte "",10
-.byte KEY,"ESC",MEAN,"Help",10
-.byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
-.byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
-.byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
-.byte KEY," ^W",MEAN,"rite   - save screen/source",10
-.byte KEY," ^L",MEAN,"oad    - load screen/source",10
-.byte KEY," ^G",MEAN,"arnish - pretty print source",10
-.byte MEAN,"// You are in the EDITOR (comment!)",10
-.byte KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
-.byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
-.byte "",10
-.byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
-.byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
-.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S",MEAN,"]..",CODE,";",MEAN,"or",CODE,"a",GROUP,"OP",CODE,"=",GROUP,"S",CODE,";",10
-.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
-.byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
-.byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
-.byte "    ",CODE,"if (...) ...;    else {...}",10
-.byte "    ",CODE,"while(...) ...",10
-.byte "    ",CODE,"do ... while(...);",MEAN,"most efficient!",10
-.byte "    ",CODE,"for(i=0; i<NUM; ++i)...",MEAN,"ONLY i!",10
-.byte "    ",CODE,"L: ... goto L;"
-.byte 0
-
-FUNC _helptextend
 
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
