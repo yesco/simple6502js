@@ -609,8 +609,10 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
-;PRINTASM=1
+;
+PRINTREAD=1
+;
+PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
 PRINTDOTS=1
@@ -2583,6 +2585,22 @@ FUNC _librarystart
 ;;; $f5c1 : Output character to printer.
 ;;; $f8d0 : Set up the ASCII character set.
 
+;;; ORIC routines can use for MINIMAL
+;;; C3F8 (C3F4) - A block move.
+;;; C483 (C47C) - Input and process a line.
+;;; C59C (C58C) - Input a line.Input a line.
+;;; DDA3 (DDA7) - 
+
+;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
+;;; 
+;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
+;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
+;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
+;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
+;;; EDCC E4 11 CPX $11   length of data to be moved is 
+;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
+
+
 ;;; -- PRINT INTEGER IN A,X.
 ;;; E0C5 85 D1 STA $D1 
 ;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
@@ -2673,6 +2691,7 @@ FUNC _librarystart
 ;;; 19 - memcpy selfmodifying code
 ;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
 ;;; 
+;;;
 
 .ifdef MEMSET
 ;;; tos: address
@@ -6285,12 +6304,6 @@ LOADERR     = $02B1
         ;; .byte "|creadsync();" - $e735 
 
 .ifdef ATMOS_FIX
-;;; ORIC routines can use for MINIMAL
-;;; C3F8 (C3F4) - A block move.
-;;; C483 (C47C) - Input and process a line.
-;;; C59C (C58C) - Input a line.Input a line.
-;;; DDA3 (DDA7) - 
-
 ;;; 4.3 Saving an area of memory
 ;;; 
 ;;; The sequence of events when saving a block of
@@ -7097,7 +7110,15 @@ FUNC _edit
 
 editaction:     
 
-;;; - ctrl-@ - info
+;;; - ctrl-Load/edit
+        cmp #CTRL('S')
+        bne  :+
+
+        jsr _eos
+        jmp bytesieve
+:       
+
+;;; - ctrl-V - info
         cmp #CTRL('V')
         bne :+
 
@@ -8450,6 +8471,9 @@ WHITE    =128+7
 BG       =16                    ; BG+WHITE
 NORMAL   =128+8
 DOUBLE   =128+10
+
+
+.include "Play/byte-sieve-gen.asm"
 
 
 ;;; TODO: make it point at screen,
