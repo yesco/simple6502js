@@ -7234,8 +7234,9 @@ doneCE:
         cmp #CTRL('X')
         bne :+
 
-        jsr _savescreen
-        jmp _run
+        jmp _output
+;        jsr _savescreen
+;        jmp _run
 :       
 ;;; - ctrl-q - disasm
         cmp #CTRL('Q')
@@ -7410,6 +7411,14 @@ editprint:
         jmp rawputc
 
 FUNC _editorend
+
+
+
+
+;.include "Play/byte-sieve-gen.asm"
+.include "Play/byte-sieve-gen-opt.asm"
+
+
 
 ;;; TODO: move somewhere else?
 
@@ -8472,8 +8481,6 @@ BG       =16                    ; BG+WHITE
 NORMAL   =128+8
 DOUBLE   =128+10
 
-
-.include "Play/byte-sieve-gen.asm"
 
 
 ;;; TODO: make it point at screen,
