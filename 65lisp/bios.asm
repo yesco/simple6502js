@@ -81,9 +81,10 @@ readkey:
 
 ;;; input char from keyboard
 ;;;
-;;; 10B
+;;; 17B
 xgetchar:       
 .proc getchar
+
 ;        lda #'A'
 ;        rts
 
@@ -133,6 +134,7 @@ SCREND=SCR+40*28
 ;;;   10= cr/lf unix-style \n
 ;;;   A,X,Y retains values
 ;;; 
+;;; 19 B
 .export putchar
 
 .export _xputchar
@@ -167,8 +169,9 @@ cury:           .res 1
         ;; lf
         lda #13
 :       
+.ifdef CHANGECOLORS
         ;; col==2, rewrite colors!
-        lda $269                ; CURCOL
+        lda $0269                ; CURCOL
 ;        cmp #2
         bne :+
 
@@ -188,6 +191,7 @@ changecolors:
         pla
         pha
 :       
+.endif ; CHANGECOLORS           
 
         jsr rawputc
 
@@ -203,6 +207,7 @@ changecolors:
 ;;; bs lf up forward clrscr  scrollup clrln
 ;;;   may trash A,X,Y!
 ;;; 
+;;;   (+2 spc)
 spc:    
         lda #' '
 rawputc:

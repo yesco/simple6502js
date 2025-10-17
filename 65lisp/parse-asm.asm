@@ -612,7 +612,8 @@ PRINTINPUT=1
 ;PRINTREAD=1
 ;PRINTASM=1
 ;;; Prints a dot for each line compiled
-;PRINTDOTS=1
+;
+PRINTDOTS=1
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2531,6 +2532,170 @@ FUNC _bnfinterpend
 secondpage:     
 
 FUNC _librarystart
+;;; 20 - puth, put4h, put2h
+;;; 13 - plaprinth (to reverse)
+;;; 22 - axputz==printz, writez tos+Y
+;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
+;;; 13 - xputu saves A,X prints tos
+;;;      (todo cleanup printn,putu does jmp _drop, lol
+;;;  7 - axputu
+;;;  7 - axputh
+;;; (7)- axputd 
+;;; ========
+;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
+;;; 
+;;; 127 B according to info() ?
+
+
+;;; = BIOS
+;;; 17 - getchar (save XY)
+;;; 19 - nl plaputchar putchar (save AXY, \n)
+;;;  4 - rawputc
+;;;(14)- 3 clrscr, 3 forward, 3 bs, 5 spc
+;;; ========
+;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
+
+
+;;; from Summary of ROM addrsses
+;;; $c58c : Input a line.
+;;; $c5e9 : Wait for a keypress and return the ASCII codel.
+;;; $d499 : Integer to floating point.
+;;; $d99c : Floating point to integer.
+;;; $dced : Multiply the accumulator with memoryh.
+;;; $dd61 : Move memory to the second accumulator.
+;;; $dda7 : Multiply the accumulator by 10.
+;;; $ddc3 : Divide the accumulator by 10.
+;;; $dde4 : Divide memory by the accumulator.
+;;; $dde9 : Divide the second accumulator by the main accumulator.
+;;; $de77 : Move memory to the main accumulator
+;;; $dead : Move the accumulator to memory.
+;;; $ded6 : Move the second accumulator to the main accumulator.
+;;; $dee5 : Move the main accumulator to the second accumulator.
+;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
+;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
+;;; $e5f5 : Clear the top line.
+;;; $e5ea : Print message at far left of top line.
+;;; $e790 : Compare filenames.
+;;; $eb78 : Read a key without waiting.
+;;; $f77c : Output character from X register to screen.
+;;; $f865 : Output message to the top line at position X.
+;;; $f523 : Poll keyboard.
+;;; $f5c1 : Output character to printer.
+;;; $f8d0 : Set up the ASCII character set.
+
+;;; -- PRINT INTEGER IN A,X.
+;;; E0C5 85 D1 STA $D1 
+;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
+;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
+;;; E0CB 38 SEC Set sign to positive.
+;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
+
+;;; - GET NUMBER
+;;; DFE7 A0 00 LDY #$00 GET NUMBER.
+;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
+;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
+
+;;; - INT
+;;; DFBD A5 D0 LDA $D0 INT
+;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
+;;; DFC1 B0 20 BCS $DFE3 is integer already. 
+;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
+
+;;; - udiv16 (0c00/???) used by graphics line
+;;; EFC8 48 PHA This is a division routine 
+;;; EFC9 8A TXA that is used to calculate the 
+;;; EFCA 48 PHA slope of a line being drawn. 
+;;; EFCB 98 TYA 
+;;; EFCC 48 PHA The routine acts on 16 bit 
+;;; EFCD A9 00 LDA #$00 numbers. 
+;;; EFCF 85 0E STA $0E 
+;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
+;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
+;;; EFD5 06 0C ASL $0C set before routine is called. 
+;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
+;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
+;;; EFDB 26 0F ROL $0F 
+;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
+;;; EFDF 38 SEC this routine.
+
+;;; - lookup key from key code
+;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
+
+;;; - putc (335 B)
+;;; 
+;;; additional: 32 Bytes jmp table!
+;;; 
+;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
+;;; ...
+;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
+;;; ...
+;;; F730 60 RTS
+;;; ^^^^ end
+
+;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
+;;; - putc (+ 154 335) = 489!!!
+;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
+;;; ... (lots of stuff!!!)
+;;; F815 60 RTS
+
+;;; - mul40 (47 B)
+;;; F731 A0 00 LDY #$00 This routine multiplies the 
+;;; F733 8C 63 02 STY $0263 content of the accumulator by 
+;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
+;;; F739 0A ASL A byte of the result. The page 
+;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
+;;; F73D 0A ASL A results.
+;;; ...
+;;; F759 60 RTS 
+
+;;; - atoi (but on error jumps BASIC, lol)
+;;; ( no over 25*256 ??? - it's for line numbers?)
+;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
+
+
+;;; 33 - printd (smallest I found), but only DECIMAL
+
+;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
+;;; -- maybe this can be made more generic?
+;;; 24 - udiv10 - ORIC
+;;; -- baically it's a udiv16by8bits
+
+;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
+
+;;; TODO: math - floating point??? LOL
+;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
+;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
+
+;;; rand, random(), srandom()
+;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
+
+;;; RULES: memcpy/set can do inline for some fixed nubmers!
+;;; 19 - memcpy selfmodifying code
+;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
+;;; 
+
+.ifdef MEMSET
+;;; tos: address
+;;; AX : length
+;;; Y  : byte
+memset:
+;;; 16B - call 3x+ save bytes... <3 inline ok
+        pha
+        tay
+        pla
+:       
+        ldy #0
+        sta (tos),y
+
+        iny
+        bne :+
+        inc tos+1
+:       
+        dex
+        bpl :--
+       
+        rts
+.endif ; MEMSET
 
 ;;; TODO: still part of parse.bin
 ;;;    just not in screen display form firstpage/secondpage
@@ -2649,6 +2814,118 @@ putd:
 FUNC _dummyd
 .endif ; SIGNED
 
+;PRINTF=1
+.ifdef PRINTF
+
+FUNC _printf
+;;; (+ 8 12 26 3 2 9 3 3 31) = 97
+;;; just: "foo %d bar %c fish %x gurk %s kork"
+
+        ;; it's on the hardware stack
+        ;; Y contains number of bytes pushed
+        ;; (Y/2 is no of arguments)
+        ;; lda (101),x points to 
+
+;;; 8
+        sty savey
+        tsx
+        txa
+        clc
+        adc savey
+        tax
+        ;; - load first argument==format - I hope!
+;;; 12
+        lda (101),x
+        sta pos
+        lda (102),x
+        sta pos+1
+        stx savex
+        ;; - pos points to the format string
+
+        ;; parse format string
+;;; 26
+        ldy #0
+@nextc:       
+        lda (pos),y
+        jsr _incT
+        ;; \ quoted
+        cmp #'\'
+        bne :+
+        jsr _incT
+        bne @printchar
+:       
+        ;; %formatchar
+        cmp #'%'
+        bne @printchar
+        jsr processarg
+        jmp @nextc
+@printchar:
+        ;; - otherwise print!
+;;; 3
+        jsr putchar
+        ;; - (zero will terminated (after printed!))
+;;; 2
+        bne :-
+
+        ;; pop all args!
+        ;; - save return address
+;;; 9
+        pla
+        sta tos+1
+        pla
+        sta tos
+        jsr _incT               ; +1 !
+        ;; - drop !
+;;; 3
+        ldx savex
+        tsx
+.ifnblank
+        ldy savey
+:       
+        pla
+        dey
+        bpl :-
+.endif
+        ;; - finally return!
+;;; 3
+        jmp (tos)
+
+@processarg:
+;;; 31
+        ;; - save char after % in Y
+        tay
+        ;; - TODO: process "%[[-]45]d"
+        ;; - get next argument
+        ldx savex
+        dex
+        dex
+        lda (102),x             ; hi
+        tax
+        lda (101),x             ; lo
+        ;; AX is argument, Y is type char
+
+@dispatch:
+;;; TODO: put all this routines/trampoiles NEAR!
+        ;; tail-calls!
+        cpy #'u'
+        beq axputu
+        cpy #'d'
+        beq axputd
+        cpy #'x'
+        beq axputx
+        cpy #'s'
+        beq axputz
+        cpy #'c'
+        bne :+
+        jmp putchar
+:       
+        ;; fail to match type char
+        rts
+
+
+.endif ; PRINTF
+
+
 FUNC _libraryend
 
 bytecodes:      
@@ -2671,7 +2948,7 @@ _rules:
         .word 0                 ; TODO: needed?
 
 ;ruleG: like ruleG but saves AX safely in tos
-ruleH:  
+;ruleH: printf parsing
 ruleI:
 ruleJ:  
 .ifndef BNFLONG
@@ -2752,9 +3029,29 @@ FUNC _iorulesstart
         jsr axputu
       .byte ']'
 
+.ifdef OPUTD
+;;; ORIC XA print 16-bit number
+;;;    TOTALLY unreliable, starts WHILEVLTV
+;;;    sometimes at 9, outputs extra at end?
+;;;    I think it overlaps variables in zoerppage
+;;;    as it uses floating point conversions.
+;;;  --- BAD and really SLOW!
+        .byte "|oputd(",_E,")"
+      .byte '['
+        sta savea
+        txa
+        ldx savea
+        jsr $E0C5
+      .byte ']'
+.endif
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
         jsr axputu
+      .byte ']'
+
+        .byte "|printf(",34,"\%s",34,",",_E,")"
+      .byte '['
+        jsr axputz
       .byte ']'
 
 .ifdef SIGNED
@@ -4206,6 +4503,106 @@ ruleV:
 
         .byte 0
 FUNC _byterulesend
+
+;;; printf handling
+ruleH:  
+;;; 111 B not finished,
+;;; how big is an asm printf?
+.ifdef rulePRINTF
+        ;; TODO: only handles fixed formats!
+        .byte "printf(",34,""
+      .byte "%{"
+        ;; save pointer for traversal
+        lda inp 
+        sta pos
+        lda inp+1
+        sta pos+1
+        ;; skip parsing till end
+        ldy #0
+:       
+        jsr _incI
+        lda (inp),y
+;;; TODO: \ and "foo""bar" ?
+        cmp #'"'                ; "
+        bne :-
+        ;; standing at "
+        jsr _incI
+        ;; done
+        jsr immret
+
+        .byte TAILREC
+
+        ;; handle each argument
+        .byte "|,"
+      .byte "%{"
+.scope
+        ;; skip "str%..." till %
+        ldy #0
+:       
+        lda (pos),y
+        cmp #'%'
+        beq :+
+        cmp #'"'                ; "
+        beq @done
+        iny
+        bne :-
+:       
+        jsr _incI
+        ;; have string to print?
+        tya
+        pha
+
+        beq @nah
+        ;; string - put out JSR putherez
+        lda #$20
+        ldy #0
+        sta (_out),y
+        jsr _incO
+        
+        lda #<putherez
+        sta (_out),y
+        jsr _incO
+        
+        lda #>putherez
+        sta (_out),y
+        jsr _incO
+        
+        ;; string - put inline
+        pla
+        tax
+        ;; Y=0 already
+:       
+        lda (pos),y
+        sta (_out),y
+        jsr _incO
+
+        dex
+        bne :-
+
+        ;; string - zero terminate
+        tya
+        sta (_out),y
+        jsr _incO
+@done:  
+        ;; jmp _acceptrule?
+@nah:
+.endscope
+        jsr immret
+        ;; - process argument
+        .byte _E
+      .byte "%{"
+        ;; pos standing char after %
+        ldy #0
+        lda (pos),y
+        ;; 
+                
+        
+        
+
+        ;; done with printf
+        .byte "|);"
+.endif ; rulePRINTF
+        .byte 0
 
 ;;; same as ruleE but protects AX (leaving it in tos, in the end)
 ruleG:
@@ -6170,16 +6567,6 @@ FUNC _oricend
       .byte "]"
 
 
-;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
-;;; TODO: math - floating point??? LOL
-;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
-;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
-;;; rand, random(), srandom()
-;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
-
-;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
-;;; 
-
         ;; Expression; // throw away result
         .byte "|",_E,";"
 
@@ -8095,9 +8482,28 @@ input:
         .byte 0
 .endif ; PRINTF
 
+
+;WHILEVLTV=1
 .ifdef WHILEVLTV
+
+.ifdef OPUTD
         .byte "word main(){",10
-        .byte "  i=0; m=10;",10
+        .byte "  x=0; y=300;",10 ; a screenful
+        .byte "  while(x<y) {",10
+
+;;; ORIC, totally crap!
+;;;   clash of vars?
+        .byte "    oputd(x);",10
+
+        .byte "    ++x;",10
+        .byte "  }",10
+        .byte "}",10
+        .byte 0
+.endif
+
+        .byte "word main(){",10
+;        .byte "  i=0; m=10;",10
+        .byte "  i=0; m=300;",10 ; a screenful
         .byte "  while(i<m) {",10
         .byte "    putu(i); putchar(' ');",10
         .byte "    ++i;",10

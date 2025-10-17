@@ -187,7 +187,7 @@ debugputh:
   puth:
 .endif
 
-;;; print hex
+;;; puth: print hex
 ;;; (+ 5 7 8) = 20 + 14 (plaprint1h)
 ;;; 5
 .ifndef PUTHEXNODOLLAR
@@ -195,6 +195,7 @@ debugputh:
         jsr putchar
 .endif
 ;;; 7
+print4h:        
         lda tos+1
         jsr print2h
         lda tos
@@ -250,19 +251,22 @@ printit:
 ;;; nextc: dup @ swap I swap  # 5
 
 .macro PRINTZ msg
+.scope
 .data
-:       
+@data:       
         .byte msg,0
 .code
-        lda #<:-
-        ldx #>:-
+        lda #<@data
+        ldx #>@data
         jsr _printz
+.endscope
 .endmacro
 
 ;;; if had an ITERATOR : dup II swap D swasp @ ;
 ;;; 
-;;; 12 B
+;;; 22 B
 FUNC _printz
+axputz:   
         sta tos
         stx tos+1
 
