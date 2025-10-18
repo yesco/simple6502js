@@ -488,5 +488,6 @@ spc:
 .export _biosend
 _biosend:
 
+BIOSINCLUDED=1
 
 

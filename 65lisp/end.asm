@@ -4,7 +4,7 @@ endaddr:
 ;;; for debuggability, if no printer included
 ;;; we include it AFTER, so it doesn't count for size!
 
-.ifndef PRINTER
+.ifndef PRINTINCLUDED
 print_for_debug:
         PRINTHEX=1
         .include "print.asm"

@@ -19,12 +19,14 @@
 
 ;;; TODO: make this no do again if included again!
 
+.ifndef tos
 .zeropage
 
 tos:    .res 2
 ctos:   .res 1
 tmp1:   .res 2
 ctmp1:  .res 1
+.endif
 
 .code
 
@@ -78,7 +80,9 @@ ctmp1:  .res 1
 
 orgaddr:    
 
-.include "bios.asm"
+.ifndef BIOSINCLUDED
+  .include "bios.asm"
+.endif
 
 .ifndef NOSHOWSIZE
 
@@ -162,15 +166,16 @@ orgaddr:
 ;;; the function. 
 ;;; 
 ;;; For 2-page dispatch it can also align
-.macro FUNC name
+.if !.definedmacro(FUNC)
+  .macro FUNC name
 
-  .ifdef DOUBLEPAGE
-;;; TODO: seems .code segment not aligned?
-;    .align 2, _NOP_
-     .res (* .mod 2), _NOP_
- .endif ; DOUBLEPAGE
+    .ifdef DOUBLEPAGE
+  ;;; TODO: seems .code segment not aligned?
+  ;    .align 2, _NOP_
+       .res (* .mod 2), _NOP_
+   .endif ; DOUBLEPAGE
 
-  .export .ident(.string(name))
-  .ident(.string(name)) :
-.endmacro
-
+    .export .ident(.string(name))
+    .ident(.string(name)) :
+  .endmacro
+.endif

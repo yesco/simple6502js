@@ -8,17 +8,23 @@
 ;;; 
 ;;;   #x71 == 113
 
+.ifdef PRINTINCLUDED
+        .error "%% print.asm included TWICE"
+.endif
+
 .if !.definedmacro(FUNC)
   .macro FUNC name
+;;; TOD: not complete, should be export?
      .ident(.string(name)):
   .endmacro
   ;;; fake
   .zeropage
     tos:    
-    tmp1:   
+    tmp1:
   .code
   plaputchar:     
   _drop:  
+;;; replaces system incorrect one?
   putchar: 
         rts
   PUTDEC=1
@@ -409,3 +415,4 @@ axputd:
         jmp putd
 .endif
         
+PRINTINCLUDED=1

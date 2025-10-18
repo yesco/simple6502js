@@ -11,14 +11,14 @@ int curmode;
 
 #include "compress.c"
 
-
-
 char buff[64*1024], uzbuff[64*1024];
 int len;
 
 int main(int argc, char** argv) {
   char* name= argv[1];
   Compressed* z;
+  char dez= (0==strstr(argv[0],"decompress"))
+    || (0==strstr(argv[0],"ujz"));
 
   FILE* f= fopen(name, "r");
   len= fread(buff, 1, sizeof(buff), f);
@@ -71,26 +71,36 @@ int main(int argc, char** argv) {
     buff[i]= b;
   }
 
+  if (dez) {
+    // decompress given file
+    z= buff;
+  } else {
+    //  Compressed* z= compress(buff, len);
+    z= compress(buff, len);
+    assert(z);
 
-//  Compressed* z= compress(buff, len);
-  z= compress(buff, len);
-  assert(z);
-
-  fprintf(stderr, "Z:\t%d\n", z->len);
+    fprintf(stderr, "Z:\t%d\n", z->len);
   
-  for(int i=0; i < z->len; ++i) {
-    putchar(z->data[i]);
+    for(int i=0; i < z->len; ++i) {
+      putchar(z->data[i]);
+    }
   }
 
   // print decompressed on stderr
   // compare decompression correctness
   decompress(z, uzbuff);
   
-  int res= memcmp(buff, uzbuff, len);
-  fprintf(stderr, "\n\n----Decomp => %d\n", res);
   for(int i=0; i < z->origlen; ++i) {
-    fputc(uzbuff[i], stderr);
+    if (dez)
+      putchar(uzbuff[i]);
+    else
+      fputc(uzbuff[i], stderr);
   }
+
+  int res= memcmp(buff, uzbuff, len);
+  if(dez)
+    fprintf(stderr, "\n\n----Decomp => %d %s\n",
+            res, res?"FAILED":"OK");
   
 
 /*

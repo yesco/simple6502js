@@ -292,122 +292,158 @@
 ;;; matching result/alternative is accepted.
 ;;; (Can this replace priorities?)
 ;;; 
-;;; In a BNF-rule
-;;; - lower case letter is matched literally
-;;; - spaces (or any char <= ' ') won't work!- don't use
-;;; - a letter with hi-bit set ('R'+128) is a reference
-;;;   to another rule that is matched by recursion
-;;; - rules can have alternatives: E= aa | a | b that are
-;;;   tried in sequence. Once accepted no backtracking.
+;;; In a BNF-rule:
+;;; - Most ASCII chars are matched literally, except
+;;;   '%' '|' - they need to be quoted
+;;; - ' ' - SPACE (or any char<=' ') cannot be matched!
+;;;   because tey are removed from input parsed!
+;;; - 'R'+128 - A letter with HI-BIT set is a reference
+;;;   to another rule that is matched by recursion (const _E)
+;;; - '|' Rules can have alternatives: E= aa | a | b that are
+;;;   tried in sequence, if one fails, the next one after
+;;;   '|' is tried, basically backtracking.
+;;; - NO SUBRULES "(foo|bar)"
 ;;; - Put literal/longer matches first in rule alternatives.
-;;; - Right-recursion might work:
-;;; - Warning: The recursive rule matching is limited by
-;;;   the hardware stack: (~ 256/6) ~42 levels
-;;; - No Kleene operator (*+?[]) just use:
-;;; - TAILREC hibit-* = do tail-recursion on current rule!
-;;; - %D - match sequence of digits (number: /\d+/ )
-;;; - %S - string "...\n\r\"..."
+;;;   input: "foobar"    ie:   R ::= foobar | foo
+;;; - Right-recursion might work, but it's limited by the
+;;;   6502 hardware stack (~ 256/6) ~42 deep/recursion
+;;; - TAILREC constant '*"+128 jumps to match from beginning
+;;;   of the same rule. This replaces KlEENE operators *+?[].
 ;;; 
-;;; - %V - match "VARiable"
-;;; - %A - ADDRESSd of name (for assignment)
-;;;        same as %V but stored in "dos" (and "tos")
-;;;        (generative rule 'D' will set tos=dos)
+;;; CONSTANS
+;;; 
+;;; - %D - tos= NUMBER; parses various constants
+;;;        4711 - number
+;;;        'c'  - char constant
+;;; - %S - skips (parses) string till "
+;;;        NOTE: you need to write "%S 
+;;;        ...\n\"..." - rest of string is matched
+;;;        only \n is recognized, other \ just quotes
+;;;        NOTE: this doesn't copy string!
+;;;        NOTE: no address is saved given in tos, dos.
+;;; 
+;;; NAMES (variables, functions, labels)
+;;; 
+;;; - %V - tos= address; match "Variable" name
+;;; - %A - dos= tos= address; address of named
+;;;        variable (use for assignment)
+;;; 
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
 ;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
+;;; IMMEDATE (run code inline)
+;;; 
+;;; - %{ - immediate code, that runs NOW during parsing
+;;;        This is used to do one-offs, like test that
+;;;        last %D matched a byte-value (X=0), if not _fail.
+;;; 
+;;;        NOTE: can't rts, must use "jsr immret"
+;;;        FAIL: it's ok to call "jsr _fail" !
+
+;;; 
 ;;; TODO:?
-;;; -(%d - TODO: match 0-255 only)
+;;; - %d - TODO: match 0-255 only), orr
+;;; - %B - or Byte restrictor; fails if last %D (tos) > 255
+;;; - %b - match word boundary! '\b' in regexp, you know
+;;; 
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
-;;; - %B or %d - match iff datatype is byte
+;;; 
 ;;; - %r - the branch can be relative
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
+
+
 ;;; 
-;;; %{ IMMEDIATE CODE (need to enable IMMEDIATE, takes 26B)
-                                ;
-        IMMEDIATE=1
+;
+IMMEDIATE=1
 ;;; 
 ;;; Code can be executed inline *while* parsing.
 ;;; It's prefixed like this
 ;;; 
-;;; RuleX:
+;;; RuleX: ;; match foobar, prints % after match foo
 ;;;        .byte "foo"
 ;;;      .byte "%{"
-;;;;;;;;;; TODO: this may not be easily skippable
-;;; 
 ;;;        putc '%'                ; print debug info!
 ;;;        jsr immret              ; HOW TO RETURN!
-;;;      .byte ""
+;;;      .byte "["
 ;;;        .byte "bar"
 ;;;        .byte 0                 ;
 ;;; 
 ;;; This will parse foo, then print %, then parse bar
 
+
+;;; 
 ;;; [ GENERATIVE ]
 ;;; 
 ;;; The generative part of the rule may be invoked
-;;; several times. Each one will generate code.
+;;; several times. Each one will generate code from
+;;; a template.
 ;;; 
 ;;; NOTE: There is no backtradking/reset of code
 ;;;       generated, so use with care!
+;;;       Once generated, it's there!
 ;;;       Typically just generate at end or when sure.
 ;;; 
 ;;; Inside the generative brackets normal *relative*
-;;; 6502 asm is assumed to be used. See example C.
+;;; 6502 asm is assumed to be used.
 ;;; 
 ;;; There are directives used that doesn't match
 ;;; any 6502 byte-codes, these come from this set
 ;;; of printable bytecodes.
 ;;;
 ;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
-;;; free "#' 2347    ?BC GKOZ \ _bc gkortwz |
+;;; free "#' 2347    ?BC GKOZ \ _bc gkortwz
+;;;             ( '|' '[' are excluded as unsafe )
 ;;; 
-;;; TODO: consider not using | to allow for faster skip!
-;;;       using less byte code (?) (quoting problem?)
+;;; NOTE: not, there is *REAL* quoting problem
+;;;       if any (data) byte matches | [ ]
+;;; NOTE: JSR 0x4711 is autoquoted (thus "safe")
+;;;       (unless there is a 0x20, or ' ' constant!)
+;;; TODO: do the same for JMP BNE, JPI etc?
 ;;; 
-;;; The following are used:
+;;; SUBSTITUTIONS
 ;;; 
-;;;   [   - (redundant - start generative)
 ;;;   ]   - ends the generation
 ;;;   <   - lo byte of last %D number matched
 ;;;   >   - hi byte         - " -
 ;;;   <>  - little endian 2 bytes of %D     VAL0
 ;;;   +>  -       - " -           of %D+1   VAL1
 ;;;         (actually + and next byte will be replaced)
+;;;         (can't do single '+')
+;;;  
+;;; DIRECTIVES (stripped from output)
+;;;            (NOTE: relative jmps - don't know!)
 ;;; 
-
-;;; TODO: too many ops - consider "pickN" and patch only
-;;;   {{  - PUSHLOC (push and patc next loc)
+;;;   {{  - PUSHLOC (push and AUTO patch at accept rule)
 ;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
-;;;   :   - push loc (onto stack)
-;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
-
 ;;;   d   - set dos from tos
 ;;;   #   - push tos
-
-;;; maybe not needed
-;;;   Z   - TODO: swap 2 loc
-;;;   \   - TODO: slash it, pos= pop(); tos= pop(); push(pos)
-
+;;;   :   - push loc (onto stack, as backpatch! - careful)
+;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 ;;; 
+;;; TODO: keep '#' ':' ';'
+;;; TODO: 'z' to swap two locs? replaces 'D and 'd'
+;;; TODO: make a "pickN' rule instead! '#3' '?3'
+;;; 
+;;; maybe not needed
+;;;   \n   - TODO: drop pos n from stack (overwrite)
+
 ;;; NOTE: if any constant being used, such as
-;;;       address of JSR/JMP (library?) or a
+;;;       address of JMP (library?) or a
 ;;;       variable/#constant matches any of these
 ;;;       characters.
 ;;; 
-;;; NOTE2: This hasn't (?) happened yet, but we don't
-;;;        test for it so we don't know.
-;;; 
-;;;        Hey it's a hack!
+;;;       Hey it's a hack!
 ;;; 
 ;;; TODO: detect this and give assert error?
 ;;;       alt: parameterize any constants?
 
 
-;;; TODO: this is the PLAN...
+
+;;; TODO: this is the PLAN... MASTER PLAN?
 ;;; 
 ;;; TODO: experiment with
-;;;       - https://www.cc65.org/faq.php#ORG
+;;; - https://www.cc65.org/faq.php#ORG
 ;;; 
 ;;; I think, one can just do .org (to after C-code)
 ;;; then memmove it to where it should be!
@@ -415,9 +451,9 @@
 ;;; TODO: read about the linker and what it does
 ;;; 
 ;;; 
-;;; MEMORY LAYOUT - COMILER/RUNTIME/OUTPUT
-;;; ======================================
-;;;         ;;; _tap:       ---------jmp _output-----------
+;;; (ORIC) MEMORY LAYOUT - COMILER/RUNTIME/OUTPUT
+;;; ============================================
+;;; _tap:       ---------jmp _output------------
 ;;;             bios        bios       bios
 ;;;             lib         lib        lib
 ;;; _output     compiler    gen prog   gen prog
@@ -529,11 +565,222 @@ CSTIMER         = $0276
         .byte $2c               ; BITabs 3 B
 .endmacro
 
+.macro FUNC name
+  .export .ident(.string(name))
+  .ident(.string(name)):
+.endmacro
+
+;;; ========================================
+;;; ---------------- LIBRARY ---------------
+
+FUNC _librarystart
+
+.zeropage
+;;; reserved, lol
+zero:   .res 2  
+
+;;; compilation : tos = %D, dos =%A
+;;; running code: tos, dos temporary save/deref
+tos:    .res 2
+dos:    .res 2
+
+;;; used as default for printing strings (putz)
+pos:    .res 2
+;;; used by FOLD, maybe memcpy ???
+gos:    .res 2
+
+;;; temporaries for saved register
+savea:  .res 1
+savex:  .res 1
+savey:  .res 1
+
+;;; used by print.asm, lol
+;;; TODO: FIX!
+tmp1:   .res 2
+
+.code
+
+;;; BIOS
+
+.include "bios.asm"
+
+;;; TODO: somehow should be able to put BEFORE begin.asm
+;;;    but not get error, just doesn't work! (hang)
+;;;    or AFTER 
+
+PUTDEC=1
+PUTHEX=1
+.include "print.asm"
+
+
+;;; Current byte count:
+;;; 
+;;; 20 - puth, put4h, put2h
+;;; 13 - plaprinth (to reverse)
+;;; 22 - axputz==printz, writez tos+Y
+;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
+;;; 13 - xputu saves A,X prints tos
+;;;      (todo cleanup printn,putu does jmp _drop, lol
+;;;  7 - axputu
+;;;  7 - axputh
+;;; (7)- axputd 
+;;; ========
+;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
+;;; 
+;;; 127 B according to info() ?
+
+
+;;; = BIOS
+;;; 17 - getchar (save XY)
+;;; 19 - nl plaputchar putchar (save AXY, \n)
+;;;  4 - rawputc
+;;;(14)- 3 clrscr, 3 forward, 3 bs, 5 spc
+;;; ========
+;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
+
+
+;;; from Summary of ROM addrsses
+;;; $c58c : Input a line.
+;;; $c5e9 : Wait for a keypress and return the ASCII codel.
+;;; $d499 : Integer to floating point.
+;;; $d99c : Floating point to integer.
+;;; $dced : Multiply the accumulator with memoryh.
+;;; $dd61 : Move memory to the second accumulator.
+;;; $dda7 : Multiply the accumulator by 10.
+;;; $ddc3 : Divide the accumulator by 10.
+;;; $dde4 : Divide memory by the accumulator.
+;;; $dde9 : Divide the second accumulator by the main accumulator.
+;;; $de77 : Move memory to the main accumulator
+;;; $dead : Move the accumulator to memory.
+;;; $ded6 : Move the second accumulator to the main accumulator.
+;;; $dee5 : Move the main accumulator to the second accumulator.
+;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
+;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
+;;; $e5f5 : Clear the top line.
+;;; $e5ea : Print message at far left of top line.
+;;; $e790 : Compare filenames.
+;;; $eb78 : Read a key without waiting.
+;;; $f77c : Output character from X register to screen.
+;;; $f865 : Output message to the top line at position X.
+;;; $f523 : Poll keyboard.
+;;; $f5c1 : Output character to printer.
+;;; $f8d0 : Set up the ASCII character set.
+
+;;; ORIC routines can use for MINIMAL
+;;; C3F8 (C3F4) - A block move.
+;;; C483 (C47C) - Input and process a line.
+;;; C59C (C58C) - Input a line.Input a line.
+;;; DDA3 (DDA7) - 
+
+;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
+;;; 
+;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
+;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
+;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
+;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
+;;; EDCC E4 11 CPX $11   length of data to be moved is 
+;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
+
+
+;;; -- PRINT INTEGER IN A,X.
+;;; E0C5 85 D1 STA $D1 
+;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
+;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
+;;; E0CB 38 SEC Set sign to positive.
+;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
+
+;;; - GET NUMBER
+;;; DFE7 A0 00 LDY #$00 GET NUMBER.
+;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
+;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
+
+;;; - INT
+;;; DFBD A5 D0 LDA $D0 INT
+;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
+;;; DFC1 B0 20 BCS $DFE3 is integer already. 
+;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
+
+;;; - udiv16 (0c00/???) used by graphics line
+;;; EFC8 48 PHA This is a division routine 
+;;; EFC9 8A TXA that is used to calculate the 
+;;; EFCA 48 PHA slope of a line being drawn. 
+;;; EFCB 98 TYA 
+;;; EFCC 48 PHA The routine acts on 16 bit 
+;;; EFCD A9 00 LDA #$00 numbers. 
+;;; EFCF 85 0E STA $0E 
+;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
+;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
+;;; EFD5 06 0C ASL $0C set before routine is called. 
+;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
+;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
+;;; EFDB 26 0F ROL $0F 
+;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
+;;; EFDF 38 SEC this routine.
+
+;;; - lookup key from key code
+;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
+
+;;; - putc (335 B)
+;;; 
+;;; additional: 32 Bytes jmp table!
+;;; 
+;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
+;;; ...
+;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
+;;; ...
+;;; F730 60 RTS
+;;; ^^^^ end
+
+;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
+;;; - putc (+ 154 335) = 489!!!
+;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
+;;; ... (lots of stuff!!!)
+;;; F815 60 RTS
+
+;;; - mul40 (47 B)
+;;; F731 A0 00 LDY #$00 This routine multiplies the 
+;;; F733 8C 63 02 STY $0263 content of the accumulator by 
+;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
+;;; F739 0A ASL A byte of the result. The page 
+;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
+;;; F73D 0A ASL A results.
+;;; ...
+;;; F759 60 RTS 
+
+;;; - atoi (but on error jumps BASIC, lol)
+;;; ( no over 25*256 ??? - it's for line numbers?)
+;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
+
+
+;;; 33 - printd (smallest I found), but only DECIMAL
+
+;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
+;;; -- maybe this can be made more generic?
+;;; 24 - udiv10 - ORIC
+;;; -- baically it's a udiv16by8bits
+
+;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
+
+;;; TODO: math - floating point??? LOL
+;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
+;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
+
+;;; rand, random(), srandom()
+;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
+
+;;; RULES: memcpy/set can do inline for some fixed nubmers!
+;;; 19 - memcpy selfmodifying code
+;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
+;;; 
+;;;
+
+
+
+
 
 .export _minimallibrarystart
 _minimallibrarystart:   
  
-library:        
 ;;; (- #xdad #xd4d) = 96 B
 
 .ifdef MINIMAL
@@ -631,9 +878,11 @@ _SHR:
 _minimallibraryend:     
 
 
+
 ;;; See template-asm.asm for docs on begin/end.asm
 NOSHOWSIZE=1
 .include "begin.asm"
+
 
 .zeropage
 
@@ -780,24 +1029,9 @@ _start:
 
 .zeropage
         
-;;; TOS
-; (defined in print.asm .lol)
-
-;;; DOS (second value)
-dos:    .res 2
-
-;;; POS (Patch ptr)
-pos:    .res 2
-;;; GOS search long names
-gos:    .res 2
-
 ;;; if %V or %A stores 'V' or 'A'
 ;;; 'A' for assigment
 vrule:  .res 1
-
-savea:  .res 1
-savex:  .res 1
-savey:  .res 1
 
 ;;; not pushing all
 ;state:  
@@ -833,9 +1067,38 @@ PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
 DONE= '$'
 
-;;; parser
+;;; parser to compile _
 FUNC _init
-        
+
+;;; compile using defaults input, output
+FUNC _compile
+        ;; default output location
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
+
+;;; compile source from input
+;;;    _out must be set to where you want output to go
+FUNC _compileInput
+
+        ;; default input location
+        lda #<input
+        ldx #>input
+
+;;; Compiles source from AX
+;;; to *_out location.
+FUNC _compileAX
+
+        ;; store what to compile
+        sta inp
+        stx inp+1
+
+.ifdef ERRPOS
+        sta erp
+        stx erp+1
+.endif        
+
 ;;; INTERRUPT DEBUG TESTING
 ;        lda #$40                ; RTI
 ;        sta $0245
@@ -971,22 +1234,6 @@ XYZ=1
         COMPILESTART= input
 .endif
 
-        lda #<COMPILESTART
-        ldx #>COMPILESTART
-
-        sta inp
-        stx inp+1
-
-.ifdef ERRPOS
-        sta erp
-        stx erp+1
-.endif        
-
-        ;; init _out vector
-        lda #<_output
-        sta _out
-        lda #>_output
-        sta _out+1
         ;; store an rts for safety
         _RTS=$60
         lda #_RTS
@@ -1050,11 +1297,9 @@ putc 10
 ;;;   can reach everything (?)
 FUNC _next
 
-;;; TODO: potentially very expensive here
-;;;   can put before and after _incI === _incIspc!
+;;; TODO: remove, disable here, maybe check and end of rule?
 
-; jsr nextInp ????
-
+;;; This is very expensive, but keep to find overflow bugs
 .ifdef CHECKSTACK
 ;;; TODO: measure overhead
 	;; check stack sentinel
@@ -1081,6 +1326,7 @@ stackerror:
         
 :       
 .endif ; CHECKSTACK
+
 
 .ifdef DEBUGRULE
     pha
@@ -1188,17 +1434,15 @@ percent:
 
 .ifdef IMMEDIATE
 ;;; 26 B
-        ;; - immediate code!
+        ;; immediate code! to run NOW!
         cmp #'{'
         bne noimm
-        ;; copy rule address
+        ;; - copy rule address (self-modifying)
         lda rule
         sta imm+1
         ldx rule+1
         stx imm+2
-
-        ;; jump to the rule inline code!
-;        putc 'I'
+        ;; - jump to the rule inline code!
 imm:    jmp $ffff
         ;; that code "returns" by jsr immret!
         ;; (this puts after the code on stack)
@@ -1214,7 +1458,6 @@ immret:
 noimm:
 .endif ; IMMEDIATE
 
-        ;; - %D - digits
         cmp #'D'
         beq isdigits
         cmp #'S'
@@ -1231,16 +1474,15 @@ isstring:
 .ifdef STRING
         ;; when arrive here %S only reads till "
         ;; (skipping \"). \n is converted.
-        
 str:    
         jsr _incI
         cmp #'"'                ; "
         beq _next
+        ;; - quote (next char is raw)
         cmp #'\'
         bne :+
-        ;; quote (next char is raw)
         jsr _incI
-        ;; \n - except => 10
+        ;; - \n - except => 10
         cmp #'n'
         bne :+
         lda #10
@@ -2686,165 +2928,6 @@ FUNC _bnfinterpend
 ;  .res 256-(* .mod 256)
 secondpage:     
 
-FUNC _librarystart
-;;; 20 - puth, put4h, put2h
-;;; 13 - plaprinth (to reverse)
-;;; 22 - axputz==printz, writez tos+Y
-;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
-;;; 13 - xputu saves A,X prints tos
-;;;      (todo cleanup printn,putu does jmp _drop, lol
-;;;  7 - axputu
-;;;  7 - axputh
-;;; (7)- axputd 
-;;; ========
-;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
-;;; 
-;;; 127 B according to info() ?
-
-
-;;; = BIOS
-;;; 17 - getchar (save XY)
-;;; 19 - nl plaputchar putchar (save AXY, \n)
-;;;  4 - rawputc
-;;;(14)- 3 clrscr, 3 forward, 3 bs, 5 spc
-;;; ========
-;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
-
-
-;;; from Summary of ROM addrsses
-;;; $c58c : Input a line.
-;;; $c5e9 : Wait for a keypress and return the ASCII codel.
-;;; $d499 : Integer to floating point.
-;;; $d99c : Floating point to integer.
-;;; $dced : Multiply the accumulator with memoryh.
-;;; $dd61 : Move memory to the second accumulator.
-;;; $dda7 : Multiply the accumulator by 10.
-;;; $ddc3 : Divide the accumulator by 10.
-;;; $dde4 : Divide memory by the accumulator.
-;;; $dde9 : Divide the second accumulator by the main accumulator.
-;;; $de77 : Move memory to the main accumulator
-;;; $dead : Move the accumulator to memory.
-;;; $ded6 : Move the second accumulator to the main accumulator.
-;;; $dee5 : Move the main accumulator to the second accumulator.
-;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
-;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
-;;; $e5f5 : Clear the top line.
-;;; $e5ea : Print message at far left of top line.
-;;; $e790 : Compare filenames.
-;;; $eb78 : Read a key without waiting.
-;;; $f77c : Output character from X register to screen.
-;;; $f865 : Output message to the top line at position X.
-;;; $f523 : Poll keyboard.
-;;; $f5c1 : Output character to printer.
-;;; $f8d0 : Set up the ASCII character set.
-
-;;; ORIC routines can use for MINIMAL
-;;; C3F8 (C3F4) - A block move.
-;;; C483 (C47C) - Input and process a line.
-;;; C59C (C58C) - Input a line.Input a line.
-;;; DDA3 (DDA7) - 
-
-;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
-;;; 
-;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
-;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
-;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
-;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
-;;; EDCC E4 11 CPX $11   length of data to be moved is 
-;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
-
-
-;;; -- PRINT INTEGER IN A,X.
-;;; E0C5 85 D1 STA $D1 
-;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
-;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
-;;; E0CB 38 SEC Set sign to positive.
-;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
-
-;;; - GET NUMBER
-;;; DFE7 A0 00 LDY #$00 GET NUMBER.
-;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
-;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
-
-;;; - INT
-;;; DFBD A5 D0 LDA $D0 INT
-;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
-;;; DFC1 B0 20 BCS $DFE3 is integer already. 
-;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
-
-;;; - udiv16 (0c00/???) used by graphics line
-;;; EFC8 48 PHA This is a division routine 
-;;; EFC9 8A TXA that is used to calculate the 
-;;; EFCA 48 PHA slope of a line being drawn. 
-;;; EFCB 98 TYA 
-;;; EFCC 48 PHA The routine acts on 16 bit 
-;;; EFCD A9 00 LDA #$00 numbers. 
-;;; EFCF 85 0E STA $0E 
-;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
-;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
-;;; EFD5 06 0C ASL $0C set before routine is called. 
-;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
-;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
-;;; EFDB 26 0F ROL $0F 
-;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
-;;; EFDF 38 SEC this routine.
-
-;;; - lookup key from key code
-;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
-
-;;; - putc (335 B)
-;;; 
-;;; additional: 32 Bytes jmp table!
-;;; 
-;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
-;;; ...
-;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
-;;; ...
-;;; F730 60 RTS
-;;; ^^^^ end
-
-;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
-;;; - putc (+ 154 335) = 489!!!
-;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
-;;; ... (lots of stuff!!!)
-;;; F815 60 RTS
-
-;;; - mul40 (47 B)
-;;; F731 A0 00 LDY #$00 This routine multiplies the 
-;;; F733 8C 63 02 STY $0263 content of the accumulator by 
-;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
-;;; F739 0A ASL A byte of the result. The page 
-;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
-;;; F73D 0A ASL A results.
-;;; ...
-;;; F759 60 RTS 
-
-;;; - atoi (but on error jumps BASIC, lol)
-;;; ( no over 25*256 ??? - it's for line numbers?)
-;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
-
-
-;;; 33 - printd (smallest I found), but only DECIMAL
-
-;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
-;;; -- maybe this can be made more generic?
-;;; 24 - udiv10 - ORIC
-;;; -- baically it's a udiv16by8bits
-
-;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
-
-;;; TODO: math - floating point??? LOL
-;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
-;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
-
-;;; rand, random(), srandom()
-;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
-
-;;; RULES: memcpy/set can do inline for some fixed nubmers!
-;;; 19 - memcpy selfmodifying code
-;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
-;;; 
-;;;
 
 .ifdef MEMSET
 ;;; tos: address
@@ -2873,14 +2956,6 @@ memset:
 ;;;    just not in screen display form firstpage/secondpage
 
 ;;; BEGIN CHEAT? - not count...
-
-;;; TODO: somehow should be able to put BEFORE begin.asm
-;;;    but not get error, just doesn't work! (hang)
-;;;    or AFTER 
-
-PUTDEC=1
-PUTHEX=1
-.include "print.asm"
 
 
 ;;; (inp) => AX, inp points at next (not digit) char
