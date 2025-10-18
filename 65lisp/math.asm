@@ -3,6 +3,106 @@
 ;;; basically mul16 div16(mod?)
 
 
+;;; Best choice?
+;;; - https: //github.com/TobyLobster/multiply_test/blob/main/tests%2Fomult16.a
+;;; 
+; omult16.a
+; from BBC BASIC 2 ROM,
+; - https://archive.org/details/BBCMicroCompendium/page/302/mode/1up?q=9236
+; used for calculating multidimensional array access
+;
+; 16 bit x 16 bit multiply, 16 bit result (low bytes)
+;   (carry set if overflow?)
+;
+; Average cycles: 223.69
+;
+; 33 bytes
+
+multiplicand = $02
+multiplier   = $04
+
+mult:   
+        ldx #0
+        ldy #0
+loop:   
+        lsr multiplicand+1
+        ror multiplicand
+        bcc skip
+
+        ;; add
+        clc
+        tya
+        adc multiplier
+        tay
+        txa
+        adc multiplier+1
+        tax
+
+        bcs overflow
+skip:   
+        asl multiplier
+        rol multiplier+1
+
+        ;; done if zero
+        lda multiplicand
+        ora multiplicand+1
+        bne loop
+        ;; no overflow
+        clc
+
+        ;; results in lo y, hi x, C if overflow
+overflow:       
+        rts
+
+
+
+;;; jsk: tos * dos => AX (lo,hi)
+;;; 
+;;; smaller value in tos more efficient (?)
+;;; 
+;;; 30 bytes 16x16=>16 +4 store in tos
+;;; 26       16x 8=>16
+;;; 20        8x 8=>16
+
+tos:            .res 2
+dos:            .res 2
+
+
+mult:   
+        ldx #0
+        ldy #0
+loop:   
+        ;; get bit
+        lsr tos+1
+        ror tos+1
+        bcc skip
+
+        ;; add
+        clc
+
+        tya
+        adc dos
+        tay
+
+        txa
+        adc dos+1
+        tax
+
+skip:   
+        asl dos
+        rol dos+1
+
+        ;; done if zero
+        lda tos
+        ora tos+1
+        bne loop
+
+        ;; results in lo y, hi x, C if overflow
+        rts
+
+
+
+
 ;;; 9 ops from _MUL16 macro in
 ;;; - https://atariwiki.org/wiki/Wiki.jsp?page=6502%20Coding%20Algorithms%20Macro%20Library
 ;;; 

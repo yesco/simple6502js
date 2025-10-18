@@ -403,6 +403,42 @@
 ;;; TODO: detect this and give assert error?
 ;;;       alt: parameterize any constants?
 
+
+;;; TODO: this is the PLAN...
+;;; 
+;;; TODO: experiment with
+;;;       - https://www.cc65.org/faq.php#ORG
+;;; 
+;;; I think, one can just do .org (to after C-code)
+;;; then memmove it to where it should be!
+;;; 
+;;; TODO: read about the linker and what it does
+;;; 
+;;; 
+;;; MEMORY LAYOUT - COMILER/RUNTIME/OUTPUT
+;;; ======================================
+;;;         ;;; _tap:       ---------jmp _output-----------
+;;;             bios        bios       bios
+;;;             lib         lib        lib
+;;; _output     compiler    gen prog   gen prog
+;;;             input       ...        ...
+;;;             ...         *_out      END
+;;;             ...         ...        ...
+;;;             END
+;;;             ---------cc65-heap--   MYHEAP
+;;;             ---------cc65-stack-   MYAXSTACK
+;;; _compiler               input
+;;;                         compiler
+;;;                         END
+;;; FIXED:
+;;; ------
+;;; _hcharset:
+;;; _hires:
+;;; 
+;;; _charset:
+;;; _textscreen:
+;;; _hitext:
+
 .export _asmstart
 _asmstart:      
 
@@ -493,6 +529,106 @@ CSTIMER         = $0276
         .byte $2c               ; BITabs 3 B
 .endmacro
 
+
+.export _minimallibrarystart
+_minimallibrarystart:   
+ 
+library:        
+;;; (- #xdad #xd4d) = 96 B
+
+.ifdef MINIMAL
+
+;;; TODO: use a preexisting VM .include
+;;;   preferable one with all stack
+_SAVE:  
+        sta tos
+        stx tos
+        rts
+
+_AND: 
+        and tos
+        tay
+        txa
+        and tos+1
+        tax
+        tya
+        rts
+_OR:    
+        ora tos
+        tay
+        txa
+        ora tos+1
+        tax
+        tya
+        rts
+_EOR:   
+        eor tos
+        tay
+        txa
+        eor tos+1
+        tax
+        tya
+        rts
+_PLUS:  
+        clc
+        adc tos
+        tay
+        txa
+        adc tos+1
+        tax
+        tya
+        rts
+_MINUS: 
+        sec
+        eor #$ff
+        adc tos
+        tay
+        txa
+        eor #$ff
+        adc tos+1
+        tax
+        tya
+        rts
+_EQ:    
+        ldy #0
+        cmp tos
+        bne false
+        cpx tos+1
+true:  
+        dey
+false: 
+        tya
+        tax
+        rts
+_LT:    
+        ldy #0
+        cpx tos+1
+        bcc true
+        bne false
+        cmp tos
+        bcc true
+        bcs false
+_SHL:   
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+        rts
+_SHR:   
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+        rts
+
+
+.endif ; MINIMAL
+.export _minimallibraryend
+_minimallibraryend:     
 
 
 ;;; See template-asm.asm for docs on begin/end.asm
@@ -616,6 +752,14 @@ PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
 PRINTDOTS=1
+
+
+
+;;; TODO:
+;;;  capture which rule and pos
+;;;  for longest match (only)
+
+
 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
@@ -2106,15 +2250,18 @@ gendone:
 
 FUNC _digits
 DEBC '#'
-;;; 36 B (+ 36 25) = 61
+;;; 55 B + 18 B char
 
         ;; valid initial digit or fail?
         ldy #0
         lda (inp),y
-        cmp #'''               ; 'c' is a char "digit"
+
+        ;; 'c' : is char?
+        cmp #'''
         beq ischar
-;;; TODO: C=1 from cmp if digit, ahum (but not otherwise...)
-        sec                    
+        ;; TODO: C=1 from cmp if digit
+        ;; 0-9 : is digit?
+        sec
         sbc #'0'
         cmp #10
         bcs failjmp2
@@ -2127,31 +2274,33 @@ DEBC '#'
 nextdigit:
         ldy #0
         lda (inp),y
-.ifdef DEBUG
-        jsr putchar
-.endif ; DEBUG
 
+        ;; change '0'-> 0
         sec
         sbc #'0'
         cmp #10
         bcc digit
-        ;; end (not 0-9)
+        ;; Done
+        ;; > 9 : end == OK
         jmp _next
+
 digit:  
         pha
         jsr _mul10
         pla
+        ;; add digit from A to tos
         clc
         adc tos
         sta tos
-        bcc @noinc
+        bcc :+
         inc tos+1
-@noinc:
+:       
         ;; lol space inside numbers!
         jsr _incIspc
         jmp nextdigit
 
 ischar: 
+;;; 18 B
         ;; - get char
         jsr _incI
         ;; - y is retained by _incI
@@ -2166,8 +2315,12 @@ ischar:
         jsr _incI
         jmp _next
 
+
+
 failjmp2:        
         jmp _fail
+
+
 
 
 ;;; flags not set in any way, registers untouched
@@ -2837,6 +2990,69 @@ FUNC _dummyd
 .ifdef PRINTF
 
 FUNC _printf
+;;; according to printf.c minimal *restricted*
+;;; implementation (no .7 max limit) the 
+;;; cc65 - printf will "include" funs giving
+;;; - a total of +1870 B
+;;; - a replace  +1701 B (many support funcs)
+;;;   where      ( 765 B ) is simplified impl in C
+
+;;; here we strive for a compiling printf as:
+;;; 
+;;; printf("foo %d bar %-8s fie %c fum %07.4x\n",...
+;;; 
+;;; TO:
+.ifnblank
+;;; (+ -4 +0 -4 +3 -4 -4 +8) == -5 B
+;;; compared to cc65 (estimate) save 5B and
+;;; no need large function at runtime!
+;;; BUT: no printf(var, ....) !!!!
+
+        ;; "foo " (-4 B loading ax)
+        jsr hereputz
+        .byte "foo ",0
+
+        ;; %d     (+0 B as otherwise jsr pushax)
+        ... value in AX
+        jsr axputd
+
+        ;; " bar " (-4 B)
+        jsr hereputz
+        .byte " bar ",0
+
+        ;; %-8s (+ 3 B cmp jsr pushax)
+        ... value in AX
+        ldy #256-8              ; negative value!
+        clc
+        jsr axputzF
+
+        ;; "fie" (- 4 B)
+        jsr hereputz
+        .byte " fie ",0
+
+        ;; %c
+        ... value in A
+        jsr putchar
+
+        ;; " fum " (-4 B)
+        jsr hereputz
+        .byte " fum ",0
+        
+        ;; %07.4x" (+ 8 B for parameters)
+        ... value in AX
+        ;; - dot value ".4"
+        sed                     ; WOW: d= means dot value
+        ldy #4
+        sty dos
+        ;; - len 07
+        sec                     ; leading 0
+        ldy #7                 
+        jsr axputhF
+;;; 
+
+.endif
+
+
 ;;; (+ 8 12 26 3 2 9 3 3 31) = 97
 ;;; just: "foo %d bar %c fish %x gurk %s kork"
 
@@ -2966,6 +3182,7 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
+ruleF: ; was used for function, TODO: remove
 ;ruleG: like ruleG but saves AX safely in tos
 ;ruleH: printf parsing
 ruleI:
@@ -3329,7 +3546,8 @@ FUNC _memoryrulesend
         ;; result in AX
       .byte ']'
 
-FUNC _postprerulesstart
+
+
         ;; Surprisingly ++v and --v expression w value
         ;; arn't smalller or faster than v++ and v-- !
         .byte "|++%V"
@@ -3402,8 +3620,6 @@ FUNC _postprerulesstart
         sta VAR0
 .endif
       .byte ']'
-FUNC _postprerulesend
-
 
 ;;; cc65: get parameter value from subroutine
 ;000055r 1  A0 01        	ldy     #$01
@@ -4689,6 +4905,9 @@ ruleE:
         .byte 0
 
 
+;;; TODO: remove, this old for function calls?
+
+.ifdef RULESF
 ruleF:  
 ;;; works
 ;        .byte _T,"%V(){",_S,"}"
@@ -4721,7 +4940,12 @@ ruleF:
 ;      .byte ']'
 
 
-;;; (byte)Array data,data,data
+.endif ; RULESF
+
+;;; prefix: array= {
+;;;  ruleQ:  num,num,num }
+
+;;; TODO:allow for expressions if have constant folding
 ruleQ:
         ;; end
         .byte "};"
@@ -4755,6 +4979,12 @@ ruleQ:
 
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
 ruleN:
+
+;;; TODO: make this folding work,
+;;;   mostly OK, but don't know where to put result
+;;;   want to have restartable programs? 
+;;;   or like cc65 just put in inline in the code?
+;;;   LIMIT: can only do at top-level
 
 ;FOLD=1
 .ifdef FOLD
@@ -4911,7 +5141,9 @@ ruleN:
 
         .byte 0
 
-;;; DEFSSKIP ::= jmp main; DEFS <here>
+;;; This is the first rule applied on program.
+;;; Generates a jmp to main(). If no functions/decl
+;;; is wasting 3B. Bah.
 ruleO:
       .byte '['
         jmp PUSHLOC
@@ -5130,6 +5362,8 @@ ruleK:
 
 .endif ; BNFLONG
 
+
+
 FUNC _stmtrulesstart
 ;;; Statement
 ruleS:
@@ -5158,7 +5392,6 @@ ruleS:
 ;;;   which is just inline of _B ... HMMM :-(
         .byte "|{}"
         .byte "|{",_A,"}"
-
 
 
 ;;; TODO:
@@ -5428,6 +5661,8 @@ afterELSE:
       .byte "]"
 
 
+FUNC _stmtbyterulestart
+
 .ifdef BYTERULES
 ;;; TODO: is it OPTRULES
         .byte "|++$%V;"
@@ -5676,9 +5911,9 @@ afterELSE:
 :       
       .byte "]"
 .endif ; BYTERULES
+FUNC _stmtbyteruleend
 
 .ifdef OPTRULES
-
 ;;; TODO make ruleC when %A pushes
         .byte "|"
 
@@ -5877,7 +6112,6 @@ afterELSE:
         bcs :-
 :       
       .byte "]"
-
 .endif ; OPTRULES
 
 .ifdef POINTERS
@@ -6218,7 +6452,6 @@ afterELSE:
         jmp VAL0
 :       
       .byte "]"
-
 
 
 FUNC _oricstart
@@ -7234,9 +7467,11 @@ doneCE:
         cmp #CTRL('X')
         bne :+
 
-        jmp _output
-;        jsr _savescreen
-;        jmp _run
+;        jmp _output
+        jsr _savescreen
+        jmp _run
+        ;; no rts? lol, wasted one byte on stack...
+;;; TODO: cleanup???
 :       
 ;;; - ctrl-q - disasm
         cmp #CTRL('Q')
@@ -7827,7 +8062,7 @@ _xmul40:
         rol savex
 
 FUNC _xmul10
-;;; 3 7c (+ 7 37) = 44c
+;;; 3 7c (+ 7 37) = 44c (24 B (+ 3 21))
         ;; double
         asl
         rol savex
@@ -7875,7 +8110,7 @@ FUNC _mul40
         rol tos+1
 
 FUNC _mul10                     
-;;; 4 10c (+ 42 10) = 52c   +12= 64c
+;;; 4 10c (+ 42 10) = 52c   +12= 64c   27 B
         ;; double
         asl tos
         rol tos+1
@@ -7900,6 +8135,8 @@ FUNC _mul5
         rts
 
 .endif ; !FASTERMULX
+
+
 
 
 
@@ -8492,12 +8729,22 @@ DOUBLE   =128+10
 ;;;   typedef unsigned uing8_t  byte;
 ;;; 
 
+
+;;; OK, not fully true, but try not put 
+;;; any code after here!
+
+FUNC _asmend
+
+;;; TODO: move to beginning of _init/_compiler
+;;;   we want to able to NUKE it from memory!
+
+FUNC _inputstart
+
+;;; TODO: remove
 ;;; This is just to keep input safe, lol
 ;;; _incIspc may mark prev as read, and or 
 ;;; it could be used by memcpyz that need prefix?
 .byte 0,0
-
-FUNC _inputstart
 
 input:
 
@@ -8505,6 +8752,17 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+;BUGS=1
+.ifdef BUGS
+        .byte "word main() {",10
+
+        .byte "  putu(0);",10
+;        .byte "  return 1<<10;",10
+
+        .byte "}",10
+        .byte 0
+.endif
 
 
 .ifdef PRINTF
@@ -9625,7 +9883,7 @@ FUNC _inputend
 
 FUNC _savedscreen
 
-savedscreen:    
+savedscreen:
 .ifdef JUNK
   .code
         .byte "0123456789012345678901234567890123456789"
@@ -9670,7 +9928,10 @@ savedscreen:
 
 ;;; END INPUT
 ;;; ----------------------------------------
+;;; GLOBAL DATA
 
+
+;;; TODO: move to earlier, or beginning of compiler?
 
 ;;; TODO: simulated arr, only one! lol
 .ifdef FROGMOVE
@@ -9688,7 +9949,16 @@ arr:    .res 256
 vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
-.ifdef TESTING
+.ifndef TESTING
+        ;; A-Z: GLOBAL FUNCS
+        .res 32*2
+        ;; a-z: GLOBAL VARS
+        .res 27*2
+.else
+;;; Can't init zeropage, so nobody should rely on
+;;; these values.
+;;; TODO: memset in program before run/compile
+
 ;;; FUNS A-Z / 32
         .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
         .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
@@ -9772,8 +10042,11 @@ vnext:
 .bss
 ;;; Generated program memory layout:
 ;;; 
+;;;   _start:  jmp _output              TODO:
+;;;            ...bios...               TODO:
+;;;            ...library...            TODO:
 ;;;   _output: jmp main
-;;;            ...machine code...
+;;;            ...gen machine code...
 ;;;            rts
 ;;;    out->
 ;;; 
@@ -9783,6 +10056,9 @@ vnext:
 ;;;   _outend: 
 
 FUNC _outputstart
+;;; ideally this should be *overlapping* the
+;;; compiler, and memmove compiler to end of mem
+;;; Probably can do by explicit .org (and then memmove)
 
 _output:
 .bss
@@ -9806,108 +10082,6 @@ FUNC _outputend
 ;;; LIBRARY
 
 .code
-
-FUNC _minimallibrarystart
-library:        
-;;; (- #xdad #xd4d) = 96 B
-
-.ifdef MINIMAL
-
-;;; TODO: use a preexisting VM .include
-;;;   preferable one with all stack
-_SAVE:  
-        sta tos
-        stx tos
-        rts
-
-_AND: 
-        and tos
-        tay
-        txa
-        and tos+1
-        tax
-        tya
-        rts
-_OR:    
-        ora tos
-        tay
-        txa
-        ora tos+1
-        tax
-        tya
-        rts
-_EOR:   
-        eor tos
-        tay
-        txa
-        eor tos+1
-        tax
-        tya
-        rts
-_PLUS:  
-        clc
-        adc tos
-        tay
-        txa
-        adc tos+1
-        tax
-        tya
-        rts
-_MINUS: 
-        sec
-        eor #$ff
-        adc tos
-        tay
-        txa
-        eor #$ff
-        adc tos+1
-        tax
-        tya
-        rts
-_EQ:    
-        ldy #0
-        cmp tos
-        bne false
-        cpx tos+1
-true:  
-        dey
-false: 
-        tya
-        tax
-        rts
-_LT:    
-        ldy #0
-        cpx tos+1
-        bcc true
-        bne false
-        cmp tos
-        bcc true
-        bcs false
-_SHL:   
-        asl
-        tay
-        txa
-        rol
-        tax
-        tya
-        rts
-_SHR:   
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-        rts
-
-
-.endif ; MINIMAL
-FUNC _minimallibraryend
-
-
-FUNC _asmend
-
-
 
 
 .end

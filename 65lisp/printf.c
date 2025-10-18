@@ -17,6 +17,7 @@
 // without:   611 Bytes 
 //
 //#define printf(a,b) puts(a)
+// 265 bytes for my printf 
 
 #ifndef FOO
 int cdecl printf(const char* fmmt, ...) {

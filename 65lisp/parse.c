@@ -66,14 +66,15 @@ extern int myfun(int a, int b) {
 #define SCREENLAST (TEXTSCREEN+SCREENSIZE-1)
 
 
-void CparseStart(){}
-
 // OLD: fix it...
 //
 // C implementation of minimal parse-asm.asm in
 // TODO: compare compiled sizes and speed
-
+//
 // (- #x77e #x493) = 747 bytes (asm: 554 bytes, no library)
+
+#ifdef CPARSE
+void CparseStart(){}
 
 unsigned int vars[64];
 
@@ -175,6 +176,7 @@ char* parse(char r, char* in) {
 }
 
 void CparseEnd(){}
+#endif // CPARSE
 
 
 // empty main: 284 Bytes (C overhead)
@@ -368,8 +370,9 @@ extern char   postprerulesstart,postprerulesend;
 extern char   oprulesstart,oprulesend;
 extern char   parametersstart,parametersend;
 extern char   stmtrulesstart,stmtrulesend;
+extern char     stmtbyterulestart,stmtbyteruleend;
+extern char     oricstart,oricend;
 extern char   byterulesstart,byterulesend;
-extern char   oricstart,oricend;
 extern char idestart,ideend;
 extern char   editorstart,editorend;
 extern char   helptext,helptextend,help,helpend;
@@ -388,50 +391,62 @@ void info() {
   if (outsize>16384) outsize= 0;
 
    //--------------------------------------
+
+
+
+// TAP-file: (- 16792 2944 1350 922 7394)= 4182
+//
+// TODO: RODATA: +13xx bytes from disasm + prettyprint
+// TODO: 4KB cc65 libraries (?) - is this correct?
+//    can create file without any asm and see size?
+
+
   printf
-    ("--- CC02 (65-MUCC-02 w C-rules) ---\n"
+    ("\x97\x84- CC02 (MeteoriC-6502compiler) -  \x90\n"
      "C            %6u - use as 'loader'\n"
-     "  disasm     %6u - ^Q disasm code\n"
-     "  parse      %6u - alt impl.\n"
-     "  prettyprnt %6u - ^G colorize\n"
-     "  info       %6u - *this* page!\n"
      "  main       %6u - main/loader\n"
+     "  (disasm)   %6u - ^Q disasm code\n"
+//     "  parse      %6u - alt impl\n"
+     "  (prettypr) %6u - ^G colorize\n"
+     "  (info)     %6u - *this* page!\n"
    //--------------------------------------
+     "FILES        %6u - input/files\n"
      "ASM          %6u (bytes)\n"
      "  IDE        %6u\n"
      "    editor   %6u\n"
-     "  help       %6u - help text+code\n"
-     " FILES       %6u - input/files\n"
-     " C-compiler  %6u\n"
-     "   BNF-intrp %6u - BNF interpreter\n"
-     "   C-rules   %6u - C lang rules\n"
-     "     I/O     %6u - put,get-char\n"
-     "     mem     %6u - peek/malloc\n"
-     "     ++--    %6u - ++a; --b; ...\n"
-     "     ops     %6u - + / * ... == <\n"
-     "     params  %6u (3,4,a,b)\n"
-     "     stms    %6u - if while a+=3;\n"
+     "    help     %6u - help text+code\n"
+     "  C-compiler %6u\n"
+     "    BNF-intrp%6u - BNF interpreter\n"
+     "    C-rules  %6u - C lang rules\n"
+     "      I/O    %6u - put,get-char\n"
+     "      mem    %6u - peek/malloc\n"
+     "      ops    %6u - + / * ... == <\n"
+     "      params %6u - f(3,4,a,b)\n"
+     "      stms   %6u - if while a+=3;\n"
      "        oric %6u - ORIC ATMOS API!\n"
-     "     (byte   %6u)- opt: byte ops\n"
+     "        (byte)%5u - opt: byte stmts\n"
+     "      misc   %6u - misc rules;\n"
+     "      (byte) %6u - opt: byte ops\n"
 //   "  symbols           \n"
    //--------------------------------------
-     "/ bios       %6u - getchar/putchar\n"
-     "| library    %6u - keep minimal\n"
+     "\xff bios      +%6u\\  getchar/putchar\n"
+     "\xff library   +%6u \\ keep minimal\n"
      // "  minilib    %6u\n"
-     "}-tap-file   %6u - bios+lib+out\n"
-     "\\ output     %6u - gen code" // no \n to fit!
+     " \xfftap-file  =%4u    >bios+lib+out\n"
+     "\xff  output   +%6u / gen code" // no \n to fit!
 //     "  /reserv    %6u - area reserved"
      , (char*)Cend-(char*)Cstart
-       , (char*)disasmEnd-(char*)disasmStart
-       , (char*)CparseEnd-(char*)CparseStart
-       , (char*)prettyprintEnd-(char*)prettyprintStart
-       , (char*)infoEnd-(char*)info
        , (char*)Cend-(char*)Cstart-(0
           + (char*)disasmEnd-(char*)disasmStart
-          + (char*)CparseEnd-(char*)CparseStart
+//          + (char*)CparseEnd-(char*)CparseStart
           + (char*)prettyprintEnd-(char*)prettyprintStart
           + (char*)infoEnd-(char*)info
           )
+       , (char*)disasmEnd-(char*)disasmStart
+//       , (char*)CparseEnd-(char*)CparseStart
+       , (char*)prettyprintEnd-(char*)prettyprintStart
+       , (char*)infoEnd-(char*)info
+     , &inputend-&inputstart
      , &asmend-&asmstart
        , &ideend-&idestart
          , &editorend-&editorstart
@@ -439,7 +454,6 @@ void info() {
           + &helptextend-&helptext
           + &helpend-&help
           )
-       , &inputend-&inputstart
        , (0
           + &bnfinterpend-&bnfinterpstart
           + &rulesend-&rulesstart
@@ -448,11 +462,19 @@ void info() {
          , &rulesend-&rulesstart
            , &iorulesend-&iorulesstart
            , &memoryrulesend-&memoryrulesstart
-           , &postprerulesend-&postprerulesstart
            , &oprulesend-&oprulesstart
            , &parametersend-&parametersstart
            , &stmtrulesend-&stmtrulesstart
              , &oricend-&oricstart
+             , &stmtbyteruleend-&stmtbyterulestart
+           , (&rulesend-&rulesstart
+              - (&iorulesend-&iorulesstart)
+              - (&memoryrulesend-&memoryrulesstart)
+              - (&oprulesend-&oprulesstart)
+              - (&parametersend-&parametersstart)
+              - (&stmtrulesend-&stmtrulesstart)
+              - (&byterulesend-&byterulesstart)
+              )
            , &byterulesend-&byterulesstart
        // TODO: , symbols...
        , &biosend-&biosstart
