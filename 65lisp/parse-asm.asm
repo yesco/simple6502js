@@ -578,6 +578,16 @@ CSTIMER         = $0276
 FUNC _librarystart
 ;;; Current byte count:
 ;;; 
+;;; Bytes #functions
+;;; ----- ---- 
+;;;    23(?)      BIOS: getchar putchar
+;;;   119(?)      #include <stdio.h>
+;;;                (print.asm: putu, putchar, putz) (127 B?)
+;;;    98   10    #include <ctype.h> isdigit isalnum ...
+;;;   144    6    #include <srting.h> strlen strcpy ...
+;;; ======
+;;;   384         (+ 23 119 98 144) 
+
 
 ;;; -------- BIOS
 ;;; 17 - getchar (save XY)
@@ -589,6 +599,8 @@ FUNC _librarystart
 
 
 ;;; -------- <stdio.h> - LOL
+;;; 
+;;; --- basis for PRINTF modular
 ;;; 20 - puth, put4h, put2h
 ;;; 13 - plaprinth (to reverse)
 ;;; 22 - axputz==printz, writez tos+Y
@@ -603,21 +615,42 @@ FUNC _librarystart
 ;;; 
 ;;; 127 B according to info() ?
 ;;; 
+;;; TODO:messy code: cleanup, rewrite
+
+
 ;;; TODO:
 ;;; - puts axputz w nl, lol
 ;;; - printf
+;;; - (sprintf)
 ;;; 
 ;;; - stdin, stdout - vars, lol
 ;;; - stderr - write on screen with INVERSE? lol
-;;; - fprintf(STDOUT, 
-;;; - getc(FILE)
-;;; - ungetc(FILE)
 ;;; - getline
 ;;; - gets
+
+;;; - fprintf(STDOUT, 
+;;; - fprintf(STDERR,
+;;; - getc(FILE)
+;;; - ungetc(FILE)
 ;;; - feof(FILE)
 ;;; - ffflush(FILE)
 ;;; - TYPE: size_t == int, lol
-;;; 
+
+;;; ------- <time.h>
+;;; - clock difftime
+;;; - va_start va_arg va_copy va_end
+;;; - signal (irq timer?)
+
+;;; -------- <assert.h>
+;;; - assert
+
+
+;;; ORIC:
+;;; - wait
+;;; - plot scrn
+;;; - plots
+
+
 ;;; simulate files?
 ;;; - fopen
 ;;; - fclose
@@ -625,9 +658,16 @@ FUNC _librarystart
 ;;; - fread
 ;;; - fwrite
 
+
+
 ;;; -------- <ctype.h>
 ;;; 98 Bytes !
 ;;; 
+;;; Inlineable (if no #include <ctype.h>)
+;;; - isdigit
+;;; - isalpha
+;;; - isspace
+;;; These are "all-or-nothing"
 ;;; - isspace
 ;;; - isxdigit
 ;;; - isdigit
@@ -638,6 +678,7 @@ FUNC _librarystart
 ;;; - ispunct
 ;;; - tolower
 ;;; - toupper
+;;; 
 ;;; - (isblank)
 ;;; - (isgraph)
 ;;; - (isprint)
@@ -713,13 +754,17 @@ FUNC _librarystart
 ;;; - memcmp
 ;;; - (memccopy) can be used to impl strcpy
 ;;; 
-;;; - strcat
-;;; - strcpy
-;;; - strlen
+;;; 14 - stpcpy (stpTOScpy using strTOScpy)
+;;; 16 - strcat (strTOScat using strTOSchrY)
+;;; 26 - strcpy (strAXcpy and strTOScpy)
 ;;; 
-;;; - strcmp
-;;; - strchr
+;;; 22 - strlen
+;;; 30 - strcmp (strTOScmp)
+;;; 36 - strchr (strAXchrY, strTOSchrY)
 ;;; - strstr
+;;; -----
+;;; 144 Bytes
+;;; 
 ;;; 
 ;;; - strdup
 ;;; 
@@ -772,6 +817,110 @@ tmp1:   .res 2
 PUTDEC=1
 PUTHEX=1
 .include "print.asm"
+
+
+;;; (inp) => AX, inp points at next (not digit) char
+;;; 
+;;; TODO: too big! just use parse rules!!!
+.ifdef ATOI
+FUNC _atoiXR
+        lda #0
+        sta tos
+        sta tos+1
+        ;; base
+        sta dos
+        lda #10
+        sta base
+
+        ;; 0x 'c' -
+        lda (0,x)
+        ;; ' - char constant
+        cmp #'''
+        bne :+
+        
+        jsr _incXR
+        lda (0,x)
+        ;; TODO: handle \' \n \b \t ???
+        jsr _incXR
+        ;; - should be '-' lol
+        jsr _incXR
+        jmp @retA
+:       
+        ;; "-" negative
+        cmp #'-'
+        bne :+
+
+        jsr _incXR
+        jsr _atoiXR
+        jmp _negate
+:       
+        ;; "0x" - hex
+        cmp #'0'
+        bne :+                  ; 1-9
+        jsr _incXR
+        ora #32
+        cmp #'X'
+        bne @ret                ; zero! (no octal...)
+        
+        lda #16
+        sta base
+:       
+        lda (0,x)
+        ;; digit? '0' <= a <= '9'
+        sec
+        sbc #'0'
+        cmp #'9'+1-'0'
+        bcs @notdigit
+        ;; digit
+        sta savea
+        lda base
+        sta dos
+        lda #0
+        ;; tos= tos * dos; // mul16 destroys tos&dos
+        jsr _mul16bits
+        ;; c=0 from cmp
+        adc savea
+        tay
+
+@ret:
+        lda tos
+@retA:
+        ldx tos+1
+        rts
+.endif ; ATOI
+
+
+.ifdef SIGNED
+;;; 31B
+FUNC _negate
+;;; 12 b
+        sec
+        eor #$ff
+        adc #0
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+        rts
+
+;;; print signed decimal
+FUNC _putd
+putd:
+;;; 19 b
+        cpx #0
+        bpl :+
+        putc '-'
+:       
+        ;; negate
+        jsr _negate
+        
+        sta tos
+        stx tos+1
+        jmp putu
+
+FUNC _dummyd
+.endif ; SIGNED
 
 
 ;;; from ORIC: Summary of ROM addrsses
@@ -1023,10 +1172,193 @@ tolower:
         ora #32
 :       
         rts
-        
-
 FUNC _ctypeend
 .endif ; CTYPE
+
+
+
+
+
+FUNC _stringstart
+;
+STRING=1
+.ifdef STRING
+
+strlen: 
+;;; 22 B
+        sta pos
+        stx pos+1
+
+        ldy #0
+        ldx #0                  ; hi-length
+:       
+        lda (pos),y
+        beq :+
+        iny
+        bne :-
+        ;; inc hibyte
+        inc pos+1
+        inx
+        bne :-
+:       
+        tya
+        rts
+        
+;;; TODO: strchrnul really?
+
+;;; strchr(AX,Y)
+;;;   tos := AX
+;;; 
+strAXchrY:
+;;; 36 B (any savings at call with this acrobatics?)
+        sta tos
+        stx tos+1
+
+strTOSchrY:
+;;; (32 B) fastest and smallest!
+        sty savey
+        ;; use tos.lo
+        ldy tos
+
+        lda #0
+        sta tos
+:       
+        lda (tos),y
+        ;; look for char (even 0)
+        cmp savey
+        beq @found
+        ;; end (after cmp savey)
+        cmp #0                  ; +2c
+        beq ret0
+        ;; forward 
+        iny
+        bne :-
+        ;; int hibyte
+        inc tos+1
+        bne :-
+        ;; always loops back
+@found:
+        tya                     ; lo
+        ldx tos+1               ; hi
+        rts
+;;; TODO: (if called strAXchrY)
+;;; note: (orig @(tos+1) stored in X, stil there)
+;;;  ????
+ret0:
+        ldx #0
+        txa
+        rts
+
+
+;;; tos already contains first argument
+;;; AX has second arg
+;;; 
+;;; TODO: combine with strncmp (?)
+strTOScmp:
+;;; 30 B (cc65: 33 B)
+        sta pos
+        stx pos+1
+
+        ldy #0
+;;; 18   cc65: 18
+:       
+        sec
+        lda (tos),y
+        beq @end
+        sbc (pos),y
+        bne @neq
+        iny
+        bne :-
+        ;; inc hi
+        inc tos
+        inc pos
+        bne :-
+        ;; always
+;;; fix after 6 (cc65: 8)
+@end:
+;;; TODO: check neg if first < last
+        sec
+        sbc (pos),y
+@neq:
+;;; TODO: sign extend into X ... >128 == neg, lol
+        ldx #0
+        rts
+
+
+strstr:
+        rts
+
+;;; tos: first arg, copy to
+;;; AX : second, arg, source
+;;; 
+;;; TODO: can combine into a strncpy?
+strTOScpy:
+;;; 24 B (cc65: 31 B)
+        ;; save destination
+        sta dos
+        stx dos+1
+
+        ldy #0
+:       
+        ;; copy byte, including \0 byte
+        lda (dos),y
+        sta (tos),y
+        beq :+
+        iny
+        bne :-
+        ;; inc hi
+        inc dos+1
+        inc tos+1
+        bne :-
+:       
+        ;; return orig destination
+        ;; X is untouched
+        lda dos
+        rts
+
+;;; stpcpy, same as strcpy
+;;; EXCEPT! Returns pointer to last byte (@ \0)
+;;; 
+;;; TODO: is it more efficent to have strpcpy implement
+;;; and strcpy callling? (turn around?)
+stpTOScpy:
+;;; 14 B
+        jsr strTOScpy
+        ;; AX = dos+Y
+        clc
+        tya
+        adc #dos
+        bcc :+
+        inc dos+1
+:       
+        ldx dos+1
+        rts
+
+;;; TOS: first argument: destination
+;;; AX : second argument: what to concat at end
+strTOScat: 
+;;; 16B ~ TODO: finish it...
+        ;; save AX to concat for later, lol
+        pha
+        txa
+        pha
+        ;; search first string for \0 - end of string
+        ldy #0
+        jsr strTOSchrY
+        ;; AX points to \0 at end of string!
+        ;; store lo A in tos (X== value at tos+1 already)
+        sta tos
+        ;; pop revesre destination
+        pla
+        txa
+        pla
+        ;; concat(TOS,AX)
+        jmp strTOScat
+        ;; STRCAT returns original dest
+
+        
+.endif ; STRING
+FUNC _stringend
 
 
 FUNC _minimallibrarystart
@@ -1125,6 +1457,195 @@ _SHR:
 
 .endif ; MINIMAL
 FUNC _minimallibraryend
+
+
+
+
+
+
+;PRINTF=1
+.ifdef PRINTF
+
+FUNC _printf
+;;; according to printf.c minimal *restricted*
+;;; implementation (no .7 max limit) the 
+;;; cc65 - printf will "include" funs giving
+;;; - a total of +1870 B
+;;; - a replace  +1701 B (many support funcs)
+;;;   where      ( 765 B ) is simplified impl in C
+
+;;; here we strive for a compiling printf as:
+;;; 
+;;; printf("foo %d bar %-8s fie %c fum %07.4x\n",...
+;;; 
+;;; TO:
+.ifnblank
+;;; (+ -4 +0 -4 +3 -4 -4 +8) == -5 B
+;;; compared to cc65 (estimate) save 5B and
+;;; no need large function at runtime!
+;;; BUT: no printf(var, ....) !!!!
+
+        ;; "foo " (-4 B loading ax)
+        jsr hereputz
+        .byte "foo ",0
+
+        ;; %d     (+0 B as otherwise jsr pushax)
+        ... value in AX
+        jsr axputd
+
+        ;; " bar " (-4 B)
+        jsr hereputz
+        .byte " bar ",0
+
+        ;; %-8s (+ 3 B cmp jsr pushax)
+        ... value in AX
+        ldy #256-8              ; negative value!
+        clc
+        jsr axputzF
+
+        ;; "fie" (- 4 B)
+        jsr hereputz
+        .byte " fie ",0
+
+        ;; %c
+        ... value in A
+        jsr putchar
+
+        ;; " fum " (-4 B)
+        jsr hereputz
+        .byte " fum ",0
+        
+        ;; %07.4x" (+ 8 B for parameters)
+        ... value in AX
+        ;; - dot value ".4"
+        sed                     ; WOW: d= means dot value
+        ldy #4
+        sty dos
+        ;; - len 07
+        sec                     ; leading 0
+        ldy #7                 
+        jsr axputhF
+;;; 
+
+.endif
+
+
+;;; (+ 8 12 26 3 2 9 3 3 31) = 97
+;;; just: "foo %d bar %c fish %x gurk %s kork"
+
+        ;; it's on the hardware stack
+        ;; Y contains number of bytes pushed
+        ;; (Y/2 is no of arguments)
+        ;; lda (101),x points to 
+
+;;; 8
+        sty savey
+        tsx
+        txa
+        clc
+        adc savey
+        tax
+        ;; - load first argument==format - I hope!
+;;; 12
+        lda (101),x
+        sta pos
+        lda (102),x
+        sta pos+1
+        stx savex
+        ;; - pos points to the format string
+
+        ;; parse format string
+;;; 26
+        ldy #0
+@nextc:       
+        lda (pos),y
+        jsr _incT
+        ;; \ quoted
+        cmp #'\'
+        bne :+
+        jsr _incT
+        bne @printchar
+:       
+        ;; %formatchar
+        cmp #'%'
+        bne @printchar
+        jsr processarg
+        jmp @nextc
+@printchar:
+        ;; - otherwise print!
+;;; 3
+        jsr putchar
+        ;; - (zero will terminated (after printed!))
+;;; 2
+        bne :-
+
+        ;; pop all args!
+        ;; - save return address
+;;; 9
+        pla
+        sta tos+1
+        pla
+        sta tos
+        jsr _incT               ; +1 !
+        ;; - drop !
+;;; 3
+        ldx savex
+        tsx
+.ifnblank
+        ldy savey
+:       
+        pla
+        dey
+        bpl :-
+.endif
+        ;; - finally return!
+;;; 3
+        jmp (tos)
+
+@processarg:
+;;; 31
+        ;; - save char after % in Y
+        tay
+        ;; - TODO: process "%[[-]45]d"
+        ;; - get next argument
+        ldx savex
+        dex
+        dex
+        lda (102),x             ; hi
+        tax
+        lda (101),x             ; lo
+        ;; AX is argument, Y is type char
+
+@dispatch:
+;;; TODO: put all this routines/trampoiles NEAR!
+        ;; tail-calls!
+        cpy #'u'
+        beq axputu
+        cpy #'d'
+        beq axputd
+        cpy #'x'
+        beq axputx
+        cpy #'s'
+        beq axputz
+        cpy #'c'
+        bne :+
+        jmp putchar
+:       
+        ;; fail to match type char
+        rts
+
+
+.endif ; PRINTF
+
+
+
+FUNC _libraryend
+
+
+
+
+
+
 
 
 
@@ -1245,8 +1766,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;
-PRINTASM=1
+;PRINTASM=1
 .ifndef PRINTREAD
 ;;; Don't do both...
 ;
@@ -1730,7 +2250,9 @@ string:
 str:    
         jsr _incI
         cmp #'"'                ; "
-        beq _next
+        bne :+
+        jmp _next
+:       
         ;; - quote (next char is raw)
         cmp #'\'
         bne :+
@@ -3211,285 +3733,6 @@ memset:
 ;;; BEGIN CHEAT? - not count...
 
 
-;;; (inp) => AX, inp points at next (not digit) char
-;;; 
-;;; TODO: too big! just use parse rules!!!
-.ifdef ATOI
-FUNC _atoiXR
-        lda #0
-        sta tos
-        sta tos+1
-        ;; base
-        sta dos
-        lda #10
-        sta base
-
-        ;; 0x 'c' -
-        lda (0,x)
-        ;; ' - char constant
-        cmp #'''
-        bne :+
-        
-        jsr _incXR
-        lda (0,x)
-        ;; TODO: handle \' \n \b \t ???
-        jsr _incXR
-        ;; - should be '-' lol
-        jsr _incXR
-        jmp @retA
-:       
-        ;; "-" negative
-        cmp #'-'
-        bne :+
-
-        jsr _incXR
-        jsr _atoiXR
-        jmp _negate
-:       
-        ;; "0x" - hex
-        cmp #'0'
-        bne :+                  ; 1-9
-        jsr _incXR
-        ora #32
-        cmp #'X'
-        bne @ret                ; zero! (no octal...)
-        
-        lda #16
-        sta base
-:       
-        lda (0,x)
-        ;; digit? '0' <= a <= '9'
-        sec
-        sbc #'0'
-        cmp #'9'+1-'0'
-        bcs @notdigit
-        ;; digit
-        sta savea
-        lda base
-        sta dos
-        lda #0
-        ;; tos= tos * dos; // mul16 destroys tos&dos
-        jsr _mul16bits
-        ;; c=0 from cmp
-        adc savea
-        tay
-
-@ret:
-        lda tos
-@retA:
-        ldx tos+1
-        rts
-.endif ; ATOI
-
-
-.ifdef SIGNED
-;;; 31B
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-;;; print signed decimal
-FUNC _putd
-putd:
-;;; 19 b
-        cpx #0
-        bpl :+
-        putc '-'
-:       
-        ;; negate
-        jsr _negate
-        
-        sta tos
-        stx tos+1
-        jmp putu
-
-FUNC _dummyd
-.endif ; SIGNED
-
-;PRINTF=1
-.ifdef PRINTF
-
-FUNC _printf
-;;; according to printf.c minimal *restricted*
-;;; implementation (no .7 max limit) the 
-;;; cc65 - printf will "include" funs giving
-;;; - a total of +1870 B
-;;; - a replace  +1701 B (many support funcs)
-;;;   where      ( 765 B ) is simplified impl in C
-
-;;; here we strive for a compiling printf as:
-;;; 
-;;; printf("foo %d bar %-8s fie %c fum %07.4x\n",...
-;;; 
-;;; TO:
-.ifnblank
-;;; (+ -4 +0 -4 +3 -4 -4 +8) == -5 B
-;;; compared to cc65 (estimate) save 5B and
-;;; no need large function at runtime!
-;;; BUT: no printf(var, ....) !!!!
-
-        ;; "foo " (-4 B loading ax)
-        jsr hereputz
-        .byte "foo ",0
-
-        ;; %d     (+0 B as otherwise jsr pushax)
-        ... value in AX
-        jsr axputd
-
-        ;; " bar " (-4 B)
-        jsr hereputz
-        .byte " bar ",0
-
-        ;; %-8s (+ 3 B cmp jsr pushax)
-        ... value in AX
-        ldy #256-8              ; negative value!
-        clc
-        jsr axputzF
-
-        ;; "fie" (- 4 B)
-        jsr hereputz
-        .byte " fie ",0
-
-        ;; %c
-        ... value in A
-        jsr putchar
-
-        ;; " fum " (-4 B)
-        jsr hereputz
-        .byte " fum ",0
-        
-        ;; %07.4x" (+ 8 B for parameters)
-        ... value in AX
-        ;; - dot value ".4"
-        sed                     ; WOW: d= means dot value
-        ldy #4
-        sty dos
-        ;; - len 07
-        sec                     ; leading 0
-        ldy #7                 
-        jsr axputhF
-;;; 
-
-.endif
-
-
-;;; (+ 8 12 26 3 2 9 3 3 31) = 97
-;;; just: "foo %d bar %c fish %x gurk %s kork"
-
-        ;; it's on the hardware stack
-        ;; Y contains number of bytes pushed
-        ;; (Y/2 is no of arguments)
-        ;; lda (101),x points to 
-
-;;; 8
-        sty savey
-        tsx
-        txa
-        clc
-        adc savey
-        tax
-        ;; - load first argument==format - I hope!
-;;; 12
-        lda (101),x
-        sta pos
-        lda (102),x
-        sta pos+1
-        stx savex
-        ;; - pos points to the format string
-
-        ;; parse format string
-;;; 26
-        ldy #0
-@nextc:       
-        lda (pos),y
-        jsr _incT
-        ;; \ quoted
-        cmp #'\'
-        bne :+
-        jsr _incT
-        bne @printchar
-:       
-        ;; %formatchar
-        cmp #'%'
-        bne @printchar
-        jsr processarg
-        jmp @nextc
-@printchar:
-        ;; - otherwise print!
-;;; 3
-        jsr putchar
-        ;; - (zero will terminated (after printed!))
-;;; 2
-        bne :-
-
-        ;; pop all args!
-        ;; - save return address
-;;; 9
-        pla
-        sta tos+1
-        pla
-        sta tos
-        jsr _incT               ; +1 !
-        ;; - drop !
-;;; 3
-        ldx savex
-        tsx
-.ifnblank
-        ldy savey
-:       
-        pla
-        dey
-        bpl :-
-.endif
-        ;; - finally return!
-;;; 3
-        jmp (tos)
-
-@processarg:
-;;; 31
-        ;; - save char after % in Y
-        tay
-        ;; - TODO: process "%[[-]45]d"
-        ;; - get next argument
-        ldx savex
-        dex
-        dex
-        lda (102),x             ; hi
-        tax
-        lda (101),x             ; lo
-        ;; AX is argument, Y is type char
-
-@dispatch:
-;;; TODO: put all this routines/trampoiles NEAR!
-        ;; tail-calls!
-        cpy #'u'
-        beq axputu
-        cpy #'d'
-        beq axputd
-        cpy #'x'
-        beq axputx
-        cpy #'s'
-        beq axputz
-        cpy #'c'
-        bne :+
-        jmp putchar
-:       
-        ;; fail to match type char
-        rts
-
-
-.endif ; PRINTF
-
-
-FUNC _libraryend
 
 bytecodes:      
 
@@ -3510,8 +3753,8 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
-ruleF: ; was used for function, TODO: remove
-;ruleG: like ruleG but saves AX safely in tos
+;ruleF: byte rule, keeps AX, get byte expr => Y
+;ruleG: calling convention "(@tos,AX) like ruleC
 ;ruleH: printf parsing
 ruleI:
 ruleJ:  
@@ -3785,6 +4028,48 @@ FUNC _ctypestart
 FUNC _ctypeend
 .endif ; !CTYPE
 
+
+FUNC _stringrulesstart
+.ifdef STRINGS
+
+        .byte "|strlen(",_E,")"
+      .byte '['
+        jsr strlen
+      .byte ']'
+
+        ;; all these takes 2 args
+        ;; TODO: harmonize?
+        .byte "|strchr(",_E,",",_F,")"
+      .byte '['
+        jsr strAXchrY
+      .byte ']'
+
+        .byte "|strTOScpy(",_G
+      .byte '['
+        jsr strTOScpy
+      .byte ']'
+
+        .byte "|strTOScat(",_G
+      .byte '['
+        jsr strTOScat
+      .byte ']'
+
+        .byte "|strTOScmp(",_G
+      .byte '['
+        jsr strTOScmp
+      .byte ']'
+
+        .byte "|strTOSstr(",_G
+      .byte '['
+        jsr strTOSstr
+      .byte ']'
+
+
+
+.endif ; STRINGS
+FUNC _stringrulesend
+
+
 FUNC _memoryrulesstart
 
 ;;; ORIC peek/poke deek/doke
@@ -3797,36 +4082,27 @@ FUNC _memoryrulesstart
         sta VAL0
       .byte "]"
 
-;;; TODO: instead of _E use byte context _?
-
         .byte "|doke(%D[#],",_E,")"
-      .byte "[;"
-        lda VAL0
-        ldx VAL1
-        .byte 'D'
+      .byte "[;D"
         sta VAL0
         stx VAL1
       .byte "]"
 .endif ; OPTRULES
 
-
-;;; TODO: instead of _G use byte context _?
-        .byte "|poke(",_E,",",_G,")"
+        .byte "|poke(",_E,",",_F,")"
       .byte "["
-        ;; AX: value of _G to poke
-        ;; tos: destination _E
-        ldy #0
+        ;; AX address Y value to poke
+        sta tos
+        stx tos+1
+        tya
         sta (tos),y
       .byte "]"
 
-        .byte "|doke(",_E,",",_G,")"
+        .byte "|doke(",_G
       .byte "["
-        ;; AX: value of _G to poke
-        ;; tos: destination _E
+        ;; AX: value to doke
+        ;; tos: addrss to put it
       .byte "["
-        lda #'<'
-        ldx #'<'
-
         ldy #0
         sta (tos),y
 
@@ -5261,38 +5537,21 @@ ruleH:
 .endif ; rulePRINTF
         .byte 0
 
-;;; same as ruleE but protects AX (leaving it in tos, in the end)
-ruleG:
-;;; TODO: 8bit $
-.ifdef OPTRULES
-        .byte "0"
+
+
+
+;;; BYTESIEVE: saved 5 bytes using ruleF!
+;;; 
+;;; "keepAXsetY"
+ruleF:  
+        .byte "%D"
       .byte '['
-;;; 7
-        sta tos
-        stx tos+1
-
-        lda #0
-        tax
-      .byte ']'
-.endif ; OPTRULES
-
-        .byte "|%D"
-      .byte '['
-;;; 8
-        sta tos
-        stx tos+1
-
-        lda #'<'
-        ldx #'>'
+        ldy #'<'
       .byte ']'
 
         .byte "|%V"
       .byte '['
-        sta tos
-        stx tos+1
-
-        lda #'<'
-        ldx #'>'
+        lda VAL0
       .byte ']'
 
         ;; Nothing else than Expression could come now
@@ -5304,16 +5563,81 @@ ruleG:
         pha
       .byte "]"
         .byte _E
-      .byte '['
+      .byte "["
         tay
         ;; reverse pop X,A
         pla
+        txa
+        pla
+      .byte "]"
+
+        .byte 0
+
+
+;;; same as ruleE/rule but protects AX (leaving it in tos, in the end)
+;;; "saveTOSrule"
+
+;;; Another calling convention!
+;;; 
+;;; "(",_G:  two argument rule where:
+;;;    - first arg is saved in TOS
+;;;    - second arg is in AX   
+ruleG:
+
+.ifdef OPTRULES
+        .byte _E,",0)"
+      .byte '['
+;;; 7
+        sta tos
         stx tos+1
+
+        lda #0
+        tax
+      .byte ']'
+.endif ; OPTRULES
+
+        .byte "|",_E,",%D)"
+      .byte '['
+;;; 8
+        sta tos
+        stx tos+1
+
+        lda #'<'
+        ldx #'>'
+      .byte ']'
+
+        .byte "|",_E,",%V)"
+      .byte '['
+        sta tos
+        stx tos+1
+
+        lda VAL0
+        ldx VAL1
+      .byte ']'
+
+        ;; Nothing else than Expression could come now
+        .byte "|"
+      .byte "["
+        ;; reverse save A,X
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte _E
+      .byte "["
+        tay
+        sta savex
+        ;; reverse pop X,A
+        pla
+        sta tos+1
         pla
         sta tos
         ;; 
+        ldx savex
         tya
       .byte "]"
+
+        .byte 0
 
 ;;; Exprssion:
 ruleE:  
@@ -5328,41 +5652,6 @@ ruleE:
 
 
 ;;; TODO: remove, this old for function calls?
-
-.ifdef RULESF
-ruleF:  
-;;; works
-;        .byte _T,"%V(){",_S,"}"
-
-        .byte _T,"%F()"
-
-;;; TODO: something wrong with 'B'
-;        .byte _T,"%V(){",_B,"}"
-      .byte '['
-        PUTC '!'
-;;; TODO: remove, for now we skip over function, lol
-;;;   need for compile LONGNAMES and "main" for now
-        jmp PUSHLOC
-      .byte ']'
-        .byte "{",_S,"}"
-      .byte '['
-        PUTC 'F'
-        rts
-      .byte ']'
-        
-        .byte 0
-
-
-
-        .byte "%V()"
-        .byte _B
-;      .byte '['
-        ;; pretend it's the body
-;        PUTC 'F'
-;      .byte ']'
-
-
-.endif ; RULESF
 
 ;;; prefix: array= {
 ;;;  ruleQ:  num,num,num }
@@ -7118,38 +7407,6 @@ FUNC _oricend
         jsr addr
 .endmacro
         
-
-
-
-;;; ----------------------------------------
-;;; "borrowing" cc65 as stdlib!
-
-;;; TODO:
-;;; - exit
-;;; - clock difftime
-;;; - div -> struct div,mod
-;;; - rand srand 
-;;; - va_start va_arg va_copy va_end
-;;; - signal (irq timer?)
-;;; - assert
-;;; STRING:
-;;; - atoi 
-;;; - strcpy strcat strncpy strncat
-;;; - strlen
-;;; - strcmp strncmp 
-;;; - strchr strrchr strstr strpbrk strspn strtok
-;;; - memcpy memmove memset memcmp memchr
-;;; IO-ish:
-;;; - sscanf printf sprintf
-;;; CHAR:
-;;; - toupper tolower isupper islower
-;;; - isalnum isalpha ispunct isdigit isspace isblank iscntrl 
-;;;  (isprint isxdigit isgraph)
-
-;;; ORIC:
-;;; - wait
-;;; - plot scrn
-;;; - plots
 
 
 ;;; TODO: furk!
@@ -9182,8 +9439,7 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
-;
-ISCHAR=1
+;ISCHAR=1
 .ifdef ISCHAR
         .incbin "Input/test-ctype.c"
         .byte 0
@@ -9807,7 +10063,7 @@ ISCHAR=1
 ;;;              6% FASTER than cc65 -Cl
 ;;;              1% BEAT cc65 default! SMALLER! (- 3 bytes!)
 ;;;             11% bigger than smallest (slowest) cc65 (287)
-;;;         315    same   CC02   axputu
+;;;         315    2.665s  CC02   axputu
 
 ;;; https://thred.github.io/c-bench-64/
 ;;;         240j means jsk extracted main from .asm
@@ -9819,8 +10075,9 @@ ISCHAR=1
 ;;;  2.4K          2.13s  SDCC (21.3s, 2.4K)
 ;;;  5.8K          1.33s  VBCC (15.9s, 3.4K)
 ;;; 
-;;;         315    2.60s  CC02 10K runs
-;;;         307    2.53s  CC02   while-speed,++i(;),+BYTE,-BYTE
+;;;         315    2.60s  CC02 10K runs ^X * 100
+;;;         307    2.53s  CC02 while-speed,++i(;),+BYTE
+;;;         302    2.43s  CC02 rule _F byte rule for poke!
 ;;; 
 
 
