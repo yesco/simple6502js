@@ -777,11 +777,95 @@ PUTHEX=1
 ;;;
 
 
+FUNC ctypestart
+
+;
+CTYPE=1
+
+.ifdef CTYPE
+isxdigit:       
+;;; 14
+        tay
+        ora #32
+        cmp #'a'
+        bcc :+
+        cmp #'f'+1
+        bcs retfalse
+        bcc rettrue
+:       
+        tya
+isdigit:        
+;;; 7
+        sec
+        sbc #'0'
+        cmp #'9'-'0'+1
+        bcs retfalse
+rettrue:
+;;; 3
+;;; TODO: maybe $ff as nobody should rely on 1!
+        lda #1
+        SKIPTWO
+retfalse:
+;;; 5
+        lda #0
+        ldx #0
+        rts
+
+isalnum:
+;;; 8
+        tay
+        jsr isdigit
+        tax
+        bne rettrue
+        tya
+isalpha:        
+;;; 11
+        ;; make all lower case
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        bcs retfalse
+        bcc rettrue
+
+isspace:        
+;;; 6
+        ;; we take ourselves some freedom of interpreation!
+        cmp #' '+1
+        bcs retfalse
+        bcc rettrue
+
+islower:        
+;;; 9
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        bcs retfalse
+        bcc rettrue
+
+isupper:        
+;;; 9
+        sec
+        sbc #'A'
+        cmp #'Z'-'A'+1
+        bcs retfalse
+        bcc rettrue
+
+ispunct:        
+;;; 12
+        jsr isalnum
+        bcc retfalse
+        ;; still have Y
+        tya
+        jsr isspace
+        bcc retfalse
+        bcs rettrue
+
+FUNC _ctypeend
+.endif ; CTYPE
 
 
-
-.export _minimallibrarystart
-_minimallibrarystart:   
+FUNC _minimallibrarystart
  
 ;;; (- #xdad #xd4d) = 96 B
 
@@ -876,8 +960,7 @@ _SHR:
 
 
 .endif ; MINIMAL
-.export _minimallibraryend
-_minimallibraryend:     
+FUNC _minimallibraryend
 
 
 
@@ -998,7 +1081,8 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;PRINTASM=1
+;
+PRINTASM=1
 .ifndef PRINTREAD
 ;;; Don't do both...
 ;
@@ -1464,9 +1548,9 @@ noimm:
 .endif ; IMMEDIATE
 
         cmp #'D'
-        beq isdigits
+        beq digits
         cmp #'S'
-        beq isstring
+        beq string
 jmpvar: 
         ;; - % anything...
         ;;   %V (or %A %N %U %...)
@@ -1474,7 +1558,7 @@ jmpvar:
 
         ;; - "constant string"
         ;; (store inline!?)
-isstring:       
+string: 
 ;STRING=1
 .ifdef STRING
         ;; when arrive here %S only reads till "
@@ -1502,7 +1586,7 @@ str:
         jmp _next
 .endif ; STRING
 
-isdigits:       
+digits:       
         ;; assume it's %D
         jmp _digits
 
@@ -3010,7 +3094,7 @@ FUNC _atoiXR
         sta base
 :       
         lda (0,x)
-        ;; isdigit? '0' <= a <= '9'
+        ;; digit? '0' <= a <= '9'
         sec
         sbc #'0'
         cmp #'9'+1-'0'
@@ -3442,6 +3526,90 @@ FUNC _iorulesstart
       .byte ']'
 FUNC _iorulesend
 
+.ifdef CTYPE
+        .byte "|isxdigit(",_E,")"
+      .byte '['
+        jsr isxdigit
+      .byte ']'
+
+        .byte "|isdigit(",_E,")"
+      .byte '['
+        jsr isdigit
+      .byte ']'
+
+        .byte "|isalnum(",_E,")"
+      .byte '['
+        jsr isalnum
+      .byte ']'
+
+        .byte "|isalpha(",_E,")"
+      .byte '['
+        jsr isalpha
+      .byte ']'
+
+        .byte "|isspace(",_E,")"
+      .byte '['
+        jsr isspace
+      .byte ']'
+
+        .byte "|islower(",_E,")"
+      .byte '['
+        jsr islower
+      .byte ']'
+
+        .byte "|isupper(",_E,")"
+      .byte '['
+        jsr isupper
+      .byte ']'
+
+        .byte "|ispunct(",_E,")"
+      .byte '['
+        jsr ispunct
+      .byte ']'
+.else
+
+FUNC _ctypestart
+;;; TODO: _byteexpr ??? X?
+        .byte "|isdigit(",_E,")"
+      .byte '['
+;;; 11B
+;;; TODO: make library? copy in on ref
+        ldy #0
+        sec
+        sbc #'0'
+        cmp #'9'-'0'+1
+        bcs :+
+        iny
+:       
+        tya
+      .byte ']'
+
+        .byte "|isalpha(",_E,")"
+      .byte '['
+        ldy #0
+        ;; make all lower case
+        ora #32
+        sec
+        sbc #'a'
+        cmp #'z'-'a'+1
+        bcs :+
+        iny
+:       
+        tya
+      .byte ']'
+
+        ;; we take ourselves some freedom of interpreation!
+        .byte "|isspace(",_E,")"
+      .byte '['
+        ldy #0
+        cmp #' '+1
+        bcs :+
+        iny
+:       
+        tya
+      .byte ']'
+FUNC _ctypeend
+.endif ; !CTYPE
 
 FUNC _memoryrulesstart
 
@@ -8839,6 +9007,13 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+;
+ISCHAR=1
+.ifdef ISCHAR
+        .incbin "Input/test-ctype.c"
+        .byte 0
+.endif ; ISCHAR
 
 ;BUGS=1
 .ifdef BUGS
