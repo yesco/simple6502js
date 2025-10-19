@@ -1,4 +1,5 @@
-export VBCC=/data/data/com.termux/files/home/GIT/vbcc-arm/bin:$PATH
+export VBCC="/data/data/com.termux/files/home/GIT/vbcc-arm"
+echo "vbcc= $VBCC"
 export PATH=$VBCC/bin:"$PATH"
 #vbcc6502 "$@"
 
@@ -6,11 +7,30 @@ export PATH=$VBCC/bin:"$PATH"
 #vbcc6502 -speed "$@.c" -o prime.out
 #vbcc6502 -ic1 -ic2 "$@.c" -o vbcc.out
 #vbcc6502 -ic1 -ic2 "$@.c" -o vbcc.out
-#vbcc6502 -k -size -ic1 -ic2 "$@.c" -o prime.vbcc.out
+#vbcc6502 -size -ic1 -ic2 $1.c
 #vbcc6502 -ic1 -ic2 "$@.c"
-
 #vbcc6502 "$@"
-vc +xAtmos -S -ic1 -ic2 $@
+#vc +xAtmos -S -ic1 -ic2 $@
+
+# NO FUCKING CONFIG FILE???? - WTF?
+#vc -t bbc -size -ic1 -ic2 $1.c
+
+#vc -t bbc -I $VBCC/targets/6502-bbc/include psize $1.c 
+
+# no flag -t bcc !!! LOL
+vbcc6502 -size -I"$VBCC/targets/6502-bbc/include" $1.c 
+
+# only one input file! WTF
+vbcc6502 -size "-I$VBCC/targets/6502-bbc/include" $1.c 
+
+
+#vc --help
+
+echo
+
 ls -l $1.*
+
+echo
+ls -l $VBCC/targets/6502-bbc/include
 
 
