@@ -444,6 +444,8 @@ IMMEDIATE=1
 ;;; 
 ;;; TODO: experiment with
 ;;; - https://www.cc65.org/faq.php#ORG
+;;; - http://forum.6502.org/viewtopic.php?f=2&t=4247
+;;; - https://retrocomputing.stackexchange.com/questions/13188/putting-code-into-two-different-memory-areas-with-cc65-ca65
 ;;; 
 ;;; I think, one can just do .org (to after C-code)
 ;;; then memmove it to where it should be!
@@ -996,11 +998,14 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
+;PRINTASM=1
+.ifndef PRINTREAD
+;;; Don't do both...
 ;
-PRINTASM=1
 ;;; Prints a dot for each line compiled
 ;
 PRINTDOTS=1
+.endif
 
 
 
@@ -7480,7 +7485,14 @@ editaction:
         sta (ROWADDR),y
 
 ret:
+        ;; if at last pos in row
+        lda CURCOL
+        cmp #39
+        beq @notlast
         rts
+@notlast:       
+        ;; - then go to end of line (last nonspace)
+        lda #CTRL('E')
 :       
 ;;; - ctrl-A - beginning of text in line
         cmp #CTRL('A')

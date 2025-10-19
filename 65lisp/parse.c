@@ -344,7 +344,7 @@ void main() {
 
   clrscr();
 
-  printf("Hello World!\n");
+//  printf("Hello World!\n");
 
   //exit(42);
   

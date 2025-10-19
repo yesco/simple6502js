@@ -1,3 +1,6 @@
+;;; TODO: look at 
+;;; - https://github.com/Michaelangel007/6502_calling_convention
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; jsk newest variant
@@ -20,6 +23,7 @@ hwstack:
         lda #$11
         ldx #$11
 
+        ;; 3 B, 7c overhead
         pha
         txa
         pha
@@ -206,7 +210,6 @@ hwstack:
 
         lda #$33
         ldx #$33
-        jsr pushax
 
         pha
         txa
@@ -729,3 +732,76 @@ leave:
         rts
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+push0:  
+        lda     #0
+pusha0:
+        ldx     #0
+
+;;; keeps AX unchanged!
+
+pushax: 
+;;; 22 B  44/49c
+        pha                     ; (3)
+        lda     sp              ; (6)
+        sec                     ; (8)
+        sbc     #2              ; (10)
+        sta     sp              ; (13)
+        bcs     @L1             ; (17)
+        dec     sp+1            ; (+5)
+@L1:    ldy     #1              ; (19)
+        txa                     ; (21)
+        sta     (sp),y          ; (27)
+        pla                     ; (31)
+        dey                     ; (33)
+        sta     (sp),y          ; (38)
+        rts                     ; (44/43)
+
+;;; no keep AX
+;;; TODO: if the dec after...
+;;;   assuming we have more pushax than pops!
+;;;   (reasonable as end of fun pop-all!)
+pushax_nokeep_postdec: 
+;;; 20 B  37c (+4c sometimes)
+
+;;; 8 B  18c
+        ldy     #1
+        sta     (sp),y          ; 6c
+        iny
+        txa
+        sta     (sp),y          ; 6c
+
+        ;; sp -= 2;
+;;; 12 B  13c (+4c) +6c= 19c (+4c occasionally)
+        sec
+        lda     sp
+        sbc     #2
+        sta     sp
+        bcs     :+
+        dec     sp+1
+:       
+        rts
+
+
+;;; split stack (index y)
+;;; no keep AX
+push:   
+;;; 12B  24c
+        dec stack               ; pre/post no diff!
+        ldy stack
+        sta lostack,y
+        ;; sta savea
+        txa
+        sta histack,y
+        ;; lda savea
+        rts
+
+;;; split stack
+push:   
+;;; 12B  24c
+        dec stack
+        ldx stack
+        sta lostack,x
+        txa
+        sta histack,x
+        rts
