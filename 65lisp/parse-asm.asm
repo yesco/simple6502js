@@ -778,20 +778,23 @@ PUTHEX=1
 
 
 FUNC ctypestart
-
 ;
 CTYPE=1
 
 .ifdef CTYPE
-isxdigit:       
-;;; 14
+;;; 80 B - 8 functions (- #xe6 #x96)
+;;; 
+;;; (cheaper than most compilers as they in
+;;; addition keep an 128 byte table, and each F is at least 8 bytes)
+
+isxdigit:
+;;; 13
         tay
         ora #32
         cmp #'a'
         bcc :+
         cmp #'f'+1
-        bcs retfalse
-        bcc rettrue
+        jmp retC
 :       
         tya
 isdigit:        
@@ -799,6 +802,7 @@ isdigit:
         sec
         sbc #'0'
         cmp #'9'-'0'+1
+retC:   
         bcs retfalse
 rettrue:
 ;;; 3
@@ -825,31 +829,27 @@ isalpha:
         sec
         sbc #'a'
         cmp #'z'-'a'+1
-        bcs retfalse
-        bcc rettrue
+        jmp retC
 
 isspace:        
 ;;; 6
         ;; we take ourselves some freedom of interpreation!
         cmp #' '+1
-        bcs retfalse
-        bcc rettrue
+        jmp retC
 
 islower:        
 ;;; 9
         sec
         sbc #'a'
         cmp #'z'-'a'+1
-        bcs retfalse
-        bcc rettrue
+        jmp retC
 
 isupper:        
 ;;; 9
         sec
         sbc #'A'
         cmp #'Z'-'A'+1
-        bcs retfalse
-        bcc rettrue
+        jmp retC
 
 ispunct:        
 ;;; 12
@@ -858,6 +858,7 @@ ispunct:
         ;; still have Y
         tya
         jsr isspace
+        ;; reverse others
         bcc retfalse
         bcs rettrue
 
