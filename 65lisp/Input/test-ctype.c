@@ -20,7 +20,7 @@ word main() {
         putu( isupper(c) ); putchar(' ');
         putu( islower(c) ); putchar(' ');
         putu( ispunct(c) ); putchar(' ');
-
+        
 // TODO: fix function call: T uses wrong address?
 //      a= isspace(c); T();
 //        a= isxdigit(c); T();
@@ -30,6 +30,9 @@ word main() {
 //        a= isupper(c); T();
 //        a= islower(c); T();
 //        a= ispunct(c) ); T();
+
+      putchar( toupper(c) ); putchar(' ');
+      putchar( tolower(c) ); putchar(' ');
     }
     putchar('\n');
     ++c;

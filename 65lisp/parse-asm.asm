@@ -576,6 +576,165 @@ CSTIMER         = $0276
 ;;; ---------------- LIBRARY ---------------
 
 FUNC _librarystart
+;;; Current byte count:
+;;; 
+
+;;; -------- BIOS
+;;; 17 - getchar (save XY)
+;;; 19 - nl plaputchar putchar (save AXY, \n)
+;;;  4 - rawputc
+;;;(14)- 3 clrscr, 3 forward, 3 bs, 5 spc
+;;; ========
+;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
+
+
+;;; -------- <stdio.h> - LOL
+;;; 20 - puth, put4h, put2h
+;;; 13 - plaprinth (to reverse)
+;;; 22 - axputz==printz, writez tos+Y
+;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
+;;; 13 - xputu saves A,X prints tos
+;;;      (todo cleanup printn,putu does jmp _drop, lol
+;;;  7 - axputu
+;;;  7 - axputh
+;;; (7)- axputd 
+;;; ========
+;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
+;;; 
+;;; 127 B according to info() ?
+;;; 
+;;; TODO:
+;;; - puts axputz w nl, lol
+;;; - printf
+;;; 
+;;; - stdin, stdout - vars, lol
+;;; - stderr - write on screen with INVERSE? lol
+;;; - fprintf(STDOUT, 
+;;; - getc(FILE)
+;;; - ungetc(FILE)
+;;; - getline
+;;; - gets
+;;; - feof(FILE)
+;;; - ffflush(FILE)
+;;; - TYPE: size_t == int, lol
+;;; 
+;;; simulate files?
+;;; - fopen
+;;; - fclose
+;;; - fseek
+;;; - fread
+;;; - fwrite
+
+;;; -------- <ctype.h>
+;;; 98 Bytes !
+;;; 
+;;; - isspace
+;;; - isxdigit
+;;; - isdigit
+;;; - isalnum
+;;; - isalpha
+;;; - isupper
+;;; - islower
+;;; - ispunct
+;;; - tolower
+;;; - toupper
+;;; - (isblank)
+;;; - (isgraph)
+;;; - (isprint)
+;;; - (isascii)
+;;; - (iscntrl)
+;;; - (toascii)
+
+;;; -------- <stdlib.h>
+;;; 
+;;; TODO:
+;;; - malloc
+;;; - free
+;;; - realloc
+;;; - calloc
+;;; - _Exit(int)
+;;; - abort()
+;;; - exit(int)
+
+;;; - abs
+;;; - atoi
+;;; - div
+;;; - rand()
+;;; - random()
+;;; - srand()
+;;; - srandom()
+
+;;; - getenv
+;;; - putenv
+;;; - setenv
+
+;;; - bsearch
+;;; - qsort
+;;; - setkey
+;;; - encrypt
+
+;;; --------- <stddef.h
+
+;;; TODO:
+;;; - NULL
+;;; - size_t
+;;; - TYPE: ptrdiff_t
+;;; 
+
+;;; ---------- <limits.h>
+;;;     {INT_MAX}
+;;;            Maximum value for an object of type int.
+;;;            Minimum Acceptable Value: 2 147 483 647
+;;;     {INT_MIN}
+;;;            Minimum value for an object of type int.
+;;;            Maximum Acceptable Value: -2 147 483 647
+;;;     {UINT_MAX}
+;;;            Maximum value for an object of type unsigned.
+;;;            Minimum Acceptable Value: 4 294 967 295
+
+;;; ---------- <strings.h>
+;;; 
+;;; TODO:
+;;; - ffs(int) -> bit set (32..1) 1== 0x01 input FFS!
+;;; - strcasecmp
+;;; - strncasecmp
+
+;;; --------- <system.h>
+;;; - exec?
+
+;;; --------- <string.h>
+;;; 
+;;; TODO: 
+;;; - memset
+;;; - memcpy
+;;; - memmove
+;;; 
+;;; - memchr
+;;; - memcmp
+;;; - (memccopy) can be used to impl strcpy
+;;; 
+;;; - strcat
+;;; - strcpy
+;;; - strlen
+;;; 
+;;; - strcmp
+;;; - strchr
+;;; - strstr
+;;; 
+;;; - strdup
+;;; 
+;;; - strncat
+;;; - strncmp
+;;; - (strndup)
+;;; - (strnlen)
+;;; 
+;;; - strcspn
+;;; - strpbrk
+;;; - strrchr
+;;; - strspn
+;;; - strtok
+;;; 
+;;; - (strerror)
 
 .zeropage
 ;;; reserved, lol
@@ -615,33 +774,7 @@ PUTHEX=1
 .include "print.asm"
 
 
-;;; Current byte count:
-;;; 
-;;; 20 - puth, put4h, put2h
-;;; 13 - plaprinth (to reverse)
-;;; 22 - axputz==printz, writez tos+Y
-;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
-;;; 13 - xputu saves A,X prints tos
-;;;      (todo cleanup printn,putu does jmp _drop, lol
-;;;  7 - axputu
-;;;  7 - axputh
-;;; (7)- axputd 
-;;; ========
-;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
-;;; 
-;;; 127 B according to info() ?
-
-
-;;; = BIOS
-;;; 17 - getchar (save XY)
-;;; 19 - nl plaputchar putchar (save AXY, \n)
-;;;  4 - rawputc
-;;;(14)- 3 clrscr, 3 forward, 3 bs, 5 spc
-;;; ========
-;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
-
-
-;;; from Summary of ROM addrsses
+;;; from ORIC: Summary of ROM addrsses
 ;;; $c58c : Input a line.
 ;;; $c5e9 : Wait for a keypress and return the ASCII codel.
 ;;; $d499 : Integer to floating point.
@@ -777,15 +910,20 @@ PUTHEX=1
 ;;;
 
 
-FUNC ctypestart
 ;
 CTYPE=1
 
 .ifdef CTYPE
-;;; 80 B - 8 functions (- #xe6 #x96)
+
+FUNC _ctypestart
+;;; 98 B - 10 functions (- #xf8 #x96)
 ;;; 
 ;;; (cheaper than most compilers as they in
 ;;; addition keep an 128 byte table, and each F is at least 8 bytes)
+
+;;; TODO: trigger inclusion on:
+;;; 
+;;;   #include <ctype.h>
 
 isxdigit:
 ;;; 13
@@ -794,6 +932,7 @@ isxdigit:
         cmp #'a'
         bcc :+
         cmp #'f'+1
+;;; TDOO: cannot be relocated!
         jmp retC
 :       
         tya
@@ -823,18 +962,21 @@ isalnum:
         bne rettrue
         tya
 isalpha:        
-;;; 11
+;;; 12
+        tay
         ;; make all lower case
         ora #32
         sec
         sbc #'a'
         cmp #'z'-'a'+1
+;;; TDOO: cannot be relocated!
         jmp retC
 
 isspace:        
 ;;; 6
         ;; we take ourselves some freedom of interpreation!
         cmp #' '+1
+;;; TDOO: cannot be relocated!
         jmp retC
 
 islower:        
@@ -842,6 +984,7 @@ islower:
         sec
         sbc #'a'
         cmp #'z'-'a'+1
+;;; TDOO: cannot be relocated!
         jmp retC
 
 isupper:        
@@ -849,6 +992,7 @@ isupper:
         sec
         sbc #'A'
         cmp #'Z'-'A'+1
+;;; TDOO: cannot be relocated!
         jmp retC
 
 ispunct:        
@@ -861,6 +1005,25 @@ ispunct:
         ;; reverse others
         bcc retfalse
         bcs rettrue
+
+toupper:        
+;;; 9
+        jsr isalpha
+        tya
+        bcs :+
+        and #255-32
+:       
+        rts
+
+tolower:        
+;;; 9
+        jsr isalpha 
+        tya
+        bcs :+
+        ora #32
+:       
+        rts
+        
 
 FUNC _ctypeend
 .endif ; CTYPE
@@ -3566,6 +3729,16 @@ FUNC _iorulesend
         .byte "|ispunct(",_E,")"
       .byte '['
         jsr ispunct
+      .byte ']'
+
+        .byte "|toupper(",_E,")"
+      .byte '['
+        jsr toupper
+      .byte ']'
+
+        .byte "|tolower(",_E,")"
+      .byte '['
+        jsr tolower
       .byte ']'
 .else
 
