@@ -9776,8 +9776,10 @@ DOUBLE   =128+10
 ;;; Pretend to be prefixed by:
 ;;; 
 ;;;   typedef unsigned uint16_t word;
-;;;   typedef unsigned uing8_t  byte;
 ;;; 
+
+;;; TODO: remove "word" and make "int" default.
+;;;   all ops except < don't care! (2 complement)
 
 
 ;;; OK, not fully true, but try not put 
