@@ -572,22 +572,10 @@ CSTIMER         = $0276
   .ident(.string(name)):
 .endmacro
 
-;;; ========================================
-;;; ---------------- LIBRARY ---------------
 
-FUNC _librarystart
-;;; Current byte count:
-;;; 
-;;; Bytes #functions
-;;; ----- ---- 
-;;;    23(?)      BIOS: getchar putchar
-;;;   119(?)      #include <stdio.h>
-;;;                (print.asm: putu, putchar, putz) (127 B?)
-;;;    98   10    #include <ctype.h> isdigit isalnum ...
-;;;   144    6    #include <srting.h> strlen strcpy ...
-;;; ======
-;;;   384         (+ 23 119 98 144) 
 
+;;; ----------------------------------------
+;;;                  BIOS
 
 ;;; -------- BIOS
 ;;; 17 - getchar (save XY)
@@ -598,188 +586,34 @@ FUNC _librarystart
 ;;; (+ 17 19 4 14) = 54 ( 56 according to info() ? )
 
 
-;;; -------- <stdio.h> - LOL
-;;; 
-;;; --- basis for PRINTF modular
-;;; 20 - puth, put4h, put2h
-;;; 13 - plaprinth (to reverse)
-;;; 22 - axputz==printz, writez tos+Y
-;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
-;;; 13 - xputu saves A,X prints tos
-;;;      (todo cleanup printn,putu does jmp _drop, lol
-;;;  7 - axputu
-;;;  7 - axputh
-;;; (7)- axputd 
-;;; ========
-;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
-;;; 
-;;; 127 B according to info() ?
-;;; 
-;;; TODO:messy code: cleanup, rewrite
+
+;;; enable to invers on hibit
+;TTY_HIBIT=1
 
 
-;;; TODO:
-;;; - puts axputz w nl, lol
-;;; - printf
-;;; - (sprintf)
-;;; 
-;;; - stdin, stdout - vars, lol
-;;; - stderr - write on screen with INVERSE? lol
-;;; - getline
-;;; - gets
+FUNC _biosstart
 
-;;; - fprintf(STDOUT, 
-;;; - fprintf(STDERR,
-;;; - getc(FILE)
-;;; - ungetc(FILE)
-;;; - feof(FILE)
-;;; - ffflush(FILE)
-;;; - TYPE: size_t == int, lol
+;OLDSTYLE=1
+;;; TODO: remove!!!!
+.ifdef OLDSTYLE
+  .include "bios.asm"
+  TTY_HELPERS=1
+.else
 
-;;; ------- <time.h>
-;;; - clock difftime
-;;; - va_start va_arg va_copy va_end
-;;; - signal (irq timer?)
+.ifdef __ATMOS__
+  ;.include "bios-raw-atmos.asm"
+  .include "bios-atmos-rom.asm"
+.else ; SIM
+  .include "bios-sim.asm"
+.endif ; __ATMOS__ | SIM
 
-;;; -------- <assert.h>
-;;; - assert
+.endif ; OLDSTYLE
+
+FUNC _biosend
 
 
-;;; ORIC:
-;;; - wait
-;;; - plot scrn
-;;; - plots
-
-
-;;; simulate files?
-;;; - fopen
-;;; - fclose
-;;; - fseek
-;;; - fread
-;;; - fwrite
-
-
-
-;;; -------- <ctype.h>
-;;; 98 Bytes !
-;;; 
-;;; Inlineable (if no #include <ctype.h>)
-;;; - isdigit
-;;; - isalpha
-;;; - isspace
-;;; These are "all-or-nothing"
-;;; - isspace
-;;; - isxdigit
-;;; - isdigit
-;;; - isalnum
-;;; - isalpha
-;;; - isupper
-;;; - islower
-;;; - ispunct
-;;; - tolower
-;;; - toupper
-;;; 
-;;; - (isblank)
-;;; - (isgraph)
-;;; - (isprint)
-;;; - (isascii)
-;;; - (iscntrl)
-;;; - (toascii)
-
-;;; -------- <stdlib.h>
-;;; 
-;;; TODO:
-;;; - malloc
-;;; - free
-;;; - realloc
-;;; - calloc
-;;; - _Exit(int)
-;;; - abort()
-;;; - exit(int)
-
-;;; - abs
-;;; - atoi
-;;; - div
-;;; - rand()
-;;; - random()
-;;; - srand()
-;;; - srandom()
-
-;;; - getenv
-;;; - putenv
-;;; - setenv
-
-;;; - bsearch
-;;; - qsort
-;;; - setkey
-;;; - encrypt
-
-;;; --------- <stddef.h
-
-;;; TODO:
-;;; - NULL
-;;; - size_t
-;;; - TYPE: ptrdiff_t
-;;; 
-
-;;; ---------- <limits.h>
-;;;     {INT_MAX}
-;;;            Maximum value for an object of type int.
-;;;            Minimum Acceptable Value: 2 147 483 647
-;;;     {INT_MIN}
-;;;            Minimum value for an object of type int.
-;;;            Maximum Acceptable Value: -2 147 483 647
-;;;     {UINT_MAX}
-;;;            Maximum value for an object of type unsigned.
-;;;            Minimum Acceptable Value: 4 294 967 295
-
-;;; ---------- <strings.h>
-;;; 
-;;; TODO:
-;;; - ffs(int) -> bit set (32..1) 1== 0x01 input FFS!
-;;; - strcasecmp
-;;; - strncasecmp
-
-;;; --------- <system.h>
-;;; - exec?
-
-;;; --------- <string.h>
-;;; 
-;;; TODO: 
-;;; - memset
-;;; - memcpy
-;;; - memmove
-;;; 
-;;; - memchr
-;;; - memcmp
-;;; - (memccopy) can be used to impl strcpy
-;;; 
-;;; 14 - stpcpy (stpTOScpy using strTOScpy)
-;;; 16 - strcat (strTOScat using strTOSchrY)
-;;; 26 - strcpy (strAXcpy and strTOScpy)
-;;; 
-;;; 22 - strlen
-;;; 30 - strcmp (strTOScmp)
-;;; 36 - strchr (strAXchrY, strTOSchrY)
-;;; - strstr
-;;; -----
-;;; 144 Bytes
-;;; 
-;;; 
-;;; - strdup
-;;; 
-;;; - strncat
-;;; - strncmp
-;;; - (strndup)
-;;; - (strnlen)
-;;; 
-;;; - strcspn
-;;; - strpbrk
-;;; - strrchr
-;;; - strspn
-;;; - strtok
-;;; 
-;;; - (strerror)
+;;; ========================================
+;;;          D       A       T       A
 
 .zeropage
 ;;; reserved, lol
@@ -806,33 +640,38 @@ tmp1:   .res 2
 
 .code
 
-;;; ----------------------------------------
-;;;                  BIOS
 
-;;; enable to invers on hibit
-;TTY_HIBIT=1
+;;; ========================================
+;;; ---------------- LIBRARY ---------------
+
+;
+NOLIBRARY=1
+.ifndef NOLIBRARY
+
+;;; #include <string.h> // constants and functions
+;
+STRING=1
+
+;;; #include <ctype.h> // isXXX()
+;
+CTYPE=1
+
+.endif ; NOLIBRARY
 
 
-FUNC _biosstart
-
-;OLDSTYLE=1
-;;; TODO: remove!!!!
-.ifdef OLDSTYLE
-  .include "bios.asm"
-  TTY_HELPERS=1
-.else
-
-.ifdef __ATMOS__
-  ;.include "bios-raw-atmos.asm"
-  .include "bios-atmos-rom.asm"
-.else ; SIM
-  .include "bios-sim.asm"
-.endif ; __ATMOS__ | SIM
-
-.endif ; OLDSTYLE
-
-FUNC _biosend
-
+FUNC _librarystart
+;;; Current byte count:
+;;; 
+;;; Bytes #functions
+;;; ----- ---- 
+;;; [  23(?)      BIOS: getchar putchar -- NOT part of LIBRARY]
+;;;    17         nl/newline spc bs clrscr...
+;;;   119(?)      #include <stdio.h>
+;;;                (print.asm: putu, putchar, putz) (127 B?)
+;;;    98   10    #include <ctype.h> isdigit isalnum ...
+;;;   144    6    #include <srting.h> strlen strcpy ...
+;;; ======
+;;;   384         (+ 23 119 98 144) 
 
 
 
@@ -890,6 +729,63 @@ spc:
 .endif ; !TTY_HELPERS
 
 
+FUNC _mathstart
+;;; --------------- <math.h>
+;;;
+;;; - * mul16
+;;; - / div16
+;;; - (div in stdlib?!)
+;;; - nothing, it'sl all float/double? 
+
+
+FUNC _mathend
+
+
+FUNC _stdiostart
+;;; -------- <stdio.h> - LOL
+;;; 
+;;; --- basis for PRINTF modular
+;;; 20 - puth, put4h, put2h
+;;; 13 - plaprinth (to reverse)
+;;; 22 - axputz==printz, writez tos+Y
+;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
+;;; 13 - xputu saves A,X prints tos
+;;;      (todo cleanup printn,putu does jmp _drop, lol
+;;;  7 - axputu
+;;;  7 - axputh
+;;; (7)- axputd 
+;;; ========
+;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
+;;; 
+;;; 127 B according to info() ?
+;;; 
+;;; TODO:messy code: cleanup, rewrite
+
+;;; simulate files?
+;;; - fopen
+;;; - fclose
+;;; - fseek
+;;; - fread
+;;; - fwrite
+
+;;; TODO:
+;;; - puts axputz w nl, lol
+;;; - printf
+;;; - (sprintf)
+;;; 
+;;; - stdin, stdout - vars, lol
+;;; - stderr - write on screen with INVERSE? lol
+;;; - getline
+;;; - gets
+
+;;; - fprintf(STDOUT, 
+;;; - fprintf(STDERR,
+;;; - getc(FILE)
+;;; - ungetc(FILE)
+;;; - feof(FILE)
+;;; - ffflush(FILE)
+;;; - TYPE: size_t == int, lol
+
 ;;; TODO: somehow should be able to put BEFORE begin.asm
 ;;;    but not get error, just doesn't work! (hang)
 ;;;    or AFTER 
@@ -899,252 +795,46 @@ PUTHEX=1
 .include "print.asm"
 
 
-;;; (inp) => AX, inp points at next (not digit) char
-;;; 
-;;; TODO: too big! just use parse rules!!!
-.ifdef ATOI
-FUNC _atoiXR
-        lda #0
-        sta tos
-        sta tos+1
-        ;; base
-        sta dos
-        lda #10
-        sta base
+FUNC _stdioend
 
-        ;; 0x 'c' -
-        lda (0,x)
-        ;; ' - char constant
-        cmp #'''
-        bne :+
-        
-        jsr _incXR
-        lda (0,x)
-        ;; TODO: handle \' \n \b \t ???
-        jsr _incXR
-        ;; - should be '-' lol
-        jsr _incXR
-        jmp @retA
-:       
-        ;; "-" negative
-        cmp #'-'
-        bne :+
+;;; ------- <time.h>
+;;; - clock difftime
+;;; - va_start va_arg va_copy va_end
+;;; - signal (irq timer?)
 
-        jsr _incXR
-        jsr _atoiXR
-        jmp _negate
-:       
-        ;; "0x" - hex
-        cmp #'0'
-        bne :+                  ; 1-9
-        jsr _incXR
-        ora #32
-        cmp #'X'
-        bne @ret                ; zero! (no octal...)
-        
-        lda #16
-        sta base
-:       
-        lda (0,x)
-        ;; digit? '0' <= a <= '9'
-        sec
-        sbc #'0'
-        cmp #'9'+1-'0'
-        bcs @notdigit
-        ;; digit
-        sta savea
-        lda base
-        sta dos
-        lda #0
-        ;; tos= tos * dos; // mul16 destroys tos&dos
-        jsr _mul16bits
-        ;; c=0 from cmp
-        adc savea
-        tay
-
-@ret:
-        lda tos
-@retA:
-        ldx tos+1
-        rts
-.endif ; ATOI
+;;; -------- <assert.h>
+;;; - assert
 
 
-.ifdef SIGNED
-;;; 31B
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-;;; print signed decimal
-FUNC _putd
-putd:
-;;; 19 b
-        cpx #0
-        bpl :+
-        putc '-'
-:       
-        ;; negate
-        jsr _negate
-        
-        sta tos
-        stx tos+1
-        jmp putu
-
-FUNC _dummyd
-.endif ; SIGNED
-
-
-;;; from ORIC: Summary of ROM addrsses
-;;; $c58c : Input a line.
-;;; $c5e9 : Wait for a keypress and return the ASCII codel.
-;;; $d499 : Integer to floating point.
-;;; $d99c : Floating point to integer.
-;;; $dced : Multiply the accumulator with memoryh.
-;;; $dd61 : Move memory to the second accumulator.
-;;; $dda7 : Multiply the accumulator by 10.
-;;; $ddc3 : Divide the accumulator by 10.
-;;; $dde4 : Divide memory by the accumulator.
-;;; $dde9 : Divide the second accumulator by the main accumulator.
-;;; $de77 : Move memory to the main accumulator
-;;; $dead : Move the accumulator to memory.
-;;; $ded6 : Move the second accumulator to the main accumulator.
-;;; $dee5 : Move the main accumulator to the second accumulator.
-;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
-;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
-;;; $e5f5 : Clear the top line.
-;;; $e5ea : Print message at far left of top line.
-;;; $e790 : Compare filenames.
-;;; $eb78 : Read a key without waiting.
-;;; $f77c : Output character from X register to screen.
-;;; $f865 : Output message to the top line at position X.
-;;; $f523 : Poll keyboard.
-;;; $f5c1 : Output character to printer.
-;;; $f8d0 : Set up the ASCII character set.
-
-;;; ORIC routines can use for MINIMAL
-;;; C3F8 (C3F4) - A block move.
-;;; C483 (C47C) - Input and process a line.
-;;; C59C (C58C) - Input a line.Input a line.
-;;; DDA3 (DDA7) - 
-
-;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
-;;; 
-;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
-;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
-;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
-;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
-;;; EDCC E4 11 CPX $11   length of data to be moved is 
-;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
-
-
-;;; -- PRINT INTEGER IN A,X.
-;;; E0C5 85 D1 STA $D1 
-;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
-;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
-;;; E0CB 38 SEC Set sign to positive.
-;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
-
-;;; - GET NUMBER
-;;; DFE7 A0 00 LDY #$00 GET NUMBER.
-;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
-;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
-
-;;; - INT
-;;; DFBD A5 D0 LDA $D0 INT
-;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
-;;; DFC1 B0 20 BCS $DFE3 is integer already. 
-;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
-
-;;; - udiv16 (0c00/???) used by graphics line
-;;; EFC8 48 PHA This is a division routine 
-;;; EFC9 8A TXA that is used to calculate the 
-;;; EFCA 48 PHA slope of a line being drawn. 
-;;; EFCB 98 TYA 
-;;; EFCC 48 PHA The routine acts on 16 bit 
-;;; EFCD A9 00 LDA #$00 numbers. 
-;;; EFCF 85 0E STA $0E 
-;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
-;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
-;;; EFD5 06 0C ASL $0C set before routine is called. 
-;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
-;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
-;;; EFDB 26 0F ROL $0F 
-;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
-;;; EFDF 38 SEC this routine.
-
-;;; - lookup key from key code
-;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
-
-;;; - putc (335 B)
-;;; 
-;;; additional: 32 Bytes jmp table!
-;;; 
-;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
-;;; ...
-;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
-;;; ...
-;;; F730 60 RTS
-;;; ^^^^ end
-
-;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
-;;; - putc (+ 154 335) = 489!!!
-;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
-;;; ... (lots of stuff!!!)
-;;; F815 60 RTS
-
-;;; - mul40 (47 B)
-;;; F731 A0 00 LDY #$00 This routine multiplies the 
-;;; F733 8C 63 02 STY $0263 content of the accumulator by 
-;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
-;;; F739 0A ASL A byte of the result. The page 
-;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
-;;; F73D 0A ASL A results.
-;;; ...
-;;; F759 60 RTS 
-
-;;; - atoi (but on error jumps BASIC, lol)
-;;; ( no over 25*256 ??? - it's for line numbers?)
-;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
-
-
-;;; 33 - printd (smallest I found), but only DECIMAL
-
-;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
-;;; -- maybe this can be made more generic?
-;;; 24 - udiv10 - ORIC
-;;; -- baically it's a udiv16by8bits
-
-;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
-
-;;; TODO: math - floating point??? LOL
-;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
-;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
-
-;;; rand, random(), srandom()
-;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
-
-;;; RULES: memcpy/set can do inline for some fixed nubmers!
-;;; 19 - memcpy selfmodifying code
-;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
-;;; 
-;;;
-
-
-;
-CTYPE=1
-
-.ifdef CTYPE
 
 FUNC _ctypestart
+;;; -------- <ctype.h>
+;;; 98 Bytes !
+;;; 
+;;; Inlineable (if no #include <ctype.h>)
+;;; - isdigit
+;;; - isalpha
+;;; - isspace
+;;; These are "all-or-nothing"
+;;; - isspace
+;;; - isxdigit
+;;; - isdigit
+;;; - isalnum
+;;; - isalpha
+;;; - isupper
+;;; - islower
+;;; - ispunct
+;;; - tolower
+;;; - toupper
+;;; 
+;;; - (isblank)
+;;; - (isgraph)
+;;; - (isprint)
+;;; - (isascii)
+;;; - (iscntrl)
+;;; - (toascii)
+.ifdef CTYPE
+
 ;;; 98 B - 10 functions (- #xf8 #x96)
 ;;; 
 ;;; (cheaper than most compilers as they in
@@ -1252,21 +942,211 @@ tolower:
         ora #32
 :       
         rts
-FUNC _ctypeend
 .endif ; CTYPE
+FUNC _ctypeend
 
 
+FUNC _stdlibstart
+;;; -------- <stdlib.h>
+;;; 
+;;; TODO:
+;;; - malloc
+;;; - free
+;;; - realloc
+;;; - calloc
+;;; - _Exit(int)
+;;; - abort()
+;;; - exit(int)
+
+;;; - abs
+;;; - atoi
+;;; - div
+;;; - rand()
+;;; - random()
+;;; - srand()
+;;; - srandom()
+
+;;; - getenv
+;;; - putenv
+;;; - setenv
+
+;;; - bsearch
+;;; - qsort
+;;; - setkey
+;;; - encrypt
+;;; (inp) => AX, inp points at next (not digit) char
+;;; 
+;;; TODO: too big! just use parse rules!!!
+.ifdef ATOI
+FUNC _atoiXR
+        lda #0
+        sta tos
+        sta tos+1
+        ;; base
+        sta dos
+        lda #10
+        sta base
+
+        ;; 0x 'c' -
+        lda (0,x)
+        ;; ' - char constant
+        cmp #'''
+        bne :+
+        
+        jsr _incXR
+        lda (0,x)
+        ;; TODO: handle \' \n \b \t ???
+        jsr _incXR
+        ;; - should be '-' lol
+        jsr _incXR
+        jmp @retA
+:       
+        ;; "-" negative
+        cmp #'-'
+        bne :+
+
+        jsr _incXR
+        jsr _atoiXR
+        jmp _negate
+:       
+        ;; "0x" - hex
+        cmp #'0'
+        bne :+                  ; 1-9
+        jsr _incXR
+        ora #32
+        cmp #'X'
+        bne @ret                ; zero! (no octal...)
+        
+        lda #16
+        sta base
+:       
+        lda (0,x)
+        ;; digit? '0' <= a <= '9'
+        sec
+        sbc #'0'
+        cmp #'9'+1-'0'
+        bcs @notdigit
+        ;; digit
+        sta savea
+        lda base
+        sta dos
+        lda #0
+        ;; tos= tos * dos; // mul16 destroys tos&dos
+        jsr _mul16bits
+        ;; c=0 from cmp
+        adc savea
+        tay
+
+@ret:
+        lda tos
+@retA:
+        ldx tos+1
+        rts
+.endif ; ATOI
 
 
-;;; enable string constants
-;
-STRING=1
+.ifdef SIGNED
+;;; 31B
+FUNC _negate
+;;; 12 b
+        sec
+        eor #$ff
+        adc #0
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+        rts
 
+;;; print signed decimal
+FUNC _putd
+putd:
+;;; 19 b
+        cpx #0
+        bpl :+
+        putc '-'
+:       
+        ;; negate
+        jsr _negate
+        
+        sta tos
+        stx tos+1
+        jmp putu
+
+FUNC _dummyd
+.endif ; SIGNED
+
+FUNC _stdlibend
+
+;;; --------- <stddef.h
+
+;;; TODO:
+;;; - NULL
+;;; - size_t
+;;; - TYPE: ptrdiff_t
+;;; 
+
+;;; ---------- <limits.h>
+;;;     {INT_MAX}
+;;;            Maximum value for an object of type int.
+;;;            Minimum Acceptable Value: 2 147 483 647
+;;;     {INT_MIN}
+;;;            Minimum value for an object of type int.
+;;;            Maximum Acceptable Value: -2 147 483 647
+;;;     {UINT_MAX}
+;;;            Maximum value for an object of type unsigned.
+;;;            Minimum Acceptable Value: 4 294 967 295
+
+;;; ---------- <strings.h>
+;;; 
+;;; TODO:
+;;; - ffs(int) -> bit set (32..1) 1== 0x01 input FFS!
+;;; - strcasecmp
+;;; - strncasecmp
+
+;;; --------- <system.h>
+;;; - exec?
 
 FUNC _stringstart
-;
 .ifdef STRING
-
+;;; --------- <string.h>
+;;; 
+;;; TODO: 
+;;; - memset
+;;; - memcpy
+;;; - memmove
+;;; 
+;;; - memchr
+;;; - memcmp
+;;; - (memccopy) can be used to impl strcpy
+;;; 
+;;; 14 - stpcpy (stpTOScpy using strTOScpy)
+;;; 16 - strcat (strTOScat using strTOSchrY)
+;;; 26 - strcpy (strAXcpy and strTOScpy)
+;;; 
+;;; 22 - strlen
+;;; 30 - strcmp (strTOScmp)
+;;; 36 - strchr (strAXchrY, strTOSchrY)
+;;; - strstr
+;;; -----
+;;; 144 Bytes
+;;; 
+;;; 
+;;; - strdup
+;;; 
+;;; - strncat
+;;; - strncmp
+;;; - (strndup)
+;;; - (strnlen)
+;;; 
+;;; - strcspn
+;;; - strpbrk
+;;; - strrchr
+;;; - strspn
+;;; - strtok
+;;; 
+;;; - (strerror)
 strlen: 
 ;;; 22 B
         sta pos
@@ -1438,10 +1318,197 @@ strTOScat:
         ;; concat(TOS,AX)
         jmp strTOScat
         ;; STRCAT returns original dest
-
-        
 .endif ; STRING
 FUNC _stringend
+
+FUNC _runtimestart
+;;; ---------- <unistd.h>
+;;; 
+;;; - alarm
+;;; - chdir
+;;; - chown
+;;; - close
+;;; - crypt
+;;; - dup/dup2
+;;; - _exit
+;;; - encrypt
+;;; - _exit
+;;; - fsync
+;;; - ftruncate
+;;; - getcwd
+;;; - gethostname
+;;; - getpid
+;;; - getuid
+;;; - isatty
+;;; - link
+;;; - lockf
+;;; - lseek
+;;; - nice
+;;; - pause
+;;; - read
+;;; - rmdir
+;;; - sleep
+;;; - sync
+;;; - truncate
+;;; - ttyname
+;;; - unlink
+;;; - write
+;;; ---- pthreads?
+
+FUNC _graphicsstart
+
+;;; ORIC:
+;;; - wait
+;;; - plot scrn
+;;; - plots
+FUNC _graphicsend
+
+
+
+FUNC _runtimeend
+;;; TODO: IRQ put here!
+
+
+
+
+;;; from ORIC: Summary of ROM addrsses
+;;; $c58c : Input a line.
+;;; $c5e9 : Wait for a keypress and return the ASCII codel.
+;;; $d499 : Integer to floating point.
+;;; $d99c : Floating point to integer.
+;;; $dced : Multiply the accumulator with memoryh.
+;;; $dd61 : Move memory to the second accumulator.
+;;; $dda7 : Multiply the accumulator by 10.
+;;; $ddc3 : Divide the accumulator by 10.
+;;; $dde4 : Divide memory by the accumulator.
+;;; $dde9 : Divide the second accumulator by the main accumulator.
+;;; $de77 : Move memory to the main accumulator
+;;; $dead : Move the accumulator to memory.
+;;; $ded6 : Move the second accumulator to the main accumulator.
+;;; $dee5 : Move the main accumulator to the second accumulator.
+;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
+;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
+;;; $e5f5 : Clear the top line.
+;;; $e5ea : Print message at far left of top line.
+;;; $e790 : Compare filenames.
+;;; $eb78 : Read a key without waiting.
+;;; $f77c : Output character from X register to screen.
+;;; $f865 : Output message to the top line at position X.
+;;; $f523 : Poll keyboard.
+;;; $f5c1 : Output character to printer.
+;;; $f8d0 : Set up the ASCII character set.
+
+;;; ORIC routines can use for MINIMAL
+;;; C3F8 (C3F4) - A block move.
+;;; C483 (C47C) - Input and process a line.
+;;; C59C (C58C) - Input a line.Input a line.
+;;; DDA3 (DDA7) - 
+
+;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
+;;; 
+;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
+;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
+;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
+;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
+;;; EDCC E4 11 CPX $11   length of data to be moved is 
+;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
+
+
+;;; -- PRINT INTEGER IN A,X.
+;;; E0C5 85 D1 STA $D1 
+;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
+;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
+;;; E0CB 38 SEC Set sign to positive.
+;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
+
+;;; - GET NUMBER
+;;; DFE7 A0 00 LDY #$00 GET NUMBER.
+;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
+;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
+
+;;; - INT
+;;; DFBD A5 D0 LDA $D0 INT
+;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
+;;; DFC1 B0 20 BCS $DFE3 is integer already. 
+;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
+
+;;; - udiv16 (0c00/???) used by graphics line
+;;; EFC8 48 PHA This is a division routine 
+;;; EFC9 8A TXA that is used to calculate the 
+;;; EFCA 48 PHA slope of a line being drawn. 
+;;; EFCB 98 TYA 
+;;; EFCC 48 PHA The routine acts on 16 bit 
+;;; EFCD A9 00 LDA #$00 numbers. 
+;;; EFCF 85 0E STA $0E 
+;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
+;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
+;;; EFD5 06 0C ASL $0C set before routine is called. 
+;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
+;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
+;;; EFDB 26 0F ROL $0F 
+;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
+;;; EFDF 38 SEC this routine.
+
+;;; - lookup key from key code
+;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
+
+;;; - putc (335 B)
+;;; 
+;;; additional: 32 Bytes jmp table!
+;;; 
+;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
+;;; ...
+;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
+;;; ...
+;;; F730 60 RTS
+;;; ^^^^ end
+
+;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
+;;; - putc (+ 154 335) = 489!!!
+;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
+;;; ... (lots of stuff!!!)
+;;; F815 60 RTS
+
+;;; - mul40 (47 B)
+;;; F731 A0 00 LDY #$00 This routine multiplies the 
+;;; F733 8C 63 02 STY $0263 content of the accumulator by 
+;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
+;;; F739 0A ASL A byte of the result. The page 
+;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
+;;; F73D 0A ASL A results.
+;;; ...
+;;; F759 60 RTS 
+
+;;; - atoi (but on error jumps BASIC, lol)
+;;; ( no over 25*256 ??? - it's for line numbers?)
+;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
+
+
+;;; 33 - printd (smallest I found), but only DECIMAL
+
+;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
+;;; -- maybe this can be made more generic?
+;;; 24 - udiv10 - ORIC
+;;; -- baically it's a udiv16by8bits
+
+;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
+
+;;; TODO: math - floating point??? LOL
+;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
+;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
+
+;;; rand, random(), srandom()
+;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
+
+;;; RULES: memcpy/set can do inline for some fixed nubmers!
+;;; 19 - memcpy selfmodifying code
+;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
+;;; 
+;;;
+
+
+
+
 
 
 FUNC _minimallibrarystart
@@ -1777,7 +1844,9 @@ ZPVARS=1
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
 ;
 OPTRULES=1
-;
+
+        ;; 
+
 ELSE=1
 
 ;;; Byte optimized rules
@@ -4138,7 +4207,8 @@ FUNC _iorulesend
       .byte ']'
 .else
 
-FUNC _ctypestart
+;;; nah,it's compiletime
+;FUNC _ctypestart 
 ;;; TODO: _byteexpr ??? X?
         .byte "|isdigit(",_E,")"
       .byte '['
@@ -4178,7 +4248,8 @@ FUNC _ctypestart
 :       
         tya
       .byte ']'
-FUNC _ctypeend
+;FUNC _ctypeend
+;;; nah,it's compiletime
 .endif ; !CTYPE
 
 
@@ -7957,9 +8028,11 @@ status:
         lda #>input
         sta pos+1
 
-        jmp @print
+.scope
+        ;; jumps into middle of loop!
+        jmp print
 
-@loop:
+loop:
 .ifdef ERRPOS
 ;;; TODO: on sim65 somehow this goes bad when there's an error
 ;;;   it'll print same character forever!
@@ -7967,43 +8040,44 @@ status:
         ;; hi bit on char is indicator of how var it
         ;; read, next char, or here is the error
         ;; - print red attribute
-        bpl @nohi
+        bpl nohi
         pha
 
-        putc WHITE
         putc BG+RED
+        putc WHITE
 
         ;; - remove hibit from src
         pla
         and #127
         sta (pos),y
 
-        ;; - print more chars for context
+        ;; - print more chars after HILITE for context
         ldy #1
-@printmore:
+printmore:
         jsr putchar
         lda (pos),y
         iny
         cpy #32
-        bcc @printmore
+        bcc printmore
 
-        putc 10
+        PRINTZ {10,"...",10}
         jmp _edit
         
-@nohi:
+nohi:
 .endif ; ERRPOS
 
         ;; print source char
         jsr putchar
 
         jsr _incP
-@print:
+print:
         ldy #0
         lda (pos),y
-        bne @loop
+        bne loop
 
         putc 10
 .endif ; PRINTINPUT
+.endscope
 
         jmp _edit
 ;        jmp failed

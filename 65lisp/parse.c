@@ -377,8 +377,15 @@ extern char idestart,ideend;
 extern char   editorstart,editorend;
 extern char   helptext,helptextend,help,helpend;
 extern char   inputstart,inputend;
-extern char   biosstart,biosend;
-extern char   librarystart,libraryend;
+extern char biosstart,biosend;
+extern char librarystart,libraryend;
+extern char   runtimestart,runtimeend;
+extern char   ctypestart,ctypeend;
+extern char   stdiostart,stdioend;
+extern char   stringstart,stringend;
+extern char   stdlibstart,stdlibend;
+extern char   mathstart,mathend;
+extern char   graphicsstart,graphicsend;
 extern char   minimallibrarystart,minimallibraryend;
 extern char   outputstart,outputend;
 
@@ -404,8 +411,7 @@ void info() {
   printf
     ("\x97\x84- CC02 (MeteoriC-6502compiler) -  \x90\n"
 // TAP-file
-     "C            %6u - use as 'loader'\n"
-     "  main       %6u - main/loader\n"
+     "C %u main %u (loader) TEXT: ?%u\n"
      "  (disasm)   %6u - ^Q disasm code\n"
 //     "  parse      %6u - alt impl\n"
      "  (prettypr) %6u - ^G colorize\n"
@@ -413,29 +419,33 @@ void info() {
    //--------------------------------------
      "FILES        %6u - input/files\n"
      "ASM          %6u (bytes)\n"
-     "  IDE        %6u\n"
-     "    editor   %6u\n"
-     "    help     %6u - help text+code\n"
-     "  C-compiler %6u\n"
-     "    BNF-intrp%6u - BNF interpreter\n"
-     "    C-rules  %6u - C lang rules\n"
-     "      I/O    %6u - put,get-char\n"
-     "      mem    %6u - peek/malloc\n"
-     "      ops    %6u - + / * ... == <\n"
-     "      params %6u - f(3,4,a,b)\n"
-     "      stms   %6u - if while a+=3;\n"
-     "        oric %6u - ORIC ATMOS API!\n"
-     "        (byte)%5u - opt: byte stmts\n"
-     "      misc   %6u - misc rules;\n"
-     "      (byte) %6u - opt: byte ops\n"
+     "\x86""IDE         %6u\n"
+     "  editor     %6u\n"
+     "  help       %6u - help text+code\n"
+     "\x86""C-compiler  %6u\n"
+     "  BNF-intrp  %6u - BNF interpreter\n"
+     "  C-rules    %6u - C lang rules\n"
+     "    I/O      %6u - put,get-char\n"
+     "    mem      %6u - peek/malloc\n"
+     "    ops      %6u - + / * ... == <\n"
+     "    params   %6u - f(3,4,a,b)\n"
+     "    stms     %6u - if while a+=3;\n"
+     "      oric   %6u - ORIC ATMOS API!\n"
+     "      byterules%4u - ++$c; etc\n"
+     "    misc     %6u - misc rules;\n"
+     "    (incl optimize ?%u/byte ?%u)\n"
+// TODO:
 //    "      OPT    %6u - OPT: normal ops\n"
+// TODO:
 //   "  symbols           \n"
    //--------------------------------------
-     "\xff bios      +%6u\\  get/put-char\n"
-     "\xff library   +%6u \\ ctype.h string.h\n"
      // "  minilib    %6u\n"
-     " \xfftap-file  =%4u    >bios+lib+out\n"
-     "\xff  output   +%6u / gen code" // no \n to fit!
+     "\xff  bios\x83+%u\x82 LIB\x82runtime\x87%u\x82misc\x87%u\n"
+     "\xff  LIB ctype\x87%u\x82stdio\x87%u\x82str\x87%u\n"
+     "\x83\xff tap-file \x80\x93=%4u\x82\x90"" bios\x87LIBS\x83+%u\n"
+     "\xff  LIB stdlib\x87%u\x82math\x87%u\x82graphics\x87%u\n"
+     "\xff  output    \x83+%4u\x82- compiled code" // no \n1
+     
 //     "  /reserv    %6u - area reserved"
      , (char*)Cend-(char*)Cstart
        , (char*)Cend-(char*)Cstart-(0
@@ -444,6 +454,7 @@ void info() {
           + (char*)prettyprintEnd-(char*)prettyprintStart
           + (char*)infoEnd-(char*)info
           )
+       , 1300
        , (char*)disasmEnd-(char*)disasmStart
 //       , (char*)CparseEnd-(char*)CparseStart
        , (char*)prettyprintEnd-(char*)prettyprintStart
@@ -477,17 +488,40 @@ void info() {
               - (&stmtrulesend-&stmtrulesstart)
               - (&byterulesend-&byterulesstart)
               )
+         // optimizations
+           , 1300
            , &byterulesend-&byterulesstart
        // TODO: , symbols...
-       , &biosend-&biosstart
-       , &libraryend-&librarystart
+       // one line "bios..."
+         , &biosend-&biosstart
+         , &runtimeend-&runtimestart
+         , (&libraryend-&librarystart
+            -(&runtimeend-&runtimestart)
+            -(&ctypeend-&ctypestart)
+            -(&stdioend-&stdiostart)
+            -(&stringend-&stringstart)
+            -(&stdlibend-&stdlibstart)
+            -(&mathend-&mathstart)
+            -(&graphicsend-&graphicsstart)
+            )
+       // second line "ctype..."
+         , &ctypeend-&ctypestart
+         , &stdioend-&stdiostart
+         , &stringend-&stringstart
          // , &minimallibraryend-&minimallibrarystart
+       // TAP-file estimate
        , (0
           + (&biosend-&biosstart)
           + (&libraryend-&librarystart)
           // + (&minimallibraryend-&minimallibrarystart)
           + outsize
           )
+       // library summary
+       , &libraryend-&librarystart
+       // second last line "stdlib..."
+         , &stdlibend-&stdlibstart
+         , &mathend-&mathstart
+         , &graphicsend-&graphicsstart
        , outsize
      );
 }
