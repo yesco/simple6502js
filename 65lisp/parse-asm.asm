@@ -8151,11 +8151,8 @@ print:
 .export _OK
 _OK:
         jsr _eosnormal
-        jsr nl
-        jsr nl
-        putc 'O'
-        putc 'K'
-        jsr spc
+
+        PRINTZ {10,10,"OK "}
 
 .ifdef INTERRUPT
         jmp _run
@@ -8175,9 +8172,12 @@ _OK:
         sta gos+1
         
         jsr putu
-        putc 'B'
-        putc 10
-        putc 10
+
+        PRINTZ {"B",10,10}
+
+        GOTOXY 14,26
+        ;;              ////////////////////
+        PRINTZ {YELLOW,"e^Xec sr^Z ^Ldit hElpSC",10}
 
         jmp _edit
 
