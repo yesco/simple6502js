@@ -1920,6 +1920,10 @@ PRINTINPUT=1
 ;
 PRINTREAD=1
 
+;;; more compact printing of source when compiling
+;UPDATENOSPACE=1
+
+
 ;;; TODO: make it a runtime flag, if asm is included?
 ;;; TODO: run twice seems to crash, bad state var?
 
@@ -3565,6 +3569,7 @@ FUNC _incIspc
 ;;; - skips any char <= ' ' (incl attributes)
 ;;; - skips "// comment till nl"
 FUNC nextInp
+.scope
 ;;; oops! this was actually important to save all regs!
         pha
         txa
@@ -3572,10 +3577,10 @@ FUNC nextInp
         tya
         pha
 
-@nextc:
+nextc:
         ldy #0
         lda (inp),y
-        beq @done
+        beq done
 
 .ifdef PRINTDOTS
         ;; at each newline print a dot
@@ -3585,60 +3590,24 @@ FUNC nextInp
 :       
 .endif ;PRINTDOTS
 
-        ;; CTRL characters/space skip
-        cmp #' '+1
-        bcc @skipspc
 
-
-;;; Add more cases here!
-
-
-        ;; // comment till NL
-        cmp #'/'
-        bne @done
-
-        ;; look-ahead 1 is '/'?
-        iny
-        lda (inp),y
-        ;; second /
-        cmp #'/'
-        bne @done
-
-        ;; - is comment, skip till NL
-@tillNL:
-        jsr _incI
-        ldy #0
-        lda (inp),y
-        beq @done
-        cmp #10
-        bne @tillNL
-
-@skipspc:
-        jsr _incI
-        jmp @nextc
-
-@done:
-.ifnblank
-ldy #0
-lda (inp),y
-putc '@'
-jsr printchar
-.endif
-
+.ifndef UPDATENOSPACE
 .ifdef ERRPOS
+        pha
+
 ;;; store max input position
 ;;; (indicative of error position)
         lda inp+1
         cmp erp+1
-        bcc @noupdate
-        bne @update
+        bcc noupdate
+        bne update
         ;; erp.hi == inp.hi
         lda inp
         cmp erp
-        bcc @noupdate
-        beq @noupdate
+        bcc noupdate
+        beq noupdate
         ;; erp := inp
-@update:
+update:
 .ifdef PRINTREAD
         pha
 
@@ -3661,15 +3630,101 @@ jsr printchar
         sta erp
         lda inp+1
         sta erp+1
-@noupdate:
+noupdate:
+        pla
 .endif ; ERRPOS
+.endif ; !UPDATENOSPACE
+
+
+        ;; CTRL characters/space skip
+        cmp #' '+1
+        bcc skipspc
+
+;;; Add more cases here!
+
+        ;; #include <...  - just ignore all #! .. NL!
+        cmp #'#'
+        beq tillNL
+        ;; // comment till NL
+        cmp #'/'
+        bne done
+
+        ;; look-ahead 1 is '/'?
+        iny
+        lda (inp),y
+        ;; second /
+        cmp #'/'
+        bne done
+
+        ;; - is comment, skip till NL
+tillNL:
+        jsr _incI
+        ldy #0
+        lda (inp),y
+        beq done
+        cmp #10
+        bne tillNL
+
+skipspc:
+        jsr _incI
+        jmp nextc
+
+done:
+.ifnblank
+ldy #0
+lda (inp),y
+putc '@'
+jsr printchar
+.endif
+
+.ifdef UPDATENOSPACE
+.ifdef ERRPOS
+;;; store max input position
+;;; (indicative of error position)
+        lda inp+1
+        cmp erp+1
+        bcc noupdate
+        bne update
+        ;; erp.hi == inp.hi
+        lda inp
+        cmp erp
+        bcc noupdate
+        beq noupdate
+        ;; erp := inp
+update:
+.ifdef PRINTREAD
+        pha
+
+        ldy #0
+        lda (erp),y
+        jsr putchar
+
+.ifnblank
+        sta tos
+        lda #0
+        sta tos+1
+        putc '#'
+        jsr printu
+        putc ' '
+.endif
+
+        pla
+.endif
+
+        sta erp
+        lda inp+1
+        sta erp+1
+noupdate:
+.endif ; ERRPOS
+.endif ; UPDATENOSPACE
+
 
         pla
         tay
         pla
         tax
         pla
-
+.endscope
         rts
 
 
@@ -5223,7 +5278,7 @@ FUNC _oprulesstart
 
         .byte "|>>%D"
       .byte '['
-PUTC '/'
+;PUTC '/'
 ;;; 15B (breakeven: D=4-)
         stx tos+1
         ldy #'<'
@@ -7976,7 +8031,7 @@ status:
         .word $bb80-2
         ;;     ////////////////////////////////////////
         .byte "CC02 `2025 jsk@yesco.org"
-        .byte               127&YELLOW,"ESC=help",127&WHITE
+        .byte               127&YELLOW," ESC=help",127&WHITE
         .byte 0
 .code
         ;; - from
@@ -8015,7 +8070,7 @@ status:
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ {10,"ERROR>",10}
+        PRINTZ {10,WHITE,"ERROR>",10,10}
 ;        jsr getchar
 ;        jsr clrscr
 
@@ -8051,15 +8106,24 @@ loop:
         and #127
         sta (pos),y
 
-        ;; - print more chars after HILITE for context
+        ;; - print MORE chars after HILITE for context
         ldy #1
+        ldx #0
 printmore:
         jsr putchar
         lda (pos),y
+        ;; limit lines printed
+        cmp #10
+        bne :+
+        inx
+        cpx #8
+        bcs done
+:       
+        ;; limit chars printed
         iny
-        cpy #32
+        cpy #128
         bcc printmore
-
+done:   
         PRINTZ {10,"...",10}
         jmp _edit
         
@@ -10499,6 +10563,7 @@ NOPRINT=1
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
         .byte "// BYTE SIEVE PRIME benchmark",10
+        .byte "#include <stdio.H>",10
         .byte "word main(){",10
 
        ;; BYTE MAGAZINE 8192 => 1899
@@ -10529,7 +10594,7 @@ NOPRINT=1
         .byte "      }",10
         .byte "      ++i;",10
         .byte "    }",10
-        .byte "    putu(c);",10
+        .byte "    printf(",34,"%u",34,", c);",10
         .byte "    ++n;",10
         .byte "  }",10
         .byte "  free(a);",10

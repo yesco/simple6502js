@@ -240,6 +240,7 @@ char* keywords[]={
 #define DEF       CYAN
 #define OPS       GREEN
 #define COMMENT   GREEN
+#define INCLUDE   WHITE
 
 #include <ctype.h>
 #include <string.h>
@@ -276,7 +277,8 @@ next:
     case ';': pc(c); break; // no car color!
     case '"': pc(STRING); while((c=*s)!='"')pc(c),++s; pc(c); break;
     case '\'': pc(STRING); pc(*s);pc(*++s);pc(*++s); break;
-    case '/': if (s[1]=='/') { pc(COMMENT); while((c=*s) && c!='\n' && c!='\r') pc(c),++s; goto next; }
+    case '#': pc(INCLUDE); goto printline;
+    case '/': if (s[1]=='/') printline: { pc(COMMENT); while((c=*s) && c!='\n' && c!='\r') pc(c),++s; goto next; }
       // else fallthrough (if / but not //)
     default:
       if (c<=' ') { pc(c); break; }
