@@ -8928,7 +8928,8 @@ FUNC _listsymbols
         jmp _loadscreen
 waitesc:
         PRINTZ {CYAN,"    ESC>"}
-        jmp getchar
+        jsr getchar
+        jmp _eosnormal
 FUNC _helpend
 
 FUNC _helptext
