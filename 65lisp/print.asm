@@ -270,6 +270,7 @@ printit:
 
 ;;; if had an ITERATOR : dup II swap D swasp @ ;
 ;;; 
+;;; after call tos points at \0 pos
 ;;; 22 B
 FUNC _printz
 axputz:   
@@ -285,7 +286,7 @@ _writez:
         inc tos
         bne _writez
         inc tos+1
-
+        ;; always true
         bne _writez
 :       
         rts
@@ -415,4 +416,8 @@ axputd:
         jmp putd
 .endif
         
+axputs: 
+        jsr axputz
+        jmp nl
+
 PRINTINCLUDED=1

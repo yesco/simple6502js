@@ -368,7 +368,7 @@ rawputret:
 _dummyputc:     
 
 
-.else ; !__ATMOS__
+.else ; !TTY
 
         stx savexputchar
         ;; '\n' -> '\n\r' = CRLF
@@ -431,13 +431,30 @@ nl:
         .import _getchar
         .import _putchar
 
-putchar=_putchar
 getchar=_getchar
 rawputc=_putchar
 
 plaputchar:
         pla
-        jmp putchar
+
+putchar:                
+        sty saveyputchar
+        stx savexputchar
+        pha
+        jsr _putchar
+        pla
+        ldx savexputchar
+        ldy saveyputchar
+        rts
+
+.zeropage
+
+saveaputchar:   .res 1
+savexputchar:   .res 1
+saveyputchar:   .res 1
+
+.code
+
 
 .endif ; !__ATMOS__
 

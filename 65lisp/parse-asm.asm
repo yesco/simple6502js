@@ -1178,10 +1178,13 @@ FUNC _ctypeend
 
 
 
+;;; enable string constants
+;
+STRING=1
+
 
 FUNC _stringstart
 ;
-STRING=1
 .ifdef STRING
 
 strlen: 
@@ -1285,7 +1288,7 @@ strTOScmp:
         rts
 
 
-strstr:
+strTOSstr:
         rts
 
 ;;; tos: first arg, copy to
@@ -1562,6 +1565,7 @@ FUNC _printf
         jsr _incT
         ;; \ quoted
         cmp #'\'
+;        cmp #92                 ; \
         bne :+
         jsr _incT
         bne @printchar
@@ -1766,7 +1770,10 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;PRINTASM=1
+;
+PRINTASM=1
+
+
 .ifndef PRINTREAD
 ;;; Don't do both...
 ;
@@ -1804,7 +1811,7 @@ _start:
         
 ;;; if %V or %A stores 'V' or 'A'
 ;;; 'A' for assigment
-vrule:  .res 1
+percentchar:  .res 1
 
 ;;; not pushing all
 ;state:  
@@ -2156,8 +2163,9 @@ stackerror:
         lda (rule),y
 
         ;; hibit - new rule?
-        bmi _enterrule
-
+        bpl :+
+        jmp _enterrule
+:       
         ;; 0 - end = accept
         bne :+
 jmpaccept:      
@@ -2200,6 +2208,9 @@ percent:
         jsr _incR
         ldy #0
         lda (rule),y
+
+        sta percentchar
+
         ;; - skip it assumes A not modified
         ; pha
         jsr _incR
@@ -2231,50 +2242,106 @@ immret:
 noimm:
 .endif ; IMMEDIATE
 
+        ;; Digits? (constants really)
         cmp #'D'
         beq digits
+.ifdef STRING
+        ;; String?
+        cmp #'s'
+        beq string
         cmp #'S'
         beq string
+.endif ; STRING
+
+        ;; ELSE assume it's %var..
 jmpvar: 
         ;; - % anything...
         ;;   %V (or %A %N %U %...)
         jmp _var
 
+
+
         ;; - "constant string"
         ;; (store inline!?)
 string: 
-;STRING=1
-.ifdef STRING
-        ;; when arrive here %S only reads till "
-        ;; (skipping \"). \n is converted.
-str:    
-        jsr _incI
-        cmp #'"'                ; "
-        bne :+
-        jmp _next
+        ;; determine if to Copy (%S not %s)
+        lda percentchar
+        cmp #'S'                ; sets C if to Copy
+        bcc :+
+        ;; Copy
+        lda #128
+        sta percentchar
+        ;; use "bit percentchar" to test bmi if to Copy
 :       
+        
+        
+str:    
+        ;; Y=0 still
+        ;; get first char
+;        ldy #0
+        lda (inp),y
+        beq failjmp
+        ;; " - at end?
+        cmp #'"'                ; "
+        beq @zero
+
         ;; - quote (next char is raw)
         cmp #'\'
-        bne :+
+        bne @plain
+        ;; -- quoted
         jsr _incI
-        ;; - \n - except => 10
+        ;; - \n => 10
         cmp #'n'
         bne :+
         lda #10
 :       
-;;; TODO: [just copy byte to out]
+        ;; - \t => 9
+        cmp #'t'
+        bne :+
+        lda #9
+:       
+        ;; TODO: - \xff
+@plain:
+        ;; skip to next char (keeps A)
+;;; TODO: why does this skip space? lol wtf?
+        jsr _incI
+
+        ;; - Copy (C=1)
+
+.ifdef PRINTREAD
+;;; TODO: doesn't save Y???
+;jsr putchar
+;ldy #0
+.endif
+
+        ;; 7bit set if to Copy
+        bit percentchar
+        bpl str
+
+;;; TODO: call jsr _outbyte?
+;;; 7 B
+;        ldy #0
+        sta (_out),y
+        jsr _incO
         jmp str
-        ;; have complete string
-;;; TODO: where to store it? haha
-;;; TODO: [0-terminate]
-;;; TODO: [PUSHLOC to here]
-;;; TODO: ldax %D
+
+@zero:
+        ;; zero-terminate if gen
+;putc '<'
+        lda #0
+;        tay
+        sta (_out),y
+        jsr _incO
+        ;; skip "
+        jsr _incIspc
         jmp _next
-.endif ; STRING
+
+
 
 digits:       
         ;; assume it's %D
         jmp _digits
+
 
 
 FUNC _eq    
@@ -2284,7 +2351,6 @@ FUNC _eq
 exitrule:
         jsr _incR
         jmp _next
-
 
 
 FUNC _enterrule
@@ -2920,7 +2986,6 @@ halt:
 FUNC _var
 ;;; 42 B
 DEBC '$'
-        sta vrule
         ldy #0
         lda (inp),y
 .ifnblank
@@ -2965,7 +3030,7 @@ jsr putchar
 
         ;; %N = new defining function/variable
         ;; (TODO: if used for var they are inline code)
-        lda vrule
+        lda percentchar
         cmp #'N'
         bne :+
 
@@ -3012,9 +3077,9 @@ jsr putchar
         
 .ifnblank
         ;; - is assignment? => set dos
-        ;; vrule='A' >>1 => C=1
-        ;;       'V' >>1 => C=0
-        ror vrule
+        ;; percentchar='A' >>1 => C=1
+        ;;             'V' >>1 => C=0
+        ror percentchar
         bcc @noset
         ;; - do set dos
 .else
@@ -3068,7 +3133,7 @@ jsr putchar
 
 ;;; LOCAL
 .ifnblank
-        lda vrule
+        lda percentchar
         cmp #'a'
         bcc @global
 @local:
@@ -3881,9 +3946,14 @@ FUNC _iorulesstart
         jsr axputh
       .byte ']'
 
-        .byte "|printz(",_E,")"
+        .byte "|putz(",_E,")"
       .byte '['
-        jsr _printz
+        jsr axputz
+      .byte ']'
+
+        .byte "|puts(",_E,")"
+      .byte '['
+        jsr axputs
       .byte ']'
 
 .ifdef OPTRULES
@@ -4030,7 +4100,7 @@ FUNC _ctypeend
 
 
 FUNC _stringrulesstart
-.ifdef STRINGS
+.ifdef STRING
 
         .byte "|strlen(",_E,")"
       .byte '['
@@ -4066,7 +4136,7 @@ FUNC _stringrulesstart
 
 
 
-.endif ; STRINGS
+.endif ; STRING
 FUNC _stringrulesend
 
 
@@ -4348,8 +4418,9 @@ FUNC _memoryrulesend
 
 .ifnblank
         .byte "|"
+
       .byte "%{"
-        putc '?'
+        putc '"'                ; "
         jsr immret
 
         .byte "'"
@@ -4395,36 +4466,70 @@ FUNC _memoryrulesend
         ldx #'>'
       .byte ']'
         
-.ifdef BYTERULES
-        ;; BYTERULES
-;;; TODO: if no match backtrack not propagated UP????
-        .byte "|", _U
-      .byte '['
-;;; PRIMEBYTE: TODO: this adds 10bytes!!!! lol 313->323
-;;; but sim: correct, and oric!
-;        ldx #0
-      .byte ']'
-.endif
-
+.ifdef STRING
         ;; string
         .byte "|",34            ; really >"<
-      .byte '['
+      .byte "["
         jmp PUSHLOC
-        .byte ':'               ; push here
-      .byte ']'
+;        .byte ':'               ; push address here
+      .byte "]"
+      
         ;; copies string inline till "
         .byte "%S"
+        ;; fix so that iasm doesn't get confused
+.ifdef PRINTASM
+      .byte "%{"
+        .import _last
+        lda _out
+        sta _last
+        ldx _out+1
+        stx _last+1
+        jsr _iasm
+        jsr immret
+.endif ; PRINTASM
+
       .byte "["
-        ;; load string from %D value
-        .byte ";"               ; pop here
+        ;; load patch address => tos
+        .byte ";"
+      .byte "]"
+      .byte "%{"
+        ;; PATCH jump NOW, to HERE!
+        lda _out
+        ldy #0
+        sta (tos),y
+
+        lda _out+1
+        iny
+        sta (tos),y
+
+;;; I get correct code ldx, ldx but running not?
+clc
+lda tos
+adc #2                          ; to skip jmp ADDRESS
+sta tos
+lda tos+1
+adc #0
+sta tos+1
+
+;;; prints address of string (?)
+lda tos
+ldx tos+1
+jsr axputh
+        jsr immret
+
+      .byte "["
+;        .byte "D"               ; tos= dos; addr of string
         lda #'<'
         ldx #'>'
-      .byte ']'
-        ;; autopatches jmp to here
-;;; TODO: DAMN - wrong, should be to before "load string"
+;        jsr axputh
+      .byte "]"
+
+.endif ; STRING
 
 
 .ifdef POINTERS
+;;; TODO: get's it wrong...?
+;;;   parses and gives "and $addr"!
         .byte "|&%V"
       .byte '['
         lda #'<'
@@ -4448,7 +4553,24 @@ FUNC _memoryrulesend
 
 .endif ; POINTERS
 
+
+;;; last chance, try byte rules?
+;;; TODO: is this sane?
+
+.ifdef BYTERULES
+        ;; BYTERULES
+;;; TODO: if no match backtrack not propagated UP????
+        .byte "|", _U
+      .byte '['
+;;; PRIMEBYTE: TODO: this adds 10bytes!!!! lol 313->323
+;;; but sim: correct, and oric!
+;        ldx #0
+      .byte ']'
+.endif
+
         .byte 0
+
+
 
 .ifdef MINIMAL
 ;;; Just save (TODO:push?) AX
@@ -7945,6 +8067,7 @@ TIMPER=8
 .endif ; TIM
 
         ;; prints return code
+        putc 10
         putc '='
         putc '>'
         jsr spc
@@ -9438,6 +9561,101 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+
+;
+STR=1
+.ifdef STR
+
+
+        .byte "word main(){",10
+        .byte "  puth(s);",10
+        .byte "  putchar(' ');",10
+        ;; TODO: fix this goes wrong
+        ;.byte "  puth(&s);",10
+
+
+
+;;; space dissapear?
+;        .byte "  s= ",34,"foobar        fiefum",34,";",10
+;;; spaces are retained!
+;        .byte "  s= ",34
+ ;       .byte "foobar","     ","fiefum"
+;        .byte 34,";",10
+
+;        .byte "  s= ",34,"foobar fiefum",34,";",10
+        .byte "  s= ",34,"foobar fish-fiefum",34,";",10
+
+
+;;; exists according to manual... but gives error ca64
+;        .literal "  s= ",34,"foobar           fiefum",34,";",10
+
+;;; ALSO NOT WORKING \n
+;        .byte "  s= ",34,"foobar\nfiefum",34,";",10
+;        .byte "  s= ",34,"foobar\\nfiefum",34,";",10
+
+;;; foobar works with +3 on oric but this gives nothing!
+;;; doesn't work on sim, lol
+;;; garbage on oric
+;        .byte "  s= ",34,"0123456789",34,";",10
+;        .byte "  putz(s+3);",10
+
+       .byte "  putchar('\n');",10
+;;; works now, but with extra hibit char first? hmmm
+;;; must e some memory corruption...
+;        .byte "  putz(s-2);",10
+;        .byte "  putchar('\n');",10
+
+        .byte "  putchar('\n');",10
+
+.ifnblank                       
+;;; d=0 doesn't give same result...
+        .byte "  d=0;",10
+        .byte "  putu(strlen(s-d));",10
+        .byte "  putchar('>');",10
+        .byte "  putz(strlen(s-d));",10
+        .byte "  putchar('<');",10
+        .byte "  putchar('\n');",10
+
+        .byte "  putu(strlen(s));",10
+        .byte "  putchar('>');",10
+        .byte "  putz(s);",10
+        .byte "  putchar('<');",10
+        .byte "  putchar('\n');",10
+.endif
+        .byte "  putu(s);",10
+        .byte "  putchar(':');",10
+        .byte "  putu(strlen(s));",10
+        .byte "  putchar('\n');",10
+        .byte "  putchar('>');",10
+
+;;; correct on SIM! (sometimes...)
+        .byte "  putz(s);",10
+        .byte "  putchar('<');",10
+        .byte "  putchar('\n');",10
+
+.ifdef __ATMOS__
+;        .byte "putz(20278);",10
+        .byte "putz(20310);",10
+        .byte "putchar('\n');",10
+        .byte "putz(20310);",10
+;        .byte "putz(20278);",10
+.else
+;;; 7 chars missing, lol
+        .byte "putz(19524);",10
+        .byte "putchar('\n');",10
+        .byte "putz(19642+3);",10
+.endif
+;;; Add these two lines and SIM no longer happyy
+        .byte "putchar('\n');",10
+        .byte "  putu(s);",10   ; should be same?
+
+;        .byte "  puth(s);",10
+        .byte "}",10
+        .byte 0
+.endif ; STR
+
+
 
 ;ISCHAR=1
 .ifdef ISCHAR

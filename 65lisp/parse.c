@@ -19,7 +19,7 @@ extern unsigned int out;
 extern char output, OK;
 
 //unsigned char* last= 0;
-unsigned int last= 0;
+extern unsigned int last= 0;
 
 // incremental disasm from last position/call
 extern void iasmstart() {
