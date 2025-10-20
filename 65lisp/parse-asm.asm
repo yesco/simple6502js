@@ -6202,7 +6202,14 @@ ruleS:
         ;; empty statement is legal
         .byte ";"
         
+        ;; return from void function, no checks
+        .byte "|return;"
+      .byte '['
+        rts
+      .byte ']'
+        
 .ifdef OPTRULES
+        ;; save for no args function!
         .byte "|return%U();"
       .byte '['
         ;; TAILCALL save 1 byte
@@ -9560,6 +9567,9 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+;;; return without argument, lol (AX)
+        .byte "word main(){ 666; return; }",0
 
 
 ;STR=1
