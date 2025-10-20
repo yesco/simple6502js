@@ -260,7 +260,7 @@ void pc(char c) {
 // BUG: compile again (1 or many times)
 //      then ^Garnish it - CRASH!
 extern void prettyprint(char* s) {
-  char c, i, *x, found;
+  char c, *x, found;
 
   lastc= nextcol= 0;
   color= DEFAULT;

@@ -45,8 +45,7 @@ while1:
 ;        cpx $7d
 ;        bne :+
         cmp $7c
-        beq :++
-        :       
+        beq :+
         bcs :++
         :       
         jmp end1

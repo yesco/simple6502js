@@ -806,9 +806,89 @@ tmp1:   .res 2
 
 .code
 
-;;; BIOS
+;;; ----------------------------------------
+;;;                  BIOS
 
-.include "bios.asm"
+;;; enable to invers on hibit
+;TTY_HIBIT=1
+
+
+FUNC _biosstart
+
+;OLDSTYLE=1
+;;; TODO: remove!!!!
+.ifdef OLDSTYLE
+  .include "bios.asm"
+  TTY_HELPERS=1
+.else
+
+.ifdef __ATMOS__
+  ;.include "bios-raw-atmos.asm"
+  .include "bios-atmos-rom.asm"
+.else ; SIM
+  .include "bios-sim.asm"
+.endif ; __ATMOS__ | SIM
+
+.endif ; OLDSTYLE
+
+FUNC _biosend
+
+
+
+
+;;; TODO: counting these bytes?
+
+
+;;; ----------------- MACROS
+
+.ifndef TTY_HELPERS
+
+
+;;; putchar (leaves char in A)
+;;; 5B
+.macro putc c
+        lda #(c)
+        jsr putchar
+.endmacro
+
+;;; for debugging only 'no change registers A'
+;;; 7B
+.macro PUTC c
+;        subtract .set subtract+7
+        pha
+        putc c
+        pla
+.endmacro
+
+;;; 7B - only used for testing
+.macro NEWLINE
+        PUTC 10
+.endmacro
+
+;;; ----------------- UTILTITY PRINTERS
+
+;;; Good to haves!
+.export _clrscr
+_clrscr:        
+clrscr:        
+        lda #12
+        SKIPTWO
+forward:        
+        lda #'I'-'@'
+        SKIPTWO
+bs:
+        lda #8
+        SKIPTWO
+newline:        
+nl:     
+        lda #10
+        SKIPTWO
+spc:
+        lda #' '
+        jmp putchar
+
+.endif ; !TTY_HELPERS
+
 
 ;;; TODO: somehow should be able to put BEFORE begin.asm
 ;;;    but not get error, just doesn't work! (hang)
@@ -1770,6 +1850,10 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
+
+;;; TODO: make it a runtime flag, if asm is included?
+;;; TODO: run twice seems to crash, bad state var?
+
 ;PRINTASM=1
 
 
@@ -9569,7 +9653,7 @@ input:
 ;        .byte "word main(){}",0
 
 ;;; return without argument, lol (AX)
-        .byte "word main(){ 666; return; }",0
+;        .byte "word main(){ 666; return; }",0
 
 
 ;STR=1
@@ -10841,7 +10925,9 @@ savedscreen:
 .bss
         ;; ORIC SCREEN SIZE
         ;; (save program/screen before compile to "input")
-        .res SCREENSIZE+1
+        .res 40*28
+;;; constant expressio expected ???
+;        .res SCREENSIZE+1
 
 .endif ; JUNK
 
