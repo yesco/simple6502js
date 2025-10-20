@@ -2,9 +2,12 @@
 ;;; ALL RIGHTS RESERVED
 ;;; - Free to use for non-commercial purpose subject to
 ;;;   credit of original authorship please!
-;;; - Generated code/tap-files are free!
+;;; - Generated code/tap-files are free, of course!
+
+
 ;;; 
 ;;; Essentially, this is a dynamic rule-based compiler.
+;;; 
 ;;; 
 ;;; It interprets a BNF-description of a programming
 ;;; language while reading and matching it with a
@@ -13,6 +16,7 @@
 ;;; minimal instrumentation to generate runnable machine
 ;;; code.
 ;;;
+
 ;;; 
 ;;; Implementation Notes
 ;;; 
@@ -25,6 +29,7 @@
 ;;; 
 ;;; TODO: store them in ZP when stepping
 ;;; 
+
 ;;; 
 ;;; GOALS:
 ;;; - an actual machine 6502 compiler running on 6502
@@ -43,13 +48,17 @@
 ;;; - somewhat useful error messages
 ;;;   (difficult w recursive descent BNF style parsing)
 ;;; 
+
+;;; 
 ;;; NON-Goals:
 ;;; - not be the best super-optimizing compiler
 ;;; - not be the fastest
 ;;; - no constant folding (yet)
 ;;; 
+
+;;; 
 ;;; The MINIMAL C-language subset:
-;;; - types: word (uint_16) [limited: byte (uint_8) void]
+;;; - types: word (uint_16) [limited: char (uint_8) void]
 ;;; - casting syntax
 ;;; 
 ;;; - decimal numbers: 4711 42
@@ -70,7 +79,7 @@
 ;;;      n := r>>2+r>>3;    // PASCALish
 ;;;      n := r.>>2.+r.>>3;    // PASCALish
 ;;; 
-;;; - return ...;
+;;; - return [...];
 ;;; - if () statement; [else statement;]
 ;;; - label:
 ;;; - goto label;
@@ -78,13 +87,15 @@
 ;;; - while() ...
 ;;; 
 ;;; - putchar(c); getchar();
-;;; - putu(42); puth(666); printz("foo");
+;;; - putu(42); puth(666); putz("foo"); puts("bar");
+;;;   printf("%u",x); printf("%s",s); -- ONLY!
+;;;   (*compliled* printf - in progres, no big printf!)
 ;;; 
 ;;; - word F() { ... } - function definitions
 ;;; - F() G() - function calls (no parameters)
 ;;; 
 ;;; - single letter global variables (no need declare)
-;;; - limited char support: *(byte*)p=   ... *(byte)i;
+;;; - limited char support: *(char*)p=   ... *(char)i;
 ;;; 
 ;;; - library to minimize gen code+rules (slow code==cc65)
 
@@ -114,7 +125,7 @@
 
 
 ;;; OPTIONAL:
-;;; - byte datatype
+;;; - TODO: char datatype
 ;;; - pointers (no type checking): *p= *p+1
 ;;; - I/O: getchar putc putu puth
 ;;; - else statement;
@@ -126,7 +137,7 @@
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
-;;; - 3 @+ v          byte operator (acts only on A not AX)
+;;; - 3 + $ v         byte operator (acts only on A not AX)
 
 
 
@@ -644,8 +655,8 @@ tmp1:   .res 2
 ;;; ========================================
 ;;; ---------------- LIBRARY ---------------
 
-;
-NOLIBRARY=1
+;NOLIBRARY=1
+
 .ifndef NOLIBRARY
 
 ;;; #include <string.h> // constants and functions
@@ -4323,22 +4334,22 @@ FUNC _stringrulesstart
         jsr strAXchrY
       .byte ']'
 
-        .byte "|strTOScpy(",_G
+        .byte "|strcpy(",_G
       .byte '['
         jsr strTOScpy
       .byte ']'
 
-        .byte "|strTOScat(",_G
+        .byte "|strcat(",_G
       .byte '['
         jsr strTOScat
       .byte ']'
 
-        .byte "|strTOScmp(",_G
+        .byte "|strcmp(",_G
       .byte '['
         jsr strTOScmp
       .byte ']'
 
-        .byte "|strTOSstr(",_G
+        .byte "|strstr(",_G
       .byte '['
         jsr strTOSstr
       .byte ']'
@@ -4486,8 +4497,8 @@ FUNC _memoryrulesend
         tax
       .byte "]"
 
-        ;; cast to char/byte == &0xff !
-        .byte "|(byte)",_C
+        ;; cast to char == &0xff !
+        .byte "|(char)",_C
       .byte '['
         ldx #0
       .byte ']'
@@ -5468,7 +5479,7 @@ ruleU:
 
 
         ;; byte
-        .byte "|*(byte*)%V"
+        .byte "|*(char*)%V"
       .byte "["
         lda VAR0
         ldx #0
@@ -6244,9 +6255,11 @@ ruleT:
         ;; don't use SIGNED int/char
 .ifdef FROGMOVE
         .byte "static",TAILREC
-        .byte "|word|byte|void|void*|int",0
+        ;; we don't care
+        .byte "|word|char*|char|void*|void|int*|int",0
 .else
-        .byte "word|byte|void",0
+        .byte "word|char*|char|void|void*",0
+;;; TODO: change word to int... lol
 .endif
 
 
@@ -6631,7 +6644,7 @@ afterELSE:
 
 ;;; TODO: 3 things same result, save bytes?
         ;; simple write byte to memory
-        .byte "|*(byte*)%A=",_E,";"
+        .byte "|*(char*)%A=",_E,";"
       .byte "[D"
         sta VAR0
       .byte "]"
@@ -6713,7 +6726,7 @@ afterELSE:
 FUNC _stmtbyterulestart
 
 .ifdef BYTERULES
-;;; TODO: is it OPTRULES
+;;; TODO: is it OPTRULES???? - nah
         .byte "|++$%V;"
       .byte "["
         inc VAR0
@@ -6891,6 +6904,8 @@ FUNC _stmtbyterulestart
         and #128
         sta VAR0
       .byte "]"
+
+;;; TODO:: |<<9 >>9 ???
 
 .ifnblank
         .byte "|$%A>>=%D;"
@@ -10693,13 +10708,13 @@ PRIME=1
 ;;;  (- to ~ reverse bits)
 
 ;;; TODO: there might be hi-bit chars here???
-        .byte "// PRIME test; byte arr+bitshift",10
-        .byte "byte arr[256];",10
-;        .byte "byte b[4];",10
+        .byte "// PRIME test; char arr+bitshift",10
+        .byte "char arr[256];",10
+;        .byte "char b[4];",10
 ;        .byte 10
         .byte "word main(){",10
 ;       .byte "  word n,i;",10
-;       .byte "  byte t;",10
+;       .byte "  char t;",10
 ;       .byte "  arr[0]=0xff;",10
 ;;; TODO: for!
 ;        .byte "  arr[0]=255;",10
@@ -10783,9 +10798,9 @@ PRIME=1
 
 
 .ifdef TESTARRAY
-        ;; byte arrays
-        .byte "// byte array",10
-        .byte "byte a[42];",10
+        ;; char arrays
+        .byte "// char array",10
+        .byte "char a[42];",10
         .byte "word main(){ a@[3]=20; a@[7]=22;",10
         .byte "  return a@[3]+a@[3];",10
         .byte "}",0
