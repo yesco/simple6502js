@@ -264,7 +264,7 @@ extern void prettyprint(char* s) {
   char c, *x, found;
 
   lastc= nextcol= 0;
-  color= DEFAULT;
+  color= -1;
 
 //  printf("%s", s); return;
 
@@ -278,7 +278,9 @@ next:
     case '"': pc(STRING); while((c=*s)!='"')pc(c),++s; pc(c); break;
     case '\'': pc(STRING); pc(*s);pc(*++s);pc(*++s); break;
     case '#': pc(INCLUDE); goto printline;
-    case '/': if (s[1]=='/') printline: { pc(COMMENT); while((c=*s) && c!='\n' && c!='\r') pc(c),++s; goto next; }
+    case '/': if (s[1]=='/') { pc(COMMENT);
+      printline: while((c=*s) && c!='\n' && c!='\r')
+          pc(c),++s;   goto next; }
       // else fallthrough (if / but not //)
     default:
       if (c<=' ') { pc(c); break; }

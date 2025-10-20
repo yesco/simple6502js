@@ -8150,6 +8150,7 @@ print:
 
 .export _OK
 _OK:
+        jsr _eosnormal
         jsr nl
         jsr nl
         putc 'O'
@@ -8182,15 +8183,11 @@ _OK:
 
 _run:   
 
-.ifdef __ATMOS__
         ;; set ink for new rows
-        lda #BLACK+16
-        sta $026b               ; paper
-        lda #WHITE&127
-        sta $026c               ; ink
+        lda #BLACK+16           ; paper
+        ldx #WHITE&127          ; ink
 
-        jsr _eos
-.endif        
+        jsr _eoscolors
 
 .zeropage
 runs:   .res 1
@@ -8223,15 +8220,7 @@ again:
         txa
         pha
 
-.ifdef __ATMOS__
-        ;; set ink for new rows
-        lda #BLACK&127+16
-        sta $026b               ; paper
-        lda #GREEN&127
-        sta $026c               ; ink
-
-        jsr nl
-.endif        
+        jsr _eosnormal
 
 .ifdef TIM
         ;; 13617
@@ -8377,7 +8366,7 @@ editaction:
         cmp #CTRL('S')
         bne  :+
 
-        jsr _eos
+        jsr _eosnormal
         jmp bytesieve
 :       
 
@@ -8390,7 +8379,7 @@ editaction:
 ;;; TODO: crashews second time on oric...
 ;        jsr _savescreen
 
-        jsr _eos
+        jsr _eosnormal
         jmp _info
 :       
 ;;; - ctrl-C - compile
@@ -8399,7 +8388,9 @@ editaction:
 
         jsr _savescreen
         jsr nl
-        jsr _eos
+        lda #(BLACK+BG)&127
+        ldx #WHITE&127
+        jsr _eoscolors
         ;; This basically restarts program, lol
         TIMER
         jmp _init
@@ -8497,7 +8488,7 @@ doneCE:
         bne :+
 
         jsr _savescreen
-        jsr _eos
+        jsr _eosnormal
         jmp _aftercompile
 :       
 ;;; - ctrl-X - execute whatever
@@ -8509,14 +8500,6 @@ doneCE:
         jmp _run
         ;; no rts? lol, wasted one byte on stack...
 ;;; TODO: cleanup???
-:       
-;;; - ctrl-q - disasm
-        cmp #CTRL('Q')
-        bne :+
-
-        jsr _savescreen
-        jsr clrscr
-        jmp _dasm
 :       
 ;;; - ctrl-Qasm - disasm
         cmp #CTRL('Q')
@@ -8530,6 +8513,7 @@ doneCE:
         cmp #CTRL('Z')
         bne :+
 
+        jsr _eosnormal
         jmp _printsrc
 :       
 ;;; - ctrl-Garnish source - pretty print
@@ -8537,6 +8521,7 @@ doneCE:
         bne :+
 
 .import _prettyprint
+        jsr _eosnormal
         jsr clrscr
         lda #<input
         ldx #>input
@@ -8547,7 +8532,7 @@ doneCE:
         bne :+
         
         jsr _savescreen
-        jsr _eos
+        jsr _eosnormal
         jmp _listfiles
 :       
 ;;; - ESC - print HELP
@@ -8555,6 +8540,7 @@ doneCE:
         bne :+
 
         jsr _savescreen
+        jsr _eosnormal
         jsr _help
         jmp _loadscreen
 :
@@ -8568,6 +8554,7 @@ doneCE:
         cmp #CTRL('L')
         bne  :+
 
+        jsr _eosnormal
         jmp _loadscreen
 :       
 ;;; - ctrl-Youit
@@ -8817,9 +8804,19 @@ PUTC '*'
 .endif ; INTERRUPT
 
 
-FUNC _eos
+FUNC _eosnormal
+        ;; reset to normal/default
+        lda #BLACK&127+16       ; paper
+        ldx #GREEN&127          ; ink
+FUNC _eoscolors
+;;; TODO: oric const
+        sta $026b               ; paper
+        stx $026c               ; ink
+        
         GOTOXY 2,27
         jmp nl
+
+
 
 FUNC _printsrc
         jsr clrscr
