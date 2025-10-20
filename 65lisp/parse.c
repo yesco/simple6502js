@@ -343,7 +343,9 @@ void main() {
 
   //textcolor(2);
   // $26C Ink colour.
-  *(char*)0x26c= 2; // green
+  // first we compile showing white
+  *(char*)0x26c= 7; // white
+
 #endif // __ATMOS__
 
   clrscr();
