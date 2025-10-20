@@ -403,6 +403,7 @@ void info() {
 
   printf
     ("\x97\x84- CC02 (MeteoriC-6502compiler) -  \x90\n"
+// TAP-file
      "C            %6u - use as 'loader'\n"
      "  main       %6u - main/loader\n"
      "  (disasm)   %6u - ^Q disasm code\n"
@@ -427,10 +428,11 @@ void info() {
      "        (byte)%5u - opt: byte stmts\n"
      "      misc   %6u - misc rules;\n"
      "      (byte) %6u - opt: byte ops\n"
+//    "      OPT    %6u - OPT: normal ops\n"
 //   "  symbols           \n"
    //--------------------------------------
-     "\xff bios      +%6u\\  getchar/putchar\n"
-     "\xff library   +%6u \\ keep minimal\n"
+     "\xff bios      +%6u\\  get/put-char\n"
+     "\xff library   +%6u \\ ctype.h string.h\n"
      // "  minilib    %6u\n"
      " \xfftap-file  =%4u    >bios+lib+out\n"
      "\xff  output   +%6u / gen code" // no \n to fit!

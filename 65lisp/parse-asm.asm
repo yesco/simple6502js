@@ -1770,8 +1770,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 ;
 PRINTREAD=1
-;
-PRINTASM=1
+;PRINTASM=1
 
 
 .ifndef PRINTREAD
@@ -9563,8 +9562,7 @@ input:
 ;        .byte "word main(){}",0
 
 
-;
-STR=1
+;STR=1
 .ifdef STR
 
 
@@ -10956,8 +10954,8 @@ vnext:
 ;;;   _start:  jmp _output              TODO:
 ;;;            ...bios...               TODO:
 ;;;            ...library...            TODO:
-;;;   _output: jmp main
-;;;            ...gen machine code...
+;;;   _output: jmp main               GEN CODE
+;;;            ...gen machine code... GEN CODE
 ;;;            rts
 ;;;    out->
 ;;; 
