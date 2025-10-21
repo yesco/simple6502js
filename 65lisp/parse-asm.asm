@@ -348,7 +348,7 @@
 ;;;        This is used to do one-offs, like test that
 ;;;        last %D matched a byte-value (X=0), if not _fail.
 ;;; 
-;;;        NOTE: can't rts, must use "jsr immret"
+;;;        NOTE: can't rts, must use "IMM_RET"
 ;;;        FAIL: it's ok to call "jsr _fail" !
 
 ;;; 
@@ -375,7 +375,7 @@ IMMEDIATE=1
 ;;;        .byte "foo"
 ;;;      .byte "%{"
 ;;;        putc '%'                ; print debug info!
-;;;        jsr immret              ; HOW TO RETURN!
+;;;        IMM_RET              ; HOW TO RETURN!
 ;;;      .byte "["
 ;;;        .byte "bar"
 ;;;        .byte 0                 ;
@@ -2389,10 +2389,11 @@ quoted:
 testeq: 
         ;; - lit eq?
         cmp (inp),y
-        beq _eq
+        beq eqjmp
 failjmp:
         jmp _fail
-
+eqjmp:  
+        jmp _eq
 
         ;; percent matchers
 percent:
@@ -2419,7 +2420,7 @@ percent:
         stx imm+2
         ;; - jump to the rule inline code!
 imm:    jmp $ffff
-        ;; that code "returns" by jsr immret!
+        ;; that code "returns" by IMM_RET!
         ;; (this puts after the code on stack)
 immret: 
 ;        putc 'R'
@@ -2429,7 +2430,20 @@ immret:
         sta rule+1
         jsr _incR
         jmp _next
-        
+immfail: 
+;        putc 'R'
+        pla
+        sta rule
+        pla
+        sta rule+1
+        jsr _incR
+        jmp _next
+
+.macro IMM_RET
+        jsr immret
+.endmacro
+
+
 noimm:
 .endif ; IMMEDIATE
 
@@ -4653,7 +4667,7 @@ FUNC _memoryrulesend
         .byte "|'\\n'"
       .byte "%{"
         putc '!'
-        jsr immret
+        IMM_RET
 
       .byte '['
         lda #10
@@ -4665,28 +4679,28 @@ FUNC _memoryrulesend
 
       .byte "%{"
         putc '"'                ; "
-        jsr immret
+        IMM_RET
 
         .byte "'"
       .byte "%{"
         putc '1'
-        jsr immret
+        IMM_RET
 
         .byte "\\"               ; "
       .byte "%{"
         putc '2'
-        jsr immret
+        IMM_RET
 
         .byte "n"
       .byte "%{"
         putc '3'
-        jsr immret
+        IMM_RET
 
         .byte "'"
         
       .byte "%{"
         putc '!'
-        jsr immret
+        IMM_RET
 
       .byte '['
         lda #10
@@ -4729,7 +4743,7 @@ FUNC _memoryrulesend
         ldx _out+1
         stx _last+1
         jsr _iasm
-        jsr immret
+        IMM_RET
 .endif ; PRINTASM
 
       .byte "["
@@ -4759,7 +4773,7 @@ sta tos+1
 lda tos
 ldx tos+1
 jsr axputh
-        jsr immret
+        IMM_RET
 
       .byte "["
 ;        .byte "D"               ; tos= dos; addr of string
@@ -4925,7 +4939,7 @@ FUNC _oprulesstart
         beq :+
         jmp _fail
 :       
-        jsr immret
+        IMM_RET
 
       .byte '['
 ;;; 6 B
@@ -4974,7 +4988,7 @@ FUNC _oprulesstart
         beq :+
         jmp _fail
 :       
-        jsr immret
+        IMM_RET
       .byte '['
 ;;; 6 B
         sec
@@ -5032,7 +5046,7 @@ FUNC _oprulesstart
         beq :+
         jmp _fail
 :       
-        jsr immret
+        IMM_RET
 
       .byte "["
         and #'<'
@@ -5827,7 +5841,7 @@ ruleH:
         ;; standing at "
         jsr _incI
         ;; done
-        jsr immret
+        IMM_RET
 
         .byte TAILREC
 
@@ -5886,7 +5900,7 @@ ruleH:
         ;; jmp _acceptrule?
 @nah:
 .endscope
-        jsr immret
+        IMM_RET
         ;; - process argument
         .byte _E
       .byte "%{"
@@ -6040,7 +6054,7 @@ ruleQ:
         ldy #0
         sta (pos),y
         jsr _incP
-        jsr immret
+        IMM_RET
 
         .byte TAILREC
 
@@ -6048,7 +6062,7 @@ ruleQ:
       .byte "%{"
         ;; TODO: this may not be easily skippable
         PRINTZ "got arr end"
-        jsr immret
+        IMM_RET
 
         .byte 0
 
@@ -6072,7 +6086,7 @@ ruleN:
 
       .byte "%{"
         putc '{'
-        jsr immret
+        IMM_RET
 
       .byte "%{"
         ;; save address
@@ -6088,7 +6102,7 @@ ruleN:
         PUTC '@'
         ;; cheat: artificual fail!
         jmp _fail
-        jsr immret
+        IMM_RET
 
 ;;; TODO: why needed? was it for constant folding?
 
@@ -6107,7 +6121,7 @@ ruleN:
         ldx inp+1
         jsr _printz
         jsr nl
-        jsr immret
+        IMM_RET
 .endif
         .byte _C,_D
         .byte ";"
@@ -6118,7 +6132,7 @@ ruleN:
       .byte "%{"
         PUTC '$'
 ;        jsr _iasm
-        jsr immret
+        IMM_RET
         ;; TODO: if flag set
 
       .byte "%{"
@@ -6162,11 +6176,11 @@ ruleN:
         ldx gos+1
         stx _out+1
         ;; continue
-        jsr immret
+        IMM_RET
 
       .byte "%{"
         putc '}'
-        jsr immret
+        IMM_RET
 
         .byte TAILREC
 
@@ -6207,7 +6221,7 @@ ruleN:
         sta pos
         lda #>arr
         sta pos+1
-        jsr immret
+        IMM_RET
 
 ;        .byte _Q,"};"
         .byte _Q
@@ -6231,7 +6245,7 @@ ruleO:
       .byte "%{"
         putc '_'
         jsr printstack
-        jsr immret
+        IMM_RET
 .endif
         .byte 0
         ;; Autopatches skip over definitions in N
@@ -6241,7 +6255,7 @@ ruleO:
 ruleP:  
       .byte "%{"
 ;        jsr _iasmstart
-        jsr immret
+        IMM_RET
 
         ;; this rule with jump over definitions and arrive at main
         .byte _O
@@ -6259,7 +6273,7 @@ ruleP:
 
       .byte "%{"
 ;        jsr _iasm
-        jsr immret
+        IMM_RET
 
         .byte "|"
 
@@ -6584,7 +6598,7 @@ afterELSE:
         beq :+
         jmp _fail
 :       
-        jsr immret
+        IMM_RET
 
 .scope        
       .byte "["
@@ -7276,7 +7290,7 @@ FUNC _stmtbyteruleend
         beq :+
         jmp _fail
 :              
-        jsr immret
+        IMM_RET
 
       .byte "["
 ;;;  start not with 0 but with 
@@ -7494,7 +7508,7 @@ FUNC _stmtbyteruleend
         lda #'p'                ; patch and end
         pha
         
-        jsr immret
+        IMM_RET
 
         ;; TOS is now before condition
       .byte "["
@@ -7895,7 +7909,7 @@ ruleY:
         sta pos+1
         lda #$e1
         sta pos
-        jsr immret
+        IMM_RET
 
         .byte _Z
         .byte 0
@@ -7907,7 +7921,7 @@ ruleZ:
         .byte "|)"
 ;        .byte "%{"
 ;PUTC 'F'
-;        jsr immret
+;        IMM_RET
 
         ;; parse next paramter
         .byte "|",_E
@@ -7917,7 +7931,7 @@ ruleZ:
         sta tos
         lda pos+1
         sta tos+1
-        jsr immret
+        IMM_RET
       .byte "["
         sta VAL0
         stx VAL1
@@ -7927,7 +7941,7 @@ ruleZ:
         ;; move to next paramter addr
         jsr _incP
         jsr _incP
-        jsr immret
+        IMM_RET
         ;; get next param
         .byte TAILREC
         
@@ -7945,13 +7959,13 @@ ruleX:
         .byte "("
 ;      .byte "%{"
 ;        PUTC 'B'
-;        jsr immret
+;        IMM_RET
         .byte TAILREC
 
         .byte "|)"
 ;      .byte "%{"
 ;        PUTC 'E'
-;        jsr immret
+;        IMM_RET
 
         .byte "|,"
       .byte "["
@@ -7960,7 +7974,7 @@ ruleX:
       .byte "]"
 ;      .byte "%{"
 ;        PUTC 'P'
-;        jsr immret
+;        IMM_RET
         .byte TAILREC
 
         ;; one byte constant paramter 0-255
@@ -7972,7 +7986,7 @@ ruleX:
         beq :+
         jmp _fail
 :              
-        jsr immret
+        IMM_RET
       .byte "["
         ;; saves 2 bytes!
         lda  #'<'
@@ -7984,7 +7998,7 @@ ruleX:
 ;;; TODO: can we optimize if same constant twice? (10,10)??
 ;      .byte "%{"
 ;        PUTC 'E'
-;        jsr immret
+;        IMM_RET
         .byte TAILREC
         
         .byte 0
@@ -7996,7 +8010,7 @@ PUTC 'B'
         ;; counter for args
         lda #0
         jsr pusha
-        jsr immret
+        IMM_RET
 
         .byte TAILREC
 
@@ -8005,7 +8019,7 @@ PUTC 'B'
       .byte "%{"
 PUTC 'P'
         putc '?'
-        jsr immret
+        IMM_RET
 
       .byte "["
         jsr pushax
@@ -8017,7 +8031,7 @@ PUTC 'P'
 PUTC 'E'
         jsr popa
         sta tos
-        jsr immret
+        IMM_RET
       .byte "["
         ;; vararg always generated, lol
         ;; (however vararg f needs call jsr pushax
@@ -8037,7 +8051,7 @@ PUTC 'A'
         adc #02
         jsr pusha
         putc 'B'
-        jsr immret
+        IMM_RET
 .endif
         .byte TAILREC
 
