@@ -1921,6 +1921,20 @@ TESTING=1
 ;
 OPTPARSEALL=1
 
+;;; TODO:
+;;; 0) jsr _incIspc - move it to before _next
+;;;    find locations where "jsr _incIspc; ... jmp _next"!
+;;;    it's at least 12c per character used!
+;;; 1) byte < 32 ==> skip byte (at _fail)
+;;;    check avg,max,min size of rules
+;;; 2) ruleS could be directly TAILREC - must save some!
+;;; 3) byte rules?
+;;; 4) any %D many times is costly (parse number later?)
+;;; 5) match %V many times very costly, maybe just store
+;;;    pointer and look up later when syntax fine?
+;;; 6) group functions by first letter, and skip?
+;;; 7) bitmap hash to check if var exists (no care?)
+
 ;;; CUT and CUT2
 
 ;;; -- BYTESIEVE:
@@ -4192,7 +4206,7 @@ _rules:
 ;ruleF: byte rule, keeps AX, get byte expr => Y
 ;ruleG: calling convention "(@tos,AX) like ruleC
 ;ruleH: printf parsing
-ruleI:
+;ruleI:
 ruleJ:  
 .ifndef BNFLONG
   ruleK:  
@@ -4548,11 +4562,13 @@ FUNC _memoryrulesstart
 
 ;;; TODO: instead of _E use byte context _?
 
-        .byte "|poke(%D[#],",_E,")"
+;;; OK
+        .byte "|poke(%D[#],",_I,")"
       .byte "[;"
         sta VAL0
       .byte "]"
 
+;;; TOTEST
         .byte "|doke(%D[#],",_E,")"
       .byte "[;D"
         sta VAL0
@@ -4560,15 +4576,19 @@ FUNC _memoryrulesstart
       .byte "]"
 .endif ; OPTRULES
 
-        .byte "|poke(",_E,",",_F,")"
+;;; OK
+        .byte "|poke(",_E,","
       .byte "["
-        ;; AX address Y value to poke
         sta tos
         stx tos+1
-        tya
+      .byte "]"
+        .byte _I,")"
+      .byte "["
+        ldy #0
         sta (tos),y
       .byte "]"
 
+;;; TOTEST
         .byte "|doke(",_G
       .byte "["
         ;; AX: value to doke
@@ -6084,13 +6104,32 @@ ruleH:
 .endif ; rulePRINTF
         .byte 0
 
+;;; load byte expression
+ruleI:  
+        .byte "%D"
+      .byte '['
+        lda #'<'
+      .byte ']'
+
+        .byte "|%V"
+      .byte '['
+        lda VAL0
+      .byte ']'
+
+        ;; Nothing else than Expression could come now
+        .byte "|",_E
+
+        .byte 0
 
 
 
+
+;;; TODO: bad routine, at least for poke(_E,byteexpr)
 ;;; BYTESIEVE: saved 5 bytes using ruleF!
 ;;; 
 ;;; "keepAXsetY"
 ruleF:  
+;;; TODO: remove? only used by strchr?
         .byte "%D"
       .byte '['
         ldy #'<'
@@ -6098,7 +6137,7 @@ ruleF:
 
         .byte "|%V"
       .byte '['
-        lda VAL0
+        ldy VAL0
       .byte ']'
 
         ;; Nothing else than Expression could come now
@@ -10040,6 +10079,15 @@ input:
 ;        .byte "word main(){ 666; return; }",0
 
 
+;
+RAINBOW=1
+
+.ifdef RAINBOW
+        .incbin "Input/rainbow-drop.c"
+        .byte 0
+.endif ; RAINBOW        
+
+
 ;STR=1
 .ifdef STR
 
@@ -10809,7 +10857,7 @@ NOPRINT=1
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
         .byte "// BYTE SIEVE PRIME benchmark",10
-        .byte "#include <stdio.H>",10
+        .byte "#include <stdio.h>",10
         .byte "word main(){",10
 
        ;; BYTE MAGAZINE 8192 => 1899
