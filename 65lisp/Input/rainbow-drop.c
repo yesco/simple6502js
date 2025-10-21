@@ -1,21 +1,23 @@
-// Rainbow-droping
+// Rainbow-drop
 #include <stdio.h>
 word main() {
-  hires();
-  b= 40960; // 0xa000
-
-  m= 8000; c= 8; s= m>>3;
-  a= b; j= 0;
-  i=0; while(i<m) {
-//    if (j==0) { --c; j= s; }
-//    poke(b+i, c+16);
-//    v= c+16;
-//    v= 64+32+8+1;
-    //WRONG!
-    //v= 105; poke(a+i, v);
-    poke(a+i, 105); // - ok
-    ++i; //++a;
-    //++i; --j; a+= 40;
+  hires(); b= 40960; e= b+8000;
+  d= 1; s= 1;
+ A:
+  s+= d;
+  // change direction?
+  if (s<50) ; else d= 0-d;
+  if (s<2)  d= 0-d; else ;
+  // one frame, for 8 colors
+  a= b; c= 0; i= 8; while(i--) {
+    // draw s rows of each color
+    j= s; c= 16+i; while(--j) {
+      if (a<e) poke(a, c);
+      a+= 40;
+    }
+//while(a<e){ poke(a,16);a+=40; }
   }
-  putu(i);
+  i=s<<2; i=250-i; while(--i);
+  goto A;
 }
+

@@ -9,7 +9,6 @@
 
 
 
-
 *.i
 
 *~
@@ -28,11 +27,14 @@ fil
 fil2
 fil2.*
 
+*.lst
 a.out
 *.o
 *.s
 *.log
 *.map
+*.sim
+*.bin
 *.out
 *.tap
 *.x

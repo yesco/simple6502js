@@ -1994,9 +1994,13 @@ PRINTINPUT=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;;; TODO: run twice seems to crash, bad state var?
-
 ;PRINTASM=1
+
+;;; If asm is on, you also want to see some code
+.ifdef PRINTASM
+  PRINTREAD=1
+  UPDATENOSPACE=1
+.endif ; PRINTASM
 
 
 .ifndef PRINTREAD
@@ -3697,7 +3701,10 @@ nextc:
 
 .ifdef PRINTDOTS
         ;; at each newline print a dot
-        cmp #10
+        ;; cmp #10
+
+        ;; count statements!
+        cmp #';'
         bne :+
         PUTC '.'
 :       
@@ -4207,7 +4214,7 @@ _rules:
 ;ruleG: calling convention "(@tos,AX) like ruleC
 ;ruleH: printf parsing
 ;ruleI:
-ruleJ:  
+;ruleJ:  
 .ifndef BNFLONG
   ruleK:  
   ruleL:  
@@ -4560,31 +4567,68 @@ FUNC _memoryrulesstart
 ;;; ORIC peek/poke deek/doke
 .ifdef OPTRULES
 
-;;; TODO: instead of _E use byte context _?
+
+
+;;; TODO: too many |POKE( rules!!!!
 
 ;;; OK
-        .byte "|poke(%D[#],",_I,")"
+        .byte "|poke(%D,"
+      .byte "%{"
+        ;; make sure %D <256
+        lda tos+1
+        beq :+
+        IMM_FAIL
+:       
+        IMM_RET
+
+        .byte "[#]",_I
+      .byte "[;"
+        sta '<'
+      .byte "]"
+
+;;; OK
+        .byte "|poke(%D,[#]",_I
       .byte "[;"
         sta VAL0
       .byte "]"
 
+
+.ifdef ZPVARS
+;;; OK
+        .byte "|poke(%V,0)"
+      .byte "["
+        ;; save 1 B
+        ldy #0
+        tya
+        sta (VAR0),y
+      .byte "]"
+
+;;; OK
+        .byte "|poke(%V,[#]",_I
+      .byte "[;"
+        ldy #0
+        sta (VAR0),y
+      .byte "]"
+.endif ; ZPVARS        
+
+
 ;;; TOTEST
         .byte "|doke(%D[#],",_E,")"
-      .byte "[;D"
+      .byte "[;"
+;;; TODO: how about zero page addresses! save 2B
         sta VAL0
         stx VAL1
       .byte "]"
+
 .endif ; OPTRULES
 
+
 ;;; OK
-        .byte "|poke(",_E,","
+        .byte "|poke(",_E,",",_J
+;      .byte "%{"
+;        putc '!'
+;        IMM_RET
       .byte "["
-        sta tos
-        stx tos+1
-      .byte "]"
-        .byte _I,")"
-      .byte "["
-        ldy #0
         sta (tos),y
       .byte "]"
 
@@ -4604,6 +4648,10 @@ FUNC _memoryrulesstart
 
 
 .ifdef OPTRULES
+;;; TODO: add ZPRULES opt?
+;;; actually not needed if all vars are in zp...
+;;;  just use indexing!!!!
+;;; peek(%V) === $%V lol deek(%V) === *(word*)%A
         .byte "|peek(%D)"
       .byte '['
         lda VAL0
@@ -5241,6 +5289,7 @@ FUNC _oprulesstart
         and #'<'
         ldx #0
       .byte "]"
+        .byte TAILREC
 .endif ; OPTRULES
 
         .byte "|&%D"
@@ -6106,21 +6155,78 @@ ruleH:
 
 ;;; load byte expression
 ruleI:  
-        .byte "%D"
+        .byte "%D)"
       .byte '['
         lda #'<'
       .byte ']'
 
-        .byte "|%V"
+        .byte "|%V)"
       .byte '['
-        lda VAL0
+        lda VAR0
       .byte ']'
 
         ;; Nothing else than Expression could come now
-        .byte "|",_E
+;;; TODO: possibly _byteexpreesion???
+;;; TOOD: is this dupoicate of later stuff?
+        .byte "|",_E,")"
 
         .byte 0
 
+
+
+;;; read byte expression, saving AX to tos, and sets Y=0!
+;;; LOL: only used by poke...
+
+;;; TODO:   can we use all these for foo[...]= ....; ????
+ruleJ:  
+        .byte "0)"
+      .byte '['
+        ;; save 1 B
+        sta tos
+        stx tos+1
+        lda #0
+        ;; used by indirection
+        tay
+      .byte ']'
+
+        .byte "|%D)"
+      .byte '['
+        sta tos
+        stx tos+1
+        lda #'<'
+        ;; used by indirection
+        ldy #0
+      .byte ']'
+
+        .byte "|%V)"
+      .byte '['
+        sta tos
+        stx tos+1
+        lda VAR0
+        ;; used by indirection
+        ldy #0
+      .byte ']'
+
+        ;; Nothing else than Expression could come now
+        .byte "|"
+      .byte '['
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte _E,")"
+      .byte '['
+        tay
+        pla
+        sta tos+1
+        pla
+        sta tos
+        tya
+        ;; used by indirection
+        ldy #0
+      .byte ']'
+
+        .byte 0
 
 
 
@@ -6137,7 +6243,7 @@ ruleF:
 
         .byte "|%V"
       .byte '['
-        ldy VAL0
+        ldy VAR0
       .byte ']'
 
         ;; Nothing else than Expression could come now
@@ -6167,7 +6273,7 @@ ruleF:
 ;;; 
 ;;; "(",_G:  two argument rule where:
 ;;;    - first arg is saved in TOS
-;;;    - second arg is in AX   
+;;;    - second arg is in AX
 ruleG:
 
 .ifdef OPTRULES
@@ -6197,8 +6303,8 @@ ruleG:
         sta tos
         stx tos+1
 
-        lda VAL0
-        ldx VAL1
+        lda VAR0
+        ldx VAR1
       .byte ']'
 
         ;; Nothing else than Expression could come now
@@ -10079,9 +10185,31 @@ input:
 ;        .byte "word main(){ 666; return; }",0
 
 
-;
-RAINBOW=1
+;POKEGEN=1
+.ifdef POKEGEN
+;;; Used to debug codegen for POKE
+;;; TODO: add way to do regression testsing on
+;;;       code gen sizes etc...
+        .byte "word main() {",10
+        .byte "  poke(7, 0);",10 ; 4 B
+        .byte "  poke(4711, 0);",10 ; 5 B
+        .byte "  poke(a, 0);",10 ; 5 B
+        .byte "  poke(a, 3);",10 ; 6 B
+        .byte "  poke(7, 17+4);",10
+        .byte "  poke(a, 17+4);",10
+        .byte "  poke(a, b);",10
 
+        .byte "  poke(3+4, 0);",10 ; 9 B
+        .byte "  poke(4711+4, 0);",10 ; 9 B
+        .byte "  poke(4711+4, 9);",10 ; 10 B
+        .byte "  poke(3+4, a);",10 ; 10 B
+        .byte "  poke(3+4, 17+4);",10
+        .byte "}",10
+        .byte 0
+.endif ; POKEGEN
+
+
+;RAINBOW=1
 .ifdef RAINBOW
         .incbin "Input/rainbow-drop.c"
         .byte 0
@@ -10820,8 +10948,9 @@ RAINBOW=1
 ;;;         315    2.60s  CC02 10K runs ^X * 100
 ;;;         307    2.53s  CC02 while-speed,++i(;),+BYTE
 ;;;         302    2.43s  CC02 rule _F byte rule for poke!
-;;; 
-
+;;;         304    +2 B ??? investigate, poke changed, wrong?
+;;;                - 1a45336b30cc787f668c83dd4e4c7dff4baa7a99
+;;;         303    -1 B !!! better poke
 
 
 ;;; TODO: at some point it got to 361 bytes
