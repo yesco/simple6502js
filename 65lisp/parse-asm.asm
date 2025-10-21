@@ -1928,8 +1928,7 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; more compact printing of source when compiling
 ;UPDATENOSPACE=1
@@ -2086,6 +2085,31 @@ FUNC _compileAX
 ;;; TODO: not working?
         lda #1
         sta $24f
+
+.macro CURSOR_OFF
+        pha
+        lda $026a
+        and #255-1
+        sta $026a
+        pla
+.endmacro
+
+.macro CURSOR_ON
+        pha
+        lda $026a
+        ora #1
+        sta $026a
+        pla
+.endmacro
+
+.else
+
+.macro CURSOR_ON
+.endmacro
+
+.macro CURSOR_OFF
+.endmacro
+
 .endif
 
 
@@ -8046,7 +8070,7 @@ status:
         .word $bb80-2
         ;;     ////////////////////////////////////////
         .byte "CC02 `2025 jsk@yesco.org"
-        .byte               127&YELLOW," ESC=help",127&WHITE
+        .byte               127&YELLOW,"   ^Help",127&WHITE
         .byte 0
 .code
         ;; - from
@@ -8169,10 +8193,6 @@ _OK:
 
         PRINTZ {10,10,"OK "}
 
-.ifdef INTERRUPT
-        jmp _run
-.endif
-
         ;; print size in bytes
         ;; (save in gos, too)
 ;;; TODO: gos gets overwritten by dasm(?)
@@ -8187,13 +8207,15 @@ _OK:
         sta gos+1
         
         jsr putu
+        
+        putc ' '
+        PRINTZ {" Bytes",10,10}
 
-        PRINTZ {"B",10,10}
-
-        GOTOXY 14,26
+.ifnblank
+        GOTOXY 14,27
         ;;              ////////////////////
         PRINTZ {YELLOW,"e^Xec sr^Z ^Ldit hElpSC",10}
-
+.endif
         jmp _edit
 
 _run:   
@@ -8370,13 +8392,45 @@ FUNC _edit
 .endif
 .endif ; INTERRUPT
 
+;;; TODO: somehow this makes ^E not work!
+;;;  also cannot see movement
+;        CURSOR_ON
         jsr getchar
+;        CURSOR_OFF
+
         jsr editaction
         jmp _edit
 
 
 editaction:     
 
+;;; - ESC - print HELP
+        cmp #27
+.ifndef __ATMOS__
+        bne :+
+.else
+        beq dohelp
+;;; - CTRL-H (only on oric)
+.ifnblank
+        pha
+        lda $0209
+        ldx #0
+        jsr axputu
+        pla
+.endif
+        cmp #CTRL('H')
+        bne :+
+        ;; CTRL-KEY?
+        ldx $0209
+        cpx #162
+        bne :+
+.endif ; __ATMOS__
+dohelp: 
+        jsr _savescreen
+        jsr _eosnormal
+        jsr _help
+        jmp _loadscreen
+:
 ;;; - ctrl-Load/edit
         cmp #CTRL('S')
         bne  :+
@@ -8550,15 +8604,6 @@ doneCE:
         jsr _eosnormal
         jmp _listfiles
 :       
-;;; - ESC - print HELP
-        cmp #27
-        bne :+
-
-        jsr _savescreen
-        jsr _eosnormal
-        jsr _help
-        jmp _loadscreen
-:
 ;;; - ctrl-W - save
         cmp #CTRL('W')
         bne :+
@@ -9029,6 +9074,8 @@ FUNC _savescreen
         rts
 .endif
 
+        CURSOR_OFF
+
         ;; from
         lda #<SCREEN
         ldx #>SCREEN
@@ -9043,14 +9090,18 @@ FUNC _savescreen
         lda #<SCREENSIZE
         ldx #>SCREENSIZE
         
-        jmp _memcpy
+        jsr _memcpy
+        CURSOR_ON
+
+        rts
 
 FUNC _loadscreen
 .ifndef __ATMOS__
         rts
 .endif
 
-;;; 20+3B params+call
+;;; TODO: fixed param calling (copy N bytes to tos++)
+;;;   20+3B params+call
         ;; from
         lda #<savedscreen
         ldx #>savedscreen
@@ -9066,8 +9117,6 @@ FUNC _loadscreen
         ldx #>SCREENSIZE
 
         jmp memcpy
-        
-
 
 
 ;;; CHEAT - not counted in parse.bin
@@ -11081,7 +11130,7 @@ savedscreen:
         ;; (save program/screen before compile to "input")
         .res 40*28
 ;;; constant expressio expected ???
-;        .res SCREENSIZE+1
+;        .res SCREENSIZE
 
 .endif ; JUNK
 

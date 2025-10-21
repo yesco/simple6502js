@@ -2,7 +2,12 @@
 //int T,nil,doapply1,print;
 
 // 2434 bytes with printf, 
-// #include <stdio.h>
+//#include <stdio.h>
+
+// this makes compiling cgetc() ok but linker fails!
+//#include <conio.h>
+// linmker can't find
+//extern char mygetc() { return cgetc(); }
 
 void Cstart(){}
 

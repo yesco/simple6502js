@@ -73,8 +73,45 @@ putchar:
         .import _putchar
 
 getchar=_getchar
+
+;;; NON-BLOCKING ? - how to do?
+
+;.import _cgetc
+;getchar=_cgetc
+;.import _mygetc
+;getchar=_mygetc
+
+
 rawputc=_putchar
 
 .macro GOTOXY xx,yy
-;;; TODO: implement using ANSI codes?
+;;; ansi codes not working?
+        pha
+        txa
+        pha
+        tya
+        pha
+
+        putc 27
+        putc '['
+
+        ;; row
+        lda #<yy
+        ldx #>yy
+        jsr putu
+
+        putc ';'
+
+        ;; col
+        lda #<xx
+        ldx #>xx
+        jsr putu
+
+        putc 'H'
+        
+        pla
+        tay
+        pla
+        tax
+        pla
 .endmacro

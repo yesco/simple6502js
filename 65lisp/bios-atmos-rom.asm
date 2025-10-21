@@ -61,6 +61,7 @@ getchar:
 ;.ifdef TIM
         cli
 ;.endif ; TIM
+
         stx savexputchar
         sty saveyputchar
 

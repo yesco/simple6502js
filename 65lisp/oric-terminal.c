@@ -27,6 +27,8 @@ void u8put(int uc) {
 void clear() { printf("\x1b[2J\x1b[H"); }
 void clearend() { printf("\x1b[K"); }
 void cleareos() { printf("\x1b[J"); }
+void resetcolors() { printf("\x1b[0m"); }
+
 void gotorc(int r, int c) {
   // negative values breaks the ESC seq giving garbage on the screen!
   assert(r>=0 && c>=0);
@@ -38,11 +40,11 @@ void fullputc(int c) {
   case 12:
     clear(); break;
   case ' ':
+    putchar(' ');
 #ifdef DOUBLE
-    printf("  "); break;
-#else
-    printf(" "); break;
+    putchar(' ');
 #endif
+    break;
   case 33 ... 126:
 #ifdef DOUBLE
     u8put(fullwidth-32+c); break;
@@ -50,30 +52,27 @@ void fullputc(int c) {
     putchar(c); break;
 #endif
   case '\n':
-    clearend();
+    clearend(); // hmmm?
+    resetcolors();
     printf("\n    "); break;
   case '\r':
     printf("\r    "); break;
 
-  // TODO:
-  // not correct as when new line on oric colors white on black
+  // TODO: 30,31? setink/setpaper
 
   // text colors
   case (128) ... (128+7):
     // ORIC attributes take up one space
-#ifdef DOUBLE
-    printf("\e[%dm  ", c-128+30); break;
-#else
     printf("\e[%dm ", c-128+30); break;
+#ifdef DOUBLE
+    putchar(' ');
 #endif
   // background colors
   case (128+16) ... (128+16+7):
-#ifdef DOUBLE
-    printf("\e[%dm  ", c-128-16+40); break;
-#else
     printf("\e[%dm ", c-128-16+40); break;
+#ifdef DOUBLE
+    putchar(' ');
 #endif
-
   // inverse
   case (128+32)...255:
 //    printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
@@ -82,7 +81,9 @@ void fullputc(int c) {
 
   // double up
   case 8:
+#ifdef DOUBLE
     putchar(c);
+#endif
   default:
     putchar(c);
     //printf("%02x", c); break;
@@ -97,6 +98,9 @@ char* fullputs(char* s) {
 int main(void) {
   //u8put('X'); printf("\n");
   //u8put(0x20AC); // eurosign output: E2 82 AC.
+
+  // Set stdout to be unbuffered
+  setvbuf(stdout, NULL, _IONBF, 0);
 
   clear();
   fullputs("\nORIC 65LISP>02                     CAPS");

@@ -26,7 +26,7 @@ rm $name.s    2>/dev/null
 # "Since the stack is emulated in software, this gives shorter and usually faster code, but the code is no longer reentrant. "
 
 # -- generating .s too
-cl65 $OPTS -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
+cl65 $OPTS -t sim6502 $name.c -o $name.sim -m $name.map #2>/dev/null
 
 # Optimize inline more - creates errornious code
 #time cl65 -Or $OPTS -t sim6502 $name.c -o $name.sim -m $name.map 2>/dev/null
