@@ -35,9 +35,9 @@
 ;;; - an actual machine 6502 compiler running on 6502
 ;;; - be a "proper" subset of C (at least syntactically)
 ;;; - *minimal* sized BNF-engine as well as rules
-;;;   keeping the whole compiler in about 1-2KB!
+;;;   keeping the whole "compiler" in about 1-2KB!
 ;;; - fast "enough" to run "on a screen of code"
-;;;   (~ 133 "ops" compiled/s ~ 19 lines/s)
+;;;   (~ 133 "ops" compiled/s ~ 19 lines/s) - LOL
 ;;;   (Turbo Pascal did 2000 lines in less than 60s)
 ;;;   (== 33 lines/s)
 ;;; - provide on-screen editor
@@ -592,6 +592,8 @@ CSTIMER         = $0276
   .export .ident(.string(name))
   .ident(.string(name)):
 .endmacro
+
+
 
 
 
@@ -1910,6 +1912,39 @@ TESTING=1
 ;DEBUGRULE2=1
 
 ;DEB2=1
+
+
+;;; ========================================
+;;;   P A R S E R   O P T I M I Z A T I O N
+;;; 
+;;;   41% faster by CUT+CUT2
+;
+OPTPARSEALL=1
+
+;;; CUT and CUT2
+
+;;; -- BYTESIEVE:
+;;; 
+;;; 2640900 CUT2
+;;; 2863202 CUT
+;;; 2052939 CUT+CUT2 !
+;;; 3451213
+;;; CUT2: 14.14% faster(/ 2640900 3451213.0)
+;;; 
+;;; both CUTs: (- 1 (/ 2052939 3451213.0))
+        
+;;   41% faster!
+; OPTPARSEALL=1
+.ifdef OPTPARSEALL
+;;; CUT2 is simple ruleS cut by '}'
+;
+CUT2=1
+;;; TODO: generalize! it now only cuts ruleD
+;;;       cutting expressions at ',;:)]?'
+;
+CUT=1
+.endif ; OPTPARSEALL
+
 
 
 ;DEBUGRULE2ADDR=1
@@ -3820,7 +3855,9 @@ FUNC _incRX
         rts
         
 
-;CUT=1
+rts
+
+
 
 .ifdef CUT
 cut:    
@@ -4221,7 +4258,6 @@ ruleA:
 
 .ifdef CUT2
         ;; '}' marks end - CUT
-        ;;  how much savings if can stop at '}'
       .byte "%{"
         ;; peek ahead
         ldy #0                  ; danger! 0 can't skip
@@ -4231,7 +4267,13 @@ ruleA:
         jmp _acceptrule
 :       
         ;; put at end "past" any 0, lol
-        IMM_FAIL
+        lda #<@next
+        ldx #>@next
+        sta rule
+        stx rule+1
+;        IMM_FAIL
+        jmp _fail
+@next:   
         .byte '|'
 .endif ; CUT2
 
@@ -4949,7 +4991,7 @@ ruleD:
 
 .ifdef CUT
         ;; "CUT" operator
-        ;; if the next character is ,:;)]
+        ;; if the next character is ,:;)]?
         ;; expression is ended
 ;;; BYTESIEVE:
 ;;;   3450146 before
@@ -4965,7 +5007,7 @@ ruleD:
 
 breakchars:
         ;; '|'+128 so not conflict with '|', not 0!
-        .byte ",:;)]",'|'+128
+        .byte ",:;)]?",'|'+128
 
         .byte "|"
 nextrule:       
