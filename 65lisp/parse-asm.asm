@@ -348,8 +348,9 @@
 ;;;        This is used to do one-offs, like test that
 ;;;        last %D matched a byte-value (X=0), if not _fail.
 ;;; 
-;;;        NOTE: can't rts, must use "IMM_RET"
-;;;        FAIL: it's ok to call "jsr _fail" !
+;;;        NOTE:   can't rts, must use "IMM_RET"
+;;;        FAIL:   it's ok to do "IMM_FAIL" !
+;;;        ACCEPT: it's ok to do "jsr _acceptrule"
 
 ;;; 
 ;;; TODO:?
@@ -2431,16 +2432,20 @@ immret:
         jsr _incR
         jmp _next
 immfail: 
-;        putc 'R'
         pla
         sta rule
         pla
         sta rule+1
-        jsr _incR
-        jmp _next
+        ;; no incR!
+        jmp _fail
 
 .macro IMM_RET
         jsr immret
+.endmacro
+
+.macro IMM_FAIL
+        jmp _fail
+;        jsr immfail
 .endmacro
 
 
@@ -4937,7 +4942,7 @@ FUNC _oprulesstart
         ;; make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :       
         IMM_RET
 
@@ -4986,7 +4991,7 @@ FUNC _oprulesstart
         ;; make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :       
         IMM_RET
       .byte '['
@@ -5044,7 +5049,7 @@ FUNC _oprulesstart
         ;; make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :       
         IMM_RET
 
@@ -6101,7 +6106,7 @@ ruleN:
         ;; TODO: should set a flag
         PUTC '@'
         ;; cheat: artificual fail!
-        jmp _fail
+        IMM_FAIL
         IMM_RET
 
 ;;; TODO: why needed? was it for constant folding?
@@ -6596,7 +6601,7 @@ afterELSE:
         ;; make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :       
         IMM_RET
 
@@ -7288,7 +7293,7 @@ FUNC _stmtbyteruleend
 ;;;  make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :              
         IMM_RET
 
@@ -7984,7 +7989,7 @@ ruleX:
 ;;;  make sure %D <256
         lda tos+1
         beq :+
-        jmp _fail
+        IMM_FAIL
 :              
         IMM_RET
       .byte "["
