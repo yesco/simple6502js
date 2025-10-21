@@ -348,9 +348,8 @@
 ;;;        This is used to do one-offs, like test that
 ;;;        last %D matched a byte-value (X=0), if not _fail.
 ;;; 
-;;;        NOTE:   can't rts, must use "IMM_RET"
-;;;        FAIL:   it's ok to do "IMM_FAIL" !
-;;;        ACCEPT: it's ok to do "jsr _acceptrule"
+;;;        NOTE: can't rts, must use "jsr immret"
+;;;        FAIL: it's ok to call "jsr _fail" !
 
 ;;; 
 ;;; TODO:?
@@ -376,7 +375,17 @@ IMMEDIATE=1
 ;;;        .byte "foo"
 ;;;      .byte "%{"
 ;;;        putc '%'                ; print debug info!
-;;;        IMM_RET              ; HOW TO RETURN!
+;;;or      IMM_FAIL                ; HOW TO FAIL
+
+;;; NOTE: IMM_FAIL will skip to next '|'
+;;;       must not find any '|' or \0
+;;;       in the remaining code - OK'its a HACK!
+
+;;;        IMM_RET                 ; HOW TO RETURN!
+
+;;; NOTE: IMM_RET must be the last of the CODE!
+;;;       as it tells the interpreter where BNF continuse
+
 ;;;      .byte "["
 ;;;        .byte "bar"
 ;;;        .byte 0                 ;
@@ -2390,6 +2399,7 @@ quoted:
 testeq: 
         ;; - lit eq?
         cmp (inp),y
+;;; LOL: relocate to "middle"?
         beq eqjmp
 failjmp:
         jmp _fail
@@ -2421,22 +2431,21 @@ percent:
         stx imm+2
         ;; - jump to the rule inline code!
 imm:    jmp $ffff
-        ;; that code "returns" by IMM_RET!
+        ;; that code "returns" by jsr immret!
         ;; (this puts after the code on stack)
-immret: 
-;        putc 'R'
+immret:
         pla
         sta rule
         pla
         sta rule+1
         jsr _incR
         jmp _next
-immfail: 
+immfail:
+;;; doesn't seem to work correwctly
         pla
         sta rule
         pla
         sta rule+1
-        ;; no incR!
         jmp _fail
 
 .macro IMM_RET
@@ -2445,10 +2454,11 @@ immfail:
 
 .macro IMM_FAIL
         jmp _fail
+;;; TODO: doesn't work???
 ;        jsr immfail
 .endmacro
 
-
+        
 noimm:
 .endif ; IMMEDIATE
 
@@ -3810,6 +3820,69 @@ FUNC _incRX
         rts
         
 
+;CUT=1
+
+.ifdef CUT
+cut:    
+;;; OK this works! (but no benefit)
+;        pla
+;        pla
+;        jmp _fail
+
+        ;; save current char
+;;; TODO: use the inpC stuff
+        ldy #0
+        lda (inp),y
+        sta savea
+;PUTC '@'
+;jsr putchar
+        ;; search from 
+@next:
+        iny
+        lda breakchars-1,y
+;PUTC '^'
+;jsr putchar
+        ;; @end FAIL - try all the rules
+        ;; (ugh; NO use '|' - it cannot skip - lol)
+        cmp #'|'+128
+        bne :+
+
+        pla
+        pla
+        jmp _fail
+:       
+        cmp savea
+        bne @next
+
+;;; should work, return and go to _accept?
+;;; doesn't
+;        rts
+
+;;; OK, so far so good
+;        pla
+;        pla
+;        jmp _fail
+
+
+        pla
+        pla
+
+.ifnblank
+        ;; should also work, but EXIT?
+        lda #<nextrule-1
+        sta rule
+        ldx #>nextrule-1
+        stx rule+1
+        jmp _next
+.endif
+;        jmp _fail
+
+        ;; should work... but?
+        jmp _acceptrule
+
+.endif ; CUT
+
+
 .ifdef LONGNAMES
 
 ;;; --- name handling
@@ -4137,8 +4210,31 @@ _Z='Z'+128
 rule0:  
         .byte _P,0
 
+;;; PROBLEM is \0 in %{ code! can't skip when _fail!!
+;;; 
+;;; safer if done near end of of %{ area
+        
+
 ;;; aggregate statements
 ruleA:  
+
+
+.ifdef CUT2
+        ;; '}' marks end - CUT
+        ;;  how much savings if can stop at '}'
+      .byte "%{"
+        ;; peek ahead
+        ldy #0                  ; danger! 0 can't skip
+        lda (inp),y
+        cmp #'}'
+        bne :+
+        jmp _acceptrule
+:       
+        ;; put at end "past" any 0, lol
+        IMM_FAIL
+        .byte '|'
+.endif ; CUT2
+
         ;; Right-recursion is "fine"
         .byte _S,TAILREC,"|",0
 
@@ -4849,6 +4945,32 @@ ruleU:
 
 ruleD:
 
+;;; TODO: generealize!
+
+.ifdef CUT
+        ;; "CUT" operator
+        ;; if the next character is ,:;)]
+        ;; expression is ended
+;;; BYTESIEVE:
+;;;   3450146 before
+;;;   2862018 cut only in ruleD
+;;;   (/ 2862018 3430146.0)
+;;; 
+;;;   16.6% faster
+
+
+      .byte "%{"
+        jsr cut
+        jmp _acceptrule
+
+breakchars:
+        ;; '|'+128 so not conflict with '|', not 0!
+        .byte ",:;)]",'|'+128
+
+        .byte "|"
+nextrule:       
+.endif ; CUT
+
 FUNC _oprulesstart
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
@@ -4942,7 +5064,7 @@ FUNC _oprulesstart
         ;; make sure %D <256
         lda tos+1
         beq :+
-        IMM_FAIL
+        jmp _fail
 :       
         IMM_RET
 
@@ -4991,7 +5113,7 @@ FUNC _oprulesstart
         ;; make sure %D <256
         lda tos+1
         beq :+
-        IMM_FAIL
+        jmp _fail
 :       
         IMM_RET
       .byte '['
@@ -5913,10 +6035,8 @@ ruleH:
         ldy #0
         lda (pos),y
         ;; 
-                
-        
-        
 
+        IMMRET
         ;; done with printf
         .byte "|);"
 .endif ; rulePRINTF
@@ -6107,6 +6227,7 @@ ruleN:
         PUTC '@'
         ;; cheat: artificual fail!
         IMM_FAIL
+;;; ???
         IMM_RET
 
 ;;; TODO: why needed? was it for constant folding?
@@ -6601,7 +6722,7 @@ afterELSE:
         ;; make sure %D <256
         lda tos+1
         beq :+
-        IMM_FAIL
+        jmp _fail
 :       
         IMM_RET
 
@@ -7293,7 +7414,7 @@ FUNC _stmtbyteruleend
 ;;;  make sure %D <256
         lda tos+1
         beq :+
-        IMM_FAIL
+        jmp _fail
 :              
         IMM_RET
 
@@ -7989,9 +8110,9 @@ ruleX:
 ;;;  make sure %D <256
         lda tos+1
         beq :+
-        IMM_FAIL
+        jmp _fail
 :              
-        IMM_RET
+        jsr immret
       .byte "["
         ;; saves 2 bytes!
         lda  #'<'
