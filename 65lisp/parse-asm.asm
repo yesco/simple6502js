@@ -10809,6 +10809,21 @@ NOPRINT=1
 ;
 
 
+;;; sim65: 40020 bytes allocatable
+;;;  oric: 12704 bytes allocatable
+
+;;; SIM65: (- 65536 (* 2 256) 17348 4096)
+;;;           64K   0-1 pages .sim  output
+;;;        (- 43580 40020) = 3560 bytes "cc65 stack"?
+
+;;; ORIC:
+;;; (- 65536 (* 5 256) 16384 17421 4096   8000  2000)
+;;;    64KB  0-4 page  ROM   .tap  output hires charset
+;;; (- 16355 12704) = 3651 bytes "cc65 stack"?
+;;; 
+;;; TEXT:  (- 37631 (* 5 256) 17421 2000 1000) = 15930
+;;; HIRES: (- 37631 (* 5 256) 17421 8000 2000) =  8930
+;;; -- cc65 
 
 MALLOC=1
 .ifdef MALLOC
@@ -10826,10 +10841,10 @@ MALLOC=1
         .byte "    if (p) {",10
         .byte "      a+= z;",10
         .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
+        .byte "      // try same size again till fail!",10
+        .byte "    } else {",10
+        .byte "      z>>=1;",10
         .byte "    }",10
-
-        .byte "    z>>=1;",10
-
 ;        .byte "    if (z==0) return a;",10
         .byte "    if (!z) return a;",10
 
