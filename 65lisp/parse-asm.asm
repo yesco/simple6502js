@@ -2234,6 +2234,12 @@ FUNC _compileAX
         ;; store what to compile
         sta inp
         stx inp+1
+.zeropage
+originp:        .res 2
+.code
+        ;; store what to compile
+        sta originp
+        stx originp+1
 
 .ifdef ERRPOS
         sta erp
@@ -3829,48 +3835,7 @@ nextc:
 
 
 .ifndef UPDATENOSPACE
-.ifdef ERRPOS
-        pha
-
-;;; store max input position
-;;; (indicative of error position)
-        lda inp+1
-        cmp erp+1
-        bcc noupdate
-        bne update
-        ;; erp.hi == inp.hi
-        lda inp
-        cmp erp
-        bcc noupdate
-        beq noupdate
-        ;; erp := inp
-update:
-.ifdef PRINTREAD
-        pha
-
-        ldy #0
-        lda (erp),y
-;        jsr putchar
-        jsr printchar
-
-.ifnblank
-        sta tos
-        lda #0
-        sta tos+1
-        putc '#'
-        jsr printu
-        putc ' '
-.endif
-
-        pla
-.endif
-
-        sta erp
-        lda inp+1
-        sta erp+1
-noupdate:
-        pla
-.endif ; ERRPOS
+        jsr errpos
 .endif ; !UPDATENOSPACE
 
 
@@ -3919,7 +3884,23 @@ jsr printchar
 .endif
 
 .ifdef UPDATENOSPACE
-.ifdef ERRPOS
+        jsr errpos
+.endif ; UPDATENOSPACE
+
+        pla
+        tay
+        pla
+        tax
+        pla
+.endscope
+        rts
+
+errpos:
+.ifndef ERRPOS
+        rts
+.else
+        pha
+
 ;;; store max input position
 ;;; (indicative of error position)
         lda inp+1
@@ -3938,7 +3919,8 @@ update:
 
         ldy #0
         lda (erp),y
-        jsr putchar
+;        jsr putchar
+        jsr printchar
 
 .ifnblank
         sta tos
@@ -3956,17 +3938,8 @@ update:
         lda inp+1
         sta erp+1
 noupdate:
+        pla
 .endif ; ERRPOS
-.endif ; UPDATENOSPACE
-
-
-        pla
-        tay
-        pla
-        tax
-        pla
-.endscope
-        rts
 
 
 FUNC _incT
@@ -8578,9 +8551,7 @@ status:
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ {10,WHITE,"ERROR>",10,10}
-
-        jsr getchar
+        PRINTZ {10,RED,"ERROR>",10,10}
 
 ;        jsr clrscr
 
@@ -8588,9 +8559,9 @@ status:
 
 ;;; TODO: ldx , ldy, jsr _copyR - 6B
 ;;; 8 B
-        lda #<input
+        lda originp
         sta pos
-        lda #>input
+        lda originp+1
         sta pos+1
 
 .scope
