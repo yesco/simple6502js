@@ -244,7 +244,9 @@ char* keywords[]={
 #define TYPE      WHITE
 #define DEF       CYAN
 #define OPS       GREEN
-#define COMMENT   GREEN
+//#define COMMENT   GREEN
+#define COMMENT   CYAN   // best?
+//#define COMMENT   BLACK+BG
 #define INCLUDE   WHITE
 
 #include <ctype.h>
@@ -279,8 +281,9 @@ next:
     switch(c){
     case '\r': case '\n': color= DEFAULT; lastc=0;
     case '(': case ')': case '[': case ']':
+    case ',':
     case ';': pc(c); break; // no car color!
-    case '"': pc(STRING); while((c=*s)!='"')pc(c),++s; pc(c); break;
+    case '"': pc(STRING); pc(c); while((c=*++s)!='"')pc(c); pc(c); break;
     case '\'': pc(STRING); pc(*s);pc(*++s);pc(*++s); break;
     case '#': pc(INCLUDE); goto printline;
     case '/': if (s[1]=='/') { pc(COMMENT);

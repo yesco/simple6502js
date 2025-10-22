@@ -984,6 +984,8 @@ FUNC _stdlibstart
 ;;; - abs
 ;;; - atoi
 ;;; - div
+
+;;; same same...
 ;;; - rand()
 ;;; - random()
 ;;; - srand()
@@ -1000,6 +1002,45 @@ FUNC _stdlibstart
 ;;; (inp) => AX, inp points at next (not digit) char
 ;;; 
 ;;; TODO: too big! just use parse rules!!!
+
+
+
+.zeropage
+;;; 8-bit seed the generator, write here
+seedrand:       .byte 42
+.code
+
+;;; new rnadom valuie in AX
+FUNC rand
+        jsr rand8
+        tax
+        ;; fall-through for A
+
+;;; Simple 8-bit LFSR
+;;; 
+;;; The 8-bit LFSR (0–254 range, excluding all-zero),
+;;; use a Galois configuration with the primitive
+;;; polynomial \(x^8 + x^4 + x^3 + x^2 + 1\)
+;;; (mask `#$1D`). This gives a maximum period of 255
+;;; before repeating.
+;;; 
+;;; Consider using Mersenne Twister (?)
+FUNC rand8
+        lda seedrand
+        beq do_xor
+        asl
+        beq no_xor
+        bcc no_xor
+        lda seedrand
+do_xor:  
+        eor #$10
+no_xor: 
+        sta seedrand
+        rts
+
+
+
+
 .ifdef ATOI
 FUNC _atoiXR
         lda #0
@@ -1987,10 +2028,12 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
+;
+PRINTREAD=1
 
 ;;; more compact printing of source when compiling
-;UPDATENOSPACE=1
+;
+UPDATENOSPACE=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
@@ -2079,7 +2122,13 @@ DONE= '$'
 ;;; parser to compile _
 FUNC _init
 
+
+
+
+
+
 ;;; compile using defaults input, output
+;;; BEWARE: never returns! ends up in _OK/_edit
 FUNC _compile
         ;; default output location
         lda #<_output
@@ -2089,6 +2138,7 @@ FUNC _compile
 
 ;;; compile source from input
 ;;;    _out must be set to where you want output to go
+;;; BEWARE: never returns! ends up in _OK/_edit
 FUNC _compileInput
 
         ;; default input location
@@ -2097,6 +2147,7 @@ FUNC _compileInput
 
 ;;; Compiles source from AX
 ;;; to *_out location.
+;;; BEWARE: never returns! ends up in _OK/_edit
 FUNC _compileAX
 
         ;; store what to compile
@@ -2128,6 +2179,7 @@ FUNC _compileAX
 .endif
         ;; X=$ff still for init!
 
+;;; TODO: move to bios-atos-rom???
 
 ;;; Init ORIC
 .ifdef __ATMOS__
@@ -2254,20 +2306,6 @@ XYZ=1
         putc 10
 .endif ; DEBUG
 
-        ;; init input
-.ifdef COMPILESCREEN
-        jsr _printsrc
-
-        ;; "Zero terminate the screen!" LOL
-        lda #0
-        sta SCREENEND+1
-
-        COMPILESTART= SCREEN+40
-        ;; set screen as input
-.else
-        COMPILESTART= input
-.endif
-
         ;; store an rts for safety
         _RTS=$60
         lda #_RTS
@@ -2285,7 +2323,9 @@ jsr printu
 putc 10
 .endif ; LONGNAMES
 
-;;; TODO: improve using 'P'
+
+
+;;; TODO: improve using using ruleP 'P'
         lda #'P'+128
         sta rulename
 
@@ -2301,27 +2341,18 @@ putc 10
 
 .ifdef DEBUGRULE
         jsr printstack
-        jsr printstack
 .endif
-
-;;; TODO: but this doesn't work.... lol
-
-.ifnblank
-        lda #DONE
-        sta rulename
-
-        lda #'P'+128
-        jmp _enterrule
-.endif
-
-;;; pause before as DEBUG scroll info away, lol
-.ifdef DEBUGKEY
-        jsr getchar
-.endif ; NDEBUG
 
 ;.ifdef PRINTASM
         jsr _iasmstart
 ;.endif ; PRINTASM
+
+
+
+
+;;; TODO: move nextInp & _incIspc here!
+;;; TODO: jmp _nextInp falls through to _next
+
 
 
         ;; skip any space/comments
@@ -3697,6 +3728,11 @@ FUNC nextInp
 nextc:
         ldy #0
         lda (inp),y
+        bpl :+
+        ;; hi-bit set => reset, lol (cursor?)
+        and #$7f
+        sta (inp),y
+:       
         beq done
 
 .ifdef PRINTDOTS
@@ -3733,7 +3769,8 @@ update:
 
         ldy #0
         lda (erp),y
-        jsr putchar
+;        jsr putchar
+        jsr printchar
 
 .ifnblank
         sta tos
@@ -3760,11 +3797,14 @@ noupdate:
         cmp #' '+1
         bcc skipspc
 
-;;; Add more cases here!
+;;; <------------Add more cases here!----------->
 
         ;; #include <...  - just ignore all #! .. NL!
+        ;; CPP macros are complicated?
+        ;; - https://en.cppreference.com/w/c/language/translation_phases.html
         cmp #'#'
         beq tillNL
+
         ;; // comment till NL
         cmp #'/'
         bne done
@@ -8408,11 +8448,32 @@ status:
 ;        PRINTZ {10,10,"65mucc02",10}
 ;        PRINTZ {"(C)2025 Jonas S Karlsson jsk@yesco.org",10}
 
+        ;; print how many chars (of scavedscreen used)
+        lda inp
+        ldx inp+1
+        
+        sec
+        sbc #<(savedscreen+40)
+        tay
+        txa
+        sbc #>(savedscreen+40)
+        tax
+        tya
+        jsr axputu
+
         ;; failed?
         ;; (not stand at end of source)
         ldy #0
         lda (inp),y
         beq _OK
+
+        PUTC 10
+        ldx #0
+        jsr axputu
+        jsr nl
+        
+        
+
 
 .ifdef ERRPOS
         ;; hibit string near error!
@@ -8437,7 +8498,9 @@ status:
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
         PRINTZ {10,WHITE,"ERROR>",10,10}
-;        jsr getchar
+
+        jsr getchar
+
 ;        jsr clrscr
 
 ;;; TODO: printz? printR?
@@ -8782,14 +8845,51 @@ dohelp:
         cmp #CTRL('C')
         bne :+
 
-        jsr _savescreen
-        jsr nl
+;        jsr _savescreen
+;        jsr nl
         lda #(BLACK+BG)&127
         ldx #WHITE&127
         jsr _eoscolors
+        PRINTZ {10,RED,"compiling saved SCREEN...",10,10}
         ;; This basically restarts program, lol
-        TIMER
+	; TIMER
+        
+        ;; CTRL-KEY?
+;        ldx $0209
+;        cpx #162
+;        beq @default
+
+        ;; shift + ctrl ? lol
+        ;; TODO: better combo
+
+
+        ;; save 10 newline at last pos in every line!
+        ;; lol
+        ;; TODO: maybe have other way to detect this
+        ;;   during compilation?
+
+;;; TODO: make one sub? (also in FUNC _compile
+;;;  TODO: maybe have one func set all defaults,
+;;;   then you can override, and call "cont"?
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
+        ;; set input = screen
+        lda #<(savedscreen+40)
+        ldx #>(savedscreen+40)
+        ;; set one byte 0 *after* screen!
+        ;; (I guess we could just last pos..)
+        ;; 0 -- it's also BLACK TEXT...
+        ldy #0 
+        sty savedscreen+SCREENSIZE
+        ;; alright, all done?
+        jmp _compileAX
+        
+@default:
         jmp _init
+
+
 :       
 ;;; - DEL - delete backwards
         cmp #127                ; DEL-key
@@ -9401,6 +9501,32 @@ FUNC _savescreen
         rts
 .endif
 
+
+.ifblank
+        lda #<(SCREEN+40)
+        ldx #>(SCREEN+40)
+        sta pos
+        stx pos+1
+
+        ldx #27
+        ldy #39
+@nextrow:
+        lda #10                 ; \n newline
+        sta (pos),y
+        ;; move down one line
+        clc
+        lda pos
+        adc #40
+        sta pos
+        bcc :+
+        inc pos+1
+:       
+        dex
+        bne @nextrow
+.endif
+
+
+
         CURSOR_OFF
 
         ;; from
@@ -9943,7 +10069,7 @@ FUNC printvar
 
 ;;; prints readable otherwise deccode
 .zeropage
-pchar:  .res 1
+pchar:     .res 1
 ptossave:  .res 2
 .code
 FUNC printchar
@@ -9955,6 +10081,12 @@ FUNC printchar
         pha
         
         lda pchar
+        cmp #10
+        bne :+
+        jsr putchar
+        lda #13
+        jmp @printplain
+:       
         bpl :+
         ;; hi-bit set '
         and #127
@@ -10180,6 +10312,16 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+;TEMPLATE=1
+.ifdef TEMPLATE
+        .byte "word main(){",10
+        .byte "  putu(6502);",10
+        .byte "  return 42;",10
+        .res 23,10
+        .byte "}"
+        .byte 0
+.endif ; TEMPLATE
 
 ;;; return without argument, lol (AX)
 ;        .byte "word main(){ 666; return; }",0
@@ -11502,9 +11644,7 @@ savedscreen:
 .bss
         ;; ORIC SCREEN SIZE
         ;; (save program/screen before compile to "input")
-        .res 40*28
-;;; constant expressio expected ???
-;        .res SCREENSIZE
+        .res SCREENSIZE+1       ; +1 for \0
 
 .endif ; JUNK
 
