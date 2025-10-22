@@ -1,33 +1,37 @@
 ;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Free to use for non-commercial purpose subject to
 ;;;   credit of original authorship please!
 ;;; - Generated code/tap-files are free, of course!
 
 
+;;; TITLE
 ;;; 
-;;; Essentially, this is a dynamic rule-based compiler.
+;;; A 6502 Recursive Descent Data-Driven
+;;; BNF-Parser as C Program Compiler
 ;;; 
 ;;; 
 ;;; It interprets a BNF-description of a programming
 ;;; language while reading and matching it with a
 ;;; source text of that langauge. The BNF contains
-;;; generative "templated" bytes of machine code with
-;;; minimal instrumentation to generate runnable machine
-;;; code.
+;;; generative "templated" rules of code generation,
+;;; minimal instrumentation, that generates runnable 
+;;; machine code.
 ;;;
-
+;;; There are "token"-matchers: as %D to parse
+;;; constants; %V %A %N %U to match vars/fun names
+;;; giving addresses and enabling scope management.
 ;;; 
-;;; Implementation Notes
+;;; The generative directives allow for substitutions
+;;; of bytes: < > lo and hibyte; +> for one address
+;;; higher; ':' ';' '{{' for code address manipulations;
+;;; D d for value juggling.
 ;;; 
-;;; The BNF parser is implemented as a giant statemachine,
-;;; i.e., a pushdown automata. The program stack is used
-;;; as a data-stack, mixed with *some* subroutine calls.
-;;; However, one needs to be careful as you can't use
-;;; subroutine to modify the "stack". This means, that
-;;; the current rule/input char is read several times.
-;;; 
-;;; TODO: store them in ZP when stepping
+;;; A hack %{ is available to inject and run immediate
+;;; code during parsing enabling experimential 
+;;; features, like matching a byte value, or enabling
+;;; partial (constant) expression evaluations.
 ;;; 
 
 ;;; 
@@ -98,15 +102,9 @@
 ;;; - limited char support: *(char*)p=   ... *(char)i;
 ;;; 
 ;;; - library to minimize gen code+rules (slow code==cc65)
+;;; 
 
-
-;;; TODO:
-;;; - parameters (without stack)
-;;; - recursion? (requires stack)
-;;;   1) use program stack (no tailrec)
-;;;   2) separate stack ops/MINIMAL
-
-
+;;; 
 ;;; Limits:
 ;;; - only *unsigned* values
 ;;; - if supported ops/syntax should (mostly)
@@ -122,25 +120,60 @@
 ;;; - single upper case letter functions
 ;;; - NO parenthesis
 ;;; - NO generic / or * (unless add library)
+;;; 
 
-
-;;; OPTIONAL:
-;;; - TODO: char datatype
-;;; - pointers (no type checking): *p= *p+1
-;;; - I/O: getchar putc putu puth
-;;; - else statement;
-;;; - optimized: &0xff00 &0xff >>8 <<8
-;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
-;;; - optimized: ... op const   ... op var
-
-        
+;;; 
 ;;; Extentions:
 ;;; - 42=>x+7=>y;     forward assignement
 ;;; - 35.sqr          single arg function call
-;;; - 3 + $ v         byte operator (acts only on A not AX)
+;;; - 3 + $ v         byte operator (acts only on A not AX
+;;; 
+
+;;; USER MANUAL
+;;; 
+;;; The program "lives" in the editor. It allows
+;;; for fullscreen editing (currently: ORIC ATMOS).
+;;; 
+;;; Arrow keys for movement, backspace, delete (forward).
+
+;;; Emacs commands are extras:
+;;; line: ^Prev ^Next ^A=sTart ^End ^O=new
+;;; char: ^Back ^Forward ^Delete BackSpace
+;;; 
+;;; ^T - caps toggle (ORIC, lol)
+;;; 
+;;;   ^Help summary (navigation, lang, symbols)
+;;;   ^Write screen to buffer
+;;;   ^Load screen from buffer
+;;;   ^Compile buffer
+;;;   ^Xexecut program
+;;;   ^Run
+;;; 
+;;; Experimental features:
+;;; 
+;;;   ^Zource code (reload from orig)
+;;;   ^V info of compiler/program/libraries
+;;;   ^Garnish program (pretty print)
+;;; 
+;;;   ^Q disasm program (sensitive)
+;;;   ^Utilities, ahum list "files"
+;;;   ^Y quit
+;;;   
+;;;  ESC help
+;;; 
+;;; Not yet: ^Search ^J ^Killine ^Machinecode(^Q)
+
+;;; Errors
+;;; 
+;;; If there is an error a newline '%' letter error-code
+;;; is printed, and with PRINTINPUT ERRPOS defined the
+;;; source is printed, and RED text as far as parsing got.
+;;; 
 
 
 
+
+;;; 
 ;;; ORIC ATMOS API
 ;;; ==============
 ;;; Refer to the ORIC ATMOS MANUAL for parameters.
@@ -173,14 +206,55 @@
 ;;;   cread()->0..255 - TODO: erh, should be function
 ;;;   ; cwritehdr() - TODO
 ;;;   ; creadsync() - TODO
+;;; 
+
+;;; 
+;;; Implementation Notes
+;;; 
+;;; 
+;;; The BNF parser is implemented as a giant statemachine,
+;;; i.e., a pushdown automata. The program stack is used
+;;; as a data-stack, mixed with *some* subroutine calls.
+;;; The stack grows as rules are parsed, and shrinks
+;;; as they are rejected or resolved. This allows for
+;;; a simple backtracking parser.
+;;; 
+;;; One needs to be careful as you can't use subroutine
+;;; to modify the "stack".
+;;; 
+;;; This allows one to configure the compilation as a
+;;; "background" task. Ie, it performs a piecemeal work
+;;; and you can then go on to other tasks. A simple
+;;; continutation (address) to be called at specified
+;;; opportunity. Then, later, the compilation can be
+;;; called again, until finished.
+;;; 
+;;; Care must be taken so that there are no interleaving
+;;; program calls left on the stack when the compilation
+;;; process continues, it'll go bad!
+;;; 
 
 
+;;; 
+;;; TODO:
+;;; - parameters (without stack)
+;;; - recursion? (requires stack)
+;;;   1) use program stack (no tailrec)
+;;;   2) separate stack ops/MINIMAL
+;;; 
 
 
-;;; If there is an error a newline '%' letter error-code
-;;; is printed, and with PRINTINPUT ERRPOS defined the
-;;; source is printed, and RED text as far as parsing got.
+;;; 
+;;; OPTIONAL:
+;;; - pointers (no type checking): *p= *p+1
+;;; - I/O: getchar putc putu puth
+;;; - else statement;
+;;; - optimized: &0xff00 &0xff >>8 <<8
+;;; - optimized: ++v; --v; += -= &= |= ^= >>=1; <<=1;
+;;; - optimized: ... op const   ... op var
+;;; 
 
+;;; 
 ;;; How-to use
 ;;; 
 ;;; 1. The BNF is inline, rule 'P' is executed
@@ -438,7 +512,7 @@ IMMEDIATE=1
 ;;;   {{  - PUSHLOC (push and AUTO patch at accept rule)
 ;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
 ;;;   d   - set dos from tos
-;;;   #   - push tos
+;;;   #   - push tos (on to stuck)
 ;;;   :   - push loc (onto stack, as backpatch! - careful)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 ;;; 
@@ -2119,13 +2193,20 @@ PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
 DONE= '$'
 
+
+.zeropage
+dirty:          .res 1
+showbuffer:     .res 1
+.code
+
+
 ;;; parser to compile _
 FUNC _init
 
-
-
-
-
+        ;; editor states
+        lda #0
+        sta dirty
+        sta showbuffer
 
 ;;; compile using defaults input, output
 ;;; BEWARE: never returns! ends up in _OK/_edit
@@ -8765,6 +8846,7 @@ TIMPER=8
 
 FUNC _editorstart
 
+
 FUNC _edit
         
 .ifdef INTERRUPT
@@ -8781,6 +8863,25 @@ FUNC _edit
         jmp _edit
 .endif
 .endif ; INTERRUPT
+
+;;; update display of state
+        ;; - dirty
+        lda dirty
+        beq :+
+        lda #'*'
+        SKIPTWO
+:       
+        lda #' '
+        sta SCREEN+35
+
+        ;; - showbuffer
+        lda showbuffer
+        beq :+
+        lda #'a'
+        SKIPTWO
+:       
+        lda #' '
+        sta SCREEN+34
 
 ;;; TODO: somehow this makes ^E not work!
 ;;;  also cannot see movement
@@ -8821,36 +8922,29 @@ dohelp:
         jsr _help
         jmp _loadscreen
 :
-;;; - ctrl-Load/edit
-        cmp #CTRL('S')
-        bne  :+
-
-        jsr _eosnormal
-        jmp bytesieve
-:       
-
 ;;; - ctrl-V - info
         cmp #CTRL('V')
         bne :+
 
-        .import _info
-
-;;; TODO: crashews second time on oric...
-;        jsr _savescreen
-
+        jsr _savescreen
         jsr _eosnormal
+        .import _info
         jmp _info
 :       
 ;;; - ctrl-C - compile
         cmp #CTRL('C')
         bne :+
 
-;        jsr _savescreen
-;        jsr nl
+        jsr _savescreen
+
+        lda #0
+        sta showbuffer
+
+        jsr nl
         lda #(BLACK+BG)&127
         ldx #WHITE&127
         jsr _eoscolors
-        PRINTZ {10,RED,"compiling saved SCREEN...",10,10}
+        PRINTZ {10,"compiling...",10,10}
         ;; This basically restarts program, lol
 	; TIMER
         
@@ -8895,6 +8989,7 @@ dohelp:
         cmp #127                ; DEL-key
         bne :+
         
+        inc dirty
         ;; back one, delete forward!
         jsr bs
         lda #CTRL('D')
@@ -8903,6 +8998,7 @@ dohelp:
         cmp #CTRL('D')
         bne :+
 @bs:
+        inc dirty
         ;; move chars back til end of line
         ldy CURCOL
 @copyback:
@@ -8983,32 +9079,26 @@ doneCE:
         cmp #CTRL('R')
         bne :+
 
+.scope
         jsr _savescreen
         jsr _eosnormal
-        jmp _aftercompile
-:       
-;;; - ctrl-X - execute whatever
-        cmp #CTRL('X')
-        bne :+
-
-;        jmp _output
-        jsr _savescreen
         jmp _run
-        ;; no rts? lol, wasted one byte on stack...
-;;; TODO: cleanup???
+.endscope
+        ;; just shows compilation errors again
+        ;; jmp _aftercompile
 :       
-;;; - ctrl-Qasm - disasm
+;;; - ctrl-Qasm - disasm => ^M machine code? lol
         cmp #CTRL('Q')
         bne :+
 
         jsr _savescreen
-        jsr clrscr
         jmp _dasm
 :       
 ;;; - ctrl-Zource (as print source)
         cmp #CTRL('Z')
         bne :+
 
+        jsr _savescreen
         jsr _eosnormal
         jmp _printsrc
 :       
@@ -9016,26 +9106,33 @@ doneCE:
         cmp #CTRL('G')
         bne :+
 
-.import _prettyprint
+        jsr _savescreen
         jsr _eosnormal
         jsr clrscr
         lda #<input
         ldx #>input
+        .import _prettyprint
         jmp _prettyprint
 :       
-;;; - ctrl-Utilities (as print source)
+;;; - ctrl-U repeat N times ... command
         cmp #CTRL('U')
         bne :+
-        
-        jsr _savescreen
-        jsr _eosnormal
-        jmp _listfiles
+
+        rts
 :       
 ;;; - ctrl-W - save
         cmp #CTRL('W')
         bne :+
         
-        jmp _savescreen
+        ;; over-ride, you can write, silly one!
+        inc showbuffer
+        inc dirty
+
+        jsr _savescreen
+
+        ;; yeah, it's still there
+        inc showbuffer
+        rts
 :       
 ;;; - ctrl-Load/edit
         cmp #CTRL('L')
@@ -9044,7 +9141,7 @@ doneCE:
         jsr _eosnormal
         jmp _loadscreen
 :       
-;;; - ctrl-Youit
+;;; - ctrl-Youit (just for sim65, can't catch ^C)
         cmp #CTRL('Y')
         bne  :+
 
@@ -9069,6 +9166,8 @@ doneCE:
 ;;; - RETURN goes next line indented as prev!
         cmp #CTRL('M')
         bne :+
+
+        inc dirty
 
 .ifdef DOO
         ;; remember here
@@ -9113,7 +9212,6 @@ doneCE:
 ;;; - ctrl-Forward (emacs)
         cmp #CTRL('F')
         bne :+
-;;; TODO: relative jmp save bytes!
 
         jmp forward
 :       
@@ -9121,6 +9219,7 @@ doneCE:
         cmp #CTRL('B')
         bne :+
 
+        inc dirty
         jmp bs
 :       
 ;;; - ctrl-Next line (emacs)
@@ -9135,12 +9234,18 @@ doneCE:
 
         lda #CTRL('K')
 :       
+;;; - ctrl-Xended commands
+        cmp #CTRL('X')
+        beq extend
+
 ;;; - control char - just print it
         cmp #' '
         bcc editprint
+
 ;;; - INSERT CHAR (shift line + putchar)
+        inc dirty
         pha
-        ;; insert - need to push other chars on line right
+        ;; insert - push line right left of cursor
         ldy #38
 :       
         lda (ROWADDR),y
@@ -9155,6 +9260,46 @@ doneCE:
 editprint:
         ;; print it
         jmp rawputc
+
+extend:
+        jsr _savescreen
+        jsr _eosnormal
+        
+        lda #<_extendinfo
+        ldx #>_extendinfo
+        jsr _printz
+
+        jmp _listfiles
+
+        ;; get command character
+        jsr getchar
+        
+        cmp #'b'
+        bne :+
+        jmp bytesieve
+:       
+        cmp #CTRL('F')
+        bne :+
+        ; jmp fileopen
+:       
+        cmp #CTRL('S')
+        bne :+
+        ; jmp savefile
+:       
+        cmp #CTRL('W')
+        bne :+
+        ; jmp writefile
+:       
+        cmp #CTRL('C')
+        bne :+
+        ; jmp crashexit
+:       
+        cmp #CTRL('Z')
+        bne :+
+        ; jmp zleep (10s?)
+        ; PING
+:       
+        rts
 
 FUNC _editorend
 
@@ -9296,6 +9441,9 @@ FUNC _eosnormal
         lda #BLACK&127+16       ; paper
         ldx #GREEN&127          ; ink
 FUNC _eoscolors
+;;; TODO:     make this save screen? save many calls
+
+
 ;;; TODO: oric const
         sta $026b               ; paper
         stx $026c               ; ink
@@ -9463,7 +9611,20 @@ GROUP=YELLOW
 .byte "    ",CODE,"L: ... goto L;"
 .byte 0
 
+FUNC _extendinfo
+.byte 10
+.byte "TODO:",10
+.byte "^Files to load from tape/disk",10
+.byte "^Save current file",10
+.byte "^Write as new file",10
+.byte "^Crash/exit",10
+.byte "^Zleep",10
+
+.byte 0
+
 FUNC _helptextend
+
+
 
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
@@ -9501,8 +9662,27 @@ FUNC _savescreen
         rts
 .endif
 
+        ;; update editing state
+        ;; - exit if not buffer
+        lda showbuffer
+        beq @ret
+        ;; - exit if not dirty
+        lda dirty
+        beq @ret
 
-.ifblank
+        lda #0
+        sta dirty
+        sta showbuffer
+
+        ;; TODO: alt: save as sanitized "string"
+        ;;       use this for comilation/saving etc...
+        ;;       can have many "buffers" a-z...
+
+        ;; "sneakily" put 10 (newline) at last pos
+        ;; of each line (otherwise one long line)
+        ;; 
+        ;; 10 is DOUBLE NORMAL, on oric screen
+        ;; but in last column it's harmless!
         lda #<(SCREEN+40)
         ldx #>(SCREEN+40)
         sta pos
@@ -9523,9 +9703,6 @@ FUNC _savescreen
 :       
         dex
         bne @nextrow
-.endif
-
-
 
         CURSOR_OFF
 
@@ -9546,6 +9723,7 @@ FUNC _savescreen
         jsr _memcpy
         CURSOR_ON
 
+@ret:
         rts
 
 FUNC _loadscreen
@@ -9553,9 +9731,17 @@ FUNC _loadscreen
         rts
 .endif
 
+        ;; update state
+        ldx #0
+        stx dirty
+        inx
+        stx showbuffer
+
+
 ;;; TODO: fixed param calling (copy N bytes to tos++)
 ;;;   20+3B params+call
         ;; from
+;;; TODO: implement blockcalling convention!
         lda #<savedscreen
         ldx #>savedscreen
         sta tos

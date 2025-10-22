@@ -1,6 +1,29 @@
 ;;; TODO: look at 
 ;;; - https://github.com/Michaelangel007/6502_calling_convention
 
+;;; TODO: block calling convention
+;;;    - save, no save
+;;;    
+;;;    (optional)
+;;;    lda ...
+;;;    ldx ...
+;;;    sta @params+(2-1)
+;;;    stx @params+(2-1)+1
+;;; 
+;;;    lda #0
+;;;    sta @params+(3-1)
+;;;    stx @params+(3-1)
+;;; 
+;;;    jsr inlineMEMCPY
+;;;    .byte N*2
+;;; @params:
+;;;       .word param_1
+;;;       ...
+;;;       .word param_N
+;;; .  <AFTER CALL>
+
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; jsk newest variant
