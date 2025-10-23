@@ -6,7 +6,8 @@ word main() {
 
     c= 0; while(c<8) {
       putcraw(c); putu(c);
-      putcraw(c+128); putcraw(128+'0'+c); //+128);
+      putcraw(c+128);
+      putcraw(128+'0'+c);
       ++c;
     }
 

@@ -706,6 +706,10 @@ FUNC _biosstart
 
 .endif ; OLDSTYLE
 
+.ifndef putcraw
+        putcraw= putchar
+.endif
+
 FUNC _biosend
 
 
@@ -4505,14 +4509,7 @@ FUNC _iorulesstart
 
         .byte "|putcraw(",_E,")"
       .byte '['
-        pha
-        lda #9
-        jsr putchar
-        ldy CURCOL
-        ;; anum, and if col= 0, lol wraphell
-        dey
-        pla
-        sta (ROWADDR),y
+        jsr putcraw
       .byte ']'
 
 .ifdef OPTRULES

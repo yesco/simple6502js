@@ -132,6 +132,18 @@ rawputc:
         stx $13
 .endmacro
 
+putcraw:        
+        pha
+        ;; need to move first as ORIC ROM
+        ;; removes hibit!
+        lda #9
+        jsr putchar
+        ldy CURCOL
+        ;; anum, and if col= 0, lol wraphell
+        dey
+        pla
+        sta (ROWADDR),y
+        rts
 
 
 SCR=$bb80
