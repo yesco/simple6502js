@@ -4854,12 +4854,12 @@ FUNC _memoryrulesstart
 .endif
 
         ;; TODO: more like statement
-        .byte "|asm(",'"',"sei",'"',")"
+        .byte "|SEI();"
       .byte '['
         sei
       .byte ']'
 
-        .byte "|asm(",'"',"cli",'"',")"
+        .byte "|CLI();"
       .byte '['
         cli
       .byte ']'
