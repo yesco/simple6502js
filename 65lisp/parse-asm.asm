@@ -2620,7 +2620,8 @@ immret:
         jsr _incR
         jmp _next
 immfail:
-;;; doesn't seem to work correwctly
+;;; TODO: doesn't seem to work correwctly
+;;; TODO: isn't used...
         pla
         sta rule
         pla
@@ -2643,12 +2644,16 @@ noimm:
 
         ;; Digits? (constants really)
         cmp #'D'
-        beq digits
+        bne :+
+
+        jmp _digits
+:       
+
 .ifdef STRING
         ;; String?
-        cmp #'s'
+        cmp #'s'                ; means skip
         beq string
-        cmp #'S'
+        cmp #'S'                ; means Copy
         beq string
 .endif ; STRING
 
@@ -2657,7 +2662,6 @@ jmpvar:
         ;; - % anything...
         ;;   %V (or %A %N %U %...)
         jmp _var
-
 
 
         ;; - "constant string"
@@ -2734,12 +2738,6 @@ str:
         ;; skip "
         jsr _incIspc
         jmp _next
-
-
-
-digits:       
-        ;; assume it's %D
-        jmp _digits
 
 
 
