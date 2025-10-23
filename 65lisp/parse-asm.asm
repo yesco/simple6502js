@@ -1958,6 +1958,7 @@ NOSHOWSIZE=1
 ;;;   P A R S E R   O P T I M I Z A T I O N
 ;;; 
 ;;;   41% faster by CUT+CUT2
+;;;   40% faster w  FASTSKIP in _fail (no jsr _inc)
 ;
 OPTPARSEALL=1
 
@@ -3055,114 +3056,54 @@ lda savea
 
 
 FUNC _fail
-.ifdef DEB3
-PUTC '\'
-.endif
-;;; TODO: somehow this triggers more debug output???? 
-;putc '\'
-;putc 0
-;nop
+;;; 2159605 before FASTSKIP
+;;; 1287228 with FASTSKIP! - half the time almost
+;;; (/ 1287228 2159605.0) == 40.4% faster!
+;;; 
+;;; size 78 -> 87 Bytes (+ 9)
 
-;;; 25 B
-
-;;; TODO: can save bytes somehow???
-
-;;; TODO: ????
-.ifdef NOTRIGHTERROR
-        ;; Unexpected end of file?
-        ldy #0
-        lda (inp),y
-
-;;; TODO: not a problem if at end of rule too?
-;;;   but then we shouldn't end up here...
-;        beq gotendall
-
-        bne :+
-;;; TODO: just local rule end... no meaning?
-        lda (rule),y
-        beq @bothzero
-@rulenotzero:
-        jsr putchar
-        putc 'z'
-        jmp gotendall
-@bothzero:
-        putc '0'
-        jmp gotendall
-:       
-.endif
-
-
-.ifdef SHOWINPUT
-        putc '\'
-;        putc 10
-.endif ; SHOWINPUT
-
-    DEBC '|'
-.ifdef DEBUGRULESKIP
-  putc 10
-  putc '|'
-  lda rule
-  sta tos
-  lda rule+1
-  sta tos+1
-  jsr puth
-  putc ' '
-.endif
-        ;; - seek next | alt in rule
+        ;; Y= inp.lo; // faster looping!
+        ldy rule
+        lda #0
+        sta rule
 @loop:
-;        jsr _incR
-        ldy #0
         lda (rule),y
-        ;; or fail if at end of rule (no more alt)
         beq endrule
 
-;;; TODO: remove! this only catches
-;;;    bad memory location!!!! lol
-;;;    shows address for "bad" byte
-.ifdef DEBUGRULESKIP
-   cmp #'U'
-   beq @isU
-   cmp #'U'+128
-   beq @isU
-   jsr putchar
-   jmp @after
-@isU:
-   pha
-   putc 13
-   lda rule
-   sta tos
-   lda rule+1
-   sta tos+1
-   jsr puth
-   putc ' '        
-   pla
-@after:
-.endif
-;    DEBC ','
-
-        ;; skip any inline gen (binary data)
         cmp #'|'
         beq @nextalt
+
         cmp #'['
-        bne @notgen
-;;; TODO: much faster if instead have count and skip?
+        beq @skipgen
+
+        ;; not '[' - normal char to skip!
+@next:
+        iny
+        bne @loop
+        inc rule+1
+:       
+        ;; always!
+        bne @loop
+
+        ;; skip [...0...] gen
 @skipgen:
-;    DEBC ';'
-        jsr _incR
+        iny
+        bne :+
+        inc rule+1
+:       
         lda (rule),y
         cmp #']'
         bne @skipgen
-        jmp @loop
-
-@notgen:
-        jsr _incR
-        ;; _incRX is guaranteed not be be 0!
-        bne @loop
-
+        beq @next
+        
+;;; we're done skipping!
 @nextalt:
-        ;; try next alterantive
-        ;; - move after '|'
+        ;; finally write it back!
+        sty rule
+
+        ;; skip '|'
         jsr _incR
+
 
 restoreinp:
         ;; - restore inp for alt
