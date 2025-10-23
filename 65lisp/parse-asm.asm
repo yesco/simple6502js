@@ -2237,7 +2237,6 @@ FUNC _compileAX
 .zeropage
 originp:        .res 2
 .code
-        ;; store what to compile
         sta originp
         stx originp+1
 
@@ -3835,7 +3834,48 @@ nextc:
 
 
 .ifndef UPDATENOSPACE
-        jsr errpos
+.ifdef ERRPOS
+        pha
+
+;;; store max input position
+;;; (indicative of error position)
+        lda inp+1
+        cmp erp+1
+        bcc noupdate
+        bne update
+        ;; erp.hi == inp.hi
+        lda inp
+        cmp erp
+        bcc noupdate
+        beq noupdate
+        ;; erp := inp
+update:
+.ifdef PRINTREAD
+        pha
+
+        ldy #0
+        lda (erp),y
+;        jsr putchar
+        jsr printchar
+
+.ifnblank
+        sta tos
+        lda #0
+        sta tos+1
+        putc '#'
+        jsr printu
+        putc ' '
+.endif
+
+        pla
+.endif
+
+        sta erp
+        lda inp+1
+        sta erp+1
+noupdate:
+        pla
+.endif ; ERRPOS
 .endif ; !UPDATENOSPACE
 
 
@@ -3884,23 +3924,7 @@ jsr printchar
 .endif
 
 .ifdef UPDATENOSPACE
-        jsr errpos
-.endif ; UPDATENOSPACE
-
-        pla
-        tay
-        pla
-        tax
-        pla
-.endscope
-        rts
-
-errpos:
-.ifndef ERRPOS
-        rts
-.else
-        pha
-
+.ifdef ERRPOS
 ;;; store max input position
 ;;; (indicative of error position)
         lda inp+1
@@ -3919,8 +3943,7 @@ update:
 
         ldy #0
         lda (erp),y
-;        jsr putchar
-        jsr printchar
+        jsr putchar
 
 .ifnblank
         sta tos
@@ -3938,8 +3961,17 @@ update:
         lda inp+1
         sta erp+1
 noupdate:
-        pla
 .endif ; ERRPOS
+.endif ; UPDATENOSPACE
+
+
+        pla
+        tay
+        pla
+        tax
+        pla
+.endscope
+        rts
 
 
 FUNC _incT
@@ -4462,12 +4494,25 @@ FUNC _iorulesstart
 
         .byte "|putz(",_E,")"
       .byte '['
+;;; TODO: fix, strings borken?
         jsr axputz
       .byte ']'
 
         .byte "|puts(",_E,")"
       .byte '['
         jsr axputs
+      .byte ']'
+
+        .byte "|putcraw(",_E,")"
+      .byte '['
+        pha
+        lda #9
+        jsr putchar
+        ldy CURCOL
+        ;; anum, and if col= 0, lol wraphell
+        dey
+        pla
+        sta (ROWADDR),y
       .byte ']'
 
 .ifdef OPTRULES
@@ -8495,39 +8540,27 @@ status:
         .byte 0
 .code
         ;; - from
-        lda #<status
-        ldx #>status
-        jsr memcpyz
-
-;        PRINTZ {10,10,"65mucc02",10}
-;        PRINTZ {"(C)2025 Jonas S Karlsson jsk@yesco.org",10}
-
-        ;; print how many chars (of scavedscreen used)
-        lda inp
-        ldx inp+1
-        
-        sec
-        sbc #<(savedscreen+40)
-        tay
-        txa
-        sbc #>(savedscreen+40)
-        tax
-        tya
-        jsr axputu
+;        lda #<status
+;        ldx #>status        
+;        jsr memcpyz         
 
         ;; failed?
         ;; (not stand at end of source)
         ldy #0
         lda (inp),y
+        and #127
         beq _OK
 
-        PUTC 10
-        ldx #0
-        jsr axputu
-        jsr nl
-        
-        
+;;; ------------ ERROR ----------
 
+        ;; - save RTS in output to not crash
+        lda #_RTS
+        ;; replace "jmp main" with "jmp hell"
+        lda #<hell
+        ldx #>hell
+        sta _output+1
+        stx _output+2
+        
 
 .ifdef ERRPOS
         ;; hibit string near error!
@@ -8539,29 +8572,19 @@ status:
 
 .endif ; ERRPOS
 
-.ifdef xCOMPILESCREEN
-;;; TODO: ....
-        PRINTZ "HALT2"
-        jmp halt
-.endif
-
-        ;; print it
-       
 .ifdef PRINTINPUT
+        ;; print it
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
         PRINTZ {10,RED,"ERROR>",10,10}
 
+;        jsr getchar          
 ;        jsr clrscr
 
-;;; TODO: printz? printR?
-
-;;; TODO: ldx , ldy, jsr _copyR - 6B
-;;; 8 B
-        lda originp
+        lda #<originp
         sta pos
-        lda originp+1
+        lda #>originp+1
         sta pos+1
 
 .scope
@@ -8573,9 +8596,10 @@ loop:
 ;;; TODO: on sim65 somehow this goes bad when there's an error
 ;;;   it'll print same character forever!
 
-        ;; hi bit on char is indicator of how var it
-        ;; read, next char, or here is the error
-        ;; - print red attribute
+        ;; hi bit on char is indicator of how far it
+        ;; read, next char, or here it's assumed
+        ;; to be near error; thus hilite red background
+        ;; color and white text.
         bpl nohi
         pha
 
@@ -8624,9 +8648,12 @@ print:
 .endif ; PRINTINPUT
 .endscope
 
+
+
+        ;; printed program error
         jmp _edit
-;        jmp failed
-;;; LOOPS: lol
+
+
 
 
 .export _OK
@@ -8818,6 +8845,32 @@ TIMPER=8
 FUNC _editorstart
 
 
+;;; Issues:
+;;; - return doesn't break line into two
+;;;   need to scroll down part of screen 
+;;;   & move some text to next line, indented...
+;;; - ctrl-O insert newline
+;;; 
+;;; ! can cheat: insert actual 10, "extract text",
+;;;   clear screen, print text!
+;;; 
+;;; - kill line, similar
+;;; 
+;;; - need ^C to break!
+;;; - or at least NMI! (simpliest)
+;;; 
+;;; - no way to save? LPRINT? 
+;;; 
+;;; - seems CSAVE and CLOAD works like "random access"
+;;;   Not sure if last file wins if you down load .tap
+;;;   that has been saved in oriutron.
+;;; 
+;;; - 
+
+
+
+
+
 FUNC _edit
         
 .ifdef INTERRUPT
@@ -8915,7 +8968,7 @@ dohelp:
         lda #(BLACK+BG)&127
         ldx #WHITE&127
         jsr _eoscolors
-        PRINTZ {10,"compiling...",10,10}
+        PRINTZ {10,GREEN,"compiling...",10,10}
         ;; This basically restarts program, lol
 	; TIMER
         
@@ -9273,6 +9326,12 @@ extend:
         rts
 
 FUNC _editorend
+
+
+FUNC hell
+        lda #<666
+        ldx #>666
+        rts
 
 
 
@@ -10506,6 +10565,14 @@ input:
         .byte "}",10
         .byte 0
 .endif ; POKEGEN
+
+
+;
+COLORCHART=1
+.ifdef COLORCHART
+        .incbin "Input/color-chart.c"
+        .byte 0
+.endif ; COLORCHART
 
 
 ;RAINBOW=1
