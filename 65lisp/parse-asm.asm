@@ -3706,6 +3706,7 @@ nextdigit:
         jmp _next
 
 digit:  
+;;; 20 B
         pha
         jsr _mul10
         pla
@@ -3717,7 +3718,8 @@ digit:
         inc tos+1
 :       
         ;; lol space inside numbers!
-        jsr _incIspc
+        ;; (somehow _incIspc is faster than _incI ???)
+        jsr _incIspc           
         jmp nextdigit
 
 ischar: 
@@ -3743,8 +3745,17 @@ failjmp2:
 
 
 
+;;; TODO: cleanup!
 
-;;; flags not set in any way, registers untouched
+;;; Consumes current input char, moves to next
+;;; no-space character.
+;;; 
+;;; Any // comment is skipped till newline
+;;; Same goes for #define or whatever (for now)
+;;; TODO: maybe do simple macros, at least to treat
+;;;       like constant INT/STRINGS
+
+;;; registers untouched
 FUNC _incIspc
         jsr _incI
 
@@ -3923,30 +3934,37 @@ noupdate:
         rts
 
 
+;;; written more to save bytes as each
+;;; is only +3 B, but costs increase till 3x!
+;;; 
+;;; They are ordered so I is fastest, then
+;;; R O P T which probably would relate to
+;;; frequency of usage...
+
 FUNC _incT
-;;; 3
+;;; 3  32c!
         ldx #tos
         SKIPTWO
 FUNC _incP
-;;; 3
+;;; 3  27c! (used for print?... TODO: optimize?)
         ldx #pos
         SKIPTWO
 FUNC _incO
-;;; 3
+;;; 3  22c
         ldx #_out
         SKIPTWO
 FUNC _incR
-;;; 3
+;;; 3  17c
         ldx #rule
         SKIPTWO
-FUNC _incI
-;;; 2
+FUNC _incI      
+;;; 2  12c
         ldx #inp
 FUNC _incRX
-;;; 7
-        inc 0,x                 ; 3B
+;;; 6+1  10c (+ 4c seldomly) +12c for calling it!
+        inc 0,x                 ; 6c
         bne @noinc
-        inc 1,x                 ; 3B
+        inc 1,x
 @noinc:
         rts
         
