@@ -1,4 +1,4 @@
-;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Free to use for non-commercial purpose subject to
@@ -1951,6 +1951,61 @@ NOSHOWSIZE=1
 
 .code
 
+
+
+
+;;; ========================================
+;;;   P A R S E R   O P T I M I Z A T I O N
+;;; 
+;;;   41% faster by CUT+CUT2
+;
+OPTPARSEALL=1
+
+;;; TODO:
+;;; 0) jsr _incIspc - move it to before _next
+;;;    find locations where "jsr _incIspc; ... jmp _next"!
+;;;    it's at least 12c per character used!
+;;; 1) byte < 32 ==> skip byte (at _fail)
+;;;    check avg,max,min size of rules
+;;; 2) ruleS could be directly TAILREC - must save some!
+;;; 3) byte rules?
+;;; 4) any %D many times is costly (parse number later?)
+;;; 5) match %V many times very costly, maybe just store
+;;;    pointer and look up later when syntax fine?
+;;; 6) group functions by first letter, and skip?
+;;; 7) bitmap hash to check if var exists (no care?)
+
+;;; CUT and CUT2
+
+;;; -- BYTESIEVE:
+;;; 
+;;; 3451213 before opt! 3.5s
+;;; 2640900 CUT2
+;;; 2863202 CUT
+;;; 2052939 CUT+CUT2 !  2.1s!
+;;; 2159... now... lol
+
+;;; CUT2: 14.14% faster(/ 2640900 3451213.0)
+;;; 
+;;; both CUTs: (- 1 (/ 2052939 3451213.0))
+        
+;;   41% faster!
+; OPTPARSEALL=1
+.ifdef OPTPARSEALL
+;;; CUT2 is simple ruleS cut by '}'
+;
+CUT2=1
+;;; TODO: generalize! it now only cuts ruleD
+;;;       cutting expressions at ',;:)]?'
+;
+CUT=1
+.endif ; OPTPARSEALL
+
+
+
+
+
+
 ;;; ========================================
 ;;;                  M A I N
 
@@ -2023,7 +2078,7 @@ TESTING=1
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
-;DEBUGRULE=1
+;lDEBUGRULE=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
@@ -2031,54 +2086,6 @@ TESTING=1
 ;DEBUGRULE2=1
 
 ;DEB2=1
-
-
-;;; ========================================
-;;;   P A R S E R   O P T I M I Z A T I O N
-;;; 
-;;;   41% faster by CUT+CUT2
-;
-OPTPARSEALL=1
-
-;;; TODO:
-;;; 0) jsr _incIspc - move it to before _next
-;;;    find locations where "jsr _incIspc; ... jmp _next"!
-;;;    it's at least 12c per character used!
-;;; 1) byte < 32 ==> skip byte (at _fail)
-;;;    check avg,max,min size of rules
-;;; 2) ruleS could be directly TAILREC - must save some!
-;;; 3) byte rules?
-;;; 4) any %D many times is costly (parse number later?)
-;;; 5) match %V many times very costly, maybe just store
-;;;    pointer and look up later when syntax fine?
-;;; 6) group functions by first letter, and skip?
-;;; 7) bitmap hash to check if var exists (no care?)
-
-;;; CUT and CUT2
-
-;;; -- BYTESIEVE:
-;;; 
-;;; 2640900 CUT2
-;;; 2863202 CUT
-;;; 2052939 CUT+CUT2 !
-;;; 3451213
-;;; CUT2: 14.14% faster(/ 2640900 3451213.0)
-;;; 
-;;; both CUTs: (- 1 (/ 2052939 3451213.0))
-        
-;;   41% faster!
-; OPTPARSEALL=1
-.ifdef OPTPARSEALL
-;;; CUT2 is simple ruleS cut by '}'
-;
-CUT2=1
-;;; TODO: generalize! it now only cuts ruleD
-;;;       cutting expressions at ',;:)]?'
-;
-CUT=1
-.endif ; OPTPARSEALL
-
-
 
 ;DEBUGRULE2ADDR=1
 
@@ -2098,20 +2105,17 @@ CUT=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-;
-PRINTINPUT=1
+;PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; more compact printing of source when compiling
-;
-UPDATENOSPACE=1
+;UPDATENOSPACE=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
@@ -8569,6 +8573,7 @@ status:
 
 .endif ; ERRPOS
 
+.scope
 .ifdef PRINTINPUT
         ;; print it
 
@@ -8584,7 +8589,6 @@ status:
         lda #>originp+1
         sta pos+1
 
-.scope
         ;; jumps into middle of loop!
         jmp print
 
@@ -10564,8 +10568,7 @@ input:
 .endif ; POKEGEN
 
 
-;
-COLORCHART=1
+;COLORCHART=1
 .ifdef COLORCHART
         .incbin "Input/color-chart.c"
         .byte 0
