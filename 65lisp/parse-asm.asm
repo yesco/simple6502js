@@ -1,4 +1,4 @@
-;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Free to use for non-commercial purpose subject to
@@ -1043,6 +1043,7 @@ NOSHOWSIZE=1
 ;;; 
 ;;;   41% faster by CUT+CUT2
 ;;;   40% faster w  FASTSKIP in _fail (no jsr _inc)
+;;;    4.53% faster w OPTSKIP (_incIspc inline in _next)
 ;
 OPTPARSEALL=1
 
@@ -1077,6 +1078,7 @@ OPTPARSEALL=1
 ;;   41% faster!
 ; OPTPARSEALL=1
 .ifdef OPTPARSEALL
+
 ;;; CUT2 is simple ruleS cut by '}'
 ;
 CUT2=1
@@ -1084,6 +1086,11 @@ CUT2=1
 ;;;       cutting expressions at ',;:)]?'
 ;
 CUT=1
+
+;;; OPTSKIP inlines _incIspc in _next
+;
+OPTSKIP=1
+
 .endif ; OPTPARSEALL
 
 
@@ -1635,6 +1642,91 @@ stackerror:
 jmpaccept:      
         jmp _acceptrule
 :       
+
+;;; CHEAT!
+;;; 1287500 before
+;;; 1301114 after (inline inc, I extra cmp/bne costly?)
+;;; 1244770 = 3.3% faster still _incI _incR
+;;; 1233114 = 4.2% faster inline _inc
+;;; 1232119 = 4.30% faster (no ldy)
+;;; 1231955 = 4.31% cmp == skip (maybe not need?)
+;;; 1230291 = 4.44% _donecompile
+;;; 1247041
+;;; 1229158 = 4.53% 0 => acceptrule
+;;; 1252062 = 2.75% savings (PRINTDOTS add overhead...)
+
+;;; 1278508 = 0.7% OVERHEAD from ERRPOS, acceptable...
+;;;           need to insert it here.
+;;; 
+;;; (- 1 (/ 1252062 1287500.0))
+;;; 
+;;; 299 Bytes instead of 303, fail at least point?
+;;; 
+.ifdef OPTSKIP
+        cmp (inp),y
+        bne @noteq
+
+@skipspc:
+;        jsr _incI
+        inc inp
+        bne :+
+        inc inp+1
+:       
+
+
+
+;;; TODO: so... PRINTREAD... LOL
+;;;   maybe not need care as it's only "fixed text"
+;;;   so error may be indicated at begginning of "token"?
+
+
+        lda (inp),y
+        beq jmpaccept
+
+;;; TODO: hi-bit makes problem...
+;;;      and #$7f
+
+.ifdef PRINTDOTS
+        cmp #10
+        bne :+
+
+        pha
+        tya
+        pha
+        txa
+        pha
+
+        putc '.'
+
+        pla
+        tax
+        pla
+        tay
+        pla
+
+;        PUTC '.'
+:       
+.endif 
+        ;; no need handling # // % [ as they'll
+        ;; most likely fail problem is %D or [
+        ;; could give strange bugs...
+        cmp #' '+1
+        bcc @skipspc
+        
+;        jsr _incR
+        inc rule
+        bne :+
+        inc rule+1
+:       
+        ;; comp rule?
+        cmp (rule),y
+        beq @skipspc
+        jmp _next
+
+;; fallback to more costly, check-all!
+@noteq:
+.endif ; OPTSKIP
+
         ;; \ - quoted
         ;; (can't quote 0, hmmm)
         cmp #'\'

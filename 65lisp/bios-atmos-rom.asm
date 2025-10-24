@@ -87,12 +87,13 @@ plaputchar:
         pla
 putchar:        
         stx savexputchar
+        sty saveyputchar
         ;; '\n' -> '\n\r' = CRLF
         cmp #$0A                ; '\n'
         bne notnl
         pha
         ldx #$0D                ; '\r'
-        jsr $0238
+        jsr $0238               ; oric putchar
         pla
 notnl:  
 rawputc:        
@@ -105,15 +106,14 @@ rawputc:
         bcc :+
         ;; put directly in mem
 ;;; TODO: BUG: first char on line looses hibit?
-        sty saveyputchar
         ldy CURCOL
         dey
         sta (ROWADDR),y
-        ldy saveyputchar
 :       
 
 .endif ; HIBIT
         ldx savexputchar
+        ldy saveyputchar
         rts
 
 
