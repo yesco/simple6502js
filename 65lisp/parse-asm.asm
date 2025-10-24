@@ -9663,6 +9663,19 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+
+;WHILECOUNT=1
+.ifdef WHILECOUNT
+        .byte "word main(){",10
+        .byte "  s= 0; e= 8000;",10
+        .byte "  while(s<e) {",10
+        .byte "    putu(s); putchar(' ');",10
+        .byte "    s+= 40;",10
+        .byte "  }",10
+        .byte "}",10
+        .byte 0
+.endif ; WHILECOUNT
+
 ;TEMPLATE=1
 .ifdef TEMPLATE
         .byte "word main(){",10
@@ -9708,7 +9721,8 @@ input:
 .endif ; COLORCHART
 
 
-;RAINBOW=1
+;
+RAINBOW=1
 .ifdef RAINBOW
         .incbin "Input/rainbow-drop.c"
         .byte 0
