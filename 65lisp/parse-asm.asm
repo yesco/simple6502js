@@ -756,7 +756,18 @@ CTYPE=1
 .endif ; NOLIBRARY
 
 
+
 FUNC _librarystart
+
+.include "tty-helpers.asm"      ; nl spc bs PUTC putc
+.include "lib-stdio.asm"
+;include "lib-printf.asm"       ; not working
+.include "lib-ctype.asm"
+.include "lib-stdlib.asm"
+.include "lib-string.asm"
+.include "lib-math.asm"         ; mul mul10 mul16 div16
+
+
 ;;; Current byte count:
 ;;; 
 ;;; Bytes #functions
@@ -771,129 +782,6 @@ FUNC _librarystart
 ;;;   384         (+ 23 119 98 144) 
 
 
-
-;;; TODO: counting these bytes?
-
-
-;;; ----------------- MACROS
-
-.ifndef TTY_HELPERS
-
-
-;;; putchar (leaves char in A)
-;;; 5B
-.macro putc c
-        lda #(c)
-        jsr putchar
-.endmacro
-
-;;; for debugging only 'no change registers A'
-;;; 7B
-.macro PUTC c
-;        subtract .set subtract+7
-        pha
-        putc c
-        pla
-.endmacro
-
-;;; 7B - only used for testing
-.macro NEWLINE
-        PUTC 10
-.endmacro
-
-;;; ----------------- UTILTITY PRINTERS
-
-;;; Good to haves!
-.export _clrscr
-_clrscr:        
-clrscr:        
-        lda #12
-        SKIPTWO
-forward:        
-        lda #'I'-'@'
-        SKIPTWO
-bs:
-        lda #8
-        SKIPTWO
-newline:        
-nl:     
-        lda #10
-        SKIPTWO
-spc:
-        lda #' '
-        jmp putchar
-
-.endif ; !TTY_HELPERS
-
-
-FUNC _mathstart
-;;; --------------- <math.h>
-;;;
-;;; - * mul16
-;;; - / div16
-;;; - (div in stdlib?!)
-;;; - nothing, it'sl all float/double? 
-
-
-FUNC _mathend
-
-
-FUNC _stdiostart
-;;; -------- <stdio.h> - LOL
-;;; 
-;;; --- basis for PRINTF modular
-;;; 20 - puth, put4h, put2h
-;;; 13 - plaprinth (to reverse)
-;;; 22 - axputz==printz, writez tos+Y
-;;; 37 - voidputu takes AX stores in tmp1 (voidprinttmp1d 33)
-;;; 13 - xputu saves A,X prints tos
-;;;      (todo cleanup printn,putu does jmp _drop, lol
-;;;  7 - axputu
-;;;  7 - axputh
-;;; (7)- axputd 
-;;; ========
-;;; 119 B - too much!  (+ 20 13 22 37 13 7 7)
-;;; 
-;;; 127 B according to info() ?
-;;; 
-;;; TODO:messy code: cleanup, rewrite
-
-;;; simulate files?
-;;; - fopen
-;;; - fclose
-;;; - fseek
-;;; - fread
-;;; - fwrite
-
-;;; TODO:
-;;; - puts axputz w nl, lol
-;;; - printf
-;;; - (sprintf)
-;;; 
-;;; - stdin, stdout - vars, lol
-;;; - stderr - write on screen with INVERSE? lol
-;;; - getline
-;;; - gets
-
-;;; - fprintf(STDOUT, 
-;;; - fprintf(STDERR,
-;;; - getc(FILE)
-;;; - ungetc(FILE)
-;;; - feof(FILE)
-;;; - ffflush(FILE)
-;;; - TYPE: size_t == int, lol
-
-;;; TODO: somehow should be able to put BEFORE begin.asm
-;;;    but not get error, just doesn't work! (hang)
-;;;    or AFTER 
-
-PUTDEC=1
-PUTHEX=1
-.include "print.asm"
-
-
-FUNC _stdioend
-
 ;;; ------- <time.h>
 ;;; - clock difftime
 ;;; - va_start va_arg va_copy va_end
@@ -901,321 +789,6 @@ FUNC _stdioend
 
 ;;; -------- <assert.h>
 ;;; - assert
-
-
-
-FUNC _ctypestart
-;;; -------- <ctype.h>
-;;; 98 Bytes !
-;;; 
-;;; Inlineable (if no #include <ctype.h>)
-;;; - isdigit
-;;; - isalpha
-;;; - isspace
-;;; These are "all-or-nothing"
-;;; - isspace
-;;; - isxdigit
-;;; - isdigit
-;;; - isalnum
-;;; - isalpha
-;;; - isupper
-;;; - islower
-;;; - ispunct
-;;; - tolower
-;;; - toupper
-;;; 
-;;; - (isblank)
-;;; - (isgraph)
-;;; - (isprint)
-;;; - (isascii)
-;;; - (iscntrl)
-;;; - (toascii)
-.ifdef CTYPE
-
-;;; 98 B - 10 functions (- #xf8 #x96)
-;;; 
-;;; (cheaper than most compilers as they in
-;;; addition keep an 128 byte table, and each F is at least 8 bytes)
-
-;;; TODO: trigger inclusion on:
-;;; 
-;;;   #include <ctype.h>
-
-isxdigit:
-;;; 13
-        tay
-        ora #32
-        cmp #'a'
-        bcc :+
-        cmp #'f'+1
-;;; TDOO: cannot be relocated!
-        jmp retC
-:       
-        tya
-isdigit:        
-;;; 7
-        sec
-        sbc #'0'
-        cmp #'9'-'0'+1
-retC:   
-        bcs retfalse
-rettrue:
-;;; 3
-;;; TODO: maybe $ff as nobody should rely on 1!
-        lda #1
-        SKIPTWO
-retfalse:
-;;; 5
-        lda #0
-        ldx #0
-        rts
-
-isalnum:
-;;; 8
-        tay
-        jsr isdigit
-        tax
-        bne rettrue
-        tya
-isalpha:        
-;;; 12
-        tay
-        ;; make all lower case
-        ora #32
-        sec
-        sbc #'a'
-        cmp #'z'-'a'+1
-;;; TDOO: cannot be relocated!
-        jmp retC
-
-isspace:        
-;;; 6
-        ;; we take ourselves some freedom of interpreation!
-        cmp #' '+1
-;;; TDOO: cannot be relocated!
-        jmp retC
-
-islower:        
-;;; 9
-        sec
-        sbc #'a'
-        cmp #'z'-'a'+1
-;;; TDOO: cannot be relocated!
-        jmp retC
-
-isupper:        
-;;; 9
-        sec
-        sbc #'A'
-        cmp #'Z'-'A'+1
-;;; TDOO: cannot be relocated!
-        jmp retC
-
-ispunct:        
-;;; 12
-        jsr isalnum
-        bcc retfalse
-        ;; still have Y
-        tya
-        jsr isspace
-        ;; reverse others
-        bcc retfalse
-        bcs rettrue
-
-toupper:        
-;;; 9
-        jsr isalpha
-        tya
-        bcs :+
-        and #255-32
-:       
-        rts
-
-tolower:        
-;;; 9
-        jsr isalpha 
-        tya
-        bcs :+
-        ora #32
-:       
-        rts
-.endif ; CTYPE
-FUNC _ctypeend
-
-
-FUNC _stdlibstart
-;;; -------- <stdlib.h>
-;;; 
-;;; TODO:
-;;; - malloc
-;;; - free
-;;; - realloc
-;;; - calloc
-;;; - _Exit(int)
-;;; - abort()
-;;; - exit(int)
-
-;;; - abs
-;;; - atoi
-;;; - div
-
-;;; same same...
-;;; - rand()
-;;; - random()
-;;; - srand()
-;;; - srandom()
-
-;;; - getenv
-;;; - putenv
-;;; - setenv
-
-;;; - bsearch
-;;; - qsort
-;;; - setkey
-;;; - encrypt
-;;; (inp) => AX, inp points at next (not digit) char
-;;; 
-;;; TODO: too big! just use parse rules!!!
-
-
-
-.zeropage
-;;; 8-bit seed the generator, write here
-seedrand:       .byte 42
-.code
-
-;;; new rnadom valuie in AX
-FUNC rand
-        jsr rand8
-        tax
-        ;; fall-through for A
-
-;;; Simple 8-bit LFSR
-;;; 
-;;; The 8-bit LFSR (0–254 range, excluding all-zero),
-;;; use a Galois configuration with the primitive
-;;; polynomial \(x^8 + x^4 + x^3 + x^2 + 1\)
-;;; (mask `#$1D`). This gives a maximum period of 255
-;;; before repeating.
-;;; 
-;;; Consider using Mersenne Twister (?)
-FUNC rand8
-        lda seedrand
-        beq do_xor
-        asl
-        beq no_xor
-        bcc no_xor
-        lda seedrand
-do_xor:  
-        eor #$10
-no_xor: 
-        sta seedrand
-        rts
-
-
-
-
-.ifdef ATOI
-FUNC _atoiXR
-        lda #0
-        sta tos
-        sta tos+1
-        ;; base
-        sta dos
-        lda #10
-        sta base
-
-        ;; 0x 'c' -
-        lda (0,x)
-        ;; ' - char constant
-        cmp #'''
-        bne :+
-        
-        jsr _incXR
-        lda (0,x)
-        ;; TODO: handle \' \n \b \t ???
-        jsr _incXR
-        ;; - should be '-' lol
-        jsr _incXR
-        jmp @retA
-:       
-        ;; "-" negative
-        cmp #'-'
-        bne :+
-
-        jsr _incXR
-        jsr _atoiXR
-        jmp _negate
-:       
-        ;; "0x" - hex
-        cmp #'0'
-        bne :+                  ; 1-9
-        jsr _incXR
-        ora #32
-        cmp #'X'
-        bne @ret                ; zero! (no octal...)
-        
-        lda #16
-        sta base
-:       
-        lda (0,x)
-        ;; digit? '0' <= a <= '9'
-        sec
-        sbc #'0'
-        cmp #'9'+1-'0'
-        bcs @notdigit
-        ;; digit
-        sta savea
-        lda base
-        sta dos
-        lda #0
-        ;; tos= tos * dos; // mul16 destroys tos&dos
-        jsr _mul16bits
-        ;; c=0 from cmp
-        adc savea
-        tay
-
-@ret:
-        lda tos
-@retA:
-        ldx tos+1
-        rts
-.endif ; ATOI
-
-
-.ifdef SIGNED
-;;; 31B
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-;;; print signed decimal
-FUNC _putd
-putd:
-;;; 19 b
-        cpx #0
-        bpl :+
-        putc '-'
-:       
-        ;; negate
-        jsr _negate
-        
-        sta tos
-        stx tos+1
-        jmp putu
-
-FUNC _dummyd
-.endif ; SIGNED
-
-FUNC _stdlibend
 
 ;;; --------- <stddef.h
 
@@ -1246,220 +819,9 @@ FUNC _stdlibend
 ;;; --------- <system.h>
 ;;; - exec?
 
-FUNC _stringstart
-.ifdef STRING
-;;; --------- <string.h>
-;;; 
-;;; TODO: 
-;;; - memset
-;;; - memcpy
-;;; - memmove
-;;; 
-;;; - memchr
-;;; - memcmp
-;;; - (memccopy) can be used to impl strcpy
-;;; 
-;;; 14 - stpcpy (stpTOScpy using strTOScpy)
-;;; 16 - strcat (strTOScat using strTOSchrY)
-;;; 26 - strcpy (strAXcpy and strTOScpy)
-;;; 
-;;; 22 - strlen
-;;; 30 - strcmp (strTOScmp)
-;;; 36 - strchr (strAXchrY, strTOSchrY)
-;;; - strstr
-;;; -----
-;;; 144 Bytes
-;;; 
-;;; 
-;;; - strdup
-;;; 
-;;; - strncat
-;;; - strncmp
-;;; - (strndup)
-;;; - (strnlen)
-;;; 
-;;; - strcspn
-;;; - strpbrk
-;;; - strrchr
-;;; - strspn
-;;; - strtok
-;;; 
-;;; - (strerror)
-strlen: 
-;;; 22 B
-        sta pos
-        stx pos+1
 
-        ldy #0
-        ldx #0                  ; hi-length
-:       
-        lda (pos),y
-        beq :+
-        iny
-        bne :-
-        ;; inc hibyte
-        inc pos+1
-        inx
-        bne :-
-:       
-        tya
-        rts
-        
-;;; TODO: strchrnul really?
-
-;;; strchr(AX,Y)
-;;;   tos := AX
-;;; 
-strAXchrY:
-;;; 36 B (any savings at call with this acrobatics?)
-        sta tos
-        stx tos+1
-
-strTOSchrY:
-;;; (32 B) fastest and smallest!
-        sty savey
-        ;; use tos.lo
-        ldy tos
-
-        lda #0
-        sta tos
-:       
-        lda (tos),y
-        ;; look for char (even 0)
-        cmp savey
-        beq @found
-        ;; end (after cmp savey)
-        cmp #0                  ; +2c
-        beq ret0
-        ;; forward 
-        iny
-        bne :-
-        ;; int hibyte
-        inc tos+1
-        bne :-
-        ;; always loops back
-@found:
-        tya                     ; lo
-        ldx tos+1               ; hi
-        rts
-;;; TODO: (if called strAXchrY)
-;;; note: (orig @(tos+1) stored in X, stil there)
-;;;  ????
-ret0:
-        ldx #0
-        txa
-        rts
-
-
-;;; tos already contains first argument
-;;; AX has second arg
-;;; 
-;;; TODO: combine with strncmp (?)
-strTOScmp:
-;;; 30 B (cc65: 33 B)
-        sta pos
-        stx pos+1
-
-        ldy #0
-;;; 18   cc65: 18
-:       
-        sec
-        lda (tos),y
-        beq @end
-        sbc (pos),y
-        bne @neq
-        iny
-        bne :-
-        ;; inc hi
-        inc tos
-        inc pos
-        bne :-
-        ;; always
-;;; fix after 6 (cc65: 8)
-@end:
-;;; TODO: check neg if first < last
-        sec
-        sbc (pos),y
-@neq:
-;;; TODO: sign extend into X ... >128 == neg, lol
-        ldx #0
-        rts
-
-
-strTOSstr:
-        rts
-
-;;; tos: first arg, copy to
-;;; AX : second, arg, source
-;;; 
-;;; TODO: can combine into a strncpy?
-strTOScpy:
-;;; 24 B (cc65: 31 B)
-        ;; save destination
-        sta dos
-        stx dos+1
-
-        ldy #0
-:       
-        ;; copy byte, including \0 byte
-        lda (dos),y
-        sta (tos),y
-        beq :+
-        iny
-        bne :-
-        ;; inc hi
-        inc dos+1
-        inc tos+1
-        bne :-
-:       
-        ;; return orig destination
-        ;; X is untouched
-        lda dos
-        rts
-
-;;; stpcpy, same as strcpy
-;;; EXCEPT! Returns pointer to last byte (@ \0)
-;;; 
-;;; TODO: is it more efficent to have strpcpy implement
-;;; and strcpy callling? (turn around?)
-stpTOScpy:
-;;; 14 B
-        jsr strTOScpy
-        ;; AX = dos+Y
-        clc
-        tya
-        adc #dos
-        bcc :+
-        inc dos+1
-:       
-        ldx dos+1
-        rts
-
-;;; TOS: first argument: destination
-;;; AX : second argument: what to concat at end
-strTOScat: 
-;;; 16B ~ TODO: finish it...
-        ;; save AX to concat for later, lol
-        pha
-        txa
-        pha
-        ;; search first string for \0 - end of string
-        ldy #0
-        jsr strTOSchrY
-        ;; AX points to \0 at end of string!
-        ;; store lo A in tos (X== value at tos+1 already)
-        sta tos
-        ;; pop revesre destination
-        pla
-        txa
-        pla
-        ;; concat(TOS,AX)
-        jmp strTOScat
-        ;; STRCAT returns original dest
-.endif ; STRING
-FUNC _stringend
-
-FUNC _runtimestart
+FUNC _unistdstart
+;;; ;;????
 ;;; ---------- <unistd.h>
 ;;; 
 ;;; - alarm
@@ -1492,168 +854,63 @@ FUNC _runtimestart
 ;;; - unlink
 ;;; - write
 ;;; ---- pthreads?
+FUNC _unistdend
 
-FUNC _graphicsstart
+
+
+;;; TOOD: see Docs/oric-atmos-addresses.asm ?
 
 ;;; ORIC:
 ;;; - wait
 ;;; - plot scrn
 ;;; - plots
+
+
+FUNC _graphicsstart
+;;; ORIC-rom already have routines, only compiler
+;;; rules are needed for those.
+;;; 
+;;; TODO:
+;;; - faster line
+;;; - faster setpixel
+;;; - faster circle
+;;; - paint (fill?)
+;;; 
+;;; Resources:
+;;; - oric graphics book
+;;; - dflat has nice routines
+;;; - oric .. linebench.zip? has fast routines!
+;;; 
+;;; Ideas:
+;;; - could have several new graphics-modes:
+;;;   a) normal oric
+;;;   b) oric but with "set color attribute"
+;;;   c) 8 FULL colors (3x3 pixels)
+;;;   d) 2 color/mixing (2x2 pixels)
+;;;   e) lores graphics "driver"
 FUNC _graphicsend
 
 
 
-FUNC _runtimeend
+FUNC _runtimestart
+
 ;;; TODO: IRQ put here!
 
-
-
-
-;;; from ORIC: Summary of ROM addrsses
-;;; $c58c : Input a line.
-;;; $c5e9 : Wait for a keypress and return the ASCII codel.
-;;; $d499 : Integer to floating point.
-;;; $d99c : Floating point to integer.
-;;; $dced : Multiply the accumulator with memoryh.
-;;; $dd61 : Move memory to the second accumulator.
-;;; $dda7 : Multiply the accumulator by 10.
-;;; $ddc3 : Divide the accumulator by 10.
-;;; $dde4 : Divide memory by the accumulator.
-;;; $dde9 : Divide the second accumulator by the main accumulator.
-;;; $de77 : Move memory to the main accumulator
-;;; $dead : Move the accumulator to memory.
-;;; $ded6 : Move the second accumulator to the main accumulator.
-;;; $dee5 : Move the main accumulator to the second accumulator.
-;;; $dfe7 : Input a floating-point number from a string of ASCII characters.
-;;; $e0d5 : Ouput a floating-point number into a string of ASCII characters.
-;;; $e5f5 : Clear the top line.
-;;; $e5ea : Print message at far left of top line.
-;;; $e790 : Compare filenames.
-;;; $eb78 : Read a key without waiting.
-;;; $f77c : Output character from X register to screen.
-;;; $f865 : Output message to the top line at position X.
-;;; $f523 : Poll keyboard.
-;;; $f5c1 : Output character to printer.
-;;; $f8d0 : Set up the ASCII character set.
-
-;;; ORIC routines can use for MINIMAL
-;;; C3F8 (C3F4) - A block move.
-;;; C483 (C47C) - Input and process a line.
-;;; C59C (C58C) - Input a line.Input a line.
-;;; DDA3 (DDA7) - 
-
-;;; - memcpy (27 B) from: $0c to $0e coutn in $10/$11
-;;; 
-;;; EDC4 A2 00 LDX #$00  This routine transfers a block 
-;;; EDC6 A0 00 LDY #$00  of data using #0C as the 
-;;; EDC8 C4 10 CPY $10   source pointer and #0E as the 
-;;; EDCA D0 04 BNE $EDD0 destination pointer. The 
-;;; EDCC E4 11 CPX $11   length of data to be moved is 
-;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
-
-
-;;; -- PRINT INTEGER IN A,X.
-;;; E0C5 85 D1 STA $D1 
-;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
-;;; E0C9 A2 90 LDX #$90 main FPA. Set exponent to 16.
-;;; E0CB 38 SEC Set sign to positive.
-;;; E0CC 20 31 DF JSR $DF31 Normalise main FPA
-
-;;; - GET NUMBER
-;;; DFE7 A0 00 LDY #$00 GET NUMBER.
-;;; DFE9 A2 0A LDX #$0A Clear section of memory from 
-;;; DFEB 94 CC STY $CC,X $CC to $D6 inclusive.
-
-;;; - INT
-;;; DFBD A5 D0 LDA $D0 INT
-;;; DFBF C9 A0 CMP #$A0 If number is over 2A32 then it 
-;;; DFC1 B0 20 BCS $DFE3 is integer already. 
-;;; DFC3 20 8C DF JSR $DF8C Convert to integer.
-
-;;; - udiv16 (0c00/???) used by graphics line
-;;; EFC8 48 PHA This is a division routine 
-;;; EFC9 8A TXA that is used to calculate the 
-;;; EFCA 48 PHA slope of a line being drawn. 
-;;; EFCB 98 TYA 
-;;; EFCC 48 PHA The routine acts on 16 bit 
-;;; EFCD A9 00 LDA #$00 numbers. 
-;;; EFCF 85 0E STA $0E 
-;;; EFD1 85 0F STA $0F Divisor is in #0200/1 and 
-;;; EFD3 A2 10 LDX #$10 dividend is in #0C/0D. Must be 
-;;; EFD5 06 0C ASL $0C set before routine is called. 
-;;; EFD7 26 0D ROL $0D The quotient ends up in #0C/0D 
-;;; EFD9 26 0E ROL $0E and the remainder in #0E/0F. 
-;;; EFDB 26 0F ROL $0F 
-;;; EFDD A5 0E LDA $0E A, X and Y are unaffected by 
-;;; EFDF 38 SEC this routine.
-
-;;; - lookup key from key code
-;;; F4EF AD 09 02 LDA $0209 CONVERT KEY TO ASCII CODE
-
-;;; - putc (335 B)
-;;; 
-;;; additional: 32 Bytes jmp table!
-;;; 
-;;; F602 29 1F AND #$1F CONTROL CHARACTER ROUTINE.
-;;; ...
-;;; F71A A0 27 LDY #$27 CLEAR CURRENT LINE.
-;;; ...
-;;; F730 60 RTS
-;;; ^^^^ end
-
-;;; +++  !!!!!!!!!! (- #xf816 #xf77c) = 154 B
-;;; - putc (+ 154 335) = 489!!!
-;;; F77C 48 PHA PRINT CHAR TO SCREEN (in X).
-;;; ... (lots of stuff!!!)
-;;; F815 60 RTS
-
-;;; - mul40 (47 B)
-;;; F731 A0 00 LDY #$00 This routine multiplies the 
-;;; F733 8C 63 02 STY $0263 content of the accumulator by 
-;;; F736 8D 64 02 STA $0264 #28 (40). Y holds the high 
-;;; F739 0A ASL A byte of the result. The page 
-;;; F73A 2E 63 02 ROL $0263 2 locations store temporary
-;;; F73D 0A ASL A results.
-;;; ...
-;;; F759 60 RTS 
-
-;;; - atoi (but on error jumps BASIC, lol)
-;;; ( no over 25*256 ??? - it's for line numbers?)
-;;; CAE2 A2 00 LDX #$00 GET 2 BYTE INTEGER FROM TEXT.
-
-
-;;; 33 - printd (smallest I found), but only DECIMAL
-
-;;; 24 - atoi (+25 ='-' ?), itoaloop 11! Y=nchar, +13 buffreverse
-;;; -- maybe this can be made more generic?
-;;; 24 - udiv10 - ORIC
-;;; -- baically it's a udiv16by8bits
-
-;;; itoa() udiv10() - 24B - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/itoa.s
-
-;;; TODO: math - floating point??? LOL
-;;; log log10 exp fabs cos sin tan atn sqrt pow modf horner
-;;; - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/math.s
-
-;;; rand, random(), srandom()
-;;; -  https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/rand.s
-
-;;; RULES: memcpy/set can do inline for some fixed nubmers!
-;;; 19 - memcpy selfmodifying code
-;;; memset(), memcpy() - https://github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk/main/Osdk/_final_/lib/memcpy.s - very fast
-;;; 
-;;;
-
-
+FUNC _runtimeend
 
 
 
 
 FUNC _minimallibrarystart
  
+;;; zoropage variant? together with few general rules
+;;; but really small library...
+;;; 
 ;;; (- #xdad #xd4d) = 96 B
 
 .ifdef MINIMAL
+;;; These are totally untested, just written to paly
+;;; with...
 
 ;;; TODO: use a preexisting VM .include
 ;;;   preferable one with all stack
@@ -1751,183 +1008,6 @@ FUNC _minimallibraryend
 
 
 
-;PRINTF=1
-.ifdef PRINTF
-
-FUNC _printf
-;;; according to printf.c minimal *restricted*
-;;; implementation (no .7 max limit) the 
-;;; cc65 - printf will "include" funs giving
-;;; - a total of +1870 B
-;;; - a replace  +1701 B (many support funcs)
-;;;   where      ( 765 B ) is simplified impl in C
-
-;;; here we strive for a compiling printf as:
-;;; 
-;;; printf("foo %d bar %-8s fie %c fum %07.4x\n",...
-;;; 
-;;; TO:
-.ifnblank
-;;; (+ -4 +0 -4 +3 -4 -4 +8) == -5 B
-;;; compared to cc65 (estimate) save 5B and
-;;; no need large function at runtime!
-;;; BUT: no printf(var, ....) !!!!
-
-        ;; "foo " (-4 B loading ax)
-        jsr hereputz
-        .byte "foo ",0
-
-        ;; %d     (+0 B as otherwise jsr pushax)
-        ... value in AX
-        jsr axputd
-
-        ;; " bar " (-4 B)
-        jsr hereputz
-        .byte " bar ",0
-
-        ;; %-8s (+ 3 B cmp jsr pushax)
-        ... value in AX
-        ldy #256-8              ; negative value!
-        clc
-        jsr axputzF
-
-        ;; "fie" (- 4 B)
-        jsr hereputz
-        .byte " fie ",0
-
-        ;; %c
-        ... value in A
-        jsr putchar
-
-        ;; " fum " (-4 B)
-        jsr hereputz
-        .byte " fum ",0
-        
-        ;; %07.4x" (+ 8 B for parameters)
-        ... value in AX
-        ;; - dot value ".4"
-        sed                     ; WOW: d= means dot value
-        ldy #4
-        sty dos
-        ;; - len 07
-        sec                     ; leading 0
-        ldy #7                 
-        jsr axputhF
-;;; 
-
-.endif
-
-
-;;; (+ 8 12 26 3 2 9 3 3 31) = 97
-;;; just: "foo %d bar %c fish %x gurk %s kork"
-
-        ;; it's on the hardware stack
-        ;; Y contains number of bytes pushed
-        ;; (Y/2 is no of arguments)
-        ;; lda (101),x points to 
-
-;;; 8
-        sty savey
-        tsx
-        txa
-        clc
-        adc savey
-        tax
-        ;; - load first argument==format - I hope!
-;;; 12
-        lda (101),x
-        sta pos
-        lda (102),x
-        sta pos+1
-        stx savex
-        ;; - pos points to the format string
-
-        ;; parse format string
-;;; 26
-        ldy #0
-@nextc:       
-        lda (pos),y
-        jsr _incT
-        ;; \ quoted
-        cmp #'\'
-;        cmp #92                 ; \
-        bne :+
-        jsr _incT
-        bne @printchar
-:       
-        ;; %formatchar
-        cmp #'%'
-        bne @printchar
-        jsr processarg
-        jmp @nextc
-@printchar:
-        ;; - otherwise print!
-;;; 3
-        jsr putchar
-        ;; - (zero will terminated (after printed!))
-;;; 2
-        bne :-
-
-        ;; pop all args!
-        ;; - save return address
-;;; 9
-        pla
-        sta tos+1
-        pla
-        sta tos
-        jsr _incT               ; +1 !
-        ;; - drop !
-;;; 3
-        ldx savex
-        tsx
-.ifnblank
-        ldy savey
-:       
-        pla
-        dey
-        bpl :-
-.endif
-        ;; - finally return!
-;;; 3
-        jmp (tos)
-
-@processarg:
-;;; 31
-        ;; - save char after % in Y
-        tay
-        ;; - TODO: process "%[[-]45]d"
-        ;; - get next argument
-        ldx savex
-        dex
-        dex
-        lda (102),x             ; hi
-        tax
-        lda (101),x             ; lo
-        ;; AX is argument, Y is type char
-
-@dispatch:
-;;; TODO: put all this routines/trampoiles NEAR!
-        ;; tail-calls!
-        cpy #'u'
-        beq axputu
-        cpy #'d'
-        beq axputd
-        cpy #'x'
-        beq axputx
-        cpy #'s'
-        beq axputz
-        cpy #'c'
-        bne :+
-        jmp putchar
-:       
-        ;; fail to match type char
-        rts
-
-
-.endif ; PRINTF
-
-
-
 FUNC _libraryend
 
 
@@ -1936,6 +1016,10 @@ FUNC _libraryend
 
 
 
+
+
+;;; TODO: remove this and simplify,
+;;;   it's it's own project now!
 
 
 ;;; See template-asm.asm for docs on begin/end.asm
@@ -2102,12 +1186,10 @@ PRINTINPUT=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+;PRINTREAD=1
 
 ;;; more compact printing of source when compiling
-;
-UPDATENOSPACE=1
+;UPDATENOSPACE=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
@@ -10634,7 +9716,6 @@ input:
         .byte "}",10
         .byte 0
 .endif ; STR
-
 
 
 ;ISCHAR=1
