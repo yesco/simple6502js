@@ -1,4 +1,4 @@
-;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Free to use for non-commercial purpose subject to
@@ -706,6 +706,10 @@ FUNC _biosstart
 
 .endif ; OLDSTYLE
 
+.ifndef putcraw
+        putcraw= putchar
+.endif
+
 FUNC _biosend
 
 
@@ -1031,6 +1035,62 @@ NOSHOWSIZE=1
 
 .code
 
+
+
+
+;;; ========================================
+;;;   P A R S E R   O P T I M I Z A T I O N
+;;; 
+;;;   41% faster by CUT+CUT2
+;;;   40% faster w  FASTSKIP in _fail (no jsr _inc)
+;
+OPTPARSEALL=1
+
+;;; TODO:
+;;; 0) jsr _incIspc - move it to before _next
+;;;    find locations where "jsr _incIspc; ... jmp _next"!
+;;;    it's at least 12c per character used!
+;;; 1) byte < 32 ==> skip byte (at _fail)
+;;;    check avg,max,min size of rules
+;;; 2) ruleS could be directly TAILREC - must save some!
+;;; 3) byte rules?
+;;; 4) any %D many times is costly (parse number later?)
+;;; 5) match %V many times very costly, maybe just store
+;;;    pointer and look up later when syntax fine?
+;;; 6) group functions by first letter, and skip?
+;;; 7) bitmap hash to check if var exists (no care?)
+
+;;; CUT and CUT2
+
+;;; -- BYTESIEVE:
+;;; 
+;;; 3451213 before opt! 3.5s
+;;; 2640900 CUT2
+;;; 2863202 CUT
+;;; 2052939 CUT+CUT2 !  2.1s!
+;;; 2159... now... lol
+
+;;; CUT2: 14.14% faster(/ 2640900 3451213.0)
+;;; 
+;;; both CUTs: (- 1 (/ 2052939 3451213.0))
+        
+;;   41% faster!
+; OPTPARSEALL=1
+.ifdef OPTPARSEALL
+;;; CUT2 is simple ruleS cut by '}'
+;
+CUT2=1
+;;; TODO: generalize! it now only cuts ruleD
+;;;       cutting expressions at ',;:)]?'
+;
+CUT=1
+.endif ; OPTPARSEALL
+
+
+
+
+
+
 ;;; ========================================
 ;;;                  M A I N
 
@@ -1103,7 +1163,7 @@ TESTING=1
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
-;DEBUGRULE=1
+;lDEBUGRULE=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
@@ -1111,54 +1171,6 @@ TESTING=1
 ;DEBUGRULE2=1
 
 ;DEB2=1
-
-
-;;; ========================================
-;;;   P A R S E R   O P T I M I Z A T I O N
-;;; 
-;;;   41% faster by CUT+CUT2
-;
-OPTPARSEALL=1
-
-;;; TODO:
-;;; 0) jsr _incIspc - move it to before _next
-;;;    find locations where "jsr _incIspc; ... jmp _next"!
-;;;    it's at least 12c per character used!
-;;; 1) byte < 32 ==> skip byte (at _fail)
-;;;    check avg,max,min size of rules
-;;; 2) ruleS could be directly TAILREC - must save some!
-;;; 3) byte rules?
-;;; 4) any %D many times is costly (parse number later?)
-;;; 5) match %V many times very costly, maybe just store
-;;;    pointer and look up later when syntax fine?
-;;; 6) group functions by first letter, and skip?
-;;; 7) bitmap hash to check if var exists (no care?)
-
-;;; CUT and CUT2
-
-;;; -- BYTESIEVE:
-;;; 
-;;; 2640900 CUT2
-;;; 2863202 CUT
-;;; 2052939 CUT+CUT2 !
-;;; 3451213
-;;; CUT2: 14.14% faster(/ 2640900 3451213.0)
-;;; 
-;;; both CUTs: (- 1 (/ 2052939 3451213.0))
-        
-;;   41% faster!
-; OPTPARSEALL=1
-.ifdef OPTPARSEALL
-;;; CUT2 is simple ruleS cut by '}'
-;
-CUT2=1
-;;; TODO: generalize! it now only cuts ruleD
-;;;       cutting expressions at ',;:)]?'
-;
-CUT=1
-.endif ; OPTPARSEALL
-
-
 
 ;DEBUGRULE2ADDR=1
 
@@ -1178,8 +1190,7 @@ CUT=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-;
-PRINTINPUT=1
+;PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
@@ -1316,6 +1327,11 @@ FUNC _compileAX
         ;; store what to compile
         sta inp
         stx inp+1
+.zeropage
+originp:        .res 2
+.code
+        sta originp
+        stx originp+1
 
 .ifdef ERRPOS
         sta erp
@@ -1688,7 +1704,8 @@ immret:
         jsr _incR
         jmp _next
 immfail:
-;;; doesn't seem to work correwctly
+;;; TODO: doesn't seem to work correwctly
+;;; TODO: isn't used...
         pla
         sta rule
         pla
@@ -1711,12 +1728,16 @@ noimm:
 
         ;; Digits? (constants really)
         cmp #'D'
-        beq digits
+        bne :+
+
+        jmp _digits
+:       
+
 .ifdef STRING
         ;; String?
-        cmp #'s'
+        cmp #'s'                ; means skip
         beq string
-        cmp #'S'
+        cmp #'S'                ; means Copy
         beq string
 .endif ; STRING
 
@@ -1725,7 +1746,6 @@ jmpvar:
         ;; - % anything...
         ;;   %V (or %A %N %U %...)
         jmp _var
-
 
 
         ;; - "constant string"
@@ -1802,12 +1822,6 @@ str:
         ;; skip "
         jsr _incIspc
         jmp _next
-
-
-
-digits:       
-        ;; assume it's %D
-        jmp _digits
 
 
 
@@ -2124,114 +2138,54 @@ lda savea
 
 
 FUNC _fail
-.ifdef DEB3
-PUTC '\'
-.endif
-;;; TODO: somehow this triggers more debug output???? 
-;putc '\'
-;putc 0
-;nop
+;;; 2159605 before FASTSKIP
+;;; 1287228 with FASTSKIP! - half the time almost
+;;; (/ 1287228 2159605.0) == 40.4% faster!
+;;; 
+;;; size 78 -> 87 Bytes (+ 9)
 
-;;; 25 B
-
-;;; TODO: can save bytes somehow???
-
-;;; TODO: ????
-.ifdef NOTRIGHTERROR
-        ;; Unexpected end of file?
-        ldy #0
-        lda (inp),y
-
-;;; TODO: not a problem if at end of rule too?
-;;;   but then we shouldn't end up here...
-;        beq gotendall
-
-        bne :+
-;;; TODO: just local rule end... no meaning?
-        lda (rule),y
-        beq @bothzero
-@rulenotzero:
-        jsr putchar
-        putc 'z'
-        jmp gotendall
-@bothzero:
-        putc '0'
-        jmp gotendall
-:       
-.endif
-
-
-.ifdef SHOWINPUT
-        putc '\'
-;        putc 10
-.endif ; SHOWINPUT
-
-    DEBC '|'
-.ifdef DEBUGRULESKIP
-  putc 10
-  putc '|'
-  lda rule
-  sta tos
-  lda rule+1
-  sta tos+1
-  jsr puth
-  putc ' '
-.endif
-        ;; - seek next | alt in rule
+        ;; Y= inp.lo; // faster looping!
+        ldy rule
+        lda #0
+        sta rule
 @loop:
-;        jsr _incR
-        ldy #0
         lda (rule),y
-        ;; or fail if at end of rule (no more alt)
         beq endrule
 
-;;; TODO: remove! this only catches
-;;;    bad memory location!!!! lol
-;;;    shows address for "bad" byte
-.ifdef DEBUGRULESKIP
-   cmp #'U'
-   beq @isU
-   cmp #'U'+128
-   beq @isU
-   jsr putchar
-   jmp @after
-@isU:
-   pha
-   putc 13
-   lda rule
-   sta tos
-   lda rule+1
-   sta tos+1
-   jsr puth
-   putc ' '        
-   pla
-@after:
-.endif
-;    DEBC ','
-
-        ;; skip any inline gen (binary data)
         cmp #'|'
         beq @nextalt
+
         cmp #'['
-        bne @notgen
-;;; TODO: much faster if instead have count and skip?
+        beq @skipgen
+
+        ;; not '[' - normal char to skip!
+@next:
+        iny
+        bne @loop
+        inc rule+1
+:       
+        ;; always!
+        bne @loop
+
+        ;; skip [...0...] gen
 @skipgen:
-;    DEBC ';'
-        jsr _incR
+        iny
+        bne :+
+        inc rule+1
+:       
         lda (rule),y
         cmp #']'
         bne @skipgen
-        jmp @loop
-
-@notgen:
-        jsr _incR
-        ;; _incRX is guaranteed not be be 0!
-        bne @loop
-
+        beq @next
+        
+;;; we're done skipping!
 @nextalt:
-        ;; try next alterantive
-        ;; - move after '|'
+        ;; finally write it back!
+        sty rule
+
+        ;; skip '|'
         jsr _incR
+
 
 restoreinp:
         ;; - restore inp for alt
@@ -2834,6 +2788,7 @@ nextdigit:
         jmp _next
 
 digit:  
+;;; 20 B
         pha
         jsr _mul10
         pla
@@ -2845,7 +2800,8 @@ digit:
         inc tos+1
 :       
         ;; lol space inside numbers!
-        jsr _incIspc
+        ;; (somehow _incIspc is faster than _incI ???)
+        jsr _incIspc           
         jmp nextdigit
 
 ischar: 
@@ -2871,8 +2827,17 @@ failjmp2:
 
 
 
+;;; TODO: cleanup!
 
-;;; flags not set in any way, registers untouched
+;;; Consumes current input char, moves to next
+;;; no-space character.
+;;; 
+;;; Any // comment is skipped till newline
+;;; Same goes for #define or whatever (for now)
+;;; TODO: maybe do simple macros, at least to treat
+;;;       like constant INT/STRINGS
+
+;;; registers untouched
 FUNC _incIspc
         jsr _incI
 
@@ -3051,30 +3016,37 @@ noupdate:
         rts
 
 
+;;; written more to save bytes as each
+;;; is only +3 B, but costs increase till 3x!
+;;; 
+;;; They are ordered so I is fastest, then
+;;; R O P T which probably would relate to
+;;; frequency of usage...
+
 FUNC _incT
-;;; 3
+;;; 3  32c!
         ldx #tos
         SKIPTWO
 FUNC _incP
-;;; 3
+;;; 3  27c! (used for print?... TODO: optimize?)
         ldx #pos
         SKIPTWO
 FUNC _incO
-;;; 3
+;;; 3  22c
         ldx #_out
         SKIPTWO
 FUNC _incR
-;;; 3
+;;; 3  17c
         ldx #rule
         SKIPTWO
-FUNC _incI
-;;; 2
+FUNC _incI      
+;;; 2  12c
         ldx #inp
 FUNC _incRX
-;;; 7
-        inc 0,x                 ; 3B
+;;; 6+1  10c (+ 4c seldomly) +12c for calling it!
+        inc 0,x                 ; 6c
         bne @noinc
-        inc 1,x                 ; 3B
+        inc 1,x
 @noinc:
         rts
         
@@ -3571,12 +3543,18 @@ FUNC _iorulesstart
 
         .byte "|putz(",_E,")"
       .byte '['
+;;; TODO: fix, strings borken?
         jsr axputz
       .byte ']'
 
         .byte "|puts(",_E,")"
       .byte '['
         jsr axputs
+      .byte ']'
+
+        .byte "|putcraw(",_E,")"
+      .byte '['
+        jsr putcraw
       .byte ']'
 
 .ifdef OPTRULES
@@ -3921,12 +3899,12 @@ FUNC _memoryrulesstart
 .endif
 
         ;; TODO: more like statement
-        .byte "|asm(",'"',"sei",'"',")"
+        .byte "|SEI();"
       .byte '['
         sei
       .byte ']'
 
-        .byte "|asm(",'"',"cli",'"',")"
+        .byte "|CLI();"
       .byte '['
         cli
       .byte ']'
@@ -7604,39 +7582,27 @@ status:
         .byte 0
 .code
         ;; - from
-        lda #<status
-        ldx #>status
-        jsr memcpyz
-
-;        PRINTZ {10,10,"65mucc02",10}
-;        PRINTZ {"(C)2025 Jonas S Karlsson jsk@yesco.org",10}
-
-        ;; print how many chars (of scavedscreen used)
-        lda inp
-        ldx inp+1
-        
-        sec
-        sbc #<(savedscreen+40)
-        tay
-        txa
-        sbc #>(savedscreen+40)
-        tax
-        tya
-        jsr axputu
+;        lda #<status
+;        ldx #>status        
+;        jsr memcpyz         
 
         ;; failed?
         ;; (not stand at end of source)
         ldy #0
         lda (inp),y
+        and #127
         beq _OK
 
-        PUTC 10
-        ldx #0
-        jsr axputu
-        jsr nl
-        
-        
+;;; ------------ ERROR ----------
 
+        ;; - save RTS in output to not crash
+        lda #_RTS
+        ;; replace "jmp main" with "jmp hell"
+        lda #<hell
+        ldx #>hell
+        sta _output+1
+        stx _output+2
+        
 
 .ifdef ERRPOS
         ;; hibit string near error!
@@ -7648,34 +7614,22 @@ status:
 
 .endif ; ERRPOS
 
-.ifdef xCOMPILESCREEN
-;;; TODO: ....
-        PRINTZ "HALT2"
-        jmp halt
-.endif
-
-        ;; print it
-       
+.scope
 .ifdef PRINTINPUT
+        ;; print it
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ {10,WHITE,"ERROR>",10,10}
+        PRINTZ {10,RED,"ERROR>",10,10}
 
-        jsr getchar
-
+;        jsr getchar          
 ;        jsr clrscr
 
-;;; TODO: printz? printR?
-
-;;; TODO: ldx , ldy, jsr _copyR - 6B
-;;; 8 B
-        lda #<input
+        lda #<originp
         sta pos
-        lda #>input
+        lda #>originp+1
         sta pos+1
 
-.scope
         ;; jumps into middle of loop!
         jmp print
 
@@ -7684,9 +7638,10 @@ loop:
 ;;; TODO: on sim65 somehow this goes bad when there's an error
 ;;;   it'll print same character forever!
 
-        ;; hi bit on char is indicator of how var it
-        ;; read, next char, or here is the error
-        ;; - print red attribute
+        ;; hi bit on char is indicator of how far it
+        ;; read, next char, or here it's assumed
+        ;; to be near error; thus hilite red background
+        ;; color and white text.
         bpl nohi
         pha
 
@@ -7735,9 +7690,12 @@ print:
 .endif ; PRINTINPUT
 .endscope
 
+
+
+        ;; printed program error
         jmp _edit
-;        jmp failed
-;;; LOOPS: lol
+
+
 
 
 .export _OK
@@ -7929,6 +7887,32 @@ TIMPER=8
 FUNC _editorstart
 
 
+;;; Issues:
+;;; - return doesn't break line into two
+;;;   need to scroll down part of screen 
+;;;   & move some text to next line, indented...
+;;; - ctrl-O insert newline
+;;; 
+;;; ! can cheat: insert actual 10, "extract text",
+;;;   clear screen, print text!
+;;; 
+;;; - kill line, similar
+;;; 
+;;; - need ^C to break!
+;;; - or at least NMI! (simpliest)
+;;; 
+;;; - no way to save? LPRINT? 
+;;; 
+;;; - seems CSAVE and CLOAD works like "random access"
+;;;   Not sure if last file wins if you down load .tap
+;;;   that has been saved in oriutron.
+;;; 
+;;; - 
+
+
+
+
+
 FUNC _edit
         
 .ifdef INTERRUPT
@@ -8026,7 +8010,7 @@ dohelp:
         lda #(BLACK+BG)&127
         ldx #WHITE&127
         jsr _eoscolors
-        PRINTZ {10,"compiling...",10,10}
+        PRINTZ {10,GREEN,"compiling...",10,10}
         ;; This basically restarts program, lol
 	; TIMER
         
@@ -8384,6 +8368,12 @@ extend:
         rts
 
 FUNC _editorend
+
+
+FUNC hell
+        lda #<666
+        ldx #>666
+        rts
 
 
 
@@ -9617,6 +9607,13 @@ input:
         .byte "}",10
         .byte 0
 .endif ; POKEGEN
+
+
+;COLORCHART=1
+.ifdef COLORCHART
+        .incbin "Input/color-chart.c"
+        .byte 0
+.endif ; COLORCHART
 
 
 ;RAINBOW=1
