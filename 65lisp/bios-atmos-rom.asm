@@ -84,13 +84,31 @@ getchar:
         stx savexputchar
         sty saveyputchar
 
+        ;; simulate fixed cursor
+        ldy CURCOL
+        lda (ROWADDR),y
+        ora #$80
+        sta (ROWADDR),y
+        
+        sty saveaputchar
+        ldy #0
+        sty CURCOL
 :       
         jsr $023B               ; ORIC ATMOS only
         bpl :-                  ; hibit set when ready
         tax
 
+        ;; simulate fixed cursor
+        ldy saveaputchar
+        sty CURCOL
+        lda (ROWADDR),y
+        and #$7f
+        sta (ROWADDR),y
+
         ;; TODO: optional?
 ;        jsr $0238               ; echo char
+
+        txa
 
         ldy saveyputchar
         ldx savexputchar

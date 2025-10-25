@@ -8301,6 +8301,7 @@ FUNC _editorstart
 
 
 FUNC _edit
+        CURSOR_OFF
         
 .ifdef INTERRUPT
 .ifnblank
@@ -8336,11 +8337,10 @@ FUNC _edit
         lda #' '
         sta SCREEN+34
 
-;;; TODO: somehow this makes ^E not work!
-;;;  also cannot see movement
-;        CURSOR_ON
+
+        ;; "EDITLOOP"
+
         jsr getchar
-;        CURSOR_OFF
 
         jsr editaction
         jmp _edit
