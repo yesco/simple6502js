@@ -1,9 +1,10 @@
 // Rainbow-drop
-#include <stdio.h>
+//#include <stdio.h>
+//unsigned int a,j,b,e,d,s,i,q;
+//#define poke(a,v) *(char*)(a)= v
 word main() {
-  hires();
   b= 40960; e= b+8000;
-  poke(e-1,11);
+  hires(); //poke(e+120-1,30);//lol
   d= 1; s= 1;
  A:
   s+= d;
@@ -19,7 +20,6 @@ word main() {
     }
   }
   while(a<e){ poke(a, 16); a+=40; }
-  i=s<<2; i=250-i; while(--i);
+//  i=s<<2; i=210-i; while(--i);
   goto A;
 }
-

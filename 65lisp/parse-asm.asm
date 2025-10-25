@@ -1211,12 +1211,22 @@ TESTING=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
-  PRINTREAD=1
-  UPDATENOSPACE=1
+  .ifndef PRINTREAD
+    PRINTREAD=1
+  .endif
+
+  .ifndef UPDATENOSPACE
+    UPDATENOSPACE=1
+  .endif
+
+  .ifndef PRINTDOTS
+    PRINTDOTS=1
+  .endif
 .endif ; PRINTASM
 
 
@@ -1687,25 +1697,66 @@ jmpaccept:
 ;;;      and #$7f
 
 .ifdef PRINTDOTS
-        cmp #10
-        bne :+
+;;; print next statement each time when
+;;; there is a ';' or '{'
 
-        pha
-        tya
+;;; TODO: 
+        cmp #';'
+        beq :+
+        cmp #'}'
+        bne @nosemi
+:       
+
+        sty savey
         pha
         txa
         pha
 
-        putc '.'
+
+;;; TODO: sim65 seems to do different???
+.ifdef PRINTASM
+        
+        ;; print next statement fully
+        ;; (limit 256 chars)
+        ldy savey
+        iny
+:       
+putc '.'
+        lda (inp),y
+        jsr putchar
+
+        cmp #';'
+        beq :+
+        cmp #'{'
+        beq :+
+
+        iny
+        beq :+
+        jmp :-
+pha
+sty savey
+        jsr putchar
+ldy savey
+pla
+        cmp #';'
+        beq :+
+;        cmp #10
+;        beq :+
+putc '!'
+        iny
+        bne :-
+:       
+
+.else
+        putc ','
+.endif ; PRINTASM
 
         pla
         tax
         pla
-        tay
-        pla
+        ldy savey
 
-;        PUTC '.'
-:       
+@nosemi:
 .endif 
         ;; no need handling # // % [ as they'll
         ;; most likely fail problem is %D or [
@@ -2959,11 +3010,53 @@ nextc:
         ;; at each newline print a dot
         ;; cmp #10
 
-        ;; count statements!
+        ;; trigger on end of statements
+        ;; - foo();
+        ;; - while () {
         cmp #';'
-        bne :+
-        PUTC '.'
+        beq :+
+        cmp #'{'
+        bne @nosemi
 :       
+
+;;; TODO: move to subroutine
+;;; TODO: keep track of last printed src
+;;;       (and don't print again, lol)
+
+.ifdef PRINTASM
+        pha
+        tya
+        pha
+        txa
+        pha
+
+        ;; print next statement fully
+        ;; (limit 256 chars)
+        ldy #1
+:       
+putc ':'
+        lda (inp),y
+        beq :+
+        jsr putchar
+
+        cmp #';'
+        beq :+
+        cmp #'{'
+        beq :+
+
+        iny
+        bne :-
+:       
+        pla
+        tax
+        pla
+        tay
+        pla
+.else
+        PUTC '.'
+.endif
+@nosemi:
+
 .endif ;PRINTDOTS
 
 
@@ -9721,8 +9814,7 @@ input:
 .endif ; COLORCHART
 
 
-;
-RAINBOW=1
+;RAINBOW=1
 .ifdef RAINBOW
         .incbin "Input/rainbow-drop.c"
         .byte 0
