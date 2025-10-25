@@ -1216,10 +1216,6 @@ PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
-  .ifndef PRINTREAD
-    PRINTREAD=1
-  .endif
-
   .ifndef UPDATENOSPACE
     UPDATENOSPACE=1
   .endif
@@ -1235,7 +1231,9 @@ PRINTASM=1
 ;
 ;;; Prints a dot for each line compiled
 ;
-PRINTDOTS=1
+  .ifndef PRINTDOTS
+    PRINTDOTS=1
+  .endif
 .endif
 
 
@@ -1706,58 +1704,9 @@ jmpaccept:
         cmp #'}'
         bne @nosemi
 :       
-
-        sty savey
-        pha
-        txa
-        pha
-
-
-;;; TODO: sim65 seems to do different???
-.ifdef PRINTASM
-        
-        ;; print next statement fully
-        ;; (limit 256 chars)
-        ldy savey
-        iny
-:       
-putc '.'
-        lda (inp),y
-        jsr putchar
-
-        cmp #';'
-        beq :+
-        cmp #'{'
-        beq :+
-
-        iny
-        beq :+
-        jmp :-
-pha
-sty savey
-        jsr putchar
-ldy savey
-pla
-        cmp #';'
-        beq :+
-;        cmp #10
-;        beq :+
-putc '!'
-        iny
-        bne :-
-:       
-
-.else
         putc ','
-.endif ; PRINTASM
-
-        pla
-        tax
-        pla
-        ldy savey
-
 @nosemi:
-.endif 
+.endif ; PRINTDOTS
         ;; no need handling # // % [ as they'll
         ;; most likely fail problem is %D or [
         ;; could give strange bugs...
@@ -1985,7 +1934,7 @@ FUNC _enterrule
         tya
         pha
 
-        jsr _iasm
+;        jsr _iasm
         pla
         tay
         pla
@@ -2113,7 +2062,7 @@ FUNC _acceptrule
 
         putc 128+2              ; green code text
 
-        jsr _iasm
+;        jsr _iasm
 .endif ; PRINTASM
 
 .ifdef TRACERULE
@@ -2306,7 +2255,6 @@ FUNC _fail
         iny
         bne @loop
         inc rule+1
-:       
         ;; always!
         bne @loop
 
@@ -3023,38 +2971,7 @@ nextc:
 ;;; TODO: keep track of last printed src
 ;;;       (and don't print again, lol)
 
-.ifdef PRINTASM
-        pha
-        tya
-        pha
-        txa
-        pha
-
-        ;; print next statement fully
-        ;; (limit 256 chars)
-        ldy #1
-:       
-putc ':'
-        lda (inp),y
-        beq :+
-        jsr putchar
-
-        cmp #';'
-        beq :+
-        cmp #'{'
-        beq :+
-
-        iny
-        bne :-
-:       
-        pla
-        tax
-        pla
-        tay
-        pla
-.else
         PUTC '.'
-.endif
 @nosemi:
 
 .endif ;PRINTDOTS
@@ -3658,13 +3575,19 @@ ruleA:
         .byte '|'
 .endif ; CUT2
 
-        ;; Right-recursion is "fine"
         .byte _S,TAILREC,"|",0
 
 ;;; Block
 ruleB:  
         .byte "{}"
-        .byte "|{",_A,"}"
+
+        .byte "|{",_A
+.ifdef PRINTASM
+      .byte "%{"
+        jsr asmprintsrc
+        IMM_RET
+.endif ; PRINTASM
+        .byte "}"
 
         .byte 0
 
@@ -5950,9 +5873,11 @@ ruleP:
         rts
       .byte ']'
 
+.ifdef PRINTASM
       .byte "%{"
-;        jsr _iasm
+        jsr asmprintsrc
         IMM_RET
+.endif ; PRINTASM
 
         .byte "|"
 
@@ -5960,6 +5885,12 @@ ruleP:
       .byte "["
         rts
       .byte "]"            
+
+.ifdef PRINTASM
+      .byte "%{"
+        jsr asmprintsrc
+        IMM_RET
+.endif ; PRINTASM
 
 ;        .byte "|",_E,TAILREC
 ;        .byte "|;",TAILREC
@@ -6139,6 +6070,13 @@ ruleK:
 FUNC _stmtrulesstart
 ;;; Statement
 ruleS:
+
+.ifdef PRINTASM
+      .byte "%{"
+        jsr asmprintsrc
+        IMM_RET
+.endif ; PRINTASM
+
         ;; empty statement is legal
         .byte ";"
         
@@ -8562,6 +8500,44 @@ FUNC hell
 
 
 
+FUNC asmprintsrc
+        ;; print next statement fully
+        ;; from inp,y
+        ;; 
+        ;; (limit 256 chars)
+        jsr _iasm
+        
+        putc ';'
+        putc WHITE
+        jsr spc
+
+        ldy #0
+;        iny
+@nextc:       
+        lda (inp),y
+        beq @end
+        cmp #10
+        beq :+
+        cmp #' '
+        beq :+
+        jsr putchar
+:       
+        cmp #';'
+        beq @end
+        cmp #'{'
+        beq @end
+        cmp #'}'
+        beq @end
+
+        iny
+        bne @nextc
+@end:
+        putc GREEN
+
+        rts
+
+
+
 
 ;.include "Play/byte-sieve-gen.asm"
 .include "Play/byte-sieve-gen-opt.asm"
@@ -8921,12 +8897,15 @@ FUNC _savescreen
 
         ;; update editing state
         ;; - exit if not buffer
-        lda showbuffer
-        beq @ret
+;        lda showbuffer
+;        beq @ret
         ;; - exit if not dirty
+        lda showbuffer
+        beq :+
+
         lda dirty
         beq @ret
-
+:
         lda #0
         sta dirty
         sta showbuffer
@@ -11130,6 +11109,8 @@ arr:    .res 256
   .zeropage
 .endif
 
+.export _vars
+_vars:
 vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)

@@ -110,6 +110,32 @@ void disasm(char* mc, char* end, char indent) {
 
 #else
 
+//#ifdef __ATMOS__
+#if 1
+  #define ADDR "\x83"
+  #define MNIC "\x86"
+  #define JMP  "\b\x82"
+  #define ARG  "\x87"
+  #define VAR  "\x82"
+#else
+  #define ADDR " "
+  #define MNIC " "
+  #define JMP  " "
+  #define ARG  " "
+  #define VAR  " "
+#endif // __ATMOS__
+
+
+extern char vars;
+
+void pvar(char c) {
+  c-= (int)&vars;
+  if (c>128) ; //printf(" %x", c);
+  else printf(VAR"  %c", c/2+'A');
+  if (c&1) printf("+1");
+}
+
+
 char* disasm(char* mc, char* end, char indent) {
   char * p= (char*)mc, c;
   int maxlines= 25;
@@ -118,17 +144,6 @@ char* disasm(char* mc, char* end, char indent) {
 //  printf("\n%*c---CODE[%u]:\n", indent, ' ', end-mc);
   while(p<end) {
     unsigned char i= *p, m= (i>>2)&7;
-
-//#ifdef __ATMOS__
-#if 1
-  #define ADDR "\x83"
-  #define MNIC "\x86"
-  #define ARG  "\x87"
-#else
-  #define ADDR " "
-  #define MNIC " "
-  #define ARG  " "
-#endif // __ATMOS__
 
     // TODO: remove
     indent= 2;
@@ -142,15 +157,15 @@ char* disasm(char* mc, char* end, char indent) {
     ++p;
 
     // exception modes
-    if      (i==0x20) printf("jsr"ARG"$%04x",*((int*)p)++);
-    else if (i==0x4c) printf("jmp"ARG"$%04x",*((int*)p)++);
-    else if (i==0x6c) printf("jpi"ARG"($%04x)",*((int*)p)++);
+    if      (i==0x20) printf(JMP"jsr"ARG"$%04x",*((int*)p)++);
+    else if (i==0x4c) printf(JMP"jmp"ARG"$%04x",*((int*)p)++);
+    else if (i==0x6c) printf(JMP"jpi"ARG"($%04x)",*((int*)p)++);
     // branches
     else if ((i&0x1f)==0x10) 
-      printf("b%.2s"ARG"%+d\t=> $%04X", DA_BRANCH-1+(i>>4), *(signed char*)p, p+1+*(signed char*)p++);
+      printf(JMP"b%.2s"ARG"%+d\t=>"ADDR"$%04X", DA_BRANCH-1+(i>>4), *(signed char*)p, p+1+*(signed char*)p++);
     // single byte instructions
     else if ((i&0xf)==0x8 || (i&0xf)==0xA) printf("%.3s"ARG,(i&2?DA_XA:DA_X8)+3*(i>>4));
-    else if (!(i&0x9f)) printf("%.3s", DA_JMPS+3*(i>>5));
+    else if (!(i&0x9f)) printf(JMP"%.3s", DA_JMPS+3*(i>>5));
     // regular instructions with various addressing modes
     else {
       unsigned char cciii= (i>>5)+((i&3)<<3); // "ccc_ __ii" encoding change to "cciii"
@@ -158,14 +173,14 @@ char* disasm(char* mc, char* end, char indent) {
       else printf("$%02x ??? ", i);
 
       switch(m) { // addressing modes
-      case 0b000: printf(i&1?"($%02x,x)":"#$%02x", *p++); break;
-      case 0b001: printf("$%02x zp", *p++); break;
+      case 0b000: c=*p++;printf(i&1?"($%02x,x)":"#$%02x", c); if(i&1) pvar(c); break;
+      case 0b001: c=*p++;printf("$%02x", c); pvar(c); break;
       case 0b010: c=*p++; printf(i&1?"#$%02x":"a", c);
        if (i&1 && ((char)((c&0x7f)-' ')<128-' ')) printf("  '%c'", c);   break;
     //case 0b011: printf(i&1?" $%04x":" a", *((int*)p)++); break; // wrong for STX ?
       case 0b011: printf(i&3?"$%04x":"a", *((int*)p)++); break; // hmmm, seems to work, lol
-      case 0b100: printf("($%02x),y", *p++); break;
-      case 0b101: printf("$%02x,x", *p++); break;
+      case 0b100: c=*p++;printf("($%02x),y", c); pvar(c); break;
+      case 0b101: c=*p++;printf("$%02x,x", c); pvar(c); break;
       case 0b110: printf("$%04x,%c", m&1?'y':'x', *((int*)p)++); break;
       }
     }
