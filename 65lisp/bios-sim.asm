@@ -52,7 +52,9 @@ saveyputchar:   .res 1
 plaputchar:    
         pla
 putchar:        
-        pha
+        sta saveaputchar
+        stx savexputchar
+        sty saveyputchar
 
         ;; new line? => cr/lf
         cmp #10
@@ -65,7 +67,10 @@ putchar:
 
         jsr rawputc
 
-        pla
+        lda saveaputchar
+        ldx savexputchar
+        ldy saveyputchar
+
         rts
 
 ;;; Generic IO names with cc65 (conio.h)

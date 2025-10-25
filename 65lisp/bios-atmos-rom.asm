@@ -51,12 +51,31 @@ saveyputchar:   .res 1
 
 .code
 
+.macro CURSOR_OFF
+        pha
+        lda $026a
+        and #255-1
+        sta $026a
+        pla
+.endmacro
+
+.macro CURSOR_ON
+        pha
+        lda $026a
+        ora #1
+        sta $026a
+        pla
+.endmacro
+
+
 ;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
 
 ;;; input char from keyboard
 ;;;
 ;;; 17B
 getchar:        
+        ;; can't see cursor move, it's delay from turn on
+        ;;  CURSOR_ON
 
 ;.ifdef TIM
         cli
@@ -79,6 +98,8 @@ getchar:
 ;.ifdef TIM
         sei
 ;.endif ; TIM
+
+        ;CURSOR_OFF
 
         rts
 

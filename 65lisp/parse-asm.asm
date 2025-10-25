@@ -1,8 +1,6 @@
 ;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
-;;; - Free to use for non-commercial purpose subject to
-;;;   credit of original authorship please!
 ;;; - Generated code/tap-files are free, of course!
 
 
@@ -1318,7 +1316,7 @@ showbuffer:     .res 1
 FUNC _init
 
         ;; editor states
-        lda #0
+        lda #'z'                ; save screen
         sta dirty
         sta showbuffer
 
@@ -1400,22 +1398,6 @@ originp:        .res 2
 ;;; TODO: not working?
         lda #1
         sta $24f
-
-.macro CURSOR_OFF
-        pha
-        lda $026a
-        and #255-1
-        sta $026a
-        pla
-.endmacro
-
-.macro CURSOR_ON
-        pha
-        lda $026a
-        ora #1
-        sta $026a
-        pla
-.endmacro
 
 .else
 
@@ -1861,8 +1843,7 @@ string:
         sta percentchar
         ;; use "bit percentchar" to test bmi if to Copy
 :       
-        
-        
+
 str:    
         ;; Y=0 still
         ;; get first char
@@ -1891,24 +1872,16 @@ str:
         ;; TODO: - \xff
 @plain:
         ;; skip to next char (keeps A)
-;;; TODO: why does this skip space? lol wtf?
         jsr _incI
 
         ;; - Copy (C=1)
-
-.ifdef PRINTREAD
-;;; TODO: doesn't save Y???
-;jsr putchar
-;ldy #0
-.endif
-
         ;; 7bit set if to Copy
         bit percentchar
         bpl str
 
-;;; TODO: call jsr _outbyte?
-;;; 7 B
-;        ldy #0
+        ;; TODO: call jsr _outbyte?
+        ;; 7 B
+        ; ldy #0 
         sta (_out),y
         jsr _incO
         jmp str
@@ -4314,6 +4287,7 @@ POS=gos
 
 
 .ifdef STRING_DIDNTWORK_ON_EITHER
+;.ifdef STRING
 ;;; TODO: remove routines at endrules
 POS=gos
 
@@ -9185,17 +9159,16 @@ FUNC _savescreen
         rts
 .endif
 
-        ;; update editing state
-        ;; - exit if not buffer
-;        lda showbuffer
-;        beq @ret
-        ;; - exit if not dirty
-        lda showbuffer
-        beq :+
+        ;;; update editing state
 
+        ;; - exit if not buffer
+        lda showbuffer
+        beq @ret
+
+        ;; - exit if not dirty
         lda dirty
         beq @ret
-:
+
         lda #0
         sta dirty
         sta showbuffer
@@ -9230,7 +9203,7 @@ FUNC _savescreen
         dex
         bne @nextrow
 
-        CURSOR_OFF
+        ;; Now save the damn screen!
 
         ;; from
         lda #<SCREEN
@@ -9247,7 +9220,6 @@ FUNC _savescreen
         ldx #>SCREENSIZE
         
         jsr _memcpy
-        CURSOR_ON
 
 @ret:
         rts
@@ -10102,6 +10074,12 @@ STR=1
         .byte "  puts(s+3);",10
         .byte "  x= ",34,"smurk pa burk smakar urk",34,";",10
         .byte "  puts(x);",10
+
+;;; on sim65 somebody is eating up 1234!!!
+
+        .byte "  n= ",34,"1234567890",34,";",10
+        .byte "  puts(n);",10
+        .byte "  puts(",34,"1234567890",34,");",10
         .byte "}",10
         .byte 0
 
