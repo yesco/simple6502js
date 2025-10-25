@@ -1210,9 +1210,15 @@ TESTING=1
 ;UPDATENOSPACE=1
 
 
+
+;;; TODO: sim65 crashes!!!!! when PRINTASM, it happends inside
+;;;    jsr asmprintsrc which loops giving ";  m222222222222"?????
+
+;;;                                       W   T   F?
+
+
 ;;; TODO: make it a runtime flag, if asm is included?
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -1788,6 +1794,9 @@ percent:
 imm:    jmp $ffff
         ;; that code "returns" by jsr immret!
         ;; (this puts after the code on stack)
+
+;;; loads address of IMM_RET (inline in rule)
+;;; and sets rule to it, to jump over it!
 immret:
         pla
         sta rule
@@ -3657,7 +3666,22 @@ FUNC _iorulesstart
 
         .byte "|puts(",_E,")"
       .byte '['
+.ifdef PRINTIT
+        sta pos
+        stx pos+1
+        ldy #0
+:       
+        lda (pos),y
+        beq :+
+        jsr putchar
+        iny
+        bne :-
+        inc pos+1
+        bne :-
+:       
+.else
         jsr axputs
+.endif
       .byte ']'
 
         .byte "|putcraw(",_E,")"
@@ -4224,7 +4248,248 @@ FUNC _memoryrulesend
         ldx #'>'
       .byte ']'
         
+
+
+;;; TODO:       FAILS on sim65 !
+
+;;; fine on ORIC - why?
+;;; 
+;;; It seems the address is 3 bytes too small,
+;;; (if it was 2 it'd make sense as it's what PUSHLOC
+;;;  is, but it ISN'T!)
+;;; 
+;;; possiblities:
+;;;  a) addresses of vars are different?
+;;;     (could interact w %{ but I tested
+;;;      using subroutines, doesn't seem to bit it)
+;;;  b) somebody is modifying DOS? (lo byte)
+;;;  c) 
+
+
+;;; Simpliest for now
+
 .ifdef STRING
+;;; TODO: remove routines at endrules
+POS=gos
+
+        .byte "|",34            ; " character
+      .byte "["
+        ;; jump over inline string
+        jmp PUSHLOC
+        .byte ";"
+      .byte "]"               
+
+        ;; copy string to out
+        .byte "%S"
+
+        ;; TODO: make a patch routine
+      .byte "%{"
+        ;; patch jump to here
+        lda _out+1
+        ldy #1
+        sta (tos),y
+
+        lda _out
+        dey
+        sta (tos),y
+
+        ;; add 2 to tos to skip bytes
+        clc
+        lda tos
+        adc #2
+        sta tos
+        bcc :+
+        inc tos+1
+:       
+        IMM_RET
+
+      .byte "["
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+.endif ; STRING
+
+
+
+
+
+.ifdef STRING_DIDNTWORK_ON_EITHER
+;;; TODO: remove routines at endrules
+POS=gos
+
+        .byte "|",34            ; " character
+      .byte "["
+        ;; jump over inline string
+        jmp PUSHLOC
+        .byte ":;d;"
+      .byte "]"
+
+        ;; TODO: make a "swap" code
+      .byte "%{"
+        lda tos
+        ldy dos
+        sta dos
+        sty tos
+
+        lda tos+1
+        ldy dos+1
+        sta dos+1
+        sty tos+1
+
+        IMM_RET
+
+        ;; push str addr back on stack
+        .byte "[#D]"
+
+        ;; copy string to out
+        .byte "%S"
+
+        ;; TODO: make a patch routine
+      .byte "%{"
+        ;; patch jump to here
+        lda _out+1
+        ldy #1
+        sta (tos),y
+
+        lda _out
+        dey
+        sta (tos),y
+
+        IMM_RET
+
+      .byte "[;"
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+.endif ; STRING
+
+
+
+
+;;; TODO: only works on ORIC, sim65 fails... wtf?
+
+.ifdef STRING_HMM
+POS=gos ;works
+;POS=pos ;workd
+;POS=dos ; FAILS! who messes with dos?
+
+        .byte "|",34            ; " character
+      .byte "["
+        ;; jump over inline string
+        jmp PUSHLOC
+        .byte ";"               ; TOS= PUSHLOC
+      .byte "]"
+
+      .byte "%{"                ; POS= addr of str
+        jsr TOS2POS
+        IMM_RET
+
+        ;; copy string to out
+        .byte "%S"
+
+      .byte "%{"
+        jsr TOSpatch
+        jsr POS2TOS             ; TOS= POS
+        IMM_RET
+
+      .byte "["
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+.endif ; STRING
+
+
+;;; TODO: debug why dos get's changed value? (sometimes?)
+
+.ifdef STRING_DEBUG
+;.ifdef STRING
+        .byte "|",34            ; " character
+      .byte "["
+        jmp PUSHLOC
+
+;;; neither works on sim65... lol
+
+POS=gos ;works
+;POS=pos ;workd
+;POS=dos ; FAILS! who messes with dos?
+
+.ifndef POS
+        .byte ":;d;"
+      .byte "]"
+.else
+        .byte ";"               ; load PUSHLOC in tos
+      .byte "]"
+
+      .byte "%{"
+        lda _out
+        sta POS
+        ldx _out+1
+        stx POS+1
+        IMM_RET
+.endif ; POS
+
+        .byte "%S"
+
+      .byte "%{"
+        ;; tos = PUSHLOC
+        ;; dos = string address
+        
+        ;; patch jmp (over string) to here
+        ldy #1                  ; void inline 0 !!! LOL
+        lda _out+1
+        sta (tos),y
+        dey
+        lda _out
+        sta (tos),y
+        
+.ifdef POS
+        lda POS
+        sta tos
+        lda POS+1
+        sta tos+1
+        IMM_RET
+      .byte "["
+.else
+        IMM_RET
+      .byte "[D"
+.endif ; POS
+
+        jsr nl
+;        putc 'D' ;ugh!!!!
+        putc '/'
+        ;; load string address
+        lda #'<'
+        ldx #'>'
+;;; print it just to see!
+        sta tos
+        stx tos+1
+jsr puth
+        ldy #0
+:       
+        lda (tos),y
+        beq :+
+        jsr putchar
+        iny
+        bne :-
+:       
+        jsr nl
+
+        lda #'<'
+        ldx #'>'
+      .byte "]"
+
+      .byte "%{"
+        jsr nl
+        jsr nl
+        
+      lda dos
+      ldx dos+1
+      jsr axputh
+        IMM_RET
+
+.endif ; STRING_DEBUG
+
+.ifdef STRING1
         ;; string
         .byte "|",34            ; really >"<
       .byte "["
@@ -4282,7 +4547,7 @@ jsr axputh
 ;        jsr axputh
       .byte "]"
 
-.endif ; STRING
+.endif ; STRING1
 
 
 .ifdef POINTERS
@@ -7677,6 +7942,31 @@ PUTC 'A'
 .endif ; __CC65__
 FUNC _parametersend
 
+
+;;; TODO: find better place...
+TOS2POS:
+        lda _out
+        sta POS
+        ldx _out+1
+        stx POS+1
+        rts
+
+POS2TOS:        
+        lda POS
+        sta tos
+        lda POS+1
+        sta tos+1
+        rts
+
+TOSpatch:       
+        ldy #1                  ; void inline 0 !!! LOL
+        lda _out+1
+        sta (tos),y
+        dey
+        lda _out
+        sta (tos),y
+        rts
+
 endrules:       
         .byte "|",$ff
 
@@ -9800,8 +10090,20 @@ input:
 .endif ; RAINBOW        
 
 
-;STR=1
+;
+STR=1
 .ifdef STR
+
+        .byte "word main(){",10
+        .byte "  s= ",34,"foobar        fiefum",34,";",10
+        .byte "  puts(s);",10
+        .byte "  puts(",34,"gurka",34,");",10
+        .byte "  puts(",34,"foobar        fiefum",34,");",10
+        .byte "  puts(s+3);",10
+        .byte "  x= ",34,"smurk pa burk smakar urk",34,";",10
+        .byte "  puts(x);",10
+        .byte "}",10
+        .byte 0
 
 
         .byte "word main(){",10
@@ -9813,14 +10115,14 @@ input:
 
 
 ;;; space dissapear?
-;        .byte "  s= ",34,"foobar        fiefum",34,";",10
+        .byte "  s= ",34,"foobar        fiefum",34,";",10
 ;;; spaces are retained!
 ;        .byte "  s= ",34
  ;       .byte "foobar","     ","fiefum"
 ;        .byte 34,";",10
 
 ;        .byte "  s= ",34,"foobar fiefum",34,";",10
-        .byte "  s= ",34,"foobar fish-fiefum",34,";",10
+;        .byte "  s= ",34,"foobar fish-fiefum",34,";",10
 
 
 ;;; exists according to manual... but gives error ca64
@@ -9842,7 +10144,7 @@ input:
 ;        .byte "  putz(s-2);",10
 ;        .byte "  putchar('\n');",10
 
-        .byte "  putchar('\n');",10
+;        .byte "  putchar('\n');",10
 
 .ifnblank                       
 ;;; d=0 doesn't give same result...
