@@ -7307,7 +7307,140 @@ FUNC _stmtbyteruleend
         .byte "#"               ; push tos (to patch)
       .byte "]"
         ;; autopatches jump to here if false (PUSHLOC)
+.endif ; OPTRULES
+
+
+
+;;; FOR( ; ; )
+        .byte "|for(",_S
+
+;
+FORRUN=1
+
+      ;; CONDITION
+      .byte "["
+PUTC 'B'
+        .byte ":"               ; -4
+        ;; test can be empty, but need to be true!
+        lda #$ff
+      .byte "]"
+        .byte _S
+
+      ;; LOOP "INC"
+      .byte "["
+PUTC 'b'        
+        ;; test actual condition
+        tay
+        bne :++
+        txa
+        bne :++
+:       
+PUTC 'F'
+        jmp PUSHLOC             ; -3
+:       
+PUTC 'T'
+        ;; skip over INC (do first!)
+        jmp PUSHLOC             ; -2
+PUTC 'C'
+        .byte ":"               ; -1
+      .byte "]"
+;;; TODO: need to make distinction beteen
+;;;    argument statements and _E,
+;;;    latter can take a,b,c; not in args!
+        .byte _E,")"
+      .byte "[:]"               ;  0
+.ifdef FORRUN
+      .byte "%{"
+        ;; TODO: get -3 => tos
+        tsx
+        lda $102+ 3 *3,x
+        sta tos
+        lda $103+ 3 *3,x
+        sta tos+1
+jsr nl
+jsr puth
+jsr nl
+        IMM_RET
 .endif
+      .byte "["
+        jmp VAL0
+      .byte "]"
+
+.ifdef FORRUN
+      .byte "%{"
+        ;; TODO: get -2 => tos
+        tsx
+        lda $102+ 2 *3,x
+        sta tos
+        lda $103+ 2 *3,x
+        sta tos+1
+jsr nl
+jsr puth
+jsr nl
+        IMM_RET
+      .byte "%{"
+        ;; TODO: patch -2 PUSHLOC to skip here
+        lda _out+1
+        ldy #1
+        sta (tos),y
+        lda _out
+        dey
+        sta (tos),y
+        IMM_RET
+
+      ;; BODY
+.endif
+      .byte "["
+PUTC 'S'
+      .byte "]"
+        .byte _S
+
+.ifdef FORRUN
+      .byte "%{"
+        ;; TODO: get -4 to skip there 
+        tsx
+        lda $102+ 4 *3,x
+        sta tos
+        lda $103+ 4 *3,x
+        sta tos+1
+jsr nl
+jsr puth
+jsr nl
+        IMM_RET
+.endif
+
+      .byte "["
+PUTC 's'
+        jmp VAL0
+      .byte "]"
+
+
+.ifdef FORRUN
+      .byte "%{"
+        ;; TODO: get -3 => tos
+        tsx
+        lda $102+ 3 *3,x
+        sta tos
+        lda $103+ 3 *3,x
+        sta tos+1
+jsr nl
+jsr puth
+jsr nl
+        IMM_RET
+      .byte "%{"
+        ;; TODO: patch -3 PUSHLOC to skip here
+        lda _out+1
+        ldy #1
+        sta (tos),y
+        lda _out
+        dey
+        sta (tos),y
+        IMM_RET
+.endif
+        ;; cleanup
+        .byte "[;;;;]"
+
+
 
 ;;; WHILE()...
         .byte "|while("
@@ -8087,6 +8220,9 @@ print:
 
 .export _OK
 _OK:
+        jsr _dasm
+
+
         jsr _eosnormal
 
         PRINTZ {10,10,"OK "}
@@ -9997,6 +10133,17 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+
+;
+FOR=1
+.ifdef FOR
+        .byte "word main(){",10
+        .byte "  for(n=10;n;--n) {",10
+        .byte "    putu(n); putchar(' ');",10
+        .byte "  }",10
+        .byte "}",10
+        .byte 0
+.endif ; FOR
 
 ;WHILECOUNT=1
 .ifdef WHILECOUNT
