@@ -485,7 +485,7 @@ IMMEDIATE=1
 ;;; of printable bytecodes.
 ;;;
 ;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
-;;; free "#' 2347    ?BC GKOZ \ _bc gkortwz
+;;; free "#' 2347    ?B  GKOZ \ _bc gkortwz
 ;;;             ( '|' '[' are excluded as unsafe )
 ;;; 
 ;;; NOTE: not, there is *REAL* quoting problem
@@ -496,6 +496,7 @@ IMMEDIATE=1
 ;;; 
 ;;; SUBSTITUTIONS
 ;;; 
+;;;   C   - $20 (JSR) non-quoted value (can't JSR "<>")
 ;;;   ]   - ends the generation
 ;;;   <   - lo byte of last %D number matched
 ;;;   >   - hi byte         - " -
@@ -1290,6 +1291,11 @@ pframe:
 .code
 
 ;;; Magical references in [generate]
+.macro DOJSR addr
+        .byte 'C'
+        .word addr
+.endmacro
+
 VAL0= '<' + 256*'>'
 VAL1= '+' + 256*'>'
 
@@ -2551,6 +2557,11 @@ jsr putchar
         dey
         lda (tos),y
 
+        ;; tos= *tos (get value of var/fun)
+        sta tos
+        stx tos+1
+        jmp @noset
+
         ;; TODO: idea: push to auto-gen funcall?!
 .ifnblank
         ;; hi
@@ -2562,10 +2573,6 @@ jsr putchar
         jmp _next
 .endif
 
-        ;; tos= *tos (get value of var/fun)
-        sta tos
-        stx tos+1
-        jmp @noset
 
 @nofun:
         
@@ -2657,10 +2664,19 @@ DEBC ']'
         jsr _incR
         jmp _next
 :       
+        ;; Call substitute for $20 as it gets "quoted"
+        cmp #'C'
+        bne :+
+        
+        lda #$20                ; JSR
+        jmp @skipjsr
+:       
 ;;; ' '- JSR skip 2 bytes (QUOTE THEM!)
-        cmp #' '                ; JSR xx xx 
+        cmp #$20                ; JSR xx xx 
 ;        ldx #1
         bne :+
+;;; TODO: jmp?
+        ;cmp #$4c                ;JMP xx xx
         ;; out JSR (' ')
 ;;; 28B
         sta (_out),y
@@ -2694,6 +2710,8 @@ DEBC ']'
         tax
         pla
         jmp genoutAX
+
+@skipjsr:
 :       
 ;;; '<' LO %d
         cmp #'<'
@@ -3586,21 +3604,6 @@ FUNC _iorulesstart
         jsr axputu
       .byte ']'
 
-.ifdef OPUTD
-;;; ORIC XA print 16-bit number
-;;;    TOTALLY unreliable, starts WHILEVLTV
-;;;    sometimes at 9, outputs extra at end?
-;;;    I think it overlaps variables in zoerppage
-;;;    as it uses floating point conversions.
-;;;  --- BAD and really SLOW!
-        .byte "|oputd(",_E,")"
-      .byte '['
-        sta savea
-        txa
-        ldx savea
-        jsr $E0C5
-      .byte ']'
-.endif
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
         jsr axputu
@@ -4017,6 +4020,8 @@ FUNC _memoryrulesend
 
 ;;; TODO: a&!b .. hmmmm
         ;; ! - NOT
+;;; TODO: "!%V" ...?
+;;; TODO: !(...) more safe?
         .byte "|!",_E
       .byte "["
 ;;; 12B
@@ -4053,20 +4058,21 @@ FUNC _memoryrulesend
         ldx #0
       .byte ']'
 
+
         ;; function call
         .byte "|%U()"
       .byte '['
-        jsr VAL0
-        ;; result in AX
+        ;; lol, we need to quote JSR haha
+        DOJSR VAL0
       .byte ']'
+
 
         ;; EXTENTION
         ;; .method call! - LOL
         .byte "|.%U"
       .byte '['
         ;; parameter already in AX
-        jsr VAL0
-        ;; result in AX
+        DOJSR VAL0
       .byte ']'
 
 
@@ -6030,7 +6036,16 @@ ruleN:
 
         ;; Define function
         .byte _T,"%N()",_B
+
       .byte '['
+        ;; TODO: This maybe be redundant if there is
+        ;; an return just before...
+        ;; 
+        ;; Not easy to fix?
+        ;; 
+        ;; if (3) ; else return 5;
+        ;; (if no return inserted after then
+        ;;  will fall through to next function...)
         rts
       .byte ']'
 ;;; TODO: this TAILREC messes with ruleP and several F
@@ -6148,161 +6163,6 @@ ruleT:
         .byte "word|char*|char|void|void*",0
 ;;; TODO: change word to int... lol
 .endif
-
-
-.ifdef BNFLONG
-
-;;; List of actual paramters
-ruleL:  
-;;; Problem with "E,L|E|" is that E might be generated twice!
-;;; 
-;;; TODO: we could push "out" and restore with "inp" when
-;;;   backtrackging...
-
-;;; instead we gobble ','
-        .byte ",ML|ML|"         ; LOL
-        .byte 0
-
-;;; expression parameter push! (all!)
-ruleM:  
-      .byte '['
-;;; 3 B  9c - program stack!
-        pha
-        txa
-        pha
-;;; 9 B 17c - zero page stack
-        dec spy
-        ldy spy
-        sta losp,y
-        stx hisp,y
-;;; 9 B 22c - split stack
-        dec spy
-        ldy spy
-        sta (losp),y
-        txa
-        sta (hisp),y
-;;; 11 B 24c -- other stack
-        ldy spy
-        dey
-        sta (sp),y
-        dey
-        txa
-        sta (sp),y
-        sta spy
-;;; 16 B -- other stack
-        ldy #1
-        sta (sp),y
-        txa
-        dey
-        sta (sp,y
-        ;; stack grow down
-        dec sp
-        dec sp
-        bne @noinc
-        dec sp+1
-@noinc:
-      .byte ']'
-        .byte 0
-
-;;; Local variable
-ruleN:
-        .byte "%v"
-
-      .byte '['
-;;; 9 B 14c - program stack
-        tsx
-        ldy VAL0,x          ; lo
-        lda VAL1,x          ; hi
-        tax
-        tya
-;;; 8 B 16c - other stack
-        ldy #'<'
-        lda (sp),y
-        tax
-        dey 
-        lda (sp),y
-      .byte ']'
-
-;;; ++a; // more efficent, no need value
-alll wrong no | or
-        .byte "++%v;"
-      .byte '['
-        tsx
-        inc VAL0,x
-        bne @noinc
-        inc VAL1,x
-@noinc:
-      .byte ']'
-
-;;; --a; // more efficent, no need value
-        .byte "--%v;"
-      .byte '['
-        tsx
-        lda VAL0,x
-        bne @nodec
-        dec VAL1,x
-@nodec:
-        dec VAL0,x
-      .byte ']'
-
-;;; ++a+3
-        .byte "++%v"
-      .byte '['
-        tsx
-        inc VAL0,x
-        bne @noinc
-        inc VAL1,x
-        ;; need to load it
-        lda VAL0,x
-        ldx VAL1,x
-@noinc:
-      .byte ']'
-
-        .byte "%v==%D"
-      .byte '['
-        
-      .byte ']'
-
-        .byte "+%v"
-      .byte '['
-;;; 15 B 26c - program stack
-        stx savex
-        tsx
-        ;; lo
-        clc
-        adc VAL0,x
-        tay
-        ;; hi
-        lda savex
-        adc VAL1,x
-        tax
-
-        tya
-      .byte ']'
-        .byte 0
-
-;;; Kall function
-ruleK:
-        ;; Function name
-        .byte "%A("
-      .byte '['
-;;; ? B ?c - program stack
-        lda #
-
-      .byte ']'
-        ;; Parameters
-        _L,")";"
-      .byte '['
-        ;; get %A value to tos
-        .byte TAILREC
-        jsr VAL0
-;;; TODO: assuming there is no other assignement \%A
-;;;       in parsing List of parameters... LOL (push/pop?)
-;;; TODO: if we add push operator we can do reordering?
-      .byte ']'
-        .byte 0
-
-.endif ; BNFLONG
 
 
 
@@ -7417,18 +7277,18 @@ PUTC 's'
 
 .ifdef FORRUN
       .byte "%{"
-        ;; TODO: get -3 => tos
+        ;; TODO: get ??? => tos
         tsx
-        lda $102+ 3 *3,x
+        lda $102+ 3 *5,x
         sta tos
-        lda $103+ 3 *3,x
+        lda $103+ 3 *5,x
         sta tos+1
 jsr nl
 jsr puth
 jsr nl
         IMM_RET
       .byte "%{"
-        ;; TODO: patch -3 PUSHLOC to skip here
+        ;; TODO: patch -4 PUSHLOC to skip here
         lda _out+1
         ldy #1
         sta (tos),y
@@ -10134,8 +9994,7 @@ input:
 ;        .byte "word main(){}",0
 
 
-;
-FOR=1
+;FOR=1
 .ifdef FOR
         .byte "word main(){",10
         .byte "  for(n=10;n;--n) {",10
@@ -10209,8 +10068,7 @@ FOR=1
 .endif ; RAINBOW        
 
 
-;
-STR=1
+;STR=1
 .ifdef STR
 
         .byte "word main(){",10
@@ -10531,14 +10389,15 @@ STR=1
         .byte 0
 .endif
 
-;FUN=1
+;
+FUN=1
 .ifdef FUN
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10
         .byte "word G() { return F()+11; }",10
-;        .byte "word main(){ puth(F); puth(&F); putchar(10); puth(G); puth(&G); putchar(10); return G(); }",0
         .byte "word main(){ return G(); }",0
 .endif
+
 
 
 ;        .byte "word main(){a=b+c;return a;}",0
