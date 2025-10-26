@@ -8080,7 +8080,9 @@ print:
 
 .export _OK
 _OK:
-        jsr _dasm
+        ;;  only for debug purposess
+        ;; print asm generated at startup after compilation
+;        jsr _dasm
 
 
         jsr _eosnormal
@@ -9993,6 +9995,13 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
+
+;
+BIGSCROLL=1
+.ifdef BIGSCROLL
+        .incbin "Input/bigscroll.c"
+        .byte 0
+.endif ; BIGSCROLL
 
 ;FOR=1
 .ifdef FOR
