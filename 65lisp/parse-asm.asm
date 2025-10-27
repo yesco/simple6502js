@@ -179,6 +179,7 @@
 ;;; GRAPHICS: x=0..239 y=0..199 c=0..2
 ;;;   hires()
 ;;;   text()
+;;;   clrscr()
 ;;;   curset(x, y, c)
 ;;;   curmov(dx, dy, c)
 ;;;   draw(dx, dy, c)
@@ -308,7 +309,7 @@
 ;;; 
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 ;;; 
-;;; not counting: printu, mul10, end: print out
+;;; not counting: putu, mul10, end: print out
 ;;; 
 ;;; C parse() == parse.lst (- #x715 #x463) = 690
 
@@ -1172,7 +1173,7 @@ TESTING=1
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
-;lDEBUGRULE=1
+;DEBUGRULE=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
 ;;; 
@@ -1199,15 +1200,18 @@ TESTING=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-;PRINTINPUT=1
+;
+PRINTINPUT=1
 
 ;;; for good DEBUGGING
 ;;; print characters while parsing (show how fast you get)
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;
-PRINTREAD=1
+
+;;; TODO: useless - remove!
+
+;PRINTREAD=1
 
 ;;; more compact printing of source when compiling
 ;UPDATENOSPACE=1
@@ -1356,7 +1360,8 @@ FUNC _compileAX
         ;; store what to compile
         sta inp
         stx inp+1
-.zeropage
+;;; Not worthy (used enough)
+.data
 originp:        .res 2
 .code
         sta originp
@@ -1511,7 +1516,7 @@ sta tos
         sta env+1
 sta tos+1
 putc '#'
-jsr printu
+jsr putu
 putc 10
 .endif ; LONGNAMES
 
@@ -1528,6 +1533,7 @@ putc 10
 
         ;; end-all marker
 ;;; TODO: make it 0, can save many tests bytes???
+
         lda #DONE
         pha
 
@@ -1560,6 +1566,52 @@ FUNC _nextI
 ;;;   can reach everything (?)
         ;; - fall-through from above
 FUNC _next
+
+
+
+.ifdef ERRPOS
+        lda inp
+        ldx inp+1
+        jsr axputh
+        jsr spc
+
+        ldy #0
+:       
+        lda (inp),y
+        jsr putchar
+        iny
+        cpy #20
+        bne :-
+
+        jsr nl
+
+.ifnblank
+;;; Doesn't seem to work???
+        ;; update if inp>erp
+        lda inp
+
+        ldx inp+1
+        cpx erp+1
+        bcc @noupdate
+        bne @update
+
+        cmp erp
+        bcc @noupdate
+        beq @noupdate
+@update:
+        sta erp
+        stx erp+1
+@noupdate:       
+.else
+        lda inp 
+        sta erp
+        ldx inp+1
+        stx erp+1
+.endif ; 
+.endif ; ERRPOS
+
+
+
 
 ;;; TODO: remove, disable here, maybe check and end of rule?
 
@@ -2065,6 +2117,32 @@ loadruleptr:
 
 FUNC _acceptrule
 
+.ifdef xERRPOS
+.ifnblank
+;;; Doesn't seem to work???
+        ;; update if inp>erp
+        lda inp
+
+        ldx inp+1
+        cpx erp+1
+        bcc @noupdate
+        bne @update
+
+        cmp erp
+        bcc @noupdate
+        beq @noupdate
+@update:
+        sta erp
+        stx erp+1
+@noupdate:       
+.else
+        lda inp
+        ldx inp+1
+        sta erp
+        stx erp+1
+.endif
+.endif        
+
 .ifdef PRINTASM
         putc 128+5              ; magnenta RULE
 
@@ -2206,7 +2284,7 @@ tsx
 stx tos
 lda #0
 sta tos+1
-jsr printu
+jsr putu
 PUTC 10
 
 lda savea
@@ -2243,6 +2321,47 @@ lda savea
 
 
 FUNC _fail
+;;; Theory:
+;;;   program compile fail (unless error up-propagates)
+;;;   is last position of failure
+.ifdef xERRPOS
+;;; trashes stack if enabled???
+.ifnblank
+;;; looks like inp get's to point to F00 ahead!
+;;; what's that garbage?
+
+;;; Doesn't seem to work???
+        ;; update if inp>erp
+        lda inp
+        ldx inp+1
+;        jsr axputh
+;        pha
+;        jsr spc
+;        pla
+
+        cpx erp+1
+        bcc @noupdate
+        bne @update
+
+        cmp erp
+        bcc @noupdate
+        beq @noupdate
+@update:
+        sta erp
+        stx erp+1
+;        jsr axputh
+;        jsr nl
+@noupdate:       
+
+.else
+        lda inp
+        ldx inp+1
+        sta erp
+        stx erp+1
+.endif
+.endif ; ERRPOS
+
+
 ;;; 2159605 before FASTSKIP
 ;;; 1287228 with FASTSKIP! - half the time almost
 ;;; (/ 1287228 2159605.0) == 40.4% faster!
@@ -2443,6 +2562,7 @@ _donecompile:
         lda #0
 ;;; A contains error code; 0 if no error
 _errcompile:
+
         TIMER
 
 .ifdef TRACERULE
@@ -2451,7 +2571,7 @@ _errcompile:
 .ifdef DEBUGRULE
         jsr printstack
 .endif
-        ;; no errors
+        ;; no errors - lol
         lda #0
         jmp _aftercompile
 
@@ -2642,7 +2762,7 @@ jsr putchar
     lda (pos),y
     sta tos
 
-    jsr printu
+    jsr putu
 
     PRINTZ "HALT"
     jmp halt
@@ -2685,6 +2805,15 @@ FUNC _generate
         cmp #']'
         bne :+
 DEBC ']'
+        ;; - done
+
+.ifdef xERRPOS
+        lda inp
+        sta erp
+        ldx inp+1
+        stx erp+1
+.endif ; ERRPOS
+
         jsr _incR
         jmp _next
 :       
@@ -3009,7 +3138,7 @@ nextc:
 
 
 .ifndef UPDATENOSPACE
-.ifdef ERRPOS
+.ifdef xERRPOS
         pha
 
 ;;; store max input position
@@ -3025,7 +3154,7 @@ nextc:
         beq noupdate
         ;; erp := inp
 update:
-.ifdef PRINTREAD
+.ifdef xPRINTREAD
         pha
 
         ldy #0
@@ -3038,7 +3167,7 @@ update:
         lda #0
         sta tos+1
         putc '#'
-        jsr printu
+        jsr putu
         putc ' '
 .endif
 
@@ -3099,7 +3228,7 @@ jsr printchar
 .endif
 
 .ifdef UPDATENOSPACE
-.ifdef ERRPOS
+.ifdef xERRPOS
 ;;; store max input position
 ;;; (indicative of error position)
         lda inp+1
@@ -3113,7 +3242,7 @@ jsr printchar
         beq noupdate
         ;; erp := inp
 update:
-.ifdef PRINTREAD
+.ifdef xPRINTREAD
         pha
 
         ldy #0
@@ -3125,7 +3254,7 @@ update:
         lda #0
         sta tos+1
         putc '#'
-        jsr printu
+        jsr putu
         putc ' '
 .endif
 
@@ -3288,7 +3417,7 @@ FUNC _parsename
   sta tos
   lda pos+1
   sta tos+1
-  jsr printu
+  jsr putu
   putc ' '
 
   ldy #0
@@ -3328,7 +3457,7 @@ FUNC _parsename
   sta tos
   lda pos+1
   sta tos+1
-  jsr printu
+  jsr putu
   putc ' '
   ldy #0
 .endif ; DEBNAME
@@ -3346,7 +3475,7 @@ FUNC _parsename
         sta (pos),y
 .ifdef DEBNAME
   sta tos+1
-  jsr printu
+  jsr putu
   PUTC ' '
   ldy #1
 .endif ; DEBNAME
@@ -7460,23 +7589,26 @@ FUNC _oricstart
       .byte "]"
 .endmacro
 
+        OJSR "hires",   $ec33
+        OJSR "text",    $ec21
+        OJSR "clrscr",  clrscr
+
+        ORIC "paper",  $f204
+        ORIC "ink",    $f210
+
+        ORIC "circle", $f37f
         ORIC "curset", $f0c8
         ORIC "curmov", $f0fd
         ORIC "draw",   $f110
+        ORIC "point",  $f1c8    ; verify output?
+
         ORIC "hchar",  $f12d
         ORIC "fill",   $f268    ; (rows,cols,char)
-        ORIC "paper",  $f204
-        ORIC "ink",    $f210
-        ORIC "circle", $f37f    
-        ORIC "point",  $f1c8    ; verify output?
 
         .byte "|pattern(",_E,")"
       .byte "["
         sta $213
       .byte "]"
-
-        OJSR "hires",   $ec33
-        OJSR "text",    $ec21
 
         ORIC "play",    $fbd0
         ORIC "music",   $fc18
@@ -7993,6 +8125,7 @@ FUNC _aftercompile
 ;;; doesn't set A!=0 if no match/fail just errors!
 ;        sta err
 
+;;; TODO: print earlier before first compile?
         .data
 status: 
         .word $bb80-2
@@ -8001,13 +8134,14 @@ status:
         .byte               127&YELLOW,"   ^Help",127&WHITE
         .byte 0
 .code
+
         ;; - from
 ;        lda #<status
 ;        ldx #>status        
 ;        jsr memcpyz         
 
         ;; failed?
-        ;; (not stand at end of source)
+        ;; (not stand at end of source \0)
         ldy #0
         lda (inp),y
         and #127
@@ -8016,8 +8150,8 @@ status:
 ;;; ------------ ERROR ----------
 
         ;; - save RTS in output to not crash
-        lda #_RTS
         ;; replace "jmp main" with "jmp hell"
+        lda #_RTS
         lda #<hell
         ldx #>hell
         sta _output+1
@@ -8027,6 +8161,7 @@ status:
 .ifdef ERRPOS
         ;; hibit string near error!
         ;; (approximated by as far as we read)
+        ;; TOOD: or as far as we _fail (or _acccept?)
         ldy #0
         lda (erp),y
         ora #128
@@ -8040,14 +8175,29 @@ status:
 
 ;;; no use as error after backtracking all way up
 ;;        jsr printstack
-        PRINTZ {10,RED,"ERROR>",10,10}
+
+;;; TODO: RED or YELLOW (red already at error point)
+;        PRINTZ {10,RED+BG,WHITE,"ERROR>",10,10}
+;        PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
+
+        ;; print # chars ahread erp is
+        sec
+        lda erp
+        sbc originp
+        sta tos
+
+        lda erp+1
+        sbc originp+1
+        sta tos+1
+
+        jsr putu
 
 ;        jsr getchar          
 ;        jsr clrscr
 
-        lda #<originp
+        lda originp
         sta pos
-        lda #>originp+1
+        lda originp+1
         sta pos+1
 
         ;; jumps into middle of loop!
@@ -8055,21 +8205,18 @@ status:
 
 loop:
 .ifdef ERRPOS
-;;; TODO: on sim65 somehow this goes bad when there's an error
-;;;   it'll print same character forever!
-
         ;; hi bit on char is indicator of how far it
-        ;; read, next char, or here it's assumed
-        ;; to be near error; thus hilite red background
-        ;; color and white text.
+        ;; is ok; next char, it's assumed to be near
+        ;; near the error; thus hilite red background
+        ;; and white text.
         bpl nohi
-        pha
 
+        pha
         putc BG+RED
         putc WHITE
+        pla
 
         ;; - remove hibit from src
-        pla
         and #127
         sta (pos),y
 
@@ -8079,7 +8226,7 @@ loop:
 printmore:
         jsr putchar
         lda (pos),y
-        ;; limit lines printed
+        ;; limit lines printed to 7
         cmp #10
         bne :+
         inx
@@ -8110,11 +8257,8 @@ print:
 .endif ; PRINTINPUT
 .endscope
 
-
-
         ;; printed program error
         jmp _edit
-
 
 
 
@@ -10893,8 +11037,8 @@ NOPRINT=1
 ;;;   28,322,714     322           -Cl
 
 ;;; === my compiler ===
-;;;   36.3           363    - sim65   ./rrasm parse    BYTESIEVE=1
-;;;   43s            363    - ORIC    ./rasm parse     BYTESIEVE=1
+;;;   36.3           363    - sim65   ./rrasm parse  
+;;;   43s            363    - ORIC    ./rasm parse   
 
 ;;;  #x142 322 
 ;;;  #x11f 287
@@ -10902,17 +11046,26 @@ NOPRINT=1
 .ifdef BYTESIEVE
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
+;;; TODO: error is on "word main", lol
+;.byte "x"
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "#include <stdio.h>",10
         .byte "word main(){",10
-
        ;; BYTE MAGAZINE 8192 => 1899
         .byte "  m=8192;",10
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10
 
+;.byte "x"
         .byte "  a=malloc(m);",10
-        .byte "  n=0; while(n<10) {",10
+
+;        .byte "  n=0; while(n<10) {",10
+        .byte "  n=0; while(47n<10) {",10
+
+;        .byte "  n=0; while(n<10) {",10
+;        .byte "  n=0; a=7; b=9;",10
+;        .byte " xwhile(47n<10) {",10
+
         .byte "    c=0;",10
         .byte "    i=0; while(i<m) {",10
         .byte "      poke(a+i, 1); ++i;",10
