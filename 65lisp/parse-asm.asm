@@ -8016,9 +8016,17 @@ status:
         ldy #0
         lda (inp),y
         and #127
-        beq _OK
-
+        bne :+
+        jmp _OK
+:       
 ;;; ------------ ERROR ----------
+
+FUNC _ERROR
+
+.ifdef __ATMOS__
+        lda #(RED+BG)&127
+        sta SCREEN+35
+.endif ; __ATMOS__
 
         ;; - save RTS in output to not crash
         ;; replace "jmp main" with "jmp hell"
@@ -8043,12 +8051,6 @@ status:
 .scope
 .ifdef PRINTINPUT
         ;; print it
-
-;;; no use as error after backtracking all way up
-;;        jsr printstack
-
-;;; TODO: RED or YELLOW (red already at error point)
-;        PRINTZ {10,RED+BG,WHITE,"ERROR",10,10}
         PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
 
         lda originp
@@ -8118,11 +8120,12 @@ print:
 
 
 
-.export _OK
-_OK:
-        ;;  only for debug purposess
-        ;; print asm generated at startup after compilation
-;        jsr _dasm
+FUNC _OK
+
+ .ifdef __ATMOS__
+         lda #(GREEN+BG)&127
+         sta SCREEN+35
+.endif ; __ATMOS__
 
 
         jsr _eosnormal
@@ -8364,7 +8367,7 @@ FUNC _edit
         SKIPTWO
 :       
         lda #' '
-        sta SCREEN+35
+        sta SCREEN+33
 
         ;; - showbuffer
         lda showbuffer
@@ -9278,18 +9281,18 @@ FUNC _loadscreen
 ;;;   20+3B params+call
         ;; from
 ;;; TODO: implement blockcalling convention!
-        lda #<savedscreen
-        ldx #>savedscreen
+        lda #<(savedscreen+40)
+        ldx #>(savedscreen+40)
         sta tos
         stx tos+1
         ;; to
-        lda #<SCREEN
-        ldx #>SCREEN
+        lda #<(SCREEN+40)
+        ldx #>(SCREEN+40)
         sta dos
         stx dos+1
         ;; copy
-        lda #<SCREENSIZE
-        ldx #>SCREENSIZE
+        lda #<(SCREENSIZE-40)
+        ldx #>(SCREENSIZE-40)
 
         jmp memcpy
 
@@ -10912,7 +10915,7 @@ NOPRINT=1
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10
         .byte "  a=malloc(m);",10
-;.byte "x"
+.byte "x"
         .byte "  n=0; while(n<10) {",10
 ;        .byte "  n=0; while(47n<10) {",10
 
