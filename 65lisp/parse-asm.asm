@@ -1321,9 +1321,12 @@ showbuffer:     .res 1
 FUNC _init
 
         ;; editor states
-        lda #'z'                ; save screen
+        lda #255                ; first time
         sta dirty
         sta showbuffer
+
+        ;; compile from src first time
+
 
 ;;; compile using defaults input, output
 ;;; BEWARE: never returns! ends up in _OK/_edit
@@ -8123,8 +8126,8 @@ print:
 FUNC _OK
 
  .ifdef __ATMOS__
-         lda #(GREEN+BG)&127
-         sta SCREEN+35
+        lda #(GREEN+BG)&127
+        sta SCREEN+35
 .endif ; __ATMOS__
 
 
@@ -8150,12 +8153,15 @@ FUNC _OK
         putc ' '
         PRINTZ {" Bytes",10,10}
 
-.ifnblank
-        GOTOXY 14,27
-        ;;              ////////////////////
-        PRINTZ {YELLOW,"e^Xec sr^Z ^Ldit hElpSC",10}
+.ifblank
+        GOTOXY 20,27
+        ;;     
+        ;; /////////////12345678901234567890
+        PRINTZ {YELLOW,"^Run ESC=src ^Help",10}
 .endif
+
         jmp _edit
+
 
 _run:   
 
@@ -8394,12 +8400,13 @@ editaction:
         bne :+
 
         lda showbuffer
-        beq load
+        bmi load                ; firsttime
+        beq load                ; no buffer shown => show!
 docmd:  
         jsr _savescreen
+
         lda #0
         sta showbuffer
-        
         jsr _eosnormal
         jsr nl
         jmp nl
@@ -8409,6 +8416,19 @@ docmd:
         bne  :+
 
 load:   
+        ;; first time?
+        lda showbuffer
+        bpl @notfirst
+
+        lda 0
+        sta showbuffer
+        sta dirty
+
+        jsr _eosnormal
+        jsr _printsrc
+        jmp write
+@notfirst:       
+        ;; not first
         jsr _eosnormal
         jmp _loadscreen
 :       
@@ -8627,6 +8647,7 @@ doneCE:
         cmp #CTRL('W')
         bne :+
         
+write:  
         ;; over-ride, you can write, silly one!
         inc showbuffer
         inc dirty
