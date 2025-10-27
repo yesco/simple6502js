@@ -8557,6 +8557,10 @@ ret:
         putc CTRL('M')
 
         ;; move to first nonspace
+        
+        ;; (cursor must be on for this to work!!!)
+        putc CTRL('Q')
+
 ctrla:  
         ;; end of screen - don't!
         lda CURROW
@@ -8570,10 +8574,16 @@ ctrla:
         ;; move forward
         jsr forward
         jmp ctrla
+
+        ;; off
+        putc CTRL('Q')
 :       
 ;;; - ctrl-E - end of text in line
         cmp #CTRL('E')
         bne :+
+
+        ;; (cursor must be on for this to work!!!)
+        putc CTRL('Q')
 
         ;; move to end of line, lol
         putc CTRL('M')          ; beginning of line
@@ -8596,6 +8606,10 @@ ctrle:
 doneCE: 
         ;; forward one (after last char)
         jsr forward
+
+        ;; off
+        putc CTRL('Q')
+
         rts
 :
 ;;; - ctrl-R - run/display error
@@ -8753,7 +8767,8 @@ write:
 :       
 ;;; - ctrl-Xended commands
         cmp #CTRL('X')
-        beq extend
+        ;; locked up?
+;        beq extend
 
 ;;; - control char - just print it
         cmp #' '
@@ -8778,6 +8793,7 @@ editprint:
         ;; print it
         jmp rawputc
 
+        ;; locked up?
 extend:
         jsr _savescreen
         jsr _eosnormal
