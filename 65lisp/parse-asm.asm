@@ -8389,27 +8389,36 @@ FUNC _edit
 
 editaction:     
 
-;;; - ESC - print HELP
+;;; - ESC - toggle "editor" and "cmd"
         cmp #27
-.ifndef __ATMOS__
         bne :+
-.else
-        beq dohelp
+
+        lda showbuffer
+        beq load
+docmd:  
+        jsr _savescreen
+        lda #0
+        sta showbuffer
+        
+        jsr _eosnormal
+        jsr nl
+        jmp nl
+:       
+;;; - ctrl-Load/edit
+        cmp #CTRL('L')
+        bne  :+
+
+load:   
+        jsr _eosnormal
+        jmp _loadscreen
+:       
 ;;; - CTRL-H (only on oric)
-.ifnblank
-        pha
-        lda $0209
-        ldx #0
-        jsr axputu
-        pla
-.endif
         cmp #CTRL('H')
         bne :+
         ;; CTRL-KEY?
         ldx $0209
         cpx #162
         bne :+
-.endif ; __ATMOS__
 dohelp: 
         jsr _savescreen
         jsr _eosnormal
@@ -8438,7 +8447,7 @@ dohelp:
         lda #(BLACK+BG)&127
         ldx #WHITE&127
         jsr _eoscolors
-        PRINTZ {10,GREEN,"compiling...",10,10}
+        PRINTZ {10,YELLOW,"compiling...",10,10}
         ;; This basically restarts program, lol
 	; TIMER
         
@@ -8627,13 +8636,6 @@ doneCE:
         ;; yeah, it's still there
         inc showbuffer
         rts
-:       
-;;; - ctrl-Load/edit
-        cmp #CTRL('L')
-        bne  :+
-
-        jsr _eosnormal
-        jmp _loadscreen
 :       
 ;;; - ctrl-Youit (just for sim65, can't catch ^C)
         cmp #CTRL('Y')
