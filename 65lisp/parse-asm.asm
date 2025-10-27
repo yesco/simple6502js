@@ -7994,19 +7994,22 @@ FUNC _aftercompile
 ;        sta err
 
 ;;; TODO: print earlier before first compile?
+.ifdef __ATMOS__
         .data
 status: 
         .word $bb80-2
         ;;     ////////////////////////////////////////
-        .byte "CC02 `2025 jsk@yesco.org"
-        .byte               127&YELLOW,"   ^Help",127&WHITE
+        ;;     MeteoriC `25 jsk@yesco.orgY^Help*acWCAPS
+        .byte "MeteoriC `25 jsk@yesco.org"
+        .byte                 127&YELLOW,"^Help",127&WHITE
         .byte 0
 .code
 
         ;; - from
-;        lda #<status
-;        ldx #>status        
-;        jsr memcpyz         
+        lda #<status
+        ldx #>status        
+        jsr memcpyz         
+.endif ; __ATMOS__
 
         ;; failed?
         ;; (not stand at end of source \0)
