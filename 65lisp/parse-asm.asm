@@ -745,10 +745,11 @@ tmp1:   .res 2
 ;;; ========================================
 ;;; ---------------- LIBRARY ---------------
 
-;;; only 8% with parsing all the library names!
-;;; CUT+CUT2 and OPTSKIP did a lot!
-;
-NOLIBRARY=1
+;;; 1284707
+;;; 1150630 (/ 1284707 1150630.0) == 11.6% overhead
+;;; 11.6% overhead parsing STRING CTYPE
+
+;NOLIBRARY=1
 
 .ifndef NOLIBRARY
 
