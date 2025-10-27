@@ -1210,7 +1210,7 @@ PRINTINPUT=1
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
 
-;;; TODO: useless - remove!
+;;; TODO: useless - remove! or reimlement...
 
 ;PRINTREAD=1
 
@@ -1239,16 +1239,6 @@ PRINTINPUT=1
   .endif
 .endif ; PRINTASM
 
-
-.ifndef PRINTREAD
-;;; Don't do both...
-;
-;;; Prints a dot for each line compiled
-;
-  .ifndef PRINTDOTS
-    PRINTDOTS=1
-  .endif
-.endif
 
 
 
@@ -1694,13 +1684,6 @@ jmpaccept:
         inc inp+1
 :       
 
-
-
-;;; TODO: so... PRINTREAD... LOL
-;;;   maybe not need care as it's only "fixed text"
-;;;   so error may be indicated at begginning of "token"?
-
-
         lda (inp),y
         beq jmpaccept
 
@@ -2010,19 +1993,11 @@ FUNC _enterrule
         pha
 
         ;; save re-skipping!
-
+;;; TODO: would like to get rid of this
+;;;   but _next skips whitespace only
+;;;   (I think?)
+;;; This skips // comments and #define #include...
         jsr nextInp
-
-;;; TODO: replace nextInp with _incI...
-;;;   should work, but it doesn't...
-;;;   just an opt? Want to remove nextInp code...
-;;; 
-;;; Is it about comments or something?
-;;; 
-;        jsr _incI
-
-;;; It really shouldn't matter!!!!!
-;;;  TODO: print out what it's skipping!
 
         ;; - push inp for retries
         lda inp+1
@@ -3020,6 +2995,9 @@ failjmp2:
 
 
 
+;;; TODO: cannot remove as this is the onlyi
+;;;  place that skips // comments
+;;;  and # defines....  lol
 
 ;.ifdef TODOREMOVE
 .ifndef TODOREMOVE            
@@ -3069,55 +3047,7 @@ nextc:
 
         PUTC '.'
 @nosemi:
-
 .endif ;PRINTDOTS
-
-
-.ifndef UPDATENOSPACE
-.ifdef xERRPOS
-        pha
-
-;;; store max input position
-;;; (indicative of error position)
-        lda inp+1
-        cmp erp+1
-        bcc noupdate
-        bne update
-        ;; erp.hi == inp.hi
-        lda inp
-        cmp erp
-        bcc noupdate
-        beq noupdate
-        ;; erp := inp
-update:
-.ifdef xPRINTREAD
-        pha
-
-        ldy #0
-        lda (erp),y
-;        jsr putchar
-        jsr printchar
-
-.ifnblank
-        sta tos
-        lda #0
-        sta tos+1
-        putc '#'
-        jsr putu
-        putc ' '
-.endif
-
-        pla
-.endif
-
-        sta erp
-        lda inp+1
-        sta erp+1
-noupdate:
-        pla
-.endif ; ERRPOS
-.endif ; !UPDATENOSPACE
-
 
         ;; CTRL characters/space skip
         cmp #' '+1
@@ -8113,23 +8043,8 @@ status:
 ;;        jsr printstack
 
 ;;; TODO: RED or YELLOW (red already at error point)
-;        PRINTZ {10,RED+BG,WHITE,"ERROR>",10,10}
-;        PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
-
-        ;; print # chars ahread erp is
-        sec
-        lda erp
-        sbc originp
-        sta tos
-
-        lda erp+1
-        sbc originp+1
-        sta tos+1
-
-        jsr putu
-
-;        jsr getchar          
-;        jsr clrscr
+;        PRINTZ {10,RED+BG,WHITE,"ERROR",10,10}
+        PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
 
         lda originp
         sta pos
