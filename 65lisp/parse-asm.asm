@@ -1568,51 +1568,6 @@ FUNC _nextI
 FUNC _next
 
 
-
-.ifdef ERRPOS
-        lda inp
-        ldx inp+1
-        jsr axputh
-        jsr spc
-
-        ldy #0
-:       
-        lda (inp),y
-        jsr putchar
-        iny
-        cpy #20
-        bne :-
-
-        jsr nl
-
-.ifnblank
-;;; Doesn't seem to work???
-        ;; update if inp>erp
-        lda inp
-
-        ldx inp+1
-        cpx erp+1
-        bcc @noupdate
-        bne @update
-
-        cmp erp
-        bcc @noupdate
-        beq @noupdate
-@update:
-        sta erp
-        stx erp+1
-@noupdate:       
-.else
-        lda inp 
-        sta erp
-        ldx inp+1
-        stx erp+1
-.endif ; 
-.endif ; ERRPOS
-
-
-
-
 ;;; TODO: remove, disable here, maybe check and end of rule?
 
 ;;; This is very expensive, but keep to find overflow bugs
@@ -2117,9 +2072,13 @@ loadruleptr:
 
 FUNC _acceptrule
 
-.ifdef xERRPOS
-.ifnblank
-;;; Doesn't seem to work???
+;;; Theory:
+;;;   program compile fail (unless error up-propagates)
+;;;   is AFTER the last position of input that generated
+;;;   code! lol
+
+;;; seems this in _acceptrule is cheaper than _fail
+.ifdef ERRPOS
         ;; update if inp>erp
         lda inp
 
@@ -2135,12 +2094,6 @@ FUNC _acceptrule
         sta erp
         stx erp+1
 @noupdate:       
-.else
-        lda inp
-        ldx inp+1
-        sta erp
-        stx erp+1
-.endif
 .endif        
 
 .ifdef PRINTASM
@@ -2321,23 +2274,12 @@ lda savea
 
 
 FUNC _fail
-;;; Theory:
-;;;   program compile fail (unless error up-propagates)
-;;;   is last position of failure
+        
+;;; seems this in _acceptrule is cheaper than _fail
 .ifdef xERRPOS
-;;; trashes stack if enabled???
-.ifnblank
-;;; looks like inp get's to point to F00 ahead!
-;;; what's that garbage?
-
-;;; Doesn't seem to work???
         ;; update if inp>erp
         lda inp
         ldx inp+1
-;        jsr axputh
-;        pha
-;        jsr spc
-;        pla
 
         cpx erp+1
         bcc @noupdate
@@ -2349,16 +2291,7 @@ FUNC _fail
 @update:
         sta erp
         stx erp+1
-;        jsr axputh
-;        jsr nl
 @noupdate:       
-
-.else
-        lda inp
-        ldx inp+1
-        sta erp
-        stx erp+1
-.endif
 .endif ; ERRPOS
 
 
@@ -2401,7 +2334,7 @@ FUNC _fail
         bne @skipgen
         beq @next
         
-;;; we're done skipping!
+;;; we're done skipping! (standing at '|')
 @nextalt:
         ;; finally write it back!
         sty rule
@@ -2409,32 +2342,29 @@ FUNC _fail
         ;; skip '|'
         jsr _incR
 
-
 restoreinp:
-        ;; - restore inp for alt
+        ;; restore inp for alt
+
+        ;; - peek stack
         pla
         pha
-;;; TODO: correct jump? is it error?
-;;;  (means? still have input?)
-;        bmi gotendall
+        ;; TODO: correct jump? is it error?
+        ;;  (means? still have input?)
+        ;        bmi gotendall
         bmi unexpectedrule
         cmp #DONE
-;;; lda #0 ???? if no error
+        ; lda #0 ???? if no error
         beq _donecompile
 
-;;; TODO: assume it's 'I'? (how about is patch?)
-
-;;; TODO: at failure... need to get out fast???
-;;; TODO: not active!!!!
-.ifnblank
-;;; TODO: Why this interferes with simple ???
         cmp #'i'
         beq gotretry
-;;; otherwise - error 'P'
-gotpatch:
-        lda #'P'
-        jmp error
-.endif
+
+        ;; ignore... whatever is on the stack...
+        pla
+        pla
+        pla
+
+        jmp restoreinp
 
 gotretry:
 .ifdef DEBUGRULE
@@ -2443,8 +2373,9 @@ gotretry:
 .endif
     DEBC '!'
 
-        ;; copy/restore and leave inp at stack
+        ;; copy/restore inp and leave at stack
         tsx
+
         pla
         pla
         sta inp
@@ -2455,6 +2386,7 @@ gotretry:
 
 ;;; we come here if FAIL find no '|' alt
 endrule:
+
 .ifdef DEB3
 PUTC '/'
 lda rulename
@@ -2469,13 +2401,14 @@ jsr printchar
 	;; END - rule
     DEBC 'E'
 
-;;; TODO: is this always like this?
-;;;  (how about patch?)
+        ;; TODO: is this always like this?
+        ;; (how about patch?)
 
         ;; nothing to backtrack
 
-        ;; - get rid of 'i' retry
+        ;; - get rid of 'i' retry ????
         pla
+
 
 .ifdef DEB3
 PUTC '&'
@@ -2558,9 +2491,11 @@ PUTC ' '
 
 
 
+
+
 _donecompile:   
         lda #0
-;;; A contains error code; 0 if no error
+        ;; A contains error code; 0 if no error
 _errcompile:
 
         TIMER
@@ -2576,7 +2511,7 @@ _errcompile:
         jmp _aftercompile
 
 
-;;; ERRORS
+;;; --------------------------- ERRORS
 
 FUNC _errors
 ;;; 25 B
@@ -2616,17 +2551,14 @@ error:
         pla
         jsr putchar
 
-        ;; TODO: could printty print stack showing what 
-        ;;   was expected/failed? got "aa" expected "aaa"?
-        ;;   difficult(?), except at END of input
-        ;; Maybe just keep whatever rule got furtherts
-        ;; and pretty print it?
-
         ;; go edit to fix again!
         jmp _edit
 
+
 halt:
         jmp halt
+
+
 
 FUNC _var
 ;;; 42 B
@@ -2801,10 +2733,10 @@ FUNC _generate
         ldy #0
         lda (rule),y
 
-;;; '] - END GEN
+        ;; ']' - END GEN
         cmp #']'
         bne :+
-DEBC ']'
+        DEBC ']'
         ;; - done
 
 .ifdef xERRPOS
@@ -2824,11 +2756,11 @@ DEBC ']'
         lda #$20                ; JSR
         jmp @skipjsr
 :       
-;;; ' '- JSR skip 2 bytes (QUOTE THEM!)
+        ;; ' '- JSR skip 2 bytes (QUOTE THEM!)
         cmp #$20                ; JSR xx xx 
-;        ldx #1
+        ; ldx #1 ; ???
         bne :+
-;;; TODO: jmp?
+        ;; TODO: jmp?
         ;cmp #$4c                ;JMP xx xx
         ;; out JSR (' ')
 ;;; 28B
@@ -2856,11 +2788,14 @@ DEBC ']'
         ;; lo: read next
         jsr _incR
         lda (rule),y
-        pha
+
         ;; hi: read next (inc in genoutAX)
+        pha
+
         jsr _incR            
         lda (rule),y
         tax
+
         pla
         jmp genoutAX
 
@@ -10986,7 +10921,7 @@ input:
 ;;;         322    2.8323 CC65   -Cl
 ;;; === my compiler === ("no library!")
 ;;;         363    3.63   sim65  ./rrasm parse BYTESIEVE
-;;;         363    4.8s   CC02   ./rasm parse  BYTESIEVE=1
+;;;         363    4.8s   CC02   ./rasm parse  BYTESIEVE
 ;;;         336    3.185s CC02   ./rrams WHILE(a<_E)
 ;;;             12% faster than before
 ;;;             12% slower than cc65 -Cl
@@ -11055,15 +10990,11 @@ NOPRINT=1
         .byte "  m=8192;",10
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10
-
-;.byte "x"
         .byte "  a=malloc(m);",10
+;.byte "x"
+        .byte "  n=0; while(n<10) {",10
+;        .byte "  n=0; while(47n<10) {",10
 
-;        .byte "  n=0; while(n<10) {",10
-        .byte "  n=0; while(47n<10) {",10
-
-;        .byte "  n=0; while(n<10) {",10
-;        .byte "  n=0; a=7; b=9;",10
 ;        .byte " xwhile(47n<10) {",10
 
         .byte "    c=0;",10
