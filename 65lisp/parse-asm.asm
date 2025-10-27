@@ -744,7 +744,10 @@ tmp1:   .res 2
 ;;; ========================================
 ;;; ---------------- LIBRARY ---------------
 
-;NOLIBRARY=1
+;;; only 8% with parsing all the library names!
+;;; CUT+CUT2 and OPTSKIP did a lot!
+;
+NOLIBRARY=1
 
 .ifndef NOLIBRARY
 
@@ -1203,7 +1206,8 @@ TESTING=1
 ;;; It will skip numbers etc (as they call jsr _incI)
 ;;; TODO: seems to miss some characters "n(){++a;" ...?
 ;;; Requires ERRPOS (?)
-;PRINTREAD=1
+;
+PRINTREAD=1
 
 ;;; more compact printing of source when compiling
 ;UPDATENOSPACE=1
@@ -1538,16 +1542,23 @@ putc 10
 
 
 
-;;; TODO: move nextInp & _incIspc here!
-;;; TODO: jmp _nextInp falls through to _next
-
-
-
-        ;; skip any space/comments
-        jsr nextInp
         
+        jmp _next
+
+;;; TODO: opt?
+;;; 1137800
+;;; 1132809 ~6000 savings 0.4% - not worth it!
+FUNC _nextI
+;;; 3 B
+        jsr _incI
+;;; 6 B
+;        inc inp
+;        bne :+
+;        inc inp+1
+;:       
 ;;; TODO: move this to "the middle" then
 ;;;   can reach everything (?)
+        ;; - fall-through from above
 FUNC _next
 
 ;;; TODO: remove, disable here, maybe check and end of rule?
@@ -1900,18 +1911,17 @@ str:
         sta (_out),y
         jsr _incO
         ;; skip "
-        jsr _incIspc
-        jmp _next
+        jmp _nextI
 
 
 
+;;; TODO: remove?
 FUNC _eq    
 ;;; 9 B
     DEBC '='
-        jsr _incIspc
-exitrule:
         jsr _incR
-        jmp _next
+        jmp _nextI
+
 
 
 FUNC _enterrule
@@ -1992,7 +2002,20 @@ FUNC _enterrule
         pha
 
         ;; save re-skipping!
+
         jsr nextInp
+
+;;; TODO: replace nextInp with _incI...
+;;;   should work, but it doesn't...
+;;;   just an opt? Want to remove nextInp code...
+;;; 
+;;; Is it about comments or something?
+;;; 
+;        jsr _incI
+
+;;; It really shouldn't matter!!!!!
+;;;  TODO: print out what it's skipping!
+
         ;; - push inp for retries
         lda inp+1
         pha
@@ -2213,7 +2236,9 @@ lda savea
         jsr printstack
 .endif
 
-        jmp exitrule
+        ;; exit rule
+        jsr _incR
+        jmp _next
 
 
 
@@ -2600,8 +2625,7 @@ jsr putchar
 
 @noset:
         ;; skip read var char
-        jsr _incIspc
-        jmp _next
+        jmp _nextI
 
 
 .ifdef LONGNAMES
@@ -2890,9 +2914,7 @@ digit:
         bcc :+
         inc tos+1
 :       
-        ;; lol space inside numbers!
-        ;; (somehow _incIspc is faster than _incI ???)
-        jsr _incIspc           
+        jsr _incI
         jmp nextdigit
 
 ischar: 
@@ -2928,7 +2950,16 @@ failjmp2:
 ;;; TODO: maybe do simple macros, at least to treat
 ;;;       like constant INT/STRINGS
 
-;;; registers untouched
+
+
+
+
+
+
+;.ifdef TODOREMOVE
+.ifndef TODOREMOVE            
+
+;; registers untouched
 FUNC _incIspc
         jsr _incI
 
@@ -3116,6 +3147,12 @@ noupdate:
         pla
 .endscope
         rts
+
+.endif ; TODOREMOVE
+
+
+
+
 
 
 ;;; written more to save bytes as each
@@ -7909,6 +7946,8 @@ PUTC 'A'
 .endif ; __CC65__
 FUNC _parametersend
 
+;;; TODO: remove
+.ifnblank
 
 ;;; TODO: find better place...
 TOS2POS:
@@ -7933,6 +7972,7 @@ TOSpatch:
         lda _out
         sta (tos),y
         rts
+.endif
 
 endrules:       
         .byte "|",$ff
@@ -9996,8 +10036,8 @@ input:
 ;        .byte "word main(){}",0
 
 
-;
-BIGSCROLL=1
+;BIGSCROLL=1
+;;; TOOD: not working...
 .ifdef BIGSCROLL
         .incbin "Input/bigscroll.c"
         .byte 0
@@ -10398,8 +10438,7 @@ BIGSCROLL=1
         .byte 0
 .endif
 
-;
-FUN=1
+;FUN=1
 .ifdef FUN
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10
