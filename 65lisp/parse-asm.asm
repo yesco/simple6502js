@@ -1687,6 +1687,12 @@ jmpaccept:
         lda (inp),y
         beq jmpaccept
 
+        ;; no need handling # // % [ as they'll
+        ;; most likely fail problem is %D or [
+        ;; could give strange bugs...
+        cmp #' '+1
+        bcc @skipspc
+
 ;;; TODO: hi-bit makes problem...
 ;;;      and #$7f
 
@@ -1703,12 +1709,8 @@ jmpaccept:
         putc ','
 @nosemi:
 .endif ; PRINTDOTS
-        ;; no need handling # // % [ as they'll
-        ;; most likely fail problem is %D or [
-        ;; could give strange bugs...
-        cmp #' '+1
-        bcc @skipspc
-        
+
+       
 ;        jsr _incR
         inc rule
         bne :+
