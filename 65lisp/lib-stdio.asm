@@ -58,5 +58,51 @@ PUTDEC=1
 PUTHEX=1
 .include "print.asm"
 
+.ifdef INLINEPUTZOPT
+;;; Put zero terminated string directly
+;;; after jsr _inlineputz!
+;;; 
+;;; TODO: be used by:
+;;;    printf("foo %d bar %s fie %x fum")
+;;; 
+;;; 7 bytes saved per call of putz("foo"); & puts
+;;; 
+;;; 29 bytes total putz puts
+FUNC _inlineputs
+;;; 2+8 B (8 in next function)
+        sec
+        SKIPONE
+FUNC _inlineputz
+;;; 19 (+ 8) B
+        clc
+        ;; lo
+        pla
+        tay
+        ;; hi
+        pla
+        tax
+        iny
+        bne :+
+        inx
+:       
+        tya
+        ;; save C flag, lol
+        php
+        jsr axputz
+        plp
+        ;; if C set newline! (puts)
+        bcc :+
+        jsr nl
+:       
+        ;; hi
+        lda tos+1
+        pha
+        ;; lo
+        lda tos
+        pha
+        ;; perfect (at 0, next is next instruction!)
+        ;; return to location after 0
+        rts
+.endif ; INLINEPUTZOPT
 
 FUNC _stdioend

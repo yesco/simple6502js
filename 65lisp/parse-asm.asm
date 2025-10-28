@@ -768,11 +768,21 @@ CTYPE=1
 FUNC _librarystart
 
 .include "tty-helpers.asm"      ; nl spc bs PUTC putc
+
+;;; inline str after jsr; +29 bytes
+;;; saves 7 B at each puts/z("...");
+;;; is it worth it?
+;INLINEPUTZOPT=1  
 .include "lib-stdio.asm"
+
 ;include "lib-printf.asm"       ; not working
+
 .include "lib-ctype.asm"
+
 .include "lib-stdlib.asm"
+
 .include "lib-string.asm"
+
 .include "lib-math.asm"         ; mul mul10 mul16 div16
 
 
@@ -1849,13 +1859,14 @@ jmpvar:
 string: 
         ;; determine if to Copy (%S not %s)
         lda percentchar
-        cmp #'S'                ; sets C if to Copy
-        bcc :+
+        cmp #'s'                ; sets C= not copy
+        bcs :+
         ;; Copy
         lda #128
         sta percentchar
-        ;; use "bit percentchar" to test bmi if to Copy
+        putc '!'
 :       
+        ;; use "bit percentchar" to test bmi if to Copy
 
 str:    
         ;; Y=0 still
@@ -1896,16 +1907,20 @@ str:
         ;; 7 B
         ; ldy #0 
         sta (_out),y
+jsr putchar
         jsr _incO
         jmp str
 
 @zero:
+        ;; - Copy (C=1)
+        ;; 7bit set if to Copy
+        bit percentchar
+        bpl @noout
         ;; zero-terminate if gen
-;putc '<'
         lda #0
-;        tay
         sta (_out),y
         jsr _incO
+@noout:       
         ;; skip "
         jmp _nextI
 
@@ -3670,6 +3685,23 @@ FUNC _iorulesstart
 ;;; TODO: change printers to use AX
         jsr axputh
       .byte ']'
+
+
+.ifdef OPTRULES
+.ifdef INLINEPUTZOPT
+        .byte "|putz(",34
+      .byte '['
+        jsr _inlineputz
+      .byte ']'
+        .byte "%S)"
+
+        .byte "|puts(",34
+      .byte '['
+        jsr _inlineputs
+      .byte ']'
+        .byte "%S)"
+.endif ; INLINEPUTZOPT
+.endif ; OPTRULES
 
         .byte "|putz(",_E,")"
       .byte '['
@@ -10078,6 +10110,18 @@ input:
 ;        .byte "word main(){}",0
 
 
+;
+STRBYTES=1
+;;; 28 bytes (inline str, jmp over, lda/x)
+;;; 21 bytes (inline after jsr inlinePuts)
+.ifdef STRBYTES
+        .byte "word main(){",1
+        .byte " puts(",34,"0123456789",34,");",10
+;        .byte " putchar('<');",10
+        .byte "}",10
+        .byte 0
+.endif ; STRBYTES
+
 ;BIGSCROLL=1
 ;;; TOOD: not working...
 .ifdef BIGSCROLL
@@ -10954,7 +10998,7 @@ NOPRINT=1
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10
         .byte "  a=malloc(m);",10
-.byte "x"
+;.byte "x"
         .byte "  n=0; while(n<10) {",10
 ;        .byte "  n=0; while(47n<10) {",10
 
