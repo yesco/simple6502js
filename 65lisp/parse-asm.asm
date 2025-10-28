@@ -3663,6 +3663,7 @@ FUNC _iorulesstart
         jsr axputu
       .byte ']'
 
+        ;; LOL: printf("%s", s); // safe...
         .byte "|printf(",34,"\%s",34,",",_E,")"
       .byte '['
         jsr axputz
