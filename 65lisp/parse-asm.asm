@@ -3672,19 +3672,19 @@ FUNC _iorulesstart
 .ifdef INLINEPUTZOPT
         .byte "|putz(",34
       .byte '['
-        jsr _inlineputz
+        jsr iputz
       .byte ']'
         .byte "%S)"
 
         .byte "|fputs(",34
       .byte '['
-        jsr _inlineputz
+        jsr iputs
       .byte ']'
         .byte "%S,stdout)"
 
         .byte "|puts(",34
       .byte '['
-        jsr _inlineputs
+        jsr iputs
       .byte ']'
         .byte "%S)"
 .endif ; INLINEPUTZOPT
@@ -10122,8 +10122,7 @@ input:
 ;        .byte "word main(){}",0
 
 
-;
-STRBYTES=1
+;STRBYTES=1
 ;;; 28 bytes (inline str, jmp over, lda/x)
 ;;; 21 bytes (inline after jsr inlinePuts)
 .ifdef STRBYTES

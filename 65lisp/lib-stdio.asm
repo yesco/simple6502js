@@ -68,12 +68,17 @@ PUTHEX=1
 ;;; 7 bytes saved per call of putz("foo"); & puts
 ;;; 
 ;;; 29 bytes total putz puts
-FUNC _inlineputs
-;;; 2+8 B (8 in next function)
+
+;;; (+ 10 19)= 29 B (+ 29 22)=51 (iputz+putz)
+FUNC _iputs
+;;; 
+;;; (+ 2 1 7) = 10
+;;; 2
         sec
         SKIPONE
-FUNC _inlineputz
-;;; 19 (+ 8) B
+FUNC _iputz
+;;; (+ 4 4 4 7)= 19
+;;; 4+1=5
         clc
         ;; lo
         pla
@@ -81,19 +86,25 @@ FUNC _inlineputz
         ;; hi
         pla
         tax
+        ;; inc YX
+;;; 4
         iny
         bne :+
         inx
 :       
+;;; 4+7=11
         tya
         ;; save C flag, lol
         php
-        jsr axputz
+        jsr axputz              ; 22 !
         plp
         ;; if C set newline! (puts)
         bcc :+
         jsr nl
 :       
+
+TOSRTS: 
+;;; 7 B
         ;; hi
         lda tos+1
         pha
@@ -103,6 +114,40 @@ FUNC _inlineputz
         ;; perfect (at 0, next is next instruction!)
         ;; return to location after 0
         rts
+
+.ifdef PRINTFHELPERS
+;;; These are helpers for printf
+
+;;; TODO: compile printf("%-08.5u bytes\n", 4711);
+;;; 
+;;; lda #<4711
+;;; ldx #>4711
+;;; 
+;;; sec
+;;; jsr _iputuz
+;;; .byte $ff-8,5
+;;; .byte " bytes\n",0
+
+FUNC _iputuz: 
+        jsr axputu
+        jmp iputz
+
+.ifdef SIGNED
+FUNC _iputdz 
+        jsr axputu
+        jmp iputz
+.endif ; SIGNED
+
+FUNC _iputhz 
+        jsr axputh
+        jmp iputz
+
+FUCN _iputzz
+        jsr axputz
+        jmp iputz
+.endif ; PRINTFHELPERS
+
+
 .endif ; INLINEPUTZOPT
 
 FUNC _stdioend

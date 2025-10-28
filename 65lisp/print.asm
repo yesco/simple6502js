@@ -270,15 +270,19 @@ printit:
 
 ;;; if had an ITERATOR : dup II swap D swasp @ ;
 ;;; 
-;;; after call tos points at \0 pos
+;;; after call tos points at \0 pos (good for rts!)
+;;; 
 ;;; 22 B
 FUNC _printz
+;;; 6+16=22
 axputz:   
+;;; 6
         sta tos
         stx tos+1
 
         ldy #0
 _writez:
+;;; 16
         lda (tos),y
         beq :+
         jsr putchar
