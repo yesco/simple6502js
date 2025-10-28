@@ -53,7 +53,7 @@ ls -l $name.o $name.sim $name.tap
 # -- simulation
 #echo "=== RUN ==="
 #(time sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
-(sim65 -c $name.sim "$@" ; stty sane; echo "--- EXIT=$? ---") | tee $name.log
+(sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---" ; stty sane) | tee $name.log
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time");
 

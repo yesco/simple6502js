@@ -2,6 +2,116 @@
 ;;; - https://github.com/Michaelangel007/6502_calling_convention
 
 
+;;; ----------------------------------------
+;;;    a) push parameteers pha;txa;pha - fastest!
+;;;    b) jsr function
+;;;    b) swap parameters from stack, to zp block
+;;;    c) perform function
+;;;    d) swap parameters again!
+
+        lda #11
+        ldx #11
+
+        pha
+        txa
+        pha
+
+        ...
+        4 params pushed
+        ..
+        
+;;; TEST cc65 4 parameters recursion!
+
+        ;; COPY
+        ;; 
+        ;; 4 parameters
+        ;; 3*4 = 12 bytes calling overhead 8c*4= 32c)
+        ;;            + copy cost 106c (+ 32 106)
+        ;; 12 + 8 B
+        ;; 18 B  128c (+ 104c cmp zp...)
+
+        jsr fun
+
+        ;; STA zp
+        ;; 
+        ;; 4 parameters
+        ;; dedicationed sta zp locations
+        ;; (no care overlap probelm)
+        ;; 6*4= 24 B  6*4= 24c
+        ;; 24 B  24c
+
+        ;; SWAP (RECURSION!)
+        ;; 
+        ;; 4 parameters
+        ;; recursion support+swap
+        ;; + 32c + 464c (4 params, 8 bytes) - can do recursion!
+        ;; (+ (* 8 4) (* 2 2) 12 464) = 512c
+        ;; (+ (* 3 4) (* 2 (+ 3 2))) = 22 B
+        ;; 22 b  512c !!!
+
+
+fun:    
+;;; no recursion, private zp vars, no overlap
+;;; (solves the foo(3, foo(4, 5)) - problem!
+;;; 
+;;; + 5 B
+;;; + (+ 2 12 (* 2 4 13)) = 118c 4 params
+;;; + (+ 2 (* 2 4 13)) =    106c 4 params INLINE
+;;;     (but inline + 6 B... CHEAP!!!)
+        ldy #8
+        jsr copyparams
+        
+        ...body...rts...
+
+
+copyparams:     
+;;; 6 + 1 B  cycles: bytes * 13c !!!
+:       
+        pla
+        sta params-1,y
+        dey
+        bne :-
+
+        rts
+
+
+fun:    
+;;; + 8 B 2*12
+;;; + 2*12 + 2*4 + bytes * 2 * 29c
+;;; + 32c + 464c (4 params, 8 bytes) - can do recursion!
+        ldy #8                  ; bytes
+        jsr swapparams
+        
+        ...body...
+        
+        ldy #8
+        jmp swapparams
+
+swapparams:     
+;;; 20 B  4c + bytes * 29c
+        tsx
+:       
+        ;; swap stack <-> params
+        lda 101,x
+        sta savea
+
+        lda params,y
+        sta 101,x
+
+        lda savea
+        sta params,y
+
+        inx
+        dey
+        bpl :-
+
+        rts
+        
+
+
+
+;;; ----------------------------------------
+;;;                BLOCK
 
 
 
