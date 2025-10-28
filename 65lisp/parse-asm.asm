@@ -3656,12 +3656,41 @@ FUNC _iorulesstart
         jsr axputu
       .byte ']'
 
+        ;; compatibility
+
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
         jsr axputu
       .byte ']'
 
         .byte "|printf(",34,"\%s",34,",",_E,")"
+      .byte '['
+        jsr axputz
+      .byte ']'
+
+.ifdef OPTRULES
+.ifdef INLINEPUTZOPT
+        .byte "|putz(",34
+      .byte '['
+        jsr _inlineputz
+      .byte ']'
+        .byte "%S)"
+
+        .byte "|fputs(",34
+      .byte '['
+        jsr _inlineputz
+      .byte ']'
+        .byte "%S,stdout)"
+
+        .byte "|puts(",34
+      .byte '['
+        jsr _inlineputs
+      .byte ']'
+        .byte "%S)"
+.endif ; INLINEPUTZOPT
+.endif ; OPTRULES
+
+        .byte "|fputs(",_E,",stdout)"
       .byte '['
         jsr axputz
       .byte ']'
@@ -3685,23 +3714,6 @@ FUNC _iorulesstart
 ;;; TODO: change printers to use AX
         jsr axputh
       .byte ']'
-
-
-.ifdef OPTRULES
-.ifdef INLINEPUTZOPT
-        .byte "|putz(",34
-      .byte '['
-        jsr _inlineputz
-      .byte ']'
-        .byte "%S)"
-
-        .byte "|puts(",34
-      .byte '['
-        jsr _inlineputs
-      .byte ']'
-        .byte "%S)"
-.endif ; INLINEPUTZOPT
-.endif ; OPTRULES
 
         .byte "|putz(",_E,")"
       .byte '['
@@ -10116,7 +10128,9 @@ STRBYTES=1
 ;;; 21 bytes (inline after jsr inlinePuts)
 .ifdef STRBYTES
         .byte "word main(){",1
+;        .byte "  fputs(",34,"0123456789",34,",stdout);",10
         .byte " puts(",34,"0123456789",34,");",10
+        ;; make sure newline for puts...
 ;        .byte " putchar('<');",10
         .byte "}",10
         .byte 0
