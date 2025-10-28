@@ -1,4 +1,4 @@
-;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Generated code/tap-files are free, of course!
@@ -1236,7 +1236,8 @@ PRINTINPUT=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -3559,7 +3560,8 @@ ruleR:
 ;;.endif
 ;;ruleU: - BYTERULES "ruleC"
 ;;ruleV: - BYTERULES "ruleD"
-ruleW:
+
+;ruleW:  -   HW_PARMS
 ;ruleX:  -   cc65 parameter list
 ;;ruleY: -   parameters init
 ;;ruleZ: -   list of parameters
@@ -4099,6 +4101,111 @@ FUNC _memoryrulesstart
         cli
       .byte ']'
 FUNC _memoryrulesend
+
+
+
+
+;;; TODO: REMOVE! just for test
+
+        ;; Function call!!!
+        .byte "|fun",_W
+      .byte "["
+        ;;  TODO: make real!
+        jsr _edit
+        ;; cleanup (or let function do it-itself?)
+      .byte "]"
+
+
+.ifdef JSK_CALLING
+;;; ========================================
+;;;          JSK CALLING CONVENTION
+;;; 
+;;;       Calling "foo" with parameters
+;;;  
+;;;              jmp callfoo
+;;;     
+;;;  fooparams:  
+;;;              ... eval first param => AX ...
+;;; 
+;;;              ;; push reverse
+;;;              pha
+;;;              txa
+;;;              pha
+;;; 
+;;;              ... second param ...
+;;;              pha
+;;;              txa
+;;;              pha
+;;; 
+;;;              ... last param, same ...
+;;;              pha
+;;;              txa
+;;;              pha
+;;; 
+;;; 
+;;;              ;; finally call "foo"
+;;;              JMP foo
+;;; 
+;;; 
+;;;  callfoo:    JSR fooparams
+;;;              ... foo returns here! ...
+;;; 
+;;; 
+;;;  foo:        
+;;;              ldy #8            ; 4 params = 8 bytes
+;;;              jsr save_old_regs
+;;;                  (+ copy_new_params_to_regs)
+;;; 
+;;;              ... body foo ...
+;;;   
+;;;              ;; drop params
+;;;              ldy #8
+;;;              jmp drop_and_restore
+;;; 
+
+;;; TODO:
+FUN=$ffff
+        ;; Function call!!!
+        .byte "|fun"
+      .byte "["
+        ;; jump to jsr
+        jmp FUN
+        ;; jsr will call here!
+        .byte ":"
+      .byte "]"
+
+        ;; generate evaluating
+        ;; and pushing parameters
+        .byte _W
+
+      .byte "["
+        ;; JUMP to the function; return after JSR!
+        jmp FUN
+        .byte ";d"              ; dos= pop ":"
+        .byte ";"               ; tos= pop jmp
+      .byte "]"
+
+        ;; patch the jump to here
+      .byte "%{"
+        lda _out
+        ldy #0
+        sta (tos),y
+
+        lda _out+1
+        iny
+        sta (tos),y
+        IMM_RET
+        
+      .byte "[D"                ; tos= dos
+        ;; JSR to generate parameters
+        jsr VAL0
+        ;; after FUN; it'll RTS to here!
+      .byte "]"
+
+.endif ; JSK_CALLING
+
+
+
 
 ;;; TODO: a&!b .. hmmmm
         ;; ! - NOT
@@ -7471,7 +7578,6 @@ jsr nl
 .endif
 
 ;;; DO...WHILE
-;ruleW:  
         .byte "|do"
       .byte "[:]"
         .byte _S
@@ -7684,6 +7790,8 @@ store_filename:
 
 .endif ; ATMOS_FIX
 
+
+
 FUNC _oricend
 
 .macro CHARCHECK addr,char
@@ -7824,6 +7932,8 @@ FUNC _oricend
 
 FUNC _stmtrulesend
 
+
+
 FUNC _parametersstart
 ;;; - oric paramters
 ruleY:  
@@ -7881,6 +7991,12 @@ ruleZ:
         
         .byte 0
 
+
+
+
+;;; ----------------------------------------
+;;             C   C   6   5
+
 ;;; cc65 AX _fastcall_ calling convention
 .import pushax, popax, pusha0, pusha, popa
 
@@ -7929,13 +8045,15 @@ ruleX:
         .byte TAILREC
 
         .byte "|",_E
-;;; TODO: can we optimize if same constant twice? (10,10)??
-;      .byte "%{"
+        ;; TODO: can we optimize if same constant twice? (10,10)??
+ ;      .byte "%{"
 ;        PUTC 'E'
 ;        IMM_RET
         .byte TAILREC
         
         .byte 0
+
+
 
 ;;; TODO: fails on foo(42,(93),35) ???
         .byte "("
@@ -7992,6 +8110,103 @@ PUTC 'A'
 
         .byte 0
 .endif ; __CC65__
+
+
+
+
+
+
+;;; ========================================
+;;;         P H A  /  T X A  /  P H A 
+
+;;; Use the hardward stack for parameters
+;;; 
+;;; TODO: cleanup!!! LOL (or just function copy)
+;;; (see Play/calling-conventions.asm )
+
+
+
+;;; (mostly copied from cc65 ruleX)
+
+HW_PARAMS=1
+.ifndef HW_PARAMS
+
+ruleW:
+
+        .byte 0
+
+.else
+
+;;; TODO: think hard, does it handle nesting correctly?
+
+
+ruleW:  
+
+        ;; Beginning
+        .byte "("
+        .byte TAILREC
+
+
+        ;; End
+        .byte "|)"
+        ;; TODO: for now all parameters are put
+        ;;   on stack!
+      .byte "["
+        pha
+        txa
+        pha
+      .byte "]"
+
+
+        ;; Comma pushes!
+        .byte "|,"
+      .byte "["
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte TAILREC
+
+
+        ;; 0 value argument 
+        ;; TODO: handle 0,0,0.... ?
+        .byte "|0,"
+      .byte "["
+        lda #0
+        pha
+        pha
+      .byte "]"
+        .byte TAILREC
+
+        ;; one byte constant paramter 0-255
+        .byte "|%D,"
+      .byte "%{"
+        ;;  make sure %D <256
+        lda tos+1
+        beq :+
+        jmp _fail
+:              
+        IMM_RET
+      .byte "["
+        ;; saves 1 byte, hmmm
+        lda #'<'
+        pha
+        lda #0
+        pha
+      .byte "]"
+        .byte TAILREC
+
+
+        ;; Generic expression 2 B value
+        .byte "|",_E
+        ;; TODO: can we optimize if same constant twice? (10,10)??
+        .byte TAILREC
+        
+
+        .byte 0
+
+.endif ; HW_PARAMS
+
 FUNC _parametersend
 
 ;;; TODO: remove
@@ -10126,6 +10341,41 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+
+;;; Experiments in estimating and prototyping
+;;; function calls, using JSRK_CALLING !
+
+;PARAM4=1
+.ifdef PARAM4
+
+;
+CANT=1
+.ifndef CANT
+        .byte "word F(word a, word b, word c, word d) {",10
+        .byte "  if (a) return a+b+c+d;",10
+        .byte "  return F(a-1, b+1, d*2, c/2);",10
+        .byte "}",10
+        .byte "",10
+        .byte "word main() {",10
+        .byte "}",10
+        .byte 0
+.else ; CANT
+;;; cc02 cannot handle arguments just yet
+;        .byte "word F(word a, word b, word c, word d) {",10
+;;; TDOO:
+        .byte "word F() {",10
+        .byte "  if (a) return a+b+c+d;",10
+        .byte "  return fun(a-1, b+1, d*2, c/2);",10
+        .byte "}",10
+        .byte "",10
+        .byte "word main() {",10
+        .byte "  return fun(100, 0, 1, 65535);",10
+        .byte "}",10
+        .byte 0
+.endif ; CANT
+
+.endif ; PARAM4
 
 
 ;STRBYTES=1
