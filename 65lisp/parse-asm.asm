@@ -724,20 +724,20 @@ zero:   .res 2
 ;;; running code: tos, dos temporary save/deref
 tos:    .res 2
 dos:    .res 2
-
 ;;; used as default for printing strings (putz)
 pos:    .res 2
 ;;; used by FOLD, maybe memcpy ???
 gos:    .res 2
-
 ;;; temporaries for saved register
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
-
 ;;; used by print.asm, lol
 ;;; TODO: FIX!
 tmp1:   .res 2
+tmp2:   .res 2
+
+
 
 .code
 
@@ -8410,6 +8410,7 @@ FUNC _edit
 .endif
 .endif ; INTERRUPT
 
+.ifdef __ATMOS__
 ;;; update display of state
         ;; - dirty
         lda dirty
@@ -8428,6 +8429,7 @@ FUNC _edit
 :       
         lda #' '
         sta SCREEN+34
+.endif ; __ATMOS__
 
 
         ;; "EDITLOOP"
@@ -9248,6 +9250,7 @@ FUNC _helptextend
 
 
 
+
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
 ;;; String is zero-terminated.
@@ -9264,8 +9267,8 @@ memcpyz:
 
         iny
 ;;; if call here set Y=0
-;;; tos= text from (lol)
-;;; dos= destination
+;;; TOS= text from (lol)
+;;; DOS= destination
 copyz:  
         lda (tos),y
         beq @done
@@ -9330,6 +9333,7 @@ FUNC _savescreen
 
         ;; Now save the damn screen!
 
+;;; 23 B
         ;; from
         lda #<SCREEN
         ldx #>SCREEN
@@ -9345,9 +9349,10 @@ FUNC _savescreen
         ldx #>SCREENSIZE
         
         jsr _memcpy
-
 @ret:
         rts
+
+
 
 FUNC _loadscreen
 .ifndef __ATMOS__

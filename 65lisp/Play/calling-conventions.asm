@@ -1,6 +1,10 @@
 ;;; TODO: look at 
 ;;; - https://github.com/Michaelangel007/6502_calling_convention
 
+
+
+
+
 ;;; TODO: block calling convention
 ;;;    - save, no save
 ;;;    
@@ -21,6 +25,269 @@
 ;;;       ...
 ;;;       .word param_N
 ;;; .  <AFTER CALL>
+
+        ;; Now save the damn screen!
+
+;;; 23 B 24 (+ jsr)
+        ;; from
+        lda #<SCREEN
+        ldx #>SCREEN
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<savedscreen
+        ldx #>savedscreen
+        sta dos
+        stx dos+1
+        ;; copy
+        lda #<SCREENSIZE
+        ldx #>SCREENSIZE
+        
+        jsr _memcpy
+
+
+;;; 10 B (save 13 bytes) (callee overhead 9 B)
+;;; (+ 12 6 5 bytes * 25) ???
+;;; 
+        jsr memcpyPARAMS
+        .byte 6
+        .word SCREEN            ; from
+        .word savedscreen       ; to
+        .word SCREENSIZE        ; bytes
+        
+;;; 13 B (+ 3) (callee overhead 12+12+57+N*23 ?)
+
+;;; 81c + bytes *23
+        CALL memcpy5, {SCREEN,savedscreen,SCREENSIZE}
+        ;; generates
+        ;; (TODO: make sure even address!)
+        ;; (insert nop otherwise!)
+        jsr PARAMS_CALL
+        .byte 6
+        .word SCREEN            ; from
+        .word savedscreen       ; to
+        .word SCREENSIZE        ; bytes
+        
+        ;; (TODO: make sure even address!)
+        jsr memcpy5
+
+
+
+memcpyPARAMS:   
+;;; 
+
+;;; 9 B overhead in function :-
+        ;; lo
+        pla
+        tay
+        ;; hi
+        pla
+        jsr copyparams
+        ;; hi
+        pha
+        tya
+        ;; lo
+        pha
+
+        jmp memcpy5
+
+copyparams:
+;;; 30 B :-(
+        sty tmp1
+        sta tmp1+1
+        ;; Stack points to byte before
+        ;; read #bytes
+        ldy #1
+        lda (tmp1),y
+        tax
+        ;; copy
+@next:       
+        inc tmp1
+        bne :+
+        inc tmp1+1
+:       
+        dex
+        bmi @done
+
+        lda (tmp1),y
+;;; wrong if not INY!
+        sta tos-2,y
+        jmp @next
+
+@done:
+        ;; get updated address
+        ;; after copied block
+        lda tmp1+1
+        ldy tmp1
+        
+        rts
+
+
+;;; ----------------------------------------
+
+;;; 13 B (+ 3)
+        CALL memcpy5, {SCREEN,savedscreen,SCREENSIZE}
+        ;; generates
+        ;; (TODO: make sure even address!)
+        ;; (insert nop otherwise!)
+        jsr PARAMS_CALL
+        .byte 6
+        .word SCREEN            ; from
+        .word savedscreen       ; to
+        .word SCREENSIZE        ; bytes
+        
+        ;; (TODO: make sure even address!)
+        jsr memcpy5
+
+
+
+
+PARAMS_CALL
+;;; 31 B  57c + bytes * 27c
+        ;; lo
+        pla
+        sta tmp1
+        ;; hi
+        pla
+        sta tmp1+1
+        ;; init
+        ldy #1
+        lda (tmp1),y
+        sta savex
+        ldx #0
+        ;; copy
+@next:
+        inc tmp1
+        bne :+
+        inc tmp1+1
+:       
+        lda (tmp1),y
+        sta tos,x
+
+        dec savex
+        bmi @next
+@done:
+        ;; TODO: aligned right?
+        jmp (tmp1)
+
+
+
+;;; ALT 9 (no need extra jsr)
+        iny
+        lda (tmp1),y
+        pha
+        dey
+        lda (tmp1),y
+        pha
+
+        rts
+        
+
+
+        ;; tmp1+= Y; jmp (tmp1)
+;;; 13
+        tya
+        clc
+        adc tmp1
+        sta tmp1
+        bcc :+
+        inc tmp1+1
+:       
+        ;; should point to subr address!
+        jmp (tmp1)
+
+
+
+PARAMS_CALL
+;;; 19 + 13 = 32 B !
+        ;; lo
+        pla
+        sta tmp1
+        ;; hi
+        pla
+        sta tmp1+1
+        ;; init
+        ldy #0
+        lda (tmp1),y
+        tax
+        ;; copy
+@next:
+        iny
+        lda (tmp1),y
+        sta tos-2,y
+        dex
+        bne @next
+
+@done:
+        ;; tmp1+= Y; jmp (tmp1)
+;;; 13
+        tya
+        clc
+        adc tmp1
+        sta tmp1
+        bcc :+
+        inc tmp1+1
+:       
+        ;; should point to subr address!
+        jmp (tmp1)
+
+
+        ;; tmp1+= Y; phRTS; rts;
+;;; 15
+        ldx tmp1+1
+
+        clc
+        tya
+        adc tmp1
+        tay
+        bcc :+
+        inx
+:       
+        txa
+        pha
+        tya
+        pha
+        
+        rts
+
+
+;;; lo byte PC in Y
+PARAMS_CALL:    
+;;; 33 B (+ 42c + bytes * 26c)
+        ;; lo
+        pla
+        tay
+
+        lda #0
+        tax
+        sta tmp1
+        sta savey
+        ;; hi
+        pla
+        sta tmp1+1
+
+        ;; copy
+@next:
+        iny
+        bne :+
+        inc tmp1+1
+:       
+        lda (tmp1),y
+
+        ;; not init?
+        dex
+        bpl :+
+        tax
+        bne @next
+:       
+        sta tos,x
+        txa
+        bne @next
+
+@done:
+        ;; should point to subr address!
+        jmp (tmp1)
+        
 
 
 
