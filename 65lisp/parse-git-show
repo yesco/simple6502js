@@ -1,0 +1,1 @@
+git log --oneline --reverse parse-asm.asm | cut -d' ' -f1 | xargs -I {} git show {} > git.show

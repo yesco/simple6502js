@@ -307,6 +307,9 @@
 ;;;    844  +... ??? wtf? lol
 ;;;    914  +32B 'c' small char constants
 ;;; 
+;;;   1230 BNF Interpreter as reported from info()
+;;; 
+
 ;;; TODO:  634 bytes ... partial long names (+ 141 B)
 ;;; 
 ;;; not counting: putu, mul10, end: print out
@@ -4105,18 +4108,29 @@ FUNC _memoryrulesend
 
 
 
+
+;;; TODO: disturbes parseing, maybe %{ ?
+;JSK_CALLING=1
+
+.ifndef JSK_CALLING
+
 ;;; TODO: REMOVE! just for test
 
         ;; Function call!!!
-        .byte "|fun",_W
+        .byte "|fun"
+      .byte "["
+      .byte "]"
+
+        .byte _W
+
       .byte "["
         ;;  TODO: make real!
         jsr _edit
         ;; cleanup (or let function do it-itself?)
       .byte "]"
 
+.else
 
-.ifdef JSK_CALLING
 ;;; ========================================
 ;;;          JSK CALLING CONVENTION
 ;;; 
@@ -6222,6 +6236,129 @@ ruleN:
 
         .byte "|"
 .endif ; FOLD
+
+;;; DUMMY: for testing/prototype
+
+        .byte "%{"
+        putc '!'
+        IMM_RET
+
+        .byte _T,"fun(a,b,c,d)"
+
+VARa= _vars+'a'-'@'
+
+        ;;  prelude
+      .byte "["
+;REVERSE=1
+.ifndef REVERSE
+;;; 37 B (wayt too big!)
+
+        ;; swap stack w registers!
+        ;; (reverse byte order)
+        tsx
+        ldy #8                  ; bytes
+:       
+        ;; hi
+        lda VARa-1,y
+        sta savea
+
+        lda 102,x
+        sta VARa-1,y
+        
+        lda savea
+        sta 102,x
+        ;; hi
+        dey
+
+        lda VARa-1,y
+        sta savea
+
+        lda 101,x
+        sta VARa-1,y
+        
+        lda savea
+        sta 101,x
+        ;; 
+        inx
+        inx
+
+        dey
+        bne :-
+.else
+;;; 28 B (smaller and faster!)
+
+        ;; swap stack w registers!
+        ;; (reverse byte order)
+        ;; (sadly on both - not needed)
+        tsx
+        stx savex
+        ldy #8                  ; bytes
+:       
+        ;; (trying to be clever
+        ;;  - rewriting the stack!)
+        ;; hi swap
+        ldx VARa-1,y
+        pla
+        sta VARa-1,y
+        txa
+        pha
+        ;; lo swap
+        pla                     ; s-- !
+        dey
+
+        ldx VARa-1,y
+        pla
+        sta VARa-1,y
+        txa
+        pha
+        
+        ;; 
+        pla                     ; s-- !
+
+        dey
+        bne :-
+        ;; restore stack pointer!
+        ldx savex
+        txs
+.endif ; !REVERSE
+      .byte "]"
+
+        .byte _B
+
+        ;; postlude
+      .byte "["
+        ;; restore register bytes from stack
+        ;; (doesn't care order)
+.ifndef REVERSE
+;;; 8 B
+        ldx #8
+:       
+        pla
+        sta VARa-1,x
+        
+        inx
+        bne :-
+.else
+;;; 12 B
+        ldx #8
+:       
+        ;; need to reverse bytes, sic
+        ;; - hi
+        pla
+        sta VARa-2,x
+        ;; - lo
+        pla
+        sta VARa-1,x
+        
+        dex
+        dex
+        bne :-
+.endif ; !REVERSE
+      .byte "]"
+
+        .byte "|"
+
+
 
         ;; Define function
         .byte _T,"%N()",_B
@@ -10346,7 +10483,8 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;PARAM4=1
+;
+PARAM4=1
 .ifdef PARAM4
 
 ;
@@ -10364,7 +10502,7 @@ CANT=1
 ;;; cc02 cannot handle arguments just yet
 ;        .byte "word F(word a, word b, word c, word d) {",10
 ;;; TDOO:
-        .byte "word F() {",10
+        .byte "word fun(a,b,c,d) {",10
         .byte "  if (a) return a+b+c+d;",10
         .byte "  return fun(a-1, b+1, d*2, c/2);",10
         .byte "}",10
