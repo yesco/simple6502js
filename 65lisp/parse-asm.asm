@@ -1269,7 +1269,8 @@ PRINTINPUT=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -6366,7 +6367,7 @@ ruleN:
 ;;; LOL uppercase WORD matches literary!
         .byte "WORD","%N(a,b,c,d)"
 
-VARa= _vars+'a'-'@'
+VARa= _vars+('a'-'A')*2
 
         ;;  prelude
       .byte "["
@@ -6396,7 +6397,8 @@ VARa= _vars+'a'-'@'
         nop
 .endif ; TESTDISASM
 
-;REVERSE=1
+;
+REVERSE=1
 .ifndef REVERSE
 ;;; 37 b (wayt too big!)
 
@@ -6404,25 +6406,25 @@ VARa= _vars+'a'-'@'
         ;; (reverse byte order)
 putc '%'
         tsx
+        inx
+        inx
         ldy #8                  ; bytes
 :       
-        ;; hi
+        ;; hi was pushed last
         lda VARa-1,y
         sta savea
 
-        lda 102,x
+        lda 100,x
         sta VARa-1,y
         
         lda savea
-        sta 102,x
-        ;; hi
-        dey
-
-        lda VARa-1,y
+        sta 100,x
+        ;; lo
+        lda VARa-2,y
         sta savea
 
         lda $101,x
-        sta VARa-1,y
+        sta VARa-2,y
         
         lda savea
         sta $101,x
@@ -6431,8 +6433,10 @@ putc '%'
         inx
 
         dey
+        dey
         bne :-
 .else
+putc 'S'
 ;;; 28 B (smaller and faster!)
 
         ;; swap stack w registers!
@@ -6441,28 +6445,22 @@ putc '%'
         tsx
         stx savex
         ldy #8                  ; bytes
+        ;; skip JSR
+;;; TODO: with jsk-calling remove these...
+        pla
+        pla
 :       
         ;; (trying to be clever
         ;;  - rewriting the stack!)
-        ;; hi swap
+        ;; swap byte
+;;; TODO: use ,x to do zero addressing! save bytes
         ldx VARa-1,y
         pla
         sta VARa-1,y
         txa
         pha
-        ;; lo swap
+        ;; step up
         pla                     ; s-- !
-        dey
-
-        ldx VARa-1,y
-        pla
-        sta VARa-1,y
-        txa
-        pha
-        
-        ;; 
-        pla                     ; s-- !
-
         dey
         bne :-
         ;; restore stack pointer!
@@ -6487,21 +6485,62 @@ putc '%'
         inx
         bne :-
 .else
+
+        sta savea
+        stx savey
+
+;;; TODO: only need restore...
+;
+DOSWAP=1
+.ifdef DOSWAP
+putc 'R'
+
+        tsx
+        stx savex
+        ldy #8                  ; bytes
+        pla
+        pla
+:       
+        ;; (trying to be clever
+        ;;  - rewriting the stack!)
+        ;; swap byte
+        ldx VARa-1,y
+        pla
+        sta VARa-1,y
+        txa
+        pha
+        ;; step up
+        pla                     ; s-- !
+        dey
+        bne :-
+        ;; restore stack pointer!
+        ldx savex
+        txs
+.else
+putc 'r'
 ;;; 12 B
+        tsx
+        stx savex
+        pla
+        pla
+
         ldx #8
 :       
-        ;; need to reverse bytes, sic
-        ;; - hi
-        pla
-        sta VARa-2,x
-        ;; - lo
         pla
         sta VARa-1,x
-        
-        dex
         dex
         bne :-
+.endif ; DOSWAP
+
+;;; NOBODY else can currently return
+;;;   we just need to keep AX safe...
+        lda savea
+        ldx savey
+
 .endif ; !REVERSE
+
+        rts
+
       .byte "]"
         .byte TAILREC
 
@@ -10521,7 +10560,8 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;PARAM4=1
+;
+PARAM4=1
 .ifdef PARAM4
 
 ;
@@ -10555,14 +10595,20 @@ CANT=1
         .byte "  putchar(' '); puth(c);",10
         .byte "  putchar(' '); puth(d);",10
         .byte "  putchar(' '); puth(e);",10
+        .byte "  putchar(' '); puth(r);",10
         .byte "  putchar('\n');",10
         .byte "}",10
         .byte "WORD F(a,b,c,d) {",10
         .byte "  putchar('>'); P();",10
-        .byte "  if (a) r= a+b+c+d;",10
+        .byte "  if (!a) r= a+b+c+d;",10
         .byte "  else r= F(a-1, b+1, d*2, c/2);",10
         .byte "  putchar('<'); P();",10
-        .byte "  return r;",10
+
+;;; need to run postlude...
+;        .byte "  return r;",10
+;;; set AX
+        .byte "  r;",10
+
         .byte "}",10
         .byte "word main() {",10
         .byte "//#x1234  #x5678   #x1122 #x3344",10
@@ -10571,6 +10617,7 @@ CANT=1
 ;        .byte "  return 4711;",10
 
         .byte "  r= F(3, 0, 1, 65535);",10
+;        .byte "  r= F(0, 9, 1, 65535);",10
         .byte "  putchar('-'); P();",10
         .byte "  return r;",10
         .byte "}",10
@@ -12011,10 +12058,10 @@ vars:
 ;        .res 2*('z'-'a'+2)
 ;;; TODO: remove (once have long names)
 .ifndef TESTING
-        ;; A-Z: GLOBAL FUNCS
+        ;; @A-Z:.. GLOBAL FUNCS
         .res 32*2
-        ;; a-z: GLOBAL VARS
-        .res 27*2
+        ;; `a-z: GLOBAL VARS
+        .res 28*2
 .else
 ;;; Can't init zeropage, so nobody should rely on
 ;;; these values.

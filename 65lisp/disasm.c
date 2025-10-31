@@ -133,8 +133,10 @@ void pvar(int a) {
   if (a & 0xff00) return;
   c-= (int)&vars;
   if (c>128) ; //printf(" %x", c);
-  else printf(VAR"  %c", c/2+'A');
-  if (c&1) printf("+1");
+  else {
+    printf(VAR"  %c", c/2+'A');
+    if (c&1) printf("+1");
+  }
 }
 
 
