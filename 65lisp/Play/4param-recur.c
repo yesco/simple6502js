@@ -62,5 +62,7 @@ int fun(int a, int b, int c, int d) {
 }
 
 int main() {
-  return fun(100,0,1,65535u);
+//  return fun(100,0,1,65535u);
+// cc02 max 22
+  return fun(22,0,1,65535u);
 }

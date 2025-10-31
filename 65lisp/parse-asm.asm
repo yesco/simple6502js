@@ -1269,8 +1269,7 @@ PRINTINPUT=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -6397,6 +6396,35 @@ VARa= _vars+('a'-'A')*2
         nop
 .endif ; TESTDISASM
 
+
+;;; 1810247 PARAM4 compilation
+;;; 1869561 PARAM4 run 22 (23 calls)
+;;; (- 1869561 1810247) = 59314 c 
+;;; (/ 59314 23) = 2578 c per call!
+;;; 
+;;; 2393375 10x calls
+;;; (/ (- 2393375 1810247) 10 23) = 2535
+
+;;; looking at generated asm = Play/4param-recurs.c.cc02.asm
+;;; F() function cost
+;;; (+ 235   30  65     96     12   36   235) = 709
+;;;    swap  if  a+b..  params jsr  pop swap
+;;; 
+;;; actual work in func: (+ 30 65 96 12 36) = 239c
+
+;;; we're seing 4x the cost???
+;;; 
+;;; stupid calling method (pop by caller)
+;;; 282 bytes (235 B counting F() and main())
+
+
+;;; ---------- VBCC  xxxx      (242 Bytes prog)
+;;; 
+;;; ---------- CC65  356 Bytes (125 Bytes prog + LIBS)
+;;; 11359 cc65, lol DIFF! (/ 11359 23)= 493
+;;; 
+;;; OK, so we have some overhead!
+
 ;
 REVERSE=1
 .ifndef REVERSE
@@ -6436,7 +6464,7 @@ putc '%'
         dey
         bne :-
 .else
-putc 'S'
+;putc 'S'
 ;;; 28 B (smaller and faster!)
 
         ;; swap stack w registers!
@@ -6493,7 +6521,7 @@ putc 'S'
 ;
 DOSWAP=1
 .ifdef DOSWAP
-putc 'R'
+;putc 'R'
 
         tsx
         stx savex
@@ -7581,7 +7609,7 @@ jsr nl
       ;; BODY
 .endif
       .byte "["
-PUTC 'S'
+;PUTC 'S'
       .byte "]"
         .byte _S
 
@@ -10599,10 +10627,10 @@ CANT=1
         .byte "  putchar('\n');",10
         .byte "}",10
         .byte "WORD F(a,b,c,d) {",10
-        .byte "  putchar('>'); P();",10
+;;        .byte "  putchar('>'); P();",10
         .byte "  if (!a) r= a+b+c+d;",10
         .byte "  else r= F(a-1, b+1, d*2, c/2);",10
-        .byte "  putchar('<'); P();",10
+;;        .byte "  putchar('<'); P();",10
 
 ;;; need to run postlude...
 ;        .byte "  return r;",10
@@ -10613,12 +10641,14 @@ CANT=1
         .byte "word main() {",10
         .byte "//#x1234  #x5678   #x1122 #x3344",10
         .byte "  a=4660;b=22136;c=4386;d=13124;e=0;",10
-        .byte "  putchar('+'); P();",10
+;;        .byte "  putchar('+'); P();",10
 ;        .byte "  return 4711;",10
 
-        .byte "  r= F(3, 0, 1, 65535);",10
+;;; 22 max: (* 22 (+ 8 2)) = 220 !
+        .byte "  r= F(22, 0, 1, 65535);",10
+;        .byte "  r= F(3, 0, 1, 65535);",10
 ;        .byte "  r= F(0, 9, 1, 65535);",10
-        .byte "  putchar('-'); P();",10
+;;        .byte "  putchar('-'); P();",10
         .byte "  return r;",10
         .byte "}",10
         .byte 0

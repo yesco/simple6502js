@@ -29,7 +29,7 @@
 ;
 	jsr     pushax
 ;
-; return a? fun(a-1, b+1, c*2, d/2): a+b+c+d;
+; return a? fun(a-1, b+1, d*2, c/2): a+b+c+d;
 ;
 	ldy     #$07
 	lda     (sp),y
@@ -44,11 +44,11 @@
 	jsr     ldaxysp
 	jsr     incax1
 	jsr     pushax
-	ldy     #$07
+	ldy     #$05
 	jsr     ldaxysp
 	jsr     aslax1
 	jsr     pushax
-	ldy     #$07
+	ldy     #$09
 	jsr     ldaxysp
 	jsr     asrax1
 	jsr     _fun
@@ -97,9 +97,10 @@ L0003:	dey
 .segment	"CODE"
 
 ;
-; return fun(0,0,1,65535u);
+; return fun(22,0,1,65535u);
 ;
-	jsr     push0
+	lda     #$16
+	jsr     pusha0
 	jsr     push0
 	lda     #$01
 	jsr     pusha0
