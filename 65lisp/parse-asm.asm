@@ -6408,6 +6408,8 @@ VARa= _vars+('a'-'A')*2
 ;;; looking at generated asm = Play/4param-recurs.c.cc02.asm
 ;;; F() function cost
 ;;; (+ 235   30  65     96     12   36   235) = 709
+;;; using restore instead of DOSWAP
+;;; (+ 235   30  65     96     12   36   124) = 598
 ;;;    swap  if  a+b..  params jsr  pop swap
 ;;; 
 ;;; actual work in func: (+ 30 65 96 12 36) = 239c
@@ -6416,7 +6418,45 @@ VARa= _vars+('a'-'A')*2
 ;;; 
 ;;; stupid calling method (pop by caller)
 ;;; 282 bytes (235 B counting F() and main())
+;;; 267 bytes (removed P(), reversed if)
+;;; 
+;;; Bytes
+;;; (+ 23    25  42     52     3    10  8  23   4) = 190
+;;;    swap                             r  swap  r
+;;; 
+;;; (+ 190 (* 7 4) 3 3 10 1) = 235
 
+;;; 1810247
+;;; 1868576 (/ (- 1868576 1810247) 23) = 2536
+;;; 1869561 (/ (- 1869561 1810247) 23) = 2578
+
+;;; 1809840
+
+
+;;; no P(), no: if(!)
+;;; 999512 (/ (- 999512 943912) 23) = 2417c / call
+
+;;; REVERSE=1 using ,x for swap is slower?
+;;; 1877671 (/ (- 1877671 1809840) 23) = 2949 (> 2578?)
+
+;;; REVERSE=1 using ,y for swap is FASTER!
+;;; 1869561 WTF????  (/ (- 1869567 1877671) 23)
+;;;  352 ??? cycles per call? wtfwtfwtwfwtwfwtwfwt?
+
+
+;;; 1809279
+;;; 1868576 ;; DOSWAP=1  is more expensive, finanly!
+;;;      (/ (- 1868576 1865200) 23) = 146 !!!
+
+;;;    vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+;;;  (/ (- 1865200 1809276) 23) = 2431    BEST!!!!
+;;;    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+;;; (* 13 8) = 104c saved
+;;; cost: (+ 15 (* 13 8) 5) = 124
+
+;;; 1865200 ;; DOSWAP not, is slower????
+;;; 1865197 ;; using y, 3c faster??? LOL
 
 ;;; ---------- VBCC  xxxx      (242 Bytes prog)
 ;;; 
@@ -6518,8 +6558,8 @@ putc '%'
         stx savey
 
 ;;; TODO: only need restore...
-;
-DOSWAP=1
+;;; DOSWAP is 146c slower!
+;DOSWAP=1 ;
 .ifdef DOSWAP
 ;putc 'R'
 
@@ -6528,6 +6568,7 @@ DOSWAP=1
         ldy #8                  ; bytes
         pla
         pla
+;;; 26c
 :       
         ;; (trying to be clever
         ;;  - rewriting the stack!)
@@ -6541,23 +6582,28 @@ DOSWAP=1
         pla                     ; s-- !
         dey
         bne :-
+
         ;; restore stack pointer!
         ldx savex
         txs
 .else
-putc 'r'
+;putc 'r'
 ;;; 12 B
         tsx
         stx savex
         pla
         pla
 
-        ldx #8
+        ldy #8
+;;; 13 c ok, it's faster...
 :       
         pla
-        sta VARa-1,x
-        dex
+        sta VARa-1,y
+        dey
         bne :-
+
+        ldx savex
+        txs
 .endif ; DOSWAP
 
 ;;; NOBODY else can currently return
@@ -10617,6 +10663,7 @@ CANT=1
         .byte 0
 .endif ; MINISUB
 
+.ifdef P4PR
         .byte "word P(){",10
         .byte "  putchar(' '); puth(a);",10
         .byte "  putchar(' '); puth(b);",10
@@ -10626,10 +10673,11 @@ CANT=1
         .byte "  putchar(' '); puth(r);",10
         .byte "  putchar('\n');",10
         .byte "}",10
+.endif ; P4PR
         .byte "WORD F(a,b,c,d) {",10
 ;;        .byte "  putchar('>'); P();",10
-        .byte "  if (!a) r= a+b+c+d;",10
-        .byte "  else r= F(a-1, b+1, d*2, c/2);",10
+        .byte "  if (a) r= F(a-1, b+1, d*2, c/2);",10
+        .byte "  else r= a+b+c+d;",10
 ;;        .byte "  putchar('<'); P();",10
 
 ;;; need to run postlude...
