@@ -3586,6 +3586,56 @@ bytecodes:
 ;;; START rules
 
 
+.macro CHARCHECK addr,char
+  .assert (<addr <> char),error,"%% XJSR addr - bad lo']'"
+  .assert (>addr <> char),error,"%% XJSR addr - bad hi']'"
+.endmacro
+
+.macro CHECK addr
+;;; can't give good error message...
+;;        CHARCHECK(addr,']')
+
+  .assert (<addr <> '<'),error,"%% RULE addr - bad lo'<'"
+  .assert (>addr <> '<'),error,"%% RULE addr - bad hi'<'"
+
+  .assert (<addr <> '>'),error,"%% RULE addr - bad lo'>'"
+  .assert (>addr <> '>'),error,"%% RULE addr - bad hi'>'"
+
+  .assert (<addr <> '+'),error,"%% RULE addr - bad lo'+'"
+  .assert (>addr <> '+'),error,"%% RULE addr - bad hi'+'"
+
+  .assert (<addr <> 'D'),error,"%% RULE addr - bad lo'D'"
+  .assert (>addr <> 'D'),error,"%% RULE addr - bad hi'D'"
+
+  .assert (<addr <> 'd'),error,"%% RULE addr - bad lo'd'"
+  .assert (>addr <> 'd'),error,"%% RULE addr - bad hi'd'"
+
+  .assert (<addr <> ':'),error,"%% RULE addr - bad lo':'"
+  .assert (>addr <> ':'),error,"%% RULE addr - bad hi':'"
+
+  .assert (<addr <> ';'),error,"%% RULE addr - bad lo';'"
+  .assert (>addr <> ';'),error,"%% RULE addr - bad hi';'"
+
+  .assert (<addr <> '#'),error,"%% RULE addr - bad lo'#'"
+  .assert (>addr <> '#'),error,"%% RULE addr - bad hi'#'"
+
+  .assert (<addr <> '{'),error,"%% RULE addr - bad lo'{'"
+  .assert (>addr <> '{'),error,"%% RULE addr - bad hi'{'"
+
+  .assert (<addr <> '?'),error,"%% RULE addr - bad lo'?'"
+  .assert (>addr <> '?'),error,"%% RULE addr - bad hi'?'"
+
+.endmacro
+
+.macro XJSR addr
+        CHECK(addr)
+        jsr addr
+.endmacro
+        
+
+;;; ------------------------------=
+
+
 FUNC _rulesstart
 
 ;;; Rules 0,A-
@@ -7161,300 +7211,6 @@ FUNC _stmtbyterulestart
 FUNC _stmtbyteruleend
 
 
-;;; ========================================
-;;; START: optimize parsing of   "|%V..."
-
-;;; TODO: not working, seems to loop!
-
-;STARTVAROPT=1
-
-.ifdef STARTVAROPT
-        .byte "|"
-
-        ;; store current parsing location
-      .byte "%{"
-        lda inp 
-        sta pos
-        lda inp+1
-        sta pos+1
-        IMM_RET
-
-        ;; check that we have a VAR
-        .byte "%V"
-        ;; OK - we got it!
-      .byte "%{"
-        ;; reset parsing and go do the rules
-        lda pos
-        sta inp
-        lda pos+1
-        sta inp+1
-putc '!'        
-        clc
-;;; TODO: potential zero or | ? (safer)
-        bcc startparsevarfirst
-
-        ;; we didn't match, skip all!
-        .byte "|"
-      .byte "%{"
-putc '%'
-;;; TODO: potential zero or | ?
-        jmp endparsevarfirst
-
-;;; --- after here are ONLY rules that start with %A!
-        .byte "%{"
-startparsevarfirst:
-putc '<'
-        IMM_RET
-
-.endif ; STARTVAROPT
-
-
-.ifdef OPTRULES
-        ;; "|%A=%V;" (or even %A=%V _E)
-        ;; TODO: if keep track of AX= var/value
-        ;;   (and reset whenver we have : PUSHLOC etc)
-        ;;   we may be able to save 4 bytes!
-
-        .byte "|%A=0;"
-      .byte "[D"
-        lda #0
-        sta VAR0
-        sta VAR1
-      .byte "]"
-.endif ; OPTRULES
-
-        ;; A=7; // simple assignement, ONLY as statement
-        ;; and can't be nested or part of expression
-        ;; (unless we use a stack...)
-        .byte "|%A=",_E,";"
-      .byte "[D"                ; 'D' => tos=dos
-        sta VAR0
-        stx VAR1
-      .byte "]"
-
-.ifdef OPTRULES
-;;; NOTE: ops are done last, is that ok (except for -)?
-
-        ;; NOTE: no need provide: v op= const;
-        ;;       - it would wouldn't save any bytes!
-        .byte "|%A+=",_E,";"
-      .byte "[D"
-        clc
-        adc VAR0
-        sta VAR0
-        txa
-        adc VAR1
-        sta VAR1
-      .byte "]"
-
-        .byte "|%A-=",_E,";"
-      .byte "[D"
-        sec
-        eor #$ff
-        adc VAR0
-        sta VAR0
-        txa
-        eor #$ff
-        adc VAR1
-        sta VAR1
-      .byte "]"
-
-        .byte "|%A&=",_E,";"
-      .byte "[D"
-        and VAR0
-        sta VAR0
-        txa
-        and VAR1
-        sta VAR1
-      .byte "]"
-
-        .byte "|%A\|=",_E,";"
-      .byte "[D"
-        ora VAR0
-        sta VAR0
-        txa
-        ora VAR1
-        sta VAR1
-      .byte "]"
-
-        .byte "|%A^=",_E,";"
-      .byte "[D"
-        eor VAR0
-        sta VAR0
-        txa
-        eor VAR1
-        sta VAR1
-      .byte "]"
-
-        .byte "|%A>>=1;"
-      .byte "[D"
-;;; 6B
-        lsr VAR1
-        ror VAR0
-      .byte "]"
-
-        .byte "|%A<<=1;"
-      .byte "[D"
-;;; 6B
-        asl VAR0
-        rol VAR1
-      .byte "]"
-
-        .byte "|%A>>=2;"
-      .byte "[D"
-;;; 12B
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-      .byte "]"
-
-        .byte "|%A<<=2;"
-      .byte "[D"
-;;; 12B (zp: 8B)
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-      .byte "]"
-
-.ifdef ZPVARS
-        .byte "|%A>>=3;"
-      .byte "[D"
-;;; 8B
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-      .byte "]"
-
-        .byte "|%A<<=3;"
-      .byte "[D"
-;;; 8B
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-      .byte "]"
-.endif ; ZPVARS
-
-.endif ; OPTRULES
-
-
-        .byte "|%A>>=%D;"
-      .byte "["
-;;; 14B (tradeoff 14=6*d => d=2+)
-;;; (zp: 12B)
-        ldy #'<'
-        .byte "D"
-:       
-        dey
-        bmi :+
-
-        lsr VAR1
-        ror VAR0
-
-        sec
-        bcs :-
-:       
-      .byte "]"
-
-        .byte "|%A>>=%V;"
-      .byte "["
-;;; 14B (tradeoff 14=6*d => d=2+)
-        ldy VAR0
-        .byte "D"
-:       
-        dey
-        bmi :+
-
-        lsr VAR1
-        ror VAR0
-
-        sec
-        bcs :-
-:       
-      .byte "]"
-
-        .byte "|%A<<=%D;"
-      .byte "["
-;;; 14B
-        ldy #'<'
-        .byte "D"
-:       
-        dey
-        bmi :+
-
-        asl VAR0
-        rol VAR1
-
-        sec
-        bcs :-
-:       
-      .byte "]"
-
-        .byte "|%A<<=%V;"
-      .byte "["
-;;; 14B
-        ldy VAR0
-        .byte "D"
-:       
-        dey
-        bmi :+
-
-        asl VAR0
-        rol VAR1
-
-        sec
-        bcs :-
-:       
-      .byte "]"
-
-        ;; TODO: this is now limited to 128 index
-        ;; word[%D]= ... fixed address... hmmm
-        .byte "|%A\[%D\]="
-;;; TODO: similar to poke?
-      .byte '['
-        ;; prepare index (*2)
-        lda '<'
-        asl
-        pha
-      .byte ']'
-        .byte _E,";"
-      .byte "[D"
-        ;; load index
-        sta savea
-        pla
-        tay
-        lda savea
-
-        sta VAR0,y
-        txa
-        sta VAL1,y
-      .byte "]"
-
-.ifdef STARTVAROPT
-        .byte "%{"
-putc '.'
-clc
-bcc parsevarcont
-putc '>'
-endparsevarfirst:
-;;; TODO: ?
-        jmp _fail
-;;; TODO: or??
-        ;; this moves rule parsing to here!
-parsevarcont:
-        IMM_RET
-.endif ; STARTVAROPT
-
-;;; END: optimize parsing of   "|%V..."
-;;; ========================================
-
 
 ;;; TODO: are these really "OPTRULES"
 ;;;   a+= is "extra syntax"?
@@ -7519,6 +7275,12 @@ parsevarcont:
         sta VAR0,y
       .byte "]"
 .endif ; BYTERULES
+
+
+
+
+
+
 
 .ifdef OPTRULES
 
@@ -7933,254 +7695,20 @@ jsr nl
       .byte "]"
 
 
+
+
+
+
+;;; ========================================
+;;; TODO: move out to oric-cmd.rules.
+
 FUNC _oricstart
 
-        ;; ORIC ATMOS API
-
-.macro ORIC fun, addr
-        .byte .concat("|", fun), _Y
-      .byte "["
-        jsr addr
-      .byte "]"
-.endmacro
-
-.macro OJSR fun, addr
-        .byte .concat("|", fun, "()")
-      .byte "["
-        jsr addr
-      .byte "]"
-.endmacro
-
-        OJSR "hires",   $ec33
-        OJSR "text",    $ec21
-        OJSR "clrscr",  clrscr
-
-        ORIC "paper",  $f204
-        ORIC "ink",    $f210
-
-        ORIC "circle", $f37f
-        ORIC "curset", $f0c8
-        ORIC "curmov", $f0fd
-        ORIC "draw",   $f110
-        ORIC "point",  $f1c8    ; verify output?
-
-        ORIC "hchar",  $f12d
-        ORIC "fill",   $f268    ; (rows,cols,char)
-
-        .byte "|pattern(",_E,")"
-      .byte "["
-        sta $213
-      .byte "]"
-
-        ORIC "play",    $fbd0
-        ORIC "music",   $fc18
-        ORIC "sound",   $fb40
-
-        OJSR "ping",    $fa9f
-        OJSR "shoot",   $fab5
-        OJSR "zap",     $fae1
-        OJSR "explode", $facb
-        OJSR "tick",    $fb14
-        OJSR "tock",    $fb2a
-
-        OJSR "cls",     $ccce
-        OJSR "lores0",  $d9ed
-        OJSR "lores1",  $d9ea
-
-        .byte "|cwrite(",_E,")"
-      .byte "["
-        ;; value in A
-        jsr $e65e
-      .byte "]"
-
-;;; TODO: function - MOVE!
-        .byte "|cread()"
-      .byte "["
-        jsr $e6c9
-        lda $02e0
-        ldx #0
-      .byte "]"
-
-
-;;; from cc65 - libsrc/atmos/atmos_save.s (orig: Twilite)
-
-JOINFLAG    = $025A        ; 0 = don't joiu, $4A = join BASIC programs
-VERIFYFLAG  = $025B        ; 0 = load, 1 = verify
-
-CFILE_NAME  = $027F
-CFOUND_NAME = $0293
-FILESTART   = $02A9
-FILEEND     = $02AB
-AUTORUN     = $02AD        ; $00 = only load, $C7 = autorun
-LANGFLAG    = $02AE        ; $00 = BASIC, $80 = machine code
-LOADERR     = $02B1
-
-        ;; .byte "|cwritehdr();" - $e607
-        ;; .byte "|creadsync();" - $e735 
-
-.ifdef ATMOS_FIX
-;;; 4.3 Saving an area of memory
-;;; 
-;;; The sequence of events when saving a block of
-;;; memory (remember that a BASIC program is
-;;; ust a block of memory) is:
-;;; 
-;;; 1. Disable interrupts and change the 6522 into
-;;; cassette mode.
-;;; 
-;;; 2. Print the message ‘SAVING’ and the filename
-;;; on the top line of the screen.
-;;; 
-;;; 3. Save a header record, composed of:
-;;;    (a) 259 occurrences of #16 (this is the actual
-;;;        ‘header’).
-;;;    (b) The value #24 to indicate the start of
-;;;        the record.
-;;;    (c) For version 1.0 – #5E to #66 – or for
-;;;        version 1.1 – #2A0 to #2B0. This information
-;;;        is saved backwards and includes the start
-;;;        and end addresses and other flags.
-;;;    (d) A filename, ending with #0 – this is either
-;;;        #35 onwards, for version 1.0, or #27F
-;;;        onwards, for version 1.1.
-;;; 4. Save the block of memory, byte by byte.
-;;; 5. Re-enable interrupts and reset the 6522 back
-;;; to its normal mode.
-;;; 
-;;; 2. For version 1.1:
-;;; 
-;;; JSR E76A (interrupts off)
-;;; JSR E585 (print ‘saving’)
-;;; JSR E607 (save header record)
-;;; JSR E62E (save area of memory)
-;;; JSR E93D (interrupts on)
-;;; 
-;;; The filename on tape is stored at #49 to #56
-;;; (version 1.0) or #293 to #2A2 (version 1.1
-;;; 
-;;; JSR E76A (disable interrupts, etc.)
-;;; JSR E57D (print ‘searching’ message)
-;;; JSR E4AC (find file)
-;;; JSR E59B (print ‘loading’)
-;;; JSR E4E0 (load file, or verify)
-;;; JSR E93D (enable interrupts)
-
-
-        ;; void csave(char* name, void* s,, void* end)
-        .byte "|csave(",_E,","
-      .byte "["
-        sei
-        jsr     store_filename
-      .byte "]"
-
-        .byte _E,","
-      .byte "["
-        sta     FILESTART
-        stx     FILESTART+1
-      .byte "]"
-
-        .byte _E,");"
-      .byte "["
-        sta     FILEEND
-        stx     FILEEND+1
-
-        lda     #0
-        sta     AUTORUN
-        jsr     csave_bit
-        cli
-      .byte "]"
-
-
-;;; TODO: move to somewhere safe
-csave_bit:      
-        php
-        jmp     $e92c
-
-cload_bit:      
-        pha
-        jmp     $e874
-
-
-store_filename: 
-        sta     tos
-        stx     tos+1
-        ldy     #FNAME_LEN - 1  ; store filename
-: 
-        lda     (tos),y
-        sta     CFILE_NAME,y
-        dey
-        bpl     :-
-        rts
-
-
-        ;; void cload(char* name);
-        .byte "|cload(",E,");"
-      .byte "["
-        ;; 22B
-        sei
-        jsr     store_filename
-        ldx     #$00
-        stx     AUTORUN       ; don't try to run the file
-        stx     LANGFLAG      ; BASIC
-        stx     JOINFLAG      ; don't join it to another BASIC program
-        stx     VERIFYFLAG    ; load the file
-        jsr     cload_bit
-        cli
-      .byte "]"
-
-.endif ; ATMOS_FIX
-
-
+.ifdef __ATMOS__
+        .include "atmos-cmd.ruleS"
+.endif ; __ATMOS__
 
 FUNC _oricend
-
-.macro CHARCHECK addr,char
-  .assert (<addr <> char),error,"%% XJSR addr - bad lo']'"
-  .assert (>addr <> char),error,"%% XJSR addr - bad hi']'"
-.endmacro
-
-.macro CHECK addr
-;;; can't give good error message...
-;;        CHARCHECK(addr,']')
-
-  .assert (<addr <> '<'),error,"%% RULE addr - bad lo'<'"
-  .assert (>addr <> '<'),error,"%% RULE addr - bad hi'<'"
-
-  .assert (<addr <> '>'),error,"%% RULE addr - bad lo'>'"
-  .assert (>addr <> '>'),error,"%% RULE addr - bad hi'>'"
-
-  .assert (<addr <> '+'),error,"%% RULE addr - bad lo'+'"
-  .assert (>addr <> '+'),error,"%% RULE addr - bad hi'+'"
-
-  .assert (<addr <> 'D'),error,"%% RULE addr - bad lo'D'"
-  .assert (>addr <> 'D'),error,"%% RULE addr - bad hi'D'"
-
-  .assert (<addr <> 'd'),error,"%% RULE addr - bad lo'd'"
-  .assert (>addr <> 'd'),error,"%% RULE addr - bad hi'd'"
-
-  .assert (<addr <> ':'),error,"%% RULE addr - bad lo':'"
-  .assert (>addr <> ':'),error,"%% RULE addr - bad hi':'"
-
-  .assert (<addr <> ';'),error,"%% RULE addr - bad lo';'"
-  .assert (>addr <> ';'),error,"%% RULE addr - bad hi';'"
-
-  .assert (<addr <> '#'),error,"%% RULE addr - bad lo'#'"
-  .assert (>addr <> '#'),error,"%% RULE addr - bad hi'#'"
-
-  .assert (<addr <> '{'),error,"%% RULE addr - bad lo'{'"
-  .assert (>addr <> '{'),error,"%% RULE addr - bad hi'{'"
-
-  .assert (<addr <> '?'),error,"%% RULE addr - bad lo'?'"
-  .assert (>addr <> '?'),error,"%% RULE addr - bad hi'?'"
-
-.endmacro
-
-.macro XJSR addr
-        CHECK(addr)
-        jsr addr
-.endmacro
-        
-
 
 ;;; TODO: furk!
 ;;;   thsi worked, when it shouldn't have!
@@ -8264,6 +7792,317 @@ FUNC _oricend
         bpl :-
       .byte "]"
 
+endcmdrules:    
+
+;;; END: hardcoded differnt "cmd("
+;;; ========================================
+
+
+
+
+
+
+
+;;; ========================================
+;;; START: optimize parsing of   "|%V..."
+
+;;; TODO: not working, seems to loop!
+
+;;; TODO: maybe can optimize if %V name
+;;;   isn't a defined variable?
+
+;;; Moving them just here made parsing 1.27s=>1.53s
+;;; 
+
+;STARTVAROPT=1
+
+.ifdef STARTVAROPT
+        .byte "|"
+
+        ;; store current parsing location
+      .byte "%{"
+        lda inp 
+        sta pos
+        lda inp+1
+        sta pos+1
+        IMM_RET
+
+        ;; check that we have a VAR
+        .byte "%V"
+        ;; OK - we got it!
+      .byte "%{"
+        ;; reset parsing and go do the rules
+        lda pos
+        sta inp
+        lda pos+1
+        sta inp+1
+putc '!'        
+        clc
+;;; TODO: potential zero or | ? (safer)
+        bcc startparsevarfirst
+
+        ;; we didn't match, skip all!
+        .byte "|"
+      .byte "%{"
+putc '%'
+;;; TODO: potential zero or | ?
+        jmp endparsevarfirst
+
+;;; --- after here are ONLY rules that start with %A!
+        .byte "%{"
+startparsevarfirst:
+putc '<'
+        IMM_RET
+
+.endif ; STARTVAROPT
+
+
+.ifdef OPTRULES
+        ;; "|%A=%V;" (or even %A=%V _E)
+        ;; TODO: if keep track of AX= var/value
+        ;;   (and reset whenver we have : PUSHLOC etc)
+        ;;   we may be able to save 4 bytes!
+
+        .byte "|%A=0;"
+      .byte "[D"
+        lda #0
+        sta VAR0
+        sta VAR1
+      .byte "]"
+.endif ; OPTRULES
+
+        ;; A=7; // simple assignement, ONLY as statement
+        ;; and can't be nested or part of expression
+        ;; (unless we use a stack...)
+        .byte "|%A=",_E,";"
+      .byte "[D"                ; 'D' => tos=dos
+        sta VAR0
+        stx VAR1
+      .byte "]"
+
+.ifdef OPTRULES
+;;; NOTE: ops are done last, is that ok (except for -)?
+
+        ;; NOTE: no need provide: v op= const;
+        ;;       - it would wouldn't save any bytes!
+        .byte "|%A+=",_E,";"
+      .byte "[D"
+        clc
+        adc VAR0
+        sta VAR0
+        txa
+        adc VAR1
+        sta VAR1
+      .byte "]"
+
+        .byte "|%A-=",_E,";"
+      .byte "[D"
+        sec
+        eor #$ff
+        adc VAR0
+        sta VAR0
+        txa
+        eor #$ff
+        adc VAR1
+        sta VAR1
+      .byte "]"
+
+        .byte "|%A&=",_E,";"
+      .byte "[D"
+        and VAR0
+        sta VAR0
+        txa
+        and VAR1
+        sta VAR1
+      .byte "]"
+
+        .byte "|%A\|=",_E,";"
+      .byte "[D"
+        ora VAR0
+        sta VAR0
+        txa
+        ora VAR1
+        sta VAR1
+      .byte "]"
+
+        .byte "|%A^=",_E,";"
+      .byte "[D"
+        eor VAR0
+        sta VAR0
+        txa
+        eor VAR1
+        sta VAR1
+      .byte "]"
+
+        .byte "|%A>>=1;"
+      .byte "[D"
+;;; 6B
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=1;"
+      .byte "[D"
+;;; 6B
+        asl VAR0
+        rol VAR1
+      .byte "]"
+
+        .byte "|%A>>=2;"
+      .byte "[D"
+;;; 12B
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=2;"
+      .byte "[D"
+;;; 12B (zp: 8B)
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+      .byte "]"
+
+.ifdef ZPVARS
+        .byte "|%A>>=3;"
+      .byte "[D"
+;;; 8B
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=3;"
+      .byte "[D"
+;;; 8B
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+      .byte "]"
+.endif ; ZPVARS
+
+.endif ; OPTRULES
+
+
+        .byte "|%A>>=%D;"
+      .byte "["
+;;; 14B (tradeoff 14=6*d => d=2+)
+;;; (zp: 12B)
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAR1
+        ror VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        .byte "|%A>>=%V;"
+      .byte "["
+;;; 14B (tradeoff 14=6*d => d=2+)
+        ldy VAR0
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        lsr VAR1
+        ror VAR0
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        .byte "|%A<<=%D;"
+      .byte "["
+;;; 14B
+        ldy #'<'
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAR0
+        rol VAR1
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        .byte "|%A<<=%V;"
+      .byte "["
+;;; 14B
+        ldy VAR0
+        .byte "D"
+:       
+        dey
+        bmi :+
+
+        asl VAR0
+        rol VAR1
+
+        sec
+        bcs :-
+:       
+      .byte "]"
+
+        ;; TODO: this is now limited to 128 index
+        ;; word[%D]= ... fixed address... hmmm
+        .byte "|%A\[%D\]="
+;;; TODO: similar to poke?
+      .byte '['
+        ;; prepare index (*2)
+        lda '<'
+        asl
+        pha
+      .byte ']'
+        .byte _E,";"
+      .byte "[D"
+        ;; load index
+        sta savea
+        pla
+        tay
+        lda savea
+
+        sta VAR0,y
+        txa
+        sta VAL1,y
+      .byte "]"
+
+.ifdef STARTVAROPT
+        .byte "%{"
+putc '.'
+clc
+bcc parsevarcont
+putc '>'
+endparsevarfirst:
+;;; TODO: ?
+        jmp _fail
+;;; TODO: or??
+        ;; this moves rule parsing to here!
+parsevarcont:
+        IMM_RET
+.endif ; STARTVAROPT
+
+;;; END: optimize parsing of   "|%V..."
+;;; ========================================
+
 
         ;; Expression; // throw away result
         .byte "|",_E,";"
@@ -8271,6 +8110,7 @@ FUNC _oricend
         .byte 0
 
 FUNC _stmtrulesend
+
 
 
 
