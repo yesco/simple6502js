@@ -1,0 +1,117 @@
+02 ???          STX
+03 SLO (ill.)   ETX
+04 ???          EOT
+07 SLO (ill.)   BEL
+0B ANC (ill.)   VT
+0C ???          FF
+0F SLO (ill.)   SI
+12 ???          DC2
+13 SLO (ill.)   DC3
+14 ???          DC4
+17 SLO (ill.)   ETB
+1A ???          SUB
+1B SLO (ill.)   ESC
+1C ???          FS
+1F SLO (ill.)   US
+22 ???          "
+23 RLA (ill.)   #
+27 RLA (ill.)   '
+2B ANC (ill.)   +
+2C ???          ,
+2F RLA (ill.)   /
+32 ???          2
+33 RLA (ill.)   3
+34 ???          4
+37 RLA (ill.)   7
+3A ???          :
+3B RLA (ill.)   ;
+3C ???          <
+3F RLA (ill.)   ?
+42 ???          B
+43 SRE (ill.)   C
+44 ???          D
+47 SRE (ill.)   G
+4B ALR (ill.)   K
+4F SRE (ill.)   O
+52 ???          R
+53 SRE (ill.)   S
+54 ???          T
+57 SRE (ill.)   W
+5A ???          Z
+5B SRE (ill.)   [
+5C ???          \
+5F SRE (ill.)   _
+62 ???          b
+63 RRA (ill.)   c
+64 ???          d
+67 RRA (ill.)   g
+6B ARR (ill.)   k
+6F RRA (ill.)   o
+72 ???          r
+73 RRA (ill.)   s
+74 ???          t
+77 RRA (ill.)   w
+7A ???          z
+7B RRA (ill.)   {
+7C ???          |
+7F RRA (ill.)   DEL
+82 ???          STX
+83 SLO (ill.)   ETX
+84 ???          EOT
+87 SLO (ill.)   BEL
+8B ANC (ill.)   VT
+8C ???          FF
+8F SLO (ill.)   SI
+92 ???          DC2
+93 SLO (ill.)   DC3
+94 ???          DC4
+97 SLO (ill.)   ETB
+9A ???          SUB
+9B SLO (ill.)   ESC
+9C ???          FS
+9E ???          RS
+9F SLO (ill.)   US
+A2 ???          "
+A3 RLA (ill.)   #
+A4 ???          $
+A7 RLA (ill.)   '
+A8 ???          (
+AB ANC (ill.)   +
+AC ???          ,
+AF RLA (ill.)   /
+B2 ???          2
+B3 RLA (ill.)   3
+B4 ???          4
+B7 RLA (ill.)   7
+BA ???          :
+BB RLA (ill.)   ;
+BC ???          <
+BF RLA (ill.)   ?
+C2 ???          B
+C3 SRE (ill.)   C
+C4 ???          D
+C7 SRE (ill.)   G
+CB ALR (ill.)   K
+CF SRE (ill.)   O
+D2 ???          R
+D3 SRE (ill.)   S
+D4 ???          T
+D7 SRE (ill.)   W
+DA ???          Z
+DB SRE (ill.)   [
+DC ???          \
+DF SRE (ill.)   _
+E2 ???          b
+E3 RRA (ill.)   c
+E4 ???          d
+E7 RRA (ill.)   g
+EB ARR (ill.)   k
+EF RRA (ill.)   o
+F2 ???          r
+F3 RRA (ill.)   s
+F4 ???          t
+F7 RRA (ill.)   w
+FA ???          z
+FB RRA (ill.)   {
+FC ???          |
+FF RRA (ill.)   DEL

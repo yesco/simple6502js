@@ -488,9 +488,29 @@ IMMEDIATE=1
 ;;; any 6502 byte-codes, these come from this set
 ;;; of printable bytecodes.
 ;;;
-;;;      "#'+2347:;<>?BCDGKOZ[\]_bcdgkortwz{|
-;;; free "#' 2347    ?B  GKOZ \ _bc gkortwz
+;;;     missed: $(,08 KLORSTWZ`hloswz{| DEL
+
+;;;      "#$'+/2347:;<?BCDGKORSTWZ[\_bcdgkortwz{|
+;;; free "#$' /2347   ?B  GKORSTWZ \_bc gkortwz
 ;;;             ( '|' '[' are excluded as unsafe )
+;;; HI' '"#$'(+,/023478:;<?@BCDGHKLOPRSTWXZ[\_`bcdghkloprstwxz{| DEL
+
+;;;  ( 168 freee? '8'
+
+;;; GROK: free: (hex)
+;;; 02,03, 03,83, 07,87, 08,88, 12,92, 13,93, 0f,bf
+;;; 17,97, ESC: 1b,9b, 9c, 1f,9f 9e
+;;;    "#'+/237;?BCGKORSW[_ bcgkorsw{ DEL
+;;; hi: #'+/237;? CGKORSW[_  cgkorsw{ DEL
+
+
+;;; CONFLICTS!
+;;; > is ROL $nnnn,x   62(dec)
+;;; ] is EOR $nnnn,x   93(dec)
+
+
+
+
 ;;; 
 ;;; NOTE: not, there is *REAL* quoting problem
 ;;;       if any (data) byte matches | [ ]
@@ -1065,6 +1085,11 @@ NOSHOWSIZE=1
 OPTPARSEALL=1
 
 ;;; TODO:
+;;; -1) %A %V lot's of redundant variable parsing %A+= ...
+;;;    maybe HACK a guard and skip if not var?
+;;; -2) %D also parse several times, similar patterns?
+;;;    poke(%D,%D) poke(%D,%V) poke(%V,%D) ...
+;;;    "tokenization" before would "solve" this...
 ;;; 0) jsr _incIspc - move it to before _next
 ;;;    find locations where "jsr _incIspc; ... jmp _next"!
 ;;;    it's at least 12c per character used!
@@ -1181,6 +1206,11 @@ TESTING=1
 ;;; TODO: not yet done, just thinking
 ;BNFLONG=1
 
+;;; used for PARAM4
+;;; 
+;PARAM4=1
+;DEBUGFUN=1
+
 ;;; Enable for debug info
 ;DEBUG=1
 
@@ -1239,8 +1269,7 @@ PRINTINPUT=1
 
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -1783,6 +1812,11 @@ percent:
         lda (rule),y
 
         sta percentchar
+.ifdef DEBUGFUN
+putc '%'
+lda percentchar
+jsr putchar
+.endif ; DEBUGFUN
 
         ;; - skip it assumes A not modified
         ; pha
@@ -2595,17 +2629,25 @@ jsr putchar
         ;; pick global address
         asl
         adc #<vars
+
 ;;; TODO: dos and tos??? lol
 ;;;    good for a+=5; maybe?
         sta tos
         tay
-;;; TODO: simplify
+;;; TODO: simplify (?)
         lda #>vars
         adc #0
         sta tos+1
         ;; AY = lohi = addr
 
-        ;; %N = new defining function/variable
+.ifdef DEBUGFUN
+putc '!'
+lda percentchar
+jsr putchar
+jsr puth
+.endif ; DEBUGFUN
+
+        ;; %N = New defining function/variable
         ;; (TODO: if used for var they are inline code)
         lda percentchar
         cmp #'N'
@@ -2618,7 +2660,15 @@ jsr putchar
         iny
         lda _out+1
         sta (tos),y
-
+.ifdef DEBUGFUN
+putc '='
+ldy #1
+lda (tos),y
+tax
+dey
+lda (tos),y
+jsr axputh
+.endif ; DEBUGFUN
         jmp @set
 :
         ;; %U = Use value of variable
@@ -2626,7 +2676,9 @@ jsr putchar
         ;;  have value jmp (ind) more safe!)
         cmp #'U'
         bne @nofun
-;PUTC 'U'                       
+.ifdef DEBUGFUN
+PUTC 'U'                       
+.endif ; DEBUGFUN
         ;; - tos = *tos !
         ldy #1
         lda (tos),y
@@ -2637,6 +2689,10 @@ jsr putchar
         ;; tos= *tos (get value of var/fun)
         sta tos
         stx tos+1
+.ifdef DEBUGFUN
+putc ':'
+jsr puth
+.endif ; DEBUGFUN
         jmp @noset
 
         ;; TODO: idea: push to auto-gen funcall?!
@@ -4117,16 +4173,34 @@ FUNC _memoryrulesend
 ;;; TODO: REMOVE! just for test
 
         ;; Function call!!!
-        .byte "|fun"
-      .byte "["
+        .byte "|%U[#]()"
+      .byte "[;"
+        DOJSR VAL0
       .byte "]"
 
+        ;; Function call!!!
+;;; TODO: for 0 args this still pushes, lol
+        .byte "|%U[#]("
         .byte _W
+      .byte "[;"
+        DOJSR VAL0
+;;; TODO: remove, use JSK_CALLING
+;;; (this is C style where caller cleanup)
+tya
 
-      .byte "["
-        ;;  TODO: make real!
-        jsr _edit
-        ;; cleanup (or let function do it-itself?)
+pla
+pla
+
+pla
+pla
+
+pla
+pla
+
+pla
+pla
+
+tya
       .byte "]"
 
 .else
@@ -6239,22 +6313,46 @@ ruleN:
 
 ;;; DUMMY: for testing/prototype
 
-        .byte "%{"
-        putc '!'
-        IMM_RET
-
-        .byte _T,"fun(a,b,c,d)"
+;;; LOL uppercase WORD matches literary!
+        .byte "WORD","%N(a,b,c,d)"
 
 VARa= _vars+'a'-'@'
 
         ;;  prelude
       .byte "["
+
+.ifdef TESTDISASM
+        lda $1234,x
+;;; causes parse error eor = $5d
+;        eor $1234,x
+        and $1234,x
+        ora $1234,x
+        adc $1234,x
+        sta $1234,x
+        nop
+        lda $1234,y
+        eor $1234,y
+        adc $1234,y
+        sta $1234,y
+        nop
+        nop
+        ldy $1234,x
+        nop
+        nop
+;;; prints ldx $1234,x !!! lol
+        ldx $1234,y
+        nop
+        nop
+        nop
+.endif ; TESTDISASM
+
 ;REVERSE=1
 .ifndef REVERSE
-;;; 37 B (wayt too big!)
+;;; 37 b (wayt too big!)
 
         ;; swap stack w registers!
         ;; (reverse byte order)
+putc '%'
         tsx
         ldy #8                  ; bytes
 :       
@@ -6273,11 +6371,11 @@ VARa= _vars+'a'-'@'
         lda VARa-1,y
         sta savea
 
-        lda 101,x
+        lda $101,x
         sta VARa-1,y
         
         lda savea
-        sta 101,x
+        sta $101,x
         ;; 
         inx
         inx
@@ -6355,14 +6453,13 @@ VARa= _vars+'a'-'@'
         bne :-
 .endif ; !REVERSE
       .byte "]"
+        .byte TAILREC
 
-        .byte "|"
+        ;; Define function definition
+;;; TODO: _T never fails...
+;        .byte _T,"%N()",_B
 
-
-
-        ;; Define function
-        .byte _T,"%N()",_B
-
+        .byte "|word","%N()",_B
       .byte '['
         ;; TODO: This maybe be redundant if there is
         ;; an return just before...
@@ -6374,9 +6471,36 @@ VARa= _vars+'a'-'@'
         ;;  will fall through to next function...)
         rts
       .byte ']'
+        .byte TAILREC
+
+        .byte "|void*","%N()",_B
+      .byte '['
+        rts
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|void","%N()",_B
+      .byte '['
+        rts
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|byte*","%N()",_B
+      .byte '['
+        ldx #0
+        rts
+      .byte ']'
+        .byte TAILREC
+
+        .byte "|byte","%N()",_B
+      .byte '['
+        ldx #0
+        rts
+      .byte ']'
+        .byte TAILREC
+
 ;;; TODO: this TAILREC messes with ruleP and several F
 ;;;   TAILREC does something wrong!
-        .byte TAILREC
         
         .byte "|"
 
@@ -6582,7 +6706,7 @@ afterELSE:
 .endif
 
         ;; label
-        .byte "|%N:",_S
+;        .byte "|%N:",_S
         ;; set's variable/name to that address!
 
         ;; goto
@@ -8279,13 +8403,8 @@ ruleW:
 
 ruleW:  
 
-        ;; Beginning
-        .byte "("
-        .byte TAILREC
-
-
         ;; End
-        .byte "|)"
+        .byte ")"
         ;; TODO: for now all parameters are put
         ;;   on stack!
       .byte "["
@@ -10483,8 +10602,7 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;
-PARAM4=1
+;PARAM4=1
 .ifdef PARAM4
 
 ;
@@ -10502,13 +10620,40 @@ CANT=1
 ;;; cc02 cannot handle arguments just yet
 ;        .byte "word F(word a, word b, word c, word d) {",10
 ;;; TDOO:
-        .byte "word fun(a,b,c,d) {",10
-        .byte "  if (a) return a+b+c+d;",10
-        .byte "  return fun(a-1, b+1, d*2, c/2);",10
+.ifdef MINISUB
+        .byte "word P(){",10
+        .byte "  putchar(' '); puth(a);",10
         .byte "}",10
-        .byte "",10
         .byte "word main() {",10
-        .byte "  return fun(100, 0, 1, 65535);",10
+        .byte "  a=4660; P();",10
+        .byte "}",10
+        .byte 0
+.endif ; MINISUB
+
+        .byte "word P(){",10
+        .byte "  putchar(' '); puth(a);",10
+        .byte "  putchar(' '); puth(b);",10
+        .byte "  putchar(' '); puth(c);",10
+        .byte "  putchar(' '); puth(d);",10
+        .byte "  putchar(' '); puth(e);",10
+        .byte "  putchar('\n');",10
+        .byte "}",10
+        .byte "WORD F(a,b,c,d) {",10
+        .byte "  putchar('>'); P();",10
+        .byte "  if (a) r= a+b+c+d;",10
+        .byte "  else r= F(a-1, b+1, d*2, c/2);",10
+        .byte "  putchar('<'); P();",10
+        .byte "  return r;",10
+        .byte "}",10
+        .byte "word main() {",10
+        .byte "//#x1234  #x5678   #x1122 #x3344",10
+        .byte "  a=4660;b=22136;c=4386;d=13124;e=0;",10
+        .byte "  putchar('+'); P();",10
+;        .byte "  return 4711;",10
+
+        .byte "  r= F(3, 0, 1, 65535);",10
+        .byte "  putchar('-'); P();",10
+        .byte "  return r;",10
         .byte "}",10
         .byte 0
 .endif ; CANT

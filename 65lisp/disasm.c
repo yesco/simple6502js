@@ -128,7 +128,9 @@ void disasm(char* mc, char* end, char indent) {
 
 extern char vars;
 
-void pvar(char c) {
+void pvar(int a) {
+  char c= a;
+  if (a & 0xff00) return;
   c-= (int)&vars;
   if (c>128) ; //printf(" %x", c);
   else printf(VAR"  %c", c/2+'A');
@@ -181,7 +183,8 @@ char* disasm(char* mc, char* end, char indent) {
       case 0b011: printf(i&3?"$%04x":"a", *((int*)p)++); break; // hmmm, seems to work, lol
       case 0b100: c=*p++;printf("($%02x),y", c); pvar(c); break;
       case 0b101: c=*p++;printf("$%02x,x", c); pvar(c); break;
-      case 0b110: printf("$%04x,%c", m&1?'y':'x', *((int*)p)++); break;
+      case 0b111:
+      case 0b110: ;printf("$%04x,%c", *((int*)p), i&6?'x':'y'); pvar(*((int*)p)++); break;
       }
     }
 
