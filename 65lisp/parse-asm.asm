@@ -1,4 +1,4 @@
-;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Generated code/tap-files are free, of course!
@@ -6903,28 +6903,7 @@ afterELSE:
       .byte "[D"
         sta VAR0
       .byte "]"
-
-        ;; "|%A=%V;" (or even %A=%V _E)
-        ;; TODO: if keep track of AX= var/value
-        ;;   (and reset whenver we have : PUSHLOC etc)
-        ;;   we may be able to save 4 bytes!
-
-        .byte "|%A=0;"
-      .byte "[D"
-        lda #0
-        sta VAR0
-        sta VAR1
-      .byte "]"
 .endif ; OPTRULES
-
-        ;; A=7; // simple assignement, ONLY as statement
-        ;; and can't be nested or part of expression
-        ;; (unless we use a stack...)
-        .byte "|%A=",_E,";"
-      .byte "[D"                ; 'D' => tos=dos
-        sta VAR0
-        stx VAR1
-      .byte "]"
 
 
 FUNC _stmtbyterulestart
@@ -7181,28 +7160,79 @@ FUNC _stmtbyterulestart
 .endif ; BYTERULES
 FUNC _stmtbyteruleend
 
-.ifdef OPTRULES
-;;; TODO make ruleC when %A pushes
+
+;;; ========================================
+;;; START: optimize parsing of   "|%V..."
+
+;;; TODO: not working, seems to loop!
+
+;STARTVAROPT=1
+
+.ifdef STARTVAROPT
         .byte "|"
 
-        .byte "++%A;"
+        ;; store current parsing location
+      .byte "%{"
+        lda inp 
+        sta pos
+        lda inp+1
+        sta pos+1
+        IMM_RET
+
+        ;; check that we have a VAR
+        .byte "%V"
+        ;; OK - we got it!
+      .byte "%{"
+        ;; reset parsing and go do the rules
+        lda pos
+        sta inp
+        lda pos+1
+        sta inp+1
+putc '!'        
+        clc
+;;; TODO: potential zero or | ? (safer)
+        bcc startparsevarfirst
+
+        ;; we didn't match, skip all!
+        .byte "|"
+      .byte "%{"
+putc '%'
+;;; TODO: potential zero or | ?
+        jmp endparsevarfirst
+
+;;; --- after here are ONLY rules that start with %A!
+        .byte "%{"
+startparsevarfirst:
+putc '<'
+        IMM_RET
+
+.endif ; STARTVAROPT
+
+
+.ifdef OPTRULES
+        ;; "|%A=%V;" (or even %A=%V _E)
+        ;; TODO: if keep track of AX= var/value
+        ;;   (and reset whenver we have : PUSHLOC etc)
+        ;;   we may be able to save 4 bytes!
+
+        .byte "|%A=0;"
       .byte "[D"
-        inc VAR0
-        bne :+
-        inc VAR1
-:       
+        lda #0
+        sta VAR0
+        sta VAR1
+      .byte "]"
+.endif ; OPTRULES
+
+        ;; A=7; // simple assignement, ONLY as statement
+        ;; and can't be nested or part of expression
+        ;; (unless we use a stack...)
+        .byte "|%A=",_E,";"
+      .byte "[D"                ; 'D' => tos=dos
+        sta VAR0
+        stx VAR1
       .byte "]"
 
-;;; TODO make ruleC when %A pushes
-        .byte "|--%A;"
-      .byte "[D"
-        lda VAR0
-        bne :+
-        dec VAR1
-:       
-        dec VAR0
-      .byte "]"
-
+.ifdef OPTRULES
 ;;; NOTE: ops are done last, is that ok (except for -)?
 
         ;; NOTE: no need provide: v op= const;
@@ -7312,6 +7342,9 @@ FUNC _stmtbyteruleend
       .byte "]"
 .endif ; ZPVARS
 
+.endif ; OPTRULES
+
+
         .byte "|%A>>=%D;"
       .byte "["
 ;;; 14B (tradeoff 14=6*d => d=2+)
@@ -7380,6 +7413,74 @@ FUNC _stmtbyteruleend
         bcs :-
 :       
       .byte "]"
+
+        ;; TODO: this is now limited to 128 index
+        ;; word[%D]= ... fixed address... hmmm
+        .byte "|%A\[%D\]="
+;;; TODO: similar to poke?
+      .byte '['
+        ;; prepare index (*2)
+        lda '<'
+        asl
+        pha
+      .byte ']'
+        .byte _E,";"
+      .byte "[D"
+        ;; load index
+        sta savea
+        pla
+        tay
+        lda savea
+
+        sta VAR0,y
+        txa
+        sta VAL1,y
+      .byte "]"
+
+.ifdef STARTVAROPT
+        .byte "%{"
+putc '.'
+clc
+bcc parsevarcont
+putc '>'
+endparsevarfirst:
+;;; TODO: ?
+        jmp _fail
+;;; TODO: or??
+        ;; this moves rule parsing to here!
+parsevarcont:
+        IMM_RET
+.endif ; STARTVAROPT
+
+;;; END: optimize parsing of   "|%V..."
+;;; ========================================
+
+
+;;; TODO: are these really "OPTRULES"
+;;;   a+= is "extra syntax"?
+;;;   ++a; is opt, yes
+
+.ifdef OPTRULES
+;;; TODO make ruleC when %A pushes
+        .byte "|"
+
+        .byte "++%A;"
+      .byte "[D"
+        inc VAR0
+        bne :+
+        inc VAR1
+:       
+      .byte "]"
+
+;;; TODO make ruleC when %A pushes
+        .byte "|--%A;"
+      .byte "[D"
+        lda VAR0
+        bne :+
+        dec VAR1
+:       
+        dec VAR0
+      .byte "]"
 .endif ; OPTRULES
 
 .ifdef POINTERS
@@ -7418,28 +7519,6 @@ FUNC _stmtbyteruleend
         sta VAR0,y
       .byte "]"
 .endif ; BYTERULES
-
-        ;; TODO: this is now limited to 128 index
-        ;; word[%D]= ... fixed address... hmmm
-        .byte "|%A\[%D\]="
-      .byte '['
-        ;; prepare index (*2)
-        lda '<'
-        asl
-        pha
-      .byte ']'
-        .byte _E,";"
-      .byte "[D"
-        ;; load index
-        sta savea
-        pla
-        tay
-        lda savea
-
-        sta VAR0,y
-        txa
-        sta VAL1,y
-      .byte "]"
 
 .ifdef OPTRULES
 
