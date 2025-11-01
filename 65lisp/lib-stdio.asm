@@ -115,11 +115,30 @@ TOSRTS:
         ;; return to location after 0
         rts
 
+
+
 .ifdef PRINTFHELPERS
 ;;; These are helpers for printf
 
 ;;; TODO: compile printf("%-08.5u bytes\n", 4711);
 ;;; 
+;;; Idea: AX contains data value/string pointer
+;;;       C flag set if has extra formatting
+;;;       Y set to length (%-08)
+;;; 
+;;; need to capture:
+;;;   W: min width of field (can be neg=left just)
+;;;   Z: leading zeroes
+;;;   M: maxlen of data (after .) (min for %d?)
+;;;   S: space (left blank for +)
+;;;   P: +/- always printed
+;;;   
+;;; probably not:
+;;;   #: prefix 0 for octal 0x for hex
+;;;      jsk: so for %s could quote "!
+;;;   ': grouping character!
+;;;   *: take paramter as W or M value
+
 ;;; lda #<4711
 ;;; ldx #>4711
 ;;; 
@@ -127,6 +146,10 @@ TOSRTS:
 ;;; jsr _iputuz
 ;;; .byte $ff-8,5
 ;;; .byte " bytes\n",0
+
+;;; TODO: make _iputufz (formatted)
+;;; - https:  //github.com/agn453/HI-TECH-Z80-C/blob/master/gen%2FPNUM.C
+
 
 FUNC _iputuz: 
         jsr axputu

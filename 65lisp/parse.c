@@ -81,7 +81,9 @@ extern int myfun(int a, int b) {
 #ifdef CPARSE
 void CparseStart(){}
 
-unsigned int vars[64];
+// TODO: somehow still get varning?
+#pragma zpsym ("vars")
+extern unsigned int vars[64];
 
 unsigned int num, addr, tmp;
 

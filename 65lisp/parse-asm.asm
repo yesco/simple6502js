@@ -233,7 +233,114 @@
 ;;; process continues, it'll go bad!
 ;;; 
 
+;;; 
+;;; PERFORMANCE
+;;; 
+;;; 6502 is famous for begin a "difficult" C-compiler
+;;; target, or for that matter any high-level compilation
+;;; to it. New compilers may show that this isn't 
+;;; necessarily true: oscar64, KickC, llvm-mos, and even
+;;; the abonded (?) gcc-6502, that challanges this:
+;;; 
+;;;   "The C64 executes 442 dhrystone V2.2 iteration
+;;;    per second, when compiled with Oscar64 and -O3
+;;;    (which shows that the ancient dhrystone benchmark
+;;;    is no match to an optimizing compiler)."
+;;; 
+;;; There are more generic compilers like sbcc, vbcc,
+;;; and finally cc65. That latter upholds a gold-standard
+;;; in compliance and reliabitily, but is "known" for
+;;; slow code, and sometimes bloated. But it is very
+;;; well-rounded. It heavily relies on jsr-calls to
+;;; a relatively big library, trading smaller size
+;;; for loss of speed.
+;;; 
+;;; MeteoriC isn't about to challange oscar64 in this
+;;; aspects, instead it's all about interactivety ON
+;;; the actual 6502 device and fast edit-compile-run
+;;; experience - basically an IDE on 6502 with acceptable
+;;; performance.
+;;; 
+;;; This doesn't stop us at taking best practices,
+;;; which include, but are not limited to:
+;;; 
+;;; a) Static call graph analysis to eliminate call stack
+;;; = Fixed location for paramter passing
+;;; + very performant
+;;; + simple code
+;;; - uses precious zero page locations
+;;; - doesn't (directly) support recursion
+;;; - might "step on the toes" on other functions/itself!
+;;;   Example: foo(34, foo(72, 64)); // !
+;;; % cc02: see next section on CALLING CONVENTIONS
+;;; 
+;;; b) Static integer range analysis to simplify 16-bit
+;;;    operations to faster 8-bit operations.
+;;; + almost halves machine code instructions!
+;;; - complicated
+;;; - easy make mistakes/compliance
+;;; % cc02: can do some "switching" to byte-context
+;;;         BUT best is if user specify byte/char vars
+;;;         AND we have $v rules (=byte context)!
+;;; 
+;;; c) Conversion of indirect addressing to indexed
+;;;    addressing when feasible.
+;;; + indirection only possible using Y and zp pointers
+;;; + faster
+;;; - may need advanced analysis & partial evaluation
+;;; - or at least constant folding
+;;; % cc02: see what we can do
+;;; %       1) constant folding
+;;; %       2) use that address match %D (?)
+;;; 
+;;; d) Whole program compilation by including library
+;;; + can optimize away specific code by "code inlining"
+;;; - very complicated and easy to intruduce bugs
+;;; - (need libraries as source code - slower compilation)
+;;; % cc02: probably cannot do inlining of source
+;;; %       but might do some constant folding
+;;; %       AND have memcpy() inlined in some cases!
+;;; %       AND isdigit(), islapha(), printf()
+;;; 
+;;; e) Ongoing improvements driven by the development
+;;;    of new games, with a focus on improving the
+;;;    compiler rather than writing inline assembler code.
+;;;    - offical goal of oscar64.
+;;; % cc02: well, active now...
 
+
+
+;;; 
+;;; CALLING CONVENTIONS
+;;; 
+;;; As this compiler is initially targeting ORIC ATMOS,
+;;; we're gonno have some specifics, that can be
+;;; generalized.
+;;; 
+;;; 1) ruleY/Z: ORIC parameter block "procedure" calls
+;;;    using parameter block 0x02e0...
+;;; 
+;;; 2) OJSR: no parameter JSR addresses (clrscr/hires)
+;;; 
+;;; 3) FAST: calling using dedicated ZP addresses
+;;;    for the function (may be overlapping other
+;;;    functions if not conflicting)
+;;; 
+;;; 4) SAFAST: (safe fast) like 3), but usess
+;;;    pha/txa/pha and copies the parameters inside
+;;;    the function (combination 3)+5) )
+;;; 
+;;; 5) __recursive__: pha/txa/pha JSK_CALLING
+;;;    In progress! working, now 4 parameters hardcoded
+;;;    Enter: SWAPS register/arguments!
+;;;    Exit:  restores registers
+;;; 
+;;; ...
+;;; 
+;;; 9) ruleX: cc65 __cdecl__ (not __fastcal__)
+;;;    compatible with cc65, TODO: remove?
+;;;    we don't want to depend on cc65
+;;; 
 ;;; 
 ;;; TODO:
 ;;; - parameters (without stack)
@@ -244,7 +351,8 @@
 
 
 ;;; 
-;;; OPTIONAL:
+;;; OPTIONA FEATURES
+;;;
 ;;; - pointers (no type checking): *p= *p+1
 ;;; - I/O: getchar putc putu puth
 ;;; - else statement;
@@ -6366,12 +6474,19 @@ ruleN:
 ;;; LOL uppercase WORD matches literary!
         .byte "WORD","%N(a,b,c,d)"
 
-VARa= _vars+('a'-'A')*2
+;;; TODO: cleanup, don't use globals
 
-        ;;  prelude
-      .byte "["
+;;; TODO: don't use a..z, not correct
+;;; WORKS! 
+VARa= vars+('a'-'A')*2
+
+;;; TODO: why doesn't it work?
+;;;   holds up parsing!
+;;VARa= _params
+
 
 .ifdef TESTDISASM
+      .byte "["
         lda $1234,x
 ;;; causes parse error eor = $5d
 ;        eor $1234,x
@@ -6394,6 +6509,7 @@ VARa= _vars+('a'-'A')*2
         nop
         nop
         nop
+      .byte "]"
 .endif ; TESTDISASM
 
 
@@ -6458,6 +6574,12 @@ VARa= _vars+('a'-'A')*2
 ;;; 1865200 ;; DOSWAP not, is slower????
 ;;; 1865197 ;; using y, 3c faster??? LOL
 
+;;; 943788
+;;; (- 983850 943788) 40062 ??? 1 call?
+;;; (- 732569 692453) 40116 ??? 1 call
+;;; (- 642428 598475) 43953 ??? 
+
+
 ;;; ---------- VBCC  xxxx      (242 Bytes prog)
 ;;; 
 ;;; ---------- CC65  356 Bytes (125 Bytes prog + LIBS)
@@ -6465,6 +6587,19 @@ VARa= _vars+('a'-'A')*2
 ;;; 
 ;;; OK, so we have some overhead!
 
+;;;  813657 compile no prepost
+;;; 1042678 (/ (- 1042678 813657) 1000) = 229
+
+
+
+;;; Just to test overhead
+;
+PRELUDE=1
+;
+POSTLUDE=1
+
+.ifdef PRELUDE
+      .byte "["
 ;
 REVERSE=1
 .ifndef REVERSE
@@ -6536,11 +6671,14 @@ putc '%'
         txs
 .endif ; !REVERSE
       .byte "]"
+.endif ; PRELUDE
 
         .byte _B
 
-        ;; postlude
       .byte "["
+
+.ifdef POSTLUDE
+        ;; postlude
         ;; restore register bytes from stack
         ;; (doesn't care order)
 .ifndef REVERSE
@@ -6612,6 +6750,7 @@ putc '%'
         ldx savey
 
 .endif ; !REVERSE
+.endif ; POSTLUDE
 
         rts
 
@@ -7818,7 +7957,7 @@ jsr nl
 FUNC _oricstart
 
 .ifdef __ATMOS__
-        .include "atmos-cmd.ruleS"
+        .include "atmos-cmd-ruleS.asm"
 .endif ; __ATMOS__
 
 FUNC _oricend
@@ -10653,6 +10792,15 @@ CANT=1
 ;;; cc02 cannot handle arguments just yet
 ;        .byte "word F(word a, word b, word c, word d) {",10
 ;;; TDOO:
+
+;;; 598475 compile
+;;; 642428 run (- 642428 598475) = 43953
+.ifdef NOTHING
+        .byte "word main() {",10
+        .byte "}",10
+        .byte 0
+.endif ; NOTHING
+
 .ifdef MINISUB
         .byte "word P(){",10
         .byte "  putchar(' '); puth(a);",10
@@ -10663,6 +10811,8 @@ CANT=1
         .byte 0
 .endif ; MINISUB
 
+;;; PRINT vars in calls
+;P4PR=1
 .ifdef P4PR
         .byte "word P(){",10
         .byte "  putchar(' '); puth(a);",10
@@ -10675,10 +10825,15 @@ CANT=1
         .byte "}",10
 .endif ; P4PR
         .byte "WORD F(a,b,c,d) {",10
-;;        .byte "  putchar('>'); P();",10
+.ifdef P4PR
+        .byte "  putchar('>'); P();",10
+.endif
         .byte "  if (a) r= F(a-1, b+1, d*2, c/2);",10
         .byte "  else r= a+b+c+d;",10
-;;        .byte "  putchar('<'); P();",10
+;        .byte "  r= a+b+c+d;",10
+.ifdef P4PR
+        .byte "  putchar('<'); P();",10
+.endif
 
 ;;; need to run postlude...
 ;        .byte "  return r;",10
@@ -10689,14 +10844,42 @@ CANT=1
         .byte "word main() {",10
         .byte "//#x1234  #x5678   #x1122 #x3344",10
         .byte "  a=4660;b=22136;c=4386;d=13124;e=0;",10
-;;        .byte "  putchar('+'); P();",10
+.ifdef P4PR
+        .byte "  putchar('+'); P();",10
+.endif
 ;        .byte "  return 4711;",10
 
 ;;; 22 max: (* 22 (+ 8 2)) = 220 !
-        .byte "  r= F(22, 0, 1, 65535);",10
+;        .byte "  r= F(22, 0, 1, 65535);",10
 ;        .byte "  r= F(3, 0, 1, 65535);",10
+
+;;;  43953 c overhead/start
+;;; 692453 compile
+;;; 732569 (- 732569 692453 43953) 1x
+;;; 
+
+;;;    0                 1           10      100
+;;; 791254 compile    820571       820695    820942
+;;; 834224 run 0      860660       865860   1424480
+;;; 
+;;; (/ (- 1424480 820942) 100) = 6035c !!!!????
+
+;;;  1065057
+;;;  1695899 (/ (- 1695899 1065057) 1000) = 630
+;;; 13821630 (/ (- 13821630 1065057) 1000 23) = 554!!!
+;;; 
+;;; 554! cycles, so ok (/ 554 493.0) =
+;;;       12.4% slower than cc65
+;;; 
+.byte "i=1000;while(i--){",10
+        .byte "  r= F(22, 0, 1, 65535);",10
 ;        .byte "  r= F(0, 9, 1, 65535);",10
-;;        .byte "  putchar('-'); P();",10
+.byte "}",10
+
+.ifdef P4PR
+        .byte "  putchar('-'); P();",10
+.endif
+
         .byte "  return r;",10
         .byte "}",10
         .byte 0
@@ -12130,6 +12313,13 @@ arr:    .res 256
   .zeropage
 .endif
 
+.export _params
+_params:        
+params: 
+;;; TODO: increase
+        .res 16*2
+
+;;; TODO: decrease/remove globals/make dynamic
 .export _vars
 _vars:
 vars:

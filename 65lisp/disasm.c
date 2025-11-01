@@ -127,6 +127,7 @@ void disasm(char* mc, char* end, char indent) {
 
 
 extern char vars;
+#pragma zpsym ("vars")
 
 void pvar(int a) {
   char c= a;
