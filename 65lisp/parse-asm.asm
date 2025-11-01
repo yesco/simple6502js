@@ -1352,6 +1352,8 @@ TESTING=1
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
+
+;;; TODO: FIX
 ;
 PRINTINPUT=1
 
@@ -4321,20 +4323,22 @@ FUNC _memoryrulesend
 
 
 
-
-
-;;; TODO: disturbes parseing, maybe %{ ?
-;JSK_CALLING=1
-
-.ifndef JSK_CALLING
-
-;;; TODO: REMOVE! just for test
-
+;;; TODO: REMOVE! just for test (?)
+;;;  or generalize JSK_CALLING to handle 0 arg?
         ;; Function call!!!
         .byte "|%U[#]()"
       .byte "[;"
         DOJSR VAL0
       .byte "]"
+
+
+;;; TODO: disturbes parseing, maybe %{ ?
+
+;
+JSK_CALLING=1
+.ifndef JSK_CALLING
+
+
 
         ;; Function call!!!
 ;;; TODO: for 0 args this still pushes, lol
@@ -4409,13 +4413,14 @@ tya
 ;;;              jmp drop_and_restore
 ;;; 
 
-;;; TODO:
-FUN=$ffff
         ;; Function call!!!
-        .byte "|fun"
+        .byte "|%U[#]("
+;.byte "%{"
+;jsr puth
+;IMM_RET
       .byte "["
         ;; jump to jsr
-        jmp FUN
+        jmp PUSHLOC
         ;; jsr will call here!
         .byte ":"
       .byte "]"
@@ -4424,29 +4429,50 @@ FUN=$ffff
         ;; and pushing parameters
         .byte _W
 
+.macro PICK nn
+        tsx
+        ;; pick nnrd argument
+        lda $102+ nn *3,x
+        sta tos
+        lda $103+ nn *3,x
+        sta tos+1
+.endmacro
+
+      .byte "%{"
+        PICK 2                  ; %U
+;PUTC '!'
+;jsr puth
+        IMM_RET
+
       .byte "["
         ;; JUMP to the function; return after JSR!
-        jmp FUN
-        .byte ";d"              ; dos= pop ":"
-        .byte ";"               ; tos= pop jmp
+	;TODO:  DOJMP in future?
+        jmp VAL0
       .byte "]"
 
         ;; patch the jump to here
       .byte "%{"
-        lda _out
-        ldy #0
+        PICK 1
+        lda _out+1
+        ldy #1
         sta (tos),y
 
-        lda _out+1
-        iny
+        lda _out
+        dey
         sta (tos),y
+        
         IMM_RET
         
-      .byte "[D"                ; tos= dos
+      .byte "[;"                 ; tos= dos
         ;; JSR to generate parameters
-        jsr VAL0
+        DOJSR VAL0
         ;; after FUN; it'll RTS to here!
-      .byte "]"
+      .byte ";;]"
+
+;.byte "%{"
+;PUTC '.'
+;jsr _iasm        
+;IMM_RET
 
 .endif ; JSK_CALLING
 
@@ -6600,46 +6626,34 @@ POSTLUDE=1
 
 .ifdef PRELUDE
       .byte "["
-;
-REVERSE=1
+;REVERSE=1
 .ifndef REVERSE
-;;; 37 b (wayt too big!)
+;;; TODO: new one use jsr
 
-        ;; swap stack w registers!
-        ;; (reverse byte order)
-putc '%'
+;;; 21 B (smaller and faster!)
         tsx
-        inx
-        inx
-        ldy #8                  ; bytes
+        stx savex
+        ldy #8
+;;; 26c / byte
 :       
-        ;; hi was pushed last
-        lda VARa-1,y
-        sta savea
-
-        lda 100,x
+        ;; swap byte
+	;; TODO: use ,x to do zero addressing!
+        ;;      save bytes?
+        ;;   (somehow goes slower??? hmmm)
+        ldx VARa-1,y
+        pla
         sta VARa-1,y
-        
-        lda savea
-        sta 100,x
-        ;; lo
-        lda VARa-2,y
-        sta savea
-
-        lda $101,x
-        sta VARa-2,y
-        
-        lda savea
-        sta $101,x
-        ;; 
-        inx
-        inx
-
-        dey
+        txa
+        pha
+        ;; step up
+        pla                     ; s-- !
         dey
         bne :-
+        ;; restore stack pointer!
+        ldx savex
+        txs
 .else
-;putc 'S'
+putc 'S'
 ;;; 28 B (smaller and faster!)
 
         ;; swap stack w registers!
@@ -6681,20 +6695,25 @@ putc '%'
         ;; postlude
         ;; restore register bytes from stack
         ;; (doesn't care order)
-.ifndef REVERSE
-;;; 8 B
-        ldx #8
-:       
-        pla
-        sta VARa-1,x
-        
-        inx
-        bne :-
-.else
 
+        ;; save ax
         sta savea
+;;; TODO: maybe no need saving?
         stx savey
 
+.ifndef REVERSE
+;;; RESTORE!
+;;; 9 B
+        ldy #8
+;;; 13 c ok, it's faster...
+;;; could generate a long sequence and jump middle
+;;; wquld be 6c faster/byte! (8 => 42c!)
+:       
+        pla
+        sta VARa-1,y
+        dey
+        bne :-
+.else
 ;;; TODO: only need restore...
 ;;; DOSWAP is 146c slower!
 ;DOSWAP=1 ;
@@ -6743,13 +6762,13 @@ putc '%'
         ldx savex
         txs
 .endif ; DOSWAP
+.endif ; !REVERSE
 
 ;;; NOBODY else can currently return
 ;;;   we just need to keep AX safe...
         lda savea
         ldx savey
 
-.endif ; !REVERSE
 .endif ; POSTLUDE
 
         rts
@@ -9711,12 +9730,13 @@ FUNC _eoscolors
 
 
 ;;; TODO: oric const
+.ifdef __ATMOS__
         sta $026b               ; paper
         stx $026c               ; ink
-        
         GOTOXY 2,27
-        jmp nl
+.endif ; __ATMOS__        
 
+        jmp nl
 
 
 FUNC _printsrc
@@ -10848,6 +10868,18 @@ CANT=1
         .byte "  putchar('+'); P();",10
 .endif
 ;        .byte "  return 4711;",10
+        .byte "i=1000;while(i--){",10
+;.byte "i=1;while(i--){",10
+        .byte "  r= F(22, 0, 1, 65535);",10
+;        .byte "  r= F(0, 9, 1, 65535);",10
+;;; I think value comes out wrong???
+.byte "}",10
+
+;;; 1078241
+;;; 12507300 (/ (- 12507300 1078241) 1000 23) = 496
+;;; using JSK_CALLING! 267 => 279 bytes?
+;;; uses extra 6c (+6B jumps) but saves
+
 
 ;;; 22 max: (* 22 (+ 8 2)) = 220 !
 ;        .byte "  r= F(22, 0, 1, 65535);",10
@@ -10870,11 +10902,10 @@ CANT=1
 ;;; 
 ;;; 554! cycles, so ok (/ 554 493.0) =
 ;;;       12.4% slower than cc65
-;;; 
-.byte "i=1000;while(i--){",10
-        .byte "  r= F(22, 0, 1, 65535);",10
-;        .byte "  r= F(0, 9, 1, 65535);",10
-.byte "}",10
+;;;  1072631
+;;; 13821624 (/ (- 13821624 1072631) 1000 23) = 554
+
+
 
 .ifdef P4PR
         .byte "  putchar('-'); P();",10
