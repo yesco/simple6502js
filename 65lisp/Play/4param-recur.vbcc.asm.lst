@@ -1,10 +1,13 @@
-;; jsk:
+;; jsk:source compiled by VBCC
 ;;
+;; (.lst made with ca65)
 ;; ca65 Play/4param-recur.asm.saved -l Play/4param-recur.asm.lst
 ;;
 ca65 V2.18 - N/A
 Main file   : Play/4param-recur.asm
 Current file: Play/4param-recur.asm
+
+;; #xf2 = 242 bytes
 
 000000r 1               .zeropage
 000000r 1  xx           		sp: .res 1
@@ -57,6 +60,7 @@ Current file: Play/4param-recur.asm
 00000Br 1               l10:
 
 ;; save current! (never restored lol)
+;; (* 4 11) = 44 B
 
 ;; push(r0/1)
 ;; 11 B
