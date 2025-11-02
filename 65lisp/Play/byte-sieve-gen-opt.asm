@@ -263,7 +263,7 @@ end3:
         lda $66
         ldx $67
 ;;;      D  E ) C 
-        jsr axputu
+        jsr _printu
 ;;;      D  E .; S  A ++n.; S 
         inc $7c
 ;        bne :+

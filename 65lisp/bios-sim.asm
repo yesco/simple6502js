@@ -103,14 +103,14 @@ rawputc=_putchar
         ;; row
         lda #<yy
         ldx #>yy
-        jsr putu
+        jsr _printu
 
         putc ';'
 
         ;; col
         lda #<xx
         ldx #>xx
-        jsr putu
+        jsr _printu
 
         putc 'H'
         

@@ -876,6 +876,28 @@ tmp2:   .res 2
 ;;; ========================================
 ;;; ---------------- LIBRARY ---------------
 
+;;; 
+;;; Current byte count:
+;;; 
+;;; Bytes #functions
+;;; ----- ---- 
+;;; [  23(?) ]    BIOS: getchar putchar -- NOT LIBRARY!
+;;;    17         misc: nl/newline spc bs clrscr...
+;;;   (69)        Runtime: all=RECURSION
+;;;    96    7    #include <stdio.h>
+;;;  ((19))  1    (_print u/h/z/s OPT: _iprintz)
+;;;    99   10    #include <ctype.h> isXXXX
+;;;   144    6    #include <string.h> str len/cpy/...
+;;;    20    2    #include <stdlib.h> rand srand
+;;; ======
+;;;   376 (+ 69)    (+ 17 96 99 144 20)   69 19
+;;; =====
+;;;   445
+;;; +  23 bios
+
+
+
+
 ;;; 1284707
 ;;; 1150630 (/ 1284707 1150630.0) == 11.6% overhead
 ;;; 11.6% overhead parsing STRING CTYPE
@@ -892,7 +914,10 @@ STRING=1
 ;
 CTYPE=1
 
+; TODO: RECURSION?
+
 .endif ; NOLIBRARY
+
 
 
 
@@ -904,6 +929,12 @@ FUNC _librarystart
 FUNC _runtimestart
 
 ;;; TODO: IRQ put here!
+
+
+
+
+
+;;; TODO: move to file "lib-runtime-recursion.asm"
 
 
 ;;; support RECURSION, has RUNTIME code overhead
@@ -1339,10 +1370,10 @@ FUNC _minimallibraryend
 
 
 
-;;; inline str after jsr; +29 bytes
+;;; inline str after jsr; +19 bytes
 ;;; saves 7 B at each puts/z("...");
 ;;; is it worth it?
-;INLINEPUTZOPT=1  
+;INLINEPRINTZ=1  
 .include "lib-stdio.asm"
 
 ;include "lib-printf.asm"       ; not working
@@ -1354,20 +1385,6 @@ FUNC _minimallibraryend
 .include "lib-string.asm"
 
 .include "lib-math.asm"         ; mul mul10 mul16 div16
-
-
-;;; Current byte count:
-;;; 
-;;; Bytes #functions
-;;; ----- ---- 
-;;; [  23(?)      BIOS: getchar putchar -- NOT part of LIBRARY]
-;;;    17         nl/newline spc bs clrscr...
-;;;   119(?)      #include <stdio.h>
-;;;                (print.asm: putu, putchar, putz) (127 B?)
-;;;    98   10    #include <ctype.h> isdigit isalnum ...
-;;;   144    6    #include <srting.h> strlen strcpy ...
-;;; ======
-;;;   384         (+ 23 119 98 144) 
 
 
 ;;; ------- <time.h>
@@ -4195,21 +4212,20 @@ FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "putu(",_E,")"
       .byte '['
-;;; TODO: change printers to use AX
-        jsr axputu
+        jsr _printu
       .byte ']'
 
         ;; compatibility
 
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
-        jsr axputu
+        jsr _printu
       .byte ']'
 
         ;; LOL: printf("%s", s); // safe...
         .byte "|printf(",34,"\%s",34,",",_E,")"
       .byte '['
-        jsr axputz
+        jsr _printz
       .byte ']'
 
 .ifdef OPTRULES
@@ -4236,13 +4252,13 @@ FUNC _iorulesstart
 
         .byte "|fputs(",_E,",stdout)"
       .byte '['
-        jsr axputz
+        jsr _printz
       .byte ']'
 
 .ifdef SIGNED
         .byte "|printf(",34,"\%d",34,",",_E,")"
       .byte '['
-        jsr axputd
+        jsr _printd
       .byte ']'
 
         ;; "IO-lib" hack
@@ -4256,18 +4272,19 @@ FUNC _iorulesstart
         .byte "|puth(",_E,")"
       .byte '['
 ;;; TODO: change printers to use AX
-        jsr axputh
+        jsr _printh
       .byte ']'
 
         .byte "|putz(",_E,")"
       .byte '['
 ;;; TODO: fix, strings borken?
-        jsr axputz
+        jsr _printz
       .byte ']'
 
         .byte "|puts(",_E,")"
       .byte '['
 .ifdef PRINTIT
+;;; 20 B inline only...
         sta pos
         stx pos+1
         ldy #0
@@ -4281,7 +4298,7 @@ FUNC _iorulesstart
         bne :-
 :       
 .else
-        jsr axputs
+        jsr _prints
 .endif
       .byte ']'
 
@@ -8153,7 +8170,9 @@ PUTC 'C'
         lda $103+ 3 *3,x
         sta tos+1
 jsr nl
-jsr puth
+lda tos
+ldx tos+1
+jsr _printh
 jsr nl
         IMM_RET
 .endif
@@ -8170,7 +8189,9 @@ jsr nl
         lda $103+ 2 *3,x
         sta tos+1
 jsr nl
-jsr puth
+lda tos
+ldx tos+1
+jsr _printh
 jsr nl
         IMM_RET
       .byte "%{"
@@ -8199,7 +8220,9 @@ jsr nl
         lda $103+ 4 *3,x
         sta tos+1
 jsr nl
-jsr puth
+lda tos
+ldx tos+1
+jsr _printh
 jsr nl
         IMM_RET
 .endif
@@ -8219,7 +8242,9 @@ PUTC 's'
         lda $103+ 3 *5,x
         sta tos+1
 jsr nl
-jsr puth
+lda tos
+ldx tos+1
+jsr _printh
 jsr nl
         IMM_RET
       .byte "%{"
@@ -9231,7 +9256,9 @@ FUNC _OK
         sta tos+1
         sta gos+1
         
-        jsr putu
+        lda tos
+        ldx tos+1
+        jsr _printu
         
         putc ' '
         PRINTZ {" Bytes",10,10}
@@ -9280,7 +9307,7 @@ again:
         dec runs
         bne again
 
-        ;; save result
+        ;; save result "reverse"
         pha
         txa
         pha
@@ -9348,17 +9375,20 @@ TIMPER=8
         jsr nl
 .endif ; TIM
 
-        ;; prints return code
+        ;; print return code
         putc 10
         putc '='
         putc '>'
         jsr spc
 
+        ;; get it "reverse"
         pla
-        sta tos+1
+        tax
         pla
-        sta tos
-        jsr putu
+
+        jsr _printu
+
+;;; TODO: do printu etc need to keep AX?
 
         jsr nl
         
@@ -10874,10 +10904,7 @@ CSRESET=1
 ;        jsr spc
 .else
         jsr nl
-        sta tos
-        stx tos+1
-
-        jsr putu
+        jsr _printu
         putc 'c'
         putc 's'
 
@@ -10906,17 +10933,15 @@ CSRESET=1
 FUNC printvar
         sta tos
         stx tos+1
-        putc '@'
-        jsr puth
+        PUTC '@'
+        jsr _printh
         putc '='
         ldy #1
         lda (tos),y
         tax
         dey
         lda (tos),y
-        sta tos
-        stx tos+1
-        jsr putu
+        jsr _printu
         jsr spc
         rts     
 
@@ -10963,14 +10988,12 @@ FUNC printchar
         lda tos
         pha
 
-        lda pchar
-        sta tos
-        lda #0
-        sta tos+1
         
-        putc '['
-        jsr putu
-        putc ']'
+        PUTC '['
+        lda pchar
+        ldx #0
+        jsr _printu
+        PUTC ']'
 
         pla
         sta tos
@@ -10988,11 +11011,6 @@ FUNC printchar
         tay
         pla
         rts
-
-FUNC printaxh
-        sta tos
-        stx tos+1
-        jmp puth
 
 FUNC printstack
         pha
@@ -11023,9 +11041,8 @@ FUNC printstack
 
         ;; print s
         stx tos
-        lda #0
-        sta tos+1
-        jsr putu
+        txa
+        jsr _print1h
 
 @loop:
         jsr spc
@@ -11165,6 +11182,8 @@ input:
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
+
+;        .byte "word main(){ return 4711; }",0
 
 
 ;;; Experiments in estimating and prototyping

@@ -8,6 +8,7 @@
 FUNC _stdiostart
 ;;; -------- <stdio.h> - LOL
 ;;; 
+;;; TODO: ... fix...
 ;;; --- basis for PRINTF modular
 ;;; 20 - puth, put4h, put2h
 ;;; 13 - plaprinth (to reverse)
@@ -54,69 +55,282 @@ FUNC _stdiostart
 ;;;    but not get error, just doesn't work! (hang)
 ;;;    or AFTER 
 
-PUTDEC=1
-PUTHEX=1
-.include "print.asm"
 
-.ifdef INLINEPUTZOPT
-;;; Put zero terminated string directly
-;;; after jsr _inlineputz!
-;;; 
-;;; TODO: be used by:
-;;;    printf("foo %d bar %s fie %x fum")
-;;; 
-;;; 7 bytes saved per call of putz("foo"); & puts
-;;; 
-;;; 29 bytes total putz puts
 
-;;; (+ 10 19)= 29 B (+ 29 22)=51 (iputz+putz)
-FUNC _iputs
-;;; 
-;;; (+ 2 1 7) = 10
-;;; 2
-        sec
-        SKIPONE
-FUNC _iputz
-;;; (+ 4 4 4 7)= 19
-;;; 4+1=5
-        clc
-        ;; lo
-        pla
-        tay
-        ;; hi
-        pla
-        tax
-        ;; inc YX
-;;; 4
-        iny
-        bne :+
-        inx
-:       
-;;; 4+7=11
-        tya
-        ;; save C flag, lol
-        php
-        jsr axputz              ; 22 !
-        plp
-        ;; if C set newline! (puts)
-        bcc :+
-        jsr nl
-:       
 
-TOSRTS: 
-;;; 7 B
-        ;; hi
-        lda tos+1
+;;; from "print.asm" but simplified
+
+;;; compat with print.asm
+PRINTER=1
+PRINTINCLUDED=1
+
+PRINTHEX=1
+
+.ifdef PRINTHEX
+
+;;; print4h: print hex from AX
+;;; 
+;;; (+ 7 6 8 1 8 3) = 32
+;;; 
+;;; TODO: doesn't it feel like a generic
+;;;       div BASE printer would be same?
+
+;;; TODO: optional?
+FUNC _printh
+FUNC _printdollar4h
+;;; 7
         pha
-        ;; lo
+        lda #'$'
+        jsr putchar
+        pla
+FUNC _print4h        
+;;; 6
+        pha
+        txa
+        jsr _print2h
+        pla
+FUNC _print2h
+;;; 8
+        pha
+        ;; hi
+        ror
+        ror
+        ror
+        ror
+        jsr _print1h
+        ;; fall-through
+.endif ; PRINTHEX
+
+plaprint1h:     
+;;; 1 B
+        pla
+FUNC _print1h
+.ifblank
+;;; 6502 "ideom" convert 0-f => '0'..'F' !
+;;; ! - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
+;;; 8 B !
+        and #$f
+
+        SED
+        CMP #$0A
+        ADC #'0'
+        CLD
+.else
+;;; 10 B "normal"
+        and #$0f
+        ora #$30
+        cmp #'9'+1
+        bcc :+
+        adc #6
+:       
+.endif
+;;; 3 B
+        jmp putchar
+
+;;; printu: print a decimal value from AX
+;;; (+Y trashed)
+;;; 
+;;; 35 B
+;;; 
+;;; _posprintu
+;;; 31B - this is a very "minimal" sized routine
+;;;       slow, one loop per bit/16
+;;; 
+;;; ~554c = (+ (* 26 16) (* 5 24) 6 6 6)
+;;;       (not include time to print digits)
+;;; 
+;;; Based on DecPrint 6502 by Mike B 7/7/2017
+;;; Optimized by J. Brooks & qkubma 7/8/2017
+;;; This implementation by jsk@yesco.org 2025-06-08
+
+FUNC _printu 
+;;; 4
+        sta pos
+        stx pos+1
+        
+FUNC _posprintu
+;;; 31
+.scope
+digit:  
+        lda #0
+        tay
+        ldx #16
+;;; TODO: can this be generalized
+;;;       for any (even) BASE?
+div10:  
+        cmp #10/2
+        bcc under10
+        sbc #10/2
+        iny
+under10:
+        rol pos
+        rol pos+1
+        rol
+
+        dex
+        bne div10
+
+        ;; push delay print => reverses order!
+        ;; 7 B
+        pha
+        lda #>(plaprint1h-1)
+        pha
+        lda #<(plaprint1h-1)
+        pha
+
+        dey
+        bpl digit
+
+        rts
+.endscope
+
+
+;;; TDDO: ???
+.ifdef BYTECODE
+
+.proc _putu
+;;; 14 B
+next:   LIT 10
+        DO _divmod
+        ;; Recurse to print higher value digits first!
+        DO _swap
+        DO _putu
+
+        DO print1h              ; maybe CALL?
+        DO _drop
+        BRANCH next
+
+        DO _drop
+        DO _exit
+.endproc        
+.endif
+
+
+;;; TODO: 
+.ifdef PRINTBASE
+
+FUNC _printu
+;;; print decimal
+;;; 
+;;; 29 B + 14 B (plaprint1h)
+
+BASE=10
+
+        ;; divide by BASE
+        lda #BASE
+        jsr _pushA
+        jsr _divmod
+
+        ;; delayed print digit (reverses order!)
         lda tos
         pha
-        ;; perfect (at 0, next is next instruction!)
-        ;; return to location after 0
+        lda #>(plaprint1h-1)
+        pha
+        lda #<(plaprint1h-1)
+        pha
+
+        jsr _drop
+
+        ;; p => done
+        lda tos
+        ora tos
+        bne _putu
+done:
+        jmp _drop
+.endproc
+
+.endif ; PRINTBASE
+
+
+
+
+.ifdef INLINEPRINTZ
+;;; (+ 11 7) = 19 B
+;;; +19 B  each usage saves 7 B
+;;;        compared to: puts("foo\n")
+
+FUNC _iprintz
+;;; 11
+        pla
+        sta pos
+        pla
+        sta pos+1
+        
+        ;; skip first char
+        ldy #0
+        jsr _incposYprintz
+        ;; fall-through
+FUNC _posRTS
+;;; 7
+        ;; return to byte after \0
+        lda pos+1
+        pha
+        lda pos
+        pha
+        rts
+
+  .macro PRINTZ msg
+        ;; 3 B
+        jsr _iprintz
+        .byte msg,0
+  .endmacro
+
+.else
+;;; TODO: sometimes fails?
+;;;   (label pollution?)
+  .macro PRINTZ msg
+    .scope
+
+  .data
+  @data:       
+        .byte msg,0
+  .code
+        ;; 7 B
+        lda #<@data
+        ldx #>@data
+        jsr _printz
+
+    .endscope
+  .endmacro
+
+.endif ; INLINEPRINTZ
+
+
+;;; (+ 19 4 6) = 29 B
+;;; 
+;;; 29 B gives _printz _prints
+
+FUNC _prints
+;;; 6
+        jsr _printz
+        jmp nl
+
+FUNC _printz
+;;; 4
+        sta pos
+        stx pos+1
+FUNC _posprintz
+;;; 18
+        ldy #0
+FUNC _posYprintz
+        lda (pos),y
+        beq endprint
+        jsr putchar
+FUNC _incposYprintz
+        inc pos
+        bne :+
+        inc pos+1
+:       
+        ;; always jmp
+        bne _posYprintz
+
+endprint:
         rts
 
 
 
+
+;;; TODO: printf!
 .ifdef PRINTFHELPERS
 ;;; These are helpers for printf
 
@@ -169,8 +383,5 @@ FUCN _iputzz
         jsr axputz
         jmp iputz
 .endif ; PRINTFHELPERS
-
-
-.endif ; INLINEPUTZOPT
 
 FUNC _stdioend

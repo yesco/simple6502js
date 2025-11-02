@@ -460,7 +460,7 @@ void info() {
      "\xff  LIB ctype\x87%u\x82stdio\x87%u\x82str\x87%u\n"
      "\x83\xff tap-file \x80\x93=%4u\x82\x90"" bios\x87LIBS\x83+%u\n"
      "\xff  LIB stdlib\x87%u\x82math\x87%u\x82graphics\x87%u\n"
-     "\xff  output    \x83+%4u\x82- compiled code" // no \n1
+     "\xff  code      \x83+%4u\x82- compiled code" // no \n1
      
 //     "  /reserv    %6u - area reserved"
      , (char*)Cend-(char*)Cstart
