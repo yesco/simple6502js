@@ -52,6 +52,7 @@ saveyputchar:   .res 1
 .code
 
 .macro CURSOR_OFF
+;;; 10
         pha
         lda $026a
         and #255-1
@@ -60,6 +61,7 @@ saveyputchar:   .res 1
 .endmacro
 
 .macro CURSOR_ON
+;;; 10
         pha
         lda $026a
         ora #1
@@ -72,7 +74,8 @@ saveyputchar:   .res 1
 
 ;;; input char from keyboard
 ;;;
-;;; 17B
+;;; was 17B
+;;; NOW: huge!!!!!
 getchar:        
         ;; can't see cursor move, it's delay from turn on
         ;;  CURSOR_ON
