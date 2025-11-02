@@ -24,6 +24,7 @@ int main() {
 
   nc= nextc();
   while( (c=nc) != 255) {
+    semi= 0;
     // semicolon+NL+n spcs sets hibit!
     if (c==';') {
       semi= 0x80;
@@ -36,14 +37,15 @@ int main() {
       nc= nextc();
       if (nc!=c && (nc==10 || nc==13)) {
         // ignore redundant char (CRLF)
-        c= nextc();
-      } else c= nc;
+        nc= nextc();
+      }
       // count spaces
       n= 0;
-      while(n<30) {
-        if (c==' ') ++n;
-        else if (c=='\t') n+= tabsize;
+      while(nc!=255 && n<30) {
+        if (nc==' ') ++n;
+        else if (nc=='\t') n+= tabsize;
         else break;
+        nc= nextc();
       }
       // output compresed NL+spaces
       pc(('\n'+n) | semi);
