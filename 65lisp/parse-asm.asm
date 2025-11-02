@@ -11189,8 +11189,7 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;
-PARAM4=1
+;PARAM4=1
 .ifdef PARAM4
 
 ;
@@ -12136,8 +12135,7 @@ CANT=1
 ;;;; Updating 4b6bac9..4e41cbd
 ;;; Fast-forward
 
-;
-BYTESIEVE=1
+;BYTESIEVE=1
 ;
 NOPRINT=1
 
@@ -12233,8 +12231,8 @@ MALLOC=1
         .byte "  z= 32768;",10
         .byte "  a= 0;",10
 
-;;        .byte "  do {",10
-        .byte "X:",10
+        .byte "  while(1) {",10
+;        .byte "X:",10
 
         .byte "    p= malloc(z);",10
         .byte "    if (p) {",10
@@ -12250,8 +12248,8 @@ MALLOC=1
 ;;; crash! errror "1" lol
 ;        .byte "  } while(1);",10
 ;;; NOT TRUE????
-        .byte "  goto X;",10
-;        .byte "  } while(z);",10
+;        .byte "  goto X;",10
+        .byte "  }",10
 
         .byte "}",10
         .byte 0
