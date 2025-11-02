@@ -425,7 +425,7 @@ void info() {
 
 
   printf
-    ("\x97\x84- CC02  MeteoriC-650-compiler -  \x90\n"
+    ("\x97\x84- CC02  MeteoriC-6502-compiler -  \x90\n"
 // TAP-file
      "C %u main %u (loader) TEXT: ?%u\n"
      "  (disasm)   %6u - ^Q disasm code\n"
