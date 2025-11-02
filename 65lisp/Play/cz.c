@@ -1,10 +1,24 @@
+// (>) 2025 Jonas S Karlsson, jsk@yesco.org
+//
+// cz: Simple C source compression program.
+//
+// CompreZzes to about 70% of itself.
+//
+// Simple scheme, in order to save space on
+// editing on 6502 to save memory:
+//
+// [;] LF ' '*n  => char(( LF+n) | hibitIfSemicolon)
+//
+// \w ' '        => char(\1 + | hibitIfSpaceFollows)
+//
+
 // Test on itself:
 //
-// clang Play/txt2tzt.c && ./a.out < Play/txt2tzt.c > Play/txt2tzt.c.tzt ; ls -l Play/txt2tzt.c*
+// clang Play/cz.c && ./a.out < Play/cz.c > Play/cz.c.cz ; clang Play/uncz.c && ./a.out < Play/cz.c.cz > Play/cz.c.cz.c ; ls -l Play/cz.c* Play/uncz.c*
 
 #include <stdio.h>
 
-unsigned int in= 0, out= 0;
+int in= 0, out= 0;
 
 char tabsize= 8;
 
@@ -17,6 +31,7 @@ char pc(char c) {
   ++out;
   return putchar(c);
 }
+
 
 int main() {
   char c, nc, n;
@@ -61,9 +76,10 @@ int main() {
       else pc(c);
     }
   }   
+  --in;
 
   // report savings
-  fprintf(stderr, "[Saved %u bytes giving (%u/%u) => %u%%]\n",
+  fprintf(stderr, "[Saved %d bytes giving (%d/%d) => %d%%]\n",
           in-out, out, in, out*100/in);
   return 0;
 }
