@@ -1373,7 +1373,8 @@ FUNC _minimallibraryend
 ;;; inline str after jsr; +19 bytes
 ;;; saves 7 B at each puts/z("...");
 ;;; is it worth it?
-;INLINEPRINTZ=1  
+;
+INLINEPRINTZ=1  
 .include "lib-stdio.asm"
 
 ;include "lib-printf.asm"       ; not working
@@ -1986,7 +1987,7 @@ XYZ=1
 
 .ifdef DEBUG 
         putc 'S'
-        putc 10
+        jsr nl
 .endif ; DEBUG
 
         ;; store an rts for safety
@@ -2003,7 +2004,7 @@ sta tos
 sta tos+1
 putc '#'
 jsr putu
-putc 10
+jsk nl
 .endif ; LONGNAMES
 
 
@@ -2067,17 +2068,14 @@ FUNC _next
         bne stackerror
         jmp :+
 stackerror:     
-        putc 10
+        jsr nl
         jsr printstack
 
         ;; reset stacck
         ldx #$ff
         txs
 
-        putc 10
-        putc '%'
-        putc 'S'
-        putc '>'
+        PRINTZ {10,"%S>"}
 
         jmp _edit
         
@@ -2110,7 +2108,7 @@ stackerror:
 
 .ifdef DEBUG
     ;; RULE
-    putc 10
+    jsr nl
     lda rulename
     jsr putchar
     putc '.'
@@ -2128,10 +2126,10 @@ stackerror:
 ;;; TODO: ;;;;;
 .ifdef xDEBUGRULE
 ;    PUTC ' '
-    PUTC 10
+    jsk nl
     ldy #0
     lda (rule),y
-    jsr putchar
+    PUTC 10
 .endif ; DEBUG
 
 ;;; Actual code to process rule, lol
@@ -2469,13 +2467,13 @@ FUNC _enterrule
         cmp #13
         bne :+
         ;; print state
-        putc 10
+        jsr nl
         putc '~'
         jsr putchar
         lda inp
         ldx inp+1
         jsr _printz
-        putc 10
+        jsr nl
 :       
         ldy #0
         
@@ -2746,7 +2744,7 @@ lda savea
         lda rule+1
         sta tos+1
         jsr puth
-        putc 10
+        jsr nl
         jsr printstack
 .endif
 
@@ -2852,7 +2850,7 @@ restoreinp:
 gotretry:
 .ifdef DEBUGRULE
     putc '!'
-    putc 10
+    jsr nl
 .endif
     DEBC '!'
 
@@ -2984,7 +2982,7 @@ _errcompile:
         TIMER
 
 .ifdef TRACERULE
-        putc 10
+        jsr nl
 .endif
 .ifdef DEBUGRULE
         jsr printstack
@@ -3002,8 +3000,7 @@ FUNC _errors
 ;;; ? mismatch stack?
 unexpectedrule:
 .ifdef CHECKSTACK
-        putc '%'
-        putc 'R'
+        PRINTZ "%R"
         jmp stackerror
 .else
         lda #'R'
@@ -3029,8 +3026,7 @@ failed:
 ;;; A register contains error
 error:
         pha
-        putc 10
-        putc '%'
+        PRINTZ {10,"%"}
         pla
         jsr putchar
 
@@ -9222,7 +9218,7 @@ print:
         lda (pos),y
         bne loop
 
-        putc 10
+        jsr nl
 .endif ; PRINTINPUT
 .endscope
 
@@ -9335,9 +9331,7 @@ TIMPER=8
         pha
 
         ;; print "[47B 100x: 4711us]"
-        jsr nl
-        putc WHITE
-        putc '['
+        PRINTZ {10,WHITE,"["}
 
         ;; print "47B "
 ;;; TODO: gos gets overwritten by dasm(?)
@@ -9346,9 +9340,7 @@ TIMPER=8
         ldx gos+1
         stx tos+1
         jsr putu
-        jsr spc
-        putc 'B'
-        jsr spc
+        PRINTZ {10,"B "}
 
         ;; print "100x: "
         lda #<RUNTIMES
@@ -9356,9 +9348,7 @@ TIMPER=8
         ldx #>RUNTIMES
         stx tos+1
         jsr putu
-        putc 'x'
-        putc ':'
-        jsr spc
+        PRINTZ {"x: "}
 
         ;; restore timing
         pla
@@ -9368,18 +9358,11 @@ TIMPER=8
 
         jsr putu
 
-        jsr spc
-        putc 'u'
-        putc 's'
-        putc ']'
-        jsr nl
+        PRINTZ {" us]",10}
 .endif ; TIM
 
         ;; print return code
-        putc 10
-        putc '='
-        putc '>'
-        jsr spc
+        PRINTZ {10,"=> "}
 
         ;; get it "reverse"
         pla
@@ -9924,7 +9907,11 @@ extend:
         
         cmp #'b'
         bne :+
-        jmp bytesieve
+
+;;; TODO: load and run compiled programs?
+
+;        jmp bytesieve
+        jmp _edit
 :       
         cmp #CTRL('F')
         bne :+
@@ -9966,9 +9953,7 @@ FUNC asmprintsrc
         ;; (limit 256 chars)
         jsr _iasm
         
-        putc ';'
-        putc WHITE
-        jsr spc
+        PRINTZ {";",WHITE," "}
 
         ldy #0
 ;        iny
@@ -9999,7 +9984,7 @@ FUNC asmprintsrc
 
 
 ;.include "Play/byte-sieve-gen.asm"
-.include "Play/byte-sieve-gen-opt.asm"
+;.include "Play/byte-sieve-gen-opt.asm"
 
 
 
@@ -10857,8 +10842,7 @@ FUNC timer
         stx tos+1
         jsr putu
 
-        putc 'u'
-        putc 's'
+        PRINTZ {"us"}
 ;        jsr nl
         
         ;; CLEAR TIMER
@@ -10905,13 +10889,10 @@ CSRESET=1
 .else
         jsr nl
         jsr _printu
-        putc 'c'
-        putc 's'
+        PRINTZ {"cs"}
 
 .endif
-        putc ']'
-        putc 128+2
-        jsr nl
+        PRINTZ {"]",GREEN,10}
 
 .ifdef CSRESET
         lda #$ff
@@ -11084,11 +11065,7 @@ FUNC printstack
         jmp @loop
 
 @err:
-        jsr spc
-        jsr spc
-        putc 'o'
-        putc 'o'
-        
+        PRINTZ {"  oo"}
 @done:
         putc '>'
 ;;; TODO: 
