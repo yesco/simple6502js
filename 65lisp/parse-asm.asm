@@ -900,146 +900,6 @@ FUNC _librarystart
 
 .include "tty-helpers.asm"      ; nl spc bs PUTC putc
 
-;;; inline str after jsr; +29 bytes
-;;; saves 7 B at each puts/z("...");
-;;; is it worth it?
-;INLINEPUTZOPT=1  
-.include "lib-stdio.asm"
-
-;include "lib-printf.asm"       ; not working
-
-.include "lib-ctype.asm"
-
-.include "lib-stdlib.asm"
-
-.include "lib-string.asm"
-
-.include "lib-math.asm"         ; mul mul10 mul16 div16
-
-
-;;; Current byte count:
-;;; 
-;;; Bytes #functions
-;;; ----- ---- 
-;;; [  23(?)      BIOS: getchar putchar -- NOT part of LIBRARY]
-;;;    17         nl/newline spc bs clrscr...
-;;;   119(?)      #include <stdio.h>
-;;;                (print.asm: putu, putchar, putz) (127 B?)
-;;;    98   10    #include <ctype.h> isdigit isalnum ...
-;;;   144    6    #include <srting.h> strlen strcpy ...
-;;; ======
-;;;   384         (+ 23 119 98 144) 
-
-
-;;; ------- <time.h>
-;;; - clock difftime
-;;; - va_start va_arg va_copy va_end
-;;; - signal (irq timer?)
-
-;;; -------- <assert.h>
-;;; - assert
-
-;;; --------- <stddef.h
-
-;;; TODO:
-;;; - NULL
-;;; - size_t
-;;; - TYPE: ptrdiff_t
-;;; 
-
-;;; ---------- <limits.h>
-;;;     {INT_MAX}
-;;;            Maximum value for an object of type int.
-;;;            Minimum Acceptable Value: 2 147 483 647
-;;;     {INT_MIN}
-;;;            Minimum value for an object of type int.
-;;;            Maximum Acceptable Value: -2 147 483 647
-;;;     {UINT_MAX}
-;;;            Maximum value for an object of type unsigned.
-;;;            Minimum Acceptable Value: 4 294 967 295
-
-;;; ---------- <strings.h>
-;;; 
-;;; TODO:
-;;; - ffs(int) -> bit set (32..1) 1== 0x01 input FFS!
-;;; - strcasecmp
-;;; - strncasecmp
-
-;;; --------- <system.h>
-;;; - exec?
-
-
-FUNC _unistdstart
-;;; ;;????
-;;; ---------- <unistd.h>
-;;; 
-;;; - alarm
-;;; - chdir
-;;; - chown
-;;; - close
-;;; - crypt
-;;; - dup/dup2
-;;; - _exit
-;;; - encrypt
-;;; - _exit
-;;; - fsync
-;;; - ftruncate
-;;; - getcwd
-;;; - gethostname
-;;; - getpid
-;;; - getuid
-;;; - isatty
-;;; - link
-;;; - lockf
-;;; - lseek
-;;; - nice
-;;; - pause
-;;; - read
-;;; - rmdir
-;;; - sleep
-;;; - sync
-;;; - truncate
-;;; - ttyname
-;;; - unlink
-;;; - write
-;;; ---- pthreads?
-FUNC _unistdend
-
-
-
-;;; TOOD: see Docs/oric-atmos-addresses.asm ?
-
-;;; ORIC:
-;;; - wait
-;;; - plot scrn
-;;; - plots
-
-
-FUNC _graphicsstart
-;;; ORIC-rom already have routines, only compiler
-;;; rules are needed for those.
-;;; 
-;;; TODO:
-;;; - faster line
-;;; - faster setpixel
-;;; - faster circle
-;;; - paint (fill?)
-;;; 
-;;; Resources:
-;;; - oric graphics book
-;;; - dflat has nice routines
-;;; - oric .. linebench.zip? has fast routines!
-;;; 
-;;; Ideas:
-;;; - could have several new graphics-modes:
-;;;   a) normal oric
-;;;   b) oric but with "set color attribute"
-;;;   c) 8 FULL colors (3x3 pixels)
-;;;   d) 2 color/mixing (2x2 pixels)
-;;;   e) lores graphics "driver"
-FUNC _graphicsend
-
-
 
 FUNC _runtimestart
 
@@ -1475,6 +1335,148 @@ _SHR:
 
 .endif ; MINIMAL
 FUNC _minimallibraryend
+
+
+
+
+;;; inline str after jsr; +29 bytes
+;;; saves 7 B at each puts/z("...");
+;;; is it worth it?
+;INLINEPUTZOPT=1  
+.include "lib-stdio.asm"
+
+;include "lib-printf.asm"       ; not working
+
+.include "lib-ctype.asm"
+
+.include "lib-stdlib.asm"
+
+.include "lib-string.asm"
+
+.include "lib-math.asm"         ; mul mul10 mul16 div16
+
+
+;;; Current byte count:
+;;; 
+;;; Bytes #functions
+;;; ----- ---- 
+;;; [  23(?)      BIOS: getchar putchar -- NOT part of LIBRARY]
+;;;    17         nl/newline spc bs clrscr...
+;;;   119(?)      #include <stdio.h>
+;;;                (print.asm: putu, putchar, putz) (127 B?)
+;;;    98   10    #include <ctype.h> isdigit isalnum ...
+;;;   144    6    #include <srting.h> strlen strcpy ...
+;;; ======
+;;;   384         (+ 23 119 98 144) 
+
+
+;;; ------- <time.h>
+;;; - clock difftime
+;;; - va_start va_arg va_copy va_end
+;;; - signal (irq timer?)
+
+;;; -------- <assert.h>
+;;; - assert
+
+;;; --------- <stddef.h
+
+;;; TODO:
+;;; - NULL
+;;; - size_t
+;;; - TYPE: ptrdiff_t
+;;; 
+
+;;; ---------- <limits.h>
+;;;     {INT_MAX}
+;;;            Maximum value for an object of type int.
+;;;            Minimum Acceptable Value: 2 147 483 647
+;;;     {INT_MIN}
+;;;            Minimum value for an object of type int.
+;;;            Maximum Acceptable Value: -2 147 483 647
+;;;     {UINT_MAX}
+;;;            Maximum value for an object of type unsigned.
+;;;            Minimum Acceptable Value: 4 294 967 295
+
+;;; ---------- <strings.h>
+;;; 
+;;; TODO:
+;;; - ffs(int) -> bit set (32..1) 1== 0x01 input FFS!
+;;; - strcasecmp
+;;; - strncasecmp
+
+;;; --------- <system.h>
+;;; - exec?
+
+
+FUNC _unistdstart
+;;; ;;????
+;;; ---------- <unistd.h>
+;;; 
+;;; - alarm
+;;; - chdir
+;;; - chown
+;;; - close
+;;; - crypt
+;;; - dup/dup2
+;;; - _exit
+;;; - encrypt
+;;; - _exit
+;;; - fsync
+;;; - ftruncate
+;;; - getcwd
+;;; - gethostname
+;;; - getpid
+;;; - getuid
+;;; - isatty
+;;; - link
+;;; - lockf
+;;; - lseek
+;;; - nice
+;;; - pause
+;;; - read
+;;; - rmdir
+;;; - sleep
+;;; - sync
+;;; - truncate
+;;; - ttyname
+;;; - unlink
+;;; - write
+;;; ---- pthreads?
+FUNC _unistdend
+
+
+
+;;; TOOD: see Docs/oric-atmos-addresses.asm ?
+
+;;; ORIC:
+;;; - wait
+;;; - plot scrn
+;;; - plots
+
+
+FUNC _graphicsstart
+;;; ORIC-rom already have routines, only compiler
+;;; rules are needed for those.
+;;; 
+;;; TODO:
+;;; - faster line
+;;; - faster setpixel
+;;; - faster circle
+;;; - paint (fill?)
+;;; 
+;;; Resources:
+;;; - oric graphics book
+;;; - dflat has nice routines
+;;; - oric .. linebench.zip? has fast routines!
+;;; 
+;;; Ideas:
+;;; - could have several new graphics-modes:
+;;;   a) normal oric
+;;;   b) oric but with "set color attribute"
+;;;   c) 8 FULL colors (3x3 pixels)
+;;;   d) 2 color/mixing (2x2 pixels)
+;;;   e) lores graphics "driver"
+FUNC _graphicsend
 
 
 
