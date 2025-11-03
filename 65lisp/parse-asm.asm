@@ -7973,7 +7973,8 @@ FUNC _stmtbyteruleend
 ;;;  autopatches jump to here if false (PUSHLOC)
 
 
-;FOROPT=1
+;
+FOROPT=1
 .ifdef FOROPT
 ;;; TODO: doesn't match a[n]= b[n] ????
 ;;;  seems be tied to %V parsing???
@@ -7983,17 +7984,24 @@ FUNC _stmtbyteruleend
 ;;; TODO: check LIM < 256
 ;;; TODO: if "constants" generate no indirection!
         .byte "|for(%V[#]=0;%V<%D[#];++%V)"
-        .byte   "%V[#]\[%V;=%V[#]\[%V\];"
+
+;;; TODO []???
+;        .byte   "%V[#]\[%V\]=%V[#]\[%V\];"
+
+        .byte   "*%V[#]++=*%V[#]++;"
 
 ;;; TODO: syntax all wrong?
 ;;; 
 ;;; seems can't match to \[%V\] ... ? lol
 
-;        .byte   "*%V[#]=*%V[#];"
         ;; vara ?3
         ;; lim  ?2
         ;; to   ?1
         ;; from ?0
+
+.ifndef ZPVARS
+
+;;; 29 B
        .byte "["
         ;; to
         .byte "?1"
@@ -8001,17 +8009,13 @@ FUNC _stmtbyteruleend
         ldx VAR1
         sta tos
         stx tos+1
-
 ;;; TODO: works with tos+pos but not with dos???
-
-;jsr _printh        
         ;; from
         .byte "?0"
         lda VAR0
         ldx VAR1
         sta pos
         stx pos+1
-;jsr _printh        
         
         ;; get arg 2 (can't do inside loop!)
         .byte "?2"
@@ -8021,24 +8025,45 @@ FUNC _stmtbyteruleend
         lda (pos),y
         sta (tos),y
 
-;     lda tos
-;     ldx tos+1
-;     jsr _printh
-        
-;     jsr spc
-
-;     lda dos
-;     ldx dos+1
-;    jsr _printh
-
-;     jsr nl
-;     jsr getchar
-
         iny
         cpy #'<'
         bne :-
 
+        ;; update loop variable
+        ;; superfluos?
+        .byte "?3"
+        sty VAR0
+        
      .byte ";;;;]"
+.else ; ZPVARS
+
+;;; 13 B
+       .byte "["
+        ldy #0
+@nextc:
+        .byte "?0"
+        lda (VAR0),y
+
+        .byte "?1"
+        sta (VAR0),y
+
+        iny
+
+        .byte "?2"
+        cpy #'<'
+
+        ;bne :-
+        bne @nextc+ 3 *2
+
+        ;; update loop variable
+        ;; superfluos?
+        .byte "?3"
+        sty VAR0
+
+     .byte ";;;;]"
+
+.endif ; ZEROPAGE
+
 
 .endif ; FOROPT
         
@@ -11250,16 +11275,21 @@ CANT=1
 .endif ; FORSMALL
 
 
-;FORCOPY=1
+;
+FORCOPY=1
 .ifdef FORCOPY
         .byte "word main(){",10
 ;        .byte "  a= 48000; b= a+1;",10
         ;; #xbb80
         .byte "  s= 48000; t= s+1;",10
         .byte "  for(n=0;n<39;++n)",10
-        .byte "    a[n;=b[n];",10
-;
-;        .byte "    *s=*t;",10
+
+;;; TODO: fix
+;        .byte "    a[n;=b[n];",10
+;;; It's a lie, s and t not updated!
+        .byte "    *s++=*t++;",10
+;        .byte "    *(char*)s++=*(char*)t++;",10
+
         .byte "}",10
         .byte 0
 .endif ; FOR
