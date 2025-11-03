@@ -599,7 +599,7 @@ IMMEDIATE=1
 ;;;     missed: $(,08 KLORSTWZ`hloswz{| DEL
 
 ;;;      "#$'+/2347:;<?BCDGKORSTWZ[\_bcdgkortwz{|
-;;; free "#$' /2347    B  GKORSTWZ \_bc gkortwz
+;;; free "#$' /2347       GKORSTWZ \_bc gkortwz
 ;;;             ( '|' '[' are excluded as unsafe )
 ;;; HI' '"#$'(+,/023478:;<?@BCDGHKLOPRSTWXZ[\_`bcdghkloprstwxz{| DEL
 
@@ -647,6 +647,7 @@ IMMEDIATE=1
 ;;;   :   - push loc (onto stack, as backpatch! - careful)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 ;;;   ?n  - PICK n from stack (last is 0)
+;;;   B   - BRACH here (patch jmp at TOS) (use ?n first)
 ;;; 
 ;;; TODO: keep '#' ':' ';'
 ;;; TODO: 'z' to swap two locs? replaces 'D and 'd'
@@ -3250,13 +3251,6 @@ FUNC _generate
         DEBC ']'
         ;; - done
 
-.ifdef xERRPOS
-        lda inp
-        sta erp
-        ldx inp+1
-        stx erp+1
-.endif ; ERRPOS
-
         jsr _incR
         jmp _next
 :       
@@ -3347,6 +3341,19 @@ DEBC '?'
         sta tos
         lda $103,x
         sta tos+1
+        jmp _generate
+:       
+;;; 'B' Branch patch TOS to here
+        cmp #'B'
+        bne :+
+DEBC 'B'
+        lda _out+1
+        iny
+        sta (tos),y
+
+        lda _out
+        dey                     ; Y back to 0 !
+        sta (tos),y
         jmp _generate
 :
 ;;; 'D' SET tos=dos
@@ -4796,28 +4803,19 @@ tya
         .byte _W
 
       .byte "["
-        .byte "?2"
         ;; JUMP to the function; return after JSR!
 	;TODO:  DOJMP in future?
+        .byte "?2"
         jmp VAL0
       .byte "]"
 
-        .byte "[?1]"
 
+      .byte "["                  ; tos= dos
         ;; patch the jump to here
-      .byte "%{"
-        lda _out+1
-        ldy #1
-        sta (tos),y
+        .byte "?1B"
 
-        lda _out
-        dey
-        sta (tos),y
-        
-        IMM_RET
-        
-      .byte "[;"                 ; tos= dos
-        ;; JSR to generate parameters
+        ;; JSR to prepare parameters
+        .byte ";"
         DOJSR VAL0
         ;; after FUN; it'll RTS to here!
       .byte ";;]"
@@ -9280,7 +9278,7 @@ FUNC _OK
         PRINTZ {" Bytes",10,10}
 
 .ifblank
-        GOTOXY 20,27
+        jsr _eosnormal
         ;;     
         ;; /////////////12345678901234567890
         PRINTZ {YELLOW,"^Run ESC=src ^Help",10}
