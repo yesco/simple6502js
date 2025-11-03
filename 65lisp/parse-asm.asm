@@ -7412,9 +7412,7 @@ else:
 afterELSE:      
 .endif
 
-        ;; label
-;        .byte "|%N:",_S
-        ;; set's variable/name to that address!
+        ;; LABEL moved to end of ruleS
 
         ;; goto
 ;;; TODO: %A can be %V ???
@@ -8766,6 +8764,16 @@ parsevarcont:
 
         ;; Expression; // throw away result
         .byte "|",_E,";"
+
+
+
+        ;; MUST BE LAST!
+        ;; (%N sidoeffects are large, lol)
+
+        ;; label
+        .byte "|%N:",_S
+        ;; set's variable/name to that address!
+
 
         .byte 0
 
@@ -11275,8 +11283,7 @@ CANT=1
 .endif ; FORSMALL
 
 
-;
-FORCOPY=1
+;FORCOPY=1
 .ifdef FORCOPY
         .byte "word main(){",10
 ;        .byte "  a= 48000; b= a+1;",10
