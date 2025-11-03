@@ -8138,140 +8138,59 @@ FUNC _stmtbyteruleend
 
 
 ;;; FOR( ; ; )
+;        .byte "|for(",_E,";"
+
+;;; TODO: _S just to do assignment.
+;;;       but should be _E that allows _E,_E,_E
+;;;       (like sequence)
         .byte "|for(",_S
-
-;
-FORRUN=1
-
+      ;; INITIALIZER
       ;; CONDITION
       .byte "["
-PUTC 'B'
-        .byte ":"               ; -4
+        .byte ":"               ; ?3jmp - fixed
         ;; test can be empty, but need to be true!
         lda #$ff
       .byte "]"
-        .byte _S
-
-      ;; LOOP "INC"
+        .byte _E,";"
+        ;; TEST
       .byte "["
-PUTC 'b'        
-        ;; test actual condition
+        ;; not zero?
         tay
-        bne :++
+        bne @true
         txa
-        bne :++
-:       
-PUTC 'F'
-        jmp PUSHLOC             ; -3
-:       
-PUTC 'T'
+        bne @true
+@fail:
+        jmp PUSHLOC             ; ?2B - fixed
+@true:
         ;; skip over INC (do first!)
-        jmp PUSHLOC             ; -2
-PUTC 'C'
-        .byte ":"               ; -1
+        jmp PUSHLOC             ; ?1B - fixed
+
+       ;; STEP (inc)
+        .byte ":"               ; ?0jmp - fixed
       .byte "]"
-;;; TODO: need to make distinction beteen
-;;;    argument statements and _E,
-;;;    latter can take a,b,c; not in args!
+        ;; TODO: need to make distinction beteen
+        ;;    argument statements and _E,
+        ;;    latter can take a,b,c; not in args!
         .byte _E,")"
-      .byte "[:]"               ;  0
-.ifdef FORRUN
-      .byte "%{"
-        ;; TODO: get -3 => tos
-        tsx
-        lda $102+ 3 *3,x
-        sta tos
-        lda $103+ 3 *3,x
-        sta tos+1
-jsr nl
-lda tos
-ldx tos+1
-jsr _printh
-jsr nl
-        IMM_RET
-.endif
-      .byte "["
+
+      .byte "[?3"
         jmp VAL0
       .byte "]"
 
-.ifdef FORRUN
-      .byte "%{"
-        ;; TODO: get -2 => tos
-        tsx
-        lda $102+ 2 *3,x
-        sta tos
-        lda $103+ 2 *3,x
-        sta tos+1
-jsr nl
-lda tos
-ldx tos+1
-jsr _printh
-jsr nl
-        IMM_RET
-      .byte "%{"
-        ;; TODO: patch -2 PUSHLOC to skip here
-        lda _out+1
-        ldy #1
-        sta (tos),y
-        lda _out
-        dey
-        sta (tos),y
-        IMM_RET
+      ;; BODY 
+        ;; come here after CONDITION
+      .byte "[?1B]"
 
-      ;; BODY
-.endif
-      .byte "["
-;PUTC 'S'
-      .byte "]"
         .byte _S
 
-.ifdef FORRUN
-      .byte "%{"
-        ;; TODO: get -4 to skip there 
-        tsx
-        lda $102+ 4 *3,x
-        sta tos
-        lda $103+ 4 *3,x
-        sta tos+1
-jsr nl
-lda tos
-ldx tos+1
-jsr _printh
-jsr nl
-        IMM_RET
-.endif
-
-      .byte "["
-PUTC 's'
+      .byte "[?0"
         jmp VAL0
       .byte "]"
+        
+        ;; FAIL go here
+      .byte "[?2B]"
 
-
-.ifdef FORRUN
-      .byte "%{"
-        ;; TODO: get ??? => tos
-        tsx
-        lda $102+ 3 *5,x
-        sta tos
-        lda $103+ 3 *5,x
-        sta tos+1
-jsr nl
-lda tos
-ldx tos+1
-jsr _printh
-jsr nl
-        IMM_RET
-      .byte "%{"
-        ;; TODO: patch -4 PUSHLOC to skip here
-        lda _out+1
-        ldy #1
-        sta (tos),y
-        lda _out
-        dey
-        sta (tos),y
-        IMM_RET
-.endif
-        ;; cleanup
+        ;; cleanup, lol - big one!
         .byte "[;;;;]"
 
 
@@ -11184,8 +11103,7 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;
-PARAM4=1
+;PARAM4=1
 .ifdef PARAM4
 
 ;
@@ -11296,10 +11214,11 @@ CANT=1
         .byte 0
 .endif ; BIGSCROLL
 
-;FOR=1
+;
+FOR=1
 .ifdef FOR
         .byte "word main(){",10
-        .byte "  for(n=10;n;--n) {",10
+        .byte "  for(n=10;n--;) {",10
         .byte "    putu(n); putchar(' ');",10
         .byte "  }",10
         .byte "}",10
