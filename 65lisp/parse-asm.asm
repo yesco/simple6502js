@@ -599,8 +599,16 @@ IMMEDIATE=1
 ;;;     missed: $(,08 KLORSTWZ`hloswz{| DEL
 
 ;;;      "#$'+/2347:;<?BCDGKORSTWZ[\_bcdgkortwz{|
-;;; free "#$' /2347       GKORSTWZ \_bc gkortwz
-;;;             ( '|' '[' are excluded as unsafe )
+;;; free  #$  /2347       GKORSTWZ \_bc gkortwz
+;;; 
+;;;             DON'T USE THE FOLOWING
+;;;                | = used to skip to next |-or-rule
+;;;                [ = start of block, if one left out...
+;;;                ] = is actually EOR $nnnn,$x
+;;;                > = is actually ROL $nnnn,x
+;;;                < = used previously, but cannot >
+;;; 
+;;; 
 ;;; HI' '"#$'(+,/023478:;<?@BCDGHKLOPRSTWXZ[\_`bcdghkloprstwxz{| DEL
 
 ;;;  ( 168 freee? '8'
@@ -1799,11 +1807,15 @@ pframe:
         .word addr
 .endmacro
 
-VAL0= '<' + 256*'>'
-VAL1= '+' + 256*'>'
+;;; TODO: chagne '>' is bad, so better change all!
+LOVAL= '<'
+HIVAL= '>'
+
+VAL0 = LOVAL + 256* HIVAL
+VAL1 = '+'   + 256* HIVAL
 
 .ifdef ZPVARS
-  VAR0= '<'
+  VAR0= LOVAL
   VAR1= '+'
 .else
   VAR0= VAL0
@@ -4290,6 +4302,8 @@ FUNC _iorulesstart
       .byte ']'
         .byte "%S)"
 
+        ;; fputs("foo",stdout); == putz !
+        ;; NO newline!
         .byte "|fputs(",34
       .byte '['
         jsr iputs
