@@ -599,7 +599,7 @@ IMMEDIATE=1
 ;;;     missed: $(,08 KLORSTWZ`hloswz{| DEL
 
 ;;;      "#$'+/2347:;<?BCDGKORSTWZ[\_bcdgkortwz{|
-;;; free "#$' /2347   ?B  GKORSTWZ \_bc gkortwz
+;;; free "#$' /2347    B  GKORSTWZ \_bc gkortwz
 ;;;             ( '|' '[' are excluded as unsafe )
 ;;; HI' '"#$'(+,/023478:;<?@BCDGHKLOPRSTWXZ[\_`bcdghkloprstwxz{| DEL
 
@@ -646,6 +646,7 @@ IMMEDIATE=1
 ;;;   #   - push tos (on to stuck)
 ;;;   :   - push loc (onto stack, as backpatch! - careful)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
+;;;   ?n  - PICK n from stack (last is 0)
 ;;; 
 ;;; TODO: keep '#' ':' ';'
 ;;; TODO: 'z' to swap two locs? replaces 'D and 'd'
@@ -1142,7 +1143,7 @@ sw2:
 .else ; !CALLSWAP8
 
 swapY:  
-;;; 24 B (smaller and faster!)
+;;; 20 B (smaller and faster!)
         tsx
         stx savex
         ;; skip call here
@@ -1173,7 +1174,16 @@ swapY:
 
 
 
+;;; 634690
+;;; 69 B - SWAPY !RESTORY
+;;; 9313634   (/ (- 9313694 634690) 1000 19)  = 456
+;;; 36 B - SWAPY RESTORY
+;;; 10452843  (/ (- 10452843 634690) 1000 19) = 516
 
+;;; --> +33 B => 10% faster RECURSION
+
+;;; save RUNTIME memory
+RESTORY=1
 .ifdef RESTORY
 
 restoreY:
@@ -3316,6 +3326,29 @@ DEBC '>'
         lda tos+1
         jmp doout
 :       
+;;; '?n' PICK n
+        cmp #'?'
+        bne :+
+DEBC '?'
+        jsr _incR
+        lda (rule),y
+        and #$0f
+        ;; mul3
+        sta savea
+        asl a
+        adc savea
+        ;; add x
+        tsx
+        stx savex
+        adc savex
+        tax
+        ;; PICK n:rd from stack
+        lda $102,x
+        sta tos
+        lda $103,x
+        sta tos+1
+        jmp _generate
+:
 ;;; 'D' SET tos=dos
         cmp #'D'
         bne :+
@@ -4762,30 +4795,17 @@ tya
         ;; and pushing parameters
         .byte _W
 
-.macro PICK nn
-        tsx
-        ;; pick nnrd argument
-        lda $102+ nn *3,x
-        sta tos
-        lda $103+ nn *3,x
-        sta tos+1
-.endmacro
-
-      .byte "%{"
-        PICK 2                  ; %U
-;PUTC '!'
-;jsr puth
-        IMM_RET
-
       .byte "["
+        .byte "?2"
         ;; JUMP to the function; return after JSR!
 	;TODO:  DOJMP in future?
         jmp VAL0
       .byte "]"
 
+        .byte "[?1]"
+
         ;; patch the jump to here
       .byte "%{"
-        PICK 1
         lda _out+1
         ldy #1
         sta (tos),y
@@ -7017,7 +7037,7 @@ POSTLUDE=1
 .ifdef OPTJSK_CALLING
         ;; defer: restore(8)
 ;putc '!'
-.ifblank
+.ifnblank
 ;;; 6 B
 ;;; TODO: code that generates specific caLL
         lda #>(restore8-1)
@@ -11166,7 +11186,8 @@ input:
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
-;PARAM4=1
+;
+PARAM4=1
 .ifdef PARAM4
 
 ;
