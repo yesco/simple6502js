@@ -2270,6 +2270,7 @@ percent:
         lda (rule),y
 
         sta percentchar
+
 .ifdef DEBUGFUN
 putc '%'
 lda percentchar
@@ -2329,9 +2330,11 @@ noimm:
 .endif ; IMMEDIATE
 
         ;; Digits? (constants really)
-        cmp #'D'
-        bne :+
-
+        cmp #'d'                ; < 256
+        beq :+
+        cmp #'D'                ; any constant
+        bne :++
+:       
         jmp _digits
 :       
 
@@ -2403,7 +2406,7 @@ str:
         ;; 7 B
         ; ldy #0 
         sta (_out),y
-jsr putchar
+;jsr putchar
         jsr _incO
         jmp str
 
@@ -3066,8 +3069,12 @@ jsr putchar
 ;;; with XOR #64 ; CMP #('z' & 63) - save 1 b!
         sec
         sbc #'A'
-;;; TODO: enable for a-z too, now only F
-        cmp #'z'-'A'+1
+        sta savea
+
+        ;; lowercase for test
+        and #255-32
+;        cmp #'z'-'A'+1
+        cmp #'Z'-'A'+1
 ;;; If we limit to A-F suddenly "word main()" doesn't
 ;;; parse. Since we take only char (first) "ain"
 ;;; doesn't match so it'll backtrack up to ruleP word main
@@ -3080,6 +3087,9 @@ jsr putchar
         bcc :+
         jmp failjmp
 :
+
+        ;; get offset back
+        lda savea
 
 ;;; TODO: move a-z A-Z to zp
         ;; pick global address
@@ -3505,6 +3515,15 @@ nextdigit:
         bcc digit
         ;; Done
         ;; > 9 : end == OK
+
+        ;; test that it's allowed range
+        lda percentchar
+        cmp #'D'
+        beq @OK
+        ;; we have 'd' lets see < 256
+        lda tos+1
+        bne failjmp2
+@OK:       
         jmp _next
 
 digit:  
@@ -3537,7 +3556,6 @@ ischar:
         ;; - skip '
         jsr _incI
         jmp _next
-
 
 
 failjmp2:        
@@ -4539,15 +4557,7 @@ FUNC _memoryrulesstart
 ;;; TODO: too many |POKE( rules!!!!
 
 ;;; OK
-        .byte "|poke(%D,"
-      .byte "%{"
-        ;; make sure %D <256
-        lda tos+1
-        beq :+
-        IMM_FAIL
-:       
-        IMM_RET
-
+        .byte "|poke(%d,"
         .byte "[#]",_I
       .byte "[;"
         sta '<'
@@ -4592,9 +4602,6 @@ FUNC _memoryrulesstart
 
 ;;; OK
         .byte "|poke(",_E,",",_J
-;      .byte "%{"
-;        putc '!'
-;        IMM_RET
       .byte "["
         sta (tos),y
       .byte "]"
@@ -5514,16 +5521,7 @@ FUNC _oprulesstart
 
 .ifdef OPTRULES
         ;; +BYTE
-        .byte "|+%D"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; make sure %D <256
-        lda tos+1
-        beq :+
-        jmp _fail
-:       
-        IMM_RET
-
+        .byte "|+%d"
       .byte '['
 ;;; 6 B
         clc
@@ -5563,15 +5561,7 @@ FUNC _oprulesstart
 
 .ifdef OPTRULES
         ;; -BYTE
-        .byte "|-%D"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; make sure %D <256
-        lda tos+1
-        beq :+
-        jmp _fail
-:       
-        IMM_RET
+        .byte "|-%d"
       .byte '['
 ;;; 6 B
         sec
@@ -5621,16 +5611,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|&%D"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; make sure %D <256
-        lda tos+1
-        beq :+
-        IMM_FAIL
-:       
-        IMM_RET
-
+        .byte "|&%d"
       .byte "["
         and #'<'
         ldx #0
@@ -6709,6 +6690,7 @@ ruleQ:
         ;; TODO: this may not be easily skippable
         ;; TODO: remove as this is hack
         lda tos
+;;; TODO: this 0 may cause problem.. to skip!
         ldy #0
         sta (pos),y
         jsr _incP
@@ -7481,16 +7463,7 @@ afterELSE:
 .endif ; ELSE
 .endscope
 
-        .byte "|if(%A&%D)"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; make sure %D <256
-        lda tos+1
-        beq :+
-        jmp _fail
-:       
-        IMM_RET
-
+        .byte "|if(%A&%d)"
 .scope        
       .byte "["
         lda #'<'
@@ -7963,17 +7936,7 @@ FUNC _stmtbyteruleend
 
 ;;; TODO: for expects empty statement to be "true"!
 
-        .byte "|for(i=0;i<%D[d] ;++%V)"
-;;; 22B (is less than while!!! 40B!)
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-;;;  make sure %D <256
-        lda tos+1
-        beq :+
-        jmp _fail
-:              
-        IMM_RET
-
+        .byte "|for(i=0;i<%d[d];++%V)"
       .byte "["
 ;;;  start not with 0 but with 
         lda #0
@@ -8009,6 +7972,76 @@ FUNC _stmtbyteruleend
       .byte "]"
 ;;;  autopatches jump to here if false (PUSHLOC)
 
+
+;FOROPT=1
+.ifdef FOROPT
+;;; TODO: doesn't match a[n]= b[n] ????
+;;;  seems be tied to %V parsing???
+
+        ;; Fastest small memcopy!
+;;; TODO: check same var!
+;;; TODO: check LIM < 256
+;;; TODO: if "constants" generate no indirection!
+        .byte "|for(%V[#]=0;%V<%D[#];++%V)"
+        .byte   "%V[#]\[%V;=%V[#]\[%V\];"
+
+;;; TODO: syntax all wrong?
+;;; 
+;;; seems can't match to \[%V\] ... ? lol
+
+;        .byte   "*%V[#]=*%V[#];"
+        ;; vara ?3
+        ;; lim  ?2
+        ;; to   ?1
+        ;; from ?0
+       .byte "["
+        ;; to
+        .byte "?1"
+        lda VAR0
+        ldx VAR1
+        sta tos
+        stx tos+1
+
+;;; TODO: works with tos+pos but not with dos???
+
+;jsr _printh        
+        ;; from
+        .byte "?0"
+        lda VAR0
+        ldx VAR1
+        sta pos
+        stx pos+1
+;jsr _printh        
+        
+        ;; get arg 2 (can't do inside loop!)
+        .byte "?2"
+
+        ldy #0
+:       
+        lda (pos),y
+        sta (tos),y
+
+;     lda tos
+;     ldx tos+1
+;     jsr _printh
+        
+;     jsr spc
+
+;     lda dos
+;     ldx dos+1
+;    jsr _printh
+
+;     jsr nl
+;     jsr getchar
+
+        iny
+        cpy #'<'
+        bne :-
+
+     .byte ";;;;]"
+
+.endif ; FOROPT
+        
 
         ;; i > 255
         ;; (saves 20B for PRIME for)
@@ -8959,14 +8992,7 @@ ruleW:
         .byte TAILREC
 
         ;; one byte constant paramter 0-255
-        .byte "|%D,"
-      .byte "%{"
-        ;;  make sure %D <256
-        lda tos+1
-        beq :+
-        jmp _fail
-:              
-        IMM_RET
+        .byte "|%d,"
       .byte "["
         ;; saves 1 byte, hmmm
         lda #'<'
@@ -11214,8 +11240,31 @@ CANT=1
         .byte 0
 .endif ; BIGSCROLL
 
+;FORSMALL=1
+.ifdef FORSMALL
+        .byte "word main(){",10
+        .byte "  for(i=0;i<100;++i)",10
+        .byte "    putu(i);",10
+        .byte "}",10
+        .byte 0
+.endif ; FORSMALL
+
+
+;FORCOPY=1
+.ifdef FORCOPY
+        .byte "word main(){",10
+;        .byte "  a= 48000; b= a+1;",10
+        ;; #xbb80
+        .byte "  s= 48000; t= s+1;",10
+        .byte "  for(n=0;n<39;++n)",10
+        .byte "    a[n;=b[n];",10
 ;
-FOR=1
+;        .byte "    *s=*t;",10
+        .byte "}",10
+        .byte 0
+.endif ; FOR
+
+;FOR=1
 .ifdef FOR
         .byte "word main(){",10
         .byte "  for(n=10;n--;) {",10
@@ -12037,9 +12086,9 @@ FOR=1
 ;;;         315    2.60s  CC02 10K runs ^X * 100
 ;;;         307    2.53s  CC02 while-speed,++i(;),+BYTE
 ;;;         302    2.43s  CC02 rule _F byte rule for poke!
-;;;         304    +2 B ??? investigate, poke changed, wrong?
-;;;                - 1a45336b30cc787f668c83dd4e4c7dff4baa7a99
-;;;         303    -1 B !!! better poke
+;;;         304       +2 B ??? investigate, poke changed, wrong?
+;;;                    - 1a45336b30cc787f668c83dd4e4c7dff4baa7a99
+;;;         303         -1 B !!! better poke (?)
 
 
 ;;; TODO: at some point it got to 361 bytes
