@@ -24,7 +24,7 @@ rm fil
 # TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
 # TODO: linker -D __AUTORUN__=$C7
 
-# orig
+# orig (opts)
 ( cl65 -r -Oirs $* $OPTS '-D__AUTORUN__=$C7' -t atmos $name.c vm-asm.s -o $name.tap -vm -m $name.map 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || (echo "??????????????? FAILED ???????????"; exit 72)
 
 # opt for size?
@@ -46,10 +46,12 @@ echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 
 ls -l $name.o $name.tap
 
-# make it autostart and copy to download directory
+
+
+# --- make it autostart and copy to download directory
 
 nam=$(basename $name)
 echo "NAME: $nam"
 
-cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C $nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -l $name.tap ORIC/$nam.tap
+cat $name.tap | sed '1 s/^\(.......\)./\1\xc7/' > fil ; cp fil ORIC/$nam.tap ; hexdump -C ORIC/$nam.tap | head -1 ; hexdump -C ORIC/$nam.tap | head -1 ; ls -l $name.tap ORIC/$nam.tap
 
