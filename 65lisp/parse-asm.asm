@@ -873,12 +873,6 @@ gos:    .res 2
 savea:  .res 1
 savex:  .res 1
 savey:  .res 1
-;;; used by print.asm, lol
-;;; TODO: FIX!
-tmp1:   .res 2
-tmp2:   .res 2
-
-
 
 .code
 
@@ -9399,8 +9393,8 @@ TIMPER=8
 FUNC _editorstart
 
 
-;
-ATMOS_SCREEN_EDITOR=1
+;ATMOS_SCREEN_EDITOR=1
+
 .ifdef ATMOS_SCREEN_EDITOR
         .include "edit-atmos-screen.asm"
 .else
@@ -11702,7 +11696,7 @@ NOPRINT=1
 ;;; HIRES: (- 37631 (* 5 256) 17421 8000 2000) =  8930
 ;;; -- cc65 
 
-MALLOC=1
+;MALLOC=1
 .ifdef MALLOC
         .byte "// malloc() test",10
         .byte "word main() {",10
@@ -12188,7 +12182,7 @@ arr:    .res 256
 _params:        
 params: 
 ;;; TODO: increase
-        .res 16*2
+        .res 8*2
 
 ;;; TODO: decrease/remove globals/make dynamic
 .export _vars

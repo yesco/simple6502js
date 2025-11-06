@@ -8,7 +8,8 @@
 ;;; TODO: move to atmos constants file?
 HIRES      = $a000
 HICHARSET  = $9800
-SCREEN     = $bb80
+;SCREEN     = $bb80
+SC=$bb80
 CHARSET    = $b400
 
 
@@ -19,10 +20,14 @@ CHARSET    = $b400
 
 ;;; For ORIC ATMOS we're going to use part of the
 ;;; HIRES as an editing buffer.
-EDITNULL= HICHARSET
+;EDITNULL= HICHARSET
+
+;;; lol
+EDITNULL= input-1
 
 
 EDITSTART= EDITNULL+1
+
 ;;; non inclusive
 ;;; TEXTSCREEN CHARSET start
 EDITEND= CHARSET
@@ -30,17 +35,13 @@ EDITEND= CHARSET
 EDITSIZE= EDITEND-EDITSTART
 
 
-
-.bss
-        
-.org EDITSTART
-
-editbuffer:         .res BUFFERSIZE
+WIDTH=40
 
 .zeropage
 
 ;;; A value of point EDITSTART <= x < EDITEND
-editcursor:     .res 2
+editpos:        .res 2
+lineptr:        .res 2
 editend:        .res 2
 
 editrow:        .res 1
@@ -48,35 +49,43 @@ editcol:        .res 1
 
 .code
 
-startedit:
+.ifdef FISHF
+FUNC _initedit
         jsr clrscr
         
         ;; put cursor at start, len=0 bytes
         lda #<EDITSTART
         ldx #>EDITSTART
-        sta editcursor
-        stx editcursor+1
+        sta editpos
+        stx editpos+1
         sta editend
         stx editend+1
 
         ;; put zeroes at boundaries
-        lda #0
+        ldy #0
+        tya
         sta EDITNULL
-        sta (editend),0
-        sta editrow
-        sta editcol
+        sta (editend),y
+;        sta editrow
+;        sta editcol
 
+.endif
 
-edit:   
+FUNC _edit
+FUNC _editloop
         jsr getchar
-        jsr editaction
-        jmp edit
+        jsr _editaction
+        jmp _editloop
         
 
 ;;; Each operation ends with RTS
 ;;; (instead of jmp edit, saving 2 bytes)
-editaction:
+FUNC _editaction
         
+;        putc '!'
+        jmp _redraw
+
+
         ;; ^L redisplay (TOOD: reload)
         cmp #CTRL('L')
         bne :+
@@ -95,9 +104,14 @@ loadfirst:
         stx dos+1
 
         jsr copyz
-
         ;; calculate end
-.if (EDITSTART .mod 256)==0
+
+;.if ((EDITSTART .mod 256)==0)
+;EDITALIGNED=1
+.scope
+.ifdef EDITALIGNED
+
+        .assert ((EDITNULL .mod 256)=0),error,"%% EDITALIGNED"
         sty dos
         lda dos+1
         sta editend+1
@@ -113,19 +127,214 @@ loadfirst:
         ldx dos+1
         stx editend+1
 .endif
+.endscope
 
-        jmp redraw
+;;; LOL
+        jmp _redraw
 :       
+;;; on every update!? lol
+;;; (how fast can we make it?)
+        jmp _redraw
+
+
+;REDRAW_NONE=1
+;
+RED_RAW_ORIC=1
+;RECDRAW_Y=1
+;REDRAW_GENERIC=1
+;REDRAW_PUTCHAR=1
+
+.ifdef REDRAW_NONE
+FUNC _redraw
+        rts
+.endif ; REDRAW_NONE
+
+
+
+.ifdef RED_RAW_ORIC
+;;; raw raw raw
+FUNC _redraw 
+;;; (+ 20 47) = 67
+        lda #<(SC+40)
+        ldx #>(SC+40)
+        sta tos
+        stx tos+1
         
+        lda #<EDITNULL
+        ldx #>EDITNULL
+        sta pos
+        stx pos+1
+
+        ldx #WIDTH
+        ldy #0
+
+@nextc:
+        inc pos
+        bne :+
+        inc pos+1
+:       
+
+        lda (pos),y
+        beq @done2
+
+        cmp #10
+        beq @newline
+
+        sta (tos),y
+        
+@forw:
+        dex
+        bne :+
+        ldx #WIDTH
+:       
+
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        jmp @nextc
+
+@newline:
+        lda #' '
+@clreol2:
+        sta (tos),y
+
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        dex
+        bne @clreol2
+
+        ldx #WIDTH
+        jmp @nextc
+;        jmp @forw
+
+@done2:
+        rts
+        
+.endif ; RED_RAW_ORIC
         
 
-;;; update
-redraw: 
+
+.ifdef REDRAW_Y;
+;; redraw whole edit screen directly in memory
+FUNC _redraw 
+;;; (+ 20 50) = 70
+        lda #<(SCREEN+40)
+        ldx #>(SCREEN+40)
+        sta dos
+        stx dos+1
+        
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        sta pos
+        stx pos+1
+
+        ldx #0                  ; X=rows
+        ;; Y store col and offset from dos and pos!
+        ldy #0                  ; Y=cols, lol
+        
+@nextc:
+        lda (pos),y
+        beq @done
+        ;; newline
+        cmp #10
+        bne :+
+
+        ;; update lineptr
+        tya
+        clc
+        adc pos
+        sta lineptr
+        lda pos+1
+        sta lineptr+1
+
+        ;; clear till end of line
+        lda #' '
+:       
+;;; TODO: always do one, maybe not good?
+        sta (dos),y
+        iny
+        cpy #COLS
+        bne :-
+        beq @wrap
+
+@putcraw:
+        sta (dos),y
+
+        iny
+        cpy #WIDTH
+        bne :+
+@wrap:
+        ;; move line down
+        clc
+        lda dos
+        adc #WIDTH
+        sta dos
+        bcc :+
+        inc dos+1
+:       
+        jmp @nextc
+        
+
+@done:
+        rts
+
+.endif ; REDRAW_Y
+
+.ifdef REDRAW_GENERIC
+;;; GENERIC "vt100" terminal style
+FUNC _redraw
+;;; 42 B
+        ;; "hack"
+        ;; - save char at cursor, replace with \0
+        ldy #0
+        lda (editpos),y
+        pha
+        tya
+        sta (editpos),y
+
+        ;; print till cursor
+        jsr clrscr
+
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        jsr putz
+        
+        ;; save cursor pos on screen
+        ;; (TODO: it's compat w gap-buffer!)
+        jsr hidecursor
+        jsr savecursor
+
+        ;; restore char
+        pla
+        ldy #0
+        sta (editpos),y
+
+        lda editpos
+        ldx editpos+1
+        jsr putz
+        
+        ;; move cursor to "editpos"
+        jsr restorecursor
+        jsr showcursor
+
+        rts
+.endif ; REDRAW_GENERIC
+
+
+.ifdef REDRAW_PUTChAR
+;;; update "no putz"
+FUNC _redraw
+;;; 56 B
         lda #<EDITSTART
         ldx #>EDITSTART
         sta pos
         lda #0
         sta pos+1
+
+        sta editrow
         
         ;; keep track of column
         ldx #$ff
@@ -137,6 +346,11 @@ redraw:
         ;; newline
         cmp #10
         bne :+
+
+        ;; store lineptr
+        sty lineptr
+        lda pos+1
+        sta lineptr+1
 
         jsr clreol
         jmp @wrap
@@ -153,7 +367,7 @@ redraw:
         cmp #ROWS
         beq @done
 :       
-        jsr putchar
+;        jsr putchar
 
         ;; move forward
         iny
@@ -167,6 +381,7 @@ redraw:
         rts
         
 
+.endif ; REDRAW_PUTChAR
 
         
 
