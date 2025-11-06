@@ -72,9 +72,12 @@ FUNC _initedit
 .endif
 
 FUNC _edit
+        jsr loadfirst
+
 FUNC _editloop
 
         jsr getchar
+
 ;jsr printchar
         jsr _editaction
 
@@ -88,6 +91,8 @@ FUNC _editloop
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
         
+        ldy #0
+
         ;; ^L redisplay (TOOD: reload)
         cmp #CTRL('L')
         beq loadfirst
@@ -117,8 +122,13 @@ FUNC _editaction
         lda editend+1
         sta tos+1
 
-        ldy #1
-        jmp @copyc
+        ldy #0
+
+;;; DOUBLE 0 BYTE MAKES THIS INSERT
+;;; NOT bleed into next input
+
+;        jsr _incT
+;        jmp @copyc
 @nextc:
         ;; DEC tos
         lda tos
@@ -133,51 +143,56 @@ FUNC _editaction
         dey
         ;; TODO: beginning of file (no cursor?)
         tax
-        beq @done
+;        beq @done
         ;; hibit == curpos! => exit
-
+        beq @nextc
         bpl @nextc
         
 @done:
         pla
 ;        sta (editpos),y
         sta (tos),y
+        
+        ;; update cursorpos
+
+        lda tos
+        sta editpos
+        ldx tos+1
+        stx editpos
+        
+        ;; fall-through
 
 eforward:        
-        ;; hide "cursor"
-        lda (editpos),y
-        and #$7f
-        sta (editpos),y
+        jsr togglecursor
 
+;;; TODO: jsr _incE
         inc editpos
         bne :+
         inc editpos+1
 :       
 
-        ;; show "cursor"
-        lda (editpos),y
-        ora #$80
-        sta (editpos),y
-        rts
+        jmp togglecursor
 
 eback:   
-        ;; hide "cursor"
-        lda (editpos),y
-        and #$7f
-        sta (editpos),y
 
+        jsr togglecursor
+
+;;; TODO: jsr _decE
         lda editpos
         bne :+
         dec editpos+1
 :       
         dec editpos
 
-        ;; show "cursor"
+;;; TODO: fall-through?
+        jmp togglecursor
+
+togglecursor:   
+        ldy #0
         lda (editpos),y
-        ora #$80
+        eor #$80
         sta (editpos),y
         rts
-
 
 loadfirst:
         ;; TOS= from
@@ -185,6 +200,10 @@ loadfirst:
         ldx #>input
         sta tos
         stx tos+1
+
+;;; same!!!!
+
+;;; TODO: make use of actual buffer...
 
         ;; DOS= to
         lda #<EDITSTART
@@ -253,9 +272,9 @@ FUNC _redraw
 
 
 .ifdef RED_RAW_ORIC
-;;; raw raw raw
+;;; raw raw raw - relatively fast!
 FUNC _redraw 
-;;; (+ 20 47) = 67
+;;; (+ 20 50) = 70
         lda #<(SC+40)
         ldx #>(SC+40)
         sta tos
@@ -316,6 +335,14 @@ FUNC _redraw
         
 .endif ; RED_RAW_ORIC
         
+
+
+
+
+
+
+
+
 
 
 .ifdef REDRAW_Y;
@@ -383,6 +410,21 @@ FUNC _redraw
         rts
 
 .endif ; REDRAW_Y
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .ifdef REDRAW_GENERIC
 ;;; GENERIC "vt100" terminal style

@@ -11672,9 +11672,11 @@ NOPRINT=1
         .byte "    printf(",34,"%u",34,", c);",10
         .byte "    ++n;",10
         .byte "  }",10
-        .byte "  free(a);",10
+        .byte "  free(a);" ;;,10
         .byte "  return c;",10
         .byte "}"
+        .byte 0
+        ;; double byte make edit insert happy, lol
         .byte 0
 .endif ; BYTESIEVE
 ;
