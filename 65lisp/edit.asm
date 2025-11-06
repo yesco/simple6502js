@@ -73,8 +73,14 @@ FUNC _initedit
 
 FUNC _edit
 FUNC _editloop
+
         jsr getchar
+;jsr printchar
         jsr _editaction
+
+;;; TODO: if bbhit skip redraw!
+        jsr _redraw
+
         jmp _editloop
         
 
@@ -82,13 +88,96 @@ FUNC _editloop
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
         
-;        putc '!'
-        jmp _redraw
-
-
         ;; ^L redisplay (TOOD: reload)
         cmp #CTRL('L')
+        beq loadfirst
+
+        cmp #CTRL('F')
+        beq eforward
+        cmp #CTRL('I')
+        beq eforward
+
+        cmp #CTRL('B')
+        beq eback
+        cmp #CTRL('H')
+        beq eback
+        ;; not special - insert
+        ;; - save for later
+        pha
+
+        ;; - make spece shift up
+        ;; (we need to know the end)
+
+;;; seems redundant or too much work!
+;;; TODO: we knew it when we copied...
+
+        ;; - move back from end
+        lda editend
+        sta tos
+        lda editend+1
+        sta tos+1
+
+        ldy #1
+        jmp @copyc
+@nextc:
+        ;; DEC tos
+        lda tos
         bne :+
+        dec tos+1
+:       
+        dec tos
+@copyc:       
+        lda (tos),y
+        iny
+        sta (tos),y
+        dey
+        ;; TODO: beginning of file (no cursor?)
+        tax
+        beq @done
+        ;; hibit == curpos! => exit
+
+        bpl @nextc
+        
+@done:
+        pla
+;        sta (editpos),y
+        sta (tos),y
+
+eforward:        
+        ;; hide "cursor"
+        lda (editpos),y
+        and #$7f
+        sta (editpos),y
+
+        inc editpos
+        bne :+
+        inc editpos+1
+:       
+
+        ;; show "cursor"
+        lda (editpos),y
+        ora #$80
+        sta (editpos),y
+        rts
+
+eback:   
+        ;; hide "cursor"
+        lda (editpos),y
+        and #$7f
+        sta (editpos),y
+
+        lda editpos
+        bne :+
+        dec editpos+1
+:       
+        dec editpos
+
+        ;; show "cursor"
+        lda (editpos),y
+        ora #$80
+        sta (editpos),y
+        rts
+
 
 loadfirst:
         ;; TOS= from
@@ -104,6 +193,21 @@ loadfirst:
         stx dos+1
 
         jsr copyz
+
+        tya
+        clc
+        adc dos
+        sta editend
+        lda #0
+        adc dos+1
+        sta editend+1
+
+        ;; set hibit on first char
+        ;; == cursor!
+        lda EDITSTART
+        ora #$80
+        sta EDITSTART
+        
         ;; calculate end
 
 ;.if ((EDITSTART .mod 256)==0)
@@ -129,12 +233,9 @@ loadfirst:
 .endif
 .endscope
 
-;;; LOL
-        jmp _redraw
-:       
-;;; on every update!? lol
-;;; (how fast can we make it?)
-        jmp _redraw
+        rts
+
+
 
 
 ;REDRAW_NONE=1
