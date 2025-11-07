@@ -305,11 +305,14 @@ FUNC _redraw
 
         lda (pos),y
         beq @done2
+        sta (tos),y
 
+        ;; newline
         cmp #10
         beq @newline
+        cmp #10+128             ; nl + cursor!
+        beq @newline
 
-        sta (tos),y
         
 @forw:
         dex
@@ -323,11 +326,10 @@ FUNC _redraw
 :       
         jmp @nextc
 
-@newline:
-        lda #' '
 @clreol2:
+        lda #' '
         sta (tos),y
-
+@newline:
         inc tos
         bne :+
         inc tos+1
@@ -365,7 +367,7 @@ FUNC _redraw
         ldx #>(SCREEN+40)
         sta dos
         stx dos+1
-        
+lskjdflsakjdflasdkjflsdkf        
         lda #<EDITSTART
         ldx #>EDITSTART
         sta pos
@@ -379,9 +381,11 @@ FUNC _redraw
         lda (pos),y
         beq @done
         ;; newline
+        cmp #10+128
+        beq @newline
         cmp #10
-        bne :+
-
+        bne @putcraw
+@newline:
         ;; update lineptr
         tya
         clc
@@ -390,8 +394,9 @@ FUNC _redraw
         lda pos+1
         sta lineptr+1
 
+@cleareol:
         ;; clear till end of line
-        lda #' '
+        lda #'-'
 :       
 ;;; TODO: always do one, maybe not good?
         sta (dos),y
@@ -405,7 +410,7 @@ FUNC _redraw
 
         iny
         cpy #WIDTH
-        bne :+
+        bne @nextc
 @wrap:
         ;; move line down
         clc
