@@ -874,7 +874,16 @@ savea:  .res 1
 savex:  .res 1
 savey:  .res 1
 
+
+;;; IDE mode: V=64=init Mi=$ff=command Pl=0=editing=
+;;;   (_init sets it to 64)
+;;;   editor->command: dec mode
+;;;   comand->editor:  inc mode
+mode:           .res 1
+
 .code
+
+
 
 
 ;;; ========================================
@@ -1835,11 +1844,17 @@ FUNC _init
         sta dirty
         sta showbuffer
 
-        ;; compile from src first time
+        ;; tell IDE/edit.asm we're firest time
+        lda #64
+        sta mode
 
+        ;; compile from src first time
+        ;; - fall-through
 
 ;;; compile using defaults input, output
 ;;; BEWARE: never returns! ends up in _OK/_edit
+;;; 
+;;; Reverese order _compile and _compileInput _compileAX?
 FUNC _compile
         ;; default output location
         lda #<_output
@@ -1907,7 +1922,7 @@ originp:        .res 2
 ;;; (description sucks!)
 
 ;;; 0,0,protected on=0!,0, 1=off,0,screen=on=1,cursor=on=1
-        lda #%00001011
+        lda #%00001010
         sta $26a
 ;;; $24E (KBDLY) delay for keyboard auto repeat, def 32
         lda #8

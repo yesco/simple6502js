@@ -5,6 +5,18 @@
 ;;; written in pure assembly.
 ;;; 
 
+;;; TODO: optimize for code-size.
+;;; TODO: and... is gap-buffer smaller? (faster!)
+
+;;; This module is 
+;;;    545 B / IDE: 2432 B
+;;; 
+;;; Old editor ( edit-atmos-screen.asm )
+;;;    529 B / IDE: 2428 B
+;;; 
+
+
+
 ;;; TODO: move to atmos constants file?
 HIRES      = $a000
 HICHARSET  = $9800
@@ -52,6 +64,9 @@ editcol:        .res 1
 
 .code
 
+
+
+
 .ifdef FISHF
 FUNC _initedit
         jsr clrscr
@@ -77,22 +92,35 @@ FUNC _initedit
 
 
 
-
 FUNC _edit
+        bit mode
+        bvc :+
         jsr loadfirst
 
-FUNC _editloop
+        ;; set edit mode
+        lda #0
+        sta mode
+:       
+        jmp editloop
+
+
+command:
+        PRINTZ {10,">"}
+
+editing:
         jsr getchar
-        jsr _editaction
-        ;; don't draw if key waiting!
+        jsr _ideaction
+
+editloop:       
+        bit mode
+        bmi command
+
+        ;; don't redraw if key waiting!
         jsr KBHIT
         bmi :+
         jsr _redraw
 :       
-        jmp _editloop
-        
-
-
+        jmp editing
 
 
 
@@ -151,10 +179,6 @@ ebeginning:
         jsr eforward
         jmp :-
         
-
-
-
-
 ;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
@@ -162,6 +186,23 @@ FUNC _editaction
         ldy #0
 
 	;; --- CTRL DISPATCH
+
+        ;; ^ ^Prev
+        cmp #CTRL('P')
+        beq eprev
+        cmp #UPKEY              ; CTRL-K (delline)
+        bne :+
+        cpx #sCTRL
+        bne eprev
+        jmp ekill
+:       
+        ;; v ^Next
+        cmp #CTRL('N')
+        beq enext
+        cmp #DOWNKEY            ; CTRL-J (indent next line)
+        ;; TODO: indent next line (or just ^I?)
+        beq enext
+
 
         ;; -> ^Forward
         cmp #CTRL('F')
@@ -180,28 +221,13 @@ FUNC _editaction
         ;; saves+restores screen = no longer need!
         jmp _help
 :       
-        ;; ^ ^Prev
-        cmp #CTRL('P')
-        beq eprev
-        cmp #UPKEY              ; CTRL-K (delline)
-        bne :+
-        cpx #sCTRL
-        bne eprev
-        jmp ekill
-:       
-        ;; v ^Next
-        cmp #CTRL('N')
-        beq enext
-        cmp #DOWNKEY            ; CTRL-J (indent next line)
-        ;; TODO: indent next line (or just ^I?)
-        beq enext
-
         ;; |< ^A beginning
         cmp #CTRL('A')
         beq ebeginning
         ;; >| ^End
         cmp #CTRL('E')
         beq eend
+
 
         ;; Delete forward / DEL=BackSpace!
         cmp #CTRL('D')
@@ -219,7 +245,7 @@ FUNC _editaction
         ;; RETURN newline
         lda #10
 @notM:
-        ;; CAPS LOCK
+        ;; ^T CAPS LOCK (ORIC KEY)
         cmp #CTRL('T')
         bne :+
         jmp putchar
@@ -231,11 +257,12 @@ FUNC _editaction
         jsr _info
         jmp getchar
 :       
-        ;; ^l redisplay (tood: reload)
+        ;; ^L redisplay (Undo?)
         cmp #CTRL('L')
         bne :+
         jmp loadfirst          
 :       
+        ;; ----------------------------------------
         ;; ELSE
 
         ;; --- INSERT
@@ -318,21 +345,6 @@ edel:
       
         
 
-
-;REDRAW_NONE=1
-;
-RED_RAW_ORIC=1
-;RECDRAW_Y=1
-;REDRAW_GENERIC=1
-;REDRAW_PUTCHAR=1
-
-.ifdef REDRAW_NONE
-FUNC _redraw
-        rts
-.endif ; REDRAW_NONE
-
-
-.ifdef RED_RAW_ORIC
 ;;; raw raw raw - relatively fast!
 FUNC _redraw 
 ;;; (+ 24 55) = 79
@@ -408,9 +420,46 @@ FUNC _redraw
         lda (pos),y
         beq @clreol
         bne @nextc
-.endif ; RED_RAW_ORIC
-        
 
+
+
+
+;; == COMMANDS
+_ideaction:     
+
+        ;; ESCape (toggle COMAMND/EDIT)
+        cmp #27
+        bne :+
+
+togglecommand:  
+;;; 7
+        lda mode
+        eor #$ff
+        sta mode
+        rts
+:       
+        ;; ^Compile
+        cmp #CTRL('C')
+        bne :+
+
+        jsr togglecommand
+        jmp ecompile
+:       
+        ;; ^Run
+        cmp #CTRL('R')
+        bne :+
+
+        jmp _run
+:       
+        ;; --- none
+        bit mode
+        bmi @command
+@edit:
+        jmp _editaction
+
+        ;; command mode return
+@command:
+        rts
 
 
 
@@ -625,189 +674,21 @@ loadfirst:
 
 
 
-
-
-
-
-.ifdef REDRAW_Y;
-;; redraw whole edit screen directly in memory
-FUNC _redraw 
-;;; (+ 20 50) = 70
-        lda #<(SCREEN+40)
-        ldx #>(SCREEN+40)
-        sta dos
-        stx dos+1
-lskjdflsakjdflasdkjflsdkf        
+ecompile:
+        jsr nl
+        lda #(BLACK+BG)&127
+        ldx #WHITE&127
+        jsr _eoscolors
+        PRINTZ {10,YELLOW,"compiling...",10,10}
+        
+        ;; set output
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
+        ;; set input = EDITSTART
         lda #<EDITSTART
         ldx #>EDITSTART
-        sta pos
-        stx pos+1
+        ;; alright, all done?
+        jmp _compileAX
 
-        ldx #0                  ; X=rows
-        ;; Y store col and offset from dos and pos!
-        ldy #0                  ; Y=cols, lol
-        
-@nextc:
-        lda (pos),y
-        beq @done
-        ;; newline
-        cmp #10+128
-        beq @newline
-        cmp #10
-        bne @putcraw
-@newline:
-        ;; update lineptr
-        tya
-        clc
-        adc pos
-        sta lineptr
-        lda pos+1
-        sta lineptr+1
-
-@cleareol:
-        ;; clear till end of line
-        lda #'-'
-:       
-;;; TODO: always do one, maybe not good?
-        sta (dos),y
-        iny
-        cpy #COLS
-        bne :-
-        beq @wrap
-
-@putcraw:
-        sta (dos),y
-
-        iny
-        cpy #WIDTH
-        bne @nextc
-@wrap:
-        ;; move line down
-        clc
-        lda dos
-        adc #WIDTH
-        sta dos
-        bcc :+
-        inc dos+1
-:       
-        jmp @nextc
-        
-
-@done:
-        rts
-
-.endif ; REDRAW_Y
-
-
-
-
-
-
-
-
-.ifdef REDRAW_GENERIC
-;;; GENERIC "vt100" terminal style
-FUNC _redraw
-;;; 42 B
-        ;; "hack"
-        ;; - save char at cursor, replace with \0
-        ldy #0
-todoo
-        lda (editpos),y
-        pha
-        tya
-        sta (editpos),y
-
-        ;; print till cursor
-        jsr clrscr
-
-        lda #<EDITSTART
-        ldx #>EDITSTART
-        jsr putz
-        
-        ;; save cursor pos on screen
-        ;; (TODO: it's compat w gap-buffer!)
-        jsr hidecursor
-        jsr savecursor
-
-        ;; restore char
-        pla
-        ldy #0
-        sta (editpos),y
-
-        lda editpos
-        ldx editpos+1
-        jsr putz
-        
-        ;; move cursor to "editpos"
-        jsr restorecursor
-        jsr showcursor
-
-        rts
-.endif ; REDRAW_GENERIC
-
-
-.ifdef REDRAW_PUTChAR
-;;; update "no putz"
-FUNC _redraw
-;;; 56 B
-        lda #<EDITSTART
-        ldx #>EDITSTART
-        sta pos
-        lda #0
-        sta pos+1
-
-        sta editrow
-        
-        ;; keep track of column
-        ldx #$ff
-        ;; low byte of pos ptr
-        ldy pos
-@nextc:       
-        lda (pos),y
-        beq @done
-        ;; newline
-        cmp #10
-        bne :+
-
-        ;; store lineptr
-        sty lineptr
-        lda pos+1
-        sta lineptr+1
-
-        jsr clreol
-        jmp @wrap
-:       
-        inx
-        cpx #WIDTH
-        bne :+
-@wrap:
-        ldx #$ff
-
-        inc editrow
-        ;; end of screen? - done
-        lda editrow
-        cmp #ROWS
-        beq @done
-:       
-;        jsr putchar
-
-        ;; move forward
-        iny
-        bne @nextc
-        inc pos+1
-        ;; always
-        bne @nextc
-
-@done:
-        stx editcol
-        rts
-        
-
-.endif ; REDRAW_PUTChAR
-
-        
-
-        
-        
-        
