@@ -40,10 +40,11 @@ WIDTH=40
 ROWS=27
 
 .zeropage
-
 ;;; A value of point EDITSTART <= x < EDITEND
 editpos:        .res 2
 lineptr:        .res 2
+
+;;; TODO: doesn't need to be zeropage?
 editend:        .res 2
 
 editrow:        .res 1
@@ -73,21 +74,67 @@ FUNC _initedit
 
 .endif
 
+
+
+
+
 FUNC _edit
         jsr loadfirst
 
 FUNC _editloop
-
         jsr getchar
-
-;jsr printchar
         jsr _editaction
-
-;;; TODO: if bbhit skip redraw!
+        ;; don't draw if key waiting!
+        jsr KBHIT
+        bmi :+
         jsr _redraw
-
+:       
         jmp _editloop
         
+
+
+
+
+
+;;; putting some routines BEFORE ediaction
+;;; (to reach them)
+
+enext:  
+        jsr togglecursor
+        
+        lda #10
+        jsr etill
+        jsr eforward
+
+egotocol:       
+        ldx editcol
+:       
+        lda (editpos),y
+        beq :+
+        cmp #10
+        beq :+
+
+        jsr eforward
+        ;; move forward more?
+        dex
+        bpl :-
+:       
+        jmp togglecursor
+
+eprev:  
+        jsr togglecursor
+
+        jsr eback
+        lda #10
+        jsr ebtill
+        lda #10
+        jsr ebtill
+
+        ;; similar to 
+        jmp egotocol
+
+
+
 
 ;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
@@ -96,36 +143,60 @@ FUNC _editaction
         ldy #0
 
 	;; --- CTRL DISPATCH
-;;; 6 * 4 = 24
+
         ;; -> ^Forward
         cmp #CTRL('F')
         beq eforward
-        cmp #CTRL('I')
+        cmp #RIGHTKEY           ; CTRL-I (tab)
         beq eforward
+
         ;; <- ^Back
         cmp #CTRL('B')
         beq eback
-        cmp #CTRL('H')
-        beq eback
-        ;; BackSpace
+        cmp #LEFTKEY            ; CTRL-H (help)
+        bne :+
+        ;; ^Help
+        cpx #sCTRL
+        bne eback
+        ;; saves+restores screen = no longer need!
+        jmp _help
+:       
+        ;; ^ ^Prev
+        cmp #CTRL('P')
+        beq eprev
+        cmp #UPKEY              ; CTRL-K (delline)
+        bne :+
+        cpx #sCTRL
+        bne eprev
+        jmp ekill
+:       
+        ;; v ^Next
+        cmp #CTRL('N')
+        beq enext
+        cmp #DOWNKEY            ; CTRL-J (indent next line)
+        ;; TODO: indent next line (or just ^I?)
+        beq enext
+
+        ;; Delete forward / DEL=BackSpace!
         cmp #CTRL('D')
         beq edel
-        cmp #127
+        cmp #127                ; DEL key on ORIC!
         beq ebs
-        ;; Return
+        ;; RETURN
         cmp #CTRL('M')
+        bne @notM
+        ;; (test that ctrl is pressed and not BS)
+        cpx #sCTRL
         bne :+
+        jmp ctrlM
+:
+        ;; RETURN newline
         lda #10
-:       
+@notM:
         ;; CAPS LOCK
         cmp #CTRL('T')
         bne :+
         jmp putchar
-:       
-        ;; ^Help
-        cmp #CTRL('H')
-        bne :+
-        jmp _help
 :       
         ;; ^Verbose info
         cmp #CTRL('V')
@@ -139,21 +210,227 @@ FUNC _editaction
         bne :+
         jmp loadfirst          
 :       
-
+        ;; ELSE
 
         ;; --- INSERT
-;;; (+ 1 10 7 14 9) = 41
-        ;; To insert a character we need to push
-        ;; overy thing up (unless we use gap-buffer)
+        jsr einsert
+        ;; fall-through to eforward
+eforward:        
+;;; 12
+        ;; off
+        jsr togglecursor
 
+;;; TODO: at beginning of file - stop
+        ;; todo: jsr _ince
+        inc editpos
+        bne :+
+        inc editpos+1
+:       
+;;; TODO: make all routines "turn off cursor"
+;;;    turn on before getchar, turn off after
+        ;; on
+        jmp togglecursor
+
+
+eback:
+;;; 11
+        jsr togglecursor
+
+;;; TODO: at end of file - stop
+	;; todo: jsr _dece
+        lda editpos
+        bne :+
+        dec editpos+1
+:       
+        dec editpos
+        ;; fall-through togglecursor
+togglecursor:   
+;;; 9
+        ldy #0
+        lda (editpos),y
+        eor #$80
+        sta (editpos),y
+ret:    
+        rts
+
+ebs:    
+        jsr eback
+edel:    
+        jsr togglecursor
+        
+        ;; delete one character at cursor
+        ;; - to
+        lda editpos
+        ldx editpos+1
+        sta tos
+        stx tos+1
+
+        ;; Y=0
+@loop:   
+        ;; - copy back
+        iny
+        lda (tos),y
+        dey
+        sta (tos),y
+        tax
+        beq @done
+        ;; - INC tos
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        bne @loop
+@done:
+        ;; - DEC editend
+        lda editend
+        bne :+
+        dec editend+1
+:       
+        dec editend
+
+        jmp togglecursor
+      
+        
+
+
+;REDRAW_NONE=1
+;
+RED_RAW_ORIC=1
+;RECDRAW_Y=1
+;REDRAW_GENERIC=1
+;REDRAW_PUTCHAR=1
+
+.ifdef REDRAW_NONE
+FUNC _redraw
+        rts
+.endif ; REDRAW_NONE
+
+
+.ifdef RED_RAW_ORIC
+;;; raw raw raw - relatively fast!
+FUNC _redraw 
+;;; (+ 24 55) = 79
+;;; (16)
+        lda #<EDITNULL
+        ldx #>EDITNULL
+        sta pos
+        stx pos+1
+
+        lda #<(SC+40)
+        ldx #>(SC+40)
+        sta tos
+        stx tos+1
+;;; (8)
+        lda #ROWS
+        sta editrow
+        
+        ldx #WIDTH
+        ldy #0
+
+@nextc:
+;;; 
+        inc pos
+        bne :+
+        inc pos+1
+:       
+        ;; copy byte
+        lda (pos),y
+        beq @clreol             ; clrEOS!
+        sta (tos),y
+        ;; at cursor, save COL
+        bpl :+
+        sty editcol
+        ;; store editrow? currently used as loopvar
+:
+
+
+        ;; newline
+        cmp #10
+        beq @nl
+        cmp #10+128             ; nl + cursor!
+        beq @nl
+@forw:
+        dex
+        bne :+
+        ldx #WIDTH
+:       
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        ;; always
+        bne @nextc
+
+        ;; we clear till end of line
+@clreol:
+        lda #' '
+        sta (tos),y
+@nl:
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        dex
+        bne @clreol
+
+        ;; no more rows
+        dec editrow
+        beq ret
+
+        ldx #WIDTH
+
+        lda (pos),y
+        beq @clreol
+        bne @nextc
+.endif ; RED_RAW_ORIC
+        
+
+
+
+
+
+;;; move forwards (editpos) till A
+etill:  
+;;; 17
+        sta savea
+@nextc:       
+        lda (editpos),y
+        cmp savea
+        beq eret
+        ;; INC editpos
+        inc editpos
+        bne :+
+        inc editpos+1
+:       
+        bne @nextc
+eret:   
+        rts
+
+;;; move backward (editpos) till A
+ebtill:  
+;;; 19
+        sta savea
+@nextc:       
+        lda (editpos),y
+        cmp savea
+        beq eret
+        ;; DEC editpos
+        lda editpos
+        bne :+
+        dec editpos+1
+:       
+        dec editpos
+        jmp @nextc
+
+
+;;; Insert A at current cursor position
+einsert:
+;;; (+ 1 10 7 14 9) = 41
         ;; - save key for later
         pha
 
-        ;; - make spece shift up
-        ;; (we need to know the end)
-
-        ;; TDOO: seems redundant or too much work!
-        ;;       we knew it when we copied...
+        ;; To insert a character we need to push
+        ;; overy thing up (unless we use gap-buffer)
 
         ;; - move back from end
 ;;; (10)
@@ -206,176 +483,32 @@ FUNC _editaction
         bne :+
         inc editend+1
 :       
-
         ;; turn off new curosr
-        jsr togglecursor
-        ;; fall-through eforward
-eforward:        
-;;; 12
-        ;; off
-        jsr togglecursor
-
-;;; TODO: at beginning of file - stop
-        ;; todo: jsr _ince
-        inc editpos
-        bne :+
-        inc editpos+1
-:       
-;;; TODO: make all routines "turn off cursor"
-;;;    turn on before getchar, turn off after
-        ;; on
         jmp togglecursor
 
 
-eback:
-;;; 11
-        jsr togglecursor
+;;; TODO: crashes...
+ctrlM:  
+        ;; CTRL-M .... ? Sectret Mystery Action?
+        jsr _eosnormal
 
-;;; TODO: at end of file - stop
-	;; todo: jsr _dece
-        lda editpos
-        bne :+
-        dec editpos+1
-:       
-        dec editpos
-        ;; fall-through togglecursor
-togglecursor:   
-;;; 9
-        ldy #0
-        lda (editpos),y
-        eor #$80
-        sta (editpos),y
-ret:    
+        putc 'E'
+        ldx #editpos
+        jsr printvar
+
+        putc 'L'
+        ldx #lineptr
+        jsr printvar
+
+        putc 'L'
+        ldx #editend
+        jsr printvar
+
+        jmp getchar
+
+ekill:  
+;;; TODO: iplement kill line
         rts
-
-
-ebs:    
-        jsr eback
-edel:    
-        jsr togglecursor
-        
-        ;; delete one character at cursor
-        ;; - to
-        lda editpos
-        ldx editpos+1
-        sta tos
-        stx tos+1
-
-        ;; Y=0
-@loop:   
-        ;; - copy back
-        iny
-        lda (tos),y
-        dey
-        sta (tos),y
-        tax
-        beq @done
-        ;; - INC tos
-        inc tos
-        bne :+
-        inc tos+1
-:       
-        bne @loop
-@done:
-        ;; - DEC editend
-        lda editend
-        bne :+
-        dec editend+1
-:       
-        dec editend
-
-        jmp togglecursor
-        
-        
-        
-
-
-;REDRAW_NONE=1
-;
-RED_RAW_ORIC=1
-;RECDRAW_Y=1
-;REDRAW_GENERIC=1
-;REDRAW_PUTCHAR=1
-
-.ifdef REDRAW_NONE
-FUNC _redraw
-        rts
-.endif ; REDRAW_NONE
-
-
-.ifdef RED_RAW_ORIC
-;;; raw raw raw - relatively fast!
-FUNC _redraw 
-;;; (+ 24 55) = 79
-;;; (16)
-        lda #<EDITNULL
-        ldx #>EDITNULL
-        sta pos
-        stx pos+1
-
-        lda #<(SC+40)
-        ldx #>(SC+40)
-        sta tos
-        stx tos+1
-;;; (8)
-        lda #ROWS
-        sta editrow
-        
-        ldx #WIDTH
-        ldy #0
-
-@nextc:
-;;; 
-        inc pos
-        bne :+
-        inc pos+1
-:       
-        ;; copy byte
-        lda (pos),y
-        beq @clreol             ; clrEOS!
-        sta (tos),y
-
-        ;; newline
-        cmp #10
-        beq @nl
-        cmp #10+128             ; nl + cursor!
-        beq @nl
-@forw:
-        dex
-        bne :+
-        ldx #WIDTH
-:       
-        inc tos
-        bne :+
-        inc tos+1
-:       
-        ;; always
-        bne @nextc
-
-        ;; we clear till end of line
-@clreol:
-        lda #' '
-        sta (tos),y
-@nl:
-        inc tos
-        bne :+
-        inc tos+1
-:       
-        dex
-        bne @clreol
-
-        ;; no more rows
-        dec editrow
-        beq ret
-
-        ldx #WIDTH
-
-        lda (pos),y
-        beq @clreol
-        bne @nextc
-.endif ; RED_RAW_ORIC
-        
-
 
 
 loadfirst:

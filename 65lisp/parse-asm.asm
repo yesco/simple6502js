@@ -10379,7 +10379,24 @@ CSRESET=1
 .endif
         rts
 
+
+;;; print "$4711@$34 "
 FUNC printvar
+        lda 0,x
+        pha
+        lda 1,x
+        pha
+
+        jsr _printh
+
+        PUTC '@'
+        jsr _print2h
+
+        jmp spc
+
+;;; TODO: not used remove
+.ifdef PRINTADDRESS
+FUNC printaddress
         sta tos
         stx tos+1
         PUTC '@'
@@ -10393,6 +10410,7 @@ FUNC printvar
         jsr _printu
         jsr spc
         rts     
+.endif
 
 ;;; prints readable otherwise deccode
 .zeropage

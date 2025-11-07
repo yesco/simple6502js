@@ -362,7 +362,7 @@ void info() {
      "FILES        %6u - input/files\n"
      "ASM          %6u (bytes)\n"
      "\x86""IDE         %6u\n"
-     "  editor     %6u\n"
+     "  editor     %6u   misc     TODO:\n"
      "  help       %6u - help text+code\n"
      "\x86""C-compiler  %6u\n"
      "  BNF-intrp  %6u - BNF interpreter\n"

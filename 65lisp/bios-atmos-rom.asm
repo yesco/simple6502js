@@ -69,6 +69,139 @@ saveyputchar:   .res 1
         pla
 .endmacro
 
+;;; ORIC ATMOS BASIC ROM BIOS
+
+;;; TODO: reassign in my own keyb routines!
+
+;LEFTARROW  =  8
+;RIGHTARROW =  9
+;DOWNARROW  = 10
+;UPARROW    = 11
+
+;;; (choosen not to conflict with color/double/background)
+;;; (uses 4 higher "illegal" (hires/text attributes)
+;;; (27=ESC)
+
+LEFTKEY  =  8
+RIGHTKEY =  9
+DOWNKEY  = 10
+UPKEY    = 11
+
+;;; Peek key: Hi-bit set if have key, lower==KEY!
+KBHIT= $023B                  ; ORIC ATMOS only
+
+;;; TODO: remove -- too much code!!!
+.ifnblank
+
+.ifdef GETWKEY
+;;; get Word key (Y destroyed)
+;;; A= char, X= bits (CTRL,FUNC,
+getwkey: 
+;;; 36 (really???? :-( )
+:       
+        jsr KBHIT
+        bpl :-
+
+        ldx #0
+
+        ;; read special key value
+        ldy $0209
+
+        ;; ? CTRL-key => differentiate BS RETURN
+        cpy #$a2                ; CTRL-key
+        bne :+
+        ;; CTRL-pressed - OK!
+        ldx #bCTRL
+        tay                     ; make flags reflect A
+        rts
+:       
+        ;; NO-ctrl - fix special keys
+
+        ;; ? arrow keys
+        cmp #8
+        bcc :+
+        cmp #11+1
+        bcs :+
+        ;; ok, we have ARROW keys!
+        ;; (move range to 
+        ;; C=0
+        adc #LEFTKEY-8
+:       
+        ;; ? FUNC-key => set hibit of A
+        cpy #$a5
+        bne :+
+        ;; FUNC-KEY
+        ldx #FUNC
+        ora #FUNC
+:
+        rts
+.else
+getkey: 
+;;; 
+        ;; ? arrow keys
+        cmp #8
+        bcc :+
+        cmp #11+1
+        bcs :+
+        ;; CTRL off ?
+        ;; ok, we have ARROW keys!
+        ;; (move range to 
+        ;; C=0
+        adc #LEFTKEY-8
+.endif ; GETWKEY
+
+.endif ;  blank
+
+
+
+
+;CURSORGETCHAR=1
+.ifndef CURSORGETCHAR
+
+;;; ORIC ATMOS ROM special key $0209
+sCTRL   = $a2
+sFUNC   = $a5
+sLSHIFT = $a4
+sRSHIFT = $a7
+
+;;; wait for char from keyboard
+;;; 
+;;; Returns:
+;;;   A= ascii key (+128 if FUNC)
+;;;   X= $0209 on ATMOS (sCTRL / sFUNC / sLSHIFT / sRSHIFT)
+;;;
+;;; was 17B
+;;; now: 17!!!
+getchar:
+        cli
+
+;GETCHARSAVE=1
+.ifdef GETCHARSAVE
+        stx savexputchar
+        sty savexputchar
+.endif
+        ;; wait for key
+:       
+        jsr KBHIT
+        bpl :-
+
+        ldx $0209
+        ;; ? FUNC
+        cpx #$a5
+        bne @done
+        ;; FUNC
+        ora #128
+@done:
+.ifdef GETCHARSAVE
+        ldx savexputchar
+        ldy saveyputchar
+.endif
+
+        sei
+
+        rts
+
+.else
 
 ;; - https:  //github.com/Oric-Software-Development-Kit/osdk/blob/master/osdk%2Fmain%2FOsdk%2F_final_%2Flib%2Fgpchar.s
 
@@ -96,9 +229,9 @@ getchar:
         sty saveaputchar
         ldy #0
         sty CURCOL
-:       
-        jsr $023B               ; ORIC ATMOS only
-        bpl :-                  ; hibit set when ready
+
+        jsr getkey
+
         tax
 
         ;; simulate fixed cursor
@@ -123,6 +256,8 @@ getchar:
         ;CURSOR_OFF
 
         rts
+.endif ; CURSORGETCHAR
+
 
 
 plaputchar:     
