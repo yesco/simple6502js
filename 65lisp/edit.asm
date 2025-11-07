@@ -89,13 +89,13 @@ FUNC _editloop
         jmp _editloop
         
 
-;;; Each operation ends with RTS
+;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
         
         ldy #0
 
-        ;; ^L redisplay (TOOD: reload)
+        ;; ^l redisplay (tood: reload)
         cmp #CTRL('L')
         beq loadfirst
 
@@ -106,6 +106,7 @@ FUNC _editaction
 
         cmp #CTRL('B')
         beq eback
+        ;; TODO: DEL gibes ^H?
         cmp #CTRL('H')
         beq eback
         ;; not special - insert
@@ -116,7 +117,7 @@ FUNC _editaction
         ;; (we need to know the end)
 
 ;;; seems redundant or too much work!
-;;; TODO: we knew it when we copied...
+;;; todo: we knew it when we copied...
 
         ;; - move back from end
         lda editend
@@ -126,13 +127,13 @@ FUNC _editaction
 
         ldy #0
 
-;;; DOUBLE 0 BYTE MAKES THIS INSERT
-;;; NOT bleed into next input
+;;; double 0 byte makes this insert
+;;; not bleed into next input
 
-;        jsr _incT
+;        jsr _inct
 ;        jmp @copyc
 @nextc:
-        ;; DEC tos
+        ;; dec tos
         lda tos
         bne :+
         dec tos+1
@@ -140,34 +141,31 @@ FUNC _editaction
         dec tos
 @copyc:       
         lda (tos),y
+        pha
         iny
+        and #$7f
         sta (tos),y
         dey
-        ;; TODO: beginning of file (no cursor?)
-        tax
+        ;; todo: beginning of file (no cursor?)
+        pla
 ;        beq @done
         ;; hibit == curpos! => exit
         beq @nextc
         bpl @nextc
         
 @done:
+        jsr togglecursor
         pla
-;        sta (editpos),y
-        sta (tos),y
+        sta (editpos),y
         
-        ;; update cursorpos
-
-;        lda tos
-;        sta editpos
-;        ldx tos+1
-;        stx editpos
-        
+;        sta (tos),y
         ;; fall-through
+        jsr togglecursor
 
 eforward:        
         jsr togglecursor
 
-;;; TODO: jsr _incE
+;;; todo: jsr _ince
         inc editpos
         bne :+
         inc editpos+1
@@ -179,14 +177,14 @@ eback:
 
         jsr togglecursor
 
-;;; TODO: jsr _decE
+;;; todo: jsr _dece
         lda editpos
         bne :+
         dec editpos+1
 :       
         dec editpos
 
-;;; TODO: fall-through?
+;;; todo: fall-through?
         jmp togglecursor
 
 togglecursor:   
@@ -197,16 +195,19 @@ togglecursor:
         rts
 
 loadfirst:
-        ;; TOS= from
+        ;; tos= from
         lda #<input
         ldx #>input
         sta tos
         stx tos+1
-        ;; DOS= to
+        ;; dos= to
         lda #<EDITSTART
         ldx #>EDITSTART
         sta dos
         stx dos+1
+        ;; sta editpos too
+        sta editpos
+        stx editpos+1
         ;; 
         jsr copyz
         ;; zero terminate
@@ -216,6 +217,7 @@ loadfirst:
         sta (dos),y
         dey
 
+        ;; update edit end
         tya
         clc
         adc dos
