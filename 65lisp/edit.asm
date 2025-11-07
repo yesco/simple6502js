@@ -107,15 +107,15 @@ egotocol:
         ldx editcol
 :       
         lda (editpos),y
-        beq :+
+        beq rts2
         cmp #10
-        beq :+
+        beq rts2
 
         jsr eforward
         ;; move forward more?
         dex
         bpl :-
-:       
+rts2:       
         rts
 
 eprev:  
@@ -128,6 +128,29 @@ eprev:
 
         ;; similar to 
         jmp egotocol
+
+
+eend:   
+        lda #10
+        jmp etill
+
+ebeginning:
+        jsr eback
+        lda #10
+        jsr ebtill
+        jsr eforward
+        
+:       
+        lda (editpos),y
+        ;; damn cursor lol
+        and #$7f
+        beq rts2
+        cmp #' '+1
+        bcs rts2
+        
+        jsr eforward
+        jmp :-
+        
 
 
 
@@ -172,6 +195,13 @@ FUNC _editaction
         cmp #DOWNKEY            ; CTRL-J (indent next line)
         ;; TODO: indent next line (or just ^I?)
         beq enext
+
+        ;; |< ^A beginning
+        cmp #CTRL('A')
+        beq ebeginning
+        ;; >| ^End
+        cmp #CTRL('E')
+        beq eend
 
         ;; Delete forward / DEL=BackSpace!
         cmp #CTRL('D')
@@ -397,9 +427,13 @@ etill:
         beq eret
 
 ;;; TOOD: what's the difference (incinc works...)
-.ifnblank
+.ifblank
         ;; WTF? why doesn't it work?
+;;; because CMP fails? beq ...
+;;; TODO: remove almost ALL toggle cursors!
+jsr togglecursor
         jsr eforward
+jsr togglecursor
 .else
         inc editpos
         bne :+
@@ -506,10 +540,6 @@ ctrlM:
 
         putc 'E'
         ldx #editpos
-        jsr printvar
-
-        putc 'L'
-        ldx #lineptr
         jsr printvar
 
         putc 'L'
