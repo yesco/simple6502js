@@ -92,34 +92,58 @@ FUNC _editloop
 ;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
-        
+        ;; some may need it
         ldy #0
 
-        ;; ^l redisplay (tood: reload)
-        cmp #CTRL('L')
-        beq loadfirst
-
+	;; --- CTRL DISPATCH
+;;; 6 * 4 = 24
+        ;; -> ^Forward
         cmp #CTRL('F')
         beq eforward
         cmp #CTRL('I')
         beq eforward
-
+        ;; <- ^Back
         cmp #CTRL('B')
         beq eback
-        ;; TODO: DEL gibes ^H?
         cmp #CTRL('H')
         beq eback
-        ;; not special - insert
-        ;; - save for later
+        ;; BackSpace
+        
+        ;; ^Help
+        cmp #CTRL('H')
+        bne :+
+        jmp _help
+:       
+        ;; ^Verbose info
+        cmp #CTRL('V')
+        bne :+
+        .import _info
+        jsr _info
+        jmp getchar
+:       
+        ;; ^l redisplay (tood: reload)
+        cmp #CTRL('L')
+        bne :+
+        jmp loadfirst          
+:       
+
+
+        ;; --- INSERT
+;;; (+ 1 10 7 14 9) = 41
+        ;; To insert a character we need to push
+        ;; overy thing up (unless we use gap-buffer)
+
+        ;; - save key for later
         pha
 
         ;; - make spece shift up
         ;; (we need to know the end)
 
-;;; seems redundant or too much work!
-;;; todo: we knew it when we copied...
+        ;; TDOO: seems redundant or too much work!
+        ;;       we knew it when we copied...
 
         ;; - move back from end
+;;; (10)
         lda editend
         sta tos
         lda editend+1
@@ -127,12 +151,15 @@ FUNC _editaction
 
         ldy #0
 
-;;; double 0 byte makes this insert
-;;; not bleed into next input
+        ;; TODO: revisit
+        ;; double 0 byte makes this insert
+        ;; not bleed into next input
 
-;        jsr _inct
-;        jmp @copyc
+        ;; TODO: alternatives to double 0?
+        ; jsr _inct
+        ; jmp @copyc
 @nextc:
+;;; (7)
         ;; dec tos
         lda tos
         bne :+
@@ -140,29 +167,33 @@ FUNC _editaction
 :       
         dec tos
 @copyc:       
+;;; (14)
         lda (tos),y
         pha
         iny
         and #$7f
         sta (tos),y
         dey
-        ;; todo: beginning of file (no cursor?)
         pla
+        ;; hibit == curpos! => exit!
 ;        beq @done
-        ;; hibit == curpos! => exit
-        beq @nextc
         bpl @nextc
         
 @done:
-        jsr togglecursor
-        pla
-        sta (editpos),y
-        
-;        sta (tos),y
-        ;; fall-through
+;;; (9)
+        ;; turn off old cursor
         jsr togglecursor
 
+        pla
+        sta (editpos),y
+;        sta (tos),y
+
+        ;; turn off new curosr
+        jsr togglecursor
+        ;; fall-through eforward
 eforward:        
+;;; 12
+        ;; off
         jsr togglecursor
 
 ;;; todo: jsr _ince
@@ -170,31 +201,121 @@ eforward:
         bne :+
         inc editpos+1
 :       
-
+;;; TODO: make all routines "turn off cursor"
+;;;    turn on before getchar, turn off after
+        ;; on
         jmp togglecursor
 
-eback:   
 
+eback:
+;;; 11
         jsr togglecursor
 
-;;; todo: jsr _dece
+	;; todo: jsr _dece
         lda editpos
         bne :+
         dec editpos+1
 :       
         dec editpos
-
-;;; todo: fall-through?
-        jmp togglecursor
-
+        ;; fall-through togglecursor
 togglecursor:   
+;;; 9
         ldy #0
         lda (editpos),y
         eor #$80
         sta (editpos),y
+ret:    
         rts
 
+
+;REDRAW_NONE=1
+;
+RED_RAW_ORIC=1
+;RECDRAW_Y=1
+;REDRAW_GENERIC=1
+;REDRAW_PUTCHAR=1
+
+.ifdef REDRAW_NONE
+FUNC _redraw
+        rts
+.endif ; REDRAW_NONE
+
+
+.ifdef RED_RAW_ORIC
+;;; raw raw raw - relatively fast!
+FUNC _redraw 
+;;; (+ 24 55) = 79
+;;; 14
+        lda #<EDITNULL
+        ldx #>EDITNULL
+        sta pos
+        stx pos+1
+
+        lda #<(SC+40)
+        ldx #>(SC+40)
+        sta tos
+        stx tos+1
+
+        lda #ROWS
+        sta editrow
+        
+        ldx #WIDTH
+        ldy #0
+
+@nextc:
+;;; 
+        inc pos
+        bne :+
+        inc pos+1
+:       
+        ;; copy byte
+        lda (pos),y
+        beq ret
+        sta (tos),y
+
+        ;; newline
+        cmp #10
+        beq @nl
+        cmp #10+128             ; nl + cursor!
+        beq @nl
+@forw:
+        dex
+        bne :+
+        ldx #WIDTH
+:       
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        ;; always
+        bne @nextc
+
+        ;; we clear till end of line
+@clreol:
+        lda #' '
+        sta (tos),y
+@nl:
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        dex
+        bne @clreol
+
+        ;; no more rows
+        dec editrow
+        beq ret
+
+        ldx #WIDTH
+        bne @nextc
+.endif ; RED_RAW_ORIC
+        
+
 loadfirst:
+;;; (+ 20 11 12 3 14 3) = 63
+
+;;; 20+11
+;;; TODO: 20 bytes param set up
         ;; tos= from
         lda #<input
         ldx #>input
@@ -217,7 +338,10 @@ loadfirst:
         sta (dos),y
         dey
 
+        ;; TODO: maybe copyz does this? 
+        ;; or dos+a reoutine?
         ;; update edit end
+;;; 12
         tya
         clc
         adc dos
@@ -225,25 +349,23 @@ loadfirst:
         lda #0
         adc dos+1
         sta editend+1
+;;; 3
+        jsr togglecursor
 
-        ;; set hibit on first char
-        ;; == cursor!
-        lda EDITSTART
-        ora #$80
-        sta EDITSTART
-        
         ;; calculate end
 
 ;.if ((EDITSTART .mod 256)==0)
 ;EDITALIGNED=1
 .scope
 .ifdef EDITALIGNED
+;;; 6
 
         .assert ((EDITNULL .mod 256)=0),error,"%% EDITALIGNED"
-        sty dos
+        sty editend
         lda dos+1
         sta editend+1
 .else
+;;; 14
         clc
         tya
         adc dos
@@ -256,102 +378,8 @@ loadfirst:
         stx editend+1
 .endif
 .endscope
-
+;;; 3
         jmp _redraw
-;        rts
-
-
-
-
-;REDRAW_NONE=1
-;
-RED_RAW_ORIC=1
-;RECDRAW_Y=1
-;REDRAW_GENERIC=1
-;REDRAW_PUTCHAR=1
-
-.ifdef REDRAW_NONE
-FUNC _redraw
-        rts
-.endif ; REDRAW_NONE
-
-
-
-.ifdef RED_RAW_ORIC
-;;; raw raw raw - relatively fast!
-FUNC _redraw 
-;;; (+ 20 50) = 70
-        lda #<(SC+40)
-        ldx #>(SC+40)
-        sta tos
-        stx tos+1
-        
-        lda #<EDITNULL
-        ldx #>EDITNULL
-        sta pos
-        stx pos+1
-
-        lda #ROWS
-        sta editrow
-        
-        ldx #WIDTH
-        ldy #0
-
-@nextc:
-        inc pos
-        bne :+
-        inc pos+1
-:       
-
-        lda (pos),y
-        beq @done2
-        sta (tos),y
-
-        ;; newline
-        cmp #10
-        beq @newline
-        cmp #10+128             ; nl + cursor!
-        beq @newline
-
-        
-@forw:
-        dex
-        bne :+
-        ldx #WIDTH
-:       
-
-        inc tos
-        bne :+
-        inc tos+1
-:       
-        jmp @nextc
-
-@clreol2:
-        lda #' '
-        sta (tos),y
-@newline:
-        inc tos
-        bne :+
-        inc tos+1
-:       
-        dex
-        bne @clreol2
-
-        ;; no more rows
-        dec editrow
-        beq @done2
-
-        ldx #WIDTH
-        jmp @nextc
-
-@done2:
-        rts
-        
-.endif ; RED_RAW_ORIC
-        
-
-
-
 
 
 
@@ -435,14 +463,6 @@ lskjdflsakjdflasdkjflsdkf
 
 
 
-
-
-
-
-
-
-
-
 .ifdef REDRAW_GENERIC
 ;;; GENERIC "vt100" terminal style
 FUNC _redraw
@@ -450,6 +470,7 @@ FUNC _redraw
         ;; "hack"
         ;; - save char at cursor, replace with \0
         ldy #0
+todoo
         lda (editpos),y
         pha
         tya
