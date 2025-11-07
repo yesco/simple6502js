@@ -157,10 +157,10 @@ FUNC _editaction
         
         ;; update cursorpos
 
-        lda tos
-        sta editpos
-        ldx tos+1
-        stx editpos
+;        lda tos
+;        sta editpos
+;        ldx tos+1
+;        stx editpos
         
         ;; fall-through
 
@@ -255,7 +255,8 @@ loadfirst:
 .endif
 .endscope
 
-        rts
+        jmp _redraw
+;        rts
 
 
 
