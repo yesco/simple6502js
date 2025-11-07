@@ -108,7 +108,15 @@ FUNC _editaction
         cmp #CTRL('H')
         beq eback
         ;; BackSpace
-        
+        cmp #CTRL('D')
+        beq edel
+        cmp #127
+        beq ebs
+        ;; CAPS LOCK
+        cmp #CTRL('T')
+        bne :+
+        jmp putchar
+:       
         ;; ^Help
         cmp #CTRL('H')
         bne :+
@@ -188,6 +196,12 @@ FUNC _editaction
         sta (editpos),y
 ;        sta (tos),y
 
+        ;; inc editend
+        inc editend
+        bne :+
+        inc editend+1
+:       
+
         ;; turn off new curosr
         jsr togglecursor
         ;; fall-through eforward
@@ -196,7 +210,8 @@ eforward:
         ;; off
         jsr togglecursor
 
-;;; todo: jsr _ince
+;;; TODO: at beginning of file - stop
+        ;; todo: jsr _ince
         inc editpos
         bne :+
         inc editpos+1
@@ -211,6 +226,7 @@ eback:
 ;;; 11
         jsr togglecursor
 
+;;; TODO: at end of file - stop
 	;; todo: jsr _dece
         lda editpos
         bne :+
@@ -226,6 +242,47 @@ togglecursor:
         sta (editpos),y
 ret:    
         rts
+
+
+ebs:    
+        jsr eback
+edel:    
+        jsr togglecursor
+        
+        ;; delete one character at cursor
+        ;; - to
+        lda editpos
+        ldx editpos+1
+        sta tos
+        stx tos+1
+
+        ;; Y=0
+@loop:   
+        ;; - copy back
+        iny
+        lda (tos),y
+        dey
+        sta (tos),y
+        tax
+        beq @done
+        ;; - INC tos
+        inc tos
+        bne :+
+        inc tos+1
+:       
+        bne @loop
+@done:
+        ;; - DEC editend
+        lda editend
+        bne :+
+        dec editend+1
+:       
+        dec editend
+
+        jmp togglecursor
+        
+        
+        
 
 
 ;REDRAW_NONE=1
