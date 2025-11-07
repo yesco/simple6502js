@@ -99,12 +99,9 @@ FUNC _editloop
 ;;; putting some routines BEFORE ediaction
 ;;; (to reach them)
 
-enext:  
-        jsr togglecursor
-        
+enext:
         lda #10
         jsr etill
-        jsr eforward
 
 egotocol:       
         ldx editcol
@@ -119,14 +116,13 @@ egotocol:
         dex
         bpl :-
 :       
-        jmp togglecursor
+        rts
 
 eprev:  
-        jsr togglecursor
-
         jsr eback
         lda #10
         jsr ebtill
+        jsr eback
         lda #10
         jsr ebtill
 
@@ -391,35 +387,51 @@ FUNC _redraw
 
 ;;; move forwards (editpos) till A
 etill:  
-;;; 17
+;;; 15
         sta savea
+        jsr togglecursor
 @nextc:       
         lda (editpos),y
+        beq eret
         cmp savea
         beq eret
-        ;; INC editpos
+
+;;; TOOD: what's the difference (incinc works...)
+.ifnblank
+        ;; WTF? why doesn't it work?
+        jsr eforward
+.else
         inc editpos
         bne :+
         inc editpos+1
-:       
-        bne @nextc
+:
+.endif
+
+        jmp @nextc
 eret:   
-        rts
+        jmp togglecursor
+
 
 ;;; move backward (editpos) till A
 ebtill:  
-;;; 19
+;;; 12
         sta savea
+        jsr togglecursor
 @nextc:       
         lda (editpos),y
+        beq eret
         cmp savea
         beq eret
-        ;; DEC editpos
+
+.ifnblank
+        jmp eback
+.else
         lda editpos
         bne :+
         dec editpos+1
 :       
         dec editpos
+.endif
         jmp @nextc
 
 
