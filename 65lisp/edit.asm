@@ -112,6 +112,11 @@ FUNC _editaction
         beq edel
         cmp #127
         beq ebs
+        ;; Return
+        cmp #CTRL('M')
+        bne :+
+        lda #10
+:       
         ;; CAPS LOCK
         cmp #CTRL('T')
         bne :+
@@ -302,7 +307,7 @@ FUNC _redraw
 ;;; raw raw raw - relatively fast!
 FUNC _redraw 
 ;;; (+ 24 55) = 79
-;;; 14
+;;; (16)
         lda #<EDITNULL
         ldx #>EDITNULL
         sta pos
@@ -312,7 +317,7 @@ FUNC _redraw
         ldx #>(SC+40)
         sta tos
         stx tos+1
-
+;;; (8)
         lda #ROWS
         sta editrow
         
@@ -327,7 +332,7 @@ FUNC _redraw
 :       
         ;; copy byte
         lda (pos),y
-        beq ret
+        beq @clreol             ; clrEOS!
         sta (tos),y
 
         ;; newline
@@ -364,9 +369,14 @@ FUNC _redraw
         beq ret
 
         ldx #WIDTH
+
+        lda (pos),y
+        beq @clreol
         bne @nextc
 .endif ; RED_RAW_ORIC
         
+
+
 
 loadfirst:
 ;;; (+ 20 11 12 3 14 3) = 63
