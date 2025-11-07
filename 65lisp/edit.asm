@@ -20,10 +20,10 @@ CHARSET    = $b400
 
 ;;; For ORIC ATMOS we're going to use part of the
 ;;; HIRES as an editing buffer.
-;EDITNULL= HICHARSET
+EDITNULL= HICHARSET
 
 ;;; lol
-EDITNULL= input-1
+;EDITNULL= input-1
 
 
 EDITSTART= EDITNULL+1
@@ -36,6 +36,8 @@ EDITSIZE= EDITEND-EDITSTART
 
 
 WIDTH=40
+;ROWS=20
+ROWS=27
 
 .zeropage
 
@@ -200,18 +202,19 @@ loadfirst:
         ldx #>input
         sta tos
         stx tos+1
-
-;;; same!!!!
-
-;;; TODO: make use of actual buffer...
-
         ;; DOS= to
         lda #<EDITSTART
         ldx #>EDITSTART
         sta dos
         stx dos+1
-
+        ;; 
         jsr copyz
+        ;; zero terminate
+        lda #0
+        sta (dos),y
+        iny
+        sta (dos),y
+        dey
 
         tya
         clc
@@ -285,6 +288,9 @@ FUNC _redraw
         sta pos
         stx pos+1
 
+        lda #ROWS
+        sta editrow
+        
         ldx #WIDTH
         ldy #0
 
@@ -326,9 +332,12 @@ FUNC _redraw
         dex
         bne @clreol2
 
+        ;; no more rows
+        dec editrow
+        beq @done2
+
         ldx #WIDTH
         jmp @nextc
-;        jmp @forw
 
 @done2:
         rts
