@@ -11,6 +11,8 @@
 ;;; This module is 
 ;;;    545 B / IDE: 2432 B
 ;;;    683 B - added ^A ^E (hmmm?), command stuff
+;;;    769 B - ^P ^N ^I etc, but many jsr togglecursor 
+;;;    723 B - ...  removed many jsr togglecursor!
 ;;; 
 ;;; Old editor ( edit-atmos-screen.asm )
 ;;;    529 B / IDE: 2428 B
@@ -93,7 +95,6 @@ command:
         PRINTZ {10,">"}
         jsr _eosnormal
 editing:
-        jsr cursoron
         jsr getchar
         jsr _ideaction
 
@@ -104,6 +105,7 @@ editloop:
         ;; don't redraw if key waiting!
         jsr KBHIT
         bmi :+
+        ;; redraw
         jsr _redraw
 :       
         jmp editing
@@ -117,18 +119,17 @@ enext:
         lda #10
         jsr etill
 
+;;; TODO: very similar to etill!!!
 egotocol:       
         ldx editcol
 :       
+        jsr eforward
+
         lda (editpos),y
         beq rts2
         cmp #10
         beq rts2
-;;; This messes things up
-;        cmp #10+128
-;        beq rts2
 
-        jsr eforward
         ;; move forward more?
         dex
         bpl :-
@@ -248,26 +249,18 @@ FUNC _editaction
         ;; --- INSERT
         jsr einsert
         ;; fall-through to eforward
-eforward:        
+eforward:
 ;;; 12
-        ;; off
-        jsr togglecursor
-
 ;;; TODO: at beginning of file - stop
         ;; todo: jsr _ince
         inc editpos
         bne :+
         inc editpos+1
-:       
-;;; TODO: make all routines "turn off cursor"
-;;;    turn on before getchar, turn off after
-        ;; on
-        jmp togglecursor
-
-
+:
+        rts
+       
 eback:
 ;;; 11
-        jsr togglecursor
 
 ;;; TODO: at end of file - stop
 	;; todo: jsr _dece
@@ -276,35 +269,13 @@ eback:
         dec editpos+1
 :       
         dec editpos
-        ;; fall-through togglecursor
-togglecursor:   
-;;; 9
-        ldy #0
-        lda (editpos),y
-curflip:
-        eor #$80
-        sta (editpos),y
-ret:    
-        rts
-        
-cursoron:
-;;; 6 (slow) - haha
-        jsr togglecursor
-        bpl curflip
         rts
 
-cursoroff:      
-;;; 5 ! (slower) - hahaha
-        jsr cursoron
-        ;; always true
-        bmi curflip
 
 
 ebs:    
         jsr eback
 edel:    
-        jsr togglecursor
-        
         ;; delete one character at cursor
         ;; - to
         lda editpos
@@ -335,7 +306,7 @@ edel:
 :       
         dec editend
 
-        jmp togglecursor
+        rts
       
         
 
@@ -343,6 +314,9 @@ edel:
 FUNC _redraw 
 ;;; (+ 24 55) = 79
 ;;; (16)
+        ;; we need to set the cursor when drawing!
+        jsr togglecursor
+
         lda #<EDITNULL
         ldx #>EDITNULL
         sta pos
@@ -420,7 +394,18 @@ FUNC _redraw
         sbc editcol
         sta editcol
 
+        ;; clear the cursor bit, used for display
+
+        ;; fall-throught to togglecursor!
+togglecursor:
+;;; 9
+        ldy #0
+        lda (editpos),y
+        eor #$80
+        sta (editpos),y
         rts
+
+
 
 togglecommand:
 ;;; 7
@@ -428,12 +413,17 @@ togglecommand:
         eor #128
         sta mode
 
+	;; actions
+        ;; TODO: feels like lots of duplications?
+;;; 11
         bpl @ed
         ;; reshow compilation result
         jsr _eosnormal
         jmp _aftercompile
 @ed:
         jmp _redraw
+
+
 
 
 ;; == COMMANDS
@@ -508,38 +498,22 @@ ia_noctrl:
 etill:  
 ;;; 15
         sta savea
-        jsr togglecursor
 @nextc:       
         lda (editpos),y
         beq eret
         cmp savea
         beq eret
 
-;;; TOOD: what's the difference (incinc works...)
-.ifblank
-        ;; WTF? why doesn't it work?
-;;; because CMP fails? beq ...
-;;; TODO: remove almost ALL toggle cursors!
-jsr togglecursor
         jsr eforward
-jsr togglecursor
-.else
-        inc editpos
-        bne :+
-        inc editpos+1
-:
-.endif
-
         jmp @nextc
 eret:   
-        jmp togglecursor
+        rts
 
 
 ;;; move backward (editpos) till A
 ebtill:  
 ;;; 12
         sta savea
-        jsr togglecursor
 @nextc:       
         lda (editpos),y
         beq eret
@@ -563,6 +537,10 @@ einsert:
 ;;; (+ 1 10 7 14 9) = 41
         ;; - save key for later
         pha
+
+        ;; require cursor to be on!
+        ;; (use hibit to know when to stop copy)
+        jsr togglecursor
 
         ;; To insert a character we need to push
         ;; overy thing up (unless we use gap-buffer)
@@ -600,25 +578,25 @@ einsert:
         dey
         pla
         ;; hibit == curpos! => exit!
+;;; TODO: end/beginning \0 ?
 ;        beq @done
         bpl @nextc
         
 @done:
 ;;; (9)
-        ;; turn off old cursor
-        jsr togglecursor
-
         pla
         sta (editpos),y
 ;        sta (tos),y
+
+        ;; Hmmm, mustn't turn it off, huh?
+;        jsr togglecursor      
 
         ;; inc editend
         inc editend
         bne :+
         inc editend+1
 :       
-        ;; turn off new curosr
-        jmp togglecursor
+        rts
 
 
 
@@ -686,7 +664,7 @@ loadfirst:
         ldx #>EDITSTART
         sta dos
         stx dos+1
-        ;; sta editpos too
+        ;; sta EDITSTART as editpos, too
         sta editpos
         stx editpos+1
         ;; 
@@ -697,6 +675,8 @@ loadfirst:
         iny
         sta (dos),y
         dey
+
+        ;; calculate end
 
         ;; TODO: maybe copyz does this? 
         ;; or dos+a reoutine?
@@ -710,9 +690,7 @@ loadfirst:
         adc dos+1
         sta editend+1
 ;;; 3
-        jsr togglecursor
 
-        ;; calculate end
 
 
 .ifnblank
@@ -754,9 +732,6 @@ ecompile:
         ;; is set in the code we compile, either
         ;; save a copy to compile in the background
         ;; or wait...
-
-;;; TODO: remove cursor (hibit)
-jsr cursoroff
 
         jsr nl
         lda #(BLACK+BG)&127
