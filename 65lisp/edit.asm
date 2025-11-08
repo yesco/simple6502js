@@ -91,7 +91,7 @@ FUNC _edit
 
 command:
         PRINTZ {10,">"}
-
+        jsr _eosnormal
 editing:
         jsr getchar
         jsr _ideaction
@@ -150,12 +150,14 @@ eend:
         lda #10
         jmp etill
 
-ebeginning:
+ebeginning:     
         jsr eback
         lda #10
         jsr ebtill
-        jsr eforward
+        jmp eforward
         
+eindent:
+        jsr ebeginning
 :       
         lda (editpos),y
         ;; damn cursor lol
@@ -167,6 +169,7 @@ ebeginning:
         jsr eforward
         jmp :-
         
+
 ;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
@@ -181,34 +184,37 @@ FUNC _editaction
         cmp #UPKEY              ; CTRL-K (delline)
         bne :+
         cpx #sCTRL
-        bne eprev
+        bne eprev               ; is arrowkey
+        ;; ^Kill
         jmp ekill
 :       
         ;; v ^Next
         cmp #CTRL('N')
         beq enext
-        cmp #DOWNKEY            ; CTRL-J (indent next line)
-        ;; TODO: indent next line (or just ^I?)
-        beq enext
-
+        cmp #DOWNKEY            ; CTRL-J (indent new line)
+        bne :+
+        cpx #sCTRL
+        bne enext               ; is arrowkey
+        ;; CTRL-J - insert and indent line
+        ;; A=10 already!
+:       
 
         ;; -> ^Forward
         cmp #CTRL('F')
         beq eforward
         cmp #RIGHTKEY           ; CTRL-I (tab)
-        beq eforward
-
+        bne :+
+        cpx #sCTRL
+        bne eforward            ; is arrowkey
+        ;; ^Indent (move to first letter)
+        beq eindent
+:       
         ;; <- ^Back
         cmp #CTRL('B')
         beq eback
         cmp #LEFTKEY            ; CTRL-H (help)
-        bne :+
-        ;; ^Help
-        cpx #sCTRL
-        bne eback
-        ;; saves+restores screen = no longer need!
-        jmp _help
-:       
+        beq eback
+
         ;; |< ^A beginning
         cmp #CTRL('A')
         beq ebeginning
@@ -222,33 +228,16 @@ FUNC _editaction
         beq edel
         cmp #127                ; DEL key on ORIC!
         beq ebs
-        ;; RETURN
-        cmp #CTRL('M')
-        bne @notM
+        ;; ? RETURN or CTRL-M
+        cmp #13                 ; RETURN
+        bne :+
         ;; (test that ctrl is pressed and not BS)
         cpx #sCTRL
-        bne :+
+        bne @nl
         jmp ctrlM
-:
+@nl:
         ;; RETURN newline
         lda #10
-@notM:
-        ;; ^T CAPS LOCK (ORIC KEY)
-        cmp #CTRL('T')
-        bne :+
-        jmp putchar
-:       
-        ;; ^Verbose info
-        cmp #CTRL('V')
-        bne :+
-        .import _info
-        jsr _info
-        jmp getchar
-:       
-        ;; ^L redisplay (Undo?)
-        cmp #CTRL('L')
-        bne :+
-        jmp loadfirst          
 :       
         ;; ----------------------------------------
         ;; ELSE
@@ -416,13 +405,6 @@ FUNC _redraw
 
         rts
 
-
-;; == COMMANDS
-FUNC _ideaction
-        ;; ESCape (toggle COMMAND/EDIT)
-        cmp #27
-        bne :+
-
 togglecommand:
 ;;; 7
         lda mode
@@ -435,6 +417,39 @@ togglecommand:
         jmp _aftercompile
 @ed:
         jmp _redraw
+
+
+;; == COMMANDS
+FUNC _ideaction
+        ;; ESCape (toggle COMMAND/EDIT)
+        cmp #27
+        beq togglecommand
+
+        cpx #sCTRL
+        bne ia_noctrl
+       
+        ;; ^Help
+        cmp #CTRL('H')
+        bne :+
+
+        jmp _help
+:       
+        ;; ^Verbose info
+        cmp #CTRL('V')
+        bne :+
+        .import _info
+        jsr _info
+        jmp getchar
+:       
+        ;; ^L redisplay (Undo?)
+        cmp #CTRL('L')
+        bne :+
+        jmp loadfirst          
+:       
+        ;; ^T CAPS LOCK (ORIC KEY)
+        cmp #CTRL('T')
+        bne :+
+        jmp putchar
 :       
         ;; ^Compile
         cmp #CTRL('C')
@@ -448,6 +463,14 @@ togglecommand:
 
         jmp _run
 :       
+        ;; - ctrl-Qasm - disasm
+        cmp #CTRL('Q')
+        bne :+
+
+        jmp _dasm
+:       
+
+ia_noctrl:
         ;; --- none
         bit mode
         bmi @command
@@ -532,14 +555,13 @@ einsert:
         sta tos+1
 
         ldy #0
-
         ;; TODO: revisit
         ;; double 0 byte makes this insert
         ;; not bleed into next input
 
         ;; TODO: alternatives to double 0?
-        ; jsr _inct
-        ; jmp @copyc
+; jsr _inct
+        jmp @copyc
 @nextc:
 ;;; (7)
         ;; dec tos
@@ -577,6 +599,7 @@ einsert:
 :       
         ;; turn off new curosr
         jmp togglecursor
+
 
 
 ;;; TODO: crashes...
@@ -671,6 +694,9 @@ loadfirst:
 
         ;; calculate end
 
+
+.ifnblank
+
 ;.if ((EDITSTART .mod 256)==0)
 ;EDITALIGNED=1
 .scope
@@ -696,6 +722,9 @@ loadfirst:
 .endif
 .endscope
 ;;; 3
+
+.endif ; BLANK
+
         jmp _redraw
 
 
