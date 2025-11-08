@@ -1738,6 +1738,9 @@ PRINTINPUT=1
 ;UPDATENOSPACE=1
 
 
+;
+PRINTDOTS=1
+
 ;;; TODO: make it a runtime flag, if asm is included?
 ;PRINTASM=1
 
@@ -10407,6 +10410,8 @@ CSRESET=1
 
 ;;; print "$4711@$34 "
 FUNC printvar
+        jsr spc
+
         lda 0,y
         ldx 1,y
 

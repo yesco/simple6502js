@@ -10,6 +10,7 @@
 
 ;;; This module is 
 ;;;    545 B / IDE: 2432 B
+;;;    683 B - added ^A ^E (hmmm?), command stuff
 ;;; 
 ;;; Old editor ( edit-atmos-screen.asm )
 ;;;    529 B / IDE: 2428 B
@@ -68,35 +69,17 @@ editrow:        .res 1
 
 
 
-
-.ifdef FISHF
-FUNC _initedit
-        jsr clrscr
-        
-        ;; put cursor at start, len=0 bytes
-        lda #<EDITSTART
-        ldx #>EDITSTART
-        sta editpos
-        stx editpos+1
-        sta editend
-        stx editend+1
-
-        ;; put zeroes at boundaries
-        ldy #0
-        tya
-        sta EDITNULL
-        sta (editend),y
-        sty editcol
-
-.endif
-
-
-
-
+;;; Edit the current buffer
+;;; 
+;;; Depending on "mode", you're either in
+;;; edit mode (BPL) or command mode (BMI).
+;;; 
+;;; 
 FUNC _edit
+        ;; init if first time
         bit mode
         bvc :+
-        ;; first time - init
+        ;; init + "load"
         jsr loadfirst
         ;; mark not need init
         lda mode
@@ -435,9 +418,8 @@ FUNC _redraw
 
 
 ;; == COMMANDS
-_ideaction:     
-
-        ;; ESCape (toggle COMAMND/EDIT)
+FUNC _ideaction
+        ;; ESCape (toggle COMMAND/EDIT)
         cmp #27
         bne :+
 
@@ -447,7 +429,12 @@ togglecommand:
         eor #128
         sta mode
 
-        jmp _eosnormal
+        bpl @ed
+        ;; reshow compilation result
+        jsr _eosnormal
+        jmp _aftercompile
+@ed:
+        jmp _redraw
 :       
         ;; ^Compile
         cmp #CTRL('C')
@@ -598,8 +585,9 @@ ctrlM:
         jsr _eosnormal
 
         putc 'S'
+        jsr spc
         lda #<EDITSTART
-        lda #>EDITSTART
+        ldx #>EDITSTART
         jsr _printh
         jsr nl
 
@@ -611,11 +599,28 @@ ctrlM:
         ldy #editend
         jsr printvar
 
+        putc 'e'
+        jsr spc
+        lda #<EDITEND
+        ldx #>EDITEND
+        jsr _printh
+        jsr nl
+
+        putc 'Z'
+        jsr spc
+        lda #<EDITSIZE
+        ldx #>EDITSIZE
+        jsr _printu
+        jsr nl
+
+        jsr nl
+
         putc 'c'
+        jsr spc
         lda editcol
         ldx #0
         jsr _printu
-        
+
         jmp getchar
 
 ekill:  
