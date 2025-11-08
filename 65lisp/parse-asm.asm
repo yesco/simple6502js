@@ -2202,7 +2202,6 @@ jmpaccept:
 .ifdef OPTSKIP
         cmp (inp),y
         bne @noteq
-
 @skipspc:
 ;        jsr _incI
         inc inp

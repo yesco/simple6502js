@@ -173,6 +173,8 @@ eindent:
 ;;; each operation ends with rts
 ;;; (instead of jmp edit, saving 2 bytes)
 FUNC _editaction
+
+;;; 36 * 4 cmp/beq = 144 B
         ;; some may need it
         ldy #0
 
@@ -421,6 +423,9 @@ togglecommand:
 
 ;; == COMMANDS
 FUNC _ideaction
+;;; 
+;;; 16 * 4 = cmp+beq = 64 B
+
         ;; ESCape (toggle COMMAND/EDIT)
         cmp #27
         beq togglecommand
