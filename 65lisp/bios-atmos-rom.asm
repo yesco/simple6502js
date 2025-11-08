@@ -87,6 +87,20 @@ RIGHTKEY =  9
 DOWNKEY  = 10
 UPKEY    = 11
 
+;;; $208 (520) Contains the scan code of the
+;;;      currently pressed key
+;;; $2DF (735) Contains the ASCII code + 128
+;;;      of the last pressed key
+;;; $209 (521) Indicates the status of the SHIFT,
+;;;      CONTROL and FUNCTION keys (not bitwise)
+;;; $24E (KBDLY) delay for keyboard auto repeat,
+;;;      defaults to 32
+;;; $24F (KBRPT) repeat rate for keyboard repeat,
+;;;      defaults to 4
+;;; 
+;;; - https://osdk.org/index.php?page=articles&ref=ART16
+
+
 ;;; Peek key: Hi-bit set if have key, lower==KEY!
 KBHIT= $023B                  ; ORIC ATMOS only
 

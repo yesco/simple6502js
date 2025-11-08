@@ -9731,8 +9731,7 @@ FUNC _listsymbols
         jmp @nextchar
         
 @donelist:
-        jsr waitesc
-        jmp _loadscreen
+        ;; fall-through
 waitesc:
         PRINTZ {CYAN,"    ESC>"}
         jsr getchar
