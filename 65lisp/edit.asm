@@ -93,6 +93,7 @@ command:
         PRINTZ {10,">"}
         jsr _eosnormal
 editing:
+        jsr cursoron
         jsr getchar
         jsr _ideaction
 
@@ -280,10 +281,24 @@ togglecursor:
 ;;; 9
         ldy #0
         lda (editpos),y
+curflip:
         eor #$80
         sta (editpos),y
 ret:    
         rts
+        
+cursoron:
+;;; 6 (slow) - haha
+        jsr togglecursor
+        bpl curflip
+        rts
+
+cursoroff:      
+;;; 5 ! (slower) - hahaha
+        jsr cursoron
+        ;; always true
+        bmi curflip
+
 
 ebs:    
         jsr eback
@@ -735,6 +750,14 @@ loadfirst:
 
 
 ecompile:
+        ;; We need to make sure no hibit (cursor)
+        ;; is set in the code we compile, either
+        ;; save a copy to compile in the background
+        ;; or wait...
+
+;;; TODO: remove cursor (hibit)
+jsr cursoroff
+
         jsr nl
         lda #(BLACK+BG)&127
         ldx #WHITE&127
