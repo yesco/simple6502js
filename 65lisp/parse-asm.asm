@@ -877,8 +877,6 @@ savey:  .res 1
 
 ;;; IDE mode: V=64=init Mi=$ff=command Pl=0=editing=
 ;;;   (_init sets it to 64)
-;;;   editor->command: dec mode
-;;;   comand->editor:  inc mode
 mode:           .res 1
 
 .code
@@ -3064,6 +3062,10 @@ error:
         PRINTZ {10,"%"}
         pla
         jsr putchar
+
+;;; TODO: revisit, what errors are these?
+;;;   aren't they more system/compiler errors
+;;;   like assertions?
 
         ;; go edit to fix again!
         jmp _edit
@@ -9120,6 +9122,7 @@ FUNC _aftercompile
 ;        sta err
 
 ;;; TODO: print earlier before first compile?
+
 .ifdef __ATMOS__
         .data
 status: 
@@ -9223,6 +9226,12 @@ printmore:
         bcc printmore
 done:   
         PRINTZ {10,"...",10}
+
+        ;; - turn on command mode unconditionally
+        lda mode
+        ora #128
+        sta mode
+        
         jmp _edit
         
 nohi:
@@ -9241,7 +9250,8 @@ print:
 .endif ; PRINTINPUT
 .endscope
 
-        ;; printed program error
+;;; TODO: came here with no errors? 
+;;;    or none to display?
         jmp _edit
 
 
@@ -10397,17 +10407,17 @@ CSRESET=1
 
 ;;; print "$4711@$34 "
 FUNC printvar
-        lda 0,x
-        pha
-        lda 1,x
-        pha
+        lda 0,y
+        ldx 1,y
 
         jsr _printh
 
+        tya
         PUTC '@'
+        PUTC '$'
         jsr _print2h
 
-        jmp spc
+        jmp nl
 
 ;;; TODO: not used remove
 .ifdef PRINTADDRESS

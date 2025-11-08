@@ -54,13 +54,15 @@ ROWS=27
 .zeropage
 ;;; A value of point EDITSTART <= x < EDITEND
 editpos:        .res 2
-lineptr:        .res 2
 
 ;;; TODO: doesn't need to be zeropage?
 editend:        .res 2
 
-editrow:        .res 1
 editcol:        .res 1
+
+;;; TODO: just use a tmp in zp?
+editrow:        .res 1
+
 
 .code
 
@@ -84,8 +86,7 @@ FUNC _initedit
         tya
         sta EDITNULL
         sta (editend),y
-;        sta editrow
-;        sta editcol
+        sty editcol
 
 .endif
 
@@ -95,10 +96,11 @@ FUNC _initedit
 FUNC _edit
         bit mode
         bvc :+
+        ;; first time - init
         jsr loadfirst
-
-        ;; set edit mode
-        lda #0
+        ;; mark not need init
+        lda mode
+        and #255-64
         sta mode
 :       
         jmp editloop
@@ -138,6 +140,9 @@ egotocol:
         beq rts2
         cmp #10
         beq rts2
+;;; This messes things up
+;        cmp #10+128
+;        beq rts2
 
         jsr eforward
         ;; move forward more?
@@ -377,11 +382,9 @@ FUNC _redraw
         sta (tos),y
         ;; at cursor, save COL
         bpl :+
-        sty editcol
+        stx editcol
         ;; store editrow? currently used as loopvar
 :
-
-
         ;; newline
         cmp #10
         beq @nl
@@ -413,7 +416,7 @@ FUNC _redraw
 
         ;; no more rows
         dec editrow
-        beq ret
+        beq @done
 
         ldx #WIDTH
 
@@ -421,7 +424,14 @@ FUNC _redraw
         beq @clreol
         bne @nextc
 
+@done:
+        ;; reverse editcol
+        lda #40
+        sec
+        sbc editcol
+        sta editcol
 
+        rts
 
 
 ;; == COMMANDS
@@ -431,18 +441,18 @@ _ideaction:
         cmp #27
         bne :+
 
-togglecommand:  
+togglecommand:
 ;;; 7
         lda mode
-        eor #$ff
+        eor #128
         sta mode
-        rts
+
+        jmp _eosnormal
 :       
         ;; ^Compile
         cmp #CTRL('C')
         bne :+
 
-        jsr togglecommand
         jmp ecompile
 :       
         ;; ^Run
@@ -587,14 +597,25 @@ ctrlM:
         ;; CTRL-M .... ? Sectret Mystery Action?
         jsr _eosnormal
 
+        putc 'S'
+        lda #<EDITSTART
+        lda #>EDITSTART
+        jsr _printh
+        jsr nl
+
+        putc 'P'
+        ldy #editpos
+        jsr printvar
+
         putc 'E'
-        ldx #editpos
+        ldy #editend
         jsr printvar
 
-        putc 'L'
-        ldx #editend
-        jsr printvar
-
+        putc 'c'
+        lda editcol
+        ldx #0
+        jsr _printu
+        
         jmp getchar
 
 ekill:  
