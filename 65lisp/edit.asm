@@ -51,6 +51,7 @@
 ;;;    683 B - added ^A ^E (hmmm?), command stuff
 ;;;    769 B - ^P ^N ^I etc, but many jsr togglecursor 
 ;;;    723 B - ...  removed many jsr togglecursor!
+;;;    669 B - saved 54 B only using BRANCH table :-(
 ;;; 
 ;;; Old editor ( edit-atmos-screen.asm )
 ;;;    529 B / IDE: 2428 B

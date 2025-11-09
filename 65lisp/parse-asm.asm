@@ -135,41 +135,131 @@
 ;;; Arrow keys for movement, backspace, delete (forward).
 
 ;;; Emacs commands are extras:
-;;; line: ^Prev ^Next ^A=sTart ^End ^O=new
+;;; line: ^Prev ^Next ^A=stArt ^End
 ;;; char: ^Back ^Forward ^Delete BackSpace
 ;;; 
-;;; ^T - caps toggle (ORIC, lol)
+;;; ^T - caps toggle (ORIC style, lol)
+;;; 
+;;; ESC - toggles between editing and command mode
+;;; (ctrl functions available all the time through)
 ;;; 
 ;;;   ^Help summary (navigation, lang, symbols)
-;;;   ^Write screen to buffer
-;;;   ^Load screen from buffer
 ;;;   ^Compile buffer
-;;;   ^Xexecut program
-;;;   ^Run
+;;;   ^Run program
+;;; 
+;;;  (^Write file)
+;;;  (^Load screen from origional/undo all?)
+;;; 
+
+
 ;;; 
 ;;; Experimental features:
 ;;; 
-;;;   ^Zource code (reload from orig)
 ;;;   ^V info of compiler/program/libraries
-;;;   ^Garnish program (pretty print)
-;;; 
 ;;;   ^Q disasm program (sensitive)
-;;;   ^Utilities, ahum list "files"
-;;;   ^Y quit
+;;;  (^Garnish program (pretty print))
+;;; 
+;;;  (^X extend features, file stuff)
+;;;  (^Y quit - only .sim variant)
 ;;;   
 ;;;  ESC help
 ;;; 
 ;;; Not yet: ^Search ^J ^Killine ^Machinecode(^Q)
+;;; 
 
-;;; Errors
+;;; 
+;;; COMPILE ERRORS
+;;; 
+;;; Basically, it'll highlight how far it could parse,
+;;; and from then the rest of that line is highlightd in
+;;; red background color.
+;;; 
+;;; The error lies somewhere around there!
+;;; 
+;;; BNF-parsers are knowsn
+;;; 
+
+;;; 
+;;; % ERRORS - compiler errors
 ;;; 
 ;;; If there is an error a newline '%' letter error-code
-;;; is printed, and with PRINTINPUT ERRPOS defined the
-;;; source is printed, and RED text as far as parsing got.
+;;; is printed, this error code is most likely a compiler
+;;; code/rule error. Please report! Screenshot and code
+;;; that you're compiling.
+;;; 
+
+;;; 
+;;; STANDARD LIBRARIES
+;;; 
+;;;     #include <stdio.h>
+;;; 
+;;; Yeah, that's just IGNORED! Anything starting with #
+;;; is ignored to newline!
+;;; 
+;;; For now, to enable/disable libraries a recompile
+;;; maybe needed. For your "convenience" a nubmer
+;;; of variants of .tap files are provided with
+;;; common configuration:
+;;; 
+;;; TODO:
+;;; - MeteoriC.tap      = all libraries included
+;;; - MeteoriC-none.tap = no libraries (not even "bios")
+;;; - MeteoriC-raw.tap  = full libraries not using ROM
+;;; 
+
+;;; There are 4 libraries relevant to ORIC/6502
+;;; - bios      :  72 B - getchar putchar
+;;; - misc      :  17 B - nl spc routines i.e. putchar(' ')
+;;; - runtime   :  36 B - runtime routines (RECURSION)
+;;; 
+;;; - stdio.h   : 114 B - putu puth putz puts (putd)
+;;;  (printf.h) :       - not yet, maybe as inline!
+;;; - ctype.h   :  99 B - isdigit is...
+;;; - stdlib.h  :  20 B - 
+;;; - string.h  : 144 B - strlen strcpy...
+;;; - libmath.h :   0 B - TODO: mul/div/mod
+;;; 
+
+;;; 
+;;; LIBRARY LESS!
+;;; 
+;;; The compiler maps some common simple ideoms to
+;;; direct code:
+;;; 
+;;; putchar(' ') putchar('\n')   // jsr spc ; jsr spc
+;;; printf("%u", X);             // == putu
+;;; printf("%x", X);             // == puth
+;;; printf("%s", X);             // == putz (no nl)
+;;; fputs(stdout, X);            // == putz (no nl)
+;;; 
+;;; memcpy(CONST, CONST, const)  // const<256 => 14 B
+;;; memcpy(X,X,X)                // inline    => 23 B
+;;; 
+;;; // if SIGNED support has been enabled
+;;; printf("%d", X);             // == putd
 ;;; 
 
 
+;;; 
+;;; == stdio.h
+;;; == printf.h
+;;; == ctype.h
+;;; == stdlib.h
+;;; == string.h
+;;; == libmath.h
+;;; 
 
+
+;;; OTHER LIBRRARIES FOR CONSIDERATION
+;;; 
+;;; - stddef.h  :       - nah
+;;; - assert.h  :       - nah
+;;; - limits.h  :       - nah (INT_MAX INT_MIN, ffs)
+;;; - system.h  :       - nah (exec?)
+;;; - unistd.h  :       - nah (file system stuff)
+
+
+;;; - graphics.h: TODO: ORIC ATMOS optmized graphics
 
 ;;; 
 ;;; ORIC ATMOS API
@@ -8434,9 +8524,7 @@ FUNC _oricend
         sta VAL1,y
 
       .byte "]"
-;;; TODO: verify small <= 256
-;;;   and/or generate one that copies pages (+7 B!)
-        .byte "%D);"
+        .byte "%d);"
       .byte "["
 ;;; 8B
         iny
@@ -8463,6 +8551,10 @@ FUNC _oricend
         
         .byte _E,");"
       .byte "["
+
+;;; TODO: WTF?
+
+
 ;;; 8
         tay
 :       
