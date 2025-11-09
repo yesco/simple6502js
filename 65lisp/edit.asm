@@ -1,12 +1,50 @@
 ;;; edit.asm -
+;;; 
 ;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
 ;;; 
 ;;; A simple emacs style editor for ORIC ATMOS
 ;;; written in pure assembly.
 ;;; 
+;;; NOTE: this need to be made into a generic
+;;;       variant, vt100/ansi-style...
+
+;;; IMPLEMENTATION DETAILS
+;;; 
+;;; This code knows it's native on ORIC ATMOS.
+;;; It particularly uses the HIRES (grabbable)
+;;; memory as edit buffer.
+;;; 
+;;; For each (!!) keystroke the WHOLE screen is
+;;; _redraw:n. This may seem "wasteful" but there
+;;; is no "background" operations to steal from.
+;;; 
+;;; However, the current editor implementation
+;;; uses a contious implementation, each insert,
+;;; delete, does memmoves on the size of the file
+;;; potentially. The typicaly memory copy bandwidth
+;;; of an 1MHz 6502 is about 62.5K/s So if the "file"
+;;; edited is 7K we can only do (/ 62.5 7) 8 inserts
+;;; per second. That's rather slow...
+;;; 
+;;; For comparsison, a normal typer does 3-4 cps,
+;;; whereas more experienced maybe 10. Expert typist
+;;; may reach 20cps. So...
+;;; 
+;;; The problem may be misssed keystrokes as currently
+;;; keyboard is only read when waiting for key, if there
+;;; is a keypress before I don't catch it as interrupts
+;;; are off (try turn on?)
+;;; 
+;;; The bigger problem is that I stop the interrupts,
+;;; as ATMOS ROM "corrupts" zero-page.
+;;; 
+;;; To revisit!
+;;; 
+
+
 
 ;;; TODO: optimize for code-size.
-;;; TODO: and... is gap-buffer smaller? (faster!)
+;;; TODO: and... is gap-buffer smaller? (faster for sure!)
 
 ;;; This module is 
 ;;;    545 B / IDE: 2432 B
@@ -34,7 +72,7 @@ CHARSET    = $b400
 ;;; (to facilitate backward processing)
 
 ;;; For ORIC ATMOS we're going to use part of the
-;;; HIRES as an editing buffer.
+;;; HIRES as an editing buffer. '-lol
 EDITNULL= HICHARSET
 
 ;;; lol
@@ -96,19 +134,88 @@ command:
         jsr _eosnormal
 editing:
         jsr getchar
-        jsr _ideaction
+        jsr _editaction
 
 editloop:       
         bit mode
         bmi command
 
-        ;; don't redraw if key waiting!
+        ;; don't redraw if key waiting!'
         jsr KBHIT
         bmi :+
         ;; redraw
         jsr _redraw
 :       
         jmp editing
+
+
+
+;;; This is the local CTRL dispatch BRANCH table
+;;; 
+.macro BR label
+        .byte label-patchbranch-2
+        .assert label-patchbranch-2<128,error,"%% BR too far"
+.endmacro
+;;; BackRuB? BRanchBack!
+.macro BRB label
+        .byte $100+label-patchbranch-2
+        .assert $100+label-patchbranch-2,error,"%% BR too far BACK"
+.endmacro
+
+
+ctrlbranch:     
+;;; For test only
+;BR lastctrl
+        BR ctrlSPC
+        
+        ;; ^A-^E
+       BRB ebeginning
+        BR eback
+        BR jcompile
+        BR edel
+       BRB eend
+
+        ;; ^F-^J
+        BR eforward
+        BR ctrlG
+        BR jhelp
+       BRB eindent
+;        BR jins
+        BR jreturn
+
+        ;; ^K-^O
+        BR jkill
+        BR jload
+        BR jreturn
+       BRB enext
+        BR ctrlO
+
+        ;; ^P-^T
+       BRB eprev
+        BR jdasm
+        BR jrun
+        BR ctrlS
+        BR jcaps
+
+        ;; ^U-^Y
+        BR ctrlU
+        BR jinfo
+        BR ctrlW
+        BR ctrlX
+        BR eyank
+
+        ;; ^Z ESC
+        BR ctrlZ
+        BR jcmd
+
+        ;; Arrows remapeed: 29--31!
+        BR eback
+        BR eforward
+       BRB enext
+       BRB eprev
+
+
+
 
 
 
@@ -180,89 +287,93 @@ FUNC _editaction
         ;; some may need it
         ldy #0
 
-	;; --- CTRL DISPATCH
-
-        ;; ^ ^Prev
-        cmp #CTRL('P')
-        beq eprev
-        cmp #UPKEY              ; CTRL-K (delline)
-        bne :+
+        ;; noctrl: special keys without cTRL
         cpx #sCTRL
-        bne eprev               ; is arrowkey
-        ;; ^Kill
-        jmp ekill
-:       
-        ;; v ^Next
-        cmp #CTRL('N')
-        beq enext
-        cmp #DOWNKEY            ; CTRL-J (indent new line)
-        bne :+
-        cpx #sCTRL
-        bne enext               ; is arrowkey
-        ;; CTRL-J - insert and indent line
-        ;; A=10 already!
-:       
-
-        ;; -> ^Forward
-        cmp #CTRL('F')
-        beq eforward
-        cmp #RIGHTKEY           ; CTRL-I (tab)
-        bne :+
-        cpx #sCTRL
-        bne eforward            ; is arrowkey
-        ;; ^Indent (move to first letter)
-        beq eindent
-:       
-        ;; <- ^Back
-        cmp #CTRL('B')
-        beq eback
-        cmp #LEFTKEY            ; CTRL-H (help)
-        beq eback
-
-        ;; |< ^A beginning
-        cmp #CTRL('A')
-        beq ebeginning
-        ;; >| ^End
-        cmp #CTRL('E')
-        beq eend
-
-
-        ;; Delete forward / DEL=BackSpace!
-        cmp #CTRL('D')
-        beq edel
-        cmp #127                ; DEL key on ORIC!
+        beq ctrl
+@noctrl:
+        ;; DEL key on ORIC (do perform BS)
+        cmp #127
         beq ebs
-        ;; ? RETURN or CTRL-M
-        cmp #13                 ; RETURN
-        bne :+
-        ;; (test that ctrl is pressed and not BS)
-        cpx #sCTRL
-        bne @nl
-        jmp ctrlM
-@nl:
-        ;; RETURN newline
-        lda #10
-:       
-        ;; ----------------------------------------
-        ;; ELSE
 
-        ;; --- INSERT
+        ;; TODO: META (>128 keys?)
+
+        ;; Insert normal characters
+        ;; 4 B but cam't catch ^M (is == RETURN)
+        cmp #' '
+        bcs jins
+
+;;; fall-through: control codes
+
+;;; Using dispatch table intead of cmp/beq (4 B)
+;;; 
+;;; (- 18790 18706) = 84 bytes saved (only?)
+	;; --- CTRL DISPATCH
+        ;; A= 0..31 !
+ctrl:   
+        tax
+        lda ctrlbranch,x
+        ;; self-modifying code
+        sta patchbranch+1
+
+        sec
+patchbranch:
+        bcs eprev               ; gets "self-modified"!
+
+;;; --------------------- brnaches to here after
+
+;;; jmp dispatch 9*3= 27 B
+;;; (almost worth it to just do wide dispatch table!)
+jcompile:       
+        jmp ecompile
+jrun:   
+        jmp _run
+jmystery:       
+        jmp emystery
+jkill:          
+        jmp ekill
+jload:  
+        jmp loadfirst
+jcaps:  
+        jmp putchar
+jhelp:  
+        jmp _help
+jdasm:  
+        jsr _dasm
+        jmp getchar
+jinfo:  
+        .import _info
+        jsr _info
+        jmp getchar
+jcmd:   
+        jmp togglecommand
+
+jreturn:        
+        lda #10
+        ;; normal char - insert
+jins:   
         jsr einsert
-        ;; fall-through to eforward
-eforward:
-;;; 12
+        ;; fall-through
+eforward:       
 ;;; TODO: at beginning of file - stop
         ;; todo: jsr _ince
         inc editpos
         bne :+
         inc editpos+1
 :
+;;; TODO: these are un-assigned, just return for now
+ctrlSPC:                        ; TODO: mark?
+ctrlG:                          ; ?
+ctrlO:                          ; TOOD: insert RET after
+ctrlS:                          ; TODO: searcd
+ctrlU:                          ; TODO: repeat
+ctrlW:                          ; TODO: write
+ctrlX:                          ; TODO: extras
+ctrlZ:                          ; TODO: undo?
+eyank:                          ; TODO: yank
         rts
-       
-eback:
-;;; 11
 
-;;; TODO: at end of file - stop
+eback:
+	;; TODO: at end of file - stop
 	;; todo: jsr _dece
         lda editpos
         bne :+
@@ -270,11 +381,32 @@ eback:
 :       
         dec editpos
         rts
+        
+
+togglecommand:
+;;; 7
+        lda mode
+        eor #128
+        sta mode
+
+	;; actions
+        ;; TODO: feels like lots of duplications?
+;;; 11
+        bpl @ed
+        ;; reshow compilation result
+        jsr _eosnormal
+        jmp _aftercompile
+@ed:
+        jmp _redraw
 
 
 
 ebs:    
         jsr eback
+        ;; fall-through
+;;; just a marker for the last (see BR lastctrl)
+lastctrl:       
+
 edel:    
         ;; delete one character at cursor
         ;; - to
@@ -305,9 +437,9 @@ edel:
         dec editend+1
 :       
         dec editend
-
         rts
-      
+
+;;; ------------ END CTRL DISPATCH
         
 
 ;;; raw raw raw - relatively fast!
@@ -407,94 +539,8 @@ togglecursor:
 
 
 
-togglecommand:
-;;; 7
-        lda mode
-        eor #128
-        sta mode
-
-	;; actions
-        ;; TODO: feels like lots of duplications?
-;;; 11
-        bpl @ed
-        ;; reshow compilation result
-        jsr _eosnormal
-        jmp _aftercompile
-@ed:
-        jmp _redraw
-
-
-
-
-;; == COMMANDS
-FUNC _ideaction
-;;; 
-;;; 16 * 4 = cmp+beq = 64 B
-
-        ;; ESCape (toggle COMMAND/EDIT)
-        cmp #27
-        beq togglecommand
-
-        cpx #sCTRL
-        bne ia_noctrl
-       
-        ;; ^Help
-        cmp #CTRL('H')
-        bne :+
-
-        jmp _help
-:       
-        ;; ^Verbose info
-        cmp #CTRL('V')
-        bne :+
-        .import _info
-        jsr _info
-        jmp getchar
-:       
-        ;; ^L redisplay (Undo?)
-        cmp #CTRL('L')
-        bne :+
-        jmp loadfirst          
-:       
-        ;; ^T CAPS LOCK (ORIC KEY)
-        cmp #CTRL('T')
-        bne :+
-        jmp putchar
-:       
-        ;; ^Compile
-        cmp #CTRL('C')
-        bne :+
-
-        jmp ecompile
-:       
-        ;; ^Run
-        cmp #CTRL('R')
-        bne :+
-
-        jmp _run
-:       
-        ;; - ctrl-Qasm - disasm
-        cmp #CTRL('Q')
-        bne :+
-
-        jmp _dasm
-:       
-
-ia_noctrl:
-        ;; --- none
-        bit mode
-        bmi @command
-@edit:
-        jmp _editaction
-
-        ;; command mode return
-@command:
-        rts
-
-
-
-
 ;;; move forwards (editpos) till A
+;;; make use X for max moves
 etill:  
 ;;; 15
         sta savea
@@ -601,7 +647,7 @@ einsert:
 
 
 ;;; TODO: crashes...
-ctrlM:  
+emystery:       
         ;; CTRL-M .... ? Sectret Mystery Action?
         jsr _eosnormal
 

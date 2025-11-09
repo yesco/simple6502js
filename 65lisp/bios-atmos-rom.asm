@@ -200,8 +200,25 @@ getchar:
         bpl :-
 
         ldx $0209
+        ;; ? CTRL
+;;; 14 B
+        cpx #sCTRL
+        beq :+
+@noctrl: 
+        ;; arrow keys? (detect by code+no ctrl!)
+        cmp #8
+        bcc :+
+        cmp #11+1
+        bcs :+
+
+        ;; adjust arrow keys from 8-11 => 28-31 !
+        ;; C= 0
+        adc #20
+        ldx #sCTRL              ; fake CTRL! lol
+:       
         ;; ? FUNC
-        cpx #$a5
+;;; 6
+        cpx #sFUNC
         bne @done
         ;; FUNC
         ora #128

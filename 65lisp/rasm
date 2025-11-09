@@ -51,7 +51,7 @@ echo "NAME: $nam"
 perl -e '$_=join("",<>);s/^[\s\S]*BEFORE>//m;s/<AFTER[\s\S]*//m;print;' $nam.tap > $nam.bin
 
 # lol
-ca65 $name-asm.asm -l $name-asm.lst 2>/dev/null 1>/dev/null
+ca65 -t atmos $name-asm.asm -l $name-asm.lst # 2>/dev/null 1>/dev/null
 
 ls -l $name-asm.lst
 
