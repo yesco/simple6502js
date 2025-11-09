@@ -3,9 +3,6 @@
 ;;; Part of library for parse CC02 C-compiler
 
 
-
-
-FUNC _stdiostart
 ;;; -------- <stdio.h> - LOL
 ;;; 
 ;;; TODO: ... fix...
@@ -68,14 +65,17 @@ PRINTHEX=1
 
 .ifdef PRINTHEX
 
+
 ;;; print4h: print hex from AX
 ;;; 
-;;; (+ 7 6 8 1 8 3) = 32
+;;; (+ 6 8 1 8 3) = 26
 ;;; 
 ;;; TODO: doesn't it feel like a generic
 ;;;       div BASE printer would be same?
 
 ;;; TODO: optional?
+;;; (+ 7 26) = 33
+;;; 
 FUNC _printh
 FUNC _printdollar4h
 ;;; 7
@@ -109,8 +109,13 @@ FUNC _print1h
 ;;; 6502 "ideom" convert 0-f => '0'..'F' !
 ;;; ! - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
 ;;; 8 B !
-        and #$f
 
+;;; WARNING: if this get's interrrupted IRQ routine may...
+
+;;; "Though there is one problem: It works with invalid
+;;;  BCD digits and might not work on emulators." !!!
+
+        and #$f
         SED
         CMP #$0A
         ADC #'0'
@@ -384,4 +389,3 @@ FUCN _iputzz
         jmp iputz
 .endif ; PRINTFHELPERS
 
-FUNC _stdioend

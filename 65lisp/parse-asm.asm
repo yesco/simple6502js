@@ -188,6 +188,44 @@
 ;;; that you're compiling.
 ;;; 
 
+
+;;; 
+;;; LIBRARY-LESS! (NO LIBRARY, NO BIOS)
+;;; 
+;;; To incure as little storage overhead as possible,
+;;; the compiler can, on ORIC ATMOS using only
+;;; the BASIC ROM dispense with overhead of the
+;;; "fancy BIOS", that "corrects" some issues
+;;; 
+;;; The compiler maps some common simple ideoms to
+;;; direct code:
+;;; 
+;;; - using raw BIOS ROM, we do this
+;;; putchar(' ')
+;;; putchar('\n')
+;;; putchar(X)                   // \n doesn't work!
+;;; putz(S)                      // ONLY putz not puts
+;;; (no printing numbers unsigned/decimal/hex)
+;;; 
+;;; - these are compiled inline!
+;;; 
+;;; memcpy(CONST, CONST, const)  // const<256 => 14 B
+;;; memcpy(X,X,X)                // inline    => 23 B
+;;; 
+;;; - minimal ctype.h inlined (no library!!)
+;;; 
+;;; isdigit()
+;;; isalpha()
+;;; isspace()
+;;; 
+;;; - a very simplistic replacement for malloc()
+;;;   is provided, but take care - no free()!
+;;; 
+;;; malloc(X)                    // gives pointer after code
+;;; free(X)                      // does nothing
+;;; 
+
+
 ;;; 
 ;;; STANDARD LIBRARIES
 ;;; 
@@ -206,8 +244,8 @@
 ;;; - MeteoriC-none.tap = no libraries (not even "bios")
 ;;; - MeteoriC-raw.tap  = full libraries not using ROM
 ;;; 
-
-;;; There are 4 libraries relevant to ORIC/6502
+;;;
+;;; There are 8 libraries relevant to ORIC/6502
 ;;; - bios      :  72 B - getchar putchar
 ;;; - misc      :  17 B - nl spc routines i.e. putchar(' ')
 ;;; - runtime   :  36 B - runtime routines (RECURSION)
@@ -220,20 +258,16 @@
 ;;; - libmath.h :   0 B - TODO: mul/div/mod
 ;;; 
 
+
 ;;; 
-;;; LIBRARY LESS!
+;;; PRINTF SUPPORT - nah, not yet
 ;;; 
-;;; The compiler maps some common simple ideoms to
-;;; direct code:
+;;; However, these works!
 ;;; 
-;;; putchar(' ') putchar('\n')   // jsr spc ; jsr spc
-;;; printf("%u", X);             // == putu
-;;; printf("%x", X);             // == puth
-;;; printf("%s", X);             // == putz (no nl)
-;;; fputs(stdout, X);            // == putz (no nl)
-;;; 
-;;; memcpy(CONST, CONST, const)  // const<256 => 14 B
-;;; memcpy(X,X,X)                // inline    => 23 B
+;;; printf("%u", X)              // == putu
+;;; printf("%x", X)              // == puth
+;;; printf("%s", X)              // == putz (no nl)
+;;; fputs(stdout, X)             // == putz (no nl)
 ;;; 
 ;;; // if SIGNED support has been enabled
 ;;; printf("%d", X);             // == putd
@@ -899,6 +933,35 @@ CSTIMER         = $0276
 .endmacro
 
 
+;;; ----------------------------------------
+;;;      L I B R A R Y   C O N F I G 
+
+
+
+;;; NOBIOS: will generate code that doesn't 
+;;; rely on extra code for getchar/putchar
+;;;
+
+;
+NOBIOS=1
+
+
+;
+NOLIBRARY=1
+
+;;; BYTESIEVE needs printf/putu
+
+;;; TODO: we need a dynamic way to add a single
+;;;       function dynamically during compilation!
+;;;       (asumes rel jmp only)
+
+;;; if this isn't included it FAILS COMPILATION
+;;; at some random place??? m=8192; ????
+;;; TODO: investigate!
+
+;
+STDIO=1
+
 
 
 
@@ -921,12 +984,8 @@ CSTIMER         = $0276
 
 FUNC _biosstart
 
-;OLDSTYLE=1
-;;; TODO: remove!!!!
-.ifdef OLDSTYLE
-  .include "bios.asm"
-  TTY_HELPERS=1
-.else
+.ifndef NOBIOS
+
 
 .ifdef __ATMOS__
   ;.include "bios-raw-atmos.asm"
@@ -935,11 +994,13 @@ FUNC _biosstart
   .include "bios-sim.asm"
 .endif ; __ATMOS__ | SIM
 
-.endif ; OLDSTYLE
 
 .ifndef putcraw
         putcraw= putchar
 .endif
+
+
+.endif ; !NOBIOS
 
 FUNC _biosend
 
@@ -998,12 +1059,9 @@ mode:           .res 1
 
 
 
-
 ;;; 1284707
 ;;; 1150630 (/ 1284707 1150630.0) == 11.6% overhead
 ;;; 11.6% overhead parsing STRING CTYPE
-
-;NOLIBRARY=1
 
 .ifndef NOLIBRARY
 
@@ -1015,7 +1073,17 @@ STRING=1
 ;
 CTYPE=1
 
-; TODO: RECURSION?
+;;; Runtime
+
+RECURSION=1
+
+;;; stdlib
+
+STDLIB=1
+
+;;; stdio
+
+STDIO=1
 
 .endif ; NOLIBRARY
 
@@ -1045,9 +1113,6 @@ FUNC _runtimestart
 ;;; Alternative cost is (+ 21 12) == 33 B !
 ;;; overhead per recursive function!
 ;
-RECURSION=1
-
-
 
 
 .ifdef RECURSION
@@ -1481,15 +1546,19 @@ _SHR:
 FUNC _minimallibraryend
 
 
-
-
 ;;; inline str after jsr; +19 bytes
 ;;; saves 7 B at each puts/z("...");
 ;;; is it worth it?
 ;
 INLINEPRINTZ=1  
-.include "lib-stdio.asm"
 
+FUNC _stdiostart
+  .ifdef STDIO
+    .include "lib-stdio.asm"
+  .endif ; STDIO
+FUNC _stdioend
+
+;;; TODO
 ;include "lib-printf.asm"       ; not working
 
 .include "lib-ctype.asm"
@@ -1617,8 +1686,37 @@ FUNC _graphicsend
 FUNC _libraryend
 
 
+;;; IDE needs "fancy bios"
+;;; TODO: have a fancy function called getkey()?
+
+.ifdef NOBIOS
 
 
+.ifdef __ATMOS__
+  ;.include "bios-raw-atmos.asm"
+  .include "bios-atmos-rom.asm"
+.else ; SIM
+  .include "bios-sim.asm"
+.endif ; __ATMOS__ | SIM
+
+
+.ifndef putcraw
+        putcraw= putchar
+.endif
+
+
+.endif ; NOBIOS
+
+
+
+;;; IDE needs PRINTZ
+;;; (sneak it in
+;;;    - take care not to use it in compiled code!)
+.ifndef STDIO
+
+.include "lib-stdio.asm"
+
+.endif ; STDIO
 
 
 
@@ -1630,7 +1728,7 @@ FUNC _libraryend
 
 ;;; See template-asm.asm for docs on begin/end.asm
 NOSHOWSIZE=1
-.include "begin.asm"
+;.include "begin.asm"
 
 
 .zeropage
@@ -4381,6 +4479,9 @@ ruleC:
         
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
+
+.ifdef STDIO
+
         ;; "IO-lib" hack
         .byte "putu(",_E,")"
       .byte '['
@@ -4481,15 +4582,32 @@ FUNC _iorulesstart
         jsr putcraw
       .byte ']'
 
-.ifdef OPTRULES
-        ;; putchar constant - saves 2 bytes!
-        .byte "|putchar(%V)"
-      .byte '['
-        lda VAR0
-        jsr putchar
-;;; TODO: about return value...
-      .byte ']'
+.else ; NOBIOS
 
+        .byte "|putz(",_E,")"
+      .byte '['
+        ;; 19 B inline only...
+        sta pos
+        stx pos+1
+        ldy #0
+:       
+        lda (pos),y
+        beq :+
+
+        ;; ORIC: print character
+        jsr $CCD0 
+
+        iny
+        bne :-
+        inc pos+1
+        bne :-
+:       
+
+.endif ; STDIO
+
+.ifdef OPTRULES
+
+.ifndef NOBIOS
         ;; putchar variable - saves 2 bytes!
 ;;; TODO: parser skips space, hahahaha!
         .byte "|putchar('')"    ; LOL!!!!
@@ -4505,27 +4623,91 @@ FUNC _iorulesstart
 ;;; TODO: about return value...
       .byte ']'
 
-        ;; putchar variable - saves 2 bytes!
+        ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%D)"
       .byte '['
         lda #'<'
         jsr putchar
 ;;; TODO: about return value...
       .byte ']'
+
+        ;; putchar variable - saves 2 bytes!
+        .byte "|putchar(%V)"
+      .byte '['
+        lda VAR0
+        jsr putchar
+;;; TODO: about return value...
+      .byte ']'
+
+.else
+
+        ;; LDA #0C 11 20 3F
+        ;; 11= 17dec == ???
+
+        .byte "|putchar('')"    ; LOL!!!!
+        ;; (parser skips space...)
+      .byte '['
+        ;; ORIC: PRINT SPACE
+        jsr $CCD4
+      .byte ']'
+
+        ;; putchar newline
+        .byte "|putchar('\\n')" ;      double \\???
+      .byte '['
+        ;; ORIC: NEWLINE
+        jsr $CBF0
+      .byte ']'
+
+.endif ; !NOBIOS
+
 .endif ; OPTRULES
 
+
+.ifndef NOBIOS
         .byte "|putchar(",_E,")"
       .byte '['
         jsr putchar
       .byte ']'
-
-
 
         .byte "|getchar()"
       .byte '['
         jsr getchar
         ldx #0
       .byte ']'
+.else
+
+.ifdef __ATMOS__
+        .byte "|clrscr()"
+      .byte '['
+        ;; ORIC: CLS command (LDA #$0C)
+        jsr $CCCE
+      .byte ']'
+
+        .byte "|putchar(",_E,")"
+      .byte '['
+        ;; ORIC: print character...
+        jsr $CCD0 
+;;; $f77c output X !
+      .byte ']'
+
+        .byte "|getchar()"
+      .byte '['
+;;; from oric_advanced_user_guide_rom_disassembly.pdf
+;;; WARNING: it messes with address ZEROPAGE $2e ???
+        ;; ORIC: READ KEY FROM KEYBOARD
+;;; $c5e9 ?
+;;; $f523 poll keyboard
+        jsr $C5E8
+        ldx #0
+      .byte ']'
+.else
+        
+.endif ; __ATMOS__
+        
+
+.endif ; !NOBIOS
+
+
 FUNC _iorulesend
 
 .ifdef CTYPE
@@ -4779,23 +4961,92 @@ FUNC _memoryrulesstart
         lda (tos),y 
       .byte ']'
 
-.import _malloc
-        .byte "|malloc",_X
+
+.ifdef STDLIB
+
+;;; TODO: cheating, using cc65 malloc/free :-(
+
+        .byte "|malloc(",_E,")"
       .byte "["
+        .import _malloc
         jsr _malloc
       .byte "]"
 
-.import _free
-        .byte "|free",_X
+        .byte "|free(",_E,")"
       .byte "["
+        .import _free
         jsr _free
       .byte "]"
 
-.import _realloc
-        .byte "|realloc",_X
+        .byte "|realloc(",_E,")"
       .byte "["
+        .import _realloc
         jsr _realloc
       .byte "]"
+
+.else
+
+        ;; Simple dummies
+        ;; (just allocate directly after code, no free()) 
+
+        .byte "|malloc(",_E,")"
+      .byte "["
+SMALLER=1
+.ifdef SMALLER
+;;; 21 B  33c - works!
+        sta savea
+        stx savex
+
+        lda _out
+        tay
+        
+        clc
+        adc savea
+        sta _out
+        
+        lda _out+1
+        tax
+        adc savex
+        sta _out+1
+        
+        tax
+        tya     
+.else        
+;;; 21 B   42c per call! ; - DOESN'T WORK????
+        tay
+        ;; save return pointer
+        lda _out
+        pha
+        lda _out+1
+        pha
+
+        tya
+        
+        ;; move "heap" ahead
+        clc
+        adc _out
+        sta _out
+        txa
+        adc _out+1
+        sta _out+1
+        
+        ;; restore pointer
+        pla
+        tax
+        pla
+.endif
+      .byte "]"
+
+        .byte "|free(",_E,")"
+      .byte "["
+        ;; nothing to do, lol
+      .byte "]"
+
+        ;; NONO!
+        ;.byte "|realloc",_X
+
+.endif ; STDLIB
+
 
 .ifdef NOTDEFINEDIN_CC65 ; ???
 .import _heapmemavail

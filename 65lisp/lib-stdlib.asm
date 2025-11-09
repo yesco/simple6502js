@@ -1,10 +1,16 @@
 ;;; lib-stdlib.asm
 ;;; 
 ;;; Part of library for parse CC02 C-compiler
-
+;;; 
+;;; Only functions defined here:
+;;; - rand() srand()
+;;; - TODO: malloc(), free(), realloc()
 
 
 FUNC _stdlibstart
+
+.ifdef STDLIB
+
 ;;; -------- <stdlib.h>
 ;;; 
 ;;; TODO:
@@ -175,5 +181,7 @@ putd:
 
 FUNC _dummyd
 .endif ; SIGNED
+
+.endif ; STDLIB
 
 FUNC _stdlibend

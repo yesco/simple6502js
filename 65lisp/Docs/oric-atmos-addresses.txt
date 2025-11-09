@@ -41,6 +41,8 @@
 ;;; EDCE F0 0F BEQ $EDDF held in locations #10/#11.
 
 
+;;; - completely unreliable? (messes with ZP?)
+
 ;;; -- PRINT INTEGER IN A,X.
 ;;; E0C5 85 D1 STA $D1 
 ;;; E0C7 86 D2 STX $D2 Save integer in mantissa of
