@@ -1199,14 +1199,10 @@ RESTORY=1
 restoreY:
 ;putc '?'
 ;;; RESTORE!
-;;; 13 B
+;;; 14 B
         sta savea
         pla
         tay
-;        ldy #8
-;;; 13 c ok, it's faster...
-;;; could generate a long sequence and jump middle
-;;; wquld be 6c faster/byte! (8 => 42c!)
 :       
         pla
         sta VARa-1,y
@@ -1218,8 +1214,15 @@ restoreY:
 
 .else
 
+;;; ^^^=== 13 c ok, it's faster...
+;;; 
+;;; long sequence and jump middle
+;;; would be 6c faster/byte! (8 => 42c!)
+;;; (see PLOP restor8 below... + 27 B)
+
+
 ;;; (+ 27 4 4 4) = 39 B
-;;; 10% faster than cc65!
+;;; overall recursive function 10% faster than cc65!
 
 .macro PLOP nn
         pla
