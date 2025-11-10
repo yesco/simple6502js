@@ -2041,6 +2041,31 @@ FUNC _init
         lda #64
         sta mode
 
+
+
+;;; ATMOS w BASIC ROM
+;;; TODO: fix for ROM-less
+.ifdef __ATMOS__
+
+        ;; NMI patching to break running program.
+        ;; ORIC ATMOS points to:
+        ;; 
+        ;; Seems to catch once during running,
+        ;; but then maybe get's overwrriten
+        ;; (the vector?)
+        ;; 
+;NMIVEC=$FFFA                    ; => $0247
+NMIVEC=$0248                    ; => $F8B2
+
+        lda #<NMI_catcher
+        ldx #>NMI_catcher
+        sta NMIVEC
+        stx NMIVEC+1
+
+.endif ; __ATMOS__
+
+
+
         ;; compile from src first time
         ;; - fall-through
 
@@ -2140,6 +2165,9 @@ originp:        .res 2
 .ifdef TIM
         sei
 .endif ; TIM
+
+
+
 
 
 .ifdef INTERRUPT
@@ -9842,6 +9870,19 @@ FUNC asmprintsrc
 ;.include "Play/byte-sieve-gen.asm"
 ;.include "Play/byte-sieve-gen-opt.asm"
 
+
+;;; Go back to prompt
+NMI_catcher:
+        ;; reset stack pointer
+        ldx #$ff
+        txs
+        ;; set command mode
+        lda mode
+        ora #128
+        sta mode
+        ;; print message
+        PRINTZ {10,RED+BG,"RESET",10}
+        jmp forcecommandmode
 
 
 ;;; TODO: move somewhere else?
