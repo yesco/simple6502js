@@ -46,8 +46,8 @@ nam=$(basename $name)
 echo "NAME: $nam"
 
 # generate listing w \hex
-ca65 $name-asm.asm -l $name-asm.s 2>/dev/null 1>/dev/null
-ca65 $name.s -l $name.lst 2>/dev/null 1>/dev/null
+ca65 $name-asm.asm -l $name-asm.lst #2>/dev/null 1>/dev/null
+ca65 $name.s -l $name.lst #2>/dev/null 1>/dev/null
 
 ./map $name
 

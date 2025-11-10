@@ -57,7 +57,8 @@
 
 
 
-
+;;; HMMM, redo anyway...
+forcecommandmode:
 
 FUNC _edit
         CURSOR_OFF
@@ -481,8 +482,10 @@ write:
 :       
 ;;; - ctrl-Xended commands
         cmp #CTRL('X')
-        beq extend
+        bne :+
 
+        jmp extend
+:       
 ;;; - control char - just print it
         cmp #' '
         bcc editprint

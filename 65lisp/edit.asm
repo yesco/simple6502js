@@ -135,6 +135,7 @@ FUNC _edit
 
 command:
         jsr _eosnormal
+
         ;; 'Q' to temporary turn on cursor!
         PRINTZ {10,">",'Q'-'@'}
         jsr getchar
@@ -436,9 +437,10 @@ togglecommand:
         ;; TODO: feels like lots of duplications?
 ;;; 11
         bpl @ed
-        ;; reshow compilation result
+        ;; re-sshow compilation result
         jsr _eosnormal
         jmp _aftercompile
+
 @ed:
         jmp _redraw
 

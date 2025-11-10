@@ -942,27 +942,35 @@ CSTIMER         = $0276
 ;;; rely on extra code for getchar/putchar
 ;;;
 
-;
-NOBIOS=1
+;NOBIOS=1
 
 
-;
-NOLIBRARY=1
+;NOLIBRARY=1
+
+;;; WARNING:
+;;; if this isn't included it FAILS COMPILATION
+;;; at some random place??? m=8192; ????
+;;; TODO: investigate!
+
+;STDIO=1
+
+
+
+
 
 ;;; BYTESIEVE needs printf/putu
 
 ;;; TODO: we need a dynamic way to add a single
 ;;;       function dynamically during compilation!
 ;;;       (asumes rel jmp only)
+;STDIO=1
 
-;;; if this isn't included it FAILS COMPILATION
-;;; at some random place??? m=8192; ????
-;;; TODO: investigate!
-
-;
-STDIO=1
-
-
+;;; If STDLIB isn't included malloc(),free() will
+;;; most likely clobber the IDE, so after ^Run
+;;; it'll hang, or so...
+;;; 
+;;; TODO: how to work together?
+;STDLIB=1
 
 
 ;;; ----------------------------------------
@@ -1066,23 +1074,18 @@ mode:           .res 1
 .ifndef NOLIBRARY
 
 ;;; #include <string.h> // constants and functions
-;
 STRING=1
 
 ;;; #include <ctype.h> // isXXX()
-;
 CTYPE=1
 
 ;;; Runtime
-
 RECURSION=1
 
 ;;; stdlib
-
 STDLIB=1
 
 ;;; stdio
-
 STDIO=1
 
 .endif ; NOLIBRARY
@@ -1713,9 +1716,7 @@ FUNC _libraryend
 ;;; (sneak it in
 ;;;    - take care not to use it in compiled code!)
 .ifndef STDIO
-
 .include "lib-stdio.asm"
-
 .endif ; STDIO
 
 
@@ -4481,6 +4482,7 @@ ruleC:
 FUNC _iorulesstart
 
 .ifdef STDIO
+        ;;  potentially first so no "|"
 
         ;; "IO-lib" hack
         .byte "putu(",_E,")"
@@ -4574,7 +4576,7 @@ FUNC _iorulesstart
 :       
 .else
         jsr _prints
-.endif
+.endif ; PRINTIT
       .byte ']'
 
         .byte "|putcraw(",_E,")"
@@ -4582,9 +4584,11 @@ FUNC _iorulesstart
         jsr putcraw
       .byte ']'
 
-.else ; NOBIOS
+.else ; !STDIO
 
-        .byte "|putz(",_E,")"
+        ;;  potentially first so no "|"
+
+        .byte "putz(",_E,")"
       .byte '['
         ;; 19 B inline only...
         sta pos
@@ -4594,8 +4598,19 @@ FUNC _iorulesstart
         lda (pos),y
         beq :+
 
+.ifndef NOBIOS ; BIOS
+        jsr putchar
+.else ; !BIOS
+
+  .ifdef __ATMOS__
         ;; ORIC: print character
         jsr $CCD0 
+  .else
+        ;; I guess it's here?
+        jsr _putchar
+  .endif ; __ATMOS__
+
+.endif ;
 
         iny
         bne :-
@@ -4603,14 +4618,21 @@ FUNC _iorulesstart
         bne :-
 :       
 
+        .byte "|"
+
 .endif ; STDIO
+
+
+
 
 .ifdef OPTRULES
 
 .ifndef NOBIOS
+        ;; potentially first no "|"
+
         ;; putchar variable - saves 2 bytes!
 ;;; TODO: parser skips space, hahahaha!
-        .byte "|putchar('')"    ; LOL!!!!
+        .byte "putchar('')"    ; LOL!!!!
       .byte '['
         jsr spc
 ;;; TODO: about return value...
@@ -4640,11 +4662,12 @@ FUNC _iorulesstart
       .byte ']'
 
 .else
+        ;; potentially first no "|"
 
         ;; LDA #0C 11 20 3F
         ;; 11= 17dec == ???
 
-        .byte "|putchar('')"    ; LOL!!!!
+        .byte "putchar('')"    ; LOL!!!!
         ;; (parser skips space...)
       .byte '['
         ;; ORIC: PRINT SPACE
@@ -4660,11 +4683,15 @@ FUNC _iorulesstart
 
 .endif ; !NOBIOS
 
+        .byte "|"
+
 .endif ; OPTRULES
 
 
 .ifndef NOBIOS
-        .byte "|putchar(",_E,")"
+        ;; potentially first so no "|"
+
+        .byte "putchar(",_E,")"
       .byte '['
         jsr putchar
       .byte ']'
@@ -4677,7 +4704,9 @@ FUNC _iorulesstart
 .else
 
 .ifdef __ATMOS__
-        .byte "|clrscr()"
+        ;; potentially first so no "|"
+
+        .byte "clrscr()"
       .byte '['
         ;; ORIC: CLS command (LDA #$0C)
         jsr $CCCE
@@ -9734,8 +9763,7 @@ TIMPER=8
         pla
         jsr _printu
 
-        jmp _edit
-
+        jmp forcecommandmode
         
         
 
@@ -9954,6 +9982,10 @@ FUNC _eoscolors
         sta $026b               ; paper
         stx $026c               ; ink
         GOTOXY 2,27
+.else
+        jsr putchar
+        txa
+        jsr putchar
 .endif ; __ATMOS__        
 
         jmp nl
