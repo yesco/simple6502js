@@ -305,7 +305,7 @@ ebeginning:
         jsr eback
         lda #10
         jsr ebtill
-        bcs rts2
+        bcc rts2
         jmp eforward
         
 eindent:
@@ -536,25 +536,44 @@ FUNC _redraw
         inc pos
         bne :+
         inc pos+1
-:       
+:
+@nextln:        
         ;; copy byte
         lda (pos),y
         beq @clreol             ; clrEOS!
+
+; no goes bad?
+;        cmp #128
+;        beq @clreol             ; clrEOS!
+
         sta (tos),y
         ;; at cursor, save COL
         bpl :+
         stx editcol
         ;; store editrow? currently used as loopvar
 :
-        ;; newline
+        ;; remove "hibit" cursor indicator/inverse
+        and #$7f
+        sta (pos),y
+        ;; newline => clear *rest* of line
         cmp #10
-        beq @nl
-        cmp #10+128             ; nl + cursor!
-        beq @nl
+
+;;; dots "clear" on EVERY SECOND??? line?
+        beq @noclearlastchar
+
+;;; dots "clear" on every line
+;        beq @clreol
+
+
 @forw:
         dex
         bne :+
+        ;; wrap text for this line
         ldx #WIDTH
+        ;; no more screen rows?
+        dec editrow
+        beq @done
+
 :       
         inc tos
         bne :+
@@ -563,11 +582,18 @@ FUNC _redraw
         ;; always
         bne @nextc
 
+
         ;; we clear till end of line
+
+;;; TODO: can clreol be combined wtih @forw? similar...
+
 @clreol:
+;;; enable to detect every second line gets .....!
+;        lda #'.'
         lda #' '
         sta (tos),y
-@nl:
+
+@noclearlastchar:
         inc tos
         bne :+
         inc tos+1
@@ -575,14 +601,18 @@ FUNC _redraw
         dex
         bne @clreol
 
-        ;; no more rows
+        ;; no more screen rows?
         dec editrow
         beq @done
 
+        ;; prepare for next line
         ldx #WIDTH
 
+        ;; if end of file, don't we don't advance
+        ;; we just keep printing spaces!
         lda (pos),y
         beq @clreol
+
         bne @nextc
 
 @done:
@@ -591,6 +621,8 @@ FUNC _redraw
         sec
         sbc editcol
         sta editcol
+
+    rts
 
         ;; clear the cursor bit, used for display
 
@@ -782,6 +814,10 @@ loadfirst:
         dey
         ;; zero prefix!
         sta EDITNULL
+pha
+lda #65
+sta EDITNULL+7
+pla
 
         ;; calculate end
 
