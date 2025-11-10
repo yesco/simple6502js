@@ -41,7 +41,22 @@
 ;;; To revisit!
 ;;; 
 
-
+;;; 
+;;; IMPLEMENTATION NOTICE
+;;; 
+;;; *ALL* e??? primives implementing editnig commands
+;;; assumes Y=0, so don't modify it!
+;;; 
+;;; The dispatch is using a 1 byte relative dispatch
+;;; giving an approximate range of (- 256 10) bytes range.
+;;; 
+;;; There is a large (10) routines essentially using a 
+;;; trampoline jump to a ABSOLUTE address far away.
+;;; 
+;;; Using a 2 byte jmp table woudl only save 3 bytes...
+;;; 
+;;; (- (+ 32 10 (* 10 3)) (+ 64 11)) = -3
+;;; 
 
 ;;; TODO: optimize for code-size.
 ;;; TODO: and... is gap-buffer smaller? (faster for sure!)
@@ -190,10 +205,10 @@ editstart:
 .endmacro
 
 
+;;; NOTICE: All these assume Y=0!
+
 ctrlbranch:     
-;;; For test only
-;BR lastctrl
-        BR ctrlSPC
+        BR eunused              ; CTRL-SPC
         
         ;; ^A-^E
        BRB ebeginning
@@ -207,29 +222,28 @@ ctrlbranch:
         BR jgarnish
         BR jhelp
        BRB eindent
-;        BR jins
         BR jreturn
 
         ;; ^K-^O
-        BR jkill
-        BR jload
+        BR eunused              ; jkill 
+        BR eunused              ; jload
         BR jreturn
        BRB enext
-        BR ctrlO
+        BR eunused              ; ctrlO
 
         ;; ^P-^T
        BRB eprev
         BR jdasm
         BR jrun
-        BR ctrlS
+        BR eunused              ; ctrlS
         BR jcaps
 
         ;; ^U-^Y
-        BR ctrlU
+        BR eunused              ; ctrlU
         BR jinfo
-        BR jwrite
+        BR eunused              ; jwrite
         BR jextend
-        BR eyank
+        BR eunused              ; eyank
 
         ;; ^Z ESC
         BR jzource
@@ -270,6 +284,7 @@ egotocol:
 rts2:       
         rts
 
+;;; "BUG:" at top line walks to end?
 eprev:  
         jsr eback
         lda #10
@@ -290,14 +305,13 @@ ebeginning:
         jsr eback
         lda #10
         jsr ebtill
+        bcs rts2
         jmp eforward
         
 eindent:
         jsr ebeginning
 :       
         lda (editpos),y
-        ;; damn cursor lol
-        and #$7f
         beq rts2
         cmp #' '+1
         bcs rts2
@@ -329,13 +343,16 @@ FUNC _editaction
         cmp #' '
         bcs jins
 
-;;; fall-through: control codes
+	;; fall-through: unhandled control codes
 
-;;; Using dispatch table intead of cmp/beq (4 B)
-;;; 
-;;; (- 18790 18706) = 84 bytes saved (only?)
 	;; --- CTRL DISPATCH
         ;; A= 0..31 !
+
+	;; Using dispatch table intead of cmp/beq (4 B)
+        ;; 
+        ;; (- 18790 18706) = 84 bytes saved (only?)
+        ;; 
+        ;; 10 B relative BRANCH dispatch!
 ctrl:   
         tax
         lda ctrlbranch,x
@@ -391,31 +408,38 @@ jreturn:
 jins:   
         jsr einsert
         ;; fall-through
+;;; Moves editpos forward; Preserves X
 eforward:       
-        ;; TODO: at beginning of file - stop
-        ;; todo: jsr _ince
+;;; 10
+        ;; make sure not "standing at the wall" \0
+        lda (editpos),y
+        beq ret3
+;;; TODO: used in _redraw?
+_incEP:                       
         inc editpos
         bne :+
         inc editpos+1
-:
-;;; TODO: these are un-assigned, just return for now
-ctrlSPC:                        ; TODO: mark?
-ctrlO:                          ; TOOD: insert RET after
-ctrlS:                          ; TODO: searcd
-ctrlU:                          ; TODO: repeat
-jload:                          ; TODO: load
-jwrite:                         ; TODO: write
-eyank:                          ; TODO: yank
+:       
+        ;; Z!=0 (unless @editpos==0)
+ret3:
         rts
 
+;;; Moves editpos backward; Preserves X
 eback:
-	;; TODO: at end of file - stop
-	;; todo: jsr _dece
+;;; 13
+	;; "_decEP" Not used anywhere else?
         lda editpos
         bne :+
         dec editpos+1
 :       
         dec editpos
+        ;; make sure didn't "hit the wall" \0
+        lda (editpos),y
+        sec
+        beq _incEP
+        clc
+        ;; Returns C=1 if at boundary, C=0 otherwise!
+eunused:        
         rts
         
 
@@ -426,6 +450,7 @@ forcecommandmode:
         sta mode
 
         jmp _edit
+
 
 togglecommand:
 ;;; 7
@@ -445,13 +470,9 @@ togglecommand:
         jmp _redraw
 
 
-
 ebs:    
         jsr eback
         ;; fall-through
-;;; just a marker for the last (see BR lastctrl)
-lastctrl:       
-
 edel:    
         ;; delete one character at cursor
         ;; - to
@@ -611,16 +632,9 @@ ebtill:
         cmp savea
         beq eret
 
-.ifnblank
-        jmp eback
-.else
-        lda editpos
-        bne :+
-        dec editpos+1
-:       
-        dec editpos
-.endif
-        jmp @nextc
+        jsr eback
+        bcs eret
+        bcc @nextc
 
 
 ;;; Insert A at current cursor position
@@ -766,6 +780,8 @@ loadfirst:
         iny
         sta (dos),y
         dey
+        ;; zero prefix!
+        sta EDITNULL
 
         ;; calculate end
 

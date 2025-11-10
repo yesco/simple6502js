@@ -2,6 +2,133 @@
 ;;; - http://retro.hansotten.nl/6502-sbc/lee-davison-web-site/some-veryshort-code-bits/
 
 
+;;; 
+	;; TODO: at end of file - stop
+	;; todo: jsr _dece
+;;; 12
+        lda editpos
+        cmp #<EDITSTART
+        bne @OK
+        ldx editpos+1
+        cpx #>EDITSTART
+        beq @fail
+;;; 8+1 B  12c+5c
+;        lda editpos
+;;; 7 
+@OK:     
+        tay
+        bne :+
+        dec editpos+1
+:       
+        dec editpos
+@fail:
+        rts
+
+
+
+.ifnblank
+;;; 12+1 B  
+        jsr _decEP
+        ;; Y=0 already
+        lda (editpos),y
+        bne :+
+@no:
+        jsr eback
+:       
+        rts
+        
+
+;;; 
+;;; 19+1 B  19c+6c+5c  (15c fail)
+        lda editpos
+        cmp #<EDITSTART
+        bne @OK
+        
+        ldx editpos+1
+        cpx #>EDITSTART
+        beq @fail
+@OK:     
+        tax                     ; to test it
+        bne :+
+        dec editpos+1
+:       
+        dec editpos
+@fail
+        rts
+.endif
+
+
+
+;;; 19
+        lda editpos
+        cmp #<EDITPOS
+        bne @OK
+
+        ldx editpos+1
+        cmp #>EDITPOS
+        bne @OK
+        
+        rts
+@OK:
+        tax
+        bne :+
+        dec editpos+1
+:       
+        rts
+
+        
+        
+
+
+
+.ifblank
+;;; 8
+        ...
+;;; + 9
+        ldy #0
+        lda (editpos),y
+        bne :+
+        ;; undo!
+        jsr _incE
+:       
+.else
+        lda editpos
+        bne :+
+
+
+:       
+        dex editpos
+
+
+
+        ;; don't go beyond buffer!
+;;; 12
+        ldx editpos+1
+        cmp #>EDITSTART
+        beq @nah
+        lda editpos
+        cmp #<EDITSTART
+        beq @nah
+@OK:
+        ;; lo
+;;; 9
+        sec
+        sbc #1
+        sta editpos
+        bcs :+
+        ;; hi
+        dec editpos+1
+:       
+@nah:
+;;; 1
+.endif
+.endif
+        rts
+        
+
+
+
+
 
 .ifdef FASTERMULX
 ;;; AX => AX

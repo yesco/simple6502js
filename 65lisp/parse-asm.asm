@@ -4012,8 +4012,38 @@ FUNC _incRX
 @noinc:
         rts
         
+.ifnblank
 
-rts
+;;; TODO: consider
+
+_addARX:        
+;;; 10
+        clc
+        adc $0,x
+        sta $0
+        bcc :+
+        inc $1,x
+:       
+        rts
+
+_addARY:
+;;; +2
+        ldx #0
+;;; add AX to register Y
+;;; (result optionally (+2 B) in 
+_addAXRY:        
+;;; 15
+        clc
+        adc $0,y
+        sta $0,y
+        txa
+        adc $1,y
+        sta $1,y
+        rts
+;;; Note:  A=hi result, ($0,y)=lo
+
+
+.endif
 
 
 
