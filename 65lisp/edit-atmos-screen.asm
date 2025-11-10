@@ -481,8 +481,7 @@ write:
 :       
 ;;; - ctrl-Xended commands
         cmp #CTRL('X')
-        ;; locked up?
-;        beq extend
+        beq extend
 
 ;;; - control char - just print it
         cmp #' '
@@ -507,28 +506,6 @@ editprint:
         ;; print it
         jmp rawputc
 
-        ;; locked up?
-extend:
-        jsr _savescreen
-        jsr _eosnormal
-        
-        lda #<_extendinfo
-        ldx #>_extendinfo
-        jsr _printz
-
-        jmp _listfiles
-
-        ;; get command character
-        jsr getchar
-        
-        cmp #'b'
-        bne :+
-
-;;; TODO: load and run compiled programs?
-
-;        jmp bytesieve
-        jmp _edit
-:       
         cmp #CTRL('F')
         bne :+
         ; jmp fileopen

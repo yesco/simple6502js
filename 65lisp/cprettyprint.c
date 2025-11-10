@@ -1,4 +1,5 @@
-
+// C-code pretty print using 8 colors
+//
 #define NTYPES 8
 
 char* keywords[]={

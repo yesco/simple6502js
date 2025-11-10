@@ -2036,7 +2036,7 @@ FUNC _init
         sta dirty
         sta showbuffer
 
-        ;; tell IDE/edit.asm we're firest time
+        ;; tell IDE/edit.asm it's first time
         lda #64
         sta mode
 
@@ -9575,12 +9575,7 @@ printmore:
 done:   
         PRINTZ {10,"...",10}
 
-        ;; - turn on command mode unconditionally
-        lda mode
-        ora #128
-        sta mode
-        
-        jmp _edit
+        jmp forcecommandmode
         
 nohi:
 .endif ; ERRPOS
@@ -9636,13 +9631,6 @@ FUNC _OK
         putc ' '
         PRINTZ {" Bytes",10,10}
 
-.ifblank
-        jsr _eosnormal
-        ;;     
-        ;; /////////////12345678901234567890
-        PRINTZ {YELLOW,"^Run ESC=src ^Help",10}
-.endif
-
         jmp _edit
 
 
@@ -9651,7 +9639,6 @@ _run:
         ;; set ink for new rows
         lda #BLACK+16           ; paper
         ldx #WHITE&127          ; ink
-
         jsr _eoscolors
 
 .zeropage
@@ -9745,12 +9732,11 @@ TIMPER=8
         pla
         tax
         pla
-
         jsr _printu
 
-;;; TODO: do printu etc need to keep AX?
+        jmp _edit
 
-        jsr nl
+        
         
 
 ;;; full screen editor on ORIC ATMOS
@@ -9762,21 +9748,24 @@ TIMPER=8
 ;;; - CTRL-Z : disasm mucc
 
 
-
 FUNC _editorstart
 
 
-;ATMOS_SCREEN_EDITOR=1
-
-.ifdef ATMOS_SCREEN_EDITOR
+.ifndef __ATMOS__
+        ;; ironic, lol
         .include "edit-atmos-screen.asm"
 .else
+        ;; outdated (no cursor anymore)
         .include "edit.asm"
 .endif
 
 
 FUNC _editorend
 
+
+
+
+;;; only used in the IDE
 
 FUNC hell
         lda #<666
@@ -10103,29 +10092,52 @@ GROUP=YELLOW
 .byte DOUBLE,"ORIC",YELLOW,"CC02",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
 ;.byte 128+'D',128+'E'
 .byte "",10
-.byte KEY,"ESC",MEAN,"Help  ",KEY," ^V",MEAN,"info",10
-.byte KEY," ^C",MEAN,"ompile",KEY," ^X",MEAN,"ecute",10
-.byte KEY," ^R",MEAN,"un    ",KEY," ^U",MEAN,"list",10
+.byte KEY,"ESC",MEAN,"cmd/edit",KEY," ^V",MEAN,"info",10
+.byte KEY," ^C",MEAN,"ompile  ",KEY," ^X",MEAN,"tras",10
+.byte KEY," ^R",MEAN,"un      ",KEY," ^Z",MEAN,"ource",10
 .byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
-.byte KEY," ^W",MEAN,"rite   - save screen/source",10
-.byte KEY," ^L",MEAN,"oad    - load screen/source",10
-.byte KEY," ^G",MEAN,"arnish - pretty print source",10
-.byte MEAN,"// You are in the EDITOR (comment!)",10
-.byte KEY,"arrow DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"<<",KEY,"^E",MEAN,">>",10
+.byte KEY,"(^W",MEAN,"rite   - save source)",10
+.byte KEY,"(^L",MEAN,"oad    - load source)",10
+.byte KEY,"(^G",MEAN,"arnish - pretty print source)",10
+.byte 10
+.byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,">|",10
 .byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
 .byte "",10
-.byte MEAN,"C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
-.byte GROUP,"V :",CODE,"a arr[..] *(char*)a",WHITE,"same",GREEN,"$ a",10
-.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S",MEAN,"]..",CODE,";",MEAN,"or",CODE,"a",GROUP,"OP",CODE,"=",GROUP,"S",CODE,";",10
-.byte GROUP,"OP:",CODE,"+ - *2 /2 & | ^ << >> == < !",10
-.byte GROUP,"S :",CODE,"v 4711 25 'c'",MEAN,"simple values",10
+.byte MEAN,"// C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
+.byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
+.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S;",MEAN,"]..;",MEAN,"or",CODE,"a+=",GROUP,"S",CODE,"OP=",10
+.byte GROUP,"OP:",CODE,"+ - & | ^ *2 /2 << >> == < !",10
+.byte GROUP,"S :",CODE,"v 4711 25 'c' ",34,"str",34,MEAN,"simple vals",10
 .byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
-.byte "    ",CODE,"if (...) ...;    else {...}",10
-.byte "    ",CODE,"while(...) ...",10
-.byte "    ",CODE,"do ... while(...);",MEAN,"most efficient!",10
-.byte "    ",CODE,"for(i=0; i<NUM; ++i)...",MEAN,"ONLY i!",10
-.byte "    ",CODE,"L: ... goto L;"
+.byte "  ",CODE,"if (...) ...",MEAN,"OPT:",CODE,"else ...",10
+.byte "  ",CODE,"while(...) ...",10
+.byte "  ",CODE,"do...while(...);",MEAN,"most efficient!",10
+.byte "  ",CODE,"for(...; ...; ...) ...",MEAN,"least",10
+.byte "  ",CODE,"L: ... goto L;"
 .byte 0
+
+
+        ;; TODO: locked up?
+extend:
+        jsr _savescreen
+        jsr _eosnormal
+        
+        lda #<_extendinfo
+        ldx #>_extendinfo
+        jsr _printz
+
+        jmp _listfiles
+
+        ;; get command character
+        jsr getchar
+        
+;;; TODO: load and run compiled programs?
+
+;        jmp bytesieve
+
+        jmp _edit
+
+
 
 FUNC _extendinfo
 .byte 10

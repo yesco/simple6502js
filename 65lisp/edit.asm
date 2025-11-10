@@ -122,22 +122,46 @@ FUNC _edit
         bvc :+
         ;; init + "load"
         jsr loadfirst
-        ;; mark not need init
+        ;; remove init bit
         lda mode
-        and #255-64
+        eor #64
         sta mode
-:       
-        jmp editloop
 
+     ldx #0
+     jsr _printu
+:       
+
+        jmp editstart
 
 command:
-        PRINTZ {10,">"}
         jsr _eosnormal
-editing:
+        ;; 'Q' to temporary turn on cursor!
+        PRINTZ {10,">",'Q'-'@'}
         jsr getchar
+        PUTC CTRL('Q')
+
+        ;; ignore return
+        cmp #13
+        beq command
+
+        cmp #'?'
+        bne :+
+@minihelp:
+        PRINTZ {"?",10,"Command",10,YELLOW,"h)elp c)ompile r)un v)info ESC-edit ",10,YELLOW,"z)ource q)asm l)oad w)rite"}
+        jmp command
+:       
+
+        ;; lowercase whatever to print!
+        ora #64+32           
+        jsr putchar
+
+        ;; then convert any char to CTRL to run it!
+        and #31
+
+editing:
         jsr _editaction
 
-editloop:       
+editstart:
         bit mode
         bmi command
 
@@ -147,6 +171,7 @@ editloop:
         ;; redraw
         jsr _redraw
 :       
+        jsr getchar
         jmp editing
 
 
@@ -178,7 +203,7 @@ ctrlbranch:
 
         ;; ^F-^J
         BR eforward
-        BR ctrlG
+        BR jgarnish
         BR jhelp
        BRB eindent
 ;        BR jins
@@ -201,12 +226,12 @@ ctrlbranch:
         ;; ^U-^Y
         BR ctrlU
         BR jinfo
-        BR ctrlW
-        BR ctrlX
+        BR jwrite
+        BR jextend
         BR eyank
 
         ;; ^Z ESC
-        BR ctrlZ
+        BR jzource
         BR jcmd
 
         ;; Arrows remapeed: 29--31!
@@ -332,7 +357,7 @@ jmystery:
         jmp emystery
 jkill:          
         jmp ekill
-jload:  
+jzource:  
         jmp loadfirst
 jcaps:  
         jmp putchar
@@ -340,22 +365,33 @@ jhelp:
         jmp _help
 jdasm:  
         jsr _dasm
-        jmp getchar
+        jmp forcecommandmode
 jinfo:  
         .import _info
         jsr _info
         jmp getchar
 jcmd:   
         jmp togglecommand
+jextend:        
+        jmp extend
+jgarnish:       
+        .import _prettyprint
+        jsr nl
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        jsr _prettyprint
+        jmp forcecommandmode
+
 
 jreturn:        
         lda #10
+        ;; fall-through
         ;; normal char - insert
 jins:   
         jsr einsert
         ;; fall-through
 eforward:       
-;;; TODO: at beginning of file - stop
+        ;; TODO: at beginning of file - stop
         ;; todo: jsr _ince
         inc editpos
         bne :+
@@ -363,13 +399,11 @@ eforward:
 :
 ;;; TODO: these are un-assigned, just return for now
 ctrlSPC:                        ; TODO: mark?
-ctrlG:                          ; ?
 ctrlO:                          ; TOOD: insert RET after
 ctrlS:                          ; TODO: searcd
 ctrlU:                          ; TODO: repeat
-ctrlW:                          ; TODO: write
-ctrlX:                          ; TODO: extras
-ctrlZ:                          ; TODO: undo?
+jload:                          ; TODO: load
+jwrite:                         ; TODO: write
 eyank:                          ; TODO: yank
         rts
 
@@ -383,6 +417,14 @@ eback:
         dec editpos
         rts
         
+
+forcecommandmode:       
+        ;; - turn on command mode unconditionally
+        lda mode
+        ora #128
+        sta mode
+
+        jmp _edit
 
 togglecommand:
 ;;; 7

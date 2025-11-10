@@ -35,7 +35,7 @@
 ;;; Good to haves!
 .export _clrscr
 _clrscr:        
-clrscr:        
+clrscr:
         lda #12
         SKIPTWO
 forward:        
