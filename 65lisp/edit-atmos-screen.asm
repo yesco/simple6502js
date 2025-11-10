@@ -532,3 +532,116 @@ editprint:
 :       
         rts
 
+FUNC _savescreen
+.ifndef __ATMOS__
+        rts
+.endif
+
+        ;;; update editing state
+
+        ;; - exit if not buffer
+        lda showbuffer
+        beq @ret
+
+        ;; - exit if not dirty
+        lda dirty
+        beq @ret
+
+        lda #0
+        sta dirty
+        sta showbuffer
+
+        ;; TODO: alt: save as sanitized "string"
+        ;;       use this for comilation/saving etc...
+        ;;       can have many "buffers" a-z...
+
+        ;; "sneakily" put 10 (newline) at last pos
+        ;; of each line (otherwise one long line)
+        ;; 
+        ;; 10 is DOUBLE NORMAL, on oric screen
+        ;; but in last column it's harmless!
+        lda #<(SCREEN+40)
+        ldx #>(SCREEN+40)
+        sta pos
+        stx pos+1
+
+        ldx #27
+        ldy #39
+@nextrow:
+        lda #10                 ; \n newline
+        sta (pos),y
+        ;; move down one line
+        clc
+        lda pos
+        adc #40
+        sta pos
+        bcc :+
+        inc pos+1
+:       
+        dex
+        bne @nextrow
+
+        ;; Now save the damn screen!
+
+;;; 23 B
+        ;; from
+        lda #<SCREEN
+        ldx #>SCREEN
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<savedscreen
+        ldx #>savedscreen
+        sta dos
+        stx dos+1
+        ;; copy
+        lda #<SCREENSIZE
+        ldx #>SCREENSIZE
+        
+        jsr _memcpy
+@ret:
+        rts
+
+
+
+FUNC _loadscreen
+.ifndef __ATMOS__
+        rts
+.endif
+
+        ;; update state
+        ldx #0
+        stx dirty
+        inx
+        stx showbuffer
+
+
+;;; TODO: fixed param calling (copy N bytes to tos++)
+;;;   20+3B params+call
+        ;; from
+;;; TODO: implement blockcalling convention!
+        lda #<(savedscreen+40)
+        ldx #>(savedscreen+40)
+        sta tos
+        stx tos+1
+        ;; to
+        lda #<(SCREEN+40)
+        ldx #>(SCREEN+40)
+        sta dos
+        stx dos+1
+        ;; copy
+        lda #<(SCREENSIZE-40)
+        ldx #>(SCREENSIZE-40)
+
+        jmp memcpy
+
+
+;;; CHEAT - not counted in parse.bin
+
+;;; (+ 8 21 9) = 38 
+;;; now: a generic multiplication is ... 32 .. 38 bytes...
+
+;;; Isn't it just that AX means more code than
+;;; separate tos?
+
+

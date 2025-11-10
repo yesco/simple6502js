@@ -4013,7 +4013,6 @@ FUNC _incRX
         rts
         
 .ifnblank
-
 ;;; TODO: consider
 
 _addARX:        
@@ -9825,24 +9824,24 @@ TIMPER=8
         
         
 
-;;; full screen editor on ORIC ATMOS
-;;; - CTRL-C : compile program & run
-;;; - CTRL-R : run
-;;; - CTRL-L : display source for editing
-;;; 
-;;; - CTRL-Q : disasm compiled code
-;;; - CTRL-Z : disasm mucc
 
 
 FUNC _editorstart
 
 
 .ifndef __ATMOS__
-        ;; ironic, lol
-        .include "edit-atmos-screen.asm"
-.else
+
+        ;; ironic, as this is not editor for
+        ;; generic...
+
         ;; outdated (no cursor anymore)
+        .include "edit-atmos-screen.asm"
+
+.else
+
+        ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
+
 .endif
 
 
@@ -9851,6 +9850,9 @@ FUNC _editorend
 
 
 
+;;; when compiation goes bad, we replace
+;;; _output code with jmp hell!
+;;; 
 ;;; only used in the IDE
 
 FUNC hell
@@ -9860,6 +9862,8 @@ FUNC hell
 
 
 
+;;; PRINTASM uses this function
+;;; it prints source code from here till next ';'
 FUNC asmprintsrc
         ;; print next statement fully
         ;; from inp,y
@@ -9896,10 +9900,11 @@ FUNC asmprintsrc
 
 
 
-
 ;.include "Play/byte-sieve-gen.asm"
 ;.include "Play/byte-sieve-gen-opt.asm"
 
+
+;;; TODO: move to... ?
 
 ;;; Go back to prompt
 NMI_catcher:
@@ -9916,6 +9921,8 @@ NMI_catcher:
 
 
 ;;; TODO: move somewhere else?
+
+;;; This doesn't work at all!?!??!
 
 origint:        .res 2
         
@@ -10222,7 +10229,6 @@ GROUP=YELLOW
 
         ;; TODO: locked up?
 extend:
-        jsr _savescreen
         jsr _eosnormal
         
         lda #<_extendinfo
@@ -10258,515 +10264,13 @@ FUNC _helptextend
 
 
 
-;;; Copies memory from AX address (+2) to 
-;;; destination address (first two bytes).
-;;; String is zero-terminated.
+.include "memcpy.asm"
 
-;;; TODO: rename, too general name
-memcpyz:
-        sta tos
-        stx tos+1
+.include "mulx.asm"
 
-        ldy #0
-        lda (tos),y
-        sta dos
-        iny
-        lda (tos),y
-        sta dos+1
 
-        iny
-;;; if call here set Y=0
-;;; TOS= text from (lol)
-;;; DOS= destination
-copyz:  
-        lda (tos),y
-        beq @done
-        sta (dos),y
-        iny
-        bne copyz
-        ;; y overflow
-        inc tos+1
-        inc dos+1
-        bne copyz
-@done:       
-        rts
 
-FUNC _savescreen
-.ifndef __ATMOS__
-        rts
-.endif
 
-        ;;; update editing state
-
-        ;; - exit if not buffer
-        lda showbuffer
-        beq @ret
-
-        ;; - exit if not dirty
-        lda dirty
-        beq @ret
-
-        lda #0
-        sta dirty
-        sta showbuffer
-
-        ;; TODO: alt: save as sanitized "string"
-        ;;       use this for comilation/saving etc...
-        ;;       can have many "buffers" a-z...
-
-        ;; "sneakily" put 10 (newline) at last pos
-        ;; of each line (otherwise one long line)
-        ;; 
-        ;; 10 is DOUBLE NORMAL, on oric screen
-        ;; but in last column it's harmless!
-        lda #<(SCREEN+40)
-        ldx #>(SCREEN+40)
-        sta pos
-        stx pos+1
-
-        ldx #27
-        ldy #39
-@nextrow:
-        lda #10                 ; \n newline
-        sta (pos),y
-        ;; move down one line
-        clc
-        lda pos
-        adc #40
-        sta pos
-        bcc :+
-        inc pos+1
-:       
-        dex
-        bne @nextrow
-
-        ;; Now save the damn screen!
-
-;;; 23 B
-        ;; from
-        lda #<SCREEN
-        ldx #>SCREEN
-        sta tos
-        stx tos+1
-        ;; to
-        lda #<savedscreen
-        ldx #>savedscreen
-        sta dos
-        stx dos+1
-        ;; copy
-        lda #<SCREENSIZE
-        ldx #>SCREENSIZE
-        
-        jsr _memcpy
-@ret:
-        rts
-
-
-
-FUNC _loadscreen
-.ifndef __ATMOS__
-        rts
-.endif
-
-        ;; update state
-        ldx #0
-        stx dirty
-        inx
-        stx showbuffer
-
-
-;;; TODO: fixed param calling (copy N bytes to tos++)
-;;;   20+3B params+call
-        ;; from
-;;; TODO: implement blockcalling convention!
-        lda #<(savedscreen+40)
-        ldx #>(savedscreen+40)
-        sta tos
-        stx tos+1
-        ;; to
-        lda #<(SCREEN+40)
-        ldx #>(SCREEN+40)
-        sta dos
-        stx dos+1
-        ;; copy
-        lda #<(SCREENSIZE-40)
-        ldx #>(SCREENSIZE-40)
-
-        jmp memcpy
-
-
-;;; CHEAT - not counted in parse.bin
-
-;;; (+ 8 21 9) = 38 
-;;; now: a generic multiplication is ... 32 .. 38 bytes...
-
-;;; Isn't it just that AX means more code than
-;;; separate tos?
-
-
-
-.ifdef FASTERMULX
-;;; AX => AX
-
-;;; (+ 8 3 21) = 32 B (+2 B on each call MUL10,MUL5)
-;;; (+ 17 7 37) = 61c
-;;; mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B
-
-;;; tradeoff not clear ... this doesn't have routines...
-
-.macro MUL10
-;;; 5 15c (+ 15 44) = 59c
-        stx savex
-        jsr _xmul10
-.endmacro
-
-.macro MULT5
-;;; 5 15c (+ 15 37) = 52c
-        stx savex
-        jsr _xmul5
-
-FUNC MUL40
-;;; 8 17c (+ 17 44) = 61c +12= 73c
-        stx savex
-_xmul40:        
-        ;; double
-        asl
-        rol savex
-        ;; double
-        asl
-        rol savex
-
-FUNC _xmul10
-;;; 3 7c (+ 7 37) = 44c (24 B (+ 3 21))
-        ;; double
-        asl
-        rol savex
-
-FUNC _mul5
-;;; 21 37c 
-        sta tos
-        stx tos+1
-        ;; double
-        asl
-        rol savex
-        ;; double
-        asl
-        rol savex
-        
-        ;; add 1+4
-        clc
-        adc tos
-        tay
-        lda savex
-        adc tos+1
-        tax
-        tya
-
-        rts
-
-.else ; !FASTERMULX
-;;; TOS => TOS
-
-;;; (+ 8 4 23) = 35 B
-;;; (+ 20 10 42) = 72c
-
-;;;(mul5: +2B 59c  mul10: +2B 52c  mul40: 73c     32 B )
-;;; mul5:     54c  mul10:     64c  mul40: 84c     35 B
-
-;;; (/ 1000000 100)
-
-FUNC _mul40
-;;; 8 20c (+ 20 52) = 72  +12= 84c
-        ;; double
-        asl tos
-        rol tos+1
-        ;; double
-        asl tos
-        rol tos+1
-
-FUNC _mul10                     
-;;; 4 10c (+ 42 10) = 52c   +12= 64c   27 B
-        ;; double
-        asl tos
-        rol tos+1
-
-FUNC _mul5
-;;; 23 42c   +12= 54c
-        lda tos
-        ldx tos+1
-        ;; double
-        asl tos
-        rol tos+1
-        ;; double
-        asl tos
-        rol tos+1
-
-        clc
-        adc tos
-        sta tos
-        txa
-        adc tos+1
-        sta tos+1
-        rts
-
-.endif ; !FASTERMULX
-
-
-
-
-
-
-.ifdef MEM1
-FUNC _memcpy
-
-;;; WORKS!
-
-;;; memcopy smallest?
-;;;   tos: FROM
-;;;   dos: TO
-;;;   AX:  0 <= LENGTH < 32K
-;;; 
-;;; Copies backwards - fast, but not good for overlap
-;;; of FROM TO ranges...
-;;; 
-;;; - http://6502.org/source/general/memory_move.html
-;;;   smallest is 33 B ?
-;;; - cc65/libsrc/common/memcpy.s
-;;;   ~31 B copies all in forward direction
-;;; 
-;;; jsk: 27 B
-memcpy1: 
-;;; 27 B  (+ 10 17)
-        ;; copy X full pages first
-        pha
-        ldy #0
-        jsr :+
-        ;; copy A remaining bytes
-        pla
-        beq @done
-        tay
-;;; 17 B
-:       
-        dey
-        lda (tos),y
-        sta (dos),y
-        tya
-        bne :-
-        ;; move to next page
-        dex
-        bmi @done
-        inc tos+1
-        inc dos+1
-        bne :-
-@done:
-        rts
-.endif ; MEM1
-        
-.ifdef MEM2
-FUNC _memcpy
-
-;;; jsk2: copy forwards
-memcpy2: 
-;;; 32 (+ 19 13)
-;;; 19
-        pha
-        ;; copy X pages first
-        ldy #0
-@nextpage:
-        dex
-        bmi @pagesdone
-@copypage:
-        lda (tos),y
-        sta (dos),y
-        iny
-        bne @copypage
-        ;; move to next page
-        inc tos+1
-        inc dos+1
-        bne @nextpage
-@pagesdone:
-;;; 13
-        ;; assert: Y=0
-        ;; copy A remaining bytes
-        pla
-        beq @done
-        tax
-@copyrest:
-        lda (tos),y
-        sta (dos),y
-        iny
-        dex
-        bne @copyrest
-@done:
-        rts
-.endif ; MEM2        
-
-.ifdef MEM3
-FUNC _memcpy
-
-;;; jsk3: copies forward
-;;; 26
-memcpy3: 
-        ldy #0
-        ldx gos                 ; lo size
-        inx ; ugly
-@next:
-        dex
-        bne :+
-        ;; more pages?
-        dec gos+1
-        bmi @done
-:
-        lda (tos),y
-        sta (dos),y
-        iny
-        ;; page wrap after 256 bytes
-        bne @next
-        inc tos+1
-        inc dos+1
-        bne @next
-
-@done:
-        rts
-
-.endif ; MEM3
-
-.ifdef MEM4
-FUNC _memcpy
-
-;;; jsk4:
-memcpy4: 
-;;; 21 B - slow
-        ldy #0
-:       
-        jsr _decG
-        bmi @done
-        lda (tos),y
-        sta (dos),y
-        jsr _incT
-        jsr _incD
-        jmp :-
-
-@done:
-        rts
-.endif ; MEM4
-
-
-MEM5=1
-
-.ifdef MEM5
-FUNC _memcpy
-
-;;; CURRENT choosen one
-memcpy: 
-        sta gos
-        stx gos+1
-
-;;; jsk5: copies forward CLEAN!
-;;; assumes all parameters copied to
-;;;   tos,dos,gos
-memcpy5: 
-;;; 26 B
-        ldy #0
-        ldx gos                 ; lo size
-@next:
-        bne :+
-        ;; more pages?
-        dec gos+1
-        bmi @done
-:
-        lda (tos),y
-        sta (dos),y
-        iny
-        ;; page wrap after 256 bytes
-        bne :+
-        inc tos+1
-        inc dos+1
-:       
-        dex
-        jmp @next
-
-@done:
-        rts
-.endif ; MEM5
-
-
-.ifdef MEM6
-FUNC _memcpy
-
-;;; jsk6: copies forwards
-;;;   tos: from
-;;;   dos: dest
-;;;   gos: size > 0 (otherwise copy at least 1 byte)
-;;; 
-;;; 23 B
-memcpy6:
-;;; 23 (26) B
-        ldy #0
-        ldx gos                 ; lo size
-;;; TODO: optional if SIZE > 0
-;;;   otherwise copy at least one byte
-;        jmp @test
-@next:
-        lda (tos),y
-        sta (dos),y
-        iny
-        bne :+
-        ;; page wrap after 256 bytes
-        inc tos+1
-        inc dos+1
-:       
-        dex
-@test:
-        bne @next
-        ;; more pages?
-        dec gos+1
-        bpl @next
-
-@done:
-        rts
-.endif ; MEM6
-
-.ifdef MEMMAD
-;;; - https://forums.atariage.com/topic/175905-fast-memory-copy/
-;;; MADS (pascal?) example from D.W. Howerton?
-;;; A= lo length, @length= hi length
-;;; 26 B copies forwards
-;;; 
-;;; jsk BUG? always copies 1 byte at least
-FUNC _memcpy
-memcpyMAD:
-.scope
-        tax
-
-.ifdef jsk ; 24 B
-        beq nextpage
-.else      ; 26 B
-        bne start
-        dec gos+1               ; it's needed?
-.endif
-
-start:
-        ldy #0
-move:   
-        lda (tos),y             
-        sta (dos),y
-        iny
-        bne next
-        ;; wrap Y (inc page address)
-        inc tos+1
-        inc dos+1
-next:   
-        dex
-        bne move
-nextpage:       
-        dec gos+1
-        bpl move
-
-        rts        ; done
-.endscope
-
-.endif ; MEMMAD
 
 
 

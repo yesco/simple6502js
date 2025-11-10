@@ -1,10 +1,13 @@
-;;; edit.asm -
+;;; edit.asm - ORIC EMACS EDITOR for MeteoriC
 ;;; 
 ;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
+;;; 
 ;;; 
 ;;; A simple emacs style editor for ORIC ATMOS
 ;;; written in pure assembly.
 ;;; 
+
+
 ;;; NOTE: this need to be made into a generic
 ;;;       variant, vt100/ansi-style...
 
@@ -623,6 +626,8 @@ FUNC _redraw
         sta editcol
 
     rts
+
+FUNC _editormisc
 
         ;; clear the cursor bit, used for display
 
