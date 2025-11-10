@@ -644,4 +644,55 @@ FUNC _loadscreen
 ;;; Isn't it just that AX means more code than
 ;;; separate tos?
 
+.ifdef JUNK
+  .code
+FUNC _savedscreen
 
+savedscreen:
+        .byte "0123456789012345678901234567890123456789"
+        .byte "1111111111222222222233333333334444444444"
+;        .byte "2                                       "
+        .byte "2 --------------------------------------"
+        .byte "3 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "4 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "5 cccccccccccccccccccccccccccccccccccccc"
+        .byte "6 dddddddddddddddddddddddddddddddddddddd"
+        .byte "7 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "8 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "9 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "10 ccccccccccccccccccccccccccccccccccccc"
+        .byte "11 ddddddddddddddddddddddddddddddddddddd"
+        .byte "12 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "13 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "14 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "15 ccccccccccccccccccccccccccccccccccccc"
+        .byte "16 ddddddddddddddddddddddddddddddddddddd"
+        .byte "17 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "18 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "19 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "20 ccccccccccccccccccccccccccccccccccccc"
+        .byte "21 ddddddddddddddddddddddddddddddddddddd"
+        .byte "22 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        .byte "23 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        .byte "24 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        .byte "25 ccccccccccccccccccccccccccccccccccccc"
+        .byte "26 ddddddddddddddddddddddddddddddddddddd"
+        .byte "27 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",0
+        ;; not on sceen!
+        .byte "28 ####################################"
+
+.code
+
+.else
+
+.bss
+FUNC _savedscreen
+
+savedscreen:
+        ;; ORIC SCREEN SIZE
+        ;; (save program/screen before compile to "input")
+        .res SCREENSIZE+1       ; +1 for \0
+
+.code
+
+.endif ; JUNK

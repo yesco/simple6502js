@@ -856,6 +856,23 @@ CURROW		= $268
 CURCOL		= $269
 CURCALC		= $001f      ; ? how to update?
 
+
+;;; TODO: why are these so late?
+;;;   used much earlier!
+
+BLACK    =128+0
+RED      =128+1
+GREEN    =128+2
+YELLOW   =128+3
+BLUE     =128+4
+MAGNENTA =128+5
+CYAN     =128+6
+WHITE    =128+7
+BG       =16                    ; BG+WHITE
+NORMAL   =128+8
+DOUBLE   =128+10
+
+
 ;;; TODO: why is this not accepted?
 .define SCREENRC(r,c)   SCREEN+40*r+c-2
 
@@ -10590,19 +10607,6 @@ FUNC _ideend
 
 
 
-BLACK    =128+0
-RED      =128+1
-GREEN    =128+2
-YELLOW   =128+3
-BLUE     =128+4
-MAGNENTA =128+5
-CYAN     =128+6
-WHITE    =128+7
-BG       =16                    ; BG+WHITE
-NORMAL   =128+8
-DOUBLE   =128+10
-
-
 
 ;;; TODO: make it point at screen,
 ;;;   make a OricAtmosTurboC w fullscreen edit!
@@ -12126,51 +12130,6 @@ FUNC _inputend
         .byte 0,0
 
 
-FUNC _savedscreen
-
-savedscreen:
-.ifdef JUNK
-  .code
-        .byte "0123456789012345678901234567890123456789"
-        .byte "1111111111222222222233333333334444444444"
-;        .byte "2                                       "
-        .byte "2 --------------------------------------"
-        .byte "3 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        .byte "4 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        .byte "5 cccccccccccccccccccccccccccccccccccccc"
-        .byte "6 dddddddddddddddddddddddddddddddddddddd"
-        .byte "7 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-        .byte "8 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        .byte "9 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        .byte "10 ccccccccccccccccccccccccccccccccccccc"
-        .byte "11 ddddddddddddddddddddddddddddddddddddd"
-        .byte "12 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-        .byte "13 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        .byte "14 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        .byte "15 ccccccccccccccccccccccccccccccccccccc"
-        .byte "16 ddddddddddddddddddddddddddddddddddddd"
-        .byte "17 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-        .byte "18 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        .byte "19 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        .byte "20 ccccccccccccccccccccccccccccccccccccc"
-        .byte "21 ddddddddddddddddddddddddddddddddddddd"
-        .byte "22 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-        .byte "23 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-        .byte "24 bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        .byte "25 ccccccccccccccccccccccccccccccccccccc"
-        .byte "26 ddddddddddddddddddddddddddddddddddddd"
-        .byte "27 eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",0
-        ;; not on sceen!
-        .byte "28 ####################################"
-
-.else
-.bss
-        ;; ORIC SCREEN SIZE
-        ;; (save program/screen before compile to "input")
-        .res SCREENSIZE+1       ; +1 for \0
-
-.endif ; JUNK
-
 ;;; END INPUT
 ;;; ----------------------------------------
 ;;; GLOBAL DATA
@@ -12330,6 +12289,10 @@ _output:
 .endif
 
 FUNC _outputend
+
+
+
+
 
 ;;; Some variants save on codegen by using a library
 
