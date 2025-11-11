@@ -10,7 +10,8 @@
 ;;; String is zero-terminated.
 
 ;;; TODO: rename, too general name
-memcpyz:
+FUNC _memcpyz
+;;; 16
         sta tos
         stx tos+1
 
@@ -25,16 +26,17 @@ memcpyz:
 ;;; if call here set Y=0
 ;;; TOS= text from (lol)
 ;;; DOS= destination
-copyz:  
+FUNC _copyz
+;;; 16
         lda (tos),y
         beq @done
         sta (dos),y
         iny
-        bne copyz
+        bne _copyz
         ;; y overflow
         inc tos+1
         inc dos+1
-        bne copyz
+        bne _copyz
 @done:       
         rts
 
@@ -179,8 +181,11 @@ MEM5=1
 
 .ifdef MEM5
 FUNC _memcpy
+;;;  
 
-;;; CURRENT choosen one
+;;; TODO: make better choosing mechanism
+
+;;; CURRENT choosen one 
 memcpy: 
         sta gos
         stx gos+1

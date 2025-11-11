@@ -2060,8 +2060,8 @@ FUNC _init
 ;NMIVEC=$FFFA                    ; => $0247
 NMIVEC=$0248                    ; => $F8B2
 
-        lda #<NMI_catcher
-        ldx #>NMI_catcher
+        lda #<_NMI_catcher
+        ldx #>_NMI_catcher
         sta NMIVEC
         stx NMIVEC+1
 
@@ -2281,7 +2281,7 @@ jsk nl
         pha
 
 .ifdef DEBUGRULE
-        jsr printstack
+        jsr _printstack
 .endif
 
 ;.ifdef PRINTASM
@@ -2325,7 +2325,7 @@ FUNC _next
         jmp :+
 stackerror:     
         jsr nl
-        jsr printstack
+        jsr _printstack
 
         ;; reset stacck
         ldx #$ff
@@ -2375,7 +2375,7 @@ stackerror:
     putc ':'
     ldy #0
     lda (inp),y
-    jsr printchar
+    jsr _printchar
     putc ' '
 .endif ; DEBUG
 
@@ -2762,7 +2762,7 @@ FUNC _enterrule
         bne :+
         lda rulename
         jsr putchar
-;        jsr printstack
+;        jsr _printstack
 :       
         pla
 .endif ; TRACEFULE
@@ -2827,7 +2827,7 @@ FUNC _enterrule
 
 .ifdef DEB3
     PUTC ' '
-    jsr printchar
+    jsr _printchar
     PUTC '>'
 .endif
 
@@ -2848,7 +2848,7 @@ loadruleptr:
 
 
 .ifdef DEBUGRULE
-;    jsr printstack
+;    jsr _printstack
 .endif
         jmp _next
 ;;; TODO: use jsr, to know when to stop pop?
@@ -2929,8 +2929,8 @@ PUTC '.'
 
 .ifdef DEBUGRULE2
     pha
-    jsr printchar
-;    jsr printstack
+    jsr _printchar
+;    jsr _printstack
 
 ;;; Doesn't get here....?
         tsx
@@ -3013,7 +3013,7 @@ yesgoup:
 
 .ifdef DEB3
 PUTC '^'
-jsr printchar
+jsr _printchar
 .endif
 
 .ifdef DEB2
@@ -3054,7 +3054,7 @@ lda savea
         sta tos+1
         jsr puth
         jsr nl
-        jsr printstack
+        jsr _printstack
 .endif
 
         ;; exit rule
@@ -3200,12 +3200,12 @@ endrule:
 .ifdef DEB3
 PUTC '/'
 lda rulename
-jsr printchar
+jsr _printchar
 .endif
 
 .ifdef DEBUGRULE
    putc 'E'
-;   jsr printstack
+;   jsr _printstack
 .endif
 
 	;; END - rule
@@ -3222,7 +3222,7 @@ jsr printchar
 
 .ifdef DEB3
 PUTC '&'
-jsr printchar
+jsr _printchar
 .endif
 
 .ifdef DEBUGRULE2
@@ -3230,17 +3230,17 @@ pha
 putc ' '
 ldy #0
 lda (rule),y
-jsr printchar
+jsr _printchar
 lda (inp),y
-jsr printchar
+jsr _printchar
 putc '\'
 
-jsr printstack
+jsr _printstack
 
 putc '/'
 pla
 :       
-jsr printchar
+jsr _printchar
 tsx
 ;;; TODO: hmmm
 beq _donecompile                ; or %S TODO:
@@ -3268,7 +3268,7 @@ jmp :-
         pla
 
 .ifdef DEBUGRULE2
-jsr printchar
+jsr _printchar
 PUTC ' '
 .endif
 
@@ -3314,7 +3314,7 @@ _errcompile:
         jsr nl
 .endif
 .ifdef DEBUGRULE
-        jsr printstack
+        jsr _printstack
 .endif
         ;; no errors - lol
         lda #0
@@ -3992,7 +3992,7 @@ done:
 ldy #0
 lda (inp),y
 putc '@'
-jsr printchar
+jsr _printchar
 .endif
 
 .ifdef UPDATENOSPACE
@@ -4394,7 +4394,12 @@ FUNC _dummy4
 
 ;;; END CHEAT?
 
+.include "mulx.asm"
+
 FUNC _bnfinterpend
+
+
+
 
 ;;; NO-need align...
 ;  .res 256-(* .mod 256)
@@ -4598,7 +4603,7 @@ ruleB:
         .byte "|{",_A
 .ifdef PRINTASM
       .byte "%{"
-        jsr asmprintsrc
+        jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
         .byte "}"
@@ -7789,7 +7794,7 @@ ruleO:
 .ifnblank
       .byte "%{"
         putc '_'
-        jsr printstack
+        jsr _printstack
         IMM_RET
 .endif
         .byte 0
@@ -7818,7 +7823,7 @@ ruleP:
 
 .ifdef PRINTASM
       .byte "%{"
-        jsr asmprintsrc
+        jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
 
@@ -7831,7 +7836,7 @@ ruleP:
 
 .ifdef PRINTASM
       .byte "%{"
-        jsr asmprintsrc
+        jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
 
@@ -7861,7 +7866,7 @@ ruleS:
 
 .ifdef PRINTASM
       .byte "%{"
-        jsr asmprintsrc
+        jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
 
@@ -9646,7 +9651,7 @@ status:
         ;; - from
         lda #<status
         ldx #>status        
-        jsr memcpyz         
+        jsr _memcpyz         
 .endif ; __ATMOS__
 
         ;; failed?
@@ -9667,10 +9672,10 @@ FUNC _ERROR
 .endif ; __ATMOS__
 
         ;; - save RTS in output to not crash
-        ;; replace "jmp main" with "jmp hell"
+        ;; replace "jmp main" with "jmp _hell"
         lda #_RTS
-        lda #<hell
-        ldx #>hell
+        lda #<_hell
+        ldx #>_hell
         sta _output+1
         stx _output+2
         
@@ -9736,7 +9741,7 @@ printmore:
 done:   
         PRINTZ {10,"...",10}
 
-        jmp forcecommandmode
+        jmp _forcecommandmode
         
 nohi:
 .endif ; ERRPOS
@@ -9898,7 +9903,7 @@ TIMPER=8
         ;; (run finished)
 
         ;; fall-through
-forcecommandmode:       
+FUNC _forcecommandmode
         ;; - turn on command mode unconditionally
         lda mode
         ora #128
@@ -10004,7 +10009,7 @@ FUNC _idecompile
         ;; alright, all done?
         jmp _compileAX
 
-togglecommand:
+FUNC _togglecommand
 ;;; 7
         lda mode
         eor #128
@@ -10054,7 +10059,7 @@ FUNC _editorend
 ;;; 
 ;;; only used in the IDE
 
-FUNC hell
+FUNC _hell
         lda #<666
         ldx #>666
         rts
@@ -10063,7 +10068,8 @@ FUNC hell
 
 ;;; PRINTASM uses this function
 ;;; it prints source code from here till next ';'
-FUNC asmprintsrc
+FUNC _asmprintsrc
+;;; 47 !
         ;; print next statement fully
         ;; from inp,y
         ;; 
@@ -10106,7 +10112,8 @@ FUNC asmprintsrc
 ;;; TODO: move to... ?
 
 ;;; Go back to prompt
-NMI_catcher:
+FUNC _NMI_catcher
+;;; 24
         ;; reset stack pointer
         ldx #$ff
         txs
@@ -10116,7 +10123,7 @@ NMI_catcher:
         sta mode
         ;; print message
         PRINTZ {10,RED+BG,"RESET",10}
-        jmp forcecommandmode
+        jmp _forcecommandmode
 
 
 ;;; TODO: move somewhere else?
@@ -10250,14 +10257,11 @@ FUNC _eosnormal
         ;; reset to normal/default
         lda #BLACK&127+16       ; paper
         ldx #GREEN&127          ; ink
+        ;; fall-through
 FUNC _eoscolors
-;;; TODO:     make this save screen? save many calls
-
-
-;;; TODO: oric const
 .ifdef __ATMOS__
-        sta $026b               ; paper
-        stx $026c               ; ink
+        sta PAPER
+        stx INK
         GOTOXY 2,27
 .else
         jsr putchar
@@ -10420,8 +10424,10 @@ GROUP=YELLOW
 .byte 0
 
 
-        ;; TODO: locked up?
-extend:
+;;; TODO: save some chars?
+
+FUNC _extend
+;;; 16 
         jsr _eosnormal
         
         lda #<_extendinfo
@@ -10454,17 +10460,7 @@ FUNC _extendinfo
 
 FUNC _helptextend
 
-
-
-
 .include "memcpy.asm"
-
-.include "mulx.asm"
-
-
-
-
-
 
 
 .zeropage
@@ -10563,9 +10559,15 @@ CSRESET=1
 .endif
         rts
 
+       
+FUNC _ideend
 
+
+
+FUNC _debugstart
 ;;; print "$4711@$34 "
-FUNC printvar
+FUNC _printvar
+;;; 32
         jsr spc
 
         lda 0,y
@@ -10603,7 +10605,8 @@ FUNC printaddress
 pchar:     .res 1
 ptossave:  .res 2
 .code
-FUNC printchar
+FUNC _printchar
+;;; 96 !!!
         sta pchar
         pha
         tya
@@ -10665,7 +10668,8 @@ FUNC printchar
         pla
         rts
 
-FUNC printstack
+FUNC _printstack
+;;; 119  !!!!!
         pha
         tya
         pha
@@ -10688,7 +10692,7 @@ FUNC printstack
         jsr nl
         putc '#'
         lda rulename
-        jsr printchar
+        jsr _printchar
         jsr spc
         putc 's'
 
@@ -10703,7 +10707,7 @@ FUNC printstack
 
         lda $101,x
 
-        jsr printchar
+        jsr _printchar
         inx
         beq @err
 
@@ -10775,12 +10779,10 @@ FUNC printstack
         lda savex
         pha
 
-        jmp printstack
+        jmp _printstack
 @ret:
         rts
-        
-FUNC _ideend
-
+FUNC _debugend
 
 
 

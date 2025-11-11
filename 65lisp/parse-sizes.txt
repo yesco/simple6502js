@@ -31,8 +31,110 @@ parse.tap:     11138 B
 ;;
 
 
+; ============================== LIBRARY
+(+ 16 118 72 17 36 7 6 9 11 4 31 11 7 6 4 2 7 9 0 99 0 0 0 144 0 0 0 0)
+616
+
+16	_params
+118	_vars
+0	_biosstart
+72	_asmstart
+0	_clrscr
+0	_librarystart
+17	_biosend
+36	_runtimestart
+0	_stdiostart
+0	_runtimeend
+0	_printh
+0	_printdollar4h
+0	_minimallibrarystart
+7	_minimallibraryend
+6	_print4h
+9	_print2h
+11	_print1h
+4	_printu
+31	_posprintu
+11	_iprintz
+7	_posRTS
+6	_prints
+4	_printz
+2	_posprintz
+7	_posYprintz
+9	_incposYprintz
+0	_ctypestart
+99	_stdioend
+0	_stdlibstart
+0	_ctypeend
+0	_stringstart
+144	_stdlibend
+0	_libraryend
+0	_unistdend
+0	_graphicsstart
+0	_unistdstart
+0	_graphicsend
+0	_stringend
+0	_init
+0	_mathstart
+0	_mathend
+0	_start
+
+
+; ==================== BNF interpreter
+(+ 20 8 4 66 3 6 49 97 120 37 103 290 86 3 3 3 3 3 3 2 36)
+945
+
+20	_bnfinterpstart
+8	_compile
+4	_compileInput
+66	_compileAX
+3	_nextI
+6	_eq
+49	_enterrule
+97	_acceptrule
+120	_fail
+37	_errors
+103	_var
+290	_generate
+86	_digits
+3	_incIspc
+3	_incT
+3	_incP
+3	_incO
+3	_incR
+2	_incI
+36	_incRX
+0	_bnfinterpend
 
   35	mulx for compiler %D
+
+; ==================== C-rules
+(+ 95 237 161 88 268 562 110 2098 448 254 411 492 344 484 208 2)
+6282
+
+0	_rulesstart
+95	_rules
+237	_iorulesstart
+161	_iorulesend
+88	_stringrulesstart
+0	_memoryrulesstart
+268	_stringrulesend
+562	_oprulesstart
+110	_oprulesend
+298	_byterulesstart
+448	_byterulesend
+254	_stmtrulesstart
+411	_stmtbyterulestart
+492	_stmtbyteruleend
+344	_oricstart
+484	_oricend
+0	_stmtrulesend
+208	_parametersstart
+2	_parametersend
+6	_rulesend
+
+
+
+
 
 
 ============IDE============
@@ -76,26 +178,63 @@ parse.tap:     11138 B
 
 
 
-; ================= COMPILER needs
+; ================= BNFinterpreter needs
 (+ 8 4 23) = 35
 
-8	_mul40
+8	_mul40  ; maybe not, lol
 4	_mul10
 23	_mul5
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;            IDE
-; Vinfo = IDE: 2466  EDIT: 493  HELP:  942
-(- 2466 493 942 290 61 154 73) = 453 missing? ??? 
 
-(+ 154 73 61 290 493 974) = 2045
+; ================= DEBUG
+
+32      _printvar        
+96      _printchar    !!!!
+119     _printstack   !!!!!!!
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; ============================== IDE
+; Vinfo = IDE: 2184  EDIT: 493  HELP:  974
+(+ 45 18 154 73 24 42 61 290 493 974) = 2174 !!!
+
+; ===
+(+ 26 19) = 45
+26      status text  "MeteoriC..."
+19      print status
+
+
+; ==
+18	_idestart
+
+; ==
 154	_eventloop
+   (80 B = minihelptext!)
 
+; ==
 73	_listfiles
+
+; ==
+24      _NMI_catcher
+
+
+; == TIMER! (not used still take space)
+(+ 6 8 12 16) = 42
+6
+8
+12      printing..
+16
+
 
 ; ================== UTIL / UI
 (+ 30 4 27) = 61
-30	_memcpy
+16      _memcpyz
+16      _copyz
+
+
+26	_memcpy
+
 4	_eosnormal
 27	_eoscolors
 
@@ -104,9 +243,17 @@ parse.tap:     11138 B
 (+ 62 123 61 44) = 290
 18	_idestart
 62	_idecompile
+(7      _togglecommandmode)
+
 123	_ERROR
 61	_OK
+
 44	_run
+(6      forcecommandmode)
+
+5       _hell
+
+47	asmprintsrc  !!!!
 
 ; =================== editing/commands
 (+ 142 141 101 52 1 56) = 493
@@ -118,6 +265,27 @@ parse.tap:     11138 B
 
 56	_loadfirst
 
+BREAKDOWN:
+17      etill
+17      ebtill
+22      enext
+19      eprev
+
+5       eend
+13      ebeginning
+17      eindent
+
+24      _editaction (PURE)
+36      JMPS
+13      garnish
+
+2       jreturn
+3       jins
+11      eforward
+15      eback
+
+3       ebs
+34      edel !!!
 
 ; ================= HELP
 (+ 10 119 718 95 32) = 974
@@ -135,7 +303,7 @@ parse.tap:     11138 B
 (+ 725 258) = 983
 
 725	_inputstart
-258	_inputend
+
 
 
 
@@ -173,6 +341,13 @@ parse.tap:     11138 B
 965	_info
 1	_Cend
 
+
+
+
+
+
+
+
 ; =============== CC65
 (+ 87 148 123 8 8 8 8 65 60 270 51 12 325 22 0 39 57 41 58 2 2 0 0 0 1 1) = 1396
 
@@ -201,26 +376,6 @@ parse.tap:     11138 B
 39	_strlwr
 57	_strncmp
 
-;;table missing
-8	_isalnum
-8	_isalpha
-8	_isdigit
-8	_isspace
-
-
-
-2	_last
-0	_outputstart
-0	_output
-0	_outputend
-1	_color
-1	_lastc
-
-
-
-
-
-
 
 51	_start
 145	_next
@@ -242,22 +397,6 @@ parse.tap:     11138 B
 8	_incRX
 (+ 50 3 3 3 2 8) = 69
 
-1187	_rules
-
-;; ???
-34	_dummy
-
-;; -- IDE
-198	_aftercompile
-195	_edit
-10	_printsrc
-(+ 198 195 10) = 403
-
-5	_clrscr
-23	_savescreen
-23	_loadscreen
-78	_printz
-25	_mul10
-30	_memcpy
-12	_putchar
+old...
 (+ 5 23 23 78 25 30 12) = 196
+

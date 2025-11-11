@@ -196,7 +196,7 @@ ctrlbranch:
 ;;; move forwards (editpos) till A
 ;;; make use X for max moves
 etill:  
-;;; 15
+;;; 17
         sta savea
 @nextc:       
         lda (editpos),y
@@ -212,7 +212,7 @@ eret:
 
 ;;; move backward (editpos) till A
 ebtill:  
-;;; 12
+;;; 17
         sta savea
 @nextc:       
         lda (editpos),y
@@ -231,6 +231,7 @@ ebtill:
 ;;; (to reach them)
 
 enext:
+;;; 22
         lda #10
         jsr etill
 
@@ -253,6 +254,7 @@ rts2:
 
 ;;; "BUG:" at top line walks to end?
 eprev:  
+;;; 19
         jsr eback
         lda #10
         jsr ebtill
@@ -265,10 +267,12 @@ eprev:
 
 
 eend:   
+;;; 5
         lda #10
         jmp etill
 
 ebeginning:     
+;;; 13
         jsr eback
         lda #10
         jsr ebtill
@@ -276,6 +280,7 @@ ebeginning:
         jmp eforward
         
 eindent:
+;;; 17
         jsr ebeginning
 :       
         lda (editpos),y
@@ -366,23 +371,24 @@ jhelp:
         jmp _help
 jdasm:  
         jsr _dasm
-        jmp forcecommandmode
+        jmp _forcecommandmode
 jinfo:  
         .import _info
         jsr _info
         ;; TODO: depend on mode?
         jmp getchar
 jcmd:   
-        jmp togglecommand
+        jmp _togglecommand
 jextend:        
-        jmp extend
+        jmp _extend
 jgarnish:       
+;; 13
         .import _prettyprint
         jsr nl
         lda #<EDITSTART
         ldx #>EDITSTART
         jsr _prettyprint
-        jmp forcecommandmode
+        jmp _forcecommandmode
 
 
 jreturn:        
@@ -394,7 +400,7 @@ jins:
         ;; fall-through
 ;;; Moves editpos forward; Preserves X
 eforward:       
-;;; 10
+;;; 11
         ;; make sure not "standing at the wall" \0
         lda (editpos),y
         beq ret3
@@ -410,7 +416,7 @@ ret3:
 
 ;;; Moves editpos backward; Preserves X
 eback:
-;;; 13
+;;; 15
 	;; "_decEP" Not used anywhere else?
         lda editpos
         bne :+
@@ -431,6 +437,7 @@ ebs:
         jsr eback
         ;; fall-through
 edel:    
+;;; 34
         ;; delete one character at cursor
         ;; - to
         lda editpos
@@ -690,7 +697,7 @@ FUNC _loadfirst
         sta editpos
         stx editpos+1
         ;; 
-        jsr copyz
+        jsr _copyz
         ;; zero terminate
         lda #0
         sta (dos),y
@@ -770,11 +777,11 @@ FUNC _emystery
 
         putc 'P'
         ldy #editpos
-        jsr printvar
+        jsr _printvar
 
         putc 'E'
         ldy #editend
-        jsr printvar
+        jsr _printvar
 
         putc 'e'
         jsr spc

@@ -12,7 +12,8 @@ HICHARSET  = $9800
 SC=$bb80
 CHARSET    = $b400
 
-
+PAPER      = $026b
+INK        = $026c
 
 ;;; ORIC ADDRESSES
 ;;; TODO: don't assume oric, lol

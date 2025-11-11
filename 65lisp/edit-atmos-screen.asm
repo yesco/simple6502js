@@ -481,7 +481,7 @@ write:
         cmp #CTRL('X')
         bne :+
 
-        jmp extend
+        jmp _extend
 :       
 ;;; - control char - just print it
         cmp #' '

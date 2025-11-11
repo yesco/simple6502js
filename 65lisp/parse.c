@@ -317,6 +317,7 @@ extern char idestart,ideend;
 extern char   editorstart,editorend;
 extern char   helptext,helptextend,help,helpend;
 extern char   inputstart,inputend;
+extern char debugstart,debugend;
 extern char biosstart,biosend;
 extern char librarystart,libraryend;
 extern char   runtimestart,runtimeend;
@@ -351,7 +352,7 @@ void info() {
 
 
   printf
-    ("\x97\x84- CC02  MeteoriC-6502-compiler -  \x90\n"
+    ("\n\x97\x84- CC02  MeteoriC-6502-compiler -  \x90\n"
 // TAP-file
      "C %u main %u (loader) TEXT: ?%u\n"
      "  (disasm)   %6u - ^Q disasm code\n"
@@ -360,9 +361,9 @@ void info() {
      "  (info)     %6u - *this* page!\n"
    //--------------------------------------
      "FILES        %6u - input/files\n"
-     "ASM          %6u (bytes)\n"
+     "ASM          %6u   Debug   %4u\n"
      "\x86""IDE         %6u\n"
-     "  editor     %6u   misc     TODO:\n"
+     "  editor     %6u   commands%4u\n"
      "  help       %6u - help text+code\n"
      "\x86""C-compiler  %6u\n"
      "  BNF-intrp  %6u - BNF interpreter\n"
@@ -402,9 +403,14 @@ void info() {
        , (char*)prettyprintEnd-(char*)prettyprintStart
        , (char*)infoEnd-(char*)info
      , &inputend-&inputstart
-     , &asmend-&asmstart
+     , &asmend-&asmstart, &debugend-&debugstart
        , &ideend-&idestart
          , &editorend-&editorstart
+              , ( (&ideend-&idestart)
+                  - (&editorend-&editorstart)
+                  - (&helptextend-&helptext)
+                  - (&helpend-&help)
+                )
          , (0
           + &helptextend-&helptext
           + &helpend-&help
