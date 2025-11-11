@@ -70,19 +70,17 @@
 ;;;    769 B - ^P ^N ^I etc, but many jsr togglecursor 
 ;;;    723 B - ...  removed many jsr togglecursor!
 ;;;    669 B - saved 54 B only using BRANCH table :-(
-;;; 
-;;; Old editor ( edit-atmos-screen.asm )
+;;;    828 B - really just contains lots of COMMAND action
+;;;          - refactored, basically only keeping _editaction
+;;;    493 B - moved out IDE stuff, and not direct editing
+
+;;; Old editor+commands ( edit-atmos-screen.asm )
 ;;;    529 B / IDE: 2428 B
 ;;; 
 
 
-
-;;; TODO: move to atmos constants file?
-HIRES      = $a000
-HICHARSET  = $9800
-;SCREEN     = $bb80
-SC=$bb80
-CHARSET    = $b400
+;;; ========================================
+;;;             C  O  N  F  I  G
 
 
 ;;; Currently, we have a fixed buffer for editing.
@@ -125,73 +123,6 @@ editrow:        .res 1
 
 
 .code
-
-
-
-;;; Edit the current buffer
-;;; 
-;;; Depending on "mode", you're either in
-;;; edit mode (BPL) or command mode (BMI).
-;;; 
-;;; 
-FUNC _edit
-        ;; init if first time
-        bit mode
-        bvc :+
-        ;; init + "load"
-        jsr loadfirst
-        ;; remove init bit
-        lda mode
-        eor #64
-        sta mode
-
-     ldx #0
-     jsr _printu
-:       
-
-        jmp editstart
-
-command:
-        jsr _eosnormal
-
-        ;; 'Q' to temporary turn on cursor!
-        PRINTZ {10,">",'Q'-'@'}
-        jsr getchar
-        PUTC CTRL('Q')
-
-        ;; ignore return
-        cmp #13
-        beq command
-
-        cmp #'?'
-        bne :+
-@minihelp:
-        PRINTZ {"?",10,"Command",10,YELLOW,"h)elp c)ompile r)un v)info ESC-edit ",10,YELLOW,"z)ource q)asm l)oad w)rite"}
-        jmp command
-:       
-
-        ;; lowercase whatever to print!
-        ora #64+32           
-        jsr putchar
-
-        ;; then convert any char to CTRL to run it!
-        and #31
-
-editing:
-        jsr _editaction
-
-editstart:
-        bit mode
-        bmi command
-
-        ;; don't redraw if key waiting!'
-        jsr KBHIT
-        bmi :+
-        ;; redraw
-        jsr _redraw
-:       
-        jsr getchar
-        jmp editing
 
 
 
@@ -262,6 +193,39 @@ ctrlbranch:
 
 
 
+;;; move forwards (editpos) till A
+;;; make use X for max moves
+etill:  
+;;; 15
+        sta savea
+@nextc:       
+        lda (editpos),y
+        beq eret
+        cmp savea
+        beq eret
+
+        jsr eforward
+        jmp @nextc
+eret:   
+        rts
+
+
+;;; move backward (editpos) till A
+ebtill:  
+;;; 12
+        sta savea
+@nextc:       
+        lda (editpos),y
+        beq eret
+        cmp savea
+        beq eret
+
+        jsr eback
+        bcs eret
+        bcc @nextc
+
+
+
 
 ;;; putting some routines BEFORE ediaction
 ;;; (to reach them)
@@ -323,12 +287,28 @@ eindent:
         jmp :-
         
 
-;;; each operation ends with rts
-;;; (instead of jmp edit, saving 2 bytes)
-FUNC _editaction
 
-;;; 36 * 4 cmp/beq = 144 B
-        ;; some may need it
+;;; Editaction is the event-handler
+;;; 
+;;; It's jsr:ed into with a key in A
+;;; (and residu from getchar in X on Atmos)
+;;; 
+;;; It then performs a dispatch based on the
+;;; key-code to editor functions named like
+;;; eXXXX or trampoline jumps jXXXX to 
+;;; IDE functions. Each function does RTS
+;;; to save code.
+;;; 
+;;; The locaiton of this function is in
+;;; the middle of all the eFunctions as
+;;; it does the dispatch with a BRANCH
+;;; instruction that gets patched.
+;;; 
+;;; With almost all keys allocated, it's
+;;; a break even to do jump table dispatch. LOL
+;;; 
+FUNC _editaction
+        ;; most rourtines rely on Y=0
         ldy #0
 
         ;; noctrl: special keys without cTRL
@@ -371,15 +351,15 @@ patchbranch:
 ;;; jmp dispatch 9*3= 27 B
 ;;; (almost worth it to just do wide dispatch table!)
 jcompile:       
-        jmp ecompile
+        jmp _idecompile
 jrun:   
         jmp _run
-jmystery:       
-        jmp emystery
+;jmystery:       
+;        jmp _emystery
 jkill:          
-        jmp ekill
+        jmp _ekill
 jzource:  
-        jmp loadfirst
+        jmp _loadfirst
 jcaps:  
         jmp putchar
 jhelp:  
@@ -390,6 +370,7 @@ jdasm:
 jinfo:  
         .import _info
         jsr _info
+        ;; TODO: depend on mode?
         jmp getchar
 jcmd:   
         jmp togglecommand
@@ -445,33 +426,6 @@ eback:
 eunused:        
         rts
         
-
-forcecommandmode:       
-        ;; - turn on command mode unconditionally
-        lda mode
-        ora #128
-        sta mode
-
-        jmp _edit
-
-
-togglecommand:
-;;; 7
-        lda mode
-        eor #128
-        sta mode
-
-	;; actions
-        ;; TODO: feels like lots of duplications?
-;;; 11
-        bpl @ed
-        ;; re-sshow compilation result
-        jsr _eosnormal
-        jmp _aftercompile
-
-@ed:
-        jmp _redraw
-
 
 ebs:    
         jsr eback
@@ -629,49 +583,16 @@ FUNC _redraw
 
 FUNC _editormisc
 
+;;; TODO:O can remove? 
         ;; clear the cursor bit, used for display
 
         ;; fall-throught to togglecursor!
 togglecursor:
 ;;; 9
-        ldy #0
         lda (editpos),y
         eor #$80
         sta (editpos),y
         rts
-
-
-
-;;; move forwards (editpos) till A
-;;; make use X for max moves
-etill:  
-;;; 15
-        sta savea
-@nextc:       
-        lda (editpos),y
-        beq eret
-        cmp savea
-        beq eret
-
-        jsr eforward
-        jmp @nextc
-eret:   
-        rts
-
-
-;;; move backward (editpos) till A
-ebtill:  
-;;; 12
-        sta savea
-@nextc:       
-        lda (editpos),y
-        beq eret
-        cmp savea
-        beq eret
-
-        jsr eback
-        bcs eret
-        bcc @nextc
 
 
 ;;; Insert A at current cursor position
@@ -694,7 +615,6 @@ einsert:
         lda editend+1
         sta tos+1
 
-        ldy #0
         ;; TODO: revisit
         ;; double 0 byte makes this insert
         ;; not bleed into next input
@@ -742,56 +662,16 @@ einsert:
 
 
 
-;;; TODO: crashes...
-emystery:       
-        ;; CTRL-M .... ? Sectret Mystery Action?
-        jsr _eosnormal
-
-        putc 'S'
-        jsr spc
-        lda #<EDITSTART
-        ldx #>EDITSTART
-        jsr _printh
-        jsr nl
-
-        putc 'P'
-        ldy #editpos
-        jsr printvar
-
-        putc 'E'
-        ldy #editend
-        jsr printvar
-
-        putc 'e'
-        jsr spc
-        lda #<EDITEND
-        ldx #>EDITEND
-        jsr _printh
-        jsr nl
-
-        putc 'Z'
-        jsr spc
-        lda #<EDITSIZE
-        ldx #>EDITSIZE
-        jsr _printu
-        jsr nl
-
-        jsr nl
-
-        putc 'c'
-        jsr spc
-        lda editcol
-        ldx #0
-        jsr _printu
-
-        jmp getchar
-
-ekill:  
+FUNC _ekill
 ;;; TODO: iplement kill line
         rts
 
 
-loadfirst:
+
+;;; TODO: generalize to load specified file/buffer?
+
+;;; Load the first buffer from input
+FUNC _loadfirst
 ;;; (+ 20 11 12 3 14 3) = 63
 
 ;;; 20+11
@@ -873,28 +753,50 @@ pla
 
         jmp _redraw
 
+;;; For debugging
+;MYSTERY=1
+.ifdef MYSTERY
+;;; TODO: crashes...
+FUNC _emystery
+        ;; CTRL-M .... ? Sectret Mystery Action?
+        jsr _eosnormal
 
-
-ecompile:
-        ;; We need to make sure no hibit (cursor)
-        ;; is set in the code we compile, either
-        ;; save a copy to compile in the background
-        ;; or wait...
-
-        jsr nl
-        lda #(BLACK+BG)&127
-        ldx #WHITE&127
-        jsr _eoscolors
-        PRINTZ {10,YELLOW,"compiling...",10,10}
-        
-        ;; set output
-        lda #<_output
-        ldx #>_output
-        sta _out
-        stx _out+1
-        ;; set input = EDITSTART
+        putc 'S'
+        jsr spc
         lda #<EDITSTART
         ldx #>EDITSTART
-        ;; alright, all done?
-        jmp _compileAX
+        jsr _printh
+        jsr nl
 
+        putc 'P'
+        ldy #editpos
+        jsr printvar
+
+        putc 'E'
+        ldy #editend
+        jsr printvar
+
+        putc 'e'
+        jsr spc
+        lda #<EDITEND
+        ldx #>EDITEND
+        jsr _printh
+        jsr nl
+
+        putc 'Z'
+        jsr spc
+        lda #<EDITSIZE
+        ldx #>EDITSIZE
+        jsr _printu
+        jsr nl
+
+        jsr nl
+
+        putc 'c'
+        jsr spc
+        lda editcol
+        ldx #0
+        jsr _printu
+
+        jmp getchar
+.endif ; MYSTERY

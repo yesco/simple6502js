@@ -1,4 +1,4 @@
-;;; edit's text on ORIC ATMOS hardware text screen
+g;;; edit's text on ORIC ATMOS hardware text screen
 ;;; 
 ;;; 
 
@@ -60,7 +60,7 @@
 ;;; HMMM, redo anyway...
 forcecommandmode:
 
-FUNC _edit
+FUNC _ide
         CURSOR_OFF
         
 .ifdef INTERRUPT
@@ -74,7 +74,7 @@ FUNC _edit
         jsr putu
         jsr spc
 
-        jmp _edit
+        jmp _ide
 .endif
 .endif ; INTERRUPT
 
@@ -105,7 +105,7 @@ FUNC _edit
         jsr getchar
 
         jsr editaction
-        jmp _edit
+        jmp _ide
 
 
 editaction:     
@@ -696,3 +696,10 @@ savedscreen:
 .code
 
 .endif ; JUNK
+
+
+FUNC _printsrc
+        jsr clrscr
+        lda #<input
+        ldx #>input
+        jmp _printz

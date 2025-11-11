@@ -5,6 +5,14 @@
 ;;;       with names, for easier re-mapping.
 
 
+;;; TODO: move to atmos constants file?
+HIRES      = $a000
+HICHARSET  = $9800
+;SCREEN     = $bb80
+SC=$bb80
+CHARSET    = $b400
+
+
 
 ;;; ORIC ADDRESSES
 ;;; TODO: don't assume oric, lol

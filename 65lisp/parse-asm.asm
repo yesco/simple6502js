@@ -2333,7 +2333,7 @@ stackerror:
 
         PRINTZ {10,"%S>"}
 
-        jmp _edit
+        jmp _eventloop
         
 :       
 .endif ; CHECKSTACK
@@ -3364,7 +3364,7 @@ error:
 ;;;   like assertions?
 
         ;; go edit to fix again!
-        jmp _edit
+        jmp _eventloop
 
 
 halt:
@@ -9756,7 +9756,7 @@ print:
 
 ;;; TODO: came here with no errors? 
 ;;;    or none to display?
-        jmp _edit
+        jmp _eventloop
 
 
 
@@ -9792,10 +9792,11 @@ FUNC _OK
         putc ' '
         PRINTZ {" Bytes",10,10}
 
-        jmp _edit
+        jmp _eventloop
 
 
-_run:   
+
+FUNC _run
 
         ;; set ink for new rows
         lda #BLACK+16           ; paper
@@ -9894,15 +9895,125 @@ TIMPER=8
         tax
         pla
         jsr _printu
+        ;; (run finished)
 
-        jmp forcecommandmode
-        
-        
+        ;; fall-through
+forcecommandmode:       
+        ;; - turn on command mode unconditionally
+        lda mode
+        ora #128
+        sta mode
 
+        ;; fall-through
+
+;;; eventloop
+;;; 
+;;; Depending on "mode", you're either in
+;;; edit mode (BPL) or command mode (BMI).
+;;; 
+FUNC _eventloop
+        ;; init if first time
+        bit mode
+        bvc :+
+        ;; init + "load"
+        jsr _loadfirst
+        ;; remove init bit
+        lda mode
+        eor #64
+        sta mode
+:       
+        ;; start with redraw (if needed)
+        jmp editstart
+
+command:
+        jsr _eosnormal
+
+        ;; 'Q' to temporary turn on cursor!
+        PRINTZ {10,">",'Q'-'@'}
+        jsr getchar
+        PUTC CTRL('Q')
+
+        ;; ignore return
+        cmp #13
+        beq command
+
+        cmp #'?'
+        bne :+
+@minihelp:
+        PRINTZ {"?",10,"Command",10,YELLOW,"h)elp c)ompile r)un v)info ESC-edit ",10,YELLOW,"z)ource q)asm l)oad w)rite"}
+        jmp command
+:       
+
+        ;; lowercase whatever to print!
+        ora #64+32           
+        jsr putchar
+
+        ;; then convert any char to CTRL to run it!
+        and #31
+
+editing:
+        jsr _editaction
+
+editstart:
+        bit mode
+        bmi command
+
+        ;; don't redraw if key waiting!'
+        jsr KBHIT
+        bmi :+
+        ;; redraw
+        jsr _redraw
+:       
+        jsr getchar
+        jmp editing
+
+
+FUNC _idecompile
+        ;; We need to make sure no hibit (cursor)
+        ;; is set in the code we compile, either
+        ;; save a copy to compile in the background
+        ;; or wait...
+
+        jsr nl
+        lda #(BLACK+BG)&127
+        ldx #WHITE&127
+        jsr _eoscolors
+        PRINTZ {10,YELLOW,"compiling...",10,10}
+        
+        ;; set output
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
+        ;; set input = EDITSTART
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        ;; alright, all done?
+        jmp _compileAX
+
+
+
+
+
+togglecommand:
+;;; 7
+        lda mode
+        eor #128
+        sta mode
+
+	;; actions
+        ;; TODO: feels like lots of duplications?
+;;; 11
+        bpl @ed
+        ;; re-sshow compilation result
+        jsr _eosnormal
+        jmp _aftercompile
+
+@ed:
+        jmp _redraw
 
 
 FUNC _editorstart
-
 
 .ifndef __ATMOS__
 
@@ -9921,6 +10032,12 @@ FUNC _editorstart
 
 
 FUNC _editorend
+
+
+
+
+
+
 
 
 
@@ -10144,12 +10261,6 @@ FUNC _eoscolors
         jmp nl
 
 
-FUNC _printsrc
-        jsr clrscr
-        lda #<input
-        ldx #>input
-        jmp _printz
-
 FUNC _listfiles
         ;; init
         lda #<input
@@ -10319,7 +10430,7 @@ extend:
 
 ;        jmp bytesieve
 
-        jmp _edit
+        jmp _eventloop
 
 
 
