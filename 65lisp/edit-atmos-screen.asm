@@ -1,4 +1,4 @@
-g;;; edit's text on ORIC ATMOS hardware text screen
+;;; edit's text on ORIC ATMOS hardware text screen
 ;;; 
 ;;; 
 
@@ -56,9 +56,6 @@ g;;; edit's text on ORIC ATMOS hardware text screen
 ;;; - 
 
 
-
-;;; HMMM, redo anyway...
-forcecommandmode:
 
 FUNC _ide
         CURSOR_OFF

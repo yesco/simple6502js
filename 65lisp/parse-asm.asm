@@ -9906,6 +9906,7 @@ forcecommandmode:
 
         ;; fall-through
 
+.ifdef __ATMOS___
 ;;; eventloop
 ;;; 
 ;;; Depending on "mode", you're either in
@@ -9966,7 +9967,12 @@ editstart:
 :       
         jsr getchar
         jmp editing
+.else 
+FUNC _eventloop
+        jmp _ide
+.endif ; __ATMOS__
 
+.ifdef __ATMOS__
 
 FUNC _idecompile
         ;; We need to make sure no hibit (cursor)
@@ -9991,10 +9997,6 @@ FUNC _idecompile
         ;; alright, all done?
         jmp _compileAX
 
-
-
-
-
 togglecommand:
 ;;; 7
         lda mode
@@ -10012,25 +10014,23 @@ togglecommand:
 @ed:
         jmp _redraw
 
+.endif ;  __ATMOS__
+
+
+
+
 
 FUNC _editorstart
-
 .ifndef __ATMOS__
-
         ;; ironic, as this is not editor for
         ;; generic...
 
         ;; outdated (no cursor anymore)
         .include "edit-atmos-screen.asm"
-
 .else
-
         ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
-
 .endif
-
-
 FUNC _editorend
 
 
