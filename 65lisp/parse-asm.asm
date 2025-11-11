@@ -1,7 +1,10 @@
 ;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
-;;; - Generated code/tap-files are free, of course!
+;;; - Generated code in tap-files are free,
+;;;   and without royalty. The source code of
+;;;   the compiler, the rules are (C) me.
+;;; 
 
 
 ;;; TITLE
@@ -200,29 +203,32 @@
 ;;; The compiler maps some common simple ideoms to
 ;;; direct code:
 ;;; 
-;;; - using raw BIOS ROM, we do this
-;;; putchar(' ')
-;;; putchar('\n')
-;;; putchar(X)                   // \n doesn't work!
-;;; putz(S)                      // ONLY putz not puts
-;;; (no printing numbers unsigned/decimal/hex)
+;;; INPUT & OUTPUT
+;;; - putchar(' ')
+;;; - putchar('\n')
+;;; - putchar(X)               // \n doesn't work!
+;;; - putz(S)                  // ONLY putz not puts
+;;;   (no printing numbers unsigned/decimal/hex)
 ;;; 
-;;; - these are compiled inline!
+;;; MEMORY STUFF
+;;; - peek(A) -> byte
+;;; - poke(A, byte)
+;;; - deek(A) -> word          // ORICism!
+;;; - doke(A, word)
+;;; - memcpy(CONST, CONST, const)  // const<256 => 14 B
+;;; - memcpy(X,X,X)            // inline    => 23 B
 ;;; 
-;;; memcpy(CONST, CONST, const)  // const<256 => 14 B
-;;; memcpy(X,X,X)                // inline    => 23 B
+;;; CTYPE! (minimal)
+;;; - isdigit()
+;;; - isalpha()
+;;; - isspace()
 ;;; 
-;;; - minimal ctype.h inlined (no library!!)
-;;; 
-;;; isdigit()
-;;; isalpha()
-;;; isspace()
-;;; 
-;;; - a very simplistic replacement for malloc()
-;;;   is provided, but take care - no free()!
-;;; 
-;;; malloc(X)                    // gives pointer after code
-;;; free(X)                      // does nothing
+;;; STDLIB
+;;; - malloc(X)                // gives pointer after code
+;;; - free(X)                  // does nothing
+;;; (these are like sbrk, just increase a pointer)
+;;; NOTE: will most likely crash the IDE
+;;;       (TODO:? use for stand alone code generated)
 ;;; 
 
 
@@ -363,8 +369,8 @@
 ;;; 6502 is famous for begin a "difficult" C-compiler
 ;;; target, or for that matter any high-level compilation
 ;;; to it. New compilers may show that this isn't 
-;;; necessarily true: oscar64, KickC, llvm-mos, and even
-;;; the abonded (?) gcc-6502, that challanges this:
+;;; necessarily true: oscar64, KickC, llvm-mos, Tigger C,
+;;; and even the abanded (?) gcc-6502, challanges this:
 ;;; 
 ;;;   "The C64 executes 442 dhrystone V2.2 iteration
 ;;;    per second, when compiled with Oscar64 and -O3
@@ -384,6 +390,30 @@
 ;;; the actual 6502 device and fast edit-compile-run
 ;;; experience - basically an IDE on 6502 with acceptable
 ;;; performance.
+;;; 
+;;; There aren't many compilers that run NATIVELY on
+;;; 6502. Most generate a kind of byte-code.
+;;; 
+;;; Worth mentioning:
+;;; 
+;;; - Aztec C-compiler: also existed on Z80. The 6502
+;;;   variant could cross compile and genereate byte-code
+;;;   for a smaller VM that interpreted this. There was
+;;;   also a compiler than generated direct machine code.
+;;;   I think it gave rather HUGE binaries. Some variant
+;;;   of the compiler may have run natively ON the
+;;;   6502, Apple II for example.
+;;; 
+;;; - PLASMA: Not C. A new langauge+OS/environment/editor
+;;;   and compiler that natively runs on 6502, however,
+;;;   it also generate byte-code for an VM. It's mostly
+;;;   targetted to APPLE II, but not limited to.
+;;; 
+;;; - http://mdfs.net/System/C/BBC/
+
+
+
+
 ;;; 
 ;;; This doesn't stop us at taking best practices,
 ;;; which include, but are not limited to:
@@ -598,11 +628,10 @@
 ;;;    56 B is table ruleA-ruleZ- could remove empty
 ;;;    68 B library putu/puth/putc/getchar
 ;;;         LONGNAMES: move to init data in env! "externals"
-;;; TODO: 
-;;;  ~256 B parameterize ops (gen)
+;;; 
 
 
-
+;;; 
 ;;; BNF DEFINITION
 ;;; ==============
 ;;; 
@@ -629,17 +658,21 @@
 ;;; - TAILREC constant '*"+128 jumps to match from beginning
 ;;;   of the same rule. This replaces KlEENE operators *+?[].
 ;;; 
+;;; 
 ;;; CONSTANS
 ;;; 
 ;;; - %D - tos= NUMBER; parses various constants
 ;;;        4711 - number
 ;;;        'c'  - char constant
-;;; - %S - skips (parses) string till "
+;;; - %d - tos= number; only accept if <256!
+;;; 
+;;; - %S - parses string till "
 ;;;        NOTE: you need to write "%S 
 ;;;        ...\n\"..." - rest of string is matched
-;;;        only \n is recognized, other \ just quotes
-;;;        NOTE: this doesn't copy string!
-;;;        NOTE: no address is saved given in tos, dos.
+;;;        only \n is recognized, other \ just inserted
+;;;        NOTE: this COPIES the string
+;;; - %s - like %S but doesn't copy the string
+;;; 
 ;;; 
 ;;; NAMES (variables, functions, labels)
 ;;; 
@@ -650,6 +683,7 @@
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
 ;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
+;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
 ;;; - %{ - immediate code, that runs NOW during parsing
@@ -658,11 +692,21 @@
 ;;; 
 ;;;        NOTE: can't rts, must use "jsr immret"
 ;;;        FAIL: it's ok to call "jsr _fail" !
+;;; 
+;;; BINARY DATA (inline!)
+;;;
+;;; - % len BINARYDATA      
+;;;        len is 7bits < ' '(32), hbit ignored
+;;;        tos= address after len (TODO: include?)
+;;;        TODO: mabye set dos too, like %A?
+;;; 
+;;;        This is used to keep environment of
+;;;        global/local variable bindings!
+;;;        Slow linear, but very little code!
+;;;        
 
 ;;; 
 ;;; TODO:?
-;;; - %d - TODO: match 0-255 only), orr
-;;; - %B - or Byte restrictor; fails if last %D (tos) > 255
 ;;; - %b - match word boundary! '\b' in regexp, you know
 ;;; 
 ;;; - %n - define NEW LOCAL
@@ -670,11 +714,12 @@
 ;;; 
 ;;; - %r - the branch can be relative
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
+;;;    ?????
 
 
 ;;; 
-;
-IMMEDIATE=1
+;;; 
+;;; %{IMMEDIATE machien code ... IMM_RET (or IMM_FAIL)
 ;;; 
 ;;; Code can be executed inline *while* parsing.
 ;;; It's prefixed like this
@@ -744,7 +789,7 @@ IMMEDIATE=1
 ;;; hi: #'+/237;? CGKORSW[_  cgkorsw{ DEL
 
 
-;;; CONFLICTS!
+;;; CONFLICTS! (not used much but... TODO: fix?!)
 ;;; > is ROL $nnnn,x   62(dec)
 ;;; ] is EOR $nnnn,x   93(dec)
 
@@ -846,35 +891,11 @@ _asmstart:
 .export _rules
 
 
-;;; ORIC ADDRESSES
-;;; TODO: don't assume oric, lol
-SCREEN		= $bb80
-SCREENSIZE	= 40*28+0
-SCREENEND	= SCREEN+SCREENSIZE
-ROWADDR		= $12
-CURROW		= $268
-CURCOL		= $269
-CURCALC		= $001f      ; ? how to update?
-
-
-;;; TODO: why are these so late?
-;;;   used much earlier!
-
-BLACK    =128+0
-RED      =128+1
-GREEN    =128+2
-YELLOW   =128+3
-BLUE     =128+4
-MAGNENTA =128+5
-CYAN     =128+6
-WHITE    =128+7
-BG       =16                    ; BG+WHITE
-NORMAL   =128+8
-DOUBLE   =128+10
+.include "atmos-constants.asm"
 
 
 ;;; TODO: why is this not accepted?
-.define SCREENRC(r,c)   SCREEN+40*r+c-2
+;.define SCREENRC(r,c)   SCREEN+40*r+c-2
 
 ;;; TODO: not good idea?
 ;;; TODO: not working, parse error?
@@ -884,26 +905,6 @@ DOUBLE   =128+10
 ;;; 
 ;;; TTY=1
 
-
-;;; ORIC ATMOS
-;;; 
-;;; #228 ( 4244) is the address of the ‘fast’ interrupt
-;;; jump. By altering the jump address at #229,A
-;;; 
-;;; (#245,6) you can provide your own interrupt handler.
-;;; 
-;;; #230 ( #24A) is the address of the ‘slow’ interrupt
-;;; routine. Control is passed to here at the end
-;;; of the fast interrupt routine. Although 3 bytes are
-;;; eserved here, there is only the single-byte
-;;; instruction RTI present normally.
-;;; 
-;;; #228(4247) contains the jump vector for the NMI
-;;; (Non-Maskable Interrupt) routine, which on
-;;; the Oric connects to the ‘Reset button’.
-
-;;; TODO: replace NMI with _edit, lol!
-;;; TODO: 
 
 
 ;;; TIMe events: compile/run
@@ -919,21 +920,6 @@ DOUBLE   =128+10
 ;TIM=1
 
 ;TTY=1
-
-;;; 
-;;; $0244: jmp ?
-;;; points to $ee22 (ROM interrupt handler)
-;ORICINTVEC=$0245
-;;; doesn't matter?
-;INTCOUNT=10000                  ; 100x/s
-INTCOUNT=50000                  ; 100x/s
-
-;INTERRUPT=1
-
-TIMER_START	= $ffff
-SETTIMER        = $0306
-READTIMER	= $0304
-CSTIMER         = $0276
 
 
 .macro SKIPONE
@@ -2402,18 +2388,33 @@ stackerror:
     PUTC 10
 .endif ; DEBUG
 
+
+
 ;;; Actual code to process rule, lol
 
         ldy #0
         lda (rule),y
 
         ;; hibit - new rule?
-        bpl :+
+        bpl @nohi
+
+@hibit:
+
+        ;; is it a skipper (7bit < ' ')
+        cmp #128+' '
+        bcc @skip
+        ;; hibit with 'A'... - Enter new Rule
         jmp _enterrule
-:       
+@skip:        
+        ;; C=0
+        jsr skipperPlusC
+        jmp _next
+
+
+@nohi:       
         ;; 0 - end = accept
         bne :+
-jmpaccept:      
+jmpaccept:
         jmp _acceptrule
 :       
 
@@ -2521,6 +2522,7 @@ failjmp:
 eqjmp:  
         jmp _eq
 
+
         ;; percent matchers
 percent:
         jsr _incR
@@ -2540,11 +2542,11 @@ jsr putchar
         jsr _incR
         ; pla
 
-.ifdef IMMEDIATE
 ;;; 26 B
         ;; immediate code! to run NOW!
         cmp #'{'
         bne noimm
+
         ;; - copy rule address (self-modifying)
         lda rule
         sta imm+1
@@ -2583,10 +2585,36 @@ immfail:
 ;        jsr immfail
 .endmacro
 
-        
 noimm:
-.endif ; IMMEDIATE
 
+;;; TODO: remove case from char to test?
+;;;   (still have original value in percentchar!)
+
+        and #$7f
+
+        ;; Skipper? A<' '
+        ;; (TODO: potentially if hibit set could allow
+        ;;  ..127 bytes skipped/copied, could conflict
+        ;;  with hibit-'Rules if we want to make them
+        ;;  "special" %'R == optional?)
+        cmp #' '
+        bcs :+
+
+        pha
+        ;; tos= address+1 (pointer to binary data!)
+        lda rule
+        sta tos
+        lda rule+1
+        sta tos+1
+        jsr _incT               ; make sure not to affect C
+
+        pla
+        ;; Skip n bytes
+        ;; C= 0
+        jsr skipperPlusC
+        jmp _next
+
+:       
         ;; Digits? (constants really)
         cmp #'d'                ; < 256
         beq :+
@@ -2596,13 +2624,11 @@ noimm:
         jmp _digits
 :       
 
-.ifdef STRING
         ;; String?
         cmp #'s'                ; means skip
         beq string
         cmp #'S'                ; means Copy
         beq string
-.endif ; STRING
 
         ;; ELSE assume it's %var..
 jmpvar: 
@@ -2681,6 +2707,17 @@ str:
         ;; skip "
         jmp _nextI
 
+
+
+;;; skipper: skip N=(A & 127) bytes of rule
+skipperPlusC:
+        and #127
+        adc rule
+        sta rule
+        bcc :+
+        inc rule+1
+:       
+        rts
 
 
 ;;; TODO: remove?
@@ -3068,7 +3105,27 @@ FUNC _fail
         cmp #'['
         beq @skipgen
 
-        ;; not '[' - normal char to skip!
+        ;; % len7 ... (skip ... of len7,hibit ignore)
+        cmp #'%'
+        bne :+
+        
+        ;; 7bit < 32 skip bytes!
+        ;; skip one byte (notice not jsr _incR)
+        iny
+        bne @noincinc
+        inc rule+1
+@noincinc:
+        lda (rule),y
+
+        and #$7f
+        cmp #' '
+        bcs :+
+        
+        ;; C=0
+        jsr skipperPlusC
+        jmp @loop
+:       
+        ;; normal char: skip
 @next:
         iny
         bne @loop
@@ -4897,6 +4954,7 @@ FUNC _iorulesend
       .byte ']'
 
         ;; we take ourselves some freedom of interpreation!
+        ;; (anything <= ' ' is space, lol)
         .byte "|isspace(",_E,")"
       .byte '['
         ldy #0
