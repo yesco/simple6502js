@@ -9906,7 +9906,7 @@ forcecommandmode:
 
         ;; fall-through
 
-.ifdef __ATMOS___
+.ifdef __ATMOS__
 ;;; eventloop
 ;;; 
 ;;; Depending on "mode", you're either in
@@ -9941,6 +9941,7 @@ command:
         cmp #'?'
         bne :+
 @minihelp:
+        ;; 82 B
         PRINTZ {"?",10,"Command",10,YELLOW,"h)elp c)ompile r)un v)info ESC-edit ",10,YELLOW,"z)ource q)asm l)oad w)rite"}
         jmp command
 :       
@@ -9968,9 +9969,15 @@ editstart:
         jsr getchar
         jmp editing
 .else 
+
 FUNC _eventloop
         jmp _ide
+
 .endif ; __ATMOS__
+
+
+
+
 
 .ifdef __ATMOS__
 

@@ -1,3 +1,8 @@
+;; ==================================================
+;; ===================OLD============================
+;; Sun Sep 28 03:35:10 2025 +0200
+;;
+
 BNF-parser:	 746 B
 inc...:           69 B 	         ; (+ 746 69)= 815
 
@@ -17,6 +22,202 @@ TOTAL:          2601 B          ; (+ 746 69 1187 403 196)
 parse.bin:      2108 B (org SET)
 parse.bin:      4449 B (org NOT set)
 parse.tap:     11138 B
+
+
+
+;; ==================================================
+;; ===================NEW============================
+;; Tue Nov 11 23:56:34 +07 2025
+;;
+
+
+
+  35	mulx for compiler %D
+
+
+============IDE============
+(+ 30 132 828 83 31) = 1104
+
+  30    _memcpy
+ 132    compiler ok/error report
+
+ 828    editing/commands
+  73    _listfiles
+  31    UI
+
+;; TEXT
+
+ 974    help+text
+=======
+(+ 1104 974) = 2078
+
+
+
+ 983    "input"
+
+==== C program ====
+1639    disasm
+ 775    pretty print
+ 966    info()
+1396    cc65 !
+
+        743    malloc/free/realloc
+         92    printf/vfprintf ?
+        284    IO (putchar f...)
+        118    strlen/lower/lwr/ncmp
+             (+ 743 92 284 118) = 1237!
+
+================
+(+ 35 30 132 828 83 31 974 983 1639 775 966 1396)
+= 7872
+
+
+
+
+
+
+; ================= COMPILER needs
+(+ 8 4 23) = 35
+
+8	_mul40
+4	_mul10
+23	_mul5
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;            IDE
+; Vinfo = IDE: 2466  EDIT: 493  HELP:  942
+(- 2466 493 942 290 61 154 73) = 453 missing? ??? 
+
+(+ 154 73 61 290 493 974) = 2045
+154	_eventloop
+
+73	_listfiles
+
+; ================== UTIL / UI
+(+ 30 4 27) = 61
+30	_memcpy
+4	_eosnormal
+27	_eoscolors
+
+
+; =================== compilation
+(+ 62 123 61 44) = 290
+18	_idestart
+62	_idecompile
+123	_ERROR
+61	_OK
+44	_run
+
+; =================== editing/commands
+(+ 142 141 101 52 1 56) = 493
+142	_editorstart
+141	_editaction
+101	_redraw
+52	_editormisc
+1	_ekill
+
+56	_loadfirst
+
+
+; ================= HELP
+(+ 10 119 718 95 32) = 974
+
+10	_help
+119	_listsymbols
+0	_helpend
+
+718	_helptext
+95	_extendinfo
+32	_helptextend
+
+
+; ====================== "input"
+(+ 725 258) = 983
+
+725	_inputstart
+258	_inputend
+
+
+
+; ======================= C
+
+0	_Cstart
+1	_defs
+
+; ============ disasm
+(+ 1 84 1260 59 72 31 30 48 53 1) = 1639
+
+1	_disasmStart
+84	_pvar
+1260	_disasm
+59	_iasmstart
+72	_iasm
+31	_dasm
+30	_dasmcc
+48	_myfun
+53	_gotoxy
+1	_disasmEnd
+
+
+; ============= pretty print
+(+ 1 58 715 1) = 775
+
+1	_prettyprintStart
+53	_pc
+715	_prettyprint
+1	_prettyprintEnd
+
+; ============== info()
+(+ 965 1) = 966
+
+965	_info
+1	_Cend
+
+; =============== CC65
+(+ 87 148 123 8 8 8 8 65 60 270 51 12 325 22 0 39 57 41 58 2 2 0 0 0 1 1) = 1396
+
+; STDLIB: (+ 270 148 325) = 743 !
+270	_malloc
+148	_free
+325	_realloc
+
+65	_ltoa
+60	_ultoa
+
+51	_printf
+41	_vfprintf
+
+(+ 12 87 123 58 2 2)
+12	_putchar
+87	_fputc
+123	_fwrite
+58	_write
+2	_stdin
+2	_stdout
+
+(+ 22 39 57) = 118
+22	_strlen
+0	_strlower
+39	_strlwr
+57	_strncmp
+
+;;table missing
+8	_isalnum
+8	_isalpha
+8	_isdigit
+8	_isspace
+
+
+
+2	_last
+0	_outputstart
+0	_output
+0	_outputend
+1	_color
+1	_lastc
+
+
+
 
 
 
@@ -60,5 +261,3 @@ parse.tap:     11138 B
 30	_memcpy
 12	_putchar
 (+ 5 23 23 78 25 30 12) = 196
-
-
