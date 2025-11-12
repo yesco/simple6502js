@@ -1,4 +1,77 @@
-// Test tape access, random and overwrites
+// tape.tap - test tape access
+//
+// 2025 (>) Jonas S Karlsson, jsk@yeco.org
+//
+// This program allows experimemnts of saving/loading
+// multiple files, in order, or out of order.
+// 
+// When tape.tap loads (see how it's prepared below)
+// you can just type on the screen and it echoes.
+//
+// Commands start with ESC followed by a letter:
+//
+//   ESC a   - load a.tap
+//   ESC SPC - load "" file (any next file)
+//  
+//   ESC A   - save screen as a.tap
+
+
+// For the tests text "screenshots" have been saved.
+// a.tap b.tap c.tap containing just a:s, b:s c:s.
+//
+// The tap-file is a concatenation:
+//
+//   tape.tap a.tap b.tap c.tap b.tap c.tap b.tap c.tap a.tap
+//
+// Essentially: T A B C  B C  B C  A
+
+
+// Every emulator seems to do different things...
+
+
+// === Oricutron, web
+//
+// 1) atmos_load("c.tap") oricutron IGNORES the
+//    file name; it just loads next file in tap (BUG)
+// 2) you can ONLY access files in the order given
+//
+// However!
+// 3) If you save a file.
+//    You can then load it BY NAME!
+//    However, it immediately EXITS to BASIC after!
+//    (it doesn't exit for other preprepared files)
+// 4) Even if you save differnt files many times
+//    if it's saved you can do RANDOM access it seems
+//    and BY NAME! (then it's not ignored, lol)
+// 5) Files saved are NOT permanent and NOT added
+//    to the memory if you start the emulator again
+//    it uses the original tap file. (BUG?)
+// 6) Orictron web can download the tap-files,
+//    but anything saved using ESC A for example
+//    is NOT THERE (BUG)
+//
+// TODO: read the source cc65 atmos_save, maybe it
+//       sets the flags differently and causes the
+//       EIXT? (BUG)
+
+
+
+// === JORIC, android app
+//
+// 1) It can load file by name ESC c - loads c.tap
+// 2) But only for files in the order as given
+//    NO random access.
+// 3) You can ESC A save a file - But it's really slow.
+// 4) You cannot load the saved file, it seems to be 
+//    FORGOTTEN. (BUG)
+
+
+// === LOCI?
+//
+// my ORIC ATMOS is "non-responsive" at the momment,
+// any takers to test?
+//
+
 
 #include <atmos.h>
 #include <conio.h>
@@ -24,11 +97,21 @@ int main() {
       // ESC + other = load any ""
       c= cgetc();
       if (isupper(c)) {
-        name[0]= tolower(c);
+        sprintf(name, "%c.tap", tolower(c));
         printf("\n[saving %s...]", name);
         atmos_save(name, (void*)0xbd80, (void*)(0xbd80+28*40));
         printf("[...saved %s]\n", name);
       } else if (islower(c)) {
+        sprintf(name, "%c.tap", tolower(c));
+        printf("loading %s...]", name);
+        strcpy((char*)0x27b, name); // 0x27f..0x28e filename 16
+        atmos_load(name);
+//        atmos_load("c.tap"); /// UUUU???a
+        printf("loading %s...]", name);
+        printf("[loaded %s]", (char*)0x293);
+        
+        continue;
+
 // The filename on tape is stored at
 // #293 to #2A2 (version 1.1).
 //
@@ -81,8 +164,10 @@ goto next;
 
         printf("[...loaded %s]", name);
       } else {
+        printf("loading any]");
         name[0]= 0;
         atmos_load(name);
+        printf("[found: %s]", (char*)0x293);
       }
     } else putchar(c);
   }

@@ -1,0 +1,5 @@
+clang Play/gentap.c && ./a.out a.tap > a.tap
+clang Play/gentap.c && ./a.out b.tap > b.tap
+clang Play/gentap.c && ./a.out c.tap > c.tap
+
+./tap Play/tape && cat Play/tape.tap a.tap b.tap c.tap b.tap c.tap b.tap c.tap b.tap c.tap a.tap > ORIC/tape.tap
