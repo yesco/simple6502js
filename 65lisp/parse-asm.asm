@@ -2552,6 +2552,7 @@ jsr putchar
 
         ;; (isdigit isdigit => fail)
         ;; isident isident => fail
+        lda (inp),y
         jsr isident
         tax
         beq nextjmp
@@ -11177,20 +11178,18 @@ CANT=1
 .endif ; STR
 
 
-;
-ISCHAR=1
+;ISCHAR=1
 .ifdef ISCHAR
         .incbin "Input/test-ctype.c"
         .byte 0
 .endif ; ISCHAR
 
+;;; fixed!
+;;; TODO: move to bugtest verify module?
 ;BUGS=1
 .ifdef BUGS
         .byte "word main() {",10
-
-        .byte "  putu(0);",10
-;        .byte "  return 1<<10;",10
-
+        .byte "  return 1<<10;",10
         .byte "}",10
         .byte 0
 .endif
