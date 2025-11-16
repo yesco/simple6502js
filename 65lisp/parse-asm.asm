@@ -10,7 +10,7 @@
 ;;; TITLE
 ;;; 
 ;;; A 6502 Recursive Descent Data-Driven
-;;; BNF-Parser as C Program Compiler
+;;; BNF-Parser as micro C Program Compiler
 ;;; 
 ;;; 
 ;;; It interprets a BNF-description of a programming
@@ -62,7 +62,111 @@
 ;;; 
 
 ;;; 
-;;; The MINIMAL C-language subset:
+;;; NAME
+;;; 
+;;; The idea has gone through several prototypes; starting with
+;;; a BNF-style compiler generating byte code for a simple]
+;;; forth-style byte-code interpreter (ALF-AlphaBetical Forth);
+;;; to later get reincarnated as a prototype LISP byte-code compiler
+;;; and optimized rule-based machine code generator, often
+;;; generating better code than cc65, but still relying on it.
+;;; 
+;;; This incarnation has shredded it's depency on any other code,
+;;; thus the BNF-interpreter is coded with small size in mind.
+;;; It doesn't know about C at all, however the rules does.
+;;; 
+;;; The BNF-interpreter is currently about 1400 bytes. 
+;;; It will be optimized for size (and speed) later.
+;;; Currently, it's pretty minimally capable.
+;;; 
+;;; However, the goal is to provide an ON-DEVICE, 6502,
+;;; compiler IDEA: editor, compiler, library, run all
+;;; without needing to leave the program during development.
+;;; 
+;;; Here at the names, I though it had:
+;;; - Mucc = Minimal Universal C-Compiler
+;;; - CC02 = like a little brother of cc65
+;;; - MeteoriC = as it's specificially targetting ORIC ATMOS
+;;;   this is the currrent working name.
+;;; 
+;;; <TODO: insert grok ideas about what an MeteoriC-compiler
+;;;  would be>
+;;; 
+
+;;; 
+;;; MINIMAL SIZE COMPILER
+;;; 
+;;; The current size in bytes of the compiler is:
+;;; 
+;;;          TOTAL   BNF-interpr.   C-rules   BYTESIEVE   run it
+;;;          ----    ------------   -------   ---------   ------
+;;; FULL:    5866           1361      4505          303   2.458s
+;;; NOBYTE:: 4971           1361      3610          303   2.458s
+;;; NOOPT:   3786           1361      2425          366   3.082s
+;;; 
+;;; The FULL compiler is just below 6KB, the big cost is
+;;; byte rules optikmizatation, this is experimental but
+;;; could cut down on usng byte/char variables instead of 
+;;; ints, saving 50% code for those operations.
+;;; 
+;;; The next big cost is OPTIMIZATION GENERATING RULES.
+;;; These are not required, but as can be seen in the 
+;;; BYTESIEVE=1 benchmark, not having them, increase the
+;;; compiled size by 66 bytes, 21%, and time with 25%!
+;;; 
+
+;;; 
+;;; OPTIMIZING GENERATION RULES
+;;; 
+;;; MeteoriC isn't like most other compilers. It doesn't
+;;; have an optimizer per se! Normal compilers do peep-hole
+;;; optimizations, as well as complex analyzes of their parse
+;;; trees. MC doesn't have any parse-tree, we've dispensed with 
+;;; that. Instead the compiler is entirely rule-driven. You could
+;;; say that it generates code by templates. This isn't unusual
+;;; for simple compilers ala small-C, tinyC etc.
+;;; 
+;;; MeteoriC, instead, has added rules that are specific and
+;;; can generate highly efficient, but very specific, code.
+;;; 
+;;; As an example. Consider: a= 0;
+;;; 
+;;; Using the rule "%A=%D;" we geneate generic:
+;;; 
+;;;    lda #0
+;;;    ldx #0
+;;; 
+;;; But any decent 6502 asm programer would write:
+;;; 
+;;;    lda #0
+;;;    tax
+;;; 
+;;; instead. So by adding an earlier rule "%A=0;"
+;;; we get the same result.
+;;; 
+;;; These rules may seem a bit ad-hoc, but appear
+;;; often to be sufficient to get similar effcient code
+;;; as the best, in simple cases.
+;;; 
+;;; Whole program optimization is where advanced
+;;; optimizers can win big; it may analyze whole sections of
+;;; the program; inline parts; simplify using constants etc.
+;;; 
+;;; This isn't easily done in MeteoriC. It also takes
+;;; much time thus making compilation slow, so we won't go there.
+;;; 
+;;; Simepler big wins could be done by adding more optimization]
+;;; rules, adn possibly recognize what's in the AX (and Y) register.
+;;; 
+;;; It's not unusual to see code like "a=b+17; if (a==42) ...",
+;;; where a variable is set, and then used in the next statement.
+;;; In MeteoriC's case each statement generates code indepdendent
+;;; of the preceding statement, similarly to small-C, tiny-C, etc.
+;;; 
+
+;;; 
+;;; MINIMAL C-LANGUAGE SUBSET
+;;; 
 ;;; - types: word (uint_16) [limited: char (uint_8) void]
 ;;; - casting syntax
 ;;; 
@@ -1752,6 +1856,10 @@ NOSHOWSIZE=1
 ;;;   41% faster by CUT+CUT2
 ;;;   40% faster w  FASTSKIP in _fail (no jsr _inc)
 ;;;    4.53% faster w OPTSKIP (_incIspc inline in _next)
+;;;
+;;; TODO: (how many bytes added per opt?)
+;;;
+;;; TODO: maybe not optional anymore? - investigate!
 ;
 OPTPARSEALL=1
 
@@ -8168,7 +8276,6 @@ afterELSE:
 FUNC _stmtbyterulestart
 
 .ifdef BYTERULES
-;;; TODO: is it OPTRULES???? - nah
         .byte "|++$%V;"
       .byte "["
         inc VAR0
@@ -8179,8 +8286,6 @@ FUNC _stmtbyterulestart
         dec VAR0
       .byte "]"
 
-        ;; NOTE: no need provide: v op= const;
-        ;;       - it would wouldn't save any bytes!
         .byte "|$%A+=",_U,";"
       .byte "[D"
         clc
@@ -9104,10 +9209,62 @@ putc '<'
       .byte "]"
 
 .ifdef OPTRULES
-;;; NOTE: ops are done last, is that ok (except for -)?
+        .byte "|%A>>=1;"
+      .byte "[D"
+;;; 6B
+        lsr VAR1
+        ror VAR0
+      .byte "]"
 
-        ;; NOTE: no need provide: v op= const;
-        ;;       - it would wouldn't save any bytes!
+        .byte "|%A<<=1;"
+      .byte "[D"
+;;; 6B
+        asl VAR0
+        rol VAR1
+      .byte "]"
+
+        .byte "|%A>>=2;"
+      .byte "[D"
+;;; 12B
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=2;"
+      .byte "[D"
+;;; 12B (zp: 8B)
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+      .byte "]"
+
+        .byte "|%A>>=3;"
+      .byte "[D"
+;;; 8B
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+        lsr VAR1
+        ror VAR0
+      .byte "]"
+
+        .byte "|%A<<=3;"
+      .byte "[D"
+;;; 8B
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+        asl VAR0
+        rol VAR1
+      .byte "]"
+.endif ; OPTRULES
+
+
         .byte "|%A+=",_E,";"
       .byte "[D"
         clc
@@ -9157,63 +9314,7 @@ putc '<'
         sta VAR1
       .byte "]"
 
-        .byte "|%A>>=1;"
-      .byte "[D"
-;;; 6B
-        lsr VAR1
-        ror VAR0
-      .byte "]"
 
-        .byte "|%A<<=1;"
-      .byte "[D"
-;;; 6B
-        asl VAR0
-        rol VAR1
-      .byte "]"
-
-        .byte "|%A>>=2;"
-      .byte "[D"
-;;; 12B
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-      .byte "]"
-
-        .byte "|%A<<=2;"
-      .byte "[D"
-;;; 12B (zp: 8B)
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-      .byte "]"
-
-.ifdef ZPVARS
-        .byte "|%A>>=3;"
-      .byte "[D"
-;;; 8B
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-        lsr VAR1
-        ror VAR0
-      .byte "]"
-
-        .byte "|%A<<=3;"
-      .byte "[D"
-;;; 8B
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-        asl VAR0
-        rol VAR1
-      .byte "]"
-.endif ; ZPVARS
-
-.endif ; OPTRULES
 
 
         .byte "|%A>>=%D;"
@@ -11812,7 +11913,10 @@ CANT=1
 ;;;         304       +2 B ??? investigate, poke changed, wrong?
 ;;;                    - 1a45336b30cc787f668c83dd4e4c7dff4baa7a99
 ;;;         303         -1 B !!! better poke (?)
-
+;;; 
+;;;         303    2.458s - opt still stable: rules: 3610
+;;;  NOOPT! 366    3.082s - noopt             rules: 2425
+;;;  BYTES  303                               rules: 4505
 
 ;;; TODO: at some point it got to 361 bytes
 ;;;    now increased to 365... INVESTIGATE
