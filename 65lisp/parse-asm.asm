@@ -6794,8 +6794,6 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-;;; TODO: fail if <<1????
-;;; TODO: need a guard %b (break char) for matcher!
        .byte "<<1%b"
       .byte '['
         asl
@@ -11244,11 +11242,6 @@ CANT=1
 
 .ifdef FOLDx
         .byte "// Folding constants",10
-;;; Parse problem need %b word boundary check!!!
-;        .byte |<<1%b"
-
-;        .byte "1<<10;",0
-
         .byte "const word a=40+2;",10
         .byte "word main(){",10
         .byte "  putu(a);",10
