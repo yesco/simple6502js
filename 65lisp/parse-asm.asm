@@ -659,7 +659,7 @@
 ;;;   of the same rule. This replaces KlEENE operators *+?[].
 ;;; 
 ;;; 
-;;; CONSTANS
+;;; CONSTANTS
 ;;; 
 ;;; - %D - tos= NUMBER; parses various constants
 ;;;        4711 - number
@@ -672,6 +672,12 @@
 ;;;        only \n is recognized, other \ just inserted
 ;;;        NOTE: this COPIES the string
 ;;; - %s - like %S but doesn't copy the string
+;;; 
+;;; 
+;;; TEST
+;;; 
+;;; - %b - "word boundary test" (actually just test next char
+;;;        to not be isident) for "1%b" so not match "12"
 ;;; 
 ;;; 
 ;;; NAMES (variables, functions, labels)
@@ -707,8 +713,6 @@
 
 ;;; 
 ;;; TODO:?
-;;; - %b - match word boundary! '\b' in regexp, you know
-;;; 
 ;;; - %n - define NEW LOCAL
 ;;; - %v - match LOCAL USAGE of name
 ;;; 
@@ -2542,8 +2546,20 @@ jsr putchar
         jsr _incR
         ; pla
 
+        ;; %b - word boundary test 
+        cmp #'b'
+        bne :+
+
+        ;; (isdigit isdigit => fail)
+        ;; isident isident => fail
+        jsr isident
+        tax
+        beq nextjmp
+        bne failjmp
+:
+
 ;;; 26 B
-        ;; immediate code! to run NOW!
+        ;; %{ - immediate code! to run NOW!
         cmp #'{'
         bne noimm
 
@@ -2565,6 +2581,7 @@ immret:
         pla
         sta rule+1
         jsr _incR
+nextjmp:        
         jmp _next
 immfail:
 ;;; TODO: doesn't seem to work correwctly
@@ -2656,7 +2673,9 @@ str:
         ;; get first char
 ;        ldy #0
         lda (inp),y
-        beq failjmp
+        bne :+
+        jmp failjmp
+:       
         ;; " - at end?
         cmp #'"'                ; "
         beq @zero
@@ -4781,6 +4800,14 @@ FUNC _iorulesstart
 ;;; TODO: about return value...
       .byte ']'
 
+        ;; putchar variable - saves 2 bytes!
+        .byte "|putchar('\\t')" ;      double \\???
+      .byte '['
+        lda #9
+        jsr putchar
+;;; TODO: about return value...
+      .byte ']'
+
         ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%D)"
       .byte '['
@@ -5569,7 +5596,7 @@ tya
 
 .ifdef OPTRULES
         ;; load 0 saves 1 byte
-        .byte "|0"
+        .byte "|0%b"
       .byte '['
         lda #0
         tax
@@ -6018,13 +6045,13 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|/2"
+        .byte "|/2%b"
       .byte '['
         jsr _SHR
       .byte ']'
         .byte TAILREC
 
-        .byte "|\*2"
+        .byte "|\*2%b"
       .byte '['
         jsr _SHL
       .byte ']'
@@ -6136,19 +6163,19 @@ FUNC _oprulesstart
         .byte TAILREC
 
 .ifdef OPTRULES
-        .byte "|&0xff00"
+        .byte "|&0xff00%b"
       .byte '['
         lda #0
       .byte ']'
         .byte TAILREC
 
-        .byte "|&0xff"
+        .byte "|&0xff%b"
       .byte '['
         ldx #0
       .byte ']'
         .byte TAILREC
 
-        .byte "|&%d"
+        .byte "|&%d%b"
       .byte "["
         and #'<'
         ldx #0
@@ -6221,7 +6248,7 @@ FUNC _oprulesstart
 
 ;;; 24
         
-        .byte "|/2"
+        .byte "|/2%b"
       .byte '['
 ;;; 6B 12c
         tay
@@ -6233,7 +6260,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|*2"
+        .byte "|*2%b"
       .byte '['
 ;;; 6B 12c
         asl
@@ -6246,21 +6273,21 @@ FUNC _oprulesstart
         .byte TAILREC
 
 .ifdef OPTRULES
-        .byte "|>>8"
+        .byte "|>>8%b"
       .byte '['
         txa
         ldx #0
       .byte ']'
         .byte TAILREC
 
-        .byte "|<<8"
+        .byte "|<<8%b"
       .byte '['
         tax
         lda #0
       .byte ']'
         .byte TAILREC
         
-        .byte "|<<1"
+        .byte "|<<1%b"
       .byte '['
 .ifblank
 ;;; 6B 12c
@@ -6280,7 +6307,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|<<2"
+        .byte "|<<2%b"
       .byte '['
 ;;; 10B
         stx tos+1
@@ -6292,7 +6319,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|<<3"
+        .byte "|<<3%b"
       .byte '['
 ;;; 13B= 4+3*n    15=4+3*n => n=11/3=4-
         stx tos+1
@@ -6306,7 +6333,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|<<4"
+        .byte "|<<4%b"
       .byte '['
 ;;; 16B
         stx tos+1
@@ -6322,7 +6349,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|>>1"
+        .byte "|>>1%b"
       .byte '['
 .ifblank
 ;;; 6B 12c
@@ -6342,7 +6369,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|>>2"
+        .byte "|>>2%b"
       .byte '['
 ;;; 10B
         stx tos+1
@@ -6354,7 +6381,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|>>3"
+        .byte "|>>3%b"
       .byte '['
 ;;; 13B
         stx tos+1
@@ -6368,7 +6395,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|>>4"
+        .byte "|>>4%b"
       .byte '['
 ;;; 16B
         stx tos+1
@@ -6710,13 +6737,13 @@ ruleV:
 
 ;;; 24
         
-        .byte "|/2"
+        .byte "|/2%b"
       .byte '['
         lsr
       .byte ']'
         .byte TAILREC
 
-        .byte "|\*2"
+        .byte "|\*2%b"
       .byte '['
         asl
       .byte ']'
@@ -6768,68 +6795,68 @@ ruleV:
 
 ;;; TODO: fail if <<1????
 ;;; TODO: need a guard %b (break char) for matcher!
-       .byte "<<1"
+       .byte "<<1%b"
       .byte '['
         asl
       .byte ']'                  
 
-       .byte ">>1"
+       .byte ">>1%b"
       .byte '['
         lsr
       .byte ']'                  
 
-       .byte "<<2"
+       .byte "<<2%b"
       .byte '['
         asl
         asl
       .byte ']'                  
 
-       .byte ">>2"
+       .byte ">>2%b"
       .byte '['
         lsr
         lsr
       .byte ']'                  
 
-       .byte "<<3"
+       .byte "<<3%b"
       .byte '['
-        asl
-        asl
-        asl
-      .byte ']'                  
-
-       .byte ">>3"
-      .byte '['
-        lsr
-        lsr
-        lsr
-      .byte ']'                  
-
-       .byte "<<4"
-      .byte '['
-        asl
         asl
         asl
         asl
       .byte ']'                  
 
-       .byte ">>4"
+       .byte ">>3%b"
       .byte '['
-        lsr
         lsr
         lsr
         lsr
       .byte ']'                  
 
-       .byte "<<5"
+       .byte "<<4%b"
       .byte '['
-        asl
         asl
         asl
         asl
         asl
       .byte ']'                  
 
-       .byte ">>5"
+       .byte ">>4%b"
+      .byte '['
+        lsr
+        lsr
+        lsr
+        lsr
+      .byte ']'                  
+
+       .byte "<<5%b"
+      .byte '['
+        asl
+        asl
+        asl
+        asl
+        asl
+      .byte ']'                  
+
+       .byte ">>5%b"
       .byte '['
         lsr
         lsr
@@ -6838,7 +6865,7 @@ ruleV:
         lsr
       .byte ']'                  
 
-       .byte "<<6"
+       .byte "<<6%b"
       .byte '['
 .ifblank
 ;;; 5B 8c
@@ -6857,7 +6884,7 @@ ruleV:
 .endif
       .byte ']'                  
 
-       .byte ">>6"
+       .byte ">>6%b"
       .byte '['
 .ifblank
 ;;; 5B 8c
@@ -6876,14 +6903,14 @@ ruleV:
 .endif
       .byte ']'                  
 
-       .byte "<<7"
+       .byte "<<7%b"
       .byte '['
         ror
         ror
         and #128
       .byte ']'
 
-       .byte ">>7"
+       .byte ">>7%b"
       .byte '['
         rol
         rol
@@ -10824,6 +10851,7 @@ input:
 ;        .byte "word main(){ return 4711; }",0
 
 
+
 ;;; Experiments in estimating and prototyping
 ;;; function calls, using JSRK_CALLING !
 
@@ -11149,7 +11177,8 @@ CANT=1
 .endif ; STR
 
 
-;ISCHAR=1
+;
+ISCHAR=1
 .ifdef ISCHAR
         .incbin "Input/test-ctype.c"
         .byte 0

@@ -5,16 +5,16 @@ word main() {
   c= 0; while(c<128) {
     putu(c); putchar(' ');
     // indent==no inline
-    putu(isspace(c));putchar(' ');
-      putu(isxdigit(c));putchar(' ');
-    putu(isdigit(c));putchar(' ');
-      putu(isalnum(c));putchar(' ');
-    putu(isalpha(c));putchar(' ');
-      putu(isupper(c));putchar(' ');
-      putu(islower(c));putchar(' ');
-      putu(ispunct(c));putchar(' ');
-    putchar(toupper(c));putchar(' ');
-    putchar(tolower(c));putchar(' ');
+    putu(isspace(c));putchar('\t');
+      putu(isxdigit(c));putchar('\t');
+    putu(isdigit(c));putchar('\t');
+      putu(isalnum(c));putchar('\t');
+    putu(isalpha(c));putchar('\t');
+      putu(isupper(c));putchar('\t');
+      putu(islower(c));putchar('\t');
+      putu(ispunct(c));putchar('\t');
+    putchar(toupper(c));putchar('\t');
+    putchar(tolower(c));putchar('\t');
     ++c; putchar('\n');
   }
 }
