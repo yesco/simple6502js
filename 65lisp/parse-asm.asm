@@ -990,6 +990,29 @@
 ;;; _textscreen:
 ;;; _hitext:
 
+
+
+;;; ========================================
+;;;              O P T I O N S 
+
+
+
+;;; enable stack checking at each _next
+;;; (save some bytes by turn off)
+
+;;; TODO: if disabled maybe something wrong? - parse err! lol
+;;; checking every _next gives 30% overhead? lol
+;;; TODO: find better location? enterrule?
+;
+CHECKSTACK=1
+
+;;; Zeropage vars should save many bytes!
+;
+ZPVARS=1
+
+
+
+
 .export _asmstart
 _asmstart:      
 
@@ -1129,6 +1152,8 @@ FUNC _biosend
 
 .zeropage
 ;;; reserved, lol
+;;; TODO make sure it at address zero
+;;;   to be used to detect write using null pointer
 zero:   .res 2  
 
 ;;; compilation : tos = %D, dos =%A
@@ -1139,6 +1164,9 @@ dos:    .res 2
 pos:    .res 2
 ;;; used by FOLD, maybe memcpy ???
 gos:    .res 2
+;;; used by variable allocation in zeropage
+vos:    .res 2
+
 ;;; temporaries for saved register
 savea:  .res 1
 savex:  .res 1
@@ -1933,19 +1961,6 @@ FUNC _bnfinterpstart
         .endmacro
  .endif
 
-;;; enable stack checking at each _next
-;;; (save some bytes by turn off)
-
-;;; TODO: if disabled maybe something wrong? - parse err! lol
-;;; checking every _next gives 30% overhead? lol
-;;; TODO: find better location? enterrule?
-;
-CHECKSTACK=1
-
-;;; Zeropage vars should save many bytes!
-;
-ZPVARS=1
-
 ;;; TODO: not working yet
 ;;; Minimal set of rules (+ LIBRARY)
 ;MINIMAL=1
@@ -2223,6 +2238,34 @@ originp:        .res 2
         sta erp
         stx erp+1
 .endif        
+
+VOSSTART=vars
+;;; TODO: where to allocate, grow down like stack
+;;;   what's safe margin
+;;;   and can this become TOPOFMEMORY?
+;;; want to keep around for debugging
+VARS=HIRES-256
+
+.ifdef ZPVARS
+.else
+        .error "%% not support non ZPVARS"
+.endif
+
+;;; zeropage assumption...
+
+        ;; init variable vectors
+        lda #<VOSSTART
+        ldX #>VOSSTART
+        sta vos
+        stX vos+1
+
+        lda #<VARS
+        ldx #>VARS
+        sta _ruleVARS
+        stx _ruleVARS+1
+         
+
+
 
 ;;; INTERRUPT DEBUG TESTING
 ;        lda #$40                ; RTI
@@ -4187,6 +4230,14 @@ noupdate:
 ;;; R O P T which probably would relate to
 ;;; frequency of usage...
 
+FUNC _incVARS
+        ldx #_ruleVARS
+        SKIPTWO
+;;; TODO: is it worth it +3 B, used 2x 3 B=9 B, or 11 B
+FUNC _incV
+;;; 3  37c!
+        ldx #vos
+        SKIPTWO
 FUNC _incT
 ;;; 3  32c!
         ldx #tos
@@ -4206,14 +4257,48 @@ FUNC _incR
 FUNC _incI      
 ;;; 2  12c
         ldx #inp
+;;; Inc word Register X in zeropage
+;;;   preserves A,Y
 FUNC _incRX
 ;;; 6+1  10c (+ 4c seldomly) +12c for calling it!
         inc 0,x                 ; 6c
-        bne @noinc
+        bne :+
         inc 1,x
-@noinc:
+:
         rts
         
+
+
+; 18 B
+
+;;; put before (_ruleVARS), dec
+;;;   Y must be 0
+;;;   A value to be pushed
+;;;   X modified (= _ruleVARS)
+FUNC _stuffVARS
+        sta (_ruleVARS),y
+FUNC _decVARS
+        ldx #_ruleVARS
+        SKIPTWO
+;;; TODO: insert other DEC routines here
+FUNC _decT
+        ldx #tos
+        ;; fall-through
+;;; Dec word Register X in zeropage
+;;;   preserves A,Y
+FUNC _decRX
+        pha
+        lda 0,x
+        bne :+
+        dec 1,x
+:       
+        dec 0,x
+        pla
+        rts
+        
+
+
+
 .ifnblank
 ;;; TODO: consider
 
@@ -4505,8 +4590,127 @@ FUNC _find
 
 .endif ; LONGNAMES
 
-;;; dummy
-_drop:  rts
+
+;;; VAR ident list have following structure
+;;;
+;;; (no spaces, ' means hibit set)
+;;;
+;;;                   Y  dos
+;;;                  ++     
+;;; | name %b %'N  w  1 ADDR   // word i;
+;;; | NAME %b %'N  c  1 ADDR   // char b;
+
+;;; Arrays are static (no dynamic on stack)
+;;; and can from the compiler perspective be
+;;; considered a constant (pointer).
+
+;;; TODO: we need to store sizeof
+;;;   crazy idea store before array?
+
+;;; | NAME %b %'N 'W  2 ADDR   // word arrw[17];
+;;; | NAME %b %'N 'C  1 ADDR   // char bytes[17];
+;;;
+ ;;; w=word W=word* c=char C=char* 'w=const word
+
+;;; creates a newvar lexical binding
+;;;   Y = w c W C 'w 'c 'W 'C (word/const, W/C=pointer, 'hibit)
+;;;   A = ++ value (redundant from Y)
+
+;;; TODO:
+.zeropage
+_ruleVARS:        .res 2
+.code
+
+;;; TOS = array size in bytes
+newarr:
+; 20
+        pha
+        ldy #0
+
+        ;; store sizeof before array!
+        lda tos
+        sta (_out),y
+        jsr _incO
+
+        lda tos+1
+        sta (_out),y
+        jsr _incO
+        
+        ;; skip zpalloc
+        ;; (always true type char)
+        pla
+        bne regarr
+
+newvar:
+;;; (+ 9 10 18 10) = 47 B
+; 9
+        ;; V(ar)Alloc 2 bytes
+        jsr _incV               ; doesn't touch A
+        jsr _incV
+pha
+lda vos
+ldx vos+1
+jsr _printh
+pla
+        
+regarr: 
+        ;; store type letter
+PUTC 't'
+        jsr _stuffVARS
+
+        ;; TODO: store sizeof
+        ;; TODO: store itemsize/varsize for ++
+
+        ;; store address of var (backwards)
+; 10
+PUTC 'a'
+        lda vos+1
+        jsr _stuffVARS
+        lda vos
+        jsr _stuffVARS
+
+        ;; push skip chars "%<3+128>"
+PUTC 's'
+        lda #3            ; 3 bytes to skip
+        jsr _stuffVARS
+        lda #'%'
+        jsr _stuffVARS
+        
+        ;; parse var name, push on stack in reverse!
+; 18
+        ;; - ending zero
+        lda #0
+        pha
+        ;; - push ident char
+:       
+        ldy #0
+        lda (inp),y
+PUTC 'p'
+        pha
+jsr putchar
+        jsr isident
+        beq @done
+        jsr _incI
+        ;; always true
+        bne :-
+@done:
+; 10
+        ;; - drop last one
+        pla
+        ;; - copy varname BACKWARDS from stack
+:       
+        pla
+PUTC 'c'
+jsr putchar
+        jsr _stuffVARS
+        beq :-
+        ;; remove leading 0
+        jmp _incVARS
+
+
+
+;;; TODO: remove (print.asm?)dummy
+;_drop:  rts
 
 FUNC _dummy
 
@@ -4533,6 +4737,8 @@ FUNC _bnfinterpend
 ;  .res 256-(* .mod 256)
 secondpage:     
 
+
+;;; TODO: memset rules
 
 .ifdef MEMSET
 ;;; tos: address
@@ -4616,6 +4822,8 @@ bytecodes:
         jsr addr
 .endmacro
         
+
+
 
 ;;; ------------------------------=
 
@@ -5961,6 +6169,9 @@ jsr puth
 
 .endif ; STRING_DEBUG
 
+
+;;; TODO: what is this stuff?
+
 .ifdef STRING1
         ;; string
         .byte "|",34            ; really >"<
@@ -6022,15 +6233,15 @@ jsr axputh
 .endif ; STRING1
 
 
-.ifdef POINTERS
-;;; TODO: get's it wrong...?
-;;;   parses and gives "and $addr"!
+;;; pointer
         .byte "|&%V"
       .byte '['
         lda #'<'
         ldx #'>'
       .byte ']'
 
+
+;;; TODO: semantics of generic dereference?
         .byte "|\*%V"
       .byte '['
 ;;; TODO: test
@@ -6046,10 +6257,7 @@ jsr axputh
         lda (tos),y
       .byte ']'
 
-.endif ; POINTERS
-
-
-;;; last chance, try byte rules?
+;;; last chance, try BYTERULES
 ;;; TODO: is this sane?
 
 .ifdef BYTERULES
@@ -7353,10 +7561,8 @@ ruleQ:
 
         .byte "|,",TAILREC
 
-        .byte "|%D"
+        .byte "|%d"
 ;TODO: data inline!
-;      .byte "[<]"
-;;; TODO: ohoh, how to skip over!!!! LOL
       .byte "%{"
         ;; TODO: this may not be easily skippable
         ;; TODO: remove as this is hack
@@ -7880,22 +8086,95 @@ POSTLUDE=1
 ;;; TODO: this TAILREC messes with ruleP and several F
 ;;;   TAILREC does something wrong!
         
-        .byte "|"
 
+
+;.ifdef DEF
         ;; TODO: Define variable
 
+        .byte "|word","%V;"
+      .byte "%{"
+        lda #'w'
+        jsr newvar
 
-        ;; Define array
-;; TODO: now is dummy
-        .byte "bytearr\[256\];"
-;;; for now just simulate
+        IMM_RET
         .byte TAILREC
+
+
+        .byte "|word","*%V;"
+      .byte "%{"
+        lda #'W'
+        jsr newvar
+
+        IMM_RET
+        .byte TAILREC
+
+
+.ifnblank
+        .byte "|char","$%V;"
+      .byte "%{"
+        lda #'c'
+        jsr newvar
+
+        IMM_RET
+        .byte TAILREC
+.endif
+
+        ;; TODO: special case ={0};
+        .byte "|word","%V\[%D\];"
+      .byte "%{"
+        ;; word is double bytes
+        asl tos
+        rol tos+1
+        lda #'W'+128
+        jsr newarr
+
+        IMM_RET
+        .byte TAILREC
+
+
+        ;; TODO: special case ={0};
+        .byte "|char","%V\[%D\];"
+      .byte "%{"
+        lda #'C'+128
+        jsr newarr
+
+        IMM_RET
+        .byte TAILREC
+
+.ifnblank
+        ;; TODO: special case ={0};
+        .byte "|word","%V\[%D\]={"
+      .byte "%{"
+        ldy #'W'+128
+        jsr newarr
+
+        IMM_RET
+        ;; TODO: _Q reads bytes do word... or stringconst
+        .byte _Q
+        .byte TAILREC
+.endif
+
+        .byte "|char","%V\[\]={"
+      .byte "%{"
+        lda #'C'+128
+        jsr newarr
+
+        IMM_RET
+        .byte _Q
+        .byte TAILREC
+
+        ;; TODO: special case ={0};
+;        .byte "|char* %V[%D]={"
+        ;; TODO: _Q reads bytes do word... or stringconst
+;        .byte _Q
 
         .byte "|"
 
 
+;; TODO: REMOVE1
+
+
         ;; Define array
-;; TODO: now is hack
         .byte "bytearr\[\]={"
       .byte "%{"
         ;; TODO: this may not be easily skippable
@@ -7912,9 +8191,13 @@ POSTLUDE=1
 ;;; for now just simulate
         .byte TAILREC
 
+
         .byte "|"
 
         .byte 0
+
+
+
 
 ;;; This is the first rule applied on program.
 ;;; Generates a jmp to main(). If no functions/decl
@@ -10950,6 +11233,18 @@ input:
 
 ;        .byte "word main(){ return 4711; }",0
 
+
+;DEF=1
+.ifdef DEF
+        .byte "word h;",10
+        .byte "word g;",10
+        .byte "word f;",10
+        .byte "word main(){",10
+        .byte "  puth(&f); putchar('\n');",10
+        .byte "  puth(&g); putchar('\n');",10
+        .byte "  puth(&h); putchar('\n');",10
+        .byte "return 4711; }",0
+.endif ; DEF
 
 
 ;;; Experiments in estimating and prototyping
