@@ -8389,28 +8389,27 @@ afterELSE:
         ldx #'>'
         ;; cmp with VAR
         .byte 'D'               ; get aDdress
-
+        ;; test hi byte first
         cpx VAL1
-        bne :+
-        ;;  NUM>=VAR ... VAR<=NUM
+        bne :+                  ; neq determine if <
+        ;; equal: test lo byte; NUM>=VAR ... VAR<=NUM
         cmp VAR0
         beq @nah
+:       
         bcs @ok                 ; NUM>=VAR
 @nah:
         ;; set value for optional else...
-.ifdef ELSE
-        lda #0
-        tax
-.endif ;ELSE
+        ;; C=0 ! (nothing to do)
         jmp PUSHLOC
 @ok:        
+        ;; C=1 !
         ;; THEN-branch
       .byte "]"
         .byte _S
 .ifdef ELSE
-        ;; for ELSE, make sure value not 0!
+        ;; for ELSE, keep C=1
       .byte '['
-        lda #$ff
+        sec
       .byte ']'
 .endif ; ELSE
 .endscope
@@ -8428,8 +8427,7 @@ afterELSE:
 @nah:
         ;; set value for optional else...
 .ifdef ELSE
-        ;; A is 0
-        tax
+        clc
 .endif ;ELSE
         jmp PUSHLOC
 @ok:        
@@ -8437,9 +8435,9 @@ afterELSE:
       .byte "]"
         .byte _S
 .ifdef ELSE
-        ;; for ELSE, make sure value not 0!
+        ;; for ELSE, keep C=1
       .byte '['
-        lda #$ff
+        sec
       .byte ']'
 .endif ; ELSE
 .endscope
@@ -8456,6 +8454,7 @@ afterELSE:
         stx savex
         ora savex
         bne :+
+        clc
         jmp PUSHLOC
 :       
 .else
@@ -8476,19 +8475,20 @@ afterELSE:
 ;;;    then don't need to repeat this one!
         .byte _S
 .ifdef ELSE
-        ;; for ELSE, make sure value not 0!
+        ;; for ELSE set C=1
       .byte '['
-        lda #$ff
+        sec
       .byte ']'
         ;; Auto-patches at exit!
 
-        ;; ELSE as independent as is optional! hack!
+
+        ;; ELSE as independent as it's optional! hack!
         ;; 13 B
         .byte "|else"
       .byte '['
         ;; either Z is from lda #$ff z=0 => !neq
         ;; or Z is from the if expression Z=1
-        beq :+
+        bcc :+
         jmp PUSHLOC
 :
       .byte ']'
@@ -9113,8 +9113,14 @@ FOROPT=1
         ;; autopatches jump to here if false (PUSHLOC)
 
 
-;;; OPT: WHILE(a)...
+
 ;;; TODO: while(--a) ???
+
+
+;;; TODO: cleanup using "?2" positional parameters
+
+
+;;; OPT: WHILE(a)...
         .byte "|while(%V)"
         .byte "[:]"
 
@@ -12192,16 +12198,19 @@ CANT=1
 ;;;             11% bigger than smallest (slowest) cc65 (287)
 ;;;         315    2.665s  CC02   axputu
 
-;;; https://thred.github.io/c-bench-64/
-;;;         240j means jsk extracted main from .asm
-;;; 
+;;; Published results from
+;;; - https://thred.github.io/c-bench-64/
+;;; (I haven't been able to reproduce the cc65 result)
 ;;;  4.3K          2.12s  Calpyso (21.4s size opt, 4.3K)
 ;;;  3.2K          2.05s  cc65 (2.10s, 3.2K))
 ;;;  7.1K          1.90s  LLVM-mos (21.8s, 6.4K))
 ;;;  2.5K   240j   0.94s  Oscar64 (10.3s, 1.6K)
 ;;;  2.4K          2.13s  SDCC (21.3s, 2.4K)
 ;;;  5.8K          1.33s  VBCC (15.9s, 3.4K)
+;;;        (240j means jsk extracted main from .asm)
 ;;; 
+;;; 
+;;; MeteoriC:
 ;;;         315    2.60s  CC02 10K runs ^X * 100
 ;;;         307    2.53s  CC02 while-speed,++i(;),+BYTE
 ;;;         302    2.43s  CC02 rule _F byte rule for poke!
@@ -12212,14 +12221,9 @@ CANT=1
 ;;;         303    2.458s - opt still stable: rules: 3610
 ;;;  NOOPT! 366    3.082s - noopt             rules: 2425
 ;;;  BYTES  303                               rules: 4505
+;;;         302    same   - save one byte on if/clc
+;;; 
 
-;;; TODO: at some point it got to 361 bytes
-;;;    now increased to 365... INVESTIGATE
-;;;    
-;;; From https://github.com/yesco/simple6502js
-;;;    4b6bac9..4e41cbd  main       -> origin/main
-;;;; Updating 4b6bac9..4e41cbd
-;;; Fast-forward
 
 ;
 BYTESIEVE=1
@@ -12245,8 +12249,6 @@ NOPRINT=1
 .ifdef BYTESIEVE
 ;;; BC: (+ 11 9 3 16 9 6 7 3 14 5 5 1 2 1 2 1 2 2 1 2 2) = 104
 ;;; so 104 bytecodes is substantially lower than MC: 365...
-;;; TODO: error is on "word main", lol
-;.byte "x"
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "#include <stdio.h>",10
         .byte "word main(){",10
