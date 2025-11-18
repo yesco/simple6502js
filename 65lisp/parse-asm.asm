@@ -763,6 +763,11 @@
 ;;;   of the same rule. This replaces KlEENE operators *+?[].
 ;;; 
 ;;; 
+;;;         ABCDEFGHIJKLMNOPQRSTUVWXYZ {   <32
+;;; Free:   ABC EFGH JKLM OPQR T  WXYZ
+;;; Used:   A  D    I    N    S UV     {   -31
+;;;          b d              s
+;;; 
 ;;; CONSTANTS
 ;;; 
 ;;; - %D - tos= NUMBER; parses various constants
@@ -793,6 +798,8 @@
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
 ;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
+;;; - %I - read ident (really %N? but for longname)
+;;; 
 ;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
@@ -800,7 +807,7 @@
 ;;;        This is used to do one-offs, like test that
 ;;;        last %D matched a byte-value (X=0), if not _fail.
 ;;; 
-;;;        NOTE: can't rts, must use "jsr immret"
+;;;        NOTE: can't RTS, must use IMM_RET ("jsr immret")
 ;;;        FAIL: it's ok to call "jsr _fail" !
 ;;; 
 ;;; BINARY DATA (inline!)
@@ -3606,6 +3613,12 @@ jsr puth
         ;; %N = New defining function/variable
         ;; (TODO: if used for var they are inline code)
         lda percentchar
+
+        cmp #'I'
+        bne :+
+
+        jmp _ident
+:       
         cmp #'N'
         bne :+
 
@@ -4621,8 +4634,54 @@ FUNC _find
 _ruleVARS:        .res 2
 .code
 
+;;; like replacement for _var
+;;; parse identifier name
+;;; pushes (address, len) onstack
+FUNC _ident 
+jsr nl
+putc 'I'
+; 18
+        ;; push name pointer on stack
+        lda inp+1
+        pha
+        lda inp
+        pha
+
+        ;; parse name
+        ;; Y=0
+        lda #0
+        sta savea
+:       
+        ldy #0
+        lda (inp),y
+PUTC ' '
+jsr putchar
+        jsr isident             
+        beq :+                  ; not ident (AX=0), Y trashed
+        jsr _incI
+        inc savea
+        ;; always
+        bne :-
+:       
+        ;; push length
+        ;; (this will "hopefully" be cleaned up by _fail)
+        ;; (>30 might give misidentification, lol)
+        ;; TODO: Y==0 should fail?
+        lda savea
+        pha
+        jmp _next
+
 ;;; TOS = array size in bytes
 newarr:
+;;; TODO: any way to make less code?
+;;; (duplicate inm newarr)
+        ;; manual immret
+        pla
+        sta rule
+        pla
+        sta rule+1
+        jsr _incR
+
 ; 20
         pha
         ldy #0
@@ -4642,6 +4701,15 @@ newarr:
         bne regarr
 
 newvar:
+;;; TODO: any way to make less code?
+;;; (duplicate inm newarr)
+        ;; manual immret
+        pla
+        sta rule
+        pla
+        sta rule+1
+        jsr _incR
+
 ;;; (+ 9 10 18 10) = 47 B
 ; 9
         ;; V(ar)Alloc 2 bytes
@@ -4653,9 +4721,10 @@ ldx vos+1
 jsr _printh
 pla
         
-regarr: 
-        ;; store type letter
-PUTC 't'
+regarr:
+
+        ;; store type letter (last!)
+PUTC 'T'
         jsr _stuffVARS
 
         ;; TODO: store sizeof
@@ -4663,49 +4732,40 @@ PUTC 't'
 
         ;; store address of var (backwards)
 ; 10
-PUTC 'a'
+PUTC 'A'
         lda vos+1
         jsr _stuffVARS
         lda vos
         jsr _stuffVARS
 
         ;; push skip chars "%<3+128>"
-PUTC 's'
+PUTC 'S'
         lda #3            ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
         
-        ;; parse var name, push on stack in reverse!
-; 18
-        ;; - ending zero
-        lda #0
-        pha
-        ;; - push ident char
-:       
-        ldy #0
-        lda (inp),y
-PUTC 'p'
-        pha
-jsr putchar
-        jsr isident
-        beq @done
-        jsr _incI
-        ;; always true
-        bne :-
-@done:
 ; 10
-        ;; - drop last one
+        ;; copy varname BACKWARDS from address on stack
+        ;; - len
         pla
-        ;; - copy varname BACKWARDS from stack
+        tay
+        ;; - address of char
+        pla
+        sta pos
+        pla
+        sta pos+1
 :       
-        pla
-PUTC 'c'
-jsr putchar
-        jsr _stuffVARS
-        beq :-
-        ;; remove leading 0
-        jmp _incVARS
+PUTC 'C'
+jsr _printchar
+        dey
+        bmi :+
+        lda (pos),y
+        jsr _stuffVARS          ; A preserved and => flags
+        bne :-
+:       
+        ;; really just "IMM_RET" end
+        jmp _next
 
 
 
@@ -7708,6 +7768,9 @@ ruleN:
 ;;; DUMMY: for testing/prototype
 
 ;;; LOL uppercase WORD matches literary!
+
+;;; TODO: _RECURSIVE  ???
+
         .byte "WORD","%N(a,b,c,d)"
 
 ;;; TODO: cleanup, don't use globals
@@ -8027,6 +8090,9 @@ POSTLUDE=1
 .endif ; DOSWAP
 .endif ; !JSK_CALLING
 
+
+
+
 ;;; NOBODY else can currently return
 ;;;   we just need to keep AX safe...
         lda savea
@@ -8039,9 +8105,11 @@ POSTLUDE=1
       .byte "]"
         .byte TAILREC
 
+
         ;; Define function definition
 ;;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
+
 
         .byte "|word","%N()",_B
       .byte '['
@@ -8057,17 +8125,20 @@ POSTLUDE=1
       .byte ']'
         .byte TAILREC
 
+
         .byte "|void*","%N()",_B
       .byte '['
         rts
       .byte ']'
         .byte TAILREC
 
+
         .byte "|void","%N()",_B
       .byte '['
         rts
       .byte ']'
         .byte TAILREC
+
 
         .byte "|byte*","%N()",_B
       .byte '['
@@ -8076,6 +8147,7 @@ POSTLUDE=1
       .byte ']'
         .byte TAILREC
 
+
         .byte "|byte","%N()",_B
       .byte '['
         ldx #0
@@ -8083,83 +8155,75 @@ POSTLUDE=1
       .byte ']'
         .byte TAILREC
 
+
 ;;; TODO: this TAILREC messes with ruleP and several F
-;;;   TAILREC does something wrong!
+;;;   TAILREC does something wrong! ???
+;;; 
+;;;  still matters?
         
 
+        ;; Define variable
 
-;.ifdef DEF
-        ;; TODO: Define variable
-
-        .byte "|word","%V;"
+        .byte "|word","%I;"
+;;; 
+;;; TODO: lol %I messes up stack, comes to ';'
+;;;       then nobody cleans up!
+;;;       store elsewhere, or already at right location?
+;;; 
       .byte "%{"
         lda #'w'
-        jsr newvar
-
-        IMM_RET
+        jsr newvar              ; does IMM_RET!
         .byte TAILREC
 
-
-        .byte "|word","*%V;"
+        .byte "|word\*","%I;"
       .byte "%{"
         lda #'W'
-        jsr newvar
-
-        IMM_RET
+        jsr newvar              ; does IMM_RET!
         .byte TAILREC
 
-
 .ifnblank
-        .byte "|char","$%V;"
+        .byte "|char","$%I;"
       .byte "%{"
         lda #'c'
-        jsr newvar
-
-        IMM_RET
+        jsr newvar              ; does IMM_RET!
         .byte TAILREC
 .endif
 
         ;; TODO: special case ={0};
-        .byte "|word","%V\[%D\];"
+        .byte "|word","%I\[%D\];"
       .byte "%{"
         ;; word is double bytes
         asl tos
         rol tos+1
         lda #'W'+128
-        jsr newarr
-
-        IMM_RET
+        jsr newarr              ; does IMM_RET!
         .byte TAILREC
 
 
         ;; TODO: special case ={0};
-        .byte "|char","%V\[%D\];"
+        .byte "|char","%I\[%D\];"
       .byte "%{"
         lda #'C'+128
-        jsr newarr
-
-        IMM_RET
+        jsr newarr              ; does IMM_RET!
         .byte TAILREC
 
 .ifnblank
         ;; TODO: special case ={0};
-        .byte "|word","%V\[%D\]={"
+        .byte "|word","%I\[%D\]={"
       .byte "%{"
         ldy #'W'+128
-        jsr newarr
-
-        IMM_RET
-        ;; TODO: _Q reads bytes do word... or stringconst
+        jsr newarr              ; does IMM_RET!
+ ;; TODO: do WORD, _Q only reads bytes
+;;;   (how can do { "foo", "bar", "fie", fum" } ???
         .byte _Q
         .byte TAILREC
 .endif
 
-        .byte "|char","%V\[\]={"
+        .byte "|char","%I\[\]={"
       .byte "%{"
         lda #'C'+128
-        jsr newarr
-
-        IMM_RET
+        jsr newarr              ; does IMM_RET!
+        ;; newarr sets pos
         .byte _Q
         .byte TAILREC
 
@@ -8168,28 +8232,6 @@ POSTLUDE=1
         ;; TODO: _Q reads bytes do word... or stringconst
 ;        .byte _Q
 
-        .byte "|"
-
-
-;; TODO: REMOVE1
-
-
-        ;; Define array
-        .byte "bytearr\[\]={"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; set pos to array
-        ;; TODO: get real array addr
-        lda #<arr
-        sta pos
-        lda #>arr
-        sta pos+1
-        IMM_RET
-
-;        .byte _Q,"};"
-        .byte _Q
-;;; for now just simulate
-        .byte TAILREC
 
 
         .byte "|"
@@ -11240,15 +11282,16 @@ input:
 ;        .byte "word main(){ return 4711; }",0
 
 
-;DEF=1
+;
+DEF=1
 .ifdef DEF
-        .byte "word h;",10
-        .byte "word g;",10
-        .byte "word f;",10
+        .byte "word hEll0;",10
+        .byte "word gurka33;",10
+        .byte "word fish_42;",10
         .byte "word main(){",10
-        .byte "  puth(&f); putchar('\n');",10
-        .byte "  puth(&g); putchar('\n');",10
-        .byte "  puth(&h); putchar('\n');",10
+        .byte "  puth(&fish_42); putchar('\n');",10
+        .byte "  puth(&gurka33); putchar('\n');",10
+        .byte "  puth(&hEll0); putchar('\n');",10
         .byte "return 4711; }",0
 .endif ; DEF
 
