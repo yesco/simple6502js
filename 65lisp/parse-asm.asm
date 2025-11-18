@@ -17,46 +17,54 @@
 ;;; language while reading and matching it with a
 ;;; source text of that langauge. The BNF contains
 ;;; generative "templated" rules of code generation,
-;;; minimal instrumentation, that generates runnable 
+;;; with minimal instrumentation generates runnable
 ;;; machine code.
 ;;;
-;;; There are "token"-matchers: as %D to parse
-;;; constants; %V %A %N %U to match vars/fun names
-;;; giving addresses and enabling scope management.
+;;; There are "token"-matchers: as %D to parse numeric
+;;; constants; %S %s strings, and %V %A %N %U to match
+;;; variable and function names giving addresses and
+;;; enabling scope management.
 ;;; 
 ;;; The generative directives allow for substitutions
-;;; of bytes: < > lo and hibyte; +> for one address
-;;; higher; ':' ';' '{{' for code address manipulations;
-;;; D d for value juggling.
+;;; of bytes: < > lo and hi-byte; <> full address;
+;;; +> for one address higher (next byte);
+;;; ':' (push here) '{{' (push to patch);
+;;; '#' (push) ';' (pop) 'D' 'd' copy, '?N' pick
+;;; completes it with value juggling.
 ;;; 
 ;;; A hack %{ is available to inject and run immediate
 ;;; code during parsing enabling experimential 
 ;;; features, like matching a byte value, or enabling
-;;; partial (constant) expression evaluations.
+;;; partial (constant) expression evaluations. Many ushc
+;;; functions have later been generlized and become '%'
+;;; features.
 ;;; 
+
 
 ;;; 
 ;;; GOALS:
-;;; - an actual machine 6502 compiler running on 6502
-;;; - be a "proper" subset of C (at least syntactically)
-;;; - *minimal* sized BNF-engine as well as rules
-;;;   keeping the whole "compiler" in about 1-2KB!
-;;; - fast "enough" to run "on a screen of code"
-;;;   (~ 133 "ops" compiled/s ~ 19 lines/s) - LOL
-;;;   (Turbo Pascal did 2000 lines in less than 60s)
-;;;   (== 33 lines/s)
-;;; - provide on-screen editor
+;;; - an actual machine 6502 compiler running ON 6502
 ;;; - "simple" rule-driven
+;;; - provide full screen (emacs) editor
 ;;; - many languages (just change rules)
-;;; - have MINIMAL subset
+;;; - have MINIMAL workable subset
 ;;; - have OPTRULES extentions for efficient codegen
+;;; More specifically:
+;;; - be a "proper" subset of C (at least syntactically)
+;;; - *minimal* sized BNF-engine asm code engine (~ 1.5 KB)
+;;; - data driver "minimal" codegen rules (~ 2.4 KB+)
+;;; - optional optimization by specialization rules (~ +2.1 KB)
+;;; - fast "enough" to run "a few screens of code"
+;;;   (~ 133 "ops" compiled/s ~ 19 lines/s) - LOL
+;;;   (Turbo Pascal did 2000 lines in less than 60s on Z80)
+;;;   (== 33 lines/s)
 ;;; - somewhat useful error messages
 ;;;   (difficult w recursive descent BNF style parsing)
 ;;; 
 
 ;;; 
 ;;; NON-Goals:
-;;; - not be the best super-optimizing compiler
+;;; - not be the best super-optimizing compiler (no global opt)
 ;;; - not be the fastest
 ;;; - no constant folding (yet)
 ;;; 
@@ -101,19 +109,21 @@
 ;;;          TOTAL   BNF-interpr.   C-rules   BYTESIEVE   run it
 ;;;          ----    ------------   -------   ---------   ------
 ;;; FULL:    5866           1361      4505          303   2.458s
-;;; NOBYTE:: 4971           1361      3610          303   2.458s
+;;; NOBYTE:  4971           1361      3610          303   2.458s
 ;;; NOOPT:   3786           1361      2425          366   3.082s
 ;;; 
 ;;; The FULL compiler is just below 6KB, the big cost is
-;;; byte rules optikmizatation, this is experimental but
-;;; could cut down on usng byte/char variables instead of 
-;;; ints, saving 50% code for those operations.
+;;; byte rules optimizatation, this is experimental but
+;;; could cut down on using byte/char variables instead of 
+;;; ints, saving 50% code generated for those operations.
 ;;; 
 ;;; The next big cost is OPTIMIZATION GENERATING RULES.
 ;;; These are not required, but as can be seen in the 
 ;;; BYTESIEVE=1 benchmark, not having them, increase the
 ;;; compiled size by 66 bytes, 21%, and time with 25%!
 ;;; 
+
+
 
 ;;; 
 ;;; OPTIMIZING GENERATION RULES
@@ -127,7 +137,7 @@
 ;;; for simple compilers ala small-C, tinyC etc.
 ;;; 
 ;;; MeteoriC, instead, has added rules that are specific and
-;;; can generate highly efficient, but very specific, code.
+;;; can generate highly efficient, but very specialized, code.
 ;;; 
 ;;; As an example. Consider: a= 0;
 ;;; 
@@ -146,16 +156,17 @@
 ;;; 
 ;;; These rules may seem a bit ad-hoc, but appear
 ;;; often to be sufficient to get similar effcient code
-;;; as the best, in simple cases.
+;;; as the best compilers, at least in simple cases.
 ;;; 
 ;;; Whole program optimization is where advanced
 ;;; optimizers can win big; it may analyze whole sections of
-;;; the program; inline parts; simplify using constants etc.
+;;; the program; inline functions; simplify using constants etc;
+;;; and particularly dead-code optimization.
 ;;; 
 ;;; This isn't easily done in MeteoriC. It also takes
 ;;; much time thus making compilation slow, so we won't go there.
 ;;; 
-;;; Simepler big wins could be done by adding more optimization]
+;;; Simepler big wins could be done by adding more optimization
 ;;; rules, adn possibly recognize what's in the AX (and Y) register.
 ;;; 
 ;;; It's not unusual to see code like "a=b+17; if (a==42) ...",
@@ -164,50 +175,61 @@
 ;;; of the preceding statement, similarly to small-C, tiny-C, etc.
 ;;; 
 
+
+
 ;;; 
 ;;; MINIMAL C-LANGUAGE SUBSET
 ;;; 
-;;; - types: word (uint_16) [limited: char (uint_8) void]
-;;; - casting syntax
-;;; 
+;;; - basically just one type: word (uint_16)
 ;;; - decimal numbers: 4711 42
 ;;; - char constants: 'x' ''' (lol) '\' hmmm TODO: fix
-;;; - "string" constants (== number for printing)
+;;; - "string" constants (are just considered a pointer==number)
 ;;; 
 ;;; - word main() ... - no args
 ;;; - { ... }
+;;; - + - *2 /2 >> << & | ^ == < ! (TODO: && || ? != > <= >=)
+;;; - a= b+10;  // simple expressions, one operator
+;;; - ++a; --a; // and in expressions
+;;; - a+= 42;   // simple right-hand expressions (var/const)
+;;; - a OP= simple; // += -= /=2; *=2; >>= <<= |= &= ^= 
 ;;; 
-;;; - a= b+10;
-;;; - + - *2 /2 >> << & | ^ == <   (TODO: ! && || ? != > <= >=)
-;;; - &v *v
-;;; - since we don't have priorities, maybe require
-;;;   parenthesis around each operator if nested?
-;;;      n=r*40;
-;;;      n=r>>2+r>>3;       // 40 Bytes
-;;;      n=(((r>>2)+r)>>3); // "compatible C"
-;;;      n := r>>2+r>>3;    // PASCALish
-;;;      n := r.>>2.+r.>>3;    // PASCALish
-;;; 
-;;; - return [...];
+;;; - return ...;
 ;;; - if () statement; [else statement;]
 ;;; - label:
 ;;; - goto label;
 ;;; - do ... while();
 ;;; - while() ...
 ;;; 
-;;; - putchar(c); getchar();
-;;; - putu(42); puth(666); putz("foo"); puts("bar");
-;;;   printf("%u",x); printf("%s",s); -- ONLY!
-;;;   (*compliled* printf - in progres, no big printf!)
-;;; 
 ;;; - word F() { ... } - function definitions
 ;;; - F() G() - function calls (no parameters)
 ;;; 
-;;; - single letter global variables (no need declare)
-;;; - limited char support: *(char*)p=   ... *(char)i;
+;;; - memory access peek, poke, deek, doke
 ;;; 
-;;; - library to minimize gen code+rules (slow code==cc65)
+;;; - Standard library (inlined, see section below)
 ;;; 
+;;; - putchar(c); getchar(); puts(); putz();
+;;; - putu(42); puth(666); putz("foo"); puts("bar");
+;;; 
+;;; - printf("%u",v);
+;;; - printf("%x",x);
+;;; - printf("%s",s);
+;;; 
+;;;   (TODO: *compiled* printf - in progres, no big printf!)
+;;; 
+
+;;; Extras:
+;;; - limited char support: *(char*)p=...  *(char)p  p[i] 
+;;; - limited: char (uint_8) void support for optimization
+;;; - &v *(char*)v
+;;; - currently NO PRIRIOTIES of operators; strictly left-to-right
+;;;   (Also, no support parantheses at the moment, just a temporary
+;;;    variable...)
+;;; 
+;;;      // n=r*40;            // libmatch need to be enabled
+;;;      n=r<<2+r<<3;          // LEFT-TO-RIGHT (incorrect C)
+;;;      // n=(((r<<2)+r)<<3); // "compatible C"
+;;;      //n := r<<2+r<<3;     // PASCALish?
+;;;      //n = PIPE r SHR 2 PLUS r SHL 3; // stream pipe?
 
 ;;; 
 ;;; Limits:
@@ -5029,6 +5051,11 @@ FUNC _iorulesstart
         jsr _printu
       .byte ']'
 
+        .byte "|printf(",34,"\%x",34,",",_E,")"
+      .byte '['
+        jsr _print4h
+      .byte ']'
+
         ;; LOL: printf("%s", s); // safe...
         .byte "|printf(",34,"\%s",34,",",_E,")"
       .byte '['
@@ -9385,6 +9412,97 @@ FUNC _oricend
       .byte "["
         jsr _gotoxy
       .byte "]"
+
+
+.ifdef OPTRULES
+        ;; Feature (BUG): 0=>256 bytes set!
+        .byte "|memset(%D[#],%d[#],%d);"
+      .byte "["
+        ;; 10 B !
+        ldy #'<'
+        .byte ";"
+        lda #'<'
+        .byte ";"
+:       
+        sta VAL0,y
+        dey
+        bne :-
+      .byte "]"
+
+
+.ifdef CANT_UNGEN_EXPRESSION
+        ;; (once _E is parsed and code generated
+        ;;           can't backtrack!           )
+        ;; typical usage? (varying address, fixed fill & len)
+ 	.byte "|memset(",_E,",%D[d],%D[#]);"
+      .byte "["
+        ;; 22 B
+        sta tos
+        stx tos+1
+        ;; fill value
+        .byte "D"
+        lda #'<'
+        ;; YX= count
+        .byte ";"
+        ldx #'>'
+        ldy #'<'
+        bne :++
+:       
+        dey
+        sta (tos),y
+        bne :-
+        inc tos+1
+        dex
+        bpl :-
+:       
+        .byte "]"
+.endif ; CANT_UNGEN_EXPRESSION
+        
+.endif ; OPTRULES
+
+
+        ;; LIMIT: can only set max 32KB
+        .byte "|memset(",_E,","
+        ;; 29 B - too big!
+;;; TODO: include a subroutine (call overhead 4+3 B)
+      .byte "["
+        ;; push address
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte _E,","
+      .byte "["
+        ;; only one byte value to set
+        pha
+      .byte "]"
+        .byte _E,");"
+      .byte "["
+        sta savey
+        ;; get value to set
+        pla
+        tay
+        ;; get address
+        pla
+        sta tos+1
+        pla
+        sta tos
+        ;; restore A fill value
+        tya
+        ;; YX is count
+        ldy savey
+        beq :++
+:       
+        dey
+        sta (tos),y
+        bne :-
+        inc tos+1
+        dex
+        bpl :-                  ; bpl limits to 32K!
+:       
+      .byte "]"
+
+
 
 ;;; memcpy len<=256
 ;;; Function call with 3 constants:
