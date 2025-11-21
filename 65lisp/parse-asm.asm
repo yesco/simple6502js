@@ -59,7 +59,7 @@
 ;;;   (Turbo Pascal did 2000 lines in less than 60s on Z80)
 ;;;   (== 33 lines/s)
 ;;; - somewhat useful error messages
-;;;   (difficult w recursive descent BNF style parsing)
+;;;   (difficult w recursive descent BNF-style parsing)
 ;;; 
 
 ;;; 
@@ -2043,6 +2043,7 @@ TESTING=1
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
+;;; TODO: no longer working (tos & puth)
 ;DEBUGRULE=1
 
 ;;; at FAIL prints [rulechar][inputchar]/iL[rule]
@@ -2121,7 +2122,7 @@ ERRPOS=1
 
 .ifdef DEBUG
   .macro DEBC c
-    PUTC c
+        jsr _printchar
   .endmacro
 .else
   .macro DEBC c
@@ -2292,8 +2293,10 @@ VARS=HIRES-256
         ldx #>VARS
         sta _ruleVARS
         stx _ruleVARS+1
-         
-
+        ;; zero-terminate the new rule
+        lda #0
+        ;; write one after (VARS will be overwritten)
+        sta VARS+1
 
 
 ;;; INTERRUPT DEBUG TESTING
@@ -2478,6 +2481,9 @@ jsk nl
         
         jmp _next
 
+
+
+
 ;;; TODO: opt?
 ;;; 1137800
 ;;; 1132809 ~6000 savings 0.4% - not worth it!
@@ -2530,7 +2536,7 @@ stackerror:
 ;    putc '.'
     ldy #0
     lda (inp),y
-    jsr putchar
+    jsr _printchar
     putc ' '
     pla
 .endif
@@ -2550,7 +2556,7 @@ stackerror:
     ;; RULE
     jsr nl
     lda rulename
-    jsr putchar
+    jsr _printchar
     putc '.'
     ldy #0
     lda (rule),y
@@ -2564,12 +2570,25 @@ stackerror:
 .endif ; DEBUG
 
 ;;; TODO: ;;;;;
+;xDEBUGRULE=1
 .ifdef xDEBUGRULE
 ;    PUTC ' '
-    jsk nl
-    ldy #0
-    lda (rule),y
-    PUTC 10
+;    jsr nl
+;    ldy #0
+;    lda (rule),y
+;    PUTC 10
+;putc '!'
+ldy #0
+lda (rule),y
+jsr _printchar
+;jsr putchar
+bmi :+
+bne :++
+:       
+jsr nl
+:       
+cmp #'|'
+beq :--
 .endif ; DEBUG
 
 
@@ -2700,11 +2719,14 @@ testeq:
         ;; - lit eq?
         cmp (inp),y
 ;;; LOL: relocate to "middle"?
-        beq eqjmp
+        bne failjmp
+eq:  
+    DEBC '='
+        jsr _incR
+        jmp _nextI
+
 failjmp:
         jmp _fail
-eqjmp:  
-        jmp _eq
 
 
         ;; percent matchers
@@ -2801,9 +2823,16 @@ noimm:
         pha
         ;; tos= address+1 (pointer to binary data!)
         lda rule
+;;; TODO: not increase before come here???
+sec
+sbc #1        
         sta tos
-        lda rule+1
-        sta tos+1
+        ldx rule+1
+txa
+sbc #0
+tax        
+        stx tos+1
+    jsr _printh
         jsr _incT               ; make sure not to affect C
 
         pla
@@ -2920,14 +2949,6 @@ skipperPlusC:
         rts
 
 
-;;; TODO: remove?
-FUNC _eq    
-;;; 9 B
-    DEBC '='
-        jsr _incR
-        jmp _nextI
-
-
 
 FUNC _enterrule
 .ifdef PRINTASM
@@ -2997,6 +3018,7 @@ FUNC _enterrule
 .endif
         jmp _acceptrule
 
+
 ;;; Hi-bit set, and it's not '*'
 @pushnewrule:
         lda rule+1
@@ -3023,6 +3045,7 @@ FUNC _enterrule
 
         ;; - load new rule pointer
         lda (rule),y
+enterrulebyname:        
         sta rulename
 
 .ifdef DEB3
@@ -4693,8 +4716,9 @@ jsr putchar
         pha
         jmp _next
 
+
 ;;; TOS = array size in bytes
-newarr:
+FUNC _newarr
 ;;; TODO: any way to make less code?
 ;;; (duplicate inm newarr)
         ;; manual immret
@@ -4722,7 +4746,7 @@ newarr:
         pla
         bne regarr
 
-newvar:
+FUNC _newvar
 ;;; TODO: any way to make less code?
 ;;; (duplicate inm newarr)
         ;; manual immret
@@ -4741,9 +4765,27 @@ pha
 lda vos
 ldx vos+1
 jsr _printh
+jsr spc
 pla
         
+;;; The way we keep environment/bindings of
+;;; vars is by prefixing them to a rule and
+;;; let our BNF parser to the matching!
+;;; 
+;;; In the end, not clear if save code memory
+;;; as "stuffing" takes lots of bytes
 regarr:
+
+;;; TODO: too much "stuffing"
+;;; TODO: copy a "template"?
+;;; 
+;;;             >>>  %b%'3<ADDR><TYPE>| <<<
+
+        ;; store a '|' to end sub-match
+; 10
+PUTC '|'
+        lda #'|'
+        jsr _stuffVARS
 
         ;; store type letter (last!)
 PUTC 'T'
@@ -4761,8 +4803,17 @@ PUTC 'A'
         jsr _stuffVARS
 
         ;; push skip chars "%<3+128>"
+;;; 10
 PUTC 'S'
         lda #3            ; 3 bytes to skip
+        jsr _stuffVARS
+        lda #'%'
+        jsr _stuffVARS
+
+        ;; push skip 'breakchar' "%b"
+;;; 10
+PUTC 'B'
+        lda #'b'            ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
@@ -4777,18 +4828,106 @@ PUTC 'S'
         sta pos
         pla
         sta pos+1
+
+        dey
 :       
 PUTC 'C'
 jsr _printchar
-        dey
-        bmi :+
         lda (pos),y
+
+        ;; TODO: clumsy?
+        sty savey
+        ldy #0
         jsr _stuffVARS          ; A preserved and => flags
-        bne :-
+        ldy savey
+
+        dey
+        bpl :-
 :       
+
+        ;; update VARRRULEVEC
+;;; TODO: too much work... save there waste here?
+        lda _ruleVARS
+        ldx _ruleVARS+1
+        clc
+        adc #1
+        sta VARRRULEVEC
+        txa
+        adc #0
+        sta VARRRULEVEC+1
+
+
         ;; really just "IMM_RET" end
         jmp _next
 
+
+
+;;; TODO: not used as such, maybe crashes too much?
+
+FUNC _findvar
+PUTC 'F'        
+        ;; we really just need to use the RULE!
+        ;; We name our dynamic rule '[' (hibit)
+VARRULENAME='['+128
+VARRRULEVEC=_rules+(VARRULENAME&31)*2
+;;; 10 B
+        ;; patch in the real address of rule
+        lda _ruleVARS
+        ldx _ruleVARS+1
+;        jsr _incVARS
+        sta VARRRULEVEC
+        stx VARRRULEVEC+1
+VARPRINT=1
+.ifdef VARPRINT
+        putc '>'
+        putc '>'
+;;; 
+        ldy #1
+:       
+        lda (_ruleVARS),y
+        jsr _printchar
+.ifdef PRINTADDR
+.scope
+pha
+        sty savey
+        jsr spc
+        lda _ruleVARS
+        clc
+        adc #savey
+        ldx _ruleVARS
+        bcc :+
+        inx
+:       
+        jsr _printh
+        jsr nl  
+        ldy savey
+pla        
+.endscope
+.endif ; PRINTADDR
+        beq :+
+        iny
+        ;; artificial end at some point...
+        beq :+
+        cmp #' '
+        bcs :-
+        ;; "skipper"
+        sty savey
+        ;; C=0
+        and #127
+        adc savey
+        tay
+
+        jmp :-
+:       
+
+rts
+
+        ldy #0                  ; TODO: needed?
+.endif ; VARPRINT
+;;; 7 B
+        lda #VARRULENAME
+        jmp enterrulebyname
+        
 
 
 ;;; TODO: remove (print.asm?)dummy
@@ -5559,6 +5698,8 @@ FUNC _memoryrulesstart
       .byte ']'
 
 
+
+
 .ifdef STDLIB
 
 ;;; TODO: cheating, using cc65 malloc/free :-(
@@ -5645,6 +5786,8 @@ SMALLER=1
 .endif ; STDLIB
 
 
+;;; TODO: fix?
+
 .ifdef NOTDEFINEDIN_CC65 ; ???
 .import _heapmemavail
         .byte "|heapmemevail",_X
@@ -5658,6 +5801,7 @@ SMALLER=1
         jsr _heapmaxavail
       .byte "]"
 .endif
+
 
         ;; TODO: more like statement
         .byte "|SEI();"
@@ -6321,7 +6465,27 @@ jsr axputh
 
 
 ;;; pointer
-        .byte "|&%V"
+;        .byte "|&%V"
+        .byte "|&",VARRULENAME
+.ifblank
+      .byte "%{"
+putc '!'
+lda VARRRULEVEC
+ldx VARRRULEVEC+1
+jsr _printh
+jsr spc
+;        jsr _findvar
+.ifblank
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        sta tos
+        stx tos+1
+.endif
+        IMM_RET
+.endif
       .byte '['
         lda #'<'
         ldx #'>'
@@ -8199,20 +8363,20 @@ POSTLUDE=1
 ;;; 
       .byte "%{"
         lda #'w'
-        jsr newvar              ; does IMM_RET!
+        jsr _newvar              ; does IMM_RET!
         .byte TAILREC
 
         .byte "|word\*","%I;"
       .byte "%{"
         lda #'W'
-        jsr newvar              ; does IMM_RET!
+        jsr _newvar              ; does IMM_RET!
         .byte TAILREC
 
 .ifnblank
         .byte "|char","$%I;"
       .byte "%{"
         lda #'c'
-        jsr newvar              ; does IMM_RET!
+        jsr _newvar              ; does IMM_RET!
         .byte TAILREC
 .endif
 
@@ -8223,7 +8387,7 @@ POSTLUDE=1
         asl tos
         rol tos+1
         lda #'W'+128
-        jsr newarr              ; does IMM_RET!
+        jsr _newarr              ; does IMM_RET!
         .byte TAILREC
 
 
@@ -8231,7 +8395,7 @@ POSTLUDE=1
         .byte "|char","%I\[%D\];"
       .byte "%{"
         lda #'C'+128
-        jsr newarr              ; does IMM_RET!
+        jsr _newarr              ; does IMM_RET!
         .byte TAILREC
 
 .ifnblank
@@ -8239,7 +8403,7 @@ POSTLUDE=1
         .byte "|word","%I\[%D\]={"
       .byte "%{"
         ldy #'W'+128
-        jsr newarr              ; does IMM_RET!
+        jsr _newarr              ; does IMM_RET!
  ;; TODO: do WORD, _Q only reads bytes
 ;;;   (how can do { "foo", "bar", "fie", fum" } ???
         .byte _Q
@@ -8249,7 +8413,7 @@ POSTLUDE=1
         .byte "|char","%I\[\]={"
       .byte "%{"
         lda #'C'+128
-        jsr newarr              ; does IMM_RET!
+        jsr _newarr              ; does IMM_RET!
         ;; newarr sets pos
         .byte _Q
         .byte TAILREC
@@ -11408,8 +11572,10 @@ DEF=1
         .byte "word fish_42;",10
         .byte "word main(){",10
         .byte "  puth(&fish_42); putchar('\n');",10
+        .byte "  puth(&fish_42); putchar('\n');",10
+;;; TODO: only works for last one defined, lol
         .byte "  puth(&gurka33); putchar('\n');",10
-        .byte "  puth(&hEll0); putchar('\n');",10
+;        .byte "  puth(&hEll0); putchar('\n');",10
         .byte "return 4711; }",0
 .endif ; DEF
 
