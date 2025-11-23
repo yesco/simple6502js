@@ -183,7 +183,7 @@
 ;;; - basically just one type: word (uint_16)
 ;;; - decimal numbers: 4711 42
 ;;; - char constants: 'x' ''' (lol) '\' hmmm TODO: fix
-;;; - "string" constants (are just considered a pointer==number)
+;;; - "string" constants and arrays (are just considered a constant number)
 ;;; 
 ;;; - word main() ... - no args
 ;;; - { ... }
@@ -663,7 +663,9 @@
 ;;; NORMAL    :  1134 bytes = (+ 771  501)
 ;;; OLDBYTERULES :  1293 bytes = (+ 771  660)
 ;;; OPTRULES  :  1463 bytes = (+ 771 1090)
-;;; LONGNAMES :  
+;;; LONGNAMES :  (- 1633 1529) = 104
+;;;   (TODO: these are new LONGNAMES, not complete
+;;;          yet, needs hooking up with %A/%V/%U/%N?)
 ;;; 
 ;;; v= #x392 = 914 (- 914 882) = 32 (but I count 22B, hmm)
 ;;; v= #x372 = 882 
@@ -695,10 +697,44 @@
 ;;;    844  +... ??? wtf? lol
 ;;;    914  +32B 'c' small char constants
 ;;; 
+;;;        for(i=0
+;;;        PRIME opt
+;;;        peek/poke/deek/doke
+;;;        TIMING cycles
+;;;        ^Garnish (prettyprint)
+;;;        memory layout, move stuff around
+;;;        info()
+;;;        faster skipping
+;;;        move out library
+;;;        printasm
+;;;        full-FOR
+;;;        function 4-parameter parsing experiments
+;;;         (RECURSIVE COPY ZPPASSING)
+;;;        bios move out, opt
+;;;        lib-stdio opt (merge with print.asm)
+;;;        new editor
 ;;;   1230 BNF Interpreter as reported from info()
-;;; 
+;;;   1309 e1a282f51de092345419268f03c96619366a5db2
+;;;        (new editor, compiles)
+;;;   1361 %b working (+ 52 B)
+;;;   1361 fixed %b (+ 32 B) 
+;;;   1361 OPTRULES
 
-;;; TODO:  634 bytes ... partial long names (+ 141 B)
+;;;   1529 VARS binding setup a152c247a511d5112976b32ee02ac6406e649d78
+;;; 
+;;;   1529 better if
+;;;        VARS
+
+;;;   1587 memset
+;;; 
+;;;   1529 before long vars
+;;;   1633 long vars finally (just define + )
+
+;;;   1573 - removing _findvar (not used)
+;;;          NOP problem, lol
+;;;   .... (VARS: + (- 1573 1361) = 212 B?
+;;;        (+ 29 97 8 7 93) = 234 
+;;;       ; _newarr _newvar GEN/SKIP %I ctype (needed ctype always?)
 ;;; 
 ;;; not counting: putu, mul10, end: print out
 ;;; 
@@ -707,7 +743,7 @@
 
 
 
-;;; C-Rules: 469 B (- 593 56 68)
+;;; C-Rules: 469 B (- 593 56 68), LOL- long time ago!
 ;;; 
 ;;;   383 bytes = MINIMAL   (rules + library)
 ;;;   501 bytes = NORMAL
@@ -747,6 +783,8 @@
 ;;;  3026 bytes BYTERULES (opt)
 ;;;  3434 bytes ORIC ATMOS API (+ 408 B)
 ;;; 
+;;;  4710 bytes !!!
+;;; (
 
 ;;; w= #x62e 1582
 
@@ -2024,10 +2062,6 @@ TESTING=1
 ;;; Long names support
 ;;; TODO: make functional
 ;LONGNAMES=1
-;;; TODO: IDEA !!!!!!!!!!!!!!!!
-;;; DONt... JUST CREATE new parse rule that maps to data
-;;;           can generate address!
-
 
 ;;; TODO: not yet done, just thinking
 ;BNFLONG=1
@@ -2828,7 +2862,7 @@ noimm:
 
         and #$7f
 
-        ;; Skipper? A<' '
+        ;; ? Skipper: A<' '
         ;; (TODO: potentially if hibit set could allow
         ;;  ..127 bytes skipped/copied, could conflict
         ;;  with hibit-'Rules if we want to make them
@@ -2836,33 +2870,23 @@ noimm:
         cmp #' '
         bcs :+
 
-        pha
-
-        ;; tos= address+1 (pointer to binary data!)
-        lda rule
-;;; TODO: not increase before come here???
-sec
-sbc #1        
-        sta tos
-tay
+        ;; - SKIPPER
+        ;; -- tos= address+1 (pointer to binary data!)
+        ldy rule
+        sty tos
         ldx rule+1
-txa
-sbc #0
-tax        
-tya
         stx tos+1
 
-;;; TODO: needed to function correctly? lol
-
-;.ifdef DEBUGNAME
+.ifdef DEBUGNAME
+    php
+    pha
+    tya
     jsr _printh
-;.endif ; DEBUGNAME
+    pla
+    plp
+.endif ; DEBUGNAME
 
-        ;; make sure not to affect C
-        jsr _incT 
-
-        pla
-        ;; Skip n bytes
+        ;; -- Skip n bytes
         ;; C= 0
         jsr skipperPlusC
         jmp _next
@@ -4520,203 +4544,6 @@ cut:
 .endif ; CUT
 
 
-.ifdef LONGNAMES
-
-;;; --- name handling
-
-;DEBNAME=1
-
-;;; env pointing to new empty entry
-;;;   but @0 has link to previous
-;;; Result:
-;;;   new entry all linked up
-;;;     with newnew link and 0 value
-;;;   valid byte > 0 if have name
-
-FUNC _parsename
-;;; 66 B
-        ;; pos = env+4
-        lda env
-        clc
-        adc #4
-        sta pos
-        lda env+1
-        adc #0
-        sta pos+1
-        ;; parse name
-        ldy #0
-        sty valid
-
-.ifdef DEBNAME
-  putc '@'
-  lda pos
-  sta tos
-  lda pos+1
-  sta tos+1
-  jsr putu
-  putc ' '
-
-  ldy #0
-.endif ; DEBNAME
-        
-
-@copy:
-        ;; - copy one char
-        lda (inp),y
-        sta (pos),y
-        ;; - is valid char?
-        sec
-        sbc #'a'
-        cmp #'z'-'a'+1
-        bcs @notidentchar
-
-.ifdef DEBNAME
-   lda (inp),y
-   jsr putchar
-.endif ; DEBNAME
-        ;; - valid
-        inc valid
-        jsr _incI
-        jsr _incP
-        jmp @copy
-        
-@notidentchar:
-        ;; end of ident
-        ;; - zero terminate
-        tya
-        sta (pos),y
-        jsr _incP
-
-.ifdef DEBNAME
-  putc '@'
-  lda pos
-  sta tos
-  lda pos+1
-  sta tos+1
-  jsr putu
-  putc ' '
-  ldy #0
-.endif ; DEBNAME
-
-        ;; prepare next new entry!
-;;; TODO: copyreg?
-        ;; - link to prev
-        lda env
-        sta (pos),y
-.ifdef DEBNAME
-  sta tos
-.endif ; DEBNAME
-        lda env+1
-        iny
-        sta (pos),y
-.ifdef DEBNAME
-  sta tos+1
-  jsr putu
-  PUTC ' '
-  ldy #1
-.endif ; DEBNAME
-        ;; - zero value
-        lda #0
-        iny
-        sta (pos),y
-        iny
-        sta (pos),y
-        
-        ;; return valid Z=0
-        lda valid
-        rts
-
-
-;;; word to find: @env+4 (written by parser)
-FUNC _find
-;;; 56 B
-        ldy #3
-
-        lda env
-        sta gos
-        lda env+1
-        sta gos+1
-
-@nextword:
-        ;; go prev
-        ;; - load prev
-;;; TODO: code jsr _link ?
-.ifdef DEBNAME
-   PUTC 10
-   PUTC '>'
-.endif ; DEBNAME
-
-        ldy #0
-        lda (gos),y
-        tax
-        iny
-        lda (gos),y
-        sta gos+1
-        stx gos
-
-.ifdef DEBNAME
-  sta tos+1
-  stx tos
-  jsr putu
-.endif ; DEBNAME
-        ;; end?
-        ora gos
-        bne @matchword
-@notfound:
-.ifdef DEBNAME
-   PUTC '%'
-.endif ; DEBNAME
-        ;; - create!
-        ;; - commit - link it in
-        lda pos
-        sta env
-        lda pos+1
-        sta env+1
-;;; TODO: give error
-        rts
-
-@matchword:
-.ifdef DEBNAME
-    PUTC '?'
-.endif ; DEBNAME
-        ;; match word
-        ldy #3
-@match:
-        iny
-        lda (gos),y
-        beq @endword
-
-.ifdef DEBNAME
-    PUTC ':'
-    jsr putchar 
-    pha
-    lda (env),y
-    jsr putchar
-    pla
-.endif ; DEBNAME
-
-        cmp (env),y
-        beq @match
-
-@notmatch:
-.ifdef DEBNAME
-    PUTC '|'
-.endif ; DEBNAME
-        jmp @nextword
-        
-@endword:
-        lda (env),y
-        bne @notmatch
-@found:
-.ifdef DEBNAME
-    PUTC '!'
-.endif ; DEBNAME
-        ;; Z=1
-        rts
-
-.endif ; LONGNAMES
-
-
 ;;; VAR ident list have following structure
 ;;;
 ;;; (no spaces, ' means hibit set)
@@ -4751,6 +4578,7 @@ _ruleVARS:        .res 2
 ;;; parse identifier name
 ;;; pushes (address, len) onstack
 FUNC _ident 
+;;; 32 B
 
 .ifdef DEBUGNAME
 jsr nl
@@ -4794,6 +4622,8 @@ jsr putchar
 
 ;;; TOS = array size in bytes
 FUNC _newarr
+;;; 29 B
+
 ;;; TODO: any way to make less code?
 ;;; (duplicate inm newarr)
         ;; manual immret
@@ -4803,7 +4633,6 @@ FUNC _newarr
         sta rule+1
         jsr _incR
 
-; 20
         pha
         ldy #0
 
@@ -4821,7 +4650,10 @@ FUNC _newarr
         pla
         bne regarr
 
+
 FUNC _newvar
+;;; 97 B
+
 ;;; TODO: any way to make less code?
 ;;; (duplicate inm newarr)
         ;; manual immret
@@ -4953,71 +4785,23 @@ jsr _printchar
 
 
 
-;;; TODO: not used as such, maybe crashes too much?
 
-;;; TODO: remove?
+;;; TODO:
 
-FUNC _findvar
-PUTC 'F'        
-        ;; we really just need to use the RULE!
-;;; 10 B
-        ;; patch in the real address of rule
-        lda _ruleVARS
-        ldx _ruleVARS+1
-;        jsr _incVARS
-        sta VARRRULEVEC
-        stx VARRRULEVEC+1
-VARPRINT=1
-.ifdef VARPRINT
-        putc '>'
-        putc '>'
-;;; 
-        ldy #1
-:       
-        lda (_ruleVARS),y
-        jsr _printchar
-.ifdef PRINTADDR
-.scope
-pha
-        sty savey
-        jsr spc
-        lda _ruleVARS
-        clc
-        adc #savey
-        ldx _ruleVARS
-        bcc :+
-        inx
-:       
-        jsr _printh
-        jsr nl  
-        ldy savey
-pla        
-.endscope
-.endif ; PRINTADDR
-        beq :+
-        iny
-        ;; artificial end at some point...
-        beq :+
-        cmp #' '
-        bcs :-
-        ;; "skipper"
-        sty savey
-        ;; C=0
-        and #127
-        adc savey
-        tay
+;;; who the hell jumps here???? lol
 
-        jmp :-
-:       
+;;; need one of these lines? lol
+;        lda #VARRULENAME
+;        jmp enterrulebyname
 
-rts
 
-        ldy #0                  ; TODO: needed?
-.endif ; VARPRINT
-;;; 7 B
-        lda #VARRULENAME
-        jmp enterrulebyname
-        
+;;; TODO: even a nop will do????
+
+;;; Not needed anymore, lol?
+
+;nop
+
+
 
 
 ;;; TODO: remove (print.asm?)dummy
@@ -6554,9 +6338,16 @@ jsr axputh
 .endif ; STRING1
 
 
+;;; TODO: maybe no need this operator at all?
+;;;   only case to allow pointer to variable
+;;;   is only useful/safe for arrays!
+;;; 
 ;;; pointer
 ;        .byte "|&%V"
 
+;;; TODO: restrict pointer to "local"
+;;;   variables (as they are copied and reused
+;;;   in zeropage!)
 .ifndef DEBUGNAME
         .byte "|&",VARRULENAME
 .else
@@ -6588,6 +6379,10 @@ jsr spc
         lda (tos),y
         sta tos
         stx tos+1
+
+        ;; TODO: check local var?
+        
+
 .ifdef DEBUGNAME
 PUTC '='
 jsr _printh
@@ -11664,7 +11459,13 @@ input:
 ;        .byte "word main(){ return 4711; }",0
 
 
-;
+;;; TODO: memory corruption???
+;;; ;;; def hEll0 changes to hAll0?
+;;; CTRL-Z gives hAll0 too, indicating input
+;;; corruption?
+;;; (Also happens to BYTESIEVE=1 only it's in
+;;;  the comment, so not detected)
+;;; DOESN'T happen (there) on ./rrrasm ...
 DEF=1
 .ifdef DEF
         .byte "word hEll0;",10
@@ -11672,6 +11473,7 @@ DEF=1
         .byte "word fish_666;",10
         .byte "word fish_42;",10
         .byte "word main(){",10
+;;; TODO: don't use/allow &var - not safe for local!
         .byte "  puth(&fish_42); putchar('\n');",10
         .byte "  puth(&fish_42); putchar('\n');",10
         .byte "  puth(&fish_666); putchar('\n');",10

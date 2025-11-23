@@ -51,6 +51,11 @@ void pc(char c) {
   } else putchar(lastc=c);
 }
 
+char isident(char c) {
+  return isalnum(c) || c=='_';
+}
+
+
 // BUG: compile again (1 or many times)
 //      then ^Garnish it - CRASH!
 extern void prettyprint(char* s) {
@@ -79,8 +84,8 @@ next:
     default:
       if (c<=' ') { pc(c); break; }
       if (isdigit(c)) { pc(NUMBER); found= 1; }
-      // -- names
-      if (isalpha(c)) {
+      // -- names (first char)
+      if (isalpha(c) || c=='_') {
         // - keyword?
         for(c=0; c<sizeof(keywords)/sizeof(char*); ++c) {
           x= keywords[c];
@@ -97,7 +102,7 @@ next:
       }
       if (found) {
       printword:
-        while(isalnum(c=*s)) pc(c),++s;
+        while(isident(c=*s)) pc(c),++s;
         --s;
         if (!nextcol) break;
         // basically word defined
