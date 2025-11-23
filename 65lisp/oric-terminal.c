@@ -54,9 +54,17 @@ void fullputc(int c) {
   case '\n':
     clearend(); // hmmm?
     resetcolors();
-    printf("\n    "); break;
+    printf("\n  ");
+#ifdef DOUBLE
+    printf("  ");
+#endif
+    break;
   case '\r':
-    printf("\r    "); break;
+    printf("\r  ");
+#ifdef DOUBLE
+    printf("  ");
+#endif
+    break;
 
   // TODO: 30,31? setink/setpaper
 

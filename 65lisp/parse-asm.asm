@@ -2040,6 +2040,9 @@ TESTING=1
 ;;; Enable for debug info
 ;DEBUG=1
 
+;;; Debug long varnames
+;DEBUGNAME=1
+
 ;;; wait for input on each new rule invocation
 ;DEBUGKEY=1
 
@@ -2274,7 +2277,14 @@ VOSSTART=vars
 ;;;   what's safe margin
 ;;;   and can this become TOPOFMEMORY?
 ;;; want to keep around for debugging
+
+;;; TODO: better name
 VARS=HIRES-256
+
+        ;; We name our dynamic rule '[' (hibit)
+VARRULENAME='['+128
+VARRRULEVEC=_rules+(VARRULENAME&31)*2
+
 
 .ifdef ZPVARS
 .else
@@ -2294,8 +2304,8 @@ VARS=HIRES-256
         sta _ruleVARS
         stx _ruleVARS+1
         ;; zero-terminate the new rule
+        ;; (write one after (VARS will be overwritten))
         lda #0
-        ;; write one after (VARS will be overwritten)
         sta VARS+1
 
 
@@ -2676,13 +2686,18 @@ jmpaccept:
 @nosemi:
 .endif ; PRINTDOTS
 
+        ;; A is current inp char
        
+;;; Speed
 ;        jsr _incR
         inc rule
         bne :+
         inc rule+1
 :       
         ;; comp rule?
+.ifdef DEBUGNAME
+jsr _printchar
+.endif ; DEBUGNAME
         cmp (rule),y
         beq @skipspc
         jmp _next
@@ -2805,6 +2820,7 @@ immfail:
 ;        jsr immfail
 .endmacro
 
+;;; still % percent handling
 noimm:
 
 ;;; TODO: remove case from char to test?
@@ -2821,19 +2837,29 @@ noimm:
         bcs :+
 
         pha
+
         ;; tos= address+1 (pointer to binary data!)
         lda rule
 ;;; TODO: not increase before come here???
 sec
 sbc #1        
         sta tos
+tay
         ldx rule+1
 txa
 sbc #0
 tax        
+tya
         stx tos+1
+
+;;; TODO: needed to function correctly? lol
+
+;.ifdef DEBUGNAME
     jsr _printh
-        jsr _incT               ; make sure not to affect C
+;.endif ; DEBUGNAME
+
+        ;; make sure not to affect C
+        jsr _incT 
 
         pla
         ;; Skip n bytes
@@ -2951,6 +2977,9 @@ skipperPlusC:
 
 
 FUNC _enterrule
+.ifdef DEBUGNAME
+PUTC '>'
+.endif ; DEBUGNAME
 .ifdef PRINTASM
         pha
         txa
@@ -3084,7 +3113,9 @@ loadruleptr:
 ;;; rule to continue parsing (or end).
 
 FUNC _acceptrule
-
+.ifdef DEBUGVARS
+  PUTC '!'
+.endif ; DEBUGVARS
 ;;; Theory:
 ;;;   program compile fail (unless error up-propagates)
 ;;;   is AFTER the last position of input that generated
@@ -3287,7 +3318,7 @@ lda savea
 
 
 FUNC _fail
-        
+
 ;;; seems this in _acceptrule is cheaper than _fail
 .ifdef xERRPOS
         ;; update if inp>erp
@@ -3318,8 +3349,28 @@ FUNC _fail
         ldy rule
         lda #0
         sta rule
+
+;;; ca65: Can't have between @loop and usage??? LOL
+;PRINTSKIP=1
+
 @loop:
         lda (rule),y
+;
+.ifdef PRINTSKIP
+pha
+PUTC '.'
+jsr _printchar
+iny
+lda (rule),y
+jsr _printchar
+iny
+lda (rule),y
+jsr _printchar
+jsr spc
+dey
+dey
+pla
+.endif ; PRINTSKIP
         beq endrule
 
         cmp #'|'
@@ -3328,29 +3379,40 @@ FUNC _fail
         cmp #'['
         beq @skipgen
 
-        ;; % len7 ... (skip ... of len7,hibit ignore)
+        ;; ? % operator?
         cmp #'%'
         bne :+
         
-        ;; 7bit < 32 skip bytes!
-        ;; skip one byte (notice not jsr _incR)
-        iny
+        ;; - get char after %
+        ;; (notice not jsr _incR as we're INY!)
+        INY
         bne @noincinc
         inc rule+1
 @noincinc:
         lda (rule),y
 
+        ;; ? % len7 ... (skip ... of len7,hibit ignore)
+        ;; 7bit < 32 skip bytes!
         and #$7f
         cmp #' '
         bcs :+
         
+        ;; SKIP A bytes!
         ;; C=0
+
+        ;; more complicated than it should be
+        sty rule
         jsr skipperPlusC
+        ldy rule
+        lda #0
+        sta rule
+
         jmp @loop
 :       
         ;; normal char: skip
 @next:
-        iny
+        ;; loop w Y
+        INY
         bne @loop
         inc rule+1
         ;; always!
@@ -3369,7 +3431,10 @@ FUNC _fail
         
 ;;; we're done skipping! (standing at '|')
 @nextalt:
-        ;; finally write it back!
+.ifdef DEBUGNAME
+   PUTC '|'
+.endif ; DEBUGNAME
+        ;; finally rule.lo (Y) write it back!
         sty rule
 
         ;; skip '|'
@@ -3419,6 +3484,9 @@ gotretry:
 
 ;;; we come here if FAIL find no '|' alt
 endrule:
+.ifdef DEBUGNAME
+PUTC '/'
+.endif ; DEBUGNAME
 
 .ifdef DEB3
 PUTC '/'
@@ -4683,9 +4751,13 @@ _ruleVARS:        .res 2
 ;;; parse identifier name
 ;;; pushes (address, len) onstack
 FUNC _ident 
+
+.ifdef DEBUGNAME
 jsr nl
 putc 'I'
+.endif ; DEBUGNAME
 ; 18
+
         ;; push name pointer on stack
         lda inp+1
         pha
@@ -4699,8 +4771,11 @@ putc 'I'
 :       
         ldy #0
         lda (inp),y
+
+.ifdef DEBUGNAME
 PUTC ' '
 jsr putchar
+.endif ; DEBUGNAME
         jsr isident             
         beq :+                  ; not ident (AX=0), Y trashed
         jsr _incI
@@ -4761,13 +4836,15 @@ FUNC _newvar
         ;; V(ar)Alloc 2 bytes
         jsr _incV               ; doesn't touch A
         jsr _incV
+.ifdef DEBUGNAME
 pha
 lda vos
 ldx vos+1
 jsr _printh
 jsr spc
 pla
-        
+.endif ; DEBUGNAME        
+
 ;;; The way we keep environment/bindings of
 ;;; vars is by prefixing them to a rule and
 ;;; let our BNF parser to the matching!
@@ -4783,12 +4860,18 @@ regarr:
 
         ;; store a '|' to end sub-match
 ; 10
-PUTC '|'
+.ifdef DEBUGNAME
+PUTC 'B'
+.endif ; DEBUGNAME
+        pha
         lda #'|'
         jsr _stuffVARS
+        pla
 
         ;; store type letter (last!)
+.ifdef DEBUGNAME
 PUTC 'T'
+.endif ; DEBUGNAME
         jsr _stuffVARS
 
         ;; TODO: store sizeof
@@ -4796,7 +4879,9 @@ PUTC 'T'
 
         ;; store address of var (backwards)
 ; 10
+.ifdef DEBUGNAME
 PUTC 'A'
+.endif ; DEBUGNAME
         lda vos+1
         jsr _stuffVARS
         lda vos
@@ -4804,15 +4889,19 @@ PUTC 'A'
 
         ;; push skip chars "%<3+128>"
 ;;; 10
+.ifdef DEBUGNAME
 PUTC 'S'
-        lda #3            ; 3 bytes to skip
+.endif ; DEBUGNAME
+        lda #3+128              ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
 
         ;; push skip 'breakchar' "%b"
 ;;; 10
+.ifdef DEBUGNAME
 PUTC 'B'
+.endif ; DEBUGNAME
         lda #'b'            ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
@@ -4831,8 +4920,10 @@ PUTC 'B'
 
         dey
 :       
+.ifdef DEBUGNAME
 PUTC 'C'
 jsr _printchar
+.endif ; DEBUGNAME
         lda (pos),y
 
         ;; TODO: clumsy?
@@ -4864,12 +4955,11 @@ jsr _printchar
 
 ;;; TODO: not used as such, maybe crashes too much?
 
+;;; TODO: remove?
+
 FUNC _findvar
 PUTC 'F'        
         ;; we really just need to use the RULE!
-        ;; We name our dynamic rule '[' (hibit)
-VARRULENAME='['+128
-VARRRULEVEC=_rules+(VARRULENAME&31)*2
 ;;; 10 B
         ;; patch in the real address of rule
         lda _ruleVARS
@@ -6100,7 +6190,7 @@ tya
 
         .byte "|'\\n'"
       .byte "%{"
-        putc '!'
+;        putc '!'
         IMM_RET
 
       .byte '['
@@ -6133,7 +6223,7 @@ tya
         .byte "'"
         
       .byte "%{"
-        putc '!'
+;        putc '!'
         IMM_RET
 
       .byte '['
@@ -6466,16 +6556,31 @@ jsr axputh
 
 ;;; pointer
 ;        .byte "|&%V"
+
+.ifndef DEBUGNAME
         .byte "|&",VARRULENAME
-.ifblank
+.else
+        .byte "|&"
       .byte "%{"
-putc '!'
+        putc '{'
+        IMM_RET
+        .byte VARRULENAME
+      .byte "%{"
+        putc '}'
+        IMM_RET
+.endif ; DEBUGNAME
+
+      .byte "%{"
+.ifdef DEBUGNAME
+putc '@'
 lda VARRRULEVEC
 ldx VARRRULEVEC+1
 jsr _printh
 jsr spc
 ;        jsr _findvar
-.ifblank
+.endif ; DEBUGNAME
+
+        ;; TODO: %* or gen: R S T
         ldy #1
         lda (tos),y
         tax
@@ -6483,9 +6588,13 @@ jsr spc
         lda (tos),y
         sta tos
         stx tos+1
-.endif
+.ifdef DEBUGNAME
+PUTC '='
+jsr _printh
+.endif ; DEBUGNAME
+
         IMM_RET
-.endif
+
       .byte '['
         lda #'<'
         ldx #'>'
@@ -10467,6 +10576,7 @@ loop:
 printmore:
         jsr putchar
         lda (pos),y
+        beq done
         ;; limit lines printed to 7
         cmp #10
         bne :+
@@ -11340,61 +11450,51 @@ FUNC printaddress
         rts     
 .endif
 
-;;; prints readable otherwise deccode
-.zeropage
-pchar:     .res 1
-ptossave:  .res 2
-.code
+;;; prints readable otherwise:
+;;; (newline is printed)
+;;; _c means hibit-set for 'c'
+;;; [NUM] is the charcode of 'c' (c&127 < 32)
+;;; $ = \0
+;;; _$ means \0 with hibit === 128
 FUNC _printchar
 ;;; 96 !!!
-        sta pchar
         pha
         tya
         pha
         txa
         pha
         
-        lda pchar
+        tsx
+        lda $103,x
+
+        ;; ? hi-bit set '
+        bpl :+
+        ;; - remove hi-bit
+        and #127
+        PUTC '_'
+:       
+        bne :+
+        ;; ? zero - print $ and newline
+        putc '$'
+        SKIPTWO
+:       
+        ;; ? newline
         cmp #10
         bne :+
+        pha
         jsr putchar
         lda #13
-        jmp @printplain
-:       
-        bpl :+
-        ;; hi-bit set '
-        and #127
-        sta pchar
-        lda #'_'
         jsr putchar
-        lda pchar
+        pla
 :       
+        ;; print [CODE] or plain (c < 128)
         cmp #' '
         bcs @printplain
 @printcode:
-        cmp #0
-        bne :+
-        ;; zero
-        lda #'$'
-        jsr putchar
-        jmp @done
-:       
-        lda tos+1
-        pha
-        lda tos
-        pha
-
-        
         PUTC '['
-        lda pchar
         ldx #0
         jsr _printu
-        PUTC ']'
-
-        pla
-        sta tos
-        pla
-        sta tos+1
+        putc ']'
 
         jmp @done
 @printplain:
@@ -11569,13 +11669,15 @@ DEF=1
 .ifdef DEF
         .byte "word hEll0;",10
         .byte "word gurka33;",10
+        .byte "word fish_666;",10
         .byte "word fish_42;",10
         .byte "word main(){",10
         .byte "  puth(&fish_42); putchar('\n');",10
         .byte "  puth(&fish_42); putchar('\n');",10
-;;; TODO: only works for last one defined, lol
+        .byte "  puth(&fish_666); putchar('\n');",10
         .byte "  puth(&gurka33); putchar('\n');",10
-;        .byte "  puth(&hEll0); putchar('\n');",10
+        .byte "  puth(&hEll0); putchar('\n');",10
+;        .byte "  puth(&not_find); putchar('\n');",10
         .byte "return 4711; }",0
 .endif ; DEF
 

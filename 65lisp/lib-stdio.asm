@@ -148,6 +148,9 @@ FUNC _print1h
 ;;; Optimized by J. Brooks & qkubma 7/8/2017
 ;;; This implementation by jsk@yesco.org 2025-06-08
 
+;;; Kindof early C "standard"
+FUNC _printn
+
 FUNC _printu 
 ;;; 4
         sta pos
