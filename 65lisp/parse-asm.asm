@@ -902,8 +902,14 @@
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
 ;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
+
+
 ;;; - %I - read ident (really %N? but for longname)
+;;;        (pushes (identaddress/word, name length/byte) on stack)
 ;;; 
+;;; - %* - dereference tos { tos= *(int*)tos; }
+;;; 
+
 ;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
@@ -3734,6 +3740,27 @@ halt:
 FUNC _var
 ;;; 42 B
 DEBC '$'
+
+        lda percentchar
+
+        ;; ? %* - dereference tos { tos= *(int*)tos; }
+        cmp #'*'
+        bne :+
+
+        ldy #1
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        sta tos
+        stx tos+1
+
+        jmp _next
+:       
+
+;;; OLD STYLE: matching single ident (char) only
+
+        ;; ? match 
         ldy #0
         lda (inp),y
 .ifnblank
@@ -6407,7 +6434,10 @@ jsr axputh
         IMM_RET
 .endif ; DEBUGNAME
 
-      .byte "%{"
+.ifblank
+        .byte "%*"
+.else
+        .byte "%{"
 .ifdef DEBUGNAME
 putc '@'
 lda VARRRULEVEC
@@ -6416,7 +6446,6 @@ jsr _printh
 jsr spc
 ;        jsr _findvar
 .endif ; DEBUGNAME
-
         ;; TODO: %* or gen: R S T
         ldy #1
         lda (tos),y
@@ -6427,14 +6456,13 @@ jsr spc
         stx tos+1
 
         ;; TODO: check local var?
-        
-
 .ifdef DEBUGNAME
 PUTC '='
 jsr _printh
 .endif ; DEBUGNAME
 
         IMM_RET
+.endif
 
       .byte '['
         lda #'<'
