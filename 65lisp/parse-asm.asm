@@ -3758,6 +3758,7 @@ DEBC '$'
         jmp _next
 :       
 
+
 ;;; OLD STYLE: matching single ident (char) only
 
         ;; ? match 
@@ -6421,49 +6422,7 @@ jsr axputh
 ;;; TODO: restrict pointer to "local"
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
-.ifndef DEBUGNAME
-        .byte "|&",VARRULENAME
-.else
-        .byte "|&"
-      .byte "%{"
-        putc '{'
-        IMM_RET
-        .byte VARRULENAME
-      .byte "%{"
-        putc '}'
-        IMM_RET
-.endif ; DEBUGNAME
-
-.ifblank
-        .byte "%*"
-.else
-        .byte "%{"
-.ifdef DEBUGNAME
-putc '@'
-lda VARRRULEVEC
-ldx VARRRULEVEC+1
-jsr _printh
-jsr spc
-;        jsr _findvar
-.endif ; DEBUGNAME
-        ;; TODO: %* or gen: R S T
-        ldy #1
-        lda (tos),y
-        tax
-        dey
-        lda (tos),y
-        sta tos
-        stx tos+1
-
-        ;; TODO: check local var?
-.ifdef DEBUGNAME
-PUTC '='
-jsr _printh
-.endif ; DEBUGNAME
-
-        IMM_RET
-.endif
-
+        .byte "|&",VARRULENAME,"%*"
       .byte '['
         lda #'<'
         ldx #'>'
@@ -6471,6 +6430,12 @@ jsr _printh
 
 
 ;;; TODO: semantics of generic dereference?
+;;;    (char*) or (int*) or "none"
+;;;    it'd be nice if var[($)byte] == char
+;;;    TODO: how about larger arrays?
+;;;       intarr[i]== *(int*)(intarr+i*2) - expensive!!!
+;;;       want intarr[[foo]], lol 
+
         .byte "|\*%V"
       .byte '['
 ;;; TODO: test
@@ -6486,17 +6451,19 @@ jsr _printh
         lda (tos),y
       .byte ']'
 
+
 ;;; last chance, try BYTERULES
-;;; TODO: is this sane?
+;;; TODO: is this sane? doesn't seem to be triggerled?
 
 .ifdef BYTERULES
         ;; BYTERULES
 ;;; TODO: if no match backtrack not propagated UP????
         .byte "|", _U
       .byte '['
+;;; TODO: look into this...
 ;;; PRIMEBYTE: TODO: this adds 10bytes!!!! lol 313->323
 ;;; but sim: correct, and oric!
-;        ldx #0
+        ldx #0
       .byte ']'
 .endif
 
@@ -11640,7 +11607,7 @@ WHILESIZE=1
 ;;; corruption?
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
-;;; DOESN'T happen (there) on ./rrrasm ...
+;;; DOESN'T happen (there) on ./rrasm ...
 ;
 DEF=1
 .ifdef DEF
