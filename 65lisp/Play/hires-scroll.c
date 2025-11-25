@@ -28,7 +28,18 @@ void scrollright2() {
 void scrollright() {
   
 
-#ifdef FOO
+// 31s scroll 240 pixels sideays
+// (/ (* 31 1000000) 240) = 129K
+
+// (* 8000 (+ 5 2 2 2 2 6 2 3)) = 24 * ... => 192K / screen scroll 1px
+
+// (/ 1000000 24 8000) = 5 scrolls/s
+
+// better just draw: 16 rows at different offset possibly
+// cycles (* 16 40 (+ 4 2 3 6)) = 9600
+// (/ 1000000 9600) = 104/s!
+
+#ifndef FOO
   asm("lda #<%w", ((unsigned int)HIRESEND)-40);
   asm("ldx #>%w", ((unsigned int)HIRESEND)-40);
   asm("sta 0");
@@ -37,12 +48,13 @@ void scrollright() {
   asm("ldx #200");
 #else
   // only scroll middle
-  asm("lda #<%w", ((unsigned int)HIRESSCREEN)+(100+8)*40);
-  asm("ldx #>%w", ((unsigned int)HIRESSCREEN)+(100+8)*40);
+  asm("lda #<%w", ((unsigned int)HIRESSCREEN)+(105)*40);
+  asm("ldx #>%w", ((unsigned int)HIRESSCREEN)+(105)*40);
   asm("sta 0");
   asm("stx 1");
 
-  asm("ldx #16");
+//  asm("ldx #16");
+  asm("ldx #8");
 #endif
 
   asm("ldy #39");

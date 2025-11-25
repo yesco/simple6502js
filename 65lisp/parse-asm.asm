@@ -117,14 +117,14 @@
 ;;; could cut down on using byte/char variables instead of 
 ;;; ints, saving 50% code generated for those operations.
 ;;; 
-;;; The next big cost is OPTIMIZATION GENERATING RULES.
+;;; The next big size cost is OPTIMIZIZING GENERATING RULES,
+;;; we talk more about it in the next section.
+;;; 
 ;;; These are not required, but as can be seen in the 
 ;;; BYTESIEVE=1 benchmark, not having them, increase the
 ;;; compiled size by 66 bytes, 21%, and time with 25%!
-;;; 
-
-
-
+;;; They basically, adds specific common pattern cases
+;;; that can have highly specialized code. 
 ;;; 
 ;;; OPTIMIZING GENERATION RULES
 ;;; 
@@ -166,7 +166,7 @@
 ;;; This isn't easily done in MeteoriC. It also takes
 ;;; much time thus making compilation slow, so we won't go there.
 ;;; 
-;;; Simepler big wins could be done by adding more optimization
+;;; Simpler big wins could be done by adding more optimization
 ;;; rules, adn possibly recognize what's in the AX (and Y) register.
 ;;; 
 ;;; It's not unusual to see code like "a=b+17; if (a==42) ...",
@@ -174,15 +174,45 @@
 ;;; In MeteoriC's case each statement generates code indepdendent
 ;;; of the preceding statement, similarly to small-C, tiny-C, etc.
 ;;; 
-
-
+;;; OPTIMIZATION RULE EXAMPLE
+;;; 
+;;; One example is "while(a<42)..."; first the '<' doesn't
+;;; need to generate a true (!0) or false (0) value; second,
+;;; we don't need to test for it; third, the loop test is
+;;; hardcoded to use the compare flags, so that's also optimized.
+;;; 
+;;; A simple program like: 
+;;; 
+;;;       word main(){
+;;;         while(a<42) ++a;
+;;;       }
+;;; 
+;;; will without any optmization rules compile to 33 bytes.
+;;; But, with OPTRULES it's 33 bytes. This could further
+;;; be optimized with BYTERULES ("$a<42" "++$a;") giving
+;;; 26 B. The actual loop is only 12 B (no + etc).
+;;; Counting down, from 42 is even more efficient in
+;;; an "do-while" loop (26 B OPT, no opt: 41 B!),
+;;; and finally BYTERULES opt giving 20 B!
+;;; 
+;;; The loop is only 5 B and this could be further optimized,
+;;; potentially, for small-sized loops, with 3 bytes less.
+;;; 
+;;; However, at some point, the recepies gets too be too many
+;;; and using this form of limited rules will easily be
+;;; beaten by more traditional optimization methods that are
+;;; more flexible.
+;;; 
+;;; But, I still like to see them run on an actual 6502 in
+;;; limited memory (around 6 KB)!
+;;; 
 
 ;;; 
 ;;; MINIMAL C-LANGUAGE SUBSET
 ;;; 
 ;;; - basically just one type: word (uint_16)
 ;;; - decimal numbers: 4711 42
-;;; - char constants: 'x' ''' (lol) '\' hmmm TODO: fix
+;;; - char constants: 'x' ''' (lol) '\' and '\n' hmmm TODO: fix
 ;;; - "string" constants and arrays (are just considered a constant number)
 ;;; 
 ;;; - word main() ... - no args
@@ -8641,6 +8671,14 @@ afterELSE:
       .byte "]"
 
 .ifdef BYTERULES
+        ;; %D is ok as it get's "truncated" anyway.
+        .byte "|$%A=%D;"
+      .byte "["
+        lda #'<'
+        .byte "D"
+        sta VAR0
+      .byte "]"
+
         .byte "|$%A=",_E,";"
       .byte "[D"
         sta VAR0
@@ -9216,6 +9254,31 @@ FOROPT=1
         ;; autopatches jump to here if false (PUSHLOC)
 
 
+.ifdef BYTERULES
+
+        .byte "|while([:]$%A<%d[#])"
+      .byte "["
+      .byte "]"
+.scope        
+      .byte "[D"
+        lda VAR0
+        .byte ";"
+        cmp #'<'
+        bcc @okwhile            ; NUM+1>=VAR === num>VAR
+@nahwhile:
+        ;; jmp to end if false
+        jmp PUSHLOC
+@okwhile:
+.endscope
+      .byte "]"
+        .byte _S
+      .byte "[;d;"              ; pop tos, dos=tos; pop tos
+        ;; jump to beginning of loop (:)
+        jmp VAL0
+      .byte "D#]"               ; tos= dos, push tos (patch)
+        ;; autopatches jump to here if false (PUSHLOC)
+.endif ; BYTERULES
+
         .byte "|while(%A<"
         ;; similar to while(%A<%D)
       .byte "["
@@ -9424,14 +9487,31 @@ FOROPT=1
         .byte ";"               ; pop tos
         ;; don't loop if not true
 ;;; TODO: potentially "b" to generate relative jmp
-        bne :+
+        beq :+
         jmp VAL0
 :        
       .byte "]"
-
 .endif
 
-;;; DO...WHILE
+.ifdef BYTERULES
+;;; OPT: DO ... WHILE(a);
+        .byte "|DO"
+        .byte "[:]"
+        .byte _S
+
+        .byte "WHILE($%V);"
+      .byte "["
+        lda VAR0
+        .byte ";"               ; pop tos
+        ;; don't loop if not true
+;;; TODO: potentially "b" to generate relative jmp?
+        beq :+
+        jmp VAL0
+:        
+      .byte "]"
+.endif ; BYTERULES
+
+;;; GENERIC: DO...WHILE
         .byte "|do"
       .byte "[:]"
         .byte _S
@@ -11451,12 +11531,53 @@ FUNC _inputstart
 
 input:
 
-
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
 ;        .byte "word main(){ return 4711; }",0
+
+
+;;; Measure size impact on OPTRULES and BYTERULES
+;
+DOWHILE=1
+.ifdef DOWHILE
+
+        ;; 31 B optrules, wihtout 41 B
+.ifdef BYTERULES
+        ;; 20 B with BYTERULES and CAPital DO ... WHILE
+        .byte "word main(){",10
+        .byte "  $a=42;",10
+;;; TODO: BUG, cant' match on "while($a)" after generating
+;;;    "--$a;" so it gets generated twice!!!
+;;; TODO: "$do" lol!!!
+        .byte "  DO --$a; WHILE($a);",10
+        .byte "}",0
+.else
+        .byte "word main(){",10
+        .byte "  a=42;",10
+        .byte "  do --a; while(a);",10
+        .byte "}",0
+.endif
+
+.else
+
+        ;; 33 B with OPTRULES, otherwise 46 B
+.ifdef BYTERULES
+        ;; 26 B with BYTERULES
+        .byte "word main(){",10
+        .byte "  $a=0;",10
+        .byte "  while($a<42) ++$a;",10
+        .byte "}",0
+.else
+        .byte "word main(){",10
+        .byte "  a=0;",10
+        .byte "  while(a<42) putu(++a);",10
+        .byte "}",0
+.endif
+
+.endif ; !DOWHILE
+
 
 
 ;;; TODO: memory corruption???
