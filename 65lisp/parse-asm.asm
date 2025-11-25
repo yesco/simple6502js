@@ -174,6 +174,10 @@
 ;;; In MeteoriC's case each statement generates code indepdendent
 ;;; of the preceding statement, similarly to small-C, tiny-C, etc.
 ;;; 
+
+
+
+;;; 
 ;;; OPTIMIZATION RULE EXAMPLE
 ;;; 
 ;;; One example is "while(a<42)..."; first the '<' doesn't
@@ -187,13 +191,21 @@
 ;;;         while(a<42) ++a;
 ;;;       }
 ;;; 
-;;; will without any optmization rules compile to 33 bytes.
+;;; will without any optmization rules compile to 46 bytes.
 ;;; But, with OPTRULES it's 33 bytes. This could further
 ;;; be optimized with BYTERULES ("$a<42" "++$a;") giving
 ;;; 26 B. The actual loop is only 12 B (no + etc).
+;;;
 ;;; Counting down, from 42 is even more efficient in
-;;; an "do-while" loop (26 B OPT, no opt: 41 B!),
+;;; an "DO-WHILE" loop (26 B OPTRULES, no opt: 41 B!),
 ;;; and finally BYTERULES opt giving 20 B!
+;;; 
+;;; NOTE: The BYTERULES is currently a hack, requiring 
+;;;   variable usages to be prefixed by a '$' and for
+;;;   do while to be written DO WHILE (uppercase!).
+;;;   These limitations will be worked on.
+;;; 
+;;;   One thing at a time ;-)
 ;;; 
 ;;; The loop is only 5 B and this could be further optimized,
 ;;; potentially, for small-sized loops, with 3 bytes less.
@@ -206,6 +218,8 @@
 ;;; But, I still like to see them run on an actual 6502 in
 ;;; limited memory (around 6 KB)!
 ;;; 
+
+
 
 ;;; 
 ;;; MINIMAL C-LANGUAGE SUBSET
