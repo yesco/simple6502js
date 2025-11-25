@@ -3743,25 +3743,13 @@ jsr putchar
 
 @global:
         ;; verify/parse single letter var
-;;; range can probably in this case be done
-;;; with XOR #64 ; CMP #('z' & 63) - save 1 b!
         sec
         sbc #'A'
         sta savea
 
-        ;; lowercase for test
+        ;; uppercase for test
         and #255-32
-;        cmp #'z'-'A'+1
         cmp #'Z'-'A'+1
-;;; If we limit to A-F suddenly "word main()" doesn't
-;;; parse. Since we take only char (first) "ain"
-;;; doesn't match so it'll backtrack up to ruleP word main
-;;; 
-;;; TODO: but why is that fail different from this?
-;;;   this causes ruleP: "word main(){...}" to fail!
-
-;        cmp #'Z'-'A'+1
-
         bcc :+
         jmp failjmp
 :
@@ -3791,15 +3779,15 @@ jsr putchar
 jsr puth
 .endif ; DEBUGFUN
 
-        ;; %N = New defining function/variable
-        ;; (TODO: if used for var they are inline code)
         lda percentchar
 
+        ;; ? %I match an long name ident
         cmp #'I'
         bne :+
 
         jmp _ident
 :       
+        ;; ? %N = New defining function/variable
         cmp #'N'
         bne :+
 
@@ -4588,14 +4576,20 @@ cut:
 .endif ; CUT
 
 
+
+
 ;;; VAR ident list have following structure
 ;;;
 ;;; (no spaces, ' means hibit set)
 ;;;
-;;;                   Y  dos
-;;;                  ++     
-;;; | name %b %'N  w  1 ADDR   // word i;
-;;; | NAME %b %'N  c  1 ADDR   // char b;
+
+
+;;;  NOTE: ++ value not encoded!
+
+
+;;;                  ++ dos    
+;;; | name %b %'N     1 ADDR   w  // word i;
+;;; | NAME %b %'N     1 ADDR   c  // char b;
 
 ;;; Arrays are static (no dynamic on stack)
 ;;; and can from the compiler perspective be
@@ -4604,8 +4598,8 @@ cut:
 ;;; TODO: we need to store sizeof
 ;;;   crazy idea store before array?
 
-;;; | NAME %b %'N 'W  2 ADDR   // word arrw[17];
-;;; | NAME %b %'N 'C  1 ADDR   // char bytes[17];
+;;; | NAME %b %'N     2 ADDR  'W  // word arrw[17];
+;;; | NAME %b %'N     1 ADDR  'C  // char bytes[17];
 ;;;
  ;;; w=word W=word* c=char C=char* 'w=const word
 
@@ -4615,12 +4609,20 @@ cut:
 
 ;;; TODO:
 .zeropage
+;;; Vector pointing to beginning of current "ENVIRONMENT"
+;;; (address bindings encoded as matching rules)
 _ruleVARS:        .res 2
 .code
 
-;;; like replacement for _var
 ;;; parse identifier name
-;;; pushes (address, len) onstack
+;;; pushes (address/word, len/byte) on stack
+;;; (get's cleaned up correctly if _fail called!)
+;;; 
+;;; THis routine doesn't "fail"
+;;; 
+;;; NOTE: this requires inp to stand
+;;;   on the first char and that it's a legal
+;;;   ident first char.
 FUNC _ident 
 ;;; 32 B
 
@@ -11552,9 +11554,15 @@ input:
 ;        .byte "word main(){ return 4711; }",0
 
 
-;;; Measure size impact on OPTRULES and BYTERULES
+;;; TEST size of WHILE loops
 ;
-DOWHILE=1
+WHILESIZE=1
+
+.ifdef WHILE
+
+
+;;; Measure size impact on OPTRULES and BYTERULES
+;DOWHILE=1
 .ifdef DOWHILE
 
         ;; 31 B optrules, wihtout 41 B
@@ -11593,6 +11601,10 @@ DOWHILE=1
 .endif ; !DOWHILE
 
 
+.endif ; WHILESIZE
+
+
+
 
 ;;; TODO: memory corruption???
 ;;; ;;; def hEll0 changes to hAll0?
@@ -11601,6 +11613,7 @@ DOWHILE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrrasm ...
+;
 DEF=1
 .ifdef DEF
         .byte "word hEll0;",10
