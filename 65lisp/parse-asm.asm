@@ -141,7 +141,7 @@
 ;;; 
 ;;; As an example. Consider: a= 0;
 ;;; 
-;;; Using the rule "%A=%D;" we geneate generic:
+;;; Using the rule "%A=%D;" we generate generic:
 ;;; 
 ;;;    lda #0
 ;;;    ldx #0
@@ -1273,7 +1273,7 @@ FUNC _biosend
 ;;;   to be used to detect write using null pointer
 zero:   .res 2  
 
-;;; compilation : tos = %D, dos =%A
+;;; compilation : tos = %D (%V)
 ;;; running code: tos, dos temporary save/deref
 tos:    .res 2
 dos:    .res 2
@@ -2356,7 +2356,8 @@ originp:        .res 2
         stx erp+1
 .endif        
 
-VOSSTART=vars
+;;; Get's increased by two before use
+VOSSTART=vars-2
 ;;; TODO: where to allocate, grow down like stack
 ;;;   what's safe margin
 ;;;   and can this become TOPOFMEMORY?
@@ -2846,6 +2847,13 @@ jsr putchar
         cmp #'v'
         bne :+
         
+        ;; - make sure start with ident
+        lda (inp),y
+        cmp #'_'
+        beq @ok
+        jsr isalpha
+        beq failjmp             ; 0 if !a-zA-Z
+@ok:
         ;; - use rule
         lda #VARRULENAME
         jmp enterrulebyname
@@ -2930,11 +2938,23 @@ noimm:
         bcs :+
 
         ;; - SKIPPER
-        ;; -- tos= address+1 (pointer to binary data!)
+        ;; -- dos= address+1 (pointer to binary data!)
         ldy rule
-        sty tos
+        sty dos
         ldx rule+1
-        stx tos+1
+        stx dos+1
+
+        ;; -- Skip n bytes
+        ;; C= 0
+        jsr skipperPlusC
+
+        ;; -- %* - dereference tos= *dos;
+        ldy #1
+        lda (dos),y
+        sta tos+1
+        dey
+        lda (dos),y
+        sta tos
 
 .ifdef DEBUGNAME
     php
@@ -2947,7 +2967,7 @@ noimm:
 
         ;; -- Skip n bytes
         ;; C= 0
-        jsr skipperPlusC
+;        jsr skipperPlusC
         jmp _next
 
 :       
@@ -6052,7 +6072,7 @@ tya
 ;;; TODO: store addresss of arr in variable
 
         ;; variable
-        .byte "|%V"
+        .byte "|%v"
       .byte '['
         lda VAR0
         ldx VAR1
@@ -6429,12 +6449,11 @@ jsr axputh
 ;;;   is only useful/safe for arrays!
 ;;; 
 ;;; pointer
-;        .byte "|&%V"
 
 ;;; TODO: restrict pointer to "local"
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
-        .byte "|&",VARRULENAME,"%*"
+        .byte "|&%v"
       .byte '['
         lda #'<'
         ldx #'>'
@@ -6527,8 +6546,8 @@ FUNC _oprulesstart
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
-        .byte "=>%A"
-      .byte "[D"
+        .byte "=>%v"
+      .byte "["
         sta VAR0
         stx VAR1
       .byte "]"
@@ -6596,8 +6615,7 @@ FUNC _oprulesstart
 
 .else ; !MINIMAL
 
-;        .byte "|+%V"
-        .byte "|+%v%*"
+        .byte "|+%v"
       .byte '['
         clc
         adc VAR0
@@ -7807,7 +7825,6 @@ ruleN:
 .ifdef FOLD
         ;; constant partial evaluation!
         ;; TODO: expand to constant folding
-;        .byte "const",_T,"%A="
         .byte "const","word","%A="
 
       .byte "%{"
@@ -8561,7 +8578,7 @@ afterELSE:
 
         ;; goto
 ;;; TODO: %A can be %V ???
-        .byte "|goto%A;"
+        .byte "|goto%v;"
       .byte "["                ; get aDdress
         jmp (VAL0)
       .byte "]"
@@ -8571,7 +8588,7 @@ afterELSE:
         ;; IF( var < num ) ... saves 6 B (- 63 57)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%A<%D)"
+        .byte "|if(%v<%D)"
 .scope        
       .byte "["
         ;; 14
@@ -9812,32 +9829,19 @@ putc '<'
         ;;   (and reset whenver we have : PUSHLOC etc)
         ;;   we may be able to save 4 bytes!
 
-        .byte "|%A=0;"
-      .byte "[D"
+        .byte "|%v=0;"
+      .byte "["
         lda #0
         sta VAR0
         sta VAR1
       .byte "]"
 .endif ; OPTRULES
 
-        ;; A=7; // simple assignement, ONLY as statement
-        ;; and can't be nested or part of expression
-        ;; (unless we use a stack...)
-        .byte "|%A=",_E,";"
-      .byte "[D"                ; 'D' => tos=dos
-        sta VAR0
-        stx VAR1
-      .byte "]"
-
-;;; TODO: simplify to %A .. and %V ...
-;	.byte "|",VARRULENAME,"%*[#]=",_E,";"
-;        .byte "|%v%*[#]=",_E,";"
-        .byte "|%v%*[#]=",_E,";"
+        ;; A=7; // simple assignement
+        .byte "|%v=[#]",_E,";"
       .byte "[;"
         sta VAR0
         stx VAR1
-jsr _printu
-PUTC 10
       .byte "]"
 
 .ifdef OPTRULES
@@ -11635,6 +11639,7 @@ WHILESIZE=1
 ;
 DEF=1
 .ifdef DEF
+        .byte "word a;",10
         .byte "word hEll0;",10
         .byte "word gurka33;",10
         .byte "word fish_666;",10
@@ -11651,7 +11656,7 @@ DEF=1
         .byte "  a=0;",10
         .byte "  fish_42=21;",10
         .byte "  a=a+fish_42*2;",10
-        .byte "  putu(a);",10
+        .byte "  putu(fish_42);",10
         .byte "return 4711; }",0
 .endif ; DEF
 
