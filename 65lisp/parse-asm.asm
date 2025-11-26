@@ -935,7 +935,6 @@
 ;;; 
 ;;; TODO:?
 ;;; - %n - define NEW LOCAL
-;;; - %v - match LOCAL USAGE of name
 ;;; 
 ;;; - %r - the branch can be relative
 ;;; - %P - match iff word* pointer (++ adds 2, char* add 1)
@@ -2226,6 +2225,10 @@ _start:
 ;;; 'A' for assigment
 percentchar:  .res 1
 
+;;; TODO: remove! LOL
+whatvarpercentchar:      .res 1
+
+
 ;;; not pushing all
 ;state:  
   rule:   .res 2
@@ -2357,7 +2360,7 @@ originp:        .res 2
 .endif        
 
 ;;; Get's increased by two before use
-VOSSTART=vars-2
+VOSSTART=vars+64-2   ; lowercase 'a'...
 ;;; TODO: where to allocate, grow down like stack
 ;;;   what's safe margin
 ;;;   and can this become TOPOFMEMORY?
@@ -2844,9 +2847,17 @@ jsr putchar
 
         ;; Identifier?
         ;; (this goes to subrule and will do it's own _incR)
-        cmp #'v'
+        cmp #'A'                ; %A used often for Assign
+        beq @vars
+
+        cmp #'V'                ; %V used for the variable (value)
         bne :+
-        
+
+@vars:
+        ;; HACK! - remove once we figure out the flow...
+        ;; (maybe remove %A or it's usage of DOS? use stack)
+        sta whatvarpercentchar
+
         ;; - make sure start with ident
         lda (inp),y
         cmp #'_'
@@ -2940,9 +2951,9 @@ noimm:
         ;; - SKIPPER
         ;; -- dos= address+1 (pointer to binary data!)
         ldy rule
-        sty dos
+        sty pos
         ldx rule+1
-        stx dos+1
+        stx pos+1
 
         ;; -- Skip n bytes
         ;; C= 0
@@ -2950,11 +2961,25 @@ noimm:
 
         ;; -- %* - dereference tos= *dos;
         ldy #1
-        lda (dos),y
+        lda (pos),y
         sta tos+1
         dey
-        lda (dos),y
+        lda (pos),y
         sta tos
+
+;;; TODO: old percent char not here!!!! 
+        ;; -- %A tos=dos lol
+        ;; (compat with old %A)
+        lda whatvarpercentchar
+        cmp #'A'
+        bne @notA
+        
+        lda tos
+        sta dos
+        lda tos+1
+        sta dos+1
+@notA:
+
 
 .ifdef DEBUGNAME
     php
@@ -5998,7 +6023,7 @@ tya
         inc VAR1
 :       
         lda VAR0
-       ldx VAR1
+        ldx VAR1
       .byte ']'
 
         .byte "|--%V"
@@ -6072,7 +6097,7 @@ tya
 ;;; TODO: store addresss of arr in variable
 
         ;; variable
-        .byte "|%v"
+        .byte "|%V"
       .byte '['
         lda VAR0
         ldx VAR1
@@ -6453,7 +6478,7 @@ jsr axputh
 ;;; TODO: restrict pointer to "local"
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
-        .byte "|&%v"
+        .byte "|&%V"
       .byte '['
         lda #'<'
         ldx #'>'
@@ -6546,7 +6571,7 @@ FUNC _oprulesstart
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
-        .byte "=>%v"
+        .byte "=>%V"
       .byte "["
         sta VAR0
         stx VAR1
@@ -6615,7 +6640,7 @@ FUNC _oprulesstart
 
 .else ; !MINIMAL
 
-        .byte "|+%v"
+        .byte "|+%V"
       .byte '['
         clc
         adc VAR0
@@ -8578,7 +8603,7 @@ afterELSE:
 
         ;; goto
 ;;; TODO: %A can be %V ???
-        .byte "|goto%v;"
+        .byte "|goto%V;"
       .byte "["                ; get aDdress
         jmp (VAL0)
       .byte "]"
@@ -8588,7 +8613,7 @@ afterELSE:
         ;; IF( var < num ) ... saves 6 B (- 63 57)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%v<%D)"
+        .byte "|if(%V<%D)"
 .scope        
       .byte "["
         ;; 14
@@ -9829,7 +9854,7 @@ putc '<'
         ;;   (and reset whenver we have : PUSHLOC etc)
         ;;   we may be able to save 4 bytes!
 
-        .byte "|%v=0;"
+        .byte "|%V=0;"
       .byte "["
         lda #0
         sta VAR0
@@ -9838,7 +9863,7 @@ putc '<'
 .endif ; OPTRULES
 
         ;; A=7; // simple assignement
-        .byte "|%v=[#]",_E,";"
+        .byte "|%V=[#]",_E,";"
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -11636,8 +11661,7 @@ WHILESIZE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrasm ...
-;
-DEF=1
+;DEF=1
 .ifdef DEF
         .byte "word a;",10
         .byte "word hEll0;",10
@@ -12659,6 +12683,22 @@ NOPRINT=1
 ;;; so 104 bytecodes is substantially lower than MC: 365...
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "#include <stdio.h>",10
+
+;;; TODO: allow several vars defined on one line, LOL
+        .byte "word a;",10
+                .byte "word b;",10
+        .byte "word c;",10
+                .byte "word d;word e;word f;word g;word h;",10
+        .byte "word i;",10
+                .byte "word j;",10
+        .byte "word k;",10
+                .byte "word l;",10
+        .byte "word m;",10
+        .byte "word n;",10
+                .byte "word o;"
+        .byte "word p;",10
+                .byte "word q;word r;word s;word t;word u;word v;word w;",10
+
         .byte "word main(){",10
        ;; BYTE MAGAZINE 8192 => 1899
         .byte "  m=8192;",10
