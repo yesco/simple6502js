@@ -2835,12 +2835,21 @@ percent:
         lda (rule),y
 
         sta percentchar
-
 .ifdef DEBUGFUN
 putc '%'
 lda percentchar
 jsr putchar
 .endif ; DEBUGFUN
+
+        ;; Identifier?
+        ;; (this goes to subrule and will do it's own _incR)
+        cmp #'v'
+        bne :+
+        
+        ;; - use rule
+        lda #VARRULENAME
+        jmp enterrulebyname
+:       
 
         ;; - skip it assumes A not modified
         ; pha
@@ -3114,16 +3123,20 @@ PUTC '>'
 
         ;; TAILREC?
         cmp #TAILREC
-        bne @pushnewrule
+        bne pushnewrule
 
-.ifdef DEBUGRULE2
-;        putc 'R'
-.endif
         jmp _acceptrule
 
+pushnewrule:
+        ;; Hi-bit set, and it's not '*'
 
-;;; Hi-bit set, and it's not '*'
-@pushnewrule:
+        ;; - load new rule pointer
+        ldy #0
+        lda (rule),y
+enterrulebyname:
+        sta savea
+
+        ;; - save current rule
         lda rule+1
         pha
         lda rule
@@ -3133,8 +3146,7 @@ PUTC '>'
 
         ;; save re-skipping!
 ;;; TODO: would like to get rid of this
-;;;   but _next skips whitespace only
-;;;   (I think?)
+;;;   but _next skips whitespace only (I think?)
 ;;; This skips // comments and #define #include...
         jsr nextInp
 
@@ -3146,10 +3158,10 @@ PUTC '>'
         lda #'i'
         pha
 
-        ;; - load new rule pointer
-        lda (rule),y
-enterrulebyname:        
+        ;; - set rule name
+        lda savea
         sta rulename
+
 
 .ifdef DEB3
     PUTC ' '
@@ -6585,7 +6597,7 @@ FUNC _oprulesstart
 .else ; !MINIMAL
 
 ;        .byte "|+%V"
-        .byte "|+",VARRULENAME,"%*"
+        .byte "|+%v%*"
       .byte '['
         clc
         adc VAR0
@@ -9818,10 +9830,14 @@ putc '<'
       .byte "]"
 
 ;;; TODO: simplify to %A .. and %V ...
-        .byte "|",VARRULENAME,"%*[#]=",_E,";"
+;	.byte "|",VARRULENAME,"%*[#]=",_E,";"
+;        .byte "|%v%*[#]=",_E,";"
+        .byte "|%v%*[#]=",_E,";"
       .byte "[;"
         sta VAR0
         stx VAR1
+jsr _printu
+PUTC 10
       .byte "]"
 
 .ifdef OPTRULES
