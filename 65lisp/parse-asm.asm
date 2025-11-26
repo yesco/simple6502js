@@ -1827,7 +1827,6 @@ FUNC _stdioend
 
 .include "lib-math.asm"         ; mul mul10 mul16 div16
 
-
 ;;; ------- <time.h>
 ;;; - clock difftime
 ;;; - va_start va_arg va_copy va_end
@@ -1974,6 +1973,9 @@ FUNC _libraryend
 .include "lib-stdio.asm"
 .endif ; STDIO
 
+.ifndef CTYPE
+;.include "lib-ctype.asm"
+.endif ; CTYPE
 
 
 
@@ -10582,9 +10584,39 @@ FUNC _OK
         lda tos
         ldx tos+1
         jsr _printu
+        PRINTZ {" Bytes"}
+
+        PRINTZ {" (libs +"}
+        sec
+        lda #<_libraryend
+        sbc #<_librarystart
+        pha
+        tay
+        lda #>_libraryend
+        sbc #>_librarystart
+        pha
+        tax
+        tya
+
+        jsr _printu
         
-        putc ' '
-        PRINTZ {" Bytes",10,10}
+        PRINTZ {" 'tap'="}
+        clc
+        pla
+        tax
+        pla
+        adc tos
+        tay
+        txa
+        adc tos+1
+        tax
+        tya
+
+        ;; TODO: +bios
+        jsr _printu
+
+        PRINTZ {"+bios)",10,10}
+
 
         jmp _eventloop
 
