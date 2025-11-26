@@ -6584,7 +6584,8 @@ FUNC _oprulesstart
 
 .else ; !MINIMAL
 
-        .byte "|+%V"
+;        .byte "|+%V"
+        .byte "|+",VARRULENAME,"%*"
       .byte '['
         clc
         adc VAR0
@@ -9816,6 +9817,13 @@ putc '<'
         stx VAR1
       .byte "]"
 
+;;; TODO: simplify to %A .. and %V ...
+        .byte "|",VARRULENAME,"%*[#]=",_E,";"
+      .byte "[;"
+        sta VAR0
+        stx VAR1
+      .byte "]"
+
 .ifdef OPTRULES
         .byte "|%A>>=1;"
       .byte "[D"
@@ -11623,6 +11631,11 @@ DEF=1
         .byte "  puth(&gurka33); putchar('\n');",10
         .byte "  puth(&hEll0); putchar('\n');",10
 ;        .byte "  puth(&not_find); putchar('\n');",10
+
+        .byte "  a=0;",10
+        .byte "  fish_42=21;",10
+        .byte "  a=a+fish_42*2;",10
+        .byte "  putu(a);",10
         .byte "return 4711; }",0
 .endif ; DEF
 
