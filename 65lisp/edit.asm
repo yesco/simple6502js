@@ -480,6 +480,10 @@ edel:
 ;;; ------------ END CTRL DISPATCH
         
 
+;EDITCOLORCOLS=1
+EDITCOLOR=GREEN & 127
+
+
 ;;; raw raw raw - relatively fast!
 FUNC _redraw 
 ;;; (+ 24 55) = 79
@@ -487,11 +491,13 @@ FUNC _redraw
         ;; we need to set the cursor when drawing!
         jsr togglecursor
 
+        ;; Text pos
         lda #<EDITNULL
         ldx #>EDITNULL
         sta pos
         stx pos+1
 
+        ;; Screen pos
         lda #<(SC+40)
         ldx #>(SC+40)
         sta tos
@@ -503,6 +509,12 @@ FUNC _redraw
         ldx #WIDTH
         ldy #0
 
+
+.ifdef EDITCOLOR
+        jmp @color
+.endif ; EDITCOLOR
+
+
 @nextc:
 ;;; 
         inc pos
@@ -511,30 +523,33 @@ FUNC _redraw
 :
 @nextln:        
         ;; copy byte
+
         lda (pos),y
+        ;; end of text?
         beq @clreol             ; clrEOS!
 
 ; no goes bad?
 ;        cmp #128
 ;        beq @clreol             ; clrEOS!
 
+@putc:
+        ;; write to screen
         sta (tos),y
         ;; at cursor, save COL
         bpl :+
         stx editcol
         ;; store editrow? currently used as loopvar
 :
-        ;; remove "hibit" cursor indicator/inverse
+        ;; remove "hibit" cursor indicator/inverse from text
         and #$7f
         sta (pos),y
+
         ;; newline => clear *rest* of line
         cmp #10
-
-;;; dots "clear" on EVERY SECOND??? line?
+        ;; TODO: dots "clear" on EVERY SECOND??? line?
         beq @noclearlastchar
-
-;;; dots "clear" on every line
-;        beq @clreol
+        ;; dots "clear" on every line
+        ;        beq @clreol
 
 
 @forw:
@@ -542,6 +557,7 @@ FUNC _redraw
         bne :+
         ;; wrap text for this line
         ldx #WIDTH
+;;; TODO: COLOR? no color/truncate?
         ;; no more screen rows?
         dec editrow
         beq @done
@@ -551,18 +567,16 @@ FUNC _redraw
         bne :+
         inc tos+1
 :       
-        ;; always
+        ;; Always
         bne @nextc
 
 
         ;; we clear till end of line
-
-;;; TODO: can clreol be combined wtih @forw? similar...
-
 @clreol:
-;;; enable to detect every second line gets .....!
+;;; TOOD: BUG enable to detect every second line gets .....!
 ;        lda #'.'
         lda #' '
+@colorln:
         sta (tos),y
 
 @noclearlastchar:
@@ -585,11 +599,25 @@ FUNC _redraw
         lda (pos),y
         beq @clreol
 
+;;; TODL: can this be simplified?
+.ifdef EDITCOLOR
+@color:
+        lda #EDITCOLOR
+        sta (tos),y
+        ;; Always
+        bne @forw
+.else
+        ;; Always
         bne @nextc
+.endif ; EDITCOLOR
 
 @done:
         ;; reverse editcol
-        lda #40
+.ifdef xEDITCOLOR
+        lda #WIDTH-1
+.else
+        lda #WIDTH
+.endif
         sec
         sbc editcol
         sta editcol

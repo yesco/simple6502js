@@ -11644,6 +11644,28 @@ input:
 ;        .byte "word main(){ return 4711; }",0
 
 
+
+;EDITORTEST=1
+;;; (* 200 35) = 7000 B, 3 chars/second
+
+.ifdef EDITORTEST
+
+;.repeat 200, I
+
+;;; (* 50 35) = 1750 B, 7 chars/second (?)
+.repeat 50, I
+
+  .byte .sprintf("%d: ",I)
+  .res 30,'A'
+  .byte 10
+.endrep
+
+.byte 0
+
+.endif ; EDITORTEST
+
+
+
 ;;; TEST size of WHILE loops
 ;
 WHILESIZE=1
