@@ -512,6 +512,10 @@ FUNC _redraw
 
 .ifdef EDITCOLOR
         jmp @color
+;        lda #EDITCOLOR
+;        sta (pos),y
+        ;; Always
+;        bne @forw
 .endif ; EDITCOLOR
 
 
@@ -599,13 +603,14 @@ FUNC _redraw
         lda (pos),y
         beq @clreol
 
-;;; TODL: can this be simplified?
 .ifdef EDITCOLOR
 @color:
         lda #EDITCOLOR
         sta (tos),y
         ;; Always
+;        bne @putc
         bne @forw
+;        bne @nextc
 .else
         ;; Always
         bne @nextc
@@ -613,7 +618,7 @@ FUNC _redraw
 
 @done:
         ;; reverse editcol
-.ifdef xEDITCOLOR
+.ifdef EDITCOLOR
         lda #WIDTH-1
 .else
         lda #WIDTH
