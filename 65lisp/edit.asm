@@ -324,6 +324,12 @@ FUNC _editaction
         cmp #127
         beq ebs
 
+        ;; e)dit key in command mode, lol
+        bit mode
+        bpl :+
+        cmp #CTRL('E')
+        beq jcmd
+:       
         ;; TODO: META (>128 keys?)
 
         ;; Insert normal characters
@@ -346,7 +352,9 @@ ctrl:
         lda ctrlbranch,x
         ;; self-modifying code
         sta patchbranch+1
+        txa
 
+        ;; C=1 to bcs/branch relatively
         sec
 patchbranch:
         bcs eprev               ; gets "self-modified"!

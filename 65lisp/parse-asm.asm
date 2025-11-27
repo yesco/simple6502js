@@ -2314,6 +2314,16 @@ NMIVEC=$0248                    ; => $F8B2
         sta NMIVEC
         stx NMIVEC+1
 
+        ;; Fix '_' character, which on ORIC ATMOS is
+        ;; an English Pound sign, to be underscore.
+        ;; (we null out 5 top rows, keep 6th bar=>underscore!)
+        ldx #5
+        lda #0
+:       
+        sta CHARSET+'_'*8,x
+        dex
+        bpl :-
+
 .endif ; __ATMOS__
 
 
@@ -11693,7 +11703,8 @@ WHILESIZE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrasm ...
-;DEF=1
+;
+DEF=1
 .ifdef DEF
         .byte "word a;",10
         .byte "word hEll0;",10
