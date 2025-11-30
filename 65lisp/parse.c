@@ -127,8 +127,8 @@ void disasmEnd(){}
 void CparseStart(){}
 
 // TODO: somehow still get varning?
-#pragma zpsym ("vars")
-extern unsigned int vars[64];
+//#pragma zpsym ("vars")
+//extern unsigned int vars[64];
 
 unsigned int num, addr, tmp;
 
@@ -168,10 +168,10 @@ char* parse(char r, char* in) {
       unsigned v= *in-'@';
       if (v>'z'-'@') goto fail;
       switch(c) {
-      case 'A': addr= (int)(vars+v); break;
-      case 'V': num= (int)(vars+v); break;
-      case 'N': vars[v]= (int)out; break;
-      case 'U': num= vars[v]; break;
+//      case 'A': addr= (int)(vars+v); break;
+//      case 'V': num= (int)(vars+v); break;
+//      case 'N': vars[v]= (int)out; break;
+//      case 'U': num= vars[v]; break;
       default: goto fail;
       }
     }

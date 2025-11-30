@@ -1124,7 +1124,21 @@ CHECKSTACK=1
 
 ;;; Zeropage vars should save many bytes!
 ;
+;;; TODO: clear out? it's "default" now, requirement!
 ZPVARS=1
+
+;;; How many arguments? (each take 2 bytes in zeropage)
+;;; used passing arguments of *recursive*
+;;; (including locals!)
+NPARAMS=8
+
+;;; How much space for STatic parameters used directly
+;;; by NON-OVERLAPPING functions. (not calling eachother)
+;;; Requires, more or less, a call-tree analysis, and
+;;; NON-RECURSIVE functions.
+
+;;; TODO: BIGBIGBIGBIGBIGBIGBIG
+NSTARGS=8
 
 
 
@@ -1280,7 +1294,8 @@ dos:    .res 2
 pos:    .res 2
 ;;; used by FOLD, maybe memcpy ???
 gos:    .res 2
-;;; used by variable allocation in zeropage
+
+;;; used by variable allocation in zeropage (grow down)
 vos:    .res 2
 
 ;;; temporaries for saved register
@@ -1504,9 +1519,9 @@ OPTJSK_CALLING=1
 
 .macro SWAP nn
 ;;; 8 B  19c
-        ldx VARa-1+nn
+        ldx params-1+nn
         pla
-        sta VARa-1+nn
+        sta params-1+nn
         txa
         pha
         pla
@@ -1575,9 +1590,9 @@ swapY:
 :       
         ;; swap byte
         ;; TODO: use ,x to do zero, save bytes
-        ldx VARa-1,y
+        ldx params-1,y
         pla
-        sta VARa-1,y
+        sta params-1,y
         txa
         pha
         ;; step up
@@ -1618,7 +1633,7 @@ restoreY:
         tay
 :       
         pla
-        sta VARa-1,y
+        sta params-1,y
         dey
         bne :-
 
@@ -1639,7 +1654,7 @@ restoreY:
 
 .macro PLOP nn
         pla
-        sta VARa-1+nn
+        sta params-1+nn
 .endmacro
 
 
@@ -2371,12 +2386,18 @@ originp:        .res 2
         stx erp+1
 .endif        
 
-;;; Get's increased by two before use
-VOSSTART=vars+64-2   ; lowercase 'a'...
+;;; Get's decreased by two before use
+VOSSTART=256   ; grow down.
+;;; TODO: use single ZP address!
+
+
 ;;; TODO: where to allocate, grow down like stack
 ;;;   what's safe margin
 ;;;   and can this become TOPOFMEMORY?
 ;;; want to keep around for debugging
+
+
+;;; TODO: bad name, pointer to start VAR rule
 
 ;;; TODO: better name
 VARS=HIRES-256
@@ -3824,59 +3845,9 @@ DEBC '$'
         sta tos
         stx tos+1
 
+jmpnext:       
         jmp _next
 :       
-
-
-;;; OLD STYLE: matching single ident (char) only
-
-        ;; ? match 
-        ldy #0
-        lda (inp),y
-.ifnblank
-PUTC '%'
-jsr putchar
-.endif
-
-@global:
-        ;; verify/parse single letter var
-        sec
-        sbc #'A'
-        sta savea
-
-        ;; uppercase for test
-        and #255-32
-        cmp #'Z'-'A'+1
-        bcc :+
-        jmp failjmp
-:
-
-        ;; get offset back
-        lda savea
-
-;;; TODO: move a-z A-Z to zp
-        ;; pick global address
-        asl
-        adc #<vars
-
-;;; TODO: dos and tos??? lol
-;;;    good for a+=5; maybe?
-        sta tos
-        tay
-;;; TODO: simplify (?)
-        lda #>vars
-        adc #0
-        sta tos+1
-        ;; AY = lohi = addr
-
-.ifdef DEBUGFUN
-putc '!'
-lda percentchar
-jsr putchar
-jsr puth
-.endif ; DEBUGFUN
-
-        lda percentchar
 
         ;; ? %I match an long name ident
         cmp #'I'
@@ -3884,137 +3855,20 @@ jsr puth
 
         jmp _ident
 :       
-        ;; ? %N = New defining function/variable
+
+        ;; TODO: define function! 
+        ;;    maybe do %{ inline as with jsr _newvar?
         cmp #'N'
-        bne :+
-
-        ;; - *FUN = out // *tos= out
-        lda _out
-        ldy #0
-        sta (tos),y
-        iny
-        lda _out+1
-        sta (tos),y
-.ifdef DEBUGFUN
-putc '='
-ldy #1
-lda (tos),y
-tax
-dey
-lda (tos),y
-jsr axputh
-.endif ; DEBUGFUN
-        jmp @set
-:
-        ;; %U = Use value of variable
-        ;; (for functions if forward, may not
-        ;;  have value jmp (ind) more safe!)
+        beq jmpnext
+        ;; TODO: define function! 
+        ;;    maybe do %{ inline as with jsr _newvar?
         cmp #'U'
-        bne @nofun
-.ifdef DEBUGFUN
-PUTC 'U'                       
-.endif ; DEBUGFUN
-        ;; - tos = *tos !
-        ldy #1
-        lda (tos),y
-        tax
-        dey
-        lda (tos),y
-
-        ;; tos= *tos (get value of var/fun)
-        sta tos
-        stx tos+1
-.ifdef DEBUGFUN
-putc ':'
-jsr puth
-.endif ; DEBUGFUN
-        jmp @noset
-
-        ;; TODO: idea: push to auto-gen funcall?!
-.ifnblank
-        ;; hi
-        lda (tos),1
-        pha
-        lda (tos),0
-        pha
-        lda #'f'
-        jmp _next
-.endif
+        beq jmpnext
 
 
-@nofun:
-        
-.ifnblank
-        ;; - is assignment? => set dos
-        ;; percentchar='A' >>1 => C=1
-        ;;             'V' >>1 => C=0
-        ror percentchar
-        bcc @noset
-        ;; - do set dos
-.else
-        cmp #'A'
-        beq @set
-        cmp #'V'
-        beq @noset
-        ;; err
+        ;; %??? no match - give compile/fatal error
+;        lda #'%'
         jmp error
-.endif
-        
-@set:
-        lda tos
-        sta dos
-        lda tos+1
-        sta dos+1
-
-@noset:
-        ;; skip read var char
-        jmp _nextI
-
-
-.ifdef LONGNAMES
-    putc '$'
-        jsr _parsename
-        beq failjmp2
-        ;; got name
-        jsr _find
-        ;; return address
-    ldy #2
-    lda (pos),y
-    sta tos
-    iny
-    lda (pos),y
-    sta tos
-
-    jsr putu
-
-    PRINTZ "HALT"
-    jmp halt
-
-.else ; !LONGNAMES
-
-        sec
-        sbc #'a'
-        cmp #'z'-'a'+1
-        bcc @skip
-        jmp failjmp
-@skip:
-
-;;; LOCAL
-.ifnblank
-        lda percentchar
-        cmp #'a'
-        bcc @global
-@local:
-        ;; pick local address (a,b,c...)
-        asl
-        sta tos
-;;; TODO: use JSR/RTS loop intead of _next?
-        jmp _next
-.endif
-
-.endif ; !LONGNAMES
-
-
 
 ;;; TODO: can conflict w data
 ;;;   write .pl script look at .lst output?
@@ -4513,10 +4367,6 @@ FUNC _incVARS
         ldx #_ruleVARS
         SKIPTWO
 ;;; TODO: is it worth it +3 B, used 2x 3 B=9 B, or 11 B
-FUNC _incV
-;;; 3  37c!
-        ldx #vos
-        SKIPTWO
 FUNC _incT
 ;;; 3  32c!
         ldx #tos
@@ -4559,7 +4409,11 @@ FUNC _stuffVARS
 FUNC _decVARS
         ldx #_ruleVARS
         SKIPTWO
+FUNC _decV
+        ldx #vos
+        SKIPTWO
 ;;; TODO: insert other DEC routines here
+
 FUNC _decT
         ldx #tos
         ;; fall-through
@@ -4809,8 +4663,8 @@ FUNC _newvar
 ;;; (+ 9 10 18 10) = 47 B
 ; 9
         ;; V(ar)Alloc 2 bytes
-        jsr _incV               ; doesn't touch A
-        jsr _incV
+        jsr _decV               ; doesn't touch A
+        jsr _decV
 .ifdef DEBUGNAME
 pha
 lda vos
@@ -7978,13 +7832,19 @@ ruleN:
 
 ;;; TODO: cleanup, don't use globals
 
-;;; TODO: don't use a..z, not correct
-;;; WORKS! 
-VARa= vars+('a'-'A')*2
+.zeropage
 
-;;; TODO: why doesn't it work?
-;;;   holds up parsing!
-;;VARa= _params
+;;; params used as registers for recursive (copying SAFE)
+params:          .res NPARAMS*2
+;;; STatic ARGumentS used fro dedicated static
+;;; addresses for arguments for functions that
+;;; *DON'T* overlap!
+;;; TODO:
+stargs:          .res NSTARGS*2
+
+.code
+
+;;; TODO: don't use a..z, not correct
 
 
 .ifdef TESTDISASM
@@ -8137,9 +7997,9 @@ POSTLUDE=1
 	;; TODO: use ,x to do zero addressing!
         ;;      save bytes?
         ;;   (somehow goes slower??? hmmm)
-        ldx VARa-1,y
+        ldx params-1,y
         pla
-        sta VARa-1,y
+        sta params-1,y
         txa
         pha
         ;; step up
@@ -8199,9 +8059,9 @@ POSTLUDE=1
         ;;  - rewriting the stack!)
         ;; swap byte
 ;;; TODO: use ,x to do zero addressing! save bytes
-        ldx VARa-1,y
+        ldx params-1,y
         pla
-        sta VARa-1,y
+        sta params-1,y
         txa
         pha
         ;; step up
@@ -8239,7 +8099,7 @@ POSTLUDE=1
 ;;; wquld be 6c faster/byte! (8 => 42c!)
 :       
         pla
-        sta VARa-1,y
+        sta params-1,y
         dey
         bne :-
 .else
@@ -8259,9 +8119,9 @@ POSTLUDE=1
         ;; (trying to be clever
         ;;  - rewriting the stack!)
         ;; swap byte
-        ldx VARa-1,y
+        ldx params-1,y
         pla
-        sta VARa-1,y
+        sta params-1,y
         txa
         pha
         ;; step up
@@ -8284,7 +8144,7 @@ POSTLUDE=1
 ;;; 13 c ok, it's faster...
 :       
         pla
-        sta VARa-1,y
+        sta params-1,y
         dey
         bne :-
 
@@ -11725,8 +11585,7 @@ WHILESIZE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrasm ...
-;
-DEF=1
+;DEF=1
 .ifdef DEF
         .byte "word a;",10
         .byte "word hEll0;",10
@@ -11735,6 +11594,7 @@ DEF=1
         .byte "word fish_42;",10
         .byte "word main(){",10
 ;;; TODO: don't use/allow &var - not safe for local!
+        .byte "  puth(&a); putchar('\n');",10
         .byte "  puth(&fish_42); putchar('\n');",10
         .byte "  puth(&fish_42); putchar('\n');",10
         .byte "  puth(&fish_666); putchar('\n');",10
@@ -13258,53 +13118,16 @@ arr:    .res 1200
 arr:    .res 256
 .endif
 
-.ifdef ZPVARS
-;;; TODO: don't initialize zp variables...
-  .zeropage
-.endif
 
-.export _params
-_params:        
-params: 
-;;; TODO: increase
-        .res 8*2
-
-;;; TODO: decrease/remove globals/make dynamic
-.export _vars
-_vars:
-vars:
-;        .res 2*('z'-'a'+2)
-;;; TODO: remove (once have long names)
-.ifndef TESTING
-        ;; @A-Z:.. GLOBAL FUNCS
-        .res 32*2
-        ;; `a-z: GLOBAL VARS
-        .res 28*2
-.else
-;;; Can't init zeropage, so nobody should rely on
-;;; these values.
-;;; TODO: memset in program before run/compile
-
-;;; FUNS A-Z / 32
-        .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-        .word 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0
-;;; VARS a-z / 26
-        ;;    a  b  c  d  e  f  g  h  i  j
-        .word 0,10,20,30,40,50,60,70,80,90
-        .word 100,110,120,130,140,150,160,170
-        .word 180,190,200,210,220,230,240,250,260
-.endif
-
-.ifdef ZPVARS
-  .code
-.endif
-
+.code
 
 ;;; variable defs
 ;;; TODO: rework to generate BNF parse rules!
 FUNC _defs
 
 defs:
+
+;;; TODO: change with new rules?
 
 ;;; test example
 ;;; TODO: remove?

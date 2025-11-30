@@ -126,10 +126,12 @@ void disasm(char* mc, char* end, char indent) {
 #endif // __ATMOS__
 
 
-extern char vars;
-#pragma zpsym ("vars")
+//extern char vars;
+//#pragma zpsym ("vars")
 
 void pvar(int a) {
+  return;
+#ifdef PVAR
   char c= a;
   if (a & 0xff00) return;
   c-= (int)&vars;
@@ -138,6 +140,7 @@ void pvar(int a) {
     printf(VAR"  %c", c/2+'A');
     if (c&1) printf("+1");
   }
+#endif
 }
 
 
