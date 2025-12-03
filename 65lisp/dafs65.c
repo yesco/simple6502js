@@ -146,6 +146,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #define TFILE '0'
 #define TDIR '5'
@@ -158,6 +159,63 @@ int sprefix(char* a, char* b) {
   int r= 0;
   while(*a && *a==*b) ++r,++a,++b;
   return r;
+}
+
+
+typedef unsigned int word;
+
+
+//FILE* dsk[4]={0};
+FILE* dsk= 0;
+
+const int heads= 22, tracks= 256, sectors= 256;
+
+// TODO: 
+word mount(int drive) {
+//  if (dsk) fclose(dsk);
+//  dsk= fopen(name, "w+");
+//  return !dsk;
+  return 0;
+}
+
+word gosector(int drive, int head, int track, int sector) {
+  assert(dsk);
+  
+  unsigned long p= (head*tracks + track)*sectors + sector;
+  return fseek(dsk, p*256, SEEK_SET);
+}
+
+word readsector(int drive, int head, int track, int sector, char* buffer) {
+  int err= gosector(drive, head, track, sector);
+  if (err) return err;
+  return 1 != fread(buffer, 256, 1, dsk);
+}
+
+word writesector(int drive, int head, int track, int sector, char* buffer) {
+  int err= gosector(drive, head, track, sector);
+  if (err) return err;
+  return 1 != fwrite(buffer, 256, 1, dsk);
+}
+
+word dafsmkdisk(int drive, int heads, int tracks, int sectors, char* name) {
+  char buff[256]= {0};
+  int err= 0;
+
+  dsk= fopen(name, "w+");
+  if (!dsk) return -1;
+
+  for(int h=0; h<heads; ++h) {
+    for(int t=0; t<tracks; ++t) {
+      for(int s=0; s<sectors; ++s) {
+        if ((err= writesector(drive, h, t, s, buff))) {
+          fprintf(stderr, "%%dafsmkdisk: ERROR drive=%d h=%d t=%d s=%d\n", drive, h, t, s);
+          return err;
+        }
+      }
+    }
+  }
+  
+  return fflush(dsk);
 }
 
 
@@ -185,7 +243,7 @@ void dofile(FILE* f, char type, unsigned long long size, char* name) {
 
   fprintf(stdout,
 //        "%cc%s" "%c%c%s" "#%llu",
-          "--T='%c'(%d) %d %d %s" " %d %d %s" " #%llu" "\n",
+          "--T='%c'(%d) %d %lu %s" " %d %d %s" " #%llu" "\n",
 type,type,
           prefix, strlen(fname), name+prefix,
           family, coli, column,
@@ -199,8 +257,18 @@ type,type,
 //  also not writing full block to the tar file?"
 
 int main(int argc, char **argv) {
-  FILE *f = (argc > 1) ? fopen(argv[1], "rb"): 0;
+  if (argc < 2) {
+    perror("Usage: dafs65 DSK [TAR]\n");
+    exit(1);
+  }
+
+  FILE *f = (argc > 2) ? fopen(argv[2], "rb"): 0;
+  // fseek may not work with stdin??? only if file is piped!
   if (!f) f = stdin;
+
+  // TODO: make distinction between create/update?
+  dafsmkdisk(0, 2, 256, 256, argv[1]);
+
 
   char block[512];
   while (fread(block, 1, 512, f) == 512) {
