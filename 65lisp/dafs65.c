@@ -174,8 +174,29 @@ void dofile(FILE* f, char type, unsigned long long size, char* name) {
   prefix= sprefix(fname, name);
   strcpy(fname, name);
 
-  printf("%6llu  %3lu %3d : %*s%s\n", size, strlen(fname), prefix, prefix, "", name+prefix);
+  // TODO: add columm fam+name part of prefix
+
+  //fprintf(stderr, "%% %6llu  %3lu %3d : %*s%s\n", size, strlen(fname), prefix, prefix, "", name+prefix);
+  
+  // print out actual encoded data
+  char family= 0; // default family
+  char* column= ""; // TODO:
+  char coli= *column ? strlen(column)+128: 1; // "FILE"
+
+  fprintf(stdout,
+//        "%cc%s" "%c%c%s" "#%llu",
+          "--T='%c'(%d) %d %d %s" " %d %d %s" " #%llu" "\n",
+type,type,
+          prefix, strlen(fname), name+prefix,
+          family, coli, column,
+          size);
 }
+
+
+// generated largely by "grok" as minimal tar parser
+// It has a problem with "android tar files" that supposed
+// "overwrites the length, making the checksum wrong, and
+//  also not writing full block to the tar file?"
 
 int main(int argc, char **argv) {
   FILE *f = (argc > 1) ? fopen(argv[1], "rb"): 0;
@@ -196,6 +217,8 @@ int main(int argc, char **argv) {
     char size_str[12] = {0};
     char type = block[156];
 
+    type= type? type: '0';
+
     memcpy(name, block + 0,   100); name[99] = '\0';
     memcpy(size_str, block + 124, 12); size_str[11] = '\0';
 
@@ -207,22 +230,24 @@ int main(int argc, char **argv) {
 
     // Convert octal size to unsigned long long
     unsigned long long size = 0;
-    for (int i = 0; size_str[i]; i++) {
-      if (size_str[i] >= '0' && size_str[i] <= '7')
-        size = size * 8 + (size_str[i] - '0');
+    if (type == '0') {
+      for (int i = 0; size_str[i]; i++) {
+        if (size_str[i] >= '0' && size_str[i] <= '7')
+          size = size * 8 + (size_str[i] - '0');
+      }
     }
 
     // allow dofile to read the file
-    int pos= ftell(f);
+    long pos= ftell(f);
 
-    dofile(f, type? type: '0', size, name);
+    dofile(f, type, size, name);
 
     // reset file pos
     fseek(f, pos, SEEK_SET);
 
     // Skip data blocks (rounded up to 512 bytes)
     unsigned long long blocks = (size + 511) / 512;
-    fseek(f, blocks * 512, SEEK_CUR);
+    if (type == '0') fseek(f, blocks * 512, SEEK_CUR);
   }
 
   if (f != stdin) fclose(f);

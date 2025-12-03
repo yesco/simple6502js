@@ -21,7 +21,7 @@
 ;;; machine code.
 ;;;
 ;;; There are "token"-matchers: as %D to parse numeric
-;;; constants; %S %s strings, and %V %A %N %U to match
+;;; constants; %S %s strings, and %V %A %N to match
 ;;; variable and function names giving addresses and
 ;;; enabling scope management.
 ;;; 
@@ -709,7 +709,7 @@
 ;;; OPTRULES  :  1463 bytes = (+ 771 1090)
 ;;; LONGNAMES :  (- 1633 1529) = 104
 ;;;   (TODO: these are new LONGNAMES, not complete
-;;;          yet, needs hooking up with %A/%V/%U/%N?)
+;;;          yet, needs hooking up with %A/%V/%N?)
 ;;; 
 ;;; v= #x392 = 914 (- 914 882) = 32 (but I count 22B, hmm)
 ;;; v= #x372 = 882 
@@ -900,14 +900,13 @@
 ;;;        variable (use for assignment)
 ;;; 
 ;;; - %N - define NEW name (forward) TODO: 2x=>err!
-;;; - %U - USE value of NAME (tos= *tos)
 ;;; 
 
 
 ;;; - %I - read ident (really %N? but for longname)
 ;;;        (pushes (identaddress/word, name length/byte) on stack)
 ;;; 
-;;; - %* - dereference tos { tos= *(int*)tos; }
+;;; - %* - dereference tos { tos= *(int*)tos; } - old %U?
 ;;; 
 
 ;;; 
@@ -3047,7 +3046,7 @@ noimm:
         ;; ELSE assume it's %var..
 jmpvar: 
         ;; - % anything...
-        ;;   %V (or %A %N %U %...)
+        ;;   %V (or %A %N %...)
         jmp _var
 
 
@@ -3849,25 +3848,23 @@ jmpnext:
         jmp _next
 :       
 
-        ;; ? %I match an long name ident
+        ;; ? %Ident: match an long name ident
         cmp #'I'
         bne :+
 
         jmp _ident
 :       
-
-        ;; TODO: define function! 
-        ;;    maybe do %{ inline as with jsr _newvar?
+        ;; ? %New function
         cmp #'N'
-        beq jmpnext
-        ;; TODO: define function! 
-        ;;    maybe do %{ inline as with jsr _newvar?
-        cmp #'U'
-        beq jmpnext
+        bne :+
 
-
-        ;; %??? no match - give compile/fatal error
-;        lda #'%'
+        ;; add to env
+        lda #'0'                ; ignore type? 0 number of params
+;;; TODO: need to lookup, maybe have to set it?
+        jsr _newvar
+        jmp _next
+:       
+        ;; %??? no match - ERROR
         jmp error
 
 ;;; TODO: can conflict w data
@@ -4998,7 +4995,7 @@ rule0:
         
 
 ;;; aggregate statements
-ruleA:  
+ruleA: 
 
 
 .ifdef CUT2
@@ -5024,6 +5021,7 @@ ruleA:
 
         .byte _S,TAILREC,"|",0
 
+
 ;;; Block
 ruleB:  
         .byte "{}"
@@ -5038,14 +5036,17 @@ ruleB:
 
         .byte 0
 
-;;; stater of expression:
-;;; "Constant"/(variable) (simple, lol)
-ruleC: 
+
+;;; START of expression:
+;;;   var/const/arrayelt/funcall()
+ruleC:
         
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
 
 .ifdef STDIO
+;;; TODO: these don't really return anything...
+
         ;;  potentially first so no "|"
 
         ;; "IO-lib" hack
@@ -5570,7 +5571,6 @@ FUNC _memoryrulesstart
 
 
 
-
 .ifdef STDLIB
 
 ;;; TODO: cheating, using cc65 malloc/free :-(
@@ -5673,28 +5673,20 @@ SMALLER=1
       .byte "]"
 .endif
 
-
-        ;; TODO: more like statement
-        .byte "|SEI();"
-      .byte '['
-        sei
-      .byte ']'
-
-        .byte "|CLI();"
-      .byte '['
-        cli
-      .byte ']'
 FUNC _memoryrulesend
 
 
-
-;;; TODO: REMOVE! just for test (?)
-;;;  or generalize JSK_CALLING to handle 0 arg?
-        ;; Function call!!!
-        .byte "|%U[#]()"
-      .byte "[;"
+        ;; function call
+        .byte "|%V()"
+      .byte "%{"
+        putc '!'
+        putc '!'
+        putc '!'
+        IMM_RET
+      .byte '['
+        ;; lol, we need to quote JSR haha to have VAL0 used!
         DOJSR VAL0
-      .byte "]"
+      .byte ']'
 
 
 .ifndef JSK_CALLING
@@ -5705,7 +5697,7 @@ FUNC _memoryrulesend
 
         ;; Function call!!!
         ;; TODO: for 0 args this still pushes, lol
-        .byte "|%U[#]("
+        .byte "|%V[#]("
         .byte _W
       .byte "[;"
         DOJSR VAL0
@@ -5777,7 +5769,7 @@ tya
 ;;; 
 
         ;; Function call!!!
-        .byte "|%U[#]("
+        .byte "|%V[#]("
 ;.byte "%{"
 ;jsr puth
 ;IMM_RET
@@ -5859,25 +5851,6 @@ tya
         lda arr,x
         ldx #0
       .byte ']'
-
-
-        ;; function call
-        .byte "|%U()"
-      .byte '['
-        ;; lol, we need to quote JSR haha
-        DOJSR VAL0
-      .byte ']'
-
-
-        ;; EXTENTION
-        ;; .method call! - LOL
-        .byte "|.%U"
-      .byte '['
-        ;; parameter already in AX
-        DOJSR VAL0
-      .byte ']'
-
-
 
         ;; Surprisingly ++v and --v expression w value
         ;; arn't smalller or faster than v++ and v-- !
@@ -6407,7 +6380,7 @@ ruleU:
 
 ruleD:
 
-;;; TODO: generealize!
+;;; TODO: generalize!
 
 .ifdef CUT
         ;; "CUT" operator
@@ -6442,6 +6415,16 @@ FUNC _oprulesstart
         sta VAR0
         stx VAR1
       .byte "]"
+        .byte TAILREC
+
+
+        ;; EXTENTION
+        ;; .method call! - LOL
+        .byte "|.%V"
+      .byte '['
+        ;; parameter already in AX
+        DOJSR VAL0
+      .byte ']'
         .byte TAILREC
 
 
@@ -8170,16 +8153,20 @@ POSTLUDE=1
 
 
         ;; Define function definition
-;;; TODO: _T never fails...
+        ;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
 
+;;; ;TODO: %N? ???? define function
 
-        .byte "|word","%N()",_B
+        .byte "|word","%I%N()",_B
       .byte '['
         ;; TODO: This maybe be redundant if there is
-        ;; an return just before...
+        ;; a return just before...
         ;; 
         ;; Not easy to fix?
+        ;; (Can't just check if last byte is rts,
+        ;;  as there can be a jmp to the current pos,
+        ;;  see example below)
         ;; 
         ;; if (3) ; else return 5;
         ;; (if no return inserted after then
@@ -8386,15 +8373,16 @@ FUNC _stmtrulesstart
 ;;; Statement
 ruleS:
 
+        ;; empty statement is legal
+        .byte ";"
+        
+
 .ifdef PRINTASM
       .byte "%{"
         jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
 
-        ;; empty statement is legal
-        .byte ";"
-        
         ;; return from void function, no checks
         .byte "|return;"
       .byte '['
@@ -8403,10 +8391,10 @@ ruleS:
         
 .ifdef OPTRULES
         ;; save for no args function!
-        .byte "|return%U();"
+        .byte "|return%V();"
       .byte '['
         ;; TAILCALL save 1 byte
-        jmp VAL0
+        DOJSR VAL0
       .byte ']'
 .endif ; OPTRULES
 
@@ -8470,6 +8458,19 @@ else:
         ...
 afterELSE:      
 .endif
+
+
+        ;; TODO: more like statement
+        .byte "|SEI();"
+      .byte '['
+        sei
+      .byte ']'
+
+        .byte "|CLI();"
+      .byte '['
+        cli
+      .byte ']'
+
 
         ;; LABEL moved to end of ruleS
 
@@ -10765,6 +10766,9 @@ FUNC _asmprintsrc
         ;; from inp,y
         ;; 
         ;; (limit 256 chars)
+
+        jsr _printstack
+
         jsr _iasm
         
         PRINTZ {";",WHITE," "}
@@ -11499,7 +11503,7 @@ input:
 
         ;; MINIMAL PROGRAM
         ;; 7B 19c
-;        .byte "word main(){}",0
+        .byte "word main(){}",0
 
 ;        .byte "word main(){ return 4711; }",0
 
@@ -11585,7 +11589,8 @@ WHILESIZE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrasm ...
-;DEF=1
+;
+DEF=1
 .ifdef DEF
         .byte "word a;",10
         .byte "word hEll0;",10
@@ -12141,12 +12146,17 @@ CANT=1
         .byte 0
 .endif
 
-;FUN=1
+;
+FUN=1
 .ifdef FUN
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10
-        .byte "word G() { return F()+11; }",10
-        .byte "word main(){ return G(); }",0
+;        .byte "word G() { return F()+11; }",10
+;        .byte "word main(){ return G(); }",0
+        .byte "word main(){",10
+        .byte "  puth(&F); putchar('\n');",10
+        .byte "  puth(&G); putchar('\n');",10
+        .byte "}",0
 .endif
 
 
