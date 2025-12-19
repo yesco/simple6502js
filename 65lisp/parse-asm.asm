@@ -10455,9 +10455,7 @@ FUNC _OK
         lda tos
         ldx tos+1
         jsr _printu
-        PRINTZ {" Bytes"}
-
-        PRINTZ {" (libs +"}
+        PRINTZ {" Bytes (libs +"}
         sec
         lda #<_libraryend
         sbc #<_librarystart
@@ -10468,25 +10466,20 @@ FUNC _OK
         pha
         tax
         tya
-
         jsr _printu
         
-        PRINTZ {" 'tap'="}
-        clc
-        pla
-        tax
-        pla
-        adc tos
+        PRINTZ {"+bios)",10,10}
+        sec
+        lda #<_biosend
+        sbc #<_biosstart
+        pha
         tay
-        txa
-        adc tos+1
+        lda #>_biosend
+        sbc #>_biosstart
+        pha
         tax
         tya
-
-        ;; TODO: +bios
         jsr _printu
-
-        PRINTZ {"+bios)",10,10}
 
 
         jmp _eventloop
@@ -11141,6 +11134,9 @@ FUNC _extend
         jmp _eventloop
 
 
+
+;;; TODO: sedoric loads file save file
+;;; -  https://github.com/iss000/oricOpenLibrary/blob/main/lib-sedoric%2Flibsedoric.s
 
 FUNC _extendinfo
 .byte 10
@@ -12146,8 +12142,7 @@ CANT=1
         .byte 0
 .endif
 
-;
-FUN=1
+;FUN=1
 .ifdef FUN
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10

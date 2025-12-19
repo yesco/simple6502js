@@ -71,18 +71,19 @@ void fullputc(int c) {
   // text colors
   case (128) ... (128+7):
     // ORIC attributes take up one space
+    // TODO: why two spaces? one gets eaten up!
     printf("\e[%dm ", c-128+30); break;
 #ifdef DOUBLE
     putchar(' ');
 #endif
   // background colors
   case (128+16) ... (128+16+7):
-    printf("\e[%dm ", c-128-16+40); break;
+    printf("\e[%dm  ", c-128-16+40); break;
 #ifdef DOUBLE
     putchar(' ');
 #endif
   // inverse
-  case (128+32)...255:
+  case (128+32) ... 255:
 //    printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
     // ORIC console doesn't invert, just print chars
     fullputc(c&0x7f); break;
