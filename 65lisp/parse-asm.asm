@@ -1514,6 +1514,8 @@ OPTJSK_CALLING=1
 ;;;  1072631
 ;;; 13821624 (/ (- 13821624 1072631) 1000 23) = 554
 
+.ifdef FUNCALL
+
 .ifdef CALLSWAP8
 
 .macro SWAP nn
@@ -1708,6 +1710,9 @@ restore2:
 .endif ; JSK_CALLING
 
 .endif ; RECURSION
+
+.endif ; FUNCALL
+
 
 
 FUNC _runtimeend
@@ -5676,6 +5681,12 @@ SMALLER=1
 FUNC _memoryrulesend
 
 
+
+;FUNCALL=1
+
+FUNC _funcallstart
+
+.ifdef FUNCALL
         ;; function call
         .byte "|%V()"
       .byte "%{"
@@ -5687,7 +5698,6 @@ FUNC _memoryrulesend
         ;; lol, we need to quote JSR haha to have VAL0 used!
         DOJSR VAL0
       .byte ']'
-
 
 .ifndef JSK_CALLING
 
@@ -5809,6 +5819,10 @@ tya
 
 .endif ; JSK_CALLING
 
+
+.endif ; FUNCALL
+
+FUNC _funcallend
 
 
 
@@ -7805,11 +7819,20 @@ ruleN:
         .byte "|"
 .endif ; FOLD
 
+
+
+
+
+;;; DEFINING FUNCTIONS
+
+.ifdef FUNCALL
+
 ;;; DUMMY: for testing/prototype
 
 ;;; LOL uppercase WORD matches literary!
 
 ;;; TODO: _RECURSIVE  ???
+
 
         .byte "WORD","%N(a,b,c,d)"
 
@@ -8212,9 +8235,23 @@ POSTLUDE=1
 ;;;  still matters?
         
 
+.endif ; FUNCALL
+
+
+
         ;; Define variable
 
-        .byte "|word","%I;"
+;;; TODO: ... not working?
+
+;        .byte "|word","%I;"
+        .byte "|"
+;;; TODO: not getting here...
+        .byte "%{"
+        putc '!'
+        IMM_RET
+
+        .byte "word","%I;"
+
 ;;; 
 ;;; TODO: lol %I messes up stack, comes to ';'
 ;;;       then nobody cleans up!
@@ -11499,9 +11536,10 @@ input:
 
         ;; MINIMAL PROGRAM
         ;; 7B 19c
-        .byte "word main(){}",0
+;        .byte "word main(){}",0
 
-;        .byte "word main(){ return 4711; }",0
+        .byte "word main(){ return 4711; }",0
+.byte 0
 
 
 
@@ -11585,8 +11623,7 @@ WHILESIZE=1
 ;;; (Also happens to BYTESIEVE=1 only it's in
 ;;;  the comment, so not detected)
 ;;; DOESN'T happen (there) on ./rrasm ...
-;
-DEF=1
+;DEF=1
 .ifdef DEF
         .byte "word a;",10
         .byte "word hEll0;",10
