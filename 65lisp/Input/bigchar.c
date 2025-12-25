@@ -41,8 +41,6 @@ void lores(char m) {
   fill(0, 0, 28, 1, NORMAL+m);
 }
 
-char inverseon= 0;
-
 char MASK[]= {1, 2,
               4, 8,
               16, 64};
@@ -54,8 +52,8 @@ void setpixel(char x, char y) {
 //  if (x<2 || x>79 || y>=28*3) return;
   // TODO: protect color attributes?
   m |= p[a];
-  if (m >= 96) m&= (255-32);
-  p[a] = m | inverseon;
+  if ((m&127) >= 96) m&= (255-32);
+  p[a] = m;
 }
 
 void plotchar(char x, char y, char ch) {
@@ -86,21 +84,21 @@ void plot(char x, char y, char* s) {
 
 word main() {
   lores(1);
+
   fill(0, 1, 28, 1, WHITE+BG);
   fill(0, 2, 28, 1, BLACK);
 
   //             123456789012
-  plot(6,  0*8, "The C");
-  plot(6,  1*8, "Programming");
-  plot(6,  2*8, "Language");
+  plot(6,  1+0*8, "The C");
+  plot(6,  1+1*8, "Programming");
+  plot(6,  1+2*8, "Language");
 
   // print a big C!
 
 
   //             123456789012
-  plot(6,  8*8, "Jonas S");
-  plot(6,  9*8, "Karlsson");
-//plot(6,  8*8, "jsk@yesco.org");
+//plot(6,    8*8, "jsk@yesco.org");
+  plot(6,  4+9*8, "JS Karlsson");
 
  A:
   goto A;
