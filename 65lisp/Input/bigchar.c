@@ -82,6 +82,26 @@ void plot(char x, char y, char* s) {
   }
 }
 
+char bigC[]= {
+//          111111111122222222223333333333
+//0123456789012345678901234567890123456789
+ "\1                                        "
+ "                                        "
+ "             xxxxxxxxxxxx               "
+ "        xxxxxxxxxxxxxxxxxxxxxx          "
+ "     xxxxxxxxxxxxxxxxxxxxxxxxxxxxx      "
+ "   xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx    "
+ "  xxxxxxxxxxxx            xxxxxxxxxxx   "
+ "  xxxxxxxxx                  xxxxxxxxx  "
+ " xxxxxxxxx                    xxxxxxxxx " 
+ " xxxxxxxxx                    xxxxxxxxx " 
+ " xxxxxxxxx                              "
+ " xxxxxxxxx                              "
+ " xxxxxxxxx                              "
+ "\0"
+// <14
+};
+
 word main() {
   lores(1);
 
@@ -93,8 +113,35 @@ word main() {
   plot(6,  1+1*8, "Programming");
   plot(6,  1+2*8, "Language");
 
-  // print a big C!
-
+  if (1) {
+    // print a big C!
+    char *b= bigC+1+40;
+    // AFTER
+    char y= 3*8+1, x;
+    char i,n;
+    while (*b) {
+      for(n=3; --n; ) {
+        x= 20; ++y;
+        for(i=0; i<40; ++i) {
+          if (b[i]<=' ') setpixel(x, y);
+          ++x;
+        }
+      }
+      b+= 40;
+    }
+    // reverse!
+    do {
+      b-= 40;
+      for(n=3; --n; ) {
+        x= 20; ++y;
+        for(i=0; i<40; ++i) {
+          if (b[i]<=' ') setpixel(x, y);
+          ++x;
+        }
+      }
+      if (*b<' ') break; // TODO: not work?
+    } while(1);
+  }
 
   //             123456789012
 //plot(6,    8*8, "jsk@yesco.org");
