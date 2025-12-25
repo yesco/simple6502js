@@ -68,20 +68,21 @@ BIOSINCLUDED=1
 ;;; ----------------------------------------
 ;;;       C O N F I G U R A T I O N
 
+;;; TODO:?
+
 ;;; enable to invers character on hibit!
 ;;; This seems to have been an missed opportunito
 ;;; on ORIC. ('A'+128 will print an inverted 'A')
 
 ;HIBIT=1
 
+SCREEN_LINES= 28
+SCREEN_COLS= 40
 
 
 ;;; ========================================
 
 .zeropage
-
-;;; TODO: hmmm?
-sos:    .byte 0
 
 saveaputchar:   .res 1
 savexputchar:   .res 1
@@ -112,16 +113,15 @@ SCREND=SCREEN+40*28
 
 spc:    
         lda #' '
-
 putchar:        
         ;; '\n' -> '\n\r' = CRLF
         cmp #10                 ; '\n'
         bne rawputc
 newline:
 nl:     
-        lda #13                 ; '\r'
+        lda #13                 ; '\r' = CR
         jsr rawputc
-        lda #10
+        lda #10                 ;        LF
         ;; fall-through to rawputc
 
 rawputc:        
@@ -142,7 +142,7 @@ rawputc:
 ;;; 8 codes => (* 8 4) = 32 bytes
 
         ;; - cr
-        cmp #CTRL('M')          ; 10
+        cmp #CTRL('M')          ; 13
         beq cr
         ;; - lf
         cmp #CTRL('J')          ; 10
@@ -154,6 +154,12 @@ rawputc:
         cmp #CTRL('I')
         beq forward
 
+        ;; - del                ; 127
+        cmp #127
+        ;; restores regs several times, lol
+        jsr bs
+        jsr spc
+        jmp bs
         ;; - bs
         cmp #CTRL('H')
         beq bs
@@ -180,41 +186,36 @@ cr:
 lf:     
         inc cury
         lda cury
-        cmp #28
+        cmp #SCREEN_LINES
         beq scrollup
-        ;; - inc line ptr
-        ;; 11 B TODO: subroutine?
-        clc
+        ;; - inc line ptr w 40
+        ;; C=0
+lineptrdown:    
         lda curlineptr
-        adc #40
+        adc #SCREEN_COLS
         sta curlineptr
         bcc :+
         inc curlineptr+1
 :       
         jmp rawputret
 
-
-;;; put in the middel, as many exits through here
-
-writec: 
+;;; write actual character at presumed legal
+;;; location
+writec:
         ;; write it
-        ldy #0
+        ldy curx
         sta (curlineptr),y
 
         ;; inc pos
-        inc curx
-        lda curx
-        cmp #40
-        bne :+
-        jmp newline
+        iny
+        cmp #SCREEN_COLS
+        beq newline
+        sty curx
 
 rawputret:      
         ldy saveyputchar
         ldx savexputchar
         rts
-
-
-
 
 scrollup:
         ;; TODO: scrollup
@@ -222,7 +223,7 @@ scrollup:
         jsr home
         ;; - clear line
 
-clrln: 
+clrln:
         lda #' '
         ldy #39
 :       
@@ -268,7 +269,7 @@ forward:
        
 clrscr: 
         jsr home
-        ldx #27
+        ldx #SCREEN_LINES-1
         stx savexputchar
 @nextrow:
         ;; these "restore" savexputchar but don't save!
@@ -283,7 +284,7 @@ home:
         ldx #0
         sta curx
         sta cury
-
+homeptr:        
         ldx #<SCREEN
         stx curlineptr
         ldx #>SCREEN
@@ -291,7 +292,54 @@ home:
         ;; always 
         bne rawputret
 
+;;; 4+
+gotoxy: 
+        stx curx
+        sty cury
+;;; poor mans move gotoxy
+updatelineptr:  
+;;; 15
+        jsr homeptr
+        ldx curx
+        stx savexputchar
 
+:       
+        jsr lineptrdown
+        ;; lineptrdown=>rwaputret (last op = ldx)
+        dec savexputchar
+        bne :-
+        rts
+
+
+gotoxy: 
+        stx curx
+        sty cury
+updatelinteptr: 
+;;; 10+19+1 = 30
+        lda #0
+        sta saveaputchar
+        ;; a= y * 5 = y<<2 + y (max (* 27 5)=135)
+        lda cury
+        lsr
+        lsr
+        adc cury
+        ;; ax'= ax' * 8
+        asl
+        rol saveaputchar
+        asl
+        rol saveaputchar
+        asl
+        rol saveaputchar
+        ;; curlineptr = ax' + SCREEN
+        ;; C=0 (* 27 40) = 1080 < 64K
+;;; 10
+        adc #<SCREEN
+        sta curlineptr+0
+        lda saveaputchar
+        adc #>SCREEN
+        sta curlineptr+1
+
+        rts
 
 
 

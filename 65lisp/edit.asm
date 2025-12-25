@@ -174,10 +174,10 @@ ctrlbranch:
 
         ;; ^U-^Y
         BR eunused              ; ctrlU
-        BR jinfo
-        BR eunused              ; jwrite
-        BR jextend
-        BR eunused              ; eyank
+        BR jinfo                ; ctrlV
+        BR eunused              ; jwrite?
+        BR jextend              ; ctrlX
+        BR eunused              ; ctrlY (yank)
 
         ;; ^Z ESC
         BR jzource

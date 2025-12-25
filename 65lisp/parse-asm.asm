@@ -675,7 +675,7 @@
 
 
 ;;; 
-;;; OPTIONA FEATURES
+;;; OPTIONAL FEATURES
 ;;;
 ;;; - pointers (no type checking): *p= *p+1
 ;;; - I/O: getchar putc putu puth
@@ -698,9 +698,44 @@
 ;;; 
 ;;; gives a parse.tap in ORIC folder (symlink)
 
+;;; VERSION
+;;; - v0.1 void main() return
+;;; - v0.2 putc etc...
+;;; - v0.3 expr
+;;; - v0.4 unlimited statements (TAILREC)
+;;; - v0.5 IDEA/editor
+;;; - v0.60 long name variables
+;;; - v0.61 TODO: (slow) function calls
+;;; - v0.62 TODO: local variables
+;;; - v0.63 TODO: (opt) function calls (static params)
+;;; - v0.64 TODO: array indexing
+;;; - v0.69 TODO: ORIC DEMO release
+;;; - v0.7 TODO: load/write files
+;;; - v0.8 TODO: resolve expreessions issue
+;;; - v0.9 TODO: optional functions/"linker"/opt
+;;; - v0.99999...
+;;; - v1.0a TODO: alpha
+;;; - v1.0b TODO: beta
+;;; - v1.0rc TODO: release candidate
+;;; - v1.0 TODO: release
+;;; - v1.1
+;;; - v1.2
+;;; - v1.3
+;;; - v1.4
+;;; - v1.5
+;;; - v1.6
+;;; - v1.61
+;;; - v1.618
+;;; - v1.6180
+;;; - v1.61803...
+;;; - v1.618033988749
+
+.define VERSION "v0.60"
+
 
 
 ;;; STATS:
+
 
 ;;;                          asm rules
 ;;; MINIMAL   :  1016 bytes = (+ 771  383) inc LIB!
@@ -2223,6 +2258,9 @@ PRINTDOTS=1
 
 
 
+;;; TODO: do we envision "silent" complilation and
+;;;   only linenumber error messages?
+;;; 
 ;;; print/hilight ERROR position (with PRINTINPUT)
 ;
 ERRPOS=1
@@ -2350,20 +2388,9 @@ NMIVEC=$0248                    ; => $F8B2
         ;; compile from src first time
         ;; - fall-through
 
-;;; compile using defaults input, output
 ;;; BEWARE: never returns! ends up in _OK/_edit
-;;; 
-;;; Reverese order _compile and _compileInput _compileAX?
-FUNC _compile
-        ;; default output location
-        lda #<_output
-        ldx #>_output
-        sta _out
-        stx _out+1
 
-;;; compile source from input
-;;;    _out must be set to where you want output to go
-;;; BEWARE: never returns! ends up in _OK/_edit
+;;; compile source from input to output
 FUNC _compileInput
 
         ;; default input location
@@ -2371,13 +2398,21 @@ FUNC _compileInput
         ldx #>input
 
 ;;; Compiles source from AX
-;;; to *_out location.
 ;;; BEWARE: never returns! ends up in _OK/_edit
 FUNC _compileAX
 
         ;; store what to compile
         sta inp
         stx inp+1
+
+;;; compile same as last time
+FUNC _compile
+        ;; default output location
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
+
 ;;; Not worthy (used enough)
 .data
 originp:        .res 2
@@ -10335,14 +10370,30 @@ FUNC _aftercompile
 
 ;;; TODO: print earlier before first compile?
 
+.macro aschi str
+  .repeat .strlen (str), c
+    .byte .strat (str, c) | $80
+  .endrep
+.endmacro
+
 .ifdef __ATMOS__
-        .data
+
+.data
 status: 
         .word $bb80-2
         ;;     ////////////////////////////////////////
-        ;;     MeteoriC `25 jsk@yesco.orgY^Help*acWCAPS
-        .byte "MeteoriC `25 jsk@yesco.org"
-        .byte                 127&YELLOW,"^Help",127&WHITE
+        ;;     WBMeteoriC v0.60B`2025 yescoB^HelpWWCAPS
+        ;; 
+  ;;; BEGIN: INVERTED
+        .byte YELLOW            ; => BLUE
+        aschi "MeteoriC"
+        .byte GREEN             ; => MAGNENTA
+        aschi             VERSION
+        .byte WHITE             ; => BLACK
+        aschi                  "`2025 yesco"
+  ;;; END: INVERTED
+        .byte YELLOW 
+        .byte                             " ^Help"
         .byte 0
 .code
 
@@ -10720,15 +10771,10 @@ FUNC _idecompile
         jsr _eoscolors
         PRINTZ {10,YELLOW,"compiling...",10,10}
         
-        ;; set output
-        lda #<_output
-        ldx #>_output
-        sta _out
-        stx _out+1
-        ;; set input = EDITSTART
+        ;; Compile directly from editor!
+;;; TODO: take snapshot? so can compile in background...
         lda #<EDITSTART
         ldx #>EDITSTART
-        ;; alright, all done?
         jmp _compileAX
 
 FUNC _togglecommand
@@ -11159,16 +11205,38 @@ FUNC _extend
         ldx #>_extendinfo
         jsr _printz
 
-        jmp _listfiles
+        jsr _listfiles
 
         ;; get command character
         jsr getchar
         
-;;; TODO: load and run compiled programs?
+        ;; X-dispatch
 
-;        jmp bytesieve
+        ;; - a-z "buffer"/file
+        cmp #'a'
+        bcc :+
+        cmp #'z'+1
+        bcs :+
+        ;; => save current buffer/copy buffer
+;;; TODO: save current letter buffer (if edited?)
+;;; TODO: load named buffer
 
-        jmp _eventloop
+        rts
+:       
+        ;; CTRL-C : compile "input" (unmodified)
+        cmp #CTRL('C')
+        bne :+
+
+        jmp _compileInput
+:       
+
+.ifdef bytesieve
+        cmp #'J'
+        bne :+
+        jmp bytesieve
+:       
+.endif
+        rts
 
 
 
