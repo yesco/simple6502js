@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 
 typedef unsigned int word;
 
@@ -74,12 +75,16 @@ void plotchar(char x, char y, char ch) {
   } while(--r);
 }
 
-void plot(char x, char y, char* s) {
+void tplot(char x, char y, char* s) {
   while(*s) {
     // TODO: wrap?
     plotchar(x, y, *s++);
     x+= 6;
   }
+}
+
+void splot(char r, char c, char* s) {
+  memcpy(SCREEN + r*40 + c, s, strlen(s));
 }
 
 char bigC[]= {
@@ -97,6 +102,7 @@ char bigC[]= {
  " xxxxxxxxx                              "
  " xxxxxxxxx                              "
  " xxxxxxxxx                              "
+ " xxxxxxxxx                              "
  "\0"
 // <14
 };
@@ -108,15 +114,15 @@ word main() {
   fill(0, 2, 25, 1, BLACK);
 
   //             123456789012
-  plot(6,  1+0*8, "The C");
-  plot(6,  1+1*8, "Programming");
-  plot(6,  1+2*8, "Language");
+  tplot(6,  1+0*8, "The MeteoriC");
+  tplot(6,  1+1*8, "Programming");
+  tplot(6,  1+2*8, "Language");
 
+  // print a big C!
   if (1) {
-    // print a big C!
     char *b= bigC;
     // AFTER
-    char y= 3*8+2, x;
+    char y= 3*8, x;
     char i,n;
     do {
       for(n=3; --n; ) {
@@ -140,13 +146,24 @@ word main() {
       }
     } while(*b);
 
-    fill(9, 2, 16, 1, BLUE);
+    fill(9, 2, 16, 1, CYAN); // too bright
+    fill(9, 2, 16, 1, BLUE); // too dark, lol AIC?
+  }
+
+  // print red frame label
+  if (1) {
+    fill(15, 26, 4, 1, RED);
+    //plot(55, 50, "mini");
+    splot(15, 27, "\x37\x23\x23\x23\x23\x23\x23\x23\x23\x23\x4b");
+    splot(16, 27, "\x35\x0aMINIMAL\x0b\x4a");
+    splot(17, 27, "\x35\x0aMINIMAL\x0b\x4a");
+    splot(18, 27, "\x55\x50\x50\x50\x50\x50\x50\x50\x50\x50\x5a");
   }
 
   //             123456789012
-//plot(6,    8*8, "jsk@yesco.org");
-//plot(6,  4+9*8, "JS Karlsson");
-  plot(2,  4+9*8, "jsk@yesco.org");
+//tplot(6,    8*8, "jsk@yesco.org");
+//tplot(6,  4+9*8, "JS Karlsson");
+  tplot(2,  4+9*8, "jsk@yesco.org");
 
  A:
   goto A;
