@@ -85,8 +85,7 @@ void plot(char x, char y, char* s) {
 char bigC[]= {
 //          111111111122222222223333333333
 //0123456789012345678901234567890123456789
- "\1                                        "
- "                                        "
+ "\0                                       "
  "             xxxxxxxxxxxx               "
  "        xxxxxxxxxxxxxxxxxxxxxx          "
  "     xxxxxxxxxxxxxxxxxxxxxxxxxxxxx      "
@@ -105,8 +104,8 @@ char bigC[]= {
 word main() {
   lores(1);
 
-  fill(0, 1, 28, 1, WHITE+BG);
-  fill(0, 2, 28, 1, BLACK);
+  fill(0, 1, 25, 1, WHITE+BG);
+  fill(0, 2, 25, 1, BLACK);
 
   //             123456789012
   plot(6,  1+0*8, "The C");
@@ -115,37 +114,39 @@ word main() {
 
   if (1) {
     // print a big C!
-    char *b= bigC+1+40;
+    char *b= bigC;
     // AFTER
-    char y= 3*8+1, x;
+    char y= 3*8+2, x;
     char i,n;
-    while (*b) {
+    do {
       for(n=3; --n; ) {
         x= 20; ++y;
         for(i=0; i<40; ++i) {
-          if (b[i]<=' ') setpixel(x, y);
+          if (b[i]>' ') setpixel(x, y);
           ++x;
         }
       }
       b+= 40;
-    }
+    } while (*b);
     // reverse!
     do {
       b-= 40;
       for(n=3; --n; ) {
         x= 20; ++y;
         for(i=0; i<40; ++i) {
-          if (b[i]<=' ') setpixel(x, y);
+          if (b[i]>' ') setpixel(x, y);
           ++x;
         }
       }
-      if (*b<' ') break; // TODO: not work?
-    } while(1);
+    } while(*b);
+
+    fill(9, 2, 16, 1, BLUE);
   }
 
   //             123456789012
 //plot(6,    8*8, "jsk@yesco.org");
-  plot(6,  4+9*8, "JS Karlsson");
+//plot(6,  4+9*8, "JS Karlsson");
+  plot(2,  4+9*8, "jsk@yesco.org");
 
  A:
   goto A;
