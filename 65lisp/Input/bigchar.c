@@ -114,15 +114,15 @@ word main() {
   fill(0, 2, 25, 1, BLACK);
 
   //             123456789012
-  tplot(6,  1+0*8, "The MeteoriC");
-  tplot(6,  1+1*8, "Programming");
-  tplot(6,  1+2*8, "Language");
+  tplot(6,  1+0*7, "The MeteoriC");
+  tplot(6,  1+1*7, "Programming");
+  tplot(6,  1+2*7, "Language");
 
   // print a big C!
   if (1) {
     char *b= bigC;
     // AFTER
-    char y= 3*8, x;
+    char y= 3*7, x;
     char i,n;
     do {
       for(n=3; --n; ) {
@@ -146,11 +146,11 @@ word main() {
       }
     } while(*b);
 
-    fill(9, 2, 16, 1, CYAN); // too bright
-    fill(9, 2, 16, 1, BLUE); // too dark, lol AIC?
+    fill(8, 2, 16, 1, CYAN); // too bright
+    fill(8, 2, 16, 1, BLUE); // too dark, lol AIC?
   }
 
-  // print red frame label
+  // print red frame label "MINIMAL" in a box
   if (1) {
     fill(15, 26, 4, 1, RED);
     //plot(55, 50, "mini");
