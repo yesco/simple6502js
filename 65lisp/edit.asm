@@ -276,7 +276,7 @@ ebeginning:
         jsr eback
         lda #10
         jsr ebtill
-        bcc rts2
+        bne rts2
         jmp eforward
         
 eindent:
