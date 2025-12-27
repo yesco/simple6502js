@@ -10365,9 +10365,6 @@ endrules:
 
 FUNC _rulesend
 
-.include "end.asm"
-
-
 .export __ZPIDE__
 .zeropage
 __ZPIDE__:        .res 0
