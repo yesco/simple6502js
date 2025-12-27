@@ -5,6 +5,33 @@
 ;;; 2025 (>) Jonas S Karlsson
 
 
+;;; zero a memory area
+;;; 
+;;; tos: address
+;;; AX : length
+FUNC _zero
+        lda #0
+        
+;;; memset a memory area
+;;;
+;;; tos: address
+;;; YX : length (lo,hi)
+;;; A  : byte
+FUNC _memset
+;;; 11 B
+:       
+        sta (tos),y
+        dey
+        bne :-
+        ;; next page
+        inc tos+1
+        dex
+        bpl :-
+
+        rts
+        
+
+
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
 ;;; String is zero-terminated.

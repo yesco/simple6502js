@@ -720,10 +720,23 @@ FUNC _ekill
 
 ;;; Load the first buffer from input
 FUNC _loadfirst
-;;; (+ 20 11 12 3 14 3) = 63
+;;; (+ 15 25 12 6 3) = 61
 
-;;; 20+11
-;;; TODO: 20 bytes param set up
+;;; +15 B
+        ;; clear edit area
+        lda #<EDITNULL
+        sta tos
+        ldx #>EDITNULL
+        stx tos+1
+
+        lda #<EDITSIZE
+        ldx #>EDITSIZE
+
+        jsr _zero
+
+
+;;; 25
+;;; TODO: just to set up! (maybe a block copy?)
         ;; tos= from
         lda #<input
         ldx #>input
@@ -740,14 +753,6 @@ FUNC _loadfirst
         ;; copy
         ldy #0
         jsr _copyz
-        ;; zero terminate (2x lol)
-        lda #0
-        sta (dos),y
-        iny
-        sta (dos),y
-        dey
-        ;; zero prefix!
-        sta EDITNULL
         ;; calculate end
 
         ;; TODO: maybe copyz does this? 
@@ -761,9 +766,6 @@ FUNC _loadfirst
         lda #0
         adc dos+1
         sta editend+1
-;;; 3
-
-
 
 .ifnblank
 
@@ -796,6 +798,8 @@ FUNC _loadfirst
 .endif ; BLANK
 
         jmp _redraw
+
+
 
 ;;; For debugging
 ;MYSTERY=1

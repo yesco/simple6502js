@@ -4882,32 +4882,6 @@ FUNC _bnfinterpend
 ;  .res 256-(* .mod 256)
 secondpage:     
 
-
-;;; TODO: memset rules
-
-.ifdef MEMSET
-;;; tos: address
-;;; AX : length
-;;; Y  : byte
-memset:
-;;; 16B - call 3x+ save bytes... <3 inline ok
-        pha
-        tay
-        pla
-:       
-        ldy #0
-        sta (tos),y
-
-        iny
-        bne :+
-        inc tos+1
-:       
-        dex
-        bpl :--
-       
-        rts
-.endif ; MEMSET
-
 ;;; TODO: still part of parse.bin
 ;;;    just not in screen display form firstpage/secondpage
 
