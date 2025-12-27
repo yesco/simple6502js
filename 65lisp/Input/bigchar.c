@@ -107,62 +107,97 @@ char bigC[]= {
 // <14
 };
 
+char threelines(char* b, char y) {
+  char n, x, i;
+  for(n=3; --n; ) {
+    x= 20; ++y;
+    for(i=0; i<40; ++i) {
+      if (b[i]>' ') setpixel(x, y);
+      ++x;
+    }
+  }
+  return y;
+}
+
+void wait(int cs) {
+  int i;
+  while(cs-- > 0) {
+    for(i= 300; --i; );
+  }
+}
+
 word main() {
+  // cursor off
+  putchar('Q'-64);
+
   lores(1);
 
   fill(0, 1, 25, 1, WHITE+BG);
   fill(0, 2, 25, 1, BLACK);
 
-  //             123456789012
-  tplot(6,  1+0*7, "The MeteoriC");
-  tplot(6,  1+1*7, "Programming");
-  tplot(6,  1+2*7, "Language");
+  //                123456789012
+  // kerning lol
+  tplot(6        , 1+0*8, "6502");
+  tplot(6+  4*6+2, 1+0*8, "Meteori");
+  tplot(6+ 11*6+1, 1+0*8, "C");
+
+  tplot(6        , 1+1*8, "compi");
+  tplot(6+  4*6+5, 1+1*8, "ler");
+  tplot(6+  7*6+7, 1+1*8, "&");
+  tplot(6+  8*6+7, 1+1*8, "IDE");
 
   // print a big C!
   if (1) {
     char *b= bigC;
     // AFTER
-    char y= 3*7, x;
-    char i,n;
+    char y= 2*7+1;
     do {
-      for(n=3; --n; ) {
-        x= 20; ++y;
-        for(i=0; i<40; ++i) {
-          if (b[i]>' ') setpixel(x, y);
-          ++x;
-        }
-      }
+      y= threelines(b, y);
       b+= 40;
     } while (*b);
+    // one extra
+    y= threelines(b-40, y);
     // reverse!
     do {
       b-= 40;
-      for(n=3; --n; ) {
-        x= 20; ++y;
-        for(i=0; i<40; ++i) {
-          if (b[i]>' ') setpixel(x, y);
-          ++x;
-        }
-      }
+      y= threelines(b, y);
     } while(*b);
-
-    fill(8, 2, 16, 1, CYAN); // too bright
-    fill(8, 2, 16, 1, BLUE); // too dark, lol AIC?
   }
+
+  // oric atmos diagonal slash red line
+  if (1) {
+    char *p= SCREEN + 6*40 + 25;
+    char r;
+    for(r=0; r<19; ++r) {
+      wait(1);
+      p[0]= RED+BG;
+      p[1]= RED+BG;
+      p[2]= RED+BG;
+      p[3]= RED+BG;
+      p[4]= RED+BG;
+      // make horizontal line by not whitening
+      if (r<17) p[5]= WHITE+BG;
+      p+= 40-1;
+    }
+  }
+
+  // color the C blue
+  wait(30);
+  fill(6, 2, 18, 1, CYAN); // too bright
+  fill(6, 2, 18, 1, BLUE); // too dark, lol AIC?
 
   // print red frame label "MINIMAL" in a box
   if (1) {
-    fill(15, 26, 4, 1, RED);
-    //plot(55, 50, "mini");
-    splot(15, 27, "\x37\x23\x23\x23\x23\x23\x23\x23\x23\x23\x4b");
-    splot(16, 27, "\x35\x0aMINIMAL\x0b\x4a");
-    splot(17, 27, "\x35\x0aMINIMAL\x0b\x4a");
-    splot(18, 27, "\x55\x50\x50\x50\x50\x50\x50\x50\x50\x50\x5a");
+    char row= 13, col= 25;
+    wait(30);
+    fill(row, col++, 4, 1, RED);
+    splot(row++, col, "\x37\x23\x23\x23\x23\x23\x23\x23\x23\x23\x4b");
+    splot(row++, col, "\x35\x0aMINIMAL\x0b\x4a");
+    splot(row++, col, "\x35\x0aMINIMAL\x0b\x4a");
+    splot(row++, col, "\x55\x50\x50\x50\x50\x50\x50\x50\x50\x50\x5a");
   }
 
-  //             123456789012
-//tplot(6,    8*8, "jsk@yesco.org");
-//tplot(6,  4+9*8, "JS Karlsson");
+  wait(30);
   tplot(2,  4+9*8, "jsk@yesco.org");
 
  A:
