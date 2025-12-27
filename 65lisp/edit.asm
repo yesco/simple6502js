@@ -729,7 +729,7 @@ FUNC _loadfirst
         ldx #>input
         sta tos
         stx tos+1
-        ;; dos= to
+        ;; dos= destination
         lda #<EDITSTART
         ldx #>EDITSTART
         sta dos
@@ -737,9 +737,10 @@ FUNC _loadfirst
         ;; sta EDITSTART as editpos, too
         sta editpos
         stx editpos+1
-        ;; 
+        ;; copy
+        ldy #0
         jsr _copyz
-        ;; zero terminate
+        ;; zero terminate (2x lol)
         lda #0
         sta (dos),y
         iny
@@ -747,11 +748,6 @@ FUNC _loadfirst
         dey
         ;; zero prefix!
         sta EDITNULL
-pha
-lda #65
-sta EDITNULL+7
-pla
-
         ;; calculate end
 
         ;; TODO: maybe copyz does this? 

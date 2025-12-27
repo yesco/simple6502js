@@ -709,7 +709,23 @@
 ;;; - v0.62 TODO: local variables
 ;;; - v0.63 TODO: (opt) function calls (static params)
 ;;; - v0.64 TODO: array indexing
+
+
+
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+;;; TODO: before release
+;;; - save edit buffer in compile snapshot
+;;;   (this allows hires to be entered)
+;;;   (also allows background compilation)
+;;; - copy compile snapshot back to buffer
+;;; 
+;;; - when running; save, run, restore
+;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 ;;; - v0.69 TODO: ORIC DEMO release
+
+
+
 ;;; - v0.7 TODO: load/write files
 ;;; - v0.8 TODO: resolve expreessions issue
 ;;; - v0.9 TODO: optional functions/"linker"/opt
@@ -10416,13 +10432,12 @@ status:
 FUNC _ERROR
 
 .ifdef __ATMOS__
+        ;; update color status
         lda #(RED+BG)&127
         sta SCREEN+35
 .endif ; __ATMOS__
 
-        ;; - save RTS in output to not crash
         ;; replace "jmp main" with "jmp _hell"
-        lda #_RTS
         lda #<_hell
         ldx #>_hell
         sta _output+1
@@ -10765,6 +10780,11 @@ FUNC _idecompile
         ;; save a copy to compile in the background
         ;; or wait...
 
+.ifdef __ATMOS__
+        ;; update color status
+        lda #(YELLOW+BG)&127    ; YELLOW = wait, lol
+        sta SCREEN+35
+.endif ; __ATMOS__
         jsr nl
         lda #(BLACK+BG)&127
         ldx #WHITE&127
@@ -10775,6 +10795,8 @@ FUNC _idecompile
 ;;; TODO: take snapshot? so can compile in background...
         lda #<EDITSTART
         ldx #>EDITSTART
+        ;; There is no return, stack is (potentially) wiped
+        ;; and when done goes to _ERROR or _OK!
         jmp _compileAX
 
 FUNC _togglecommand

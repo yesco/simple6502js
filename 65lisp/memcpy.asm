@@ -8,6 +8,7 @@
 ;;; Copies memory from AX address (+2) to 
 ;;; destination address (first two bytes).
 ;;; String is zero-terminated.
+;;; Zero termination not copied.
 
 ;;; TODO: rename, too general name
 FUNC _memcpyz
@@ -36,6 +37,7 @@ FUNC _copyz
         ;; y overflow
         inc tos+1
         inc dos+1
+        ;; always
         bne _copyz
 @done:       
         rts
