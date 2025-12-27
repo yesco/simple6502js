@@ -2421,15 +2421,6 @@ FUNC _compileAX
         sta inp
         stx inp+1
 
-;;; compile same as last time
-FUNC _compile
-        ;; default output location
-        lda #<_output
-        ldx #>_output
-        sta _out
-        stx _out+1
-
-;;; Not worthy (used enough)
 .data
 originp:        .res 2
 .code
@@ -2440,6 +2431,14 @@ originp:        .res 2
         sta erp
         stx erp+1
 .endif        
+
+;;; compile same as last time
+FUNC _compile
+        ;; default output location
+        lda #<_output
+        ldx #>_output
+        sta _out
+        stx _out+1
 
 ;;; Get's decreased by two before use
 VOSSTART=256   ; grow down.
@@ -3360,12 +3359,12 @@ FUNC _acceptrule
 .endif        
 
 .ifdef PRINTASM
-        putc 128+5              ; magnenta RULE
+        putc MEGNENTA           ; magnenta RULE
 
         lda rulename
         jsr putchar
 
-        putc 128+2              ; green code text
+        putc GREEN              ; green code text
 
 ;        jsr _iasm
 .endif ; PRINTASM
@@ -10412,16 +10411,18 @@ FUNC _ERROR
 .endif ; __ATMOS__
 
         ;; replace "jmp main" with "jmp _hell"
+        ;; TODO: assuming it's not been optimized away?
+        ;; lda #$4c
+        ;; sta _output+0
         lda #<_hell
         ldx #>_hell
         sta _output+1
         stx _output+2
         
-
 .ifdef ERRPOS
-        ;; hibit string near error!
-        ;; (approximated by as far as we read)
-        ;; TOOD: or as far as we _fail (or _acccept?)
+        ;; set hibit near error!
+        ;; (approximated by as far as we "read")
+        ;; TODO: or as far as we _fail (or _acccept?)
         ldy #0
         lda (erp),y
         ora #128
@@ -10432,6 +10433,7 @@ FUNC _ERROR
 .scope
 .ifdef PRINTINPUT
         ;; print it
+
         PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
 
         lda originp
@@ -10450,14 +10452,17 @@ loop:
         ;; and white text.
         bpl nohi
 
-        pha
-        putc BG+RED
-        putc WHITE
-        pla
-
         ;; - remove hibit from src
         and #127
         sta (pos),y
+
+        ;; - print ERROR location source
+        pha
+        ; TODO: doesn't work, messes with y and x ? doesn't mttr?
+        ; PRINTZ {BG+RED, WHITE}
+        putc BG+RED
+        putc WHITE
+        pla
 
         ;; - print MORE chars after HILITE for context
         ldy #1
@@ -10480,7 +10485,7 @@ printmore:
 done:   
         PRINTZ {10,"...",10}
 
-        jmp _forcecommandmode
+        jmp done2
         
 nohi:
 .endif ; ERRPOS
@@ -10494,13 +10499,16 @@ print:
         lda (pos),y
         bne loop
 
+;;; TODO: came here with no errors? 
+;;;    or none to display?
+
+
+done2:  
         jsr nl
 .endif ; PRINTINPUT
 .endscope
 
-;;; TODO: came here with no errors? 
-;;;    or none to display?
-        jmp _eventloop
+        jmp _forcecommandmode
 
 
 
@@ -11275,9 +11283,12 @@ FUNC timer
 
         ;; print it
         jsr nl
-        putc 128+7
+        putc WHITE
         putc '['
 ;        putc 'T'
+
+TODO:    this will not work, A destroyed
+
         sta tos
         stx tos+1
         jsr putu
@@ -11603,7 +11614,6 @@ input:
 ;        .byte "word main(){}",0
 
         .byte "word main(){ return 4711; }",0
-.byte 0
 
 
 
