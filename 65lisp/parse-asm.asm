@@ -10717,6 +10717,8 @@ FUNC _eventloop
         ;; init if first time
         bit mode
         bvc :+
+        ;; == FIRST TIME ==
+        putc CTRL('T')          ; caps off
         ;; init + "load"
         jsr _loadfirst
         ;; remove init bit
