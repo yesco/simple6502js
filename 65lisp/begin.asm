@@ -21,13 +21,11 @@
 
 .ifndef tos
 .zeropage
-
 tos:    .res 2
 ctos:   .res 1
 tmp1:   .res 2
 ctmp1:  .res 1
 .endif
-
 .code
 
 ;;; set's TOS to num

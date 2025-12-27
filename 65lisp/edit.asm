@@ -109,7 +109,12 @@ WIDTH=40
 ;ROWS=20
 ROWS=27
 
+
+.export __ZPEDITOR__
+.export editpos,editend,editcol,editrow
+
 .zeropage
+__ZPEDITOR__:
 ;;; A value of point EDITSTART <= x < EDITEND
 editpos:        .res 2
 
@@ -120,7 +125,6 @@ editcol:        .res 1
 
 ;;; TODO: just use a tmp in zp?
 editrow:        .res 1
-
 
 .code
 

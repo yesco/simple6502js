@@ -1,12 +1,18 @@
 # counts only _named exported functions
 # __name is consider internal and avoided
 # 
-perl map.pl $1.map | tee ident.sizes | grep '_' | grep -v '__' | grep -v "_main$" | grep -v '_exit$' | grep -v "_showsize" > fil
+perl map.pl $1.map | tee $1.sizes | grep '_' | grep -v '__' | grep -v "_main$" | grep -v '_exit$' | grep -v "_showsize" > fil
 echo "--- ORDER: $* ---"
 cat fil
 echo "--- TOP: $* ---"
 cat fil | sort -r -n
+
 echo "=== Functions: `tail +11 fil | wc -l ` (excluded 10: _interpret _error _sta _mathop _reset _nexttoken _nextloop _next _foobar _transtable)"
+
 echo "=== Bytes    :`cat $1.bin | wc -c `"
+
+perl map-syms.pl $1.map > $1.syms
+
+
 
 

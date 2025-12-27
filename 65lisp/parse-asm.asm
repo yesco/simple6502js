@@ -1330,6 +1330,15 @@ FUNC _biosend
 ;;; ========================================
 ;;;          D       A       T       A
 
+.export zero,tos,dos,pos,gos,vos
+.export savea,savex,savey
+.export mode
+
+.export __ZPCOMPILER__
+.zeropage
+__ZPCOMPILER__:
+.code
+
 .zeropage
 ;;; reserved, lol
 ;;; TODO make sure it at address zero
@@ -2294,6 +2303,9 @@ ERRPOS=1
 _start:
 
 
+.export percentchar,whatvarpercentchar
+.export rule,inp,_out,erp,env,valid,rulename,pframe
+
 .zeropage
         
 ;;; if %V or %A stores 'V' or 'A'
@@ -2347,6 +2359,8 @@ PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
 DONE= '$'
 
+;;; TODO: maybe not ZP, not used that mutch
+.export dirty, showbuffer
 
 .zeropage
 dirty:          .res 1
@@ -2390,6 +2404,7 @@ NMIVEC=$0248                    ; => $F8B2
         ;; Fix '_' character, which on ORIC ATMOS is
         ;; an English Pound sign, to be underscore.
         ;; (we null out 5 top rows, keep 6th bar=>underscore!)
+        ;; 10 B
         ldx #5
         lda #0
 :       
@@ -2548,6 +2563,8 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
 .ifdef INTERRUPT
 ORICINTVEC=$0245
         ;; 
+.export centis,seconds
+
 .zeropage
 centis:     .res 1              ; 1/100ths of seconds
 seconds:    .res 2              ; (/ 65536 3600)= 18h
@@ -3571,7 +3588,8 @@ FUNC _fail
 ;;; ca65: Can't have between @loop and usage??? LOL
 ;PRINTSKIP=1
 
-@loop:
+.export loopfail
+FUNC loopfail
         lda (rule),y
 ;
 .ifdef PRINTSKIP
@@ -3592,10 +3610,10 @@ pla
         beq endrule
 
         cmp #'|'
-        beq @nextalt
+        beq nextalt
 
         cmp #'['
-        beq @skipgen
+        beq skipgen
 
         ;; ? % operator?
         cmp #'%'
@@ -3625,30 +3643,30 @@ pla
         lda #0
         sta rule
 
-        jmp @loop
+        jmp loopfail
 :       
         ;; normal char: skip
-@next:
+FUNC nextskip
         ;; loop w Y
         INY
-        bne @loop
+        bne loopfail
         inc rule+1
         ;; always!
-        bne @loop
+        bne loopfail
 
         ;; skip [...0...] gen
-@skipgen:
+FUNC skipgen
         iny
         bne :+
         inc rule+1
 :       
         lda (rule),y
         cmp #']'
-        bne @skipgen
-        beq @next
+        bne skipgen
+        beq nextskip
         
 ;;; we're done skipping! (standing at '|')
-@nextalt:
+FUNC nextalt
 .ifdef DEBUGNAME
    PUTC '|'
 .endif ; DEBUGNAME
@@ -3658,7 +3676,7 @@ pla
         ;; skip '|'
         jsr _incR
 
-restoreinp:
+FUNC restoreinp
         ;; restore inp for alt
 
         ;; - peek stack
@@ -3682,7 +3700,7 @@ restoreinp:
 
         jmp restoreinp
 
-gotretry:
+FUNC gotretry
 .ifdef DEBUGRULE
     putc '!'
     jsr nl
@@ -3809,13 +3827,10 @@ PUTC ' '
         jmp uprule
 
 
-
-
-
-_donecompile:   
+FUNC _donecompile
         lda #0
         ;; A contains error code; 0 if no error
-_errcompile:
+FUNC _errcompile
 
         TIMER
 
@@ -4611,6 +4626,8 @@ cut:
 ;;;   A = ++ value (redundant from Y)
 
 ;;; TODO:
+.export _ruleVARS
+
 .zeropage
 ;;; Vector pointing to beginning of current "ENVIRONMENT"
 ;;; (address bindings encoded as matching rules)
@@ -7862,6 +7879,8 @@ ruleN:
 
 ;;; TODO: cleanup, don't use globals
 
+.export params,stargs
+
 .zeropage
 
 ;;; params used as registers for recursive (copying SAFE)
@@ -10349,7 +10368,13 @@ FUNC _rulesend
 .include "end.asm"
 
 
+.export __ZPIDE__
+.zeropage
+__ZPIDE__:        .res 0
+.code
+
 FUNC _idestart
+
 
 FUNC _aftercompile
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
@@ -10570,13 +10595,14 @@ FUNC _OK
         jmp _eventloop
 
 
-
 FUNC _run
 
         ;; set ink for new rows
         lda #BLACK+16           ; paper
         ldx #WHITE&127          ; ink
         jsr _eoscolors
+
+.export runs
 
 .zeropage
 runs:   .res 1
@@ -10781,6 +10807,7 @@ FUNC _idecompile
         ;; and when done goes to _ERROR or _OK!
         jmp _compileAX
 
+
 FUNC _togglecommand
 ;;; 7
         lda mode
@@ -10799,27 +10826,6 @@ FUNC _togglecommand
         jmp _redraw
 
 .endif ;  __ATMOS__
-
-
-
-
-
-FUNC _editorstart
-.ifndef __ATMOS__
-        ;; ironic, as this is not editor for
-        ;; generic...
-
-        ;; outdated (no cursor anymore)
-        .include "edit-atmos-screen.asm"
-.else
-        ;; EMACS buffer RAW REDRAW
-        .include "edit.asm"
-.endif
-FUNC _editorend
-
-
-
-
 
 
 
@@ -10889,6 +10895,16 @@ FUNC _asmprintsrc
 ;;; Go back to prompt
 FUNC _NMI_catcher
 ;;; 24
+        ;; report current PC
+        jsr nl
+        plp
+        pla
+        tay
+        pla
+        tax
+        tya
+        jsr _printh
+        
         ;; reset stack pointer
         ldx #$ff
         txs
@@ -11231,6 +11247,7 @@ FUNC _extend
         cmp #CTRL('C')
         bne :+
 
+        PRINTZ {"Compile Input",10}
         jmp _compileInput
 :       
 
@@ -11262,6 +11279,8 @@ FUNC _helptextend
 
 .include "memcpy.asm"
 
+
+.export lastcs
 
 .zeropage
   lastcs:  .res 2
@@ -11363,6 +11382,20 @@ CSRESET=1
         rts
 
        
+FUNC _editorstart
+.ifndef __ATMOS__
+        ;; ironic, as this is not editor for
+        ;; generic...
+
+        ;; outdated (no cursor anymore)
+        .include "edit-atmos-screen.asm"
+.else
+        ;; EMACS buffer RAW REDRAW
+        .include "edit.asm"
+.endif
+FUNC _editorend
+
+
 FUNC _ideend
 
 
@@ -13352,6 +13385,10 @@ FUNC _outputend
 
 .code
 
+.export __ZPEND__
+.zeropage
+__ZPEND__:        .res 0
+.code
 
 .end
 
