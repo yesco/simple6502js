@@ -157,37 +157,37 @@ ctrlbranch:
 
         ;; ^F-^J
         BR eforward
-        BR jgarnish
+        BR jgarnish             ; LOL (pretty print)
         BR jhelp
        BRB eindent
         BR jreturn
 
         ;; ^K-^O
-        BR eunused              ; jkill 
-        BR eunused              ; jload
+        BR eunused              ; jkill?
+        BR jredraw              ; jredraw LOAD?
         BR jreturn
        BRB enext
-        BR eunused              ; ctrlO
+        BR eunused              ; ctrlO (emacs insert nl)
 
         ;; ^P-^T
        BRB eprev
-        BR jdasm
+        BR jdasm                ; ^Q
         BR jrun
-        BR eunused              ; ctrlS
-        BR jcaps
+        BR eunused              ; ctrlS SEARCH!
+        BR jcaps                ; toggle CAPS
 
         ;; ^U-^Y
-        BR eunused              ; ctrlU
-        BR jinfo                ; ctrlV
-        BR eunused              ; jwrite?
+        BR eunused              ; ctrlU REPEAT
+        BR jinfo                ; ctrlView info
+        BR eunused              ; jwrite? (emacs: wank? - kill region, lol)
         BR jextend              ; ctrlX
-        BR eunused              ; ctrlY (yank)
+        BR eunused              ; ctrlY TODO: YANK!
 
         ;; ^Z ESC
-        BR jzource
-        BR jcmd
+        BR jzource              ; reload Zource
+        BR jcmd                 ; ESC toggle cmd/edit mode
 
-        ;; Arrows remapeed: 29--31!
+        ;; Arrows remapped! 29--31!
         BR eback
         BR eforward
        BRB enext
@@ -376,7 +376,10 @@ jrun:
 jkill:          
         jmp _ekill
 jzource:  
-        jmp _loadfirst
+        jsr _loadfirst
+        ;; fall-through
+jredraw:        
+        jmp _redraw
 jcaps:  
         jmp putchar
 jhelp:  
@@ -801,7 +804,7 @@ FUNC _loadfirst
 
 .endif ; BLANK
 
-        jmp _redraw
+        rts
 
 
 

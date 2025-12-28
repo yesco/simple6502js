@@ -950,12 +950,12 @@
 ;;; - %A - dos= tos= address; address of named
 ;;;        variable (use for assignment)
 ;;; 
-;;; - %N - define NEW name (forward) TODO: 2x=>err!
+;;; - %N - define NEW name (use: %I%N)
 ;;; 
 
 
 ;;; - %I - read ident (really %N? but for longname)
-;;;        (pushes (identaddress/word, name length/byte) on stack)
+;;;        (pushes (identaddress/word, name length/byte) on stack!)
 ;;; 
 ;;; - %* - dereference tos { tos= *(int*)tos; } - old %U?
 ;;; 
@@ -3925,15 +3925,17 @@ jmpnext:
 
         jmp _ident
 :       
-        ;; ? %New function
+        ;; ? %New function/var
         cmp #'N'
         bne :+
 
-        ;; add to env
-        lda #'0'                ; ignore type? 0 number of params
-;;; TODO: need to lookup, maybe have to set it?
-        jsr _newvar
-        jmp _next
+        ;; add to env, default as 'w'ord
+        ;; TODO: add char after w type?
+        lda #'w'
+        jmp _newvar
+
+        ;; never returns! (jumps _next)
+
 :       
         ;; %??? no match - ERROR
         jmp error
@@ -4688,7 +4690,7 @@ jsr putchar
 
 
 ;;; TOS = array size in bytes
-FUNC _newarr
+FUNC _newarr_IMM_RET
 ;;; 29 B
 
 ;;; TODO: any way to make less code?
@@ -4715,22 +4717,14 @@ FUNC _newarr
         ;; skip zpalloc
         ;; (always true type char)
         pla
+;;; TODO: regarr2 ??? if _newarr 
         bne regarr
 
 
+;;; STACK: addrofname/w len/b JSR _newvar
 FUNC _newvar
-;;; 97 B
+;;; 70 B
 
-;;; TODO: any way to make less code?
-;;; (duplicate inm newarr)
-        ;; manual immret
-        pla
-        sta rule
-        pla
-        sta rule+1
-        jsr _incR
-
-;;; (+ 9 10 18 10) = 47 B
 ; 9
         ;; V(ar)Alloc 2 bytes
         jsr _decV               ; doesn't touch A
@@ -4834,6 +4828,127 @@ jsr _printchar
         dey
         bpl :-
 :       
+        jmp _next
+
+
+
+;;; STACK: addrofname/w len/b JSR _newvar
+FUNC _newvar_IMM_RET
+;;; 97 B
+
+;;; TODO: any way to make less code?
+;;; (duplicate inm newarr)
+        ;; manual immret
+        pla
+        sta rule
+        pla
+        sta rule+1
+        jsr _incR
+
+;;; (+ 9 10 18 10) = 47 B
+; 9
+        ;; V(ar)Alloc 2 bytes
+        jsr _decV               ; doesn't touch A
+        jsr _decV
+.ifdef DEBUGNAME
+pha
+lda vos
+ldx vos+1
+jsr _printh
+jsr spc
+pla
+.endif ; DEBUGNAME        
+
+;;; The way we keep environment/bindings of
+;;; vars is by prefixing them to a rule and
+;;; let our BNF parser to the matching!
+;;; 
+;;; In the end, not clear if save code memory
+;;; as "stuffing" takes lots of bytes
+regarr2:
+
+;;; TODO: too much "stuffing"
+;;; TODO: copy a "template"?
+;;; 
+;;;             >>>  %b%'3<ADDR><TYPE>| <<<
+
+        ;; store a '|' to end sub-match
+; 10
+.ifdef DEBUGNAME
+PUTC 'B'
+.endif ; DEBUGNAME
+        pha
+        lda #'|'
+        jsr _stuffVARS
+        pla
+
+        ;; store type letter (last!)
+.ifdef DEBUGNAME
+PUTC 'T'
+.endif ; DEBUGNAME
+        jsr _stuffVARS
+
+        ;; TODO: store sizeof
+        ;; TODO: store itemsize/varsize for ++
+
+        ;; store address of var (backwards)
+; 10
+.ifdef DEBUGNAME
+PUTC 'A'
+.endif ; DEBUGNAME
+        lda vos+1
+        jsr _stuffVARS
+        lda vos
+        jsr _stuffVARS
+
+        ;; push skip chars "%<3+128>"
+;;; 10
+.ifdef DEBUGNAME
+PUTC 'S'
+.endif ; DEBUGNAME
+        lda #3+128              ; 3 bytes to skip
+        jsr _stuffVARS
+        lda #'%'
+        jsr _stuffVARS
+
+        ;; push skip 'breakchar' "%b"
+;;; 10
+.ifdef DEBUGNAME
+PUTC 'B'
+.endif ; DEBUGNAME
+        lda #'b'            ; 3 bytes to skip
+        jsr _stuffVARS
+        lda #'%'
+        jsr _stuffVARS
+        
+; 10
+        ;; copy varname BACKWARDS from address on stack
+        ;; - len
+        pla
+        tay
+        ;; - address of char
+        pla
+        sta pos
+        pla
+        sta pos+1
+
+        dey
+:       
+.ifdef DEBUGNAME
+PUTC 'C'
+jsr _printchar
+.endif ; DEBUGNAME
+        lda (pos),y
+
+        ;; TODO: clumsy?
+        sty savey
+        ldy #0
+        jsr _stuffVARS          ; A preserved and => flags
+        ldy savey
+
+        dey
+        bpl :-
+:       
 
         ;; update VARRRULEVEC
 ;;; TODO: too much work... save there waste here?
@@ -4846,10 +4961,8 @@ jsr _printchar
         adc #0
         sta VARRRULEVEC+1
 
-
         ;; really just "IMM_RET" end
         jmp _next
-
 
 
 
@@ -8283,30 +8396,30 @@ POSTLUDE=1
 .endif ; FUNCALL
 
 
-
         ;; Define variable
-        .byte "word","%I;"
-;;; 
-;;; TODO: lol %I messes up stack, comes to ';'
-;;;       then nobody cleans up!
-;;;       store elsewhere, or already at right location?
-;;; 
+
+;;; TODO: these should be equivalent...
+.ifnblank
+      .byte "word","%I;%N"
+.else
+      .byte "word","%I;"
       .byte "%{"
         lda #'w'
-        jsr _newvar              ; does IMM_RET!
+        jsr _newvar_IMM_RET
+.endif
         .byte TAILREC
 
         .byte "|word\*","%I;"
       .byte "%{"
         lda #'W'
-        jsr _newvar              ; does IMM_RET!
+        jsr _newvar_IMM_RET
         .byte TAILREC
 
 .ifnblank
         .byte "|char","$%I;"
       .byte "%{"
         lda #'c'
-        jsr _newvar              ; does IMM_RET!
+        jsr _newvar_IMM_RET
         .byte TAILREC
 .endif
 
@@ -8317,7 +8430,7 @@ POSTLUDE=1
         asl tos
         rol tos+1
         lda #'W'+128
-        jsr _newarr              ; does IMM_RET!
+        jsr _newarr_IMM_RET
         .byte TAILREC
 
 
@@ -8325,7 +8438,7 @@ POSTLUDE=1
         .byte "|char","%I\[%D\];"
       .byte "%{"
         lda #'C'+128
-        jsr _newarr              ; does IMM_RET!
+        jsr _newarr_IMM_RET
         .byte TAILREC
 
 .ifnblank
@@ -8333,7 +8446,7 @@ POSTLUDE=1
         .byte "|word","%I\[%D\]={"
       .byte "%{"
         ldy #'W'+128
-        jsr _newarr              ; does IMM_RET!
+        jsr _newarr_IMM_RET
  ;; TODO: do WORD, _Q only reads bytes
 ;;;   (how can do { "foo", "bar", "fie", fum" } ???
         .byte _Q
@@ -8343,7 +8456,7 @@ POSTLUDE=1
         .byte "|char","%I\[\]={"
       .byte "%{"
         lda #'C'+128
-        jsr _newarr              ; does IMM_RET!
+        jsr _newarr_IMM_RET
         ;; newarr sets pos
         .byte _Q
         .byte TAILREC
@@ -10511,10 +10624,8 @@ print:
         ldy #0
         lda (pos),y
         bne loop
-
 ;;; TODO: came here with no errors? 
 ;;;    or none to display?
-
 
 done2:  
         jsr nl
@@ -10701,24 +10812,28 @@ FUNC _forcecommandmode
 ;;; Depending on "mode", you're either in
 ;;; edit mode (BPL) or command mode (BMI).
 ;;; 
+
+;;; TODO: this is more like "entereditor(again)"
 FUNC _eventloop
         ;; init if first time
         bit mode
         bvc :+
-        ;; == FIRST TIME ==
+        ;; == FIRST TIME EDIT/SCEEN INIT ==
         putc CTRL('T')          ; caps off
         ;; init + "load"
         jsr _loadfirst
-        ;; remove init bit
+        ;; remove init bit (V)
         lda mode
         eor #64
         sta mode
 :       
-        ;; start with redraw (if needed)
         jmp editstart
 
+
+;;; TODO: seems a bit roudabout the flow
+;;;   works but...
 command:
-        jsr _eosnormal
+;        jsr _eosnormal
 
         ;; 'Q' to temporary turn on cursor!
         PRINTZ {10,">",'Q'-'@'}
@@ -10728,7 +10843,7 @@ command:
         ;; ignore return
         cmp #13
         beq command
-
+        ;; ?help
         cmp #'?'
         bne :+
 @minihelp:
@@ -10743,6 +10858,7 @@ command:
 
         ;; then convert any char to CTRL to run it!
         and #31
+
 
 editing:
         jsr _editaction
@@ -12750,6 +12866,9 @@ NOPRINT=1
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "#include <stdio.h>",10
 
+.ifnblank
+        .byte "word a, c, i, k, m, n, p;",10
+.else
 ;;; TODO: allow several vars defined on one line, LOL
         .byte "word a;",10
 ;                .byte "word b;",10
@@ -12764,6 +12883,7 @@ NOPRINT=1
 ;                .byte "word o;"
         .byte "word p;",10
 ;                .byte "word q;word r;word s;word t;word u;word v;word w;",10
+.endif
 
         .byte "word main(){",10
        ;; BYTE MAGAZINE 8192 => 1899
