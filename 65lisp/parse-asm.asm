@@ -8401,6 +8401,8 @@ POSTLUDE=1
 ;;; TODO: these should be equivalent...
 .ifnblank
       .byte "word","%I;%N"
+        ;; NOTE: %N after ; otherwise maybe mix w 
+        ;;       function def: "word","%I(%N",_E ... lol
 .else
       .byte "word","%I;"
       .byte "%{"
@@ -8409,6 +8411,7 @@ POSTLUDE=1
 .endif
         .byte TAILREC
 
+;;; TODO: %I;%N ...
         .byte "|word\*","%I;"
       .byte "%{"
         lda #'W'
