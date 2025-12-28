@@ -2257,6 +2257,7 @@ PRINTINPUT=1
 ;UPDATENOSPACE=1
 
 
+;;; About 2% overhead (BYTESIEVE)
 ;
 PRINTDOTS=1
 
@@ -8277,24 +8278,14 @@ POSTLUDE=1
 ;;; 
 ;;;  still matters?
         
+        .byte "|"
 
 .endif ; FUNCALL
 
 
 
         ;; Define variable
-
-;;; TODO: ... not working?
-
-;        .byte "|word","%I;"
-        .byte "|"
-;;; TODO: not getting here...
-        .byte "%{"
-        putc '!'
-        IMM_RET
-
         .byte "word","%I;"
-
 ;;; 
 ;;; TODO: lol %I messes up stack, comes to ';'
 ;;;       then nobody cleans up!
@@ -11645,7 +11636,9 @@ input:
         ;; 7B 19c
 ;        .byte "word main(){}",0
 
-        .byte "word main(){ return 4711; }",0
+;        .byte "word main(){ return 4711; }",0
+
+;        .byte "word abc;",10,"word main(){ return 4710+1; }",0
 
 
 
@@ -12759,18 +12752,18 @@ NOPRINT=1
 
 ;;; TODO: allow several vars defined on one line, LOL
         .byte "word a;",10
-                .byte "word b;",10
+;                .byte "word b;",10
         .byte "word c;",10
-                .byte "word d;word e;word f;word g;word h;",10
+;                .byte "word d;word e;word f;word g;word h;",10
         .byte "word i;",10
-                .byte "word j;",10
+;                .byte "word j;",10
         .byte "word k;",10
-                .byte "word l;",10
+;                .byte "word l;",10
         .byte "word m;",10
         .byte "word n;",10
-                .byte "word o;"
+;                .byte "word o;"
         .byte "word p;",10
-                .byte "word q;word r;word s;word t;word u;word v;word w;",10
+;                .byte "word q;word r;word s;word t;word u;word v;word w;",10
 
         .byte "word main(){",10
        ;; BYTE MAGAZINE 8192 => 1899
