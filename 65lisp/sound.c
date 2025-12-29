@@ -315,11 +315,6 @@ RTS
 #define SILENCE      "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
 
 
-extern int T=0;
-extern int nil=0;
-extern int doapply1=0;
-extern int print=0;
-
 #ifdef BASIC_ROM
 
 void fx(char* sound) {
@@ -388,7 +383,7 @@ void sfx(char* fourteenbytes) {
 //       4,5,6 - noise -- TODO
 
 void sound(char ch, unsigned int period, char vol) {
-  printf(" [sound %d %d %d] ", ch, period, vol);
+//  printf(" [sound %d %d %d] ", ch, period, vol);
   if (1 <= ch && ch<= 3) {
     setAYword(ch*2-2, period);
     setAYreg(8-1+ch, vol);
@@ -479,6 +474,7 @@ void music(char ch, char oct, char note, char vol) {
 //
 //   tone:  A=1, B=2, C=4 => A+C==5 all=7
 //   noise: similar to tone for each channel
+//   envelope: 1..7 (?)
 //   env_period: 0..32767
 //
 //   T= n*256 / 1MHz = (1..65535) (256us..16.7s), 0.ls==380
@@ -512,10 +508,17 @@ void play(char tonemap, char noisemap, char env, unsigned int env_period) {
 
 // ------------------------------------------------------------
 
-#include <string.h>
-#include <ctype.h>
+#ifndef MAIN
+
+extern int T=0;
+extern int nil=0;
+extern int doapply1=0;
+extern int print=0;
 
 #ifdef TEST
+
+#include <string.h>
+#include <ctype.h>
 
 #include "conio-raw.c"
 
@@ -560,7 +563,7 @@ void main() {
   sfx(SILENCE);
 
   play(1,0,0,10);
-  music(1,4,10,7);
+  music(1,4,10,15);
   wait(300);
 
   {
@@ -604,4 +607,6 @@ void main() {
     wait(100);
   }
 }
-#endif //TEST
+#endif // TEST
+
+#endif // MAIN
