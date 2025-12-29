@@ -2189,13 +2189,6 @@ BYTERULES=1
 ;
 TESTING=1
 
-;;; Long names support
-;;; TODO: make functional
-;LONGNAMES=1
-
-;;; TODO: not yet done, just thinking
-;BNFLONG=1
-
 ;;; used for PARAM4
 ;;; 
 ;PARAM4=1
@@ -2225,22 +2218,21 @@ TESTING=1
 ;;; prints when skipping
 ;DEBUGRULESKIP=1
 
-;;; show input during parse \=backtrack
-;;; Note: some chars are repeated at backtracking!
-;SHOWINPUT=1
-
 ;;; gives a little bit more context for compile err...;
 ;TRACERULE=1
 ;;; backspaces out of rules done
 ;;; (works best if PRINTREAD not enabled)
 ;TRACEDEL=1
 
+;;; TODO: not working reliable anymore
+;;;   (same char repeated+crash, and skips many?)
+;;; show input during parse \=backtrack
+;;; Note: some chars are repeated at backtracking!
+;SHOWINPUT=1
+
 ;;; print input ON ERROR (after compile)
 ;;; TOOD: also, if disabled then gives stack error,
 ;;;   so it has become vital code, lol
-
-;;; TODO: FIX
-;
 PRINTINPUT=1
 
 ;;; for good DEBUGGING
@@ -2250,8 +2242,7 @@ PRINTINPUT=1
 ;;; Requires ERRPOS (?)
 
 ;;; TODO: useless - remove! or reimlement...
-
-;PRINTREAD=1
+PRINTREAD=1
 
 ;;; more compact printing of source when compiling
 ;UPDATENOSPACE=1
@@ -5090,32 +5081,32 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
+;ruleA: Aggregate statement
+;ruleB: Block
+;ruleC: start of expression (used once in expr/commands/funs)
+;ruleD: aDDons ... OP xxx TAILREC
+;ruleE: Expression _C _D (or _U _V for bytes)
 ;ruleF: byte rule, keeps AX, get byte expr => Y
 ;ruleG: calling convention "(@tos,AX) like ruleC
 ;ruleH: printf parsing
-;ruleI:
-;ruleJ:  
-.ifndef BNFLONG
-  ruleK:  
-  ruleL:  
-  ruleM:
-;  ruleN:
-.endif
-;;ruleO:  
-;;ruleP: - program
-;;ruleQ: - array data
+;ruleI: "load byte expression" - opt
+;ruleJ: "read byte expression, saving AX totos and sets Y=0"
+;ruleK: list of var defined
+ruleL:
+ruleM:
+;ruleN: - program var decl
+;ruleO: - first rule in program/jmp main
+;ruleP: - program
+;ruleQ: - array data
 ruleR:
-;;.ifndef MINIMAL
-;;ruleU:  
-;;.endif
-;;ruleU: - BYTERULES "ruleC"
-;;ruleV: - BYTERULES "ruleD"
-
-;ruleW:  -   HW_PARMS
-;ruleX:  -   cc65 parameter list
-;;ruleY: -   parameters init
-;;ruleZ: -   list of parameters
+;ruleU: - BYTERULES variant of "ruleC"
+;ruleV: - BYTERULES variant of "ruleD"
+;ruleW: = HW_PARMS
+;ruleX: = cc65 parameter list
+;ruleY: = parameters init
+;ruleZ: = list of parameters
         .byte 0
+
 
 _A='A'+128
 _B='B'+128
@@ -6546,7 +6537,6 @@ ruleU:
 .endif
 
 ;;; aDDons (::= op %d | op %V)
-
 ruleD:
 
 ;;; TODO: generalize!
@@ -7858,6 +7848,19 @@ ruleQ:
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
 ruleN:
 
+        ;; SPECIAL HACK!
+
+        ;; CUT if positive match!
+        ;; (ruleN parses var/func def and is called
+        ;;  by ruleO, which function is to skip over
+        ;;  everything before the main function!)
+        ;; TODO: possibly replace all this with
+        ;;   a lookup of main?
+        .byte "word","main("
+      .byte "%{"
+        jmp gotmain_goendfail
+
+
 ;;; TODO: make this folding work,
 ;;;   mostly OK, but don't know where to put result
 ;;;   want to have restartable programs? 
@@ -7868,7 +7871,7 @@ ruleN:
 .ifdef FOLD
         ;; constant partial evaluation!
         ;; TODO: expand to constant folding
-        .byte "const","word","%A="
+        .byte "|const","word","%A="
 
       .byte "%{"
         putc '{'
@@ -7970,11 +7973,7 @@ ruleN:
         IMM_RET
 
         .byte TAILREC
-
-        .byte "|"
 .endif ; FOLD
-
-
 
 
 
@@ -7989,7 +7988,7 @@ ruleN:
 ;;; TODO: _RECURSIVE  ???
 
 
-        .byte "WORD","%N(a,b,c,d)"
+        .byte "|WORD","%N(a,b,c,d)"
 
 ;;; TODO: cleanup, don't use globals
 
@@ -8026,6 +8025,7 @@ stargs:          .res NSTARGS*2
         sta $1234,y
         nop
         nop
+
         ldy $1234,x
         nop
         nop
@@ -8336,8 +8336,6 @@ POSTLUDE=1
         ;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
 
-;;; ;TODO: %N? ???? define function
-
         .byte "|word","%I%N()",_B
       .byte '['
         ;; TODO: This maybe be redundant if there is
@@ -8396,20 +8394,47 @@ POSTLUDE=1
 .endif ; FUNCALL
 
 
+
         ;; Define variable
 
+MANYVARS=1
+;PERCENT_N=1
+
 ;;; TODO: these should be equivalent...
-.ifnblank
-      .byte "word","%I;%N"
+.ifdef PERCENT_N
+        .byte "|word","%I;%N"
         ;; NOTE: %N after ; otherwise maybe mix w 
         ;;       function def: "word","%I(%N",_E ... lol
+      .byte "%{"
+        putc '!'
+        IMM_RET
+        .byte TAILREC
 .else
-      .byte "word","%I;"
+
+.ifdef MANYVARS
+;        .byte "|word","%I;"
+;      .byte "%{"
+;        lda #'w'
+;        jsr _newvar_IMM_RET
+;        .byte TAILREC
+
+;        .byte "|word",_K'
+;        .byte TAILREC
+
+
+;;; TDOO: parse functions before this
+
+        .byte "|word",_K
+        .byte TAILREC
+
+.else
+        .byte "|word","%I;"
       .byte "%{"
         lda #'w'
         jsr _newvar_IMM_RET
-.endif
         .byte TAILREC
+.endif ; MANYVARS
+.endif ; PERCENT_N
 
 ;;; TODO: %I;%N ...
         .byte "|word\*","%I;"
@@ -8467,15 +8492,43 @@ POSTLUDE=1
         ;; TODO: special case ={0};
 ;        .byte "|char* %V[%D]={"
         ;; TODO: _Q reads bytes do word... or stringconst
+;;; MEMSET zero
 ;        .byte _Q
 
+        .byte "|"
 
+      .byte "%{"
+        ;; comes here if we got "word main(" ...
+gotmain_goendfail:
+        lda #<after
+        ldx #>after
+        sta rule
+        stx rule+1
+;;; TODO: make IMM_FAIL do similar to IMM_RET
+        IMM_FAIL
+after:  
 
         .byte "|"
 
         .byte 0
 
 
+;;; define list of variables
+ruleK:  
+        .byte "%I;"
+      .byte "%{"
+        putc '!'
+        lda #'w'
+        jsr _newvar_IMM_RET
+
+        .byte "|%I,"
+      .byte "%{"
+        putc '?'
+        lda #'w'
+        jsr _newvar_IMM_RET
+        .byte TAILREC
+
+        .byte 0
 
 
 ;;; This is the first rule applied on program.
@@ -8493,8 +8546,9 @@ ruleO:
         jsr _printstack
         IMM_RET
 .endif
+
         .byte 0
-        ;; Autopatches skip over definitions in N
+        ;; Autopatches skip over definitions in _N
 
 
 ;;; PROGRAM ::= DEFSSKIP TYPE main() BLOCK | 
@@ -8506,10 +8560,28 @@ ruleP:
         ;; this rule with jump over definitions and arrive at main
         .byte _O
 
+.byte "%{"
+lda inp
+ldx inp+1
+jsr _printz
+IMM_RET
+
+
+        ;; TODO: not to have special case for main()?
+        ;;   just lookup and patch?
         ;; TODO: works with _S
         ;; (reason is _T error doesn't propagate up
 ;        .byte _T,"main()",_B
+
         .byte "word","main()",_B
+
+.byte "%{"
+putc '.'
+IMM_RET
+
+
+
+
       .byte '['
         ;; if main not return, return 0
         lda #0
@@ -11759,6 +11831,10 @@ input:
 
 ;        .byte "word abc;",10,"word main(){ return 4710+1; }",0
 
+;        .byte "word abc,def,ghi,jkl;",10
+;        .byte "word main(){ abc=4711; return abc; }",10
+;        .byte "{return 42;};",10
+;        .byte 0
 
 
 ;EDITORTEST=1
@@ -12869,24 +12945,7 @@ NOPRINT=1
         .byte "// BYTE SIEVE PRIME benchmark",10
         .byte "#include <stdio.h>",10
 
-.ifnblank
         .byte "word a, c, i, k, m, n, p;",10
-.else
-;;; TODO: allow several vars defined on one line, LOL
-        .byte "word a;",10
-;                .byte "word b;",10
-        .byte "word c;",10
-;                .byte "word d;word e;word f;word g;word h;",10
-        .byte "word i;",10
-;                .byte "word j;",10
-        .byte "word k;",10
-;                .byte "word l;",10
-        .byte "word m;",10
-        .byte "word n;",10
-;                .byte "word o;"
-        .byte "word p;",10
-;                .byte "word q;word r;word s;word t;word u;word v;word w;",10
-.endif
 
         .byte "word main(){",10
        ;; BYTE MAGAZINE 8192 => 1899
