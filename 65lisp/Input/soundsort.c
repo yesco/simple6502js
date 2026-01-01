@@ -149,8 +149,8 @@ void bubblesort() {
         ++n;
         arr[r]  = vv;
         arr[r+1]= v;
-        show(r,  7);
-        show(r+1, 7);
+        show(r,  4);
+        show(r+1, 4);
       } else {
         GET(r,   7);
         GET(r+1, 7);
@@ -182,8 +182,8 @@ void doublebubblesort() {
         arr[r]  = vv;
         arr[r+1]= v;
 
-        show(r,  7);
-        show(r+1, 7);
+        show(r,  4);
+        show(r+1, 4);
       } else {
 // going up doesn't show???
         GET(r,   7);
@@ -199,6 +199,52 @@ void doublebubblesort() {
   }
 }
 
+void qs(char a, char b);
+
+// TODO: at some point call bubblesort!
+void randsort() {
+  char a,b, v, vv, t, g;
+  word n=0, nn=0, d= HIRESROWS;
+  long c=0, lastc=0, sumg=0;
+
+  printname("RandSortQS");
+
+  while(1) {
+//    n= 0;
+//    for(r= 0; r<HIRESROWS-1; ++r) {
+
+      ++c;
+
+      a= rand() % HIRESROWS;
+      b= rand() % HIRESROWS;
+      if (a>b) { t= a; a= b; b= t; }
+
+      v = GET(a, 1);
+      vv= GET(b, 1);
+      if (v > vv) {
+        ++n;
+        arr[a]= vv;
+        arr[b]= v;
+        show(a, 4);
+        show(b, 4);
+
+//        sumg+= b-a;
+//        ++nn;
+//        d= sumg/nn;
+//        if (d<20) { qs(0, HIRESROWS-1); return; }
+//        if (sumg>0xfff) { sumg/=2; nn/=2; }
+//        sprintf(TEXTSCREEN+40*25, "%d/%ld %d", n, c, d);
+//        lastc= c;
+      } else {
+        GET(a, 7);
+        GET(b, 7);
+      }
+//    }
+      if (c>1000) { qs(0, HIRESROWS-1); return; }
+  }
+}
+
+
 void qs(char a, char b) {
   // only one - nothing to sort
   if (a>=b) return;
@@ -211,8 +257,8 @@ void qs(char a, char b) {
       arr[a]= vv;
       arr[b]= v;
 
-      show(a, 7);
-      show(b, 7);
+      show(a, 4);
+      show(b, 4);
     } else {
       GET(a, 7);
       GET(b, 7);
@@ -231,6 +277,7 @@ void qs(char a, char b) {
       // move up lower boundary if < 
       --a;
       do {
+        if (a>=0) GET(a, 7);
         ++a;
         v= GET(a, 1);
       } while(a<b && v<pv);
@@ -238,6 +285,7 @@ void qs(char a, char b) {
       // move down upper boundary if >=
       ++b;
       do {
+        if (b<HIRESROWS) GET(b, 7);
         --b;
         vv= GET(b, 1);
       } while(a<b && vv>=pv);
@@ -269,7 +317,7 @@ void quicksort() {
   qs(0, HIRESROWS-1);
 }
 
-#define METHODS 5
+#define METHODS 6
 
 word csecs[METHODS+1]= {0};
 char* name[METHODS+1]= {0};
@@ -287,6 +335,8 @@ void main() {
     row[r]= p;
     p+= 40;
   }
+
+// TODO: menu run choosen number, or 0 all!
 
   // run through different sorts
   for(m=1; m<=METHODS; ++m) {
@@ -310,11 +360,12 @@ void main() {
 
     switch(m) {
 
-    case 1: quicksort(); break;
-    case 2: selectionsort(); break;
-    case 3: insertsort(); break;
-    case 4: bubblesort(); break;
-    case 5: doublebubblesort(); break;
+    case 1: selectionsort(); break;
+    case 2: insertsort(); break;
+    case 3: bubblesort(); break;
+    case 4: doublebubblesort(); break;
+    case 5: quicksort(); break;
+    case 6: randsort(); break;
 
     }
 
