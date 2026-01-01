@@ -98,7 +98,7 @@ void insertsort() {
       t= GET(i, i==at? 4: 1);
       arr[i]= v;
       v= t;
-      show(i, 7);
+      show(i, i==at? 4: 6);
       ++i;
     }
     arr[i]= v;
@@ -210,9 +210,6 @@ void randsort() {
   printname("RandSortQS");
 
   while(1) {
-//    n= 0;
-//    for(r= 0; r<HIRESROWS-1; ++r) {
-
       ++c;
 
       a= rand() % HIRESROWS;
@@ -227,20 +224,12 @@ void randsort() {
         arr[b]= v;
         show(a, 4);
         show(b, 4);
-
-//        sumg+= b-a;
-//        ++nn;
-//        d= sumg/nn;
-//        if (d<20) { qs(0, HIRESROWS-1); return; }
-//        if (sumg>0xfff) { sumg/=2; nn/=2; }
-//        sprintf(TEXTSCREEN+40*25, "%d/%ld %d", n, c, d);
-//        lastc= c;
       } else {
         GET(a, 7);
         GET(b, 7);
       }
-//    }
-      if (c>1000) { qs(0, HIRESROWS-1); return; }
+      // bailout! lol
+      if (c>3000) { qs(0, HIRESROWS-1); return; }
   }
 }
 
