@@ -235,69 +235,51 @@ void randsort() {
 
 
 void qs(char a, char b) {
+  char pi, pv, oa, ob, v, vv;
+
   // only one - nothing to sort
   if (a>=b) return;
 
-  // swap if 2 in wrong order
-  if (a+1==b) {
-    char v= GET(a, 1);
-    char vv= GET(b, 1);
-    if (vv < v) {
-      arr[a]= vv;
-      arr[b]= v;
+  // else divide by middle pivot 
+  pi = (a+b)/2;
+  pv = GET(pi, 1);
+  oa= a; ob= b;
 
+  while(a<b) {
+    // move up lower boundary if < 
+    --a;
+    do {
+      if (a>=0) GET(a, 7);
+      ++a;
+      v= GET(a, 1);
+    } while(a<b && v<pv);
+      
+    // move down upper boundary if >=
+    ++b;
+    do {
+      if (b<HIRESROWS) GET(b, 7);
+      --b;
+      vv= GET(b, 1);
+    } while(a<b && vv>=pv);
+
+    if (a<b) {
+      // two elt out of place: swap
+      arr[b]= v;
+      arr[a]= vv;
+      
       show(a, 4);
       show(b, 4);
-    } else {
-      GET(a, 7);
-      GET(b, 7);
     }
-    return;
-
-  } else {
-
-    // else divide by middle pivot 
-    char pi = (a+b)/2;
-    char pv = GET(pi, 1);
-    char oa= a, ob= b;
-    char v, vv;
-
-    while(a<b) {
-      // move up lower boundary if < 
-      --a;
-      do {
-        if (a>=0) GET(a, 7);
-        ++a;
-        v= GET(a, 1);
-      } while(a<b && v<pv);
-      
-      // move down upper boundary if >=
-      ++b;
-      do {
-        if (b<HIRESROWS) GET(b, 7);
-        --b;
-        vv= GET(b, 1);
-      } while(a<b && vv>=pv);
-
-      if (a<b) {
-        // two elt out of place: swap
-        arr[b]= v;
-        arr[a]= vv;
-      
-        show(a, 4);
-        show(b, 4);
-      }
-    }
-    pi= a;
-
-    // clear colors
-    a= oa; b= ob;
-    while(a<=b) GET(a++, 7);
-
-    // sort the parts
-    qs(oa, pi);
-    qs(pi+1, ob);
   }
+  pi= a;
+
+  // clear colors
+  a= oa; b= ob;
+  while(a<=b) GET(a++, 7);
+  
+  // sort the parts
+  qs(oa, pi);
+  qs(pi+1, ob);
 }
 
 void quicksort() {
@@ -347,6 +329,8 @@ void main() {
     *(int*)0x276= 0xffff;
     csecs[m]= time();
 
+    lastname= NULL;
+
     switch(m) {
 
     case 1: selectionsort(); break;
@@ -369,16 +353,19 @@ void main() {
 
     // TODO: test is sorted - lol!
 
-    // show result
-    for(r= 0; r<HIRESROWS; ++r) {
-      wait(1);
-      show(r, 2);
-    }
+    if (lastname) {
+      // show result
+      for(r= 0; r<HIRESROWS; ++r) {
+        wait(1);
+        show(r, 2);
+      }
 
+
+      wait(150);
+    }
 
     sfx(SILENCE);
 
-    wait(150);
   }
  
   // show summary result
