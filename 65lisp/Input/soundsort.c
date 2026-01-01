@@ -126,18 +126,18 @@ void selectionsort() {
 }
 
 void bubblesort() {
-  char r, i, v, vv;
+  char r, n, v, vv;
 
   printname("BubbleSort");
 
-  i= 1;
-  while(i) {
-    i= 0;
+  n= 1;
+  while(n) {
+    n= 0;
     for(r= 0; r<HIRESROWS-1; ++r) {
       v = get(r,   1);
       vv= get(r+1, 1);
       if (v > vv) {
-        ++i;
+        ++n;
         arr[r]  = vv;
         arr[r+1]= v;
         show(r,  7);
@@ -147,6 +147,44 @@ void bubblesort() {
         get(r+1, 7);
       }
     }
+  }
+}
+
+void doublebubblesort() {
+  char n, v, vv;
+  int s, r, e, d;
+
+  printname("DoubleBubbleSort");
+
+  s= 0;
+  d= +1;
+  e= HIRESROWS-1;
+  r= s;
+
+  n= 1;
+  while(n) {
+    n= 0;
+    while (r>=s && r<e) {
+      v = get(r,   1);
+      vv= get(r+1, 1);
+      if (v > vv) {
+        // swap
+        ++n;
+        arr[r]  = vv;
+        arr[r+1]= v;
+
+        show(r,  7);
+        show(r+1, 7);
+      } else {
+        get(r,   7);
+        get(r+1, 7);
+      }
+
+      r+= d;
+    }
+    // turn around
+    d= -d;
+    r+= d;
   }
 }
 
@@ -215,7 +253,7 @@ void qs(char a, char b) {
 }
 
 void quicksort() {
-  printname("BubbleSort");
+  printname("QuickSort");
 
   qs(0, HIRESROWS-1);
 }
@@ -261,10 +299,11 @@ void main() {
 
     switch(m) {
 
-    case 1: quicksort(); break;
-    case 2: selectionsort(); break;
-    case 3: insertsort(); break;
-    case 4: bubblesort(); break;
+//    case 1: quicksort(); break;
+//    case 2: selectionsort(); break;
+//    case 3: insertsort(); break;
+//    case 4: bubblesort(); break;
+      case 1: doublebubblesort(); break;
 
     }
 
