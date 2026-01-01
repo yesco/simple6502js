@@ -12,15 +12,24 @@ char* row[HIRESROWS];
 
 char arr[HIRESROWS];
 
-char get(char r, char color) {
-  char v= arr[r];
-//  word period= v*2;
-  word period= v;
-  char *p= row[r];
-  
-  *p= color;
 
-  if (color!=7) {
+char pr;
+char pcolor;
+
+#define GET(prr, pcc) (pr= prr, pcolor= pcc, get())
+
+//char get(char r, char color) {
+char get() {
+  static char v;
+  static word period;
+  static char *p;
+  v= arr[pr];
+  period= v;
+  p= row[pr];
+  
+  *p= pcolor;
+
+  if (pcolor!=7) {
     play(1, 0, 0, 10);
     sound(1, period, 5);
   }
@@ -32,7 +41,7 @@ char partline[]= {0b1100000, 0b1110000, 0b1111000, 0b1111100,
  0b1111110, 0b1111111};
 
 void show(char r, char color) {
-  char c=1, v= get(r, color);
+  char c=1, v= GET(r, color);
   char *p= row[r];
 
   *p= color;
@@ -70,23 +79,23 @@ void insertsort() {
 
   printname("InsertSort");
 
-  v= get(0, 1);
+  v= GET(0, 1);
   show(0, 7);
   for(r= 1; r<HIRESROWS-1; ++r) {
     // next to insert
-    v= get(r, 1);
+    v= GET(r, 1);
     for(i= 0; i<r; ++i) {
-      vv= get(i, 1);
+      vv= GET(i, 1);
       if (vv >= v) break;
-      get(i, 7);
+      GET(i, 7);
     }
-    get(r, 7);
+    GET(r, 7);
 
     at= i;
 
     // move up rest
     while(i < r) {
-      t= get(i, i==at? 4: 1);
+      t= GET(i, i==at? 4: 1);
       arr[i]= v;
       v= t;
       show(i, 7);
@@ -95,7 +104,7 @@ void insertsort() {
     arr[i]= v;
     show(i, 7);
 
-    get(at, 4);
+    GET(at, 4);
   }
 }
 
@@ -106,13 +115,13 @@ void selectionsort() {
 
   for(r= 0; r<HIRESROWS-1; ++r) {
     // find smallest
-    at= r; v= get(r, 1);
+    at= r; v= GET(r, 1);
     for(i= r+1; i<HIRESROWS; ++i) {
-      vv= get(i, 1);
+      vv= GET(i, 1);
       if (vv < v) {
         at= i; v= vv;
       }
-      get(i, 7);
+      GET(i, 7);
     }
 
     // swap w smallest
@@ -134,8 +143,8 @@ void bubblesort() {
   while(n) {
     n= 0;
     for(r= 0; r<HIRESROWS-1; ++r) {
-      v = get(r,   1);
-      vv= get(r+1, 1);
+      v = GET(r,   1);
+      vv= GET(r+1, 1);
       if (v > vv) {
         ++n;
         arr[r]  = vv;
@@ -143,8 +152,8 @@ void bubblesort() {
         show(r,  7);
         show(r+1, 7);
       } else {
-        get(r,   7);
-        get(r+1, 7);
+        GET(r,   7);
+        GET(r+1, 7);
       }
     }
   }
@@ -164,9 +173,9 @@ void doublebubblesort() {
   n= 1;
   while(n) {
     n= 0;
-    while (r>=s && r<e) {
-      v = get(r,   1);
-      vv= get(r+1, 1);
+    do {
+      v = GET(r,   1);
+      vv= GET(r+1, 1);
       if (v > vv) {
         // swap
         ++n;
@@ -176,15 +185,17 @@ void doublebubblesort() {
         show(r,  7);
         show(r+1, 7);
       } else {
-        get(r,   7);
-        get(r+1, 7);
+// going up doesn't show???
+        GET(r,   7);
+        GET(r+1, 7);
       }
 
       r+= d;
-    }
+    } while (r>=s && r<e);
     // turn around
     d= -d;
     r+= d;
+    if (r==s) r= ++s; else r= --e;
   }
 }
 
@@ -194,8 +205,8 @@ void qs(char a, char b) {
 
   // swap if 2 in wrong order
   if (a+1==b) {
-    char v= get(a, 1);
-    char vv= get(b, 1);
+    char v= GET(a, 1);
+    char vv= GET(b, 1);
     if (vv < v) {
       arr[a]= vv;
       arr[b]= v;
@@ -203,8 +214,8 @@ void qs(char a, char b) {
       show(a, 7);
       show(b, 7);
     } else {
-      get(a, 7);
-      get(b, 7);
+      GET(a, 7);
+      GET(b, 7);
     }
     return;
 
@@ -212,7 +223,7 @@ void qs(char a, char b) {
 
     // else divide by middle pivot 
     char pi = (a+b)/2;
-    char pv = get(pi, 1);
+    char pv = GET(pi, 1);
     char oa= a, ob= b;
     char v, vv;
 
@@ -221,14 +232,14 @@ void qs(char a, char b) {
       --a;
       do {
         ++a;
-        v= get(a, 1);
+        v= GET(a, 1);
       } while(a<b && v<pv);
       
       // move down upper boundary if >=
       ++b;
       do {
         --b;
-        vv= get(b, 1);
+        vv= GET(b, 1);
       } while(a<b && vv>=pv);
 
       if (a<b) {
@@ -244,7 +255,7 @@ void qs(char a, char b) {
 
     // clear colors
     a= oa; b= ob;
-    while(a<b) get(a++, 7);
+    while(a<=b) GET(a++, 7);
 
     // sort the parts
     qs(oa, pi);
@@ -258,7 +269,7 @@ void quicksort() {
   qs(0, HIRESROWS-1);
 }
 
-#define METHODS 4
+#define METHODS 5
 
 word csecs[METHODS+1]= {0};
 char* name[METHODS+1]= {0};
@@ -299,11 +310,11 @@ void main() {
 
     switch(m) {
 
-//    case 1: quicksort(); break;
-//    case 2: selectionsort(); break;
-//    case 3: insertsort(); break;
-//    case 4: bubblesort(); break;
-      case 1: doublebubblesort(); break;
+    case 1: quicksort(); break;
+    case 2: selectionsort(); break;
+    case 3: insertsort(); break;
+    case 4: bubblesort(); break;
+    case 5: doublebubblesort(); break;
 
     }
 
