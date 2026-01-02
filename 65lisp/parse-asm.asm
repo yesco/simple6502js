@@ -5831,7 +5831,7 @@ FUNC _memoryrulesend
 
 
 
-FUNCALL=1
+;FUNCALL=1
 
 FUNC _funcallstart
 
@@ -12476,8 +12476,7 @@ CANT=1
         .byte 0
 .endif
 
-;
-FUN=1
+;FUN=1
 .ifdef FUN
         .byte "// Functions",10
         .byte "word F() { return 4700; }",10
