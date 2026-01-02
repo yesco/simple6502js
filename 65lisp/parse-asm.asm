@@ -5627,9 +5627,9 @@ FUNC _funcallend
       .byte ']'
 
         .byte "|'\\n'"
-      .byte "%{"
+;      .byte "%{"
 ;        putc '!'
-        IMM_RET
+;        IMM_RET
 
       .byte '['
         lda #10
@@ -5660,9 +5660,9 @@ FUNC _funcallend
 
         .byte "'"
         
-      .byte "%{"
+;      .byte "%{"
 ;        putc '!'
-        IMM_RET
+;        IMM_RET
 
       .byte '['
         lda #10
@@ -7584,9 +7584,9 @@ MANYVARS=1
         .byte "|word","%I;%N"
         ;; NOTE: %N after ; otherwise maybe mix w 
         ;;       function def: "word","%I(%N",_E ... lol
-      .byte "%{"
-        putc '!'
-        IMM_RET
+;      .byte "%{"
+;        putc '!'
+;        IMM_RET
         .byte TAILREC
 .else
 
@@ -7696,13 +7696,13 @@ after:
 ruleK:  
         .byte "%I;"
       .byte "%{"
-        putc '!'
+        ;putc '!'
         lda #'w'
         jsr _newvar_IMM_RET
 
         .byte "|%I,"
       .byte "%{"
-        putc '?'
+        ;putc '?'
         lda #'w'
         jsr _newvar_IMM_RET
         .byte TAILREC
@@ -7721,7 +7721,7 @@ ruleO:
 
 .ifnblank
       .byte "%{"
-        putc '_'
+        ;putc '_'
         jsr _printstack
         IMM_RET
 .endif
@@ -7739,13 +7739,6 @@ ruleP:
         ;; this rule with jump over definitions and arrive at main
         .byte _O
 
-.byte "%{"
-lda inp
-ldx inp+1
-jsr _printz
-IMM_RET
-
-
         ;; TODO: not to have special case for main()?
         ;;   just lookup and patch?
         ;; TODO: works with _S
@@ -7754,9 +7747,9 @@ IMM_RET
 
         .byte "word","main()",_B
 
-.byte "%{"
-putc '.'
-IMM_RET
+;.byte "%{"
+;putc '.'
+;IMM_RET
 
 
 
@@ -9138,7 +9131,7 @@ endcmdrules:
         sta inp
         lda pos+1
         sta inp+1
-putc '!'        
+;putc '!'        
         clc
 ;;; TODO: potential zero or | ? (safer)
         bcc startparsevarfirst
@@ -9146,14 +9139,14 @@ putc '!'
         ;; we didn't match, skip all!
         .byte "|"
       .byte "%{"
-putc '%'
+;putc '%'
 ;;; TODO: potential zero or | ?
         jmp endparsevarfirst
 
 ;;; --- after here are ONLY rules that start with %A!
         .byte "%{"
 startparsevarfirst:
-putc '<'
+;putc '<'
         IMM_RET
 
 .endif ; STARTVAROPT
@@ -9383,10 +9376,10 @@ putc '<'
 
 .ifdef STARTVAROPT
         .byte "%{"
-putc '.'
+;putc '.'
 clc
 bcc parsevarcont
-putc '>'
+;putc '>'
 endparsevarfirst:
 ;;; TODO: ?
         jmp _fail
@@ -9547,7 +9540,7 @@ ruleX:
 ;;; TODO: fails on foo(42,(93),35) ???
         .byte "("
        .byte "%{"
-PUTC 'B'
+;PUTC 'B'
         ;; counter for args
         lda #0
         jsr pusha
@@ -9558,7 +9551,7 @@ PUTC 'B'
 
         .byte "|,"
       .byte "%{"
-PUTC 'P'
+;PUTC 'P'
         putc '?'
         IMM_RET
 
@@ -9569,7 +9562,7 @@ PUTC 'P'
         
         .byte "|)"
       .byte "%{"
-PUTC 'E'
+;PUTC 'E'
         jsr popa
         sta tos
         IMM_RET
@@ -9949,6 +9942,9 @@ FUNC _OK
 
 
 FUNC _run
+
+        ;; TODO: print something if run from edit mode?
+        jsr nl
 
         ;; set ink for new rows
         lda #BLACK+16           ; paper
