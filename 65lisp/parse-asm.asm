@@ -2890,11 +2890,11 @@ PUTC '>'
         putc '>'
         ldy #0
         lda (rule),y
-        jsr putchar
+        jsr _printchar
         cmp #TAILREC
         bne :+
         lda rulename
-        jsr putchar
+        jsr _printchar
 ;        jsr _printstack
 :       
         pla
@@ -4804,12 +4804,11 @@ rule0:
 ;;; safer if done near end of of %{ area
         
 
-;;; aggregate statements
-ruleA: 
-
+;;; Aggregate statements, terminated by "}"
+ruleA:
 
 .ifdef CUT2
-        ;; '}' marks end - CUT
+        ;; PEEK '}' marks end - CUT
       .byte "%{"
         ;; peek ahead
         ldy #0                  ; danger! 0 can't skip
@@ -4829,7 +4828,39 @@ ruleA:
         .byte '|'
 .endif ; CUT2
 
-        .byte _S,TAILREC,"|",0
+
+        ;; store a marker to see if _S failed
+      .byte "%{"
+        lda inp+1
+        pha
+        lda inp
+        pha
+        lda #'s'
+        pha
+        IMM_RET
+
+;;; TODO: %_S ??? lol   or  %?_S  ??? or %=_S ???
+        .byte _S
+      
+        ;; if we didn't advance inp then _S failed
+      .byte "%{"
+        pla
+        cmp #'s'
+        pla
+        tax
+        pla
+        cmp inp+1
+        bne @ok
+        cpx inp
+        bne @ok
+@fail:
+        jmp _fail
+@ok:       
+        IMM_RET
+
+        ;; otherwise we try yet another _S (tailrec on _A)
+        .byte TAILREC,"|",0
+
 
 
 ;;; Block
@@ -5380,7 +5411,6 @@ FUNC _memoryrulesstart
       .byte ']'
 
 
-
 .ifdef STDLIB
 
 ;;; TODO: cheating, using cc65 malloc/free :-(
@@ -5492,6 +5522,16 @@ FUNC _memoryrulesend
 FUNC _funcallstart
 
 .include "lib-runtime-funcall.asm"
+
+
+        .byte "|%I()"
+      .byte "%{"
+        putc '!'
+        IMM_RET
+      .byte "["
+        DOJSR VAL0
+      .byte "]"
+
 
 FUNC _funcallend
 
@@ -7372,6 +7412,10 @@ ruleQ:
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
 ruleN:
 
+      .byte "%{"
+        putc 'a'
+        IMM_RET
+
         ;; SPECIAL HACK!
 
         ;; CUT if positive match!
@@ -7385,134 +7429,26 @@ ruleN:
         jmp gotmain_goendfail
 
 
-;;; TODO: make this folding work,
-;;;   mostly OK, but don't know where to put result
-;;;   want to have restartable programs? 
-;;;   or like cc65 just put in inline in the code?
-;;;   LIMIT: can only do at top-level
-
-;FOLD=1
-.ifdef FOLD
-        ;; constant partial evaluation!
-        ;; TODO: expand to constant folding
-        .byte "|const","word","%A="
-
-      .byte "%{"
-        putc '{'
-        IMM_RET
-
-      .byte "%{"
-        ;; save address
-        lda dos
-        ldx dos+1
-        jsr pushax
-        ;; save current gen
-        lda _out
-        sta gos
-        ldx _out+1
-        stx gos+1
-        ;; TODO: should set a flag
-        PUTC '@'
-        ;; cheat: artificual fail!
-        IMM_FAIL
-;;; ???
-        IMM_RET
-
-;;; TODO: why needed? was it for constant folding?
-
-;        ;; cheat!
-;        ;; (it will next rule next!)
-;      .byte "|"
-
-;        .byte "const",_T,"%A="
-;        .byte "const","word","%A="
-
-.ifdef FFF
-      .byte "%{"
-        PUTC '?'
-;        jsr _iasm
-        lda inp
-        ldx inp+1
-        jsr _printz
-        jsr nl
-        IMM_RET
-.endif
-        .byte _C,_D
-        .byte ";"
-      .byte "["
-        ;; make sure we get back!
-        rts
-      .byte "]"
-      .byte "%{"
-        PUTC '$'
-;        jsr _iasm
-        IMM_RET
-        ;; TODO: if flag set
-
-      .byte "%{"
-;        jsr _iasm
-        PUTC '#'
-        ;; print address to call
-        lda gos
-        sta tos
-        lda gos+1
-        sta tos+1
-        jsr puth
-        ;; JSR (gos) !
-        lda #$4c                ; trampoline: jmp
-        sta gos-1
-        jsr gos-1
-        ;; store result in variable from DSTACK
-        sta dos
-        stx dos+1
-        jsr popax
-        sta tos
-        stx tos+1
-        PUTC '@'
-        jsr puth
-        ;; store in var
-        ldy #0
-        lda dos
-        sta (tos),y
-        iny
-        lda dos+1
-        sta (tos),y
-        ;; print for debug
-        putc '='
-        lda dos
-        ldx dos+1
-        sta tos
-        stx tos+1
-        jsr putu
-        ;; remove code run!
-        lda gos
-        sta _out
-        ldx gos+1
-        stx _out+1
-        ;; continue
-        IMM_RET
-
-      .byte "%{"
-        putc '}'
-        IMM_RET
-
-        .byte TAILREC
-.endif ; FOLD
-
+.include "parse-fold.asm"
 
 
 ;;; DEFINING FUNCTIONS
-
-.ifdef FUNCALL
-
-.include "parse-func-def.asm"
 
 
         ;; Define function definition
         ;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
 
-        .byte "|word","%I%N()",_B
+      .byte "%{"
+        putc 'b'
+        IMM_RET
+      
+        .byte "|word","%I()%N",_B
+
+      .byte "%{"
+        putc '?'
+        IMM_RET
+
       .byte '['
         ;; TODO: This maybe be redundant if there is
         ;; a return just before...
@@ -7528,6 +7464,12 @@ ruleN:
         rts
       .byte ']'
         .byte TAILREC
+
+
+.ifdef FUNCALL
+
+.include "parse-func-def.asm"
+
 
 
         .byte "|void*","%N()",_B
@@ -7766,6 +7708,9 @@ ruleP:
         jsr _asmprintsrc
         IMM_RET
 .endif ; PRINTASM
+
+;;; We also accept simple expressions...
+;;; TODO: have a look/test
 
         .byte "|"
 
@@ -9110,6 +9055,8 @@ endcmdrules:
 ;;; 
 
 ;STARTVAROPT=1
+
+;;; TODO: ??????
 
 .ifdef STARTVAROPT
         .byte "|"
@@ -11010,6 +10957,17 @@ input:
 ;        .byte "word main(){ abc=4711; return abc; }",10
 ;        .byte "{return 42;};",10
 ;        .byte 0
+
+;
+NEWFUN=1
+.ifdef NEWFUN
+;        .byte "word foo(){ return 4700; }",10 
+        .byte "word main(){ return foo(); }",10
+;        .byte "word main(){ return foo()+11; }",10
+;        .byte "word main(){ return 4711; }",10
+        .byte 0
+.endif ; NEWFUN
+
 
 
 ;EDITORTEST=1
