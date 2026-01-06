@@ -12133,7 +12133,8 @@ CANT=1
 ;;; 
 
 
-;BYTESIEVE=1
+;
+BYTESIEVE=1
 ;
 NOPRINT=1
 
@@ -12425,8 +12426,7 @@ NOPRINT=1
 ;;; HOW is this NOT the SAME?
 ;        .byte "word main(){++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;return a;}",0
 
-;
-REP=2000
+;REP=2000
 .ifdef REP
         .byte "// MANY statements test: repeat ++a",10
         .byte "word a;",10
