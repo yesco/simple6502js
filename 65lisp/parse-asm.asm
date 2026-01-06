@@ -1162,6 +1162,12 @@
 ;;;              O P T I O N S 
 
 
+.ifndef FROGMOVE
+        ;; basically 1000x: ++a; lol
+        OUTPUTSIZE=6*1024
+.else
+        OUTPUTSIZE=8*1000+50
+.endif
 
 ;;; enable stack checking at each _next
 ;;; (save some bytes by turn off)
@@ -1878,7 +1884,8 @@ TESTING=1
 ;DEBUGRULESKIP=1
 
 ;;; gives a little bit more context for compile err...;
-;TRACERULE=1
+;
+TRACERULE=1
 ;;; backspaces out of rules done
 ;;; (works best if PRINTREAD not enabled)
 ;TRACEDEL=1
@@ -2630,7 +2637,7 @@ jsr putchar
         jsr _incR
         ; pla
 
-        ;; %b - word boundary test 
+        ;; %b - word boundary test
         cmp #'b'
         bne :+
 
@@ -3204,6 +3211,12 @@ lda savea
 
 
 FUNC _fail
+
+;;; TODO: seems to disturbe correct exec?
+;.ifdef TRACERULE
+;       PUTC '%'              
+;.endif ; TRACERULE
+
 
 ;;; seems this in _acceptrule is cheaper than _fail
 .ifdef xERRPOS
@@ -4341,6 +4354,17 @@ jsr putchar
 
 ;;; TOS = array size in bytes
 FUNC _newarr_IMM_RET
+
+
+
+;;; TODO: this seems all wrong?
+
+
+;;;   should it not set the address of the variable?
+
+
+
+
 ;;; 29 B
 
 ;;; TODO: any way to make less code?
@@ -4355,6 +4379,8 @@ FUNC _newarr_IMM_RET
         pha
         ldy #0
 
+        ;; (clever? lol)
+;;; TODO: issue with records in future/who init this?
         ;; store sizeof before array!
         lda tos
         sta (_out),y
@@ -4368,7 +4394,7 @@ FUNC _newarr_IMM_RET
         ;; (always true type char)
         pla
 ;;; TODO: regarr2 ??? if _newarr 
-        bne regarr
+        bne regarr2
 
 
 ;;; STACK: addrofname/w len/b JSR _newvar
@@ -4532,7 +4558,7 @@ PUTC 'B'
         jsr _stuffVARS
         pla
 
-        ;; store type letter (last!)
+       ;; store type letter (last!)
 .ifdef DEBUGNAME
 PUTC 'T'
 .endif ; DEBUGNAME
@@ -4881,7 +4907,7 @@ ruleB:
 ;;; START of expression:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
-        
+
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
 
@@ -5524,7 +5550,19 @@ FUNC _funcallstart
 .include "lib-runtime-funcall.asm"
 
 
-        .byte "|%I()"
+;        .byte "|%I()"
+        .byte "|"
+
+.ifnblank
+      .byte "%{"
+        putc '/'
+        lda inp 
+        ldx inp+1
+        jmp _printz
+        IMM_RET
+.endif
+
+        .byte "%I()"
       .byte "%{"
         putc '!'
         IMM_RET
@@ -7363,6 +7401,7 @@ ruleG:
 
 ;;; Exprssion:
 ruleE:  
+        
         .byte _C,_D
         
 .ifdef BYTERULES
@@ -7439,11 +7478,33 @@ ruleN:
         ;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
 
+
       .byte "%{"
         putc 'b'
         IMM_RET
       
-        .byte "|word","%I()%N",_B
+;;; 
+;;;  TODO: %N not doing it for functions!
+;;; ;;;;;  %H maybe, lol?
+
+;        .byte "|word","%I()%N",_B
+        .byte "|word","%I()%N"
+
+      .byte "%{"
+        ;; "function" (F=Word, f=byte?)
+        lda #'F'
+;;; TODO: need to set the address
+        jsr _newarr_IMM_RET
+
+        putc '&'
+        lda tos
+        ldx tos+1
+        jsr _printh
+        IMM_RET
+
+        .byte _B
+
+
 
       .byte "%{"
         putc '?'
@@ -7765,14 +7826,26 @@ ruleS:
         rts
       .byte ']'
         
+
+
 .ifdef OPTRULES
         ;; save for no args function!
-        .byte "|return%V();"
+        .byte "|return%A();"
+
+      .byte "%{"
+        putc '&'
+        lda tos
+        ldx tos+1
+        jsr _printh
+        IMM_RET
+
       .byte '['
         ;; TAILCALL save 1 byte
         DOJSR VAL0
       .byte ']'
 .endif ; OPTRULES
+
+
 
         ;; RETURN
         .byte "|return",_E,";"
@@ -9831,6 +9904,9 @@ done2:
 
 
 FUNC _OK
+;;; TODO: detect if overrun OUTPUTSIZE
+;;;    _out >= _outputend
+
 
  .ifdef __ATMOS__
         lda #(GREEN+BG)&127
@@ -10739,6 +10815,13 @@ FUNC printaddress
         rts     
 .endif
 
+
+FUNC _printinp
+        lda inp 
+        ldx inp+1
+        jmp _printz
+
+
 ;;; prints readable otherwise:
 ;;; (newline is printed)
 ;;; _c means hibit-set for 'c'
@@ -10958,10 +11041,9 @@ input:
 ;        .byte "{return 42;};",10
 ;        .byte 0
 
-;
-NEWFUN=1
+;NEWFUN=1
 .ifdef NEWFUN
-;        .byte "word foo(){ return 4700; }",10 
+        .byte "word foo(){ return 4700; }",10 
         .byte "word main(){ return foo(); }",10
 ;        .byte "word main(){ return foo()+11; }",10
 ;        .byte "word main(){ return 4711; }",10
@@ -12051,8 +12133,7 @@ CANT=1
 ;;; 
 
 
-;
-BYTESIEVE=1
+;BYTESIEVE=1
 ;
 NOPRINT=1
 
@@ -12176,7 +12257,7 @@ NOPRINT=1
 .endif
 
 ;
-PRIME=1
+;PRIME=1
 ;;; TODO: this crashes in ORIC ????
 ;PRIMBYTE=1
 
@@ -12344,8 +12425,11 @@ PRIME=1
 ;;; HOW is this NOT the SAME?
 ;        .byte "word main(){++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;++a;return a;}",0
 
+;
+REP=2000
 .ifdef REP
         .byte "// MANY statements test: repeat ++a",10
+        .byte "word a;",10
         .byte "word main(){"
         ;; 48 => 15s lol - error
         ;; 40 =>  8s LOL
@@ -12381,7 +12465,9 @@ PRIME=1
 ;        .repeat 20              ; 27cs
 ;        .repeat 2000 ; MAX!
 
-        .repeat 20
+        .byte "a=0;"
+
+        .repeat REP
         ;; ~~~~~~~~~~~~~~~~~~~~ 1cs/op == 100ops/s
         ;; (* 60 100)= 6000 ops ~ 2000 lines? lol?
         ;; w print  24s (/ 2000 24) =  83 ops/s
@@ -12672,13 +12758,7 @@ _output:
 ;;;  free tap inp output
 ;;; (- 37 11    8   16  ) = 2K left
 
-.ifndef FROGMOVE
-        ;; basically 2000x ++a; lol
-        ;.res 16*1000+50
-        .res 4*1024
-.else
-        .res 8*1000+50
-.endif
+        .res OUTPUTSIZE
 
 FUNC _outputend
 
