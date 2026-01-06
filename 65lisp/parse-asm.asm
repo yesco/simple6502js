@@ -2601,10 +2601,11 @@ percent:
         lda (rule),y
 
         sta percentchar
+
 .ifdef DEBUGFUN
 putc '%'
 lda percentchar
-jsr putchar
+jsr _printchar
 .endif ; DEBUGFUN
 
         ;; Identifier?
@@ -2650,7 +2651,7 @@ jsr putchar
         bne failjmp
 
 :
-.ifnblank
+.ifblank
         ;; "%L" (jmp to routine that ends w jmp _next)
         ;; 
         ;;      .byte "%"
@@ -2665,14 +2666,13 @@ jsr putchar
         sta tmp1
         iny
         lda (rule),y
+        dey
         sta tmp1+1
         
         ;; - skip over address
         jsr _incR
         jsr _incR
         
-        dey
-        ;; Y=0
         jmp (tmp1)
 :       
 .endif        
@@ -4362,7 +4362,7 @@ putc 'I'
 .endif ; DEBUGNAME
 ; 18
 
-        ;; push name pointer on stack
+        ;; push name pointer on stack (hi, lo)
         lda inp+1
         pha
         lda inp
@@ -4440,6 +4440,13 @@ FUNC _newarr_IMM_RET
 ;;; TODO: regarr2 ??? if _newarr 
         bne regarr2
 
+
+
+
+
+FUNC _newvar_w
+        lda #'w'
+        ;; fall-through
 
 ;;; STACK: addrofname/w len/b JSR _newvar
 FUNC _newvar
@@ -4525,7 +4532,7 @@ PUTC 'B'
         ;; - len
         pla
         tay
-        ;; - address of char
+        ;; - address of name (lo, hi)
         pla
         sta pos
         pla
@@ -4548,6 +4555,18 @@ jsr _printchar
         dey
         bpl :-
 :       
+
+        ;; update VARRRULEVEC
+;;; TODO: too much work... save there waste here?
+        lda _ruleVARS
+        ldx _ruleVARS+1
+        clc
+        adc #1
+        sta VARRRULEVEC
+        txa
+        adc #0
+        sta VARRRULEVEC+1
+
         jmp _next
 
 
@@ -7739,20 +7758,22 @@ after:
         .byte 0
 
 
+.macro IMMEDIATE addr
+      .byte "%"
+        jmp addr
+.endmacro
+
 ;;; define list of variables
 ruleK:  
-        .byte "%I;"
-      .byte "%{"
-        ;putc '!'
-        lda #'w'
-        jsr _newvar_IMM_RET
 
-        .byte "|%I,"
-      .byte "%{"
-        ;putc '?'
-        lda #'w'
-        jsr _newvar_IMM_RET
+        ;; one more,,,
+        .byte "%I,"
+        IMMEDIATE _newvar_w
         .byte TAILREC
+
+        ;; last
+        .byte "|%I;"
+        IMMEDIATE _newvar_w
 
         .byte 0
 
