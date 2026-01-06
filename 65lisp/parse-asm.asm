@@ -2648,9 +2648,36 @@ jsr putchar
         tax
         beq nextjmp
         bne failjmp
-:
 
+:
+.ifnblank
+        ;; "%L" (jmp to routine that ends w jmp _next)
+        ;; 
+        ;;      .byte "%"
+        ;;      jmp foobar
+        cmp #'L'
+        bne :+
+
+        ;; Y=0
+        ;; - load address
+        lda (rule),y
+.import tmp1
+        sta tmp1
+        iny
+        lda (rule),y
+        sta tmp1+1
+        
+        ;; - skip over address
+        jsr _incR
+        jsr _incR
+        
+        dey
+        ;; Y=0
+        jmp (tmp1)
+:       
+.endif        
 ;;; 26 B
+;;; TODO: remove - UNSAFE (to 
         ;; %{ - immediate code! to run NOW!
         cmp #'{'
         bne noimm
@@ -2660,6 +2687,7 @@ jsr putchar
         sta imm+1
         ldx rule+1
         stx imm+2
+        ;; self-modifying code! (possibly move to ZP?)
         ;; - jump to the rule inline code!
 imm:    jmp $ffff
         ;; that code "returns" by jsr immret!
@@ -3281,7 +3309,7 @@ pla
 
         ;; ? % operator?
         cmp #'%'
-        bne :+
+        bne @nopercent
         
         ;; - get char after %
         ;; (notice not jsr _incR as we're INY!)
@@ -3291,15 +3319,30 @@ pla
 @noincinc:
         lda (rule),y
 
+        ;; - skip 2 chars if "%L" ('L'= jmp!)
+        cmp #'L'
+        bne :+
+
+        lda #2
+        ;; fall-through and it'll skip 2!
+:       
+
         ;; ? % len7 ... (skip ... of len7,hibit ignore)
         ;; 7bit < 32 skip bytes!
         and #$7f
+
         cmp #' '
-        bcs :+
+        bne :+
         
+        ;; skip JSR
+        lda #2
+        clc
+        ;; fall-through and it'll skip 2!
+:       
+
+        bcs :+
         ;; SKIP A bytes!
         ;; C=0
-
         ;; more complicated than it should be
         sty rule
         jsr skipperPlusC
@@ -3309,6 +3352,7 @@ pla
 
         jmp loopfail
 :       
+@nopercent:
         ;; normal char: skip
 FUNC nextskip
         ;; loop w Y
