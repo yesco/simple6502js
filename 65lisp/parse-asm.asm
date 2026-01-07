@@ -992,8 +992,18 @@
 
 
 ;;; 
+;;; Don't use: usafe - quoting problem | and \0 ...
 ;;; 
 ;;; %{IMMEDIATE machien code ... IMM_RET (or IMM_FAIL)
+
+
+;;; IMMEDIATE jmpaddr   (replaces unsafe %{ ...)
+;;; 
+.macro IMMEDIATE addr
+      .byte "%"
+        jmp addr
+.endmacro
+
 ;;; 
 ;;; Code can be executed inline *while* parsing.
 ;;; It's prefixed like this
@@ -3636,10 +3646,11 @@ jmpnext:
         cmp #'N'
         bne :+
 
+;;; TODO: not working correctly?
+
         ;; add to env, default as 'w'ord
-        ;; TODO: add char after w type?
-        lda #'w'
-        jmp _newvar
+        ;; TODO: add char after "%Nw" w type?
+        jmp _newvar_w
 
         ;; never returns! (jumps _next)
 
@@ -4396,36 +4407,18 @@ jsr putchar
         jmp _next
 
 
-;;; TOS = array size in bytes
-FUNC _newarr_IMM_RET
 
+;;; TODO: not here yet
 
-
-;;; TODO: this seems all wrong?
-
-
-;;;   should it not set the address of the variable?
-
-
-
-
-;;; 29 B
-
-;;; TODO: any way to make less code?
-;;; (duplicate inm newarr)
-        ;; manual immret
-        pla
-        sta rule
-        pla
-        sta rule+1
-        jsr _incR
-
+;;; TOS = array size in bytes, Y = type of elements
+FUNC _newarr
+        tya
         pha
-        ldy #0
 
-        ;; (clever? lol)
-;;; TODO: issue with records in future/who init this?
-        ;; store sizeof before array!
+        ;; store sizeof before array! (clever?)
+        ;; TODO: issue with records in future/who init this?
+        ;;       (or just store in ENV below?)
+        ldy #0
         lda tos
         sta (_out),y
         jsr _incO
@@ -4434,36 +4427,44 @@ FUNC _newarr_IMM_RET
         sta (_out),y
         jsr _incO
         
-        ;; skip zpalloc
-        ;; (always true type char)
+        ;; standing at _out at start of array!
+
         pla
-;;; TODO: regarr2 ??? if _newarr 
-        bne regarr2
+        tay
+        jmp _newname_Y_out
 
 
+FUNC _newname_F
+        ldy #'F'
+        ;; fall-through
 
+FUNC _newname_Y_out
+        ;; push backwards (lo, hi)
+        lda _out
+        ldx _out+1
+        
+        jmp _newvar_Y_AX
 
 
 FUNC _newvar_w
-        lda #'w'
+        ;; V(ar)Alloc 2 bytes
+        jsr _decV
+        jsr _decV
+        lda vos
+        ldx vos+1
+
+        ;; type
+        ldy #'w'
+
         ;; fall-through
 
 ;;; STACK: addrofname/w len/b JSR _newvar
-FUNC _newvar
-;;; 70 B
+;;; AX=addr, Y=typechar
+FUNC _newvar_Y_AX
+;;; ??? 70 B
 
-; 9
-        ;; V(ar)Alloc 2 bytes
-        jsr _decV               ; doesn't touch A
-        jsr _decV
-.ifdef DEBUGNAME
-pha
-lda vos
-ldx vos+1
-jsr _printh
-jsr spc
-pla
-.endif ; DEBUGNAME        
+        sta gos
+        stx gos+1
 
 ;;; The way we keep environment/bindings of
 ;;; vars is by prefixing them to a rule and
@@ -4471,63 +4472,45 @@ pla
 ;;; 
 ;;; In the end, not clear if save code memory
 ;;; as "stuffing" takes lots of bytes
-regarr:
+FUNC _newname
+;;;             >>>  %b%'3<ADDRw><TYPEc>| <<<
 
-;;; TODO: too much "stuffing"
-;;; TODO: copy a "template"?
+;;; TODO: push 0, NAME..., 3+128, A, X, Y, '|'
 ;;; 
-;;;             >>>  %b%'3<ADDR><TYPE>| <<<
+;;;           and then have loop "stuff it" till 0?
+;;;           (A or X could be zero ... so minimal 3?)
+;;; 
+        tya
+        pha
+
+        ldy #0
 
         ;; store a '|' to end sub-match
-; 10
-.ifdef DEBUGNAME
-PUTC 'B'
-.endif ; DEBUGNAME
-        pha
         lda #'|'
         jsr _stuffVARS
-        pla
 
         ;; store type letter (last!)
-.ifdef DEBUGNAME
-PUTC 'T'
-.endif ; DEBUGNAME
+        pla
         jsr _stuffVARS
 
-        ;; TODO: store sizeof
-        ;; TODO: store itemsize/varsize for ++
-
-        ;; store address of var (backwards)
-; 10
-.ifdef DEBUGNAME
-PUTC 'A'
-.endif ; DEBUGNAME
-        lda vos+1
+        ;; store address of var
+        lda gos+1               ; hi
         jsr _stuffVARS
-        lda vos
+        lda gos                 ; lo
         jsr _stuffVARS
 
-        ;; push skip chars "%<3+128>"
-;;; 10
-.ifdef DEBUGNAME
-PUTC 'S'
-.endif ; DEBUGNAME
+        ;; store skip chars "%<3+128>"
         lda #3+128              ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
 
-        ;; push skip 'breakchar' "%b"
-;;; 10
-.ifdef DEBUGNAME
-PUTC 'B'
-.endif ; DEBUGNAME
+        ;; store skip 'breakchar' "%b"
         lda #'b'            ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
         
-; 10
         ;; copy varname BACKWARDS from address on stack
         ;; - len
         pla
@@ -4540,10 +4523,12 @@ PUTC 'B'
 
         dey
 :       
+
 .ifdef DEBUGNAME
 PUTC 'C'
 jsr _printchar
 .endif ; DEBUGNAME
+
         lda (pos),y
 
         ;; TODO: clumsy?
@@ -4560,6 +4545,7 @@ jsr _printchar
 ;;; TODO: too much work... save there waste here?
         lda _ruleVARS
         ldx _ruleVARS+1
+;;; TODO: why are we adding one again?
         clc
         adc #1
         sta VARRRULEVEC
@@ -4570,161 +4556,6 @@ jsr _printchar
         jmp _next
 
 
-
-;;; STACK: addrofname/w len/b JSR _newvar
-FUNC _newvar_IMM_RET
-;;; 97 B
-
-;;; TODO: any way to make less code?
-;;; (duplicate inm newarr)
-        ;; manual immret
-        pla
-        sta rule
-        pla
-        sta rule+1
-        jsr _incR
-
-;;; (+ 9 10 18 10) = 47 B
-; 9
-        ;; V(ar)Alloc 2 bytes
-        jsr _decV               ; doesn't touch A
-        jsr _decV
-.ifdef DEBUGNAME
-pha
-lda vos
-ldx vos+1
-jsr _printh
-jsr spc
-pla
-.endif ; DEBUGNAME        
-
-;;; The way we keep environment/bindings of
-;;; vars is by prefixing them to a rule and
-;;; let our BNF parser to the matching!
-;;; 
-;;; In the end, not clear if save code memory
-;;; as "stuffing" takes lots of bytes
-regarr2:
-
-;;; TODO: too much "stuffing"
-;;; TODO: copy a "template"?
-;;; 
-;;;             >>>  %b%'3<ADDR><TYPE>| <<<
-
-        ;; store a '|' to end sub-match
-; 10
-.ifdef DEBUGNAME
-PUTC 'B'
-.endif ; DEBUGNAME
-        pha
-        lda #'|'
-        jsr _stuffVARS
-        pla
-
-       ;; store type letter (last!)
-.ifdef DEBUGNAME
-PUTC 'T'
-.endif ; DEBUGNAME
-        jsr _stuffVARS
-
-        ;; TODO: store sizeof
-        ;; TODO: store itemsize/varsize for ++
-
-        ;; store address of var (backwards)
-; 10
-.ifdef DEBUGNAME
-PUTC 'A'
-.endif ; DEBUGNAME
-        lda vos+1
-        jsr _stuffVARS
-        lda vos
-        jsr _stuffVARS
-
-        ;; push skip chars "%<3+128>"
-;;; 10
-.ifdef DEBUGNAME
-PUTC 'S'
-.endif ; DEBUGNAME
-        lda #3+128              ; 3 bytes to skip
-        jsr _stuffVARS
-        lda #'%'
-        jsr _stuffVARS
-
-        ;; push skip 'breakchar' "%b"
-;;; 10
-.ifdef DEBUGNAME
-PUTC 'B'
-.endif ; DEBUGNAME
-        lda #'b'            ; 3 bytes to skip
-        jsr _stuffVARS
-        lda #'%'
-        jsr _stuffVARS
-        
-; 10
-        ;; copy varname BACKWARDS from address on stack
-        ;; - len
-        pla
-        tay
-        ;; - address of char
-        pla
-        sta pos
-        pla
-        sta pos+1
-
-        dey
-:       
-.ifdef DEBUGNAME
-PUTC 'C'
-jsr _printchar
-.endif ; DEBUGNAME
-        lda (pos),y
-
-        ;; TODO: clumsy?
-        sty savey
-        ldy #0
-        jsr _stuffVARS          ; A preserved and => flags
-        ldy savey
-
-        dey
-        bpl :-
-:       
-
-        ;; update VARRRULEVEC
-;;; TODO: too much work... save there waste here?
-        lda _ruleVARS
-        ldx _ruleVARS+1
-        clc
-        adc #1
-        sta VARRRULEVEC
-        txa
-        adc #0
-        sta VARRRULEVEC+1
-
-        ;; really just "IMM_RET" end
-        jmp _next
-
-
-
-;;; TODO:
-
-;;; who the hell jumps here???? lol
-
-;;; need one of these lines? lol
-;        lda #VARRULENAME
-;        jmp enterrulebyname
-
-
-;;; TODO: even a nop will do????
-
-;;; Not needed anymore, lol?
-
-;nop
-
-
-
-
-;;; TODO: remove (print.asm?)dummy
-;_drop:  rts
 
 FUNC _dummy
 
@@ -7552,22 +7383,8 @@ ruleN:
 
 ;        .byte "|word","%I()%N",_B
         .byte "|word","%I()%N"
-
-      .byte "%{"
-        ;; "function" (F=Word, f=byte?)
-        lda #'F'
-;;; TODO: need to set the address
-        jsr _newarr_IMM_RET
-
-        putc '&'
-        lda tos
-        ldx tos+1
-        jsr _printh
-        IMM_RET
-
+        IMMEDIATE _newname_F
         .byte _B
-
-
 
       .byte "%{"
         putc '?'
@@ -7642,11 +7459,13 @@ ruleN:
 
         ;; Define variable
 
-MANYVARS=1
 ;PERCENT_N=1
 
 ;;; TODO: these should be equivalent...
 .ifdef PERCENT_N
+
+;;; TODO: use %N in else branch
+
         .byte "|word","%I;%N"
         ;; NOTE: %N after ; otherwise maybe mix w 
         ;;       function def: "word","%I(%N",_E ... lol
@@ -7656,45 +7475,31 @@ MANYVARS=1
         .byte TAILREC
 .else
 
-.ifdef MANYVARS
-;        .byte "|word","%I;"
-;      .byte "%{"
-;        lda #'w'
-;        jsr _newvar_IMM_RET
-;        .byte TAILREC
-
-;        .byte "|word",_K'
-;        .byte TAILREC
-
-
-;;; TDOO: parse functions before this
+	;; TDOO: parse functions before this
 
         .byte "|word",_K
         .byte TAILREC
 
-.else
-        .byte "|word","%I;"
-      .byte "%{"
-        lda #'w'
-        jsr _newvar_IMM_RET
-        .byte TAILREC
-.endif ; MANYVARS
 .endif ; PERCENT_N
 
+
+;ARRAYS=1
+
+.ifdef ARRAYS
 ;;; TODO: %I;%N ...
         .byte "|word\*","%I;"
       .byte "%{"
-        lda #'W'
-        jsr _newvar_IMM_RET
+        ldy #'W'
+;;; Can't do this: use IMMEDIATE and only jmp to routine
+        jsr _newarr
         .byte TAILREC
 
-.ifnblank
         .byte "|char","$%I;"
       .byte "%{"
-        lda #'c'
-        jsr _newvar_IMM_RET
+        ldy #'c'
+;;; Can't do this: use IMMEDIATE and only jmp to routine
+        jsr _newarr
         .byte TAILREC
-.endif
 
         ;; TODO: special case ={0};
         .byte "|word","%I\[%D\];"
@@ -7702,8 +7507,9 @@ MANYVARS=1
         ;; word is double bytes
         asl tos
         rol tos+1
-        lda #'W'+128
-        jsr _newarr_IMM_RET
+        ldy #'W'+128
+;;; Can't do this: use IMMEDIATE and only jmp to routine
+        jsr _newarr
         .byte TAILREC
 
 
@@ -7711,25 +7517,25 @@ MANYVARS=1
         .byte "|char","%I\[%D\];"
       .byte "%{"
         lda #'C'+128
-        jsr _newarr_IMM_RET
+;;; Can't do this: use IMMEDIATE and only jmp to routine
+        jsr _newarr
         .byte TAILREC
 
-.ifnblank
         ;; TODO: special case ={0};
         .byte "|word","%I\[%D\]={"
       .byte "%{"
         ldy #'W'+128
-        jsr _newarr_IMM_RET
+;;; Can't do this: use IMMEDIATE and only jmp to routine
+        jsr _newarr
  ;; TODO: do WORD, _Q only reads bytes
 ;;;   (how can do { "foo", "bar", "fie", fum" } ???
         .byte _Q
         .byte TAILREC
-.endif
 
         .byte "|char","%I\[\]={"
       .byte "%{"
         lda #'C'+128
-        jsr _newarr_IMM_RET
+        jsr _newarr
         ;; newarr sets pos
         .byte _Q
         .byte TAILREC
@@ -7739,6 +7545,8 @@ MANYVARS=1
         ;; TODO: _Q reads bytes do word... or stringconst
 ;;; MEMSET zero
 ;        .byte _Q
+
+.endif ; ARRAYS
 
         .byte "|"
 
@@ -7757,11 +7565,6 @@ after:
 
         .byte 0
 
-
-.macro IMMEDIATE addr
-      .byte "%"
-        jmp addr
-.endmacro
 
 ;;; define list of variables
 ruleK:  
