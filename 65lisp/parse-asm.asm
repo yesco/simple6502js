@@ -4802,6 +4802,10 @@ ruleB:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
 
+        .byte "%{"
+          putc ':'
+          IMM_RET
+
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
 
@@ -5437,29 +5441,20 @@ FUNC _memoryrulesend
 
 
 
-;FUNCALL=1
+;
+FUNCALL=1
 
 FUNC _funcallstart
 
-.include "lib-runtime-funcall.asm"
+;.include "lib-runtime-funcall.asm"
 
 
-;        .byte "|%I()"
-        .byte "|"
-
-.ifnblank
-      .byte "%{"
-        putc '/'
-        lda inp 
-        ldx inp+1
-        jmp _printz
-        IMM_RET
-.endif
-
-        .byte "%I()"
-      .byte "%{"
-        putc '!'
-        IMM_RET
+;;; TODO: not fully correct, as if it's a
+;;;   normal variable, it'd jump to that variable
+;;;   address??? lol
+;;; HOWEVER: with indirect jump table it'd be fine...
+;;;     that would be nice for trace/debug???
+        .byte "|%V()"
       .byte "["
         DOJSR VAL0
       .byte "]"
@@ -7382,7 +7377,7 @@ ruleN:
 ;;; ;;;;;  %H maybe, lol?
 
 ;        .byte "|word","%I()%N",_B
-        .byte "|word","%I()%N"
+        .byte "|word","%I()"
         IMMEDIATE _newname_F
         .byte _B
 
@@ -7409,7 +7404,7 @@ ruleN:
 
 .ifdef FUNCALL
 
-.include "parse-func-def.asm"
+;.include "parse-func-def.asm"
 
 
 
@@ -7698,18 +7693,10 @@ ruleS:
 
 .ifdef OPTRULES
         ;; save for no args function!
-        .byte "|return%A();"
-
-      .byte "%{"
-        putc '&'
-        lda tos
-        ldx tos+1
-        jsr _printh
-        IMM_RET
-
+        .byte "|return%V();"
       .byte '['
-        ;; TAILCALL save 1 byte
-        DOJSR VAL0
+        ;; TAILCALL save 1 byte!
+        jmp VAL0
       .byte ']'
 .endif ; OPTRULES
 
@@ -10909,11 +10896,18 @@ input:
 ;        .byte "{return 42;};",10
 ;        .byte 0
 
-;NEWFUN=1
+;
+NEWFUN=1
 .ifdef NEWFUN
         .byte "word foo(){ return 4700; }",10 
-        .byte "word main(){ return foo(); }",10
+;        .byte "word main(){ return foo(); }",10
 ;        .byte "word main(){ return foo()+11; }",10
+;        .byte "word main(){ return foo()+11; }",10
+
+        .byte "word zzz;",10
+        .byte "word main(){ zzz=foo()+11; return zzz; }",10
+
+;        .byte "word main(){ return 11+foo(); }",10 ; can't!
 ;        .byte "word main(){ return 4711; }",10
         .byte 0
 .endif ; NEWFUN
