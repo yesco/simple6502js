@@ -11060,7 +11060,8 @@ FUN1=1
         .byte "  if (a==0) return 0;",10
         .byte "  return summer(a-1)+a;",10
         .byte "}",10
-        .byte "word main() { return summer(10); }",10
+;;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
+        .byte "word main() { return summer(41); }",10
         .byte 0
 .endif ; FUN1
 
