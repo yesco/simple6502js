@@ -1104,7 +1104,7 @@
 ;;;   {{  - PUSHLOC (push and AUTO patch at accept rule)
 ;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
 ;;;   d   - set dos from tos
-;;;   #   - push tos (on to stuck)
+;;;   #   - push tos (on to stack)
 ;;;   :   - push loc (onto stack, as backpatch! - careful)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 ;;;   ?n  - PICK n from stack (last is 0)
@@ -1894,8 +1894,7 @@ TESTING=1
 ;DEBUGRULESKIP=1
 
 ;;; gives a little bit more context for compile err...;
-;
-TRACERULE=1
+;TRACERULE=1
 ;;; backspaces out of rules done
 ;;; (works best if PRINTREAD not enabled)
 ;TRACEDEL=1
@@ -1929,7 +1928,8 @@ PRINTREAD=1
 PRINTDOTS=1
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;PRINTASM=1
+;
+PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -3072,7 +3072,7 @@ FUNC _acceptrule
 .endif        
 
 .ifdef PRINTASM
-        putc MEGNENTA           ; magnenta RULE
+        putc MAGNENTA           ; magnenta RULE
 
         lda rulename
         jsr putchar
@@ -4446,6 +4446,28 @@ FUNC _newname_Y_out
         jmp _newvar_Y_AX
 
 
+.zeropage
+nparam: .res 1
+params: .res NPARAMS*2
+.code
+
+FUNC _initparam
+        lda #255
+        sta nparam
+        jmp _next
+
+FUNC _newparam_w
+        ;; assign next fixed param position
+        inc nparam
+        lda nparam
+        asl
+        ;; C=0
+        adc #params
+        ldx #0
+        
+        ldy #'w'
+        jmp _newvar_Y_AX
+
 FUNC _newvar_w
         ;; V(ar)Alloc 2 bytes
         jsr _decV
@@ -4802,9 +4824,9 @@ ruleB:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
 
-        .byte "%{"
-          putc ':'
-          IMM_RET
+;        .byte "%{"
+;          putc ':'
+;          IMM_RET
 
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
@@ -4963,11 +4985,11 @@ FUNC _iorulesstart
 .ifdef OPTRULES
 
 .ifndef NOBIOS
-        ;; potentially first no "|"
+;;; TDO:O potentiall no | ???
 
         ;; putchar variable - saves 2 bytes!
 ;;; TODO: parser skips space, hahahaha!
-        .byte "putchar('')"    ; LOL!!!!
+        .byte "|putchar('')"    ; LOL!!!!
       .byte '['
         jsr spc
 ;;; TODO: about return value...
@@ -5010,7 +5032,7 @@ FUNC _iorulesstart
         ;; LDA #0C 11 20 3F
         ;; 11= 17dec == ???
 
-        .byte "putchar('')"    ; LOL!!!!
+        .byte "|putchar('')"    ; LOL!!!!
         ;; (parser skips space...)
       .byte '['
         ;; ORIC: PRINT SPACE
@@ -5456,6 +5478,13 @@ FUNC _funcallstart
 ;;;     that would be nice for trace/debug???
         .byte "|%V()"
       .byte "["
+        DOJSR VAL0
+      .byte "]"
+
+        ;; one parameter call
+        .byte "|%V([#]",_E,")"
+      .byte "[;"               
+        ;; AX already contains parameter value
         DOJSR VAL0
       .byte "]"
 
@@ -7363,28 +7392,15 @@ ruleN:
 ;;; DEFINING FUNCTIONS
 
 
-        ;; Define function definition
         ;; TODO: _T never fails...
 ;        .byte _T,"%N()",_B
 
 
-      .byte "%{"
-        putc 'b'
-        IMM_RET
-      
-;;; 
-;;;  TODO: %N not doing it for functions!
-;;; ;;;;;  %H maybe, lol?
+        ;; fun(){...} - Zero argument function
 
-;        .byte "|word","%I()%N",_B
         .byte "|word","%I()"
         IMMEDIATE _newname_F
         .byte _B
-
-      .byte "%{"
-        putc '?'
-        IMM_RET
-
       .byte '['
         ;; TODO: This maybe be redundant if there is
         ;; a return just before...
@@ -7399,6 +7415,71 @@ ruleN:
         ;;  will fall through to next function...)
         rts
       .byte ']'
+        .byte TAILREC
+
+
+        ;; fun(Expr){...} - One argument function
+
+        .byte "|word","%I(","word"
+        IMMEDIATE _newname_F
+        ;; TODO: make part of newname_F?
+        ;; TODO: how about other types?
+        IMMEDIATE _initparam
+        .byte "%I)"
+        IMMEDIATE _newparam_w
+
+
+PRELUDE=1
+.ifdef PRELUDE
+      .byte "["
+        ;; save register used for param
+;;; 11 B
+        ;; - lo
+        tay
+        lda params
+        pha
+        sty params
+        ;; - hi
+        lda params+1
+        pha
+        stx params+1
+        ;; restore AX - not used
+        ; tya
+
+        ;; "inject" a restore1 call
+;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
+.ifblank
+        lda #>(restore1-1)
+        pha
+        lda #<(restore1-1)
+        pha
+.else
+;;; 3 B  6c ... 3+9=12 B   6c+24c=30c
+        ;; TODO: how to reliably restore?
+        jsr here                ; TODO: WRONG!
+        ;; TODO: need relative addressing?
+
+        ;; restore1
+;;; 9 B  18+6=24c
+        tay
+        pla
+        sta params+1
+        pla
+        sta params
+        tya
+        rts
+here:   
+.endif
+        ;; 
+      .byte "]"
+.endif ; PRELUDE
+
+        .byte _B
+      .byte "["
+        ;; no easy way to determine if _B ends w return
+        ;; (even if last ir rts might be if/loop)
+        rts
+      .byte "]"
         .byte TAILREC
 
 
@@ -7757,7 +7838,7 @@ afterIF:
 elseTEST:       
         ;; 3B 4-5c
         bne PUSHREL
-        nop
+        nop                     ; ?
 else:   
         ...
 afterELSE:      
@@ -7787,13 +7868,75 @@ afterELSE:
 
 .ifdef OPTRULES
 
+        ;; IF( var == 0 ) ... saves 14 B !
+        ;; (no need generate true/false)
+        ;; note: this is safe as if it doesn't match,
+        ;;   not code has been emitted! If use subrule... no
+        .byte "|if(%V==0)"
+      .byte "["
+.scope
+;;; 13
+        lda VAR0
+        beq @eq1
+@neq:
+        ;; ELSE, C=0
+        clc
+        jmp PUSHLOC
+@eq1:
+        ldx VAR1
+        bne @neq
+.endscope
+      .byte "]"
+        ;; THEN
+        .byte _S
+      .byte "["
+        ;; C=1 prohibits ELSE to run!
+        sec
+      .byte "]"
+        ;; Autopatched ELSE jmp here
+        ;; ELSE is optional and depends on C=0 to do ELSE clause!
+
+
+
+        ;; IF( var == num ) ... saves 10 B ! (- 88 78)
+        ;; (no need generate true/false)
+        ;; note: this is safe as if it doesn't match,
+        ;;   not code has been emitted! If use subrule... no
+        .byte "|if(%V[#]==%D)"
+        .byte "["
+;;; 17
+        ;; load %D
+        lda #'<'
+        ldx #'>'
+        ;; ? AX= *%V 
+        .byte ";"                ; use %V
+        cmp VAR0
+        beq @eq1
+@neq:
+        ;; ELSE, C=0
+        clc
+        jmp PUSHLOC
+@eq1:
+        cpx VAR1
+        bne @neq
+      .byte "]"
+        ;; THEN
+        .byte _S
+      .byte "["
+        ;; C=1 prohibits ELSE to run!
+        sec
+      .byte "]"
+        ;; Autopatched ELSE jmp here
+        ;; ELSE is optional and depends on C=0 to do ELSE clause!
+
+
         ;; IF( var < num ) ... saves 6 B (- 63 57)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
         .byte "|if(%V<%D)"
 .scope        
+;;; 18
       .byte "["
-        ;; 14
         ;; reverse cmp as <> NUM avail first
         lda #'<'
         ldx #'>'
@@ -9591,6 +9734,19 @@ endrules:
 
 FUNC _rulesend
 
+restore1:
+;;; 9 B  180+6=24c
+        tay
+
+        pla
+        sta params+1
+        pla
+        sta params
+
+        tya
+        rts
+
+
 .export __ZPIDE__
 .zeropage
 __ZPIDE__:        .res 0
@@ -10087,7 +10243,7 @@ FUNC _asmprintsrc
         ;; 
         ;; (limit 256 chars)
 
-        jsr _printstack
+;        jsr _printstack
 
         jsr _iasm
         
@@ -10897,7 +11053,18 @@ input:
 ;        .byte 0
 
 ;
-NEWFUN=1
+FUN1=1
+.ifdef FUN1
+        .byte "word summer(word a) {",10
+;        .byte "  putu(a); putchar(' ');",10
+        .byte "  if (a==0) return 0;",10
+        .byte "  return summer(a-1)+a;",10
+        .byte "}",10
+        .byte "word main() { return summer(10); }",10
+        .byte 0
+.endif ; FUN1
+
+;NEWFUN=1
 .ifdef NEWFUN
         .byte "word foo(){ return 4700; }",10 
 ;        .byte "word main(){ return foo(); }",10
