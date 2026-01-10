@@ -1449,6 +1449,84 @@ FUNC _runtimestart
 
 ;.include "lib-runtime-recursion.asm"
 
+;
+SUBPARAM2=1
+;.ifdef xSUBPARAM2
+
+;;; TODO: enabling this code makes compiler crash?
+;;;    lol
+
+
+.ifdef SUBPARAM2
+;;; (+ 1 6 10 21 6 3) = 47 B
+;;; extra C: (+ 14 5) + 19c
+subparam2:
+;;; 1
+        tay
+
+        ;; remove caller from stack, store in tos
+;;; 12 B+3 22c + 5c
+;;; (1B less + 9c faster than save and pha/pha/RTS!)
+        pla
+        sta tos
+        pla
+        sta tos+1
+
+        inc tos
+        bne :+
+        inc tos+1
+:       
+
+        ;; save last param (now YX) in register
+;;; 10 B
+        ;; push register old value, replace with Y X
+        ;; - lo
+        lda params+2
+        pha
+        sty params+2
+        ;; - hi
+        lda params+1+2
+        pha
+        stx params+1+2
+
+        ;; swap first actual param on stack & first register
+;;; 21 B
+        tsx
+        ;; - lo
+        ldy $104,x
+        lda params
+        sty params
+        sta $104,x
+        
+        ;; - hi
+        ldy $103,x
+        lda params+1
+        sty params+1
+        sta $103,x
+
+        ;; "inject" a restore1 call
+;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
+        lda #>(restore2-1)
+        pha
+        lda #<(restore2-1)
+        pha
+
+        ;; "return" to caller (and actual FUNCTION)
+;;; 3 B  5c
+        jmp (tos)
+
+
+;;; TODO: it has no function here but this
+;;;   routine must have one more instruction? LOL
+;        rts
+;        nop
+        nop
+
+;;; TODO: pushes next address down...?
+
+.endif ; SUBPARAM2
+
+
 ;;; AX is retained
 restore2:       
         tay
@@ -7432,8 +7510,8 @@ ruleN:
 ;        .byte _T,"%N()",_B
 
 
-        ;; fun(){...} - Zero argument function
-
+        ;; DEFINE fun(){...} - Zero argument function
+        ;; (no overhead)
         .byte "|word","%I()"
         IMMEDIATE _newname_F
         .byte _B
@@ -7455,8 +7533,8 @@ ruleN:
 
 
 
-        ;; fun(a,b){...} - Two argument function
-
+        ;; DEFINE fun(a,b){...} - TWO argument function
+        ;; (+ 
         .byte "|word","%I(","word","%I,"
         ;; reverse order, lol
         IMMEDIATE _initparam
@@ -7466,10 +7544,15 @@ ruleN:
         IMMEDIATE _newparam_w
       .byte "["
 
-;;; JSK-calling convention!
-;;; (keeps the parameter directly pullable from stack!
-;;;  and ENDS with return address to be RTSed!)
-
+        ;; JSK-calling convention!
+        ;; (keeps the param directly pullable from stack!
+        ;;  and ENDS with return address to be RTSed!)
+.ifdef SUBPARAM2
+        ;; 3 B  +19c +12c== +31c, hmmm
+        ;; (+ 3 -38) = -33 B == 33 B saved!
+        jsr subparam2
+.else
+        ;; (+ 11 21 6) = 38 B!
         ;; save register used for param
 ;;; 11 B
         tay
@@ -7485,7 +7568,7 @@ ruleN:
         stx params+1+2
 
         ;; swap first actual param on stack & first register
-;;; 11 B
+;;; 21 B
         tsx
         ;; - lo
         ldy $104,x
@@ -7505,22 +7588,19 @@ ruleN:
         pha
         lda #<(restore2-1)
         pha
-        ;; 
+.endif ; SUBPARAM2
+
       .byte "]"
+
         .byte _B
+
       .byte "["
-        ;; no easy way to determine if _B ends w return
-        ;; (even if last ir rts might be if/loop)
         rts
       .byte "]"
         .byte TAILREC
 
 
-
-
-
-        ;; fun(Expr){...} - One argument function
-
+        ;; fun(Expr){...} - ONE argument function
         .byte "|word","%I(","word"
         IMMEDIATE _newname_F
         ;; TODO: make part of newname_F?
@@ -7528,9 +7608,7 @@ ruleN:
         IMMEDIATE _initparam
         .byte "%I)"
         IMMEDIATE _newparam_w
-
-PRELUDE=1
-.ifdef PRELUDE
+;;; (+ 11 6) = 17 B overhead/function
       .byte "["
         ;; save register used for param
 ;;; 11 B
@@ -7546,31 +7624,11 @@ PRELUDE=1
 
         ;; "inject" a restore1 call
 ;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
-.ifblank
         lda #>(restore1-1)
         pha
         lda #<(restore1-1)
         pha
-.else
-;;; 3 B  6c ... 3+9=12 B   6c+24c=30c
-        ;; TODO: how to reliably restore?
-        jsr here                ; TODO: WRONG!
-        ;; TODO: need relative addressing?
-
-        ;; restore1
-;;; 9 B  18+6=24c
-        tay
-        pla
-        sta params+1
-        pla
-        sta params
-        tya
-        rts
-here:   
-.endif
-        ;; 
       .byte "]"
-.endif ; PRELUDE
 
         .byte _B
       .byte "["
@@ -7579,6 +7637,12 @@ here:
         rts
       .byte "]"
         .byte TAILREC
+
+
+
+;;; TODO: multiple arguments
+
+        ;; DEFINE fun(a,b){...} - Two argument function
 
 
 .ifdef FUNCALL
