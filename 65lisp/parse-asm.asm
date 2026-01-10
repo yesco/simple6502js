@@ -1447,8 +1447,30 @@ FUNC _runtimestart
 
 ;;; TODO: IRQ put here!
 
+;.include "lib-runtime-recursion.asm"
 
-.include "lib-runtime-recursion.asm"
+;;; AX is retained
+restore2:       
+        tay
+
+        pla
+        sta params+1+2
+        pla
+        sta params+2
+
+        ;; fall-through
+        SKIPONE
+restore1:
+;;; 9 B  180+6=24c
+        tay
+
+        pla
+        sta params+1
+        pla
+        sta params
+
+        tya
+        rts
 
 FUNC _runtimeend
 
@@ -5475,51 +5497,33 @@ FUNC _funcallstart
 ;;; TODO: not fully correct, as if it's a
 ;;;   normal variable, it'd jump to that variable
 ;;;   address??? lol
-;;; HOWEVER: with indirect jump table it'd be fine...
-;;;     that would be nice for trace/debug???
+        ;; fun() { ... }
         .byte "|%V()"
       .byte "["
         DOJSR VAL0
       .byte "]"
 
-.ifblank
-
+        ;; fun(a...) { ... }
+        ;; JSK-calling convention!
+        ;; (keeps the parameter directly pullable from stack!
+        ;;  and ENDS with return address to be RTSed!)
+        ;; (last param in AX, others pha/txa/pha)
         .byte "|%V([#]"
-;;; JSK-calling convention!
-;;; (keeps the parameter directly pullable from stack!
-;;;  and ENDS with return address to be RTSed!)
-
-;;; +3+3 = 6 B + 6c extra
+        ;; +3+3 = 6 B + 6c extra
       .byte "["
-        jmp PUSHLOC
-        .byte ":"
+        jmp PUSHLOC             ;   jmp doFUN
+        .byte ":"               ; paramsFUN:
       .byte "]"
-        .byte _W
+        .byte _W                ;    pha/txa/pha (not last)
       .byte "["
-        .byte "?2"
-        jmp VAL0
+        .byte "?2"              ; (get's FUN-address)
+        jmp VAL0                ;    jmp FUN
       .byte "]"
       .byte "["
-        .byte "?1B"
+        .byte "?1B"             ; doFUN:  (patches Branch)
         .byte ";"
-        DOJSR VAL0
-      .byte ";;]"
-
-.else
-        ;; one parameter call
-        .byte "|%V([#]",_E,")"
-      .byte "[;"               
-        ;; AX already contains parameter value
-        DOJSR VAL0
-      .byte "]"
-        
-        ;; problem is that "one parameter call" has generated
-        ;; has generated code already!
-        .byte "|%V([#]",_E,",",_E,")"
-      .byte "[;"
-        DOJSR VAL0
-      .byte "]"
-.endif
+        DOJSR VAL0              ;    jsr paramsFUN
+      .byte ";;]"               ; (drops 2 values)
 
 FUNC _funcallend
 
@@ -9822,29 +9826,6 @@ endrules:
 
 FUNC _rulesend
 
-;;; AX is retained
-restore2:       
-        tay
-
-        pla
-        sta params+1+2
-        pla
-        sta params+2
-
-        ;; fall-through
-        SKIPONE
-restore1:
-;;; 9 B  180+6=24c
-        tay
-
-        pla
-        sta params+1
-        pla
-        sta params
-
-        tya
-        rts
-
 
 .export __ZPIDE__
 .zeropage
@@ -11171,8 +11152,11 @@ FUN2=1
         .byte 0
 .endif ; FUN2
 
-;FUN1=1
+;
+FUN1=1
 .ifdef FUN1
+;;; cc65: 13768c (41)
+;;; MC:   16915c (41=>861)
         .byte "word summer(word a) {",10
 ;        .byte "  putu(a); putchar(' ');",10
         .byte "  if (a==0) return 0;",10
