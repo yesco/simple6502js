@@ -4700,12 +4700,13 @@ ruleM:
 ;ruleP: - program
 ;ruleQ: - array data
 ruleR:
-;ruleU: - BYTERULES variant of "ruleC"
-;ruleV: - BYTERULES variant of "ruleD"
-;ruleW: = HW_PARMS
-;ruleX: = cc65 parameter list
-;ruleY: = parameters init
-;ruleZ: = list of parameters
+;ruleU: - BYTERULES variant of "ruleC" (expression)
+;ruleV: - BYTERULES variant of "ruleD" (expression)
+;;; --- CALLING CONVENTIONS (all return in AX)
+;ruleW: = hardware stack params (JSK CALLING: pha/txa/pha)
+;ruleX: = cc65 parameter list (jsr pushax), last in AX
+;ruleY: = ORIC parameters init (page 2)
+;ruleZ: = ORIC list of parameters (page 2)
         .byte 0
 
 
@@ -5481,13 +5482,44 @@ FUNC _funcallstart
         DOJSR VAL0
       .byte "]"
 
+.ifblank
+
+        .byte "|%V([#]"
+;;; JSK-calling convention!
+;;; (keeps the parameter directly pullable from stack!
+;;;  and ENDS with return address to be RTSed!)
+
+;;; +3+3 = 6 B + 6c extra
+      .byte "["
+        jmp PUSHLOC
+        .byte ":"
+      .byte "]"
+        .byte _W
+      .byte "["
+        .byte "?2"
+        jmp VAL0
+      .byte "]"
+      .byte "["
+        .byte "?1B"
+        .byte ";"
+        DOJSR VAL0
+      .byte ";;]"
+
+.else
         ;; one parameter call
         .byte "|%V([#]",_E,")"
       .byte "[;"               
         ;; AX already contains parameter value
         DOJSR VAL0
       .byte "]"
-
+        
+        ;; problem is that "one parameter call" has generated
+        ;; has generated code already!
+        .byte "|%V([#]",_E,",",_E,")"
+      .byte "[;"
+        DOJSR VAL0
+      .byte "]"
+.endif
 
 FUNC _funcallend
 
@@ -7418,6 +7450,71 @@ ruleN:
         .byte TAILREC
 
 
+
+        ;; fun(a,b){...} - Two argument function
+
+        .byte "|word","%I(","word","%I,"
+        ;; reverse order, lol
+        IMMEDIATE _initparam
+        IMMEDIATE _newparam_w
+        IMMEDIATE _newname_F
+        .byte "word","%I)"
+        IMMEDIATE _newparam_w
+      .byte "["
+
+;;; JSK-calling convention!
+;;; (keeps the parameter directly pullable from stack!
+;;;  and ENDS with return address to be RTSed!)
+
+        ;; save register used for param
+;;; 11 B
+        tay
+
+        ;; push register old value, replace by last param
+        ;; - lo
+        lda params+2
+        pha
+        sty params+2
+        ;; - hi
+        lda params+1+2
+        pha
+        stx params+1+2
+
+        ;; swap first actual param on stack & first register
+;;; 11 B
+        tsx
+        ;; - lo
+        ldy $104,x
+        lda params
+        sty params
+        sta $104,x
+        
+        ;; - hi
+        ldy $103,x
+        lda params+1
+        sty params+1
+        sta $103,x
+
+        ;; "inject" a restore1 call
+;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
+        lda #>(restore2-1)
+        pha
+        lda #<(restore2-1)
+        pha
+        ;; 
+      .byte "]"
+        .byte _B
+      .byte "["
+        ;; no easy way to determine if _B ends w return
+        ;; (even if last ir rts might be if/loop)
+        rts
+      .byte "]"
+        .byte TAILREC
+
+
+
+
+
         ;; fun(Expr){...} - One argument function
 
         .byte "|word","%I(","word"
@@ -7427,7 +7524,6 @@ ruleN:
         IMMEDIATE _initparam
         .byte "%I)"
         IMMEDIATE _newparam_w
-
 
 PRELUDE=1
 .ifdef PRELUDE
@@ -7443,8 +7539,6 @@ PRELUDE=1
         lda params+1
         pha
         stx params+1
-        ;; restore AX - not used
-        ; tya
 
         ;; "inject" a restore1 call
 ;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
@@ -9626,17 +9720,6 @@ PUTC 'A'
 
 
 
-;;; (mostly copied from cc65 ruleX)
-
-HW_PARAMS=1
-.ifndef HW_PARAMS
-
-ruleW:
-
-        .byte 0
-
-.else
-
 ;;; TODO: think hard, does it handle nesting correctly?
 
 
@@ -9644,6 +9727,7 @@ ruleW:
 
         ;; End
         .byte ")"
+.ifnblank
         ;; TODO: for now all parameters are put
         ;;   on stack!
       .byte "["
@@ -9651,7 +9735,7 @@ ruleW:
         txa
         pha
       .byte "]"
-
+.endif
 
         ;; Comma pushes!
         .byte "|,"
@@ -9663,10 +9747,11 @@ ruleW:
         .byte TAILREC
 
 
-        ;; 0 value argument 
+        ;; 0 value argument
         ;; TODO: handle 0,0,0.... ?
         .byte "|0,"
       .byte "["
+        ;; 4 B (saves 3)
         lda #0
         pha
         pha
@@ -9693,12 +9778,15 @@ ruleW:
 
         .byte 0
 
-.endif ; HW_PARAMS
+
+
 
 FUNC _parametersend
 
 ;;; TODO: remove
 .ifnblank
+
+;;; TODO: what was this for?
 
 ;;; TODO: find better place...
 TOS2POS:
@@ -9734,6 +9822,17 @@ endrules:
 
 FUNC _rulesend
 
+;;; AX is retained
+restore2:       
+        tay
+
+        pla
+        sta params+1+2
+        pla
+        sta params+2
+
+        ;; fall-through
+        SKIPONE
 restore1:
 ;;; 9 B  180+6=24c
         tay
@@ -11053,7 +11152,26 @@ input:
 ;        .byte 0
 
 ;
-FUN1=1
+FUN2=1
+.ifdef FUN2
+        .byte "word plus(word a, word b) {",10
+;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+        .byte "  return a+b;",10
+        .byte "}",10
+        .byte "word main() {",10
+.ifnblank
+        .byte "  return plus(3,4);",10
+.else
+        .byte "  return plus(plus(1,"
+        .byte "                   plus(2, plus(3,4)) ),"
+        .byte "              plus(plus(5,plus(6,7)),"
+        .byte "                   plus(8,plus(9,10)) ) );",10
+.endif
+        .byte "}",10
+        .byte 0
+.endif ; FUN2
+
+;FUN1=1
 .ifdef FUN1
         .byte "word summer(word a) {",10
 ;        .byte "  putu(a); putchar(' ');",10
