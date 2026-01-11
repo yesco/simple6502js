@@ -198,11 +198,15 @@ sw2:
 
 .else ; !CALLSWAP8
 
+;;; Y bytes to swap
 swapY:  
-;;; 20 B (smaller and faster!)
+;;; 22 B (smaller and faster!)
+;;;      (faster than what?)
 
-;;;  (faster than what?)
+;;; (+ 13 5 6) => 24 +6rts + 28*bytes =>
+;;; n => 86 n=2 => 142c
 
+;;; 13c
         tsx
         stx savex
         ;; skip call here
@@ -211,6 +215,7 @@ swapY:
 :       
         ;; swap byte
         ;; TODO: use ,x to do zero, save bytes
+;;; 28c x bytes
         ldx params-1,y
         pla
         sta params-1,y
@@ -222,6 +227,7 @@ swapY:
         bne :-
 
         ;; restore stack pointer!
+;;; 5+6c
         ldx savex
         txs
 

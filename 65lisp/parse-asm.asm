@@ -1543,6 +1543,7 @@ subparam2:
 
 ;;; AX is retained
 restore2:       
+;;; +8 B  19c
         tay
 
         pla
@@ -1553,7 +1554,7 @@ restore2:
         ;; fall-through
         SKIPONE
 restore1:
-;;; 9 B  180+6=24c
+;;; 9 B  18c+6=24c
         tay
 
         pla
