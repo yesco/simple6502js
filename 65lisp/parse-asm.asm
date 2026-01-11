@@ -4555,6 +4555,7 @@ FUNC _newarr
 
 
 FUNC _newname_F
+        lda #0
         ldy #'F'
         ;; fall-through
 
@@ -4567,13 +4568,14 @@ FUNC _newname_Y_out
 
 
 .zeropage
+curF:   .res 2
 nparam: .res 1
 params: .res NPARAMS*2
 .code
 
 FUNC _initparam
-        lda #255
-        sta nparam
+        ldx #255
+        stx nparam
         jmp _next
 
 FUNC _newparam_w
@@ -4587,6 +4589,8 @@ FUNC _newparam_w
         
         ldy #'w'
         jmp _newvar_Y_AX
+
+;;; TODO: _newlocal_w
 
 FUNC _newvar_w
         ;; V(ar)Alloc 2 bytes
@@ -4640,6 +4644,21 @@ FUNC _newname
         jsr _stuffVARS
         lda gos                 ; lo
         jsr _stuffVARS
+
+        ;; store "current function ptr"
+        ;; TODO: minimize if can do earlier?
+        ldy #3
+        lda (_ruleVARS),y
+        cmp #'F'
+        bne :+
+        
+        ;; - is Function
+        lda _ruleVARS
+        sta curF
+        lda _ruleVARS+1
+        sta curF+1
+:       
+        ldy #0
 
         ;; store skip chars "%<3+128>"
         lda #3+128              ; 3 bytes to skip
