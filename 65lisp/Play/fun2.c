@@ -6,9 +6,12 @@ word plus(word a, word b) {
   return a+b;
 }
 
+word r, i;
 word main() {
-  return plus(plus(1,
-                   plus(2, plus(3,4)) ),
-              plus(plus(5,plus(6,7)),
-                   plus(8,plus(9,10)) ) );
+  for(i=1000; i--;) 
+    r= plus(plus(1,
+                 plus(2, plus(3,4)) ),
+            plus(plus(5,plus(6,7)),
+                 plus(8,plus(9,10)) ) );
+  return r;
 }

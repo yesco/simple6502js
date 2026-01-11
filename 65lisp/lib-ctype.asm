@@ -10,7 +10,6 @@
 ;;; AX==0 is false (C=1 typically, except ident?)
 
 
-FUNC _ctypestart
 ;;; -------- <ctype.h>
 ;;; 
 ;;; Inlineable (if no #include <ctype.h>)
@@ -35,7 +34,6 @@ FUNC _ctypestart
 ;;; - (isascii)
 ;;; - (iscntrl)
 ;;; - (toascii)
-.ifdef CTYPE
 
 ;;; 98 B - 10 functions (- #xf8 #x96)
 ;;; 89 (+4 isident) ! code golf!
@@ -161,5 +159,3 @@ tolower:
         ora #32
 :       
         rts
-.endif ; CTYPE
-FUNC _ctypeend

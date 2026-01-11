@@ -1272,10 +1272,24 @@ _asmstart:
 ;;; rely on extra code for getchar/putchar
 ;;;
 
+;;; TODO: currently failing in compiler...?
 ;NOBIOS=1
 
 
-;NOLIBRARY=1
+;;; NOLIBRARY: (minimize library)
+;;; 
+;;; still includes:
+;;;     BIOS 26 + runtime 82 + misc 17
+;;;     == (+ 26 82 17) = 125... lol
+;;; 
+;;; TODO: make sure can compile without "BIOS"
+;;; TODO: make sure no need misc
+;;; TODO: RUNTIME make option - no parameters fun-calls?
+;;;   or just NORECURSIVE!!!
+;;;   (NO runtime overhead if compile w static params!)
+;;; 
+;
+NOLIBRARY=1
 
 ;;; WARNING:
 ;;; if this isn't included it FAILS COMPILATION
@@ -1449,6 +1463,12 @@ FUNC _runtimestart
 
 ;.include "lib-runtime-recursion.asm"
 
+;;; SUBPARAM2
+;;; (- (- 2862601 2849494) (- 3406223 3393485) ) = 369
+;;;   (/ 369 9.0) = 41.0 c slower per call
+;;; (+ 12 27) = 39c ... hmmm, alignment?
+;
+
 ;
 SUBPARAM2=1
 ;.ifdef xSUBPARAM2
@@ -1458,8 +1478,8 @@ SUBPARAM2=1
 
 
 .ifdef SUBPARAM2
-;;; (+ 1 6 10 21 6 3) = 47 B
-;;; extra C: (+ 14 5) + 19c
+;;; (+ 1 12 10 21 6 3) = 53 B
+;;; extra C: (+ 22 5)  = + 27c
 subparam2:
 ;;; 1
         tay
@@ -1478,7 +1498,7 @@ subparam2:
 :       
 
         ;; save last param (now YX) in register
-;;; 10 B
+;;; 10 B  18c!
         ;; push register old value, replace with Y X
         ;; - lo
         lda params+2
@@ -1490,15 +1510,15 @@ subparam2:
         stx params+1+2
 
         ;; swap first actual param on stack & first register
-;;; 21 B
+;;; 21 B  32c!
         tsx
-        ;; - lo
+        ;; - lo (15c)
         ldy $104,x
         lda params
         sty params
         sta $104,x
         
-        ;; - hi
+        ;; - hi (15c)
         ldy $103,x
         lda params+1
         sty params+1
@@ -1515,12 +1535,6 @@ subparam2:
 ;;; 3 B  5c
         jmp (tos)
 
-
-;;; TODO: it has no function here but this
-;;;   routine must have one more instruction? LOL
-;        rts
-;        nop
-        nop
 
 ;;; TODO: pushes next address down...?
 
@@ -1673,7 +1687,11 @@ FUNC _stdioend
 ;;; TODO
 ;include "lib-printf.asm"       ; not working
 
-.include "lib-ctype.asm"
+FUNC _ctypestart
+  .ifdef CTYPE
+    .include "lib-ctype.asm"
+  .endif ; CTYPE
+FUNC _ctypeend
 
 .include "lib-stdlib.asm"
 
@@ -1820,16 +1838,17 @@ FUNC _libraryend
 
 
 
+;;; Compiler needs ctype (isident/isalpha/isdigit)
+.ifndef CTYPE
+  .include "lib-ctype.asm"
+.endif ; CTYPE
+
 ;;; IDE needs PRINTZ
 ;;; (sneak it in
 ;;;    - take care not to use it in compiled code!)
 .ifndef STDIO
-.include "lib-stdio.asm"
+  .include "lib-stdio.asm"
 .endif ; STDIO
-
-.ifndef CTYPE
-;.include "lib-ctype.asm"
-.endif ; CTYPE
 
 
 
@@ -10136,7 +10155,10 @@ runs:   .res 1
 .code
 
         ;; RUN PROGRAM n TIMES
+;RUNTIMES=255
+;RUNTIMES=2
 ;RUNTIMES=100
+;
 RUNTIMES=1
 ;RUNTIMES=10
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
@@ -11196,6 +11218,58 @@ input:
 ;        .byte "{return 42;};",10
 ;        .byte 0
 
+
+
+;;; cc65:   1     1929
+;;;         2:    3682
+;;;      1000:    1700/1     (/ 1700409 1000) = 1700
+;;; => 386 B (341 if no loop)
+;;; 
+;;;    0: 2900153
+;;;    1: 2915942
+;;;    2: 2916714  (- 2916714 2915942)         =   772
+;;;  100: 3089096  (- 3089096 2900153)         =  1889.43
+;;;  255: 3361741  (/ (- 3361741 2915942) 255) =  1748
+;;; => 147 bytes + 125 (+ 147 125) = 272
+MUL2=1
+.ifdef MUL2
+        .byte "word mul(word a, word b) {",10
+;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+        .byte "  if (!a) return 0;",10
+        .byte "  if (a&1) return mul(a/2, b*2)+b;",10
+        .byte "  return mul(a/2, b*2);",10
+        .byte "}",10
+        .byte "word main() {",10
+.ifnblank
+        .byte "  return mul(3,4);",10
+.else
+        .byte "  return mul(40,40);",10
+.endif
+        .byte "}",10
+        .byte 0
+.endif ; FUN2
+
+
+
+
+
+;;; cc65:                             3110 c !!!
+;;;       (/ 3322               1) =  3320 c ???
+;;;       (/ 2893432         1000) =  2893 c ???
+;;; -O    (/ 1849420         1000) =  1849 c
+;;; -Oi   (/ 1693408         1000) =  1693 c  371 B
+;;; progsz                                    363 B
+
+;;; MC:   (- 2862398 2849291)      = 13107 (ide overhead)
+;;;  2x-1 (- 2864211 2862398)         1813
+;;;    (/ (- 2878715 2849291)  10) =  2942
+;;;    (/ (- 3042871 2849291) 100) =  1935
+;;;    (/ (- 3323886 2849291) 255) =  1861
+;;; => 167 B (+ 26 B bios + 99 B runtime/misc)
+;;;    292 B (+ 167 26 99)
+;;; 
+;;; Conclusion: we're using full/recursive param passing
+;;;    also, BIOS+NOLIBRARY == 125 B 
 ;
 FUN2=1
 .ifdef FUN2
