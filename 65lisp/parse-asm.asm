@@ -1288,8 +1288,7 @@ _asmstart:
 ;;;   or just NORECURSIVE!!!
 ;;;   (NO runtime overhead if compile w static params!)
 ;;; 
-;
-NOLIBRARY=1
+;NOLIBRARY=1
 
 ;;; WARNING:
 ;;; if this isn't included it FAILS COMPILATION
@@ -1469,17 +1468,10 @@ FUNC _runtimestart
 ;;; (+ 12 27) = 39c ... hmmm, alignment?
 ;
 
-;
-SUBPARAM2=1
-;.ifdef xSUBPARAM2
-
-;;; TODO: enabling this code makes compiler crash?
-;;;    lol
-
-
-.ifdef SUBPARAM2
-;;; (+ 1 12 10 21 6 3) = 53 B
-;;; extra C: (+ 22 5)  = + 27c
+;;; (+ 1 12 10 21 6 3)  = 53 B
+;;; saved B: (+ 38 -3) =      - 35 B saved
+;;; (+ 2 22 18 32 10 5) = 89c
+;;; extra C: (+ 22 5)  =      + 27c
 subparam2:
 ;;; 1
         tay
@@ -1536,13 +1528,166 @@ subparam2:
         jmp (tos)
 
 
+_initsubY:      
+        ;; tos= 2*nparam ; bytes
+        lda nparam
+        sta tos
+        asl tos
+
+        jmp _next
+
+
+;;; Y is 2*params + 16*2*locals
+;;; AX is pushed as next parameter
+;;; (+ 2 12 12 20  9 3) = 58 B   ; 14 B locals
+;;; (+ 3 22 21 13 16 5) = 80 c + 27c * bytes
+subparamY:
+;;; 2 B  3c
+        sta savea
+
+PUTC 'T'
+        ;; remove caller from stack, store in tos
+;;; 12 B+3 22c + 5c = 27c
+;;; (1B less  5c faster than save and pha/pha/RTS!)
+        pla
+        sta tos
+        pla
+        sta tos+1
+
+        ;; 8c (+ 5)
+        ;; TODO: 3c saved by make sure not return to page break?
+        inc tos
+        bne :+
+        inc tos+1
+:       
+
+        ;; save last param (now YX) in register
+;;; 12 B  21c
+        ;; push register old value, replace with saveaX
+        ;; - lo
+PUTC 'P'
+        lda params,y
+        pha
+        lda savea
+        sta params,y
+        ;; - hi
+        lda params+1,y
+        pha
+        stx params+1,y
+
+.ifdef LOCALS
+PUTC 'L'
+        ;; create space for local variables
+        ;; (no more than 15 parameters...)
+;;; 14 B  8c+ 13*bytes
+        tya
+:       
+PUTC '.'
+        ;; < 16 done
+        cmp #16
+        bcc :+
+        sbc #14                 ; -16 + 2 !
+        pha
+        jmp :-
+:       
+        tay
+.endif
+
+;;; TODO: not swap locals, just "store"
+;;;   generlize last param?
+
+        ;; swap first actual param on stack & first register
+;;; 20 B  13c + 27c / byte swap
+PUTC 'S'
+        sty savey
+
+        ;; save to keep
+        tsx
+        stx savex
+        ;; skip last arg (already swapped)
+        pla
+        pla
+:       
+PUTC '.'
+        ;; 13 B  27c / byte swapped
+        ;; (TODO: SWAP macro +8 B 19c / byte)
+        ldx params-1,y
+        pla
+        sta params-1,y
+        txa
+        pha
+        ;; step up
+        pla
+        dey
+        bne :-
+
+.ifnblank
+;;; print return address
+pla
+tay
+pla
+tax
+pha
+tya
+pha
+jsr _printh
+.endif
+        ldx savex
+        txs
+
+PUTC 'I'
+        ;; "inject" a restore1 call
+;;; 9 B  16c
+        ;; push how many bytes to restore:
+        ;;        2 * (nparam+nlocals)
+        lda savey
+        pha
+        ;; push call to restore
+        lda #>(restore-1)
+        pha
+        lda #<(restore-1)
+        pha
+
+        ;; "return" to caller (and actual FUNCTION)
+;;; 3 B  5c
+PUTC 'J'
+        jmp (tos)
+
+
 ;;; TODO: pushes next address down...?
 
-.endif ; SUBPARAM2
+
+
+
+;;; preserves AX, trashes Y
+restore:
+;putc '?'
+;;; RESTORE!
+;;; 14 B
+PUTC 'R'
+        sta savea
+        pla
+        ;; one more argument to restore (than swap)
+        tay
+        iny
+        iny
+:       
+PUTC '.'
+;;; 13c / byte
+        pla
+        sta params-1,y
+        dey
+        bne :-
+
+        lda savea
+        rts
+
+
+
 
 
 ;;; AX is retained
-restore2:       
+restore2:
 ;;; +8 B  19c
         tay
 
@@ -2048,8 +2193,7 @@ PRINTREAD=1
 PRINTDOTS=1
 
 ;;; TODO: make it a runtime flag, if asm is included?
-;
-PRINTASM=1
+;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
 .ifdef PRINTASM
@@ -4556,6 +4700,7 @@ FUNC _newarr
 
 FUNC _newname_F
         lda #0
+        sta nparam
         ldy #'F'
         ;; fall-through
 
@@ -4568,10 +4713,15 @@ FUNC _newname_Y_out
 
 
 .zeropage
-curF:   .res 2
+
+;;; Data abouit current function being built
+;;; number of parameters (0..n), 255==not valid
 nparam: .res 1
-params: .res NPARAMS*2
+curF:   .res 2                  ; points to addr %'3<
+params: .res NPARAMS*2          ; "registers"
+
 .code
+
 
 FUNC _initparam
         ldx #255
@@ -4821,16 +4971,21 @@ _rules:
         .word ruleZ
         .word 0                 ; TODO: needed?
 
+;rule0: use ruleP
 ;ruleA: Aggregate statement
 ;ruleB: Block
-;ruleC: start of expression (used once in expr/commands/funs)
-;ruleD: aDDons ... OP xxx TAILREC
+
+;ruleC: start of expression
+;ruleD: expr chain aDDons ... OP xxx TAILREC
 ;ruleE: Expression _C _D (or _U _V for bytes)
+
 ;ruleF: byte rule, keeps AX, get byte expr => Y
 ;ruleG: calling convention "(@tos,AX) like ruleC
+
 ;ruleH: printf parsing
 ;ruleI: "load byte expression" - opt
 ;ruleJ: "read byte expression, saving AX totos and sets Y=0"
+
 ;ruleK: list of var defined
 ruleL:
 ruleM:
@@ -4838,7 +4993,7 @@ ruleM:
 ;ruleO: - first rule in program/jmp main
 ;ruleP: - program
 ;ruleQ: - array data
-ruleR:
+;ruleR: - compile formal args list (calling convention)
 ;ruleU: - BYTERULES variant of "ruleC" (expression)
 ;ruleV: - BYTERULES variant of "ruleD" (expression)
 ;;; --- CALLING CONVENTIONS (all return in AX)
@@ -5613,14 +5768,16 @@ FUNC _funcallstart
 
 ;;; TODO: not fully correct, as if it's a
 ;;;   normal variable, it'd jump to that variable
-;;;   address??? lol
-        ;; fun() { ... }
+;;;   address??? LOL
+
+        ;; CALL fun() { ... }
         .byte "|%V()"
       .byte "["
         DOJSR VAL0
       .byte "]"
 
-        ;; fun(a...) { ... }
+        ;; CALL fun(a...) { ... }
+        ;; 
         ;; JSK-calling convention!
         ;; (keeps the parameter directly pullable from stack!
         ;;  and ENDS with return address to be RTSed!)
@@ -7546,10 +7703,11 @@ ruleN:
 
 
         ;; TODO: _T never fails...
+        ;;    need to propagate error? "%_T" ???
 ;        .byte _T,"%N()",_B
 
 
-        ;; DEFINE fun(){...} - Zero argument function
+        ;; DEFINE fun(){...} - ZERO argument function
         ;; (no overhead)
         .byte "|word","%I()"
         IMMEDIATE _newname_F
@@ -7570,7 +7728,32 @@ ruleN:
       .byte ']'
         .byte TAILREC
 
+;
+ALLFUN=1
+.ifdef ALLFUN
+        .byte "|word","%I("
+        IMMEDIATE _newname_F
+        IMMEDIATE _initparam
+        .byte _R                ; reads f.arguments
 
+        ;; TODO: local variables (?)
+
+        ;; insert code to swap regs <-> stack
+        IMMEDIATE _initsubY
+      .byte "["
+        ldy #'<'
+        PUTC 'a'
+        jsr subparamY
+        PUTC 'b'
+      .byte "]"
+
+        .byte _B
+      .byte "["
+        rts
+      .byte "]"
+        .byte TAILREC
+
+.else
 
         ;; DEFINE fun(a,b){...} - TWO argument function
         ;; (+ 
@@ -7582,53 +7765,13 @@ ruleN:
         .byte "word","%I)"
         IMMEDIATE _newparam_w
       .byte "["
-
         ;; JSK-calling convention!
         ;; (keeps the param directly pullable from stack!
         ;;  and ENDS with return address to be RTSed!)
-.ifdef SUBPARAM2
+
         ;; 3 B  +19c +12c== +31c, hmmm
         ;; (+ 3 -38) = -33 B == 33 B saved!
         jsr subparam2
-.else
-        ;; (+ 11 21 6) = 38 B!
-        ;; save register used for param
-;;; 11 B
-        tay
-
-        ;; push register old value, replace by last param
-        ;; - lo
-        lda params+2
-        pha
-        sty params+2
-        ;; - hi
-        lda params+1+2
-        pha
-        stx params+1+2
-
-        ;; swap first actual param on stack & first register
-;;; 21 B
-        tsx
-        ;; - lo
-        ldy $104,x
-        lda params
-        sty params
-        sta $104,x
-        
-        ;; - hi
-        ldy $103,x
-        lda params+1
-        sty params+1
-        sta $103,x
-
-        ;; "inject" a restore1 call
-;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
-        lda #>(restore2-1)
-        pha
-        lda #<(restore2-1)
-        pha
-.endif ; SUBPARAM2
-
       .byte "]"
 
         .byte _B
@@ -7676,12 +7819,8 @@ ruleN:
         rts
       .byte "]"
         .byte TAILREC
+.endif ; ALLFUN
 
-
-
-;;; TODO: multiple arguments
-
-        ;; DEFINE fun(a,b){...} - Two argument function
 
 
 .ifdef FUNCALL
@@ -9629,13 +9768,31 @@ parsevarcont:
 
 
 
-
 FUNC _stmtrulesend
 
 
 
 
 FUNC _parametersstart
+
+;;; - formal JSK-calling parameters
+ruleR:  
+        
+        ;; lol, just "eat" the commas
+        .byte ","
+        .byte TAILREC
+
+        ;; end
+        .byte "|)"
+
+        ;; parse one argument
+        .byte "|word","%I"
+        IMMEDIATE _newparam_w
+        .byte TAILREC
+
+        .byte 0
+
+
 ;;; - oric paramters
 ruleY:  
         .byte "("
@@ -11251,7 +11408,8 @@ input:
 ;;;  100: 3089096  (- 3089096 2900153)         =  1889.43
 ;;;  255: 3361741  (/ (- 3361741 2915942) 255) =  1748
 ;;; => 147 bytes + 125 (+ 147 125) = 272
-MUL2=1
+
+;MUL2=1
 .ifdef MUL2
         .byte "word mul(word a, word b) {",10
 ;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
@@ -11267,7 +11425,7 @@ MUL2=1
 .endif
         .byte "}",10
         .byte 0
-.endif ; FUN2
+.endif ; MUL2
 
 
 
@@ -11294,16 +11452,17 @@ MUL2=1
 FUN2=1
 .ifdef FUN2
         .byte "word plus(word a, word b) {",10
-;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+;        .byte "   putu(17);",10
+        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
         .byte "  return a+b;",10
         .byte "}",10
         .byte "word main() {",10
 .ifnblank
         .byte "  return plus(3,4);",10
 .else
-        .byte "  return plus(plus(1,"
-        .byte "                   plus(2, plus(3,4)) ),"
-        .byte "              plus(plus(5,plus(6,7)),"
+        .byte "  return plus(plus(1,",10
+        .byte "                   plus(2, plus(3,4)) ),",10
+        .byte "              plus(plus(5,plus(6,7)),",10
         .byte "                   plus(8,plus(9,10)) ) );",10
 .endif
         .byte "}",10

@@ -210,7 +210,7 @@ swapY:
         tsx
         stx savex
         ;; skip call here
-        pla
+        pla                     ; inx inx cheaper!
         pla
 :       
         ;; swap byte
@@ -259,6 +259,7 @@ restoreY:
         pla
         tay
 :       
+;;; 13c / byte
         pla
         sta params-1,y
         dey
@@ -280,6 +281,7 @@ restoreY:
 ;;; overall recursive function 10% faster than cc65!
 
 .macro PLOP nn
+;;; 3 B  7c / byte
         pla
         sta params-1+nn
 .endmacro
@@ -336,6 +338,45 @@ restore2:
 .endif ; JSK_CALLING
 
 .endif ; RECURSION
+
+
+// on stack 6*bytes+1
+;;; 24+6c + 7*bytes cycles
+restore:
+        tay
+@res:   
+        pla
+        ;; see if > 8 (*6+1..)
+        sec
+        sbc #1+8*6
+        bmi :+
+        ;; do 8 at a time
+        pha
+        jsr @res8
+        jmp @res
+:       
+        ;; negate
+        eor #$ff
+        sta @jres
+@jres:  bne $ff
+;        nop ; ??? 
+@res8:
+        PLOP 8
+        PLOP 7
+@res6:
+        PLOP 6
+        PLOP 5
+@res4:  
+        PLOP 4
+        PLOP 3
+@res2:
+        PLOP 2
+        PLOP 1
+@ret:
+        tya
+        rts
+
+
 
 .endif ; FUNCALL
 
