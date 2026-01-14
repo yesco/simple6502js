@@ -1545,7 +1545,7 @@ subparamY:
 ;;; 2 B  3c
         sta savea
 
-PUTC 'T'
+;PUTC 'T'
         ;; remove caller from stack, store in tos
 ;;; 12 B+3 22c + 5c = 27c
 ;;; (1B less  5c faster than save and pha/pha/RTS!)
@@ -1565,7 +1565,7 @@ PUTC 'T'
 ;;; 12 B  21c
         ;; push register old value, replace with saveaX
         ;; - lo
-PUTC 'P'
+;PUTC 'P'
         lda params,y
         pha
         lda savea
@@ -1576,13 +1576,13 @@ PUTC 'P'
         stx params+1,y
 
 .ifdef LOCALS
-PUTC 'L'
+;PUTC 'L'
         ;; create space for local variables
         ;; (no more than 15 parameters...)
 ;;; 14 B  8c+ 13*bytes
         tya
 :       
-PUTC '.'
+;PUTC '.'
         ;; < 16 done
         cmp #16
         bcc :+
@@ -1598,8 +1598,11 @@ PUTC '.'
 
         ;; swap first actual param on stack & first register
 ;;; 20 B  13c + 27c / byte swap
-PUTC 'S'
+;PUTC 'S'
         sty savey
+;;; TODO: to handle Y=0 (one arg)
+;;;    crashes??? why?
+;        beq @nope
 
         ;; save to keep
         tsx
@@ -1607,8 +1610,37 @@ PUTC 'S'
         ;; skip last arg (already swapped)
         pla
         pla
-:       
-PUTC '.'
+@loop:       
+
+;;; TODO: this messes up stack/registers?
+;;;   wtf how is that possible?
+;MESSUP=1
+.ifdef MESSUP
+.ifnblank
+pha
+txa
+pha
+tya
+pha
+
+;PUTC '.'
+
+pla
+tay
+pla
+tax
+pla
+.else
+;;; WTF: how can this mess anything up/
+;;;   (only have one pha/pla is ok???)
+;;;   stack full?
+pha
+pha
+pla
+pla
+.endif
+.endif ; MESSUP
+
         ;; 13 B  27c / byte swapped
         ;; (TODO: SWAP macro +8 B 19c / byte)
         ldx params-1,y
@@ -1619,23 +1651,12 @@ PUTC '.'
         ;; step up
         pla
         dey
-        bne :-
-
-.ifnblank
-;;; print return address
-pla
-tay
-pla
-tax
-pha
-tya
-pha
-jsr _printh
-.endif
+        bne @loop
         ldx savex
         txs
+@nope:
 
-PUTC 'I'
+;PUTC 'I'
         ;; "inject" a restore1 call
 ;;; 9 B  16c
         ;; push how many bytes to restore:
@@ -1650,7 +1671,7 @@ PUTC 'I'
 
         ;; "return" to caller (and actual FUNCTION)
 ;;; 3 B  5c
-PUTC 'J'
+;PUTC 'J'
         jmp (tos)
 
 
@@ -1664,21 +1685,30 @@ restore:
 ;putc '?'
 ;;; RESTORE!
 ;;; 14 B
-PUTC 'R'
+;PUTC 'R'
         sta savea
+
         pla
         ;; one more argument to restore (than swap)
         tay
         iny
         iny
 :       
-PUTC '.'
+;PUTC '.'
 ;;; 13c / byte
         pla
+
+;stx savex
+;ldx #0
+;jsr _printu
+;PUTC ' '
+;ldx savex
+
         sta params-1,y
         dey
         bne :-
 
+;PUTC 10
         lda savea
         rts
 
@@ -7731,57 +7761,11 @@ ruleN:
 ;
 ALLFUN=1
 .ifdef ALLFUN
-        .byte "|word","%I("
-        IMMEDIATE _newname_F
-        IMMEDIATE _initparam
-        .byte _R                ; reads f.arguments
 
-        ;; TODO: local variables (?)
-
-        ;; insert code to swap regs <-> stack
-        IMMEDIATE _initsubY
-      .byte "["
-        ldy #'<'
-        PUTC 'a'
-        jsr subparamY
-        PUTC 'b'
-      .byte "]"
-
-        .byte _B
-      .byte "["
-        rts
-      .byte "]"
-        .byte TAILREC
-
-.else
-
-        ;; DEFINE fun(a,b){...} - TWO argument function
-        ;; (+ 
-        .byte "|word","%I(","word","%I,"
-        ;; reverse order, lol
-        IMMEDIATE _initparam
-        IMMEDIATE _newparam_w
-        IMMEDIATE _newname_F
-        .byte "word","%I)"
-        IMMEDIATE _newparam_w
-      .byte "["
-        ;; JSK-calling convention!
-        ;; (keeps the param directly pullable from stack!
-        ;;  and ENDS with return address to be RTSed!)
-
-        ;; 3 B  +19c +12c== +31c, hmmm
-        ;; (+ 3 -38) = -33 B == 33 B saved!
-        jsr subparam2
-      .byte "]"
-
-        .byte _B
-
-      .byte "["
-        rts
-      .byte "]"
-        .byte TAILREC
-
-
+;;; TODO: need to use as ALLFUN
+;;;   can't handle Y=0 (for now),
+;;;   it would require pretest in loop
+.ifblank
         ;; fun(Expr){...} - ONE argument function
         .byte "|word","%I(","word"
         IMMEDIATE _newname_F
@@ -7819,6 +7803,59 @@ ALLFUN=1
         rts
       .byte "]"
         .byte TAILREC
+.endif
+
+        .byte "|word","%I("
+        IMMEDIATE _newname_F
+        IMMEDIATE _initparam
+        .byte _R                ; reads f.arguments
+
+        ;; TODO: local variables (?)
+
+        ;; insert code to swap regs <-> stack
+        IMMEDIATE _initsubY
+      .byte "["
+        ldy #'<'
+;        PUTC 'a'
+        jsr subparamY
+;        PUTC 'b'
+      .byte "]"
+
+        .byte _B
+      .byte "["
+        rts
+      .byte "]"
+        .byte TAILREC
+
+.else
+
+        ;; DEFINE fun(a,b){...} - TWO argument function
+        ;; (+ 
+        .byte "|word","%I(","word","%I,"
+        ;; reverse order, lol
+        IMMEDIATE _initparam
+        IMMEDIATE _newparam_w
+        IMMEDIATE _newname_F
+        .byte "word","%I)"
+        IMMEDIATE _newparam_w
+      .byte "["
+        ;; JSK-calling convention!
+        ;; (keeps the param directly pullable from stack!
+        ;;  and ENDS with return address to be RTSed!)
+
+        ;; 3 B  +19c +12c== +31c, hmmm
+        ;; (+ 3 -38) = -33 B == 33 B saved!
+        jsr subparam2
+      .byte "]"
+
+        .byte _B
+
+      .byte "["
+        rts
+      .byte "]"
+        .byte TAILREC
+
+
 .endif ; ALLFUN
 
 
@@ -11396,6 +11433,16 @@ input:
 ;        .byte 0
 
 
+;FUN4=1
+.ifdef FUN4
+        .byte "word four(word a, word b, word c, word d) {",10
+        .byte "  return a+b+c+d;",10
+        .byte "}",10
+        .byte "word main() { return four(1,2,3,four(4,5,6,four(7,8,9,10))); }",10
+        .byte 0
+.endif ; FUN4
+
+
 
 ;;; cc65:   1     1929
 ;;;         2:    3682
@@ -11411,11 +11458,22 @@ input:
 
 ;MUL2=1
 .ifdef MUL2
+        .byte "word z;",10
         .byte "word mul(word a, word b) {",10
-;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+;        .byte "  putchar(' '); putu(a); putchar(' '); putu(b); putchar('\n') ;",10
         .byte "  if (!a) return 0;",10
+.ifnblank                        
+        ;; 2x f calls => more code
         .byte "  if (a&1) return mul(a/2, b*2)+b;",10
         .byte "  return mul(a/2, b*2);",10
+.else
+        ;; careful, global variable...
+        .byte "  z= mul(a/2, b*2);",10 
+;;; To debug if right value are restored...
+;        .byte "  putchar('='); putu(a); putchar(' '); putu(b); putchar(' '); putu(z); putchar('\n');",10
+        .byte "  if (a&1) return z+b;",10
+        .byte "  return z;",10
+.endif
         .byte "}",10
         .byte "word main() {",10
 .ifnblank
@@ -11448,8 +11506,7 @@ input:
 ;;; 
 ;;; Conclusion: we're using full/recursive param passing
 ;;;    also, BIOS+NOLIBRARY == 125 B 
-;
-FUN2=1
+;FUN2=1
 .ifdef FUN2
         .byte "word plus(word a, word b) {",10
 ;        .byte "   putu(17);",10
@@ -11480,9 +11537,11 @@ FUN1=1
         .byte "  return summer(a-1)+a;",10
         .byte "}",10
 ;;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
-        .byte "word main() { return summer(41); }",10
+;        .byte "word main() { return summer(41); }",10
+        .byte "word main() { return summer(10); }",10
         .byte 0
 .endif ; FUN1
+
 
 ;NEWFUN=1
 .ifdef NEWFUN
@@ -11523,8 +11582,7 @@ FUN1=1
 
 
 ;;; TEST size of WHILE loops
-;
-WHILESIZE=1
+;WHILESIZE=1
 
 .ifdef WHILE
 
@@ -11607,7 +11665,7 @@ WHILESIZE=1
 
 
 ;;; Experiments in estimating and prototyping
-;;; function calls, using JSRK_CALLING !
+;;; function calls, using JSK_CALLING !
 
 ;PARAM4=1
 .ifdef PARAM4
@@ -11657,7 +11715,7 @@ CANT=1
         .byte "  putchar('\n');",10
         .byte "}",10
 .endif ; P4PR
-        .byte "WORD F(a,b,c,d) {",10
+        .byte "word F(word a,word b,word c,word d) {",10
 .ifdef P4PR
         .byte "  putchar('>'); P();",10
 .endif
@@ -11674,6 +11732,7 @@ CANT=1
 ;        .byte "  r;",10
 
         .byte "}",10
+        .byte "word i,r;",10
         .byte "word main() {",10
 .ifdef P4PR
         .byte "  putchar('+'); P();",10
@@ -11682,7 +11741,8 @@ CANT=1
 ;.byte "i=1;while(i--){",10
 ;        .byte "  r= F(22, 0, 1, 65535);",10
 ;;; (/ 256 (+ 8 2 1 3)) 
-        .byte "  r= F(18, 0, 1, 65535);",10
+;        .byte "  r= F(18, 0, 1, 65535);",10
+        .byte "  r= F(17, 9, 1, 65535);",10
 ;        .byte "  r= F(0, 9, 1, 65535);",10
 ;;; I think value comes out wrong???
 .byte "}",10
