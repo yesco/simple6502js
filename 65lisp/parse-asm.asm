@@ -2935,8 +2935,9 @@ jsr _printchar
         ;; - use rule
         lda #VARRULENAME
         jmp enterrulebyname
-:       
 
+        ;; try next matces
+:       
         ;; - skip it assumes A not modified
         ; pha
         jsr _incR
@@ -2954,8 +2955,29 @@ jsr _printchar
         beq nextjmp
         bne failjmp
 
+:       
+        ;; "%$<ruleaddr>" JMP "rule" used
+        ;; in env to skip local variables of funciton
+        ;; once out of the scope
+        cmp #'R'
+        bne :+
+        
+;;; Doesn't even get here, how come it works!?!?!
+PUTC 'R'
+xhalt:   jmp xhalt
+        jsr _incR
+        ;; Y=0
+        jsr _incR
+        lda (rule),y
+        sta rule
+
+        jsr _incR
+        lda (rule),y
+        sta rule+1
+        
+        jmp _next
+
 :
-.ifblank
         ;; "%L" (jmp to routine that ends w jmp _next)
         ;; 
         ;;      .byte "%"
@@ -2979,7 +3001,6 @@ jsr _printchar
         
         jmp (tmp1)
 :       
-.endif        
 ;;; 26 B
 ;;; TODO: remove - UNSAFE (to 
         ;; %{ - immediate code! to run NOW!
@@ -3049,6 +3070,9 @@ noimm:
         ldx rule+1
         stx pos+1
 
+;;; TODO: why is it skipping?
+;;;   maybe just get address?
+
         ;; -- Skip n bytes
         ;; C= 0
         jsr skipperPlusC
@@ -3060,6 +3084,8 @@ noimm:
         dey
         lda (pos),y
         sta tos
+
+;;; TODO: jmp _next ???
 
 ;;; TODO: old percent char not here!!!! 
         ;; -- %A tos=dos lol
@@ -4882,6 +4908,7 @@ jsr _printchar
         bpl :-
 :       
 
+updatevars:     
         ;; update VARRRULEVEC
 ;;; TODO: too much work... save there waste here?
         lda _ruleVARS
@@ -4895,6 +4922,29 @@ jsr _printchar
         sta VARRRULEVEC+1
 
         jmp _next
+
+
+FUNC _hideargs
+        PUTC '?'
+;        jmp _next
+;        jmp updatevars
+        
+        ;; stuff %'N paramC paramB paramA >> funcF
+        ;;           <----------N----------->
+        lda #'%'
+        jsr _stuffVARS
+        lda #'R'
+        jsr _stuffVARS
+;;; LOL, not putting actual values here, 
+;;;  and %R is never invoked (see trace print)
+;;;  then it skipps corredctly? WTF?
+        ;; put new rule address
+        lda curF
+;        jsr _stuffVARS
+        lda curF+1
+;        jsr _stuffVARS
+
+        jmp updatevars
 
 
 
@@ -7758,6 +7808,7 @@ ruleN:
       .byte ']'
         .byte TAILREC
 
+
 ;
 ALLFUN=1
 .ifdef ALLFUN
@@ -7795,13 +7846,13 @@ ALLFUN=1
         lda #<(restore1-1)
         pha
       .byte "]"
-
         .byte _B
       .byte "["
         ;; no easy way to determine if _B ends w return
         ;; (even if last ir rts might be if/loop)
         rts
       .byte "]"
+        IMMEDIATE _hideargs
         .byte TAILREC
 .endif
 
@@ -7825,6 +7876,7 @@ ALLFUN=1
       .byte "["
         rts
       .byte "]"
+        IMMEDIATE _hideargs
         .byte TAILREC
 
 .else
@@ -8156,6 +8208,15 @@ ruleS:
         ;; TAILCALL save 1 byte!
         jmp VAL0
       .byte ']'
+
+;;; TODO: how to detect???
+;        .byte "|return%V(...);"
+;;; 
+;;; Maybe second pass opt? use %O and %o flags...
+;;;   TODO: implement %O and %o flags... LOL
+;;;   
+
+
 .endif ; OPTRULES
 
 
@@ -10292,6 +10353,9 @@ done2:
 
 
 FUNC _OK
+
+jsr _printenv
+
 ;;; TODO: detect if overrun OUTPUTSIZE
 ;;;    _out >= _outputend
 
@@ -11271,6 +11335,51 @@ FUNC _printchar
         pla
         rts
 
+FUNC _printenv
+        PRINTZ {10,"---ENV---",10}
+        lda _ruleVARS
+        sta tos
+        lda _ruleVARS+1
+        sta tos+1
+        jsr _incT
+        
+        ldy #0
+@next:       
+        lda (tos),y
+        beq @done
+        jsr _printchar
+
+        cmp #'%'
+        bne @normal
+        jsr _incT
+        lda (tos),y
+        jsr _printchar
+        cmp #0
+        bpl @normal
+
+@skipperORrule:
+        and #127
+        cmp #' '+1
+        bcs @normal
+
+        sta dos
+:       
+        jsr _incT
+        lda (tos),y
+        jsr _printchar
+        dec dos
+        bne :-
+
+        jsr nl
+
+@normal:
+        jsr _incT
+        jmp @next
+
+@done:       
+        PUTC '<'
+        rts
+
 FUNC _printstack
 ;;; 119  !!!!!
         pha
@@ -11487,6 +11596,28 @@ input:
 
 
 
+;
+ARGSHADOW=1
+.ifdef ARGSHADOW
+        .byte "word a;",10
+        .byte "word seta(word v){ a= v; return a; }",10
+        .byte "word geta(){ return a; }",10
+        .byte "word shadow(word a){",10
+        .byte "  putu(a); putchar(' ');",10
+        .byte "  return geta();",10
+        .byte "}",10
+        .byte "word main() {",10
+        .byte "  putu(a); putchar('\n');",10
+        .byte "  seta(42); putu(a); putchar('\n');",10
+        .byte "  putu(geta()); putchar('\n');",10
+        .byte "  putu(shadow(666)); putchar('\n');",10
+        .byte "  putu(shadow(17)); putchar('\n');",10
+        .byte "  putu(a); putchar('\n');",10
+        .byte "  putu(geta()); putchar('\n');",10
+        .byte "}",10
+        .byte 0
+.endif ; ARGSHADOW
+
 
 
 ;;; cc65:                             3110 c !!!
@@ -11526,8 +11657,7 @@ input:
         .byte 0
 .endif ; FUN2
 
-;
-FUN1=1
+;FUN1=1
 .ifdef FUN1
 ;;; cc65: 13768c (41)
 ;;; MC:   16915c (41=>861)
