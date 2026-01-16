@@ -33,6 +33,26 @@
 ;;; ----------------- UTILTITY PRINTERS
 
 ;;; Good to haves!
+tab:    
+.ifdef ATMOS
+        ;; Atmos doesn't have TAB
+        pha
+        ;; at least one space
+        jsr forward
+:       
+        lda CURCOL
+        and #7                  ; "mod 8"
+        beq :+
+        ;; move forwward
+        jsr forward
+        jmp :-
+:       
+        pla
+.else
+        lda #9
+        SKIPTWO
+.endif
+
 .export _clrscr
 _clrscr:        
 clrscr:

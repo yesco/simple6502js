@@ -143,6 +143,9 @@ editrow:        .res 1
 .endmacro
 
 
+;;; CTRL:     @ABCDEFGHIJKLMNOPQRSTUVWXYZ ESC
+;;; FREE:     @         JKLM O  RS UV XY
+
 ;;; NOTICE: All these assume Y=0!
 
 ctrlbranch:     

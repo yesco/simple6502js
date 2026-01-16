@@ -10250,9 +10250,6 @@ status:
 
 FUNC _ERROR
 
-
-jsr _printenv
-
 .ifdef __ATMOS__
         ;; update color status
         lda #(RED+BG)&127
@@ -10361,7 +10358,8 @@ done2:
 
 FUNC _OK
 
-jsr _printenv
+jsr _printvars
+
 
 ;;; TODO: detect if overrun OUTPUTSIZE
 ;;;    _out >= _outputend
@@ -11001,6 +10999,7 @@ FUNC _listsymbols
         jsr _incP
         ldy #0
         lda (pos),y
+
         jmp @nextchar
         
 @donelist:
@@ -11042,17 +11041,18 @@ GROUP=YELLOW
 .byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,">|",10
 .byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
 .byte "",10
-.byte MEAN,"// C-Language globals",CODE,"a..z",MEAN,"type",CODE,"word",10
+.byte MEAN,"// A comment. Types:",CODE,"word",10
 .byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
 .byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S;",MEAN,"]..;",MEAN,"or",CODE,"a+=",GROUP,"S",CODE,"OP=",10
 .byte GROUP,"OP:",CODE,"+ - & | ^ *2 /2 << >> == < !",10
 .byte GROUP,"S :",CODE,"v 4711 25 'c' ",34,"str",34,MEAN,"simple vals",10
-.byte GROUP,"FN:",CODE,"word A() {... return ...; }",10
+.byte GROUP,"FN:",CODE,"word A(...) {... return ...; }",10
 .byte "  ",CODE,"if (...) ...",MEAN,"OPT:",CODE,"else ...",10
 .byte "  ",CODE,"while(...) ...",10
 .byte "  ",CODE,"do...while(...);",MEAN,"most efficient!",10
 .byte "  ",CODE,"for(...; ...; ...) ...",MEAN,"least",10
-.byte "  ",CODE,"L: ... goto L;"
+;;; TODO:
+;.byte "  ",CODE,"L: ... goto L;"
 .byte 0
 
 
@@ -11283,7 +11283,6 @@ FUNC _printinp
         ldx inp+1
         jmp _printz
 
-
 ;;; prints readable otherwise:
 ;;; (newline is printed)
 ;;; _c means hibit-set for 'c'
@@ -11343,8 +11342,124 @@ FUNC _printchar
         rts
 
 
+;;; prints vars
+;;; FORMAT: foo    $varaddr typechar
+FUNC _printvars
 
-;;; prints current variable envioronment
+        PRINTZ {10,"=== SYMBOLS ==="}
+        lda _ruleVARS
+        sta tos
+        lda _ruleVARS+1
+        sta tos+1
+        jsr _incT
+        
+        ldy #0
+        sty savex               ; indent indicator
+
+@nextline:
+        jsr nl
+@next:
+        lda (tos),y
+        bne :+
+@done:
+        PUTC '<'
+        rts
+:       
+        cmp #'%'
+        bne @normal
+@percent:        
+        jsr _incT
+        lda (tos),y
+
+        ;; new function hiding?
+        cmp #'R'
+        bne :+
+        
+        PRINTZ {"-- params & F"}
+;;; Have some problem here???
+        inc savex
+        jsr _incT
+        jsr _incT
+        jsr _incT
+        jmp @nextline
+:       
+        cmp #'b'
+        bne :+
+        jsr _incT
+        jmp @next
+:       
+        cmp #0
+        bpl @normal
+
+@skipperORrule:
+        and #127
+        cmp #' '+1
+        bcs @normal
+
+        ;; store how bytes to skip
+        sta dos
+
+        ;; print varaddr
+.ifdef __ATMOS__
+:       
+        lda CURCOL
+        cmp #20
+        beq :+
+        jsr spc
+        jmp :-
+:       
+.else
+        jsr tab
+.endif
+        iny
+        iny
+        ;; get typechar
+        iny
+        lda (tos),y
+        sta savea
+        dey
+        ;; get hi
+        lda (tos),y
+        tax
+        ;; get lo
+        dey
+        lda (tos),y
+        dey
+
+        jsr _printh
+
+        ;; print type
+        jsr tab
+        lda savea
+        jsr _printchar
+        cmp #'F'
+        bne :+
+        jsr nl
+:       
+
+        ;; skip bytes
+:       
+        jsr _incT
+        lda (tos),y
+;        jsr _printchar
+        dec dos
+        bne :-
+        
+        jsr _incT
+        jmp @next
+
+@normal:
+        jsr _incT
+        cmp #'|'
+        bne :+
+        jmp @nextline
+:       
+        jsr _printchar
+        jmp @next
+
+
+
+;;; prints current variable envioronment structure
 ;;; FORMAT: $addr foo%b%_[3] [$varaddr] varaddrbytes F |
 FUNC _printenv
 
@@ -11656,6 +11771,8 @@ input:
 ARGSHADOW=1
 .ifdef ARGSHADOW
         .byte "word a;",10
+        .byte "word three(word a, word b, word c){ return a+b+c; }",10
+        .byte "word two(word a, word b){ return a+b; }",10
         .byte "word seta(word v){ a= v; return a; }",10
         .byte "word geta(){ return a; }",10
         .byte "word shadow(word a){",10
