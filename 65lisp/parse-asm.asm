@@ -2222,6 +2222,9 @@ PRINTREAD=1
 ;
 PRINTDOTS=1
 
+;
+PRINTNAME=1
+
 ;;; TODO: make it a runtime flag, if asm is included?
 ;PRINTASM=1
 
@@ -4877,12 +4880,14 @@ FUNC _newname
         dey
 :       
 
+
+        lda (pos),y
+
 .ifdef DEBUGNAME
+;;; prints reverse...
 PUTC 'C'
 jsr _printchar
 .endif ; DEBUGNAME
-
-        lda (pos),y
 
         ;; TODO: clumsy?
         sty savey
@@ -4893,6 +4898,20 @@ jsr _printchar
         dey
         bpl :-
 :       
+.ifdef PRINTNAME
+        ldy #1
+:       
+        ;; print name
+        lda (_ruleVARS),y
+        beq :+
+        cmp #'%'
+        beq :+
+        jsr putchar
+        iny
+        jmp :-
+:       
+        jsr spc
+.endif ; PRINTNAME
 
 updatevars:     
         ;; update VARRRULEVEC
