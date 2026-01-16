@@ -7817,9 +7817,11 @@ ruleN:
 ALLFUN=1
 .ifdef ALLFUN
 
-;;; TODO: need to use as ALLFUN
+;;; TODO: need to use as ALLFUN (?)
 ;;;   can't handle Y=0 (for now),
 ;;;   it would require pretest in loop
+;;; 
+;;; - on the other hand this optimizes ONE arg function...
 .ifblank
         ;; fun(Expr){...} - ONE argument function
         .byte "|word","%I(","word"
@@ -7860,8 +7862,16 @@ ALLFUN=1
         .byte TAILREC
 .endif
 
+        ;; DEFIEN fun(a,b...) - TWO or MORE args
+
         .byte "|word","%I("
-        IMMEDIATE _newname_F
+
+;;; TODO: this is kindof messed up, lol
+;;;   it relies on that ONE arg parse have
+;;;   registred the name already, lol
+;;;   make a way to detect how many args before?
+;        IMMEDIATE _newname_F
+
         IMMEDIATE _initparam
         .byte _R                ; reads f.arguments
 
@@ -11341,6 +11351,8 @@ FUNC _printchar
         pla
         rts
 
+
+;;; TODO: ridiculus long!!! shorten?
 
 ;;; prints vars
 ;;; FORMAT: foo    $varaddr typechar
