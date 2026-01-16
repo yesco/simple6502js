@@ -2964,16 +2964,23 @@ jsr _printchar
         
 ;;; Doesn't even get here, how come it works!?!?!
 PUTC 'R'
-xhalt:   jmp xhalt
-        jsr _incR
         ;; Y=0
-        jsr _incR
+;;; loads wrong address (too early? jumps where?)
         lda (rule),y
-        sta rule
+        tax
 
-        jsr _incR
+        iny
         lda (rule),y
+
         sta rule+1
+        stx rule
+
+        ;; no
+;       jsr _incR
+
+        ;; no
+;        ldx #rule
+;        jsr _decRX
         
         jmp _next
 
@@ -4931,19 +4938,27 @@ FUNC _hideargs
         
         ;; stuff %'N paramC paramB paramA >> funcF
         ;;           <----------N----------->
+        ;; put new rule address
+.ifnblank
+;;; does the job, but must be wrong, lol
+;;; THESE are wrong order!!!! lol
         lda #'%'
         jsr _stuffVARS
         lda #'R'
         jsr _stuffVARS
-;;; LOL, not putting actual values here, 
-;;;  and %R is never invoked (see trace print)
-;;;  then it skipps corredctly? WTF?
-        ;; put new rule address
-        lda curF
-;        jsr _stuffVARS
+.else
+        ;; have to put values from the BACK!
         lda curF+1
-;        jsr _stuffVARS
+        jsr _stuffVARS
+        lda curF
+        jsr _stuffVARS
 
+        ;; "%R"
+        lda #'R'
+        jsr _stuffVARS
+        lda #'%'
+        jsr _stuffVARS
+.endif
         jmp updatevars
 
 
@@ -7852,7 +7867,7 @@ ALLFUN=1
         ;; (even if last ir rts might be if/loop)
         rts
       .byte "]"
-        IMMEDIATE _hideargs
+;        IMMEDIATE _hideargs
         .byte TAILREC
 .endif
 
@@ -10246,6 +10261,9 @@ status:
 
 FUNC _ERROR
 
+
+jsr _printenv
+
 .ifdef __ATMOS__
         ;; update color status
         lda #(RED+BG)&127
@@ -11335,8 +11353,10 @@ FUNC _printchar
         pla
         rts
 
+;;; prints current variable envioronment
+;;; FORMAT: $addr foo%b%_[3] [$varaddr] varaddrbytes F |
 FUNC _printenv
-        PRINTZ {10,"---ENV---",10}
+        PRINTZ {10,"---ENV---"}
         lda _ruleVARS
         sta tos
         lda _ruleVARS+1
@@ -11344,9 +11364,20 @@ FUNC _printenv
         jsr _incT
         
         ldy #0
+
+@nextline:
+        jsr nl
+        lda tos
+        ldx tos+1
+        jsr _printh
+        jsr spc
 @next:       
         lda (tos),y
         beq @done
+        cmp #'%'
+        bne :+
+        PUTC 9                  ; TAB (not oric)
+:       
         jsr _printchar
 
         cmp #'%'
@@ -11354,6 +11385,22 @@ FUNC _printenv
         jsr _incT
         lda (tos),y
         jsr _printchar
+
+        ;; print skipjumper address
+        cmp #'R'
+        bne :+
+        
+        pha
+        putc '['
+        iny
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        jsr _printh
+        putc ']'
+        pla
+:       
         cmp #0
         bpl @normal
 
@@ -11363,6 +11410,20 @@ FUNC _printenv
         bcs @normal
 
         sta dos
+
+        ;; print [varaddr]
+        putc '['
+        iny
+        iny
+        lda (tos),y
+        tax
+        dey
+        lda (tos),y
+        dey
+        jsr _printh
+        putc ']'
+
+        ;; print skipped bytes
 :       
         jsr _incT
         lda (tos),y
@@ -11370,15 +11431,16 @@ FUNC _printenv
         dec dos
         bne :-
 
-        jsr nl
-
 @normal:
         jsr _incT
-        jmp @next
+        cmp #'|'
+        bne @next
+        jmp @nextline
 
 @done:       
         PUTC '<'
         rts
+
 
 FUNC _printstack
 ;;; 119  !!!!!
