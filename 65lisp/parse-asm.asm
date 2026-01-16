@@ -2963,7 +2963,7 @@ jsr _printchar
         bne :+
         
 ;;; Doesn't even get here, how come it works!?!?!
-PUTC 'R'
+;PUTC'R'
         ;; Y=0
 ;;; loads wrong address (too early? jumps where?)
         lda (rule),y
@@ -2975,13 +2975,6 @@ PUTC 'R'
         sta rule+1
         stx rule
 
-        ;; no
-;       jsr _incR
-
-        ;; no
-;        ldx #rule
-;        jsr _decRX
-        
         jmp _next
 
 :
@@ -4780,7 +4773,7 @@ FUNC _newname_Y_out
 ;;; Data abouit current function being built
 ;;; number of parameters (0..n), 255==not valid
 nparam: .res 1
-curF:   .res 2                  ; points to addr %'3<
+curF:   .res 2                  ; points to "name%b..."
 params: .res NPARAMS*2          ; "registers"
 
 .code
@@ -4839,6 +4832,7 @@ FUNC _newname
 ;;;           and then have loop "stuff it" till 0?
 ;;;           (A or X could be zero ... so minimal 3?)
 ;;; 
+        sty savex
         tya
         pha
 
@@ -4857,21 +4851,6 @@ FUNC _newname
         jsr _stuffVARS
         lda gos                 ; lo
         jsr _stuffVARS
-
-        ;; store "current function ptr"
-        ;; TODO: minimize if can do earlier?
-        ldy #3
-        lda (_ruleVARS),y
-        cmp #'F'
-        bne :+
-        
-        ;; - is Function
-        lda _ruleVARS
-        sta curF
-        lda _ruleVARS+1
-        sta curF+1
-:       
-        ldy #0
 
         ;; store skip chars "%<3+128>"
         lda #3+128              ; 3 bytes to skip
@@ -4928,37 +4907,47 @@ updatevars:
         adc #0
         sta VARRRULEVEC+1
 
+storecurF:      
+        ;; store "current function ptr"
+        ;; TODO: minimize if can do earlier?
+        lda savex
+        cmp #'F'
+        bne @done
+        ;; - is Function store in curF
+        ldx _ruleVARS+1
+        ldy _ruleVARS
+        iny
+        sty curF
+        bne :+
+        inx
+:       
+        stx curF+1
+@done:       
         jmp _next
 
 
 FUNC _hideargs
-        PUTC '?'
+;        PUTC '?'
 ;        jmp _next
 ;        jmp updatevars
         
         ;; stuff %'N paramC paramB paramA >> funcF
         ;;           <----------N----------->
         ;; put new rule address
-.ifnblank
-;;; does the job, but must be wrong, lol
-;;; THESE are wrong order!!!! lol
-        lda #'%'
-        jsr _stuffVARS
-        lda #'R'
-        jsr _stuffVARS
-.else
-        ;; have to put values from the BACK!
+        ;; (have to put values from the BACK!)
+;;; TODO: generalize?
         lda curF+1
         jsr _stuffVARS
         lda curF
         jsr _stuffVARS
 
         ;; "%R"
+;;; TODO: generalize?
         lda #'R'
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
-.endif
+
         jmp updatevars
 
 
@@ -7775,7 +7764,7 @@ ruleQ:
 ruleN:
 
       .byte "%{"
-        putc 'a'
+;        putc 'a'
         IMM_RET
 
         ;; SPECIAL HACK!
@@ -7867,7 +7856,7 @@ ALLFUN=1
         ;; (even if last ir rts might be if/loop)
         rts
       .byte "]"
-;        IMMEDIATE _hideargs
+        IMMEDIATE _hideargs
         .byte TAILREC
 .endif
 
@@ -11353,9 +11342,12 @@ FUNC _printchar
         pla
         rts
 
+
+
 ;;; prints current variable envioronment
 ;;; FORMAT: $addr foo%b%_[3] [$varaddr] varaddrbytes F |
 FUNC _printenv
+
         PRINTZ {10,"---ENV---"}
         lda _ruleVARS
         sta tos
@@ -11390,7 +11382,7 @@ FUNC _printenv
         cmp #'R'
         bne :+
         
-        pha
+        jsr _incT
         putc '['
         iny
         lda (tos),y
@@ -11399,7 +11391,9 @@ FUNC _printenv
         lda (tos),y
         jsr _printh
         putc ']'
-        pla
+        
+        jsr _incT
+        jmp @nextline
 :       
         cmp #0
         bpl @normal
