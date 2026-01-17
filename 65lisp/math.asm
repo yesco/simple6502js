@@ -56,6 +56,10 @@ overflow:
 
 
 
+;;; Variant of
+; from BBC BASIC 2 ROM,
+; - https://archive.org/details/BBCMicroCompendium/page/302/mode/1up?q=9236
+
 ;;; jsk: tos * dos => AX (lo,hi)
 ;;; 
 ;;; smaller value in tos more efficient (?)
@@ -71,10 +75,11 @@ dos:            .res 2
 mult:   
         ldx #0
         ldy #0
+
 loop:   
         ;; get bit
         lsr tos+1
-        ror tos+1
+        ror tos
         bcc skip
 
         ;; add

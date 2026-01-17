@@ -3,9 +3,6 @@
 ;;; Part of library for parse CC02 C-compiler
 
 
-
-FUNC _stringstart
-.ifdef STRING
 ;;; --------- <string.h>
 ;;; 
 ;;; TODO: 
@@ -214,5 +211,3 @@ strTOScat:
         ;; concat(TOS,AX)
         jmp strTOScat
         ;; STRCAT returns original dest
-.endif ; STRING
-FUNC _stringend

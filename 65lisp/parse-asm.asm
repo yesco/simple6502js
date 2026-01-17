@@ -1869,11 +1869,28 @@ FUNC _ctypestart
   .endif ; CTYPE
 FUNC _ctypeend
 
-.include "lib-stdlib.asm"
 
-.include "lib-string.asm"
+FUNC _stdlibstart
+  .ifdef STDLIB
+    .include "lib-stdlib.asm"
+  .endif ; STDLIB
+FUNC _stdlibend
 
-.include "lib-math.asm"         ; mul mul10 mul16 div16
+
+FUNC _stringstart
+  .ifdef STRING
+    .include "lib-string.asm"
+  .endif ; STRING
+FUNC _stringend
+
+
+FUNC _mathstart
+  .ifdef MATH
+    .include "lib-math.asm"         ; mul div
+  .endif ; MATH
+FUNC _mathend
+
+
 
 ;;; ------- <time.h>
 ;;; - clock difftime
@@ -2026,6 +2043,10 @@ FUNC _libraryend
   .include "lib-stdio.asm"
 .endif ; STDIO
 
+;;; Needs for atoi, and mul
+.ifndef MATH
+    .include "lib-math.asm"         ; mul div
+.endif
 
 
 
@@ -4250,7 +4271,7 @@ nextdigit:
         ;; Done
         ;; > 9 : end == OK
 
-        ;; test that it's allowed range
+        ;; test that it's allowed range D=word d=byte
         lda percentchar
         cmp #'D'
         beq @OK
@@ -4262,16 +4283,18 @@ nextdigit:
 
 digit:  
 ;;; 20 B
-        pha
-        jsr _mul10
-        pla
+        sta savea
+        ldy #10
+        jsr _mulTOSyAX          ; AX = tos * 10
         ;; add digit from A to tos
         clc
-        adc tos
+        adc savea
         sta tos
         bcc :+
-        inc tos+1
+        inx
 :       
+        stx tos+1
+
         jsr _incI
         jmp nextdigit
 
@@ -4984,8 +5007,6 @@ _endfirstpage:
 FUNC _dummy4
 
 ;;; END CHEAT?
-
-.include "mulx.asm"
 
 FUNC _bnfinterpend
 

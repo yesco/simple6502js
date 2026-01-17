@@ -7,30 +7,28 @@
 ;;; - TODO: malloc(), free(), realloc()
 
 
-FUNC _stdlibstart
-
-.ifdef STDLIB
-
 ;;; -------- <stdlib.h>
+
+;;; same same...
+;;; - atoi
 ;;; 
+;;; - rand()
+;;; - random()
+;;; - srand()
+;;; - srandom()
+
 ;;; TODO:
 ;;; - malloc
 ;;; - free
 ;;; - realloc
 ;;; - calloc
+
 ;;; - _Exit(int)
 ;;; - abort()
 ;;; - exit(int)
 
 ;;; - abs
-;;; - atoi
 ;;; - div
-
-;;; same same...
-;;; - rand()
-;;; - random()
-;;; - srand()
-;;; - srandom()
 
 ;;; - getenv
 ;;; - putenv
@@ -82,15 +80,22 @@ no_xor:
 
 
 
+;FUNC _atoiAX
+;        sta sos
+;        stx sos+1               
+;        ldx #sos
+
 .ifdef ATOI
+
 FUNC _atoiXR
+        lda #10
+FUNC _atoibaseXR
+        sta base
         lda #0
         sta tos
         sta tos+1
         ;; base
         sta dos
-        lda #10
-        sta base
 
         ;; 0x 'c' -
         lda (0,x)
@@ -121,9 +126,10 @@ FUNC _atoiXR
         ora #32
         cmp #'X'
         bne @ret                ; zero! (no octal...)
-        
+@hex:    
         lda #16
         sta base
+
 :       
         lda (0,x)
         ;; digit? '0' <= a <= '9'
@@ -181,7 +187,3 @@ putd:
 
 FUNC _dummyd
 .endif ; SIGNED
-
-.endif ; STDLIB
-
-FUNC _stdlibend
