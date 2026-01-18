@@ -1270,9 +1270,9 @@ _asmstart:
 
 ;;; NOBIOS: will generate code that doesn't 
 ;;; rely on extra code for getchar/putchar
-;;;
-
-;;; TODO: currently failing in compiler...?
+;;; NOTE: \n will not do as expected in
+;;;   a string "foo\nbar\n", but putchar('\n') will!
+;;; 
 ;NOBIOS=1
 
 
@@ -1334,25 +1334,22 @@ _asmstart:
 
 
 FUNC _biosstart
-
 .ifndef NOBIOS
 
+  .ifdef __ATMOS__
+    ;.include "bios-raw-atmos.asm"
+    .include "bios-atmos-rom.asm"
+  .else ; SIM
+    .include "bios-sim.asm"
+  .endif ; __ATMOS__ | SIM
 
-.ifdef __ATMOS__
-  ;.include "bios-raw-atmos.asm"
-  .include "bios-atmos-rom.asm"
-.else ; SIM
-  .include "bios-sim.asm"
-.endif ; __ATMOS__ | SIM
 
-
-.ifndef putcraw
-        putcraw= putchar
-.endif
+  .ifndef putcraw
+     putcraw= putchar
+  .endif
 
 
 .endif ; !NOBIOS
-
 FUNC _biosend
 
 
@@ -1438,7 +1435,8 @@ STRING=1
 CTYPE=1
 
 ;;; Runtime
-;;; TODO: fix?
+;;; TODO: make it count, reduce runtime if not used!
+;;;   (only need "restore")
 RECURSION=1
 
 ;;; stdlib
@@ -5141,13 +5139,17 @@ ruleC:
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
 
+        ;; TODO: fix
+        ;; dummy rule to make | start - LOL
+        .byte "d43fj3"
+
 .ifdef STDIO
 ;;; TODO: these don't really return anything...
 
         ;;  potentially first so no "|"
 
         ;; "IO-lib" hack
-        .byte "putu(",_E,")"
+        .byte "|putu(",_E,")"
       .byte '['
         jsr _printu
       .byte ']'
@@ -5255,7 +5257,7 @@ FUNC _iorulesstart
 
         ;;  potentially first so no "|"
 
-        .byte "putz(",_E,")"
+        .byte "|putz(",_E,")"
       .byte '['
         ;; 19 B inline only...
         sta pos
@@ -5265,6 +5267,7 @@ FUNC _iorulesstart
         lda (pos),y
         beq :+
 
+;;; TODO: cleanup
 .ifndef NOBIOS ; BIOS
         jsr putchar
 .else ; !BIOS
@@ -5273,7 +5276,7 @@ FUNC _iorulesstart
         ;; ORIC: print character
         jsr $CCD0 
   .else
-        ;; I guess it's here?
+        ;; I guess it's here? (non oric)
         jsr _putchar
   .endif ; __ATMOS__
 
@@ -5284,9 +5287,6 @@ FUNC _iorulesstart
         inc pos+1
         bne :-
 :       
-
-        .byte "|"
-
 .endif ; STDIO
 
 
@@ -5295,8 +5295,6 @@ FUNC _iorulesstart
 .ifdef OPTRULES
 
 .ifndef NOBIOS
-;;; TDO:O potentiall no | ???
-
         ;; putchar variable - saves 2 bytes!
 ;;; TODO: parser skips space, hahahaha!
         .byte "|putchar('')"    ; LOL!!!!
@@ -5337,8 +5335,6 @@ FUNC _iorulesstart
       .byte ']'
 
 .else
-        ;; potentially first no "|"
-
         ;; LDA #0C 11 20 3F
         ;; 11= 17dec == ???
 
@@ -5358,15 +5354,13 @@ FUNC _iorulesstart
 
 .endif ; !NOBIOS
 
-        .byte "|"
-
 .endif ; OPTRULES
 
 
 .ifndef NOBIOS
         ;; potentially first so no "|"
 
-        .byte "putchar(",_E,")"
+        .byte "|putchar(",_E,")"
       .byte '['
         jsr putchar
       .byte ']'
