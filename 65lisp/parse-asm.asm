@@ -1460,116 +1460,39 @@ FUNC _librarystart
 .include "tty-helpers.asm"      ; nl spc bs PUTC putc
 
 
+
 FUNC _runtimestart
 
 ;;; TODO: IRQ put here!
 
+;;; TODO: delete file?
 ;.include "lib-runtime-recursion.asm"
-
-;;; SUBPARAM2
-;;; (- (- 2862601 2849494) (- 3406223 3393485) ) = 369
-;;;   (/ 369 9.0) = 41.0 c slower per call
-;;; (+ 12 27) = 39c ... hmmm, alignment?
-;
-
-;;; (+ 1 12 10 21 6 3)  = 53 B
-;;; saved B: (+ 38 -3) =      - 35 B saved
-;;; (+ 2 22 18 32 10 5) = 89c
-;;; extra C: (+ 22 5)  =      + 27c
-subparam2:
-;;; 1
-        tay
-
-        ;; remove caller from stack, store in tos
-;;; 12 B+3 22c + 5c
-;;; (1B less + 9c faster than save and pha/pha/RTS!)
-        pla
-        sta tos
-        pla
-        sta tos+1
-
-        inc tos
-        bne :+
-        inc tos+1
-:       
-
-        ;; save last param (now YX) in register
-;;; 10 B  18c!
-        ;; push register old value, replace with Y X
-        ;; - lo
-        lda params+2
-        pha
-        sty params+2
-        ;; - hi
-        lda params+1+2
-        pha
-        stx params+1+2
-
-        ;; swap first actual param on stack & first register
-;;; 21 B  32c!
-        tsx
-        ;; - lo (15c)
-        ldy $104,x
-        lda params
-        sty params
-        sta $104,x
-        
-        ;; - hi (15c)
-        ldy $103,x
-        lda params+1
-        sty params+1
-        sta $103,x
-
-        ;; "inject" a restore1 call
-;;; 6 B  10c .... 10c+24c= 34c (+4c cmp inline!)
-        lda #>(restore2-1)
-        pha
-        lda #<(restore2-1)
-        pha
-
-        ;; "return" to caller (and actual FUNCTION)
-;;; 3 B  5c
-        jmp (tos)
-
-
-_initsubY:      
-        ;; tos= 2*nparam ; bytes
-        lda nparam
-        sta tos
-        asl tos
-
-        jmp _next
-
 
 ;;; Y is 2*params + 16*2*locals
 ;;; AX is pushed as next parameter
-;;; (+ 2 12 12 20  9 3) = 58 B   ; 14 B locals
+;;; (+ 2 12 12 20  9 3 +1) = 59 B   ; +14 B locals
 ;;; (+ 3 22 21 13 16 5) = 80 c + 27c * bytes
 subparamY:
-;;; 2 B  3c
+        ;; 2 B  3c
         sta savea
 
-;PUTC 'T'
         ;; remove caller from stack, store in tos
-;;; 12 B+3 22c + 5c = 27c
-;;; (1B less  5c faster than save and pha/pha/RTS!)
+        ;; 12 B+3 22c + 5c = 27c
+        ;; (1B less  5c faster than save and pha/pha/RTS!)
         pla
         sta tos
         pla
         sta tos+1
 
-        ;; 8c (+ 5)
-        ;; TODO: 3c saved by make sure not return to page break?
         inc tos
         bne :+
         inc tos+1
 :       
 
         ;; save last param (now YX) in register
-;;; 12 B  21c
+        ;; 12 B  21c
         ;; push register old value, replace with saveaX
         ;; - lo
-;PUTC 'P'
         lda params,y
         pha
         lda savea
@@ -1583,10 +1506,9 @@ subparamY:
 ;PUTC 'L'
         ;; create space for local variables
         ;; (no more than 15 parameters...)
-;;; 14 B  8c+ 13*bytes
+        ;; 14 B  8c+ 13*bytes
         tya
 :       
-;PUTC '.'
         ;; < 16 done
         cmp #16
         bcc :+
@@ -1597,12 +1519,11 @@ subparamY:
         tay
 .endif
 
-;;; TODO: not swap locals, just "store"
-;;;   generlize last param?
+        ;; TODO: not swap locals, just "store"
+        ;;   generlize last param?
 
-        ;; swap first actual param on stack & first register
-;;; 20 B  13c + 27c / byte swap
-;PUTC 'S'
+        ;; swap first arg & last reg
+        ;; 20 B  13c + 27c / byte swap
         sty savey
 ;;; TODO: to handle Y=0 (one arg)
 ;;;    crashes??? why?
@@ -1615,36 +1536,6 @@ subparamY:
         pla
         pla
 @loop:       
-
-;;; TODO: this messes up stack/registers?
-;;;   wtf how is that possible?
-;MESSUP=1
-.ifdef MESSUP
-.ifnblank
-pha
-txa
-pha
-tya
-pha
-
-;PUTC '.'
-
-pla
-tay
-pla
-tax
-pla
-.else
-;;; WTF: how can this mess anything up/
-;;;   (only have one pha/pla is ok???)
-;;;   stack full?
-pha
-pha
-pla
-pla
-.endif
-.endif ; MESSUP
-
         ;; 13 B  27c / byte swapped
         ;; (TODO: SWAP macro +8 B 19c / byte)
         ldx params-1,y
@@ -1660,9 +1551,8 @@ pla
         txs
 @nope:
 
-;PUTC 'I'
         ;; "inject" a restore1 call
-;;; 9 B  16c
+        ;; 9 B  16c
         ;; push how many bytes to restore:
         ;;        2 * (nparam+nlocals)
         lda savey
@@ -1674,22 +1564,15 @@ pla
         pha
 
         ;; "return" to caller (and actual FUNCTION)
-;;; 3 B  5c
-;PUTC 'J'
+        ;; 3 B  5c
         jmp (tos)
 
 
-;;; TODO: pushes next address down...?
-
-
-
-
+;;; Restores Y+2 byte registers
 ;;; preserves AX, trashes Y
+
+;;; 15 B  16+6 +   13c x bytes
 restore:
-;putc '?'
-;;; RESTORE!
-;;; 14 B
-;PUTC 'R'
         sta savea
 
         pla
@@ -1698,42 +1581,20 @@ restore:
         iny
         iny
 :       
-;PUTC '.'
-;;; 13c / byte
+        ;; 13c / byte
         pla
-
-;stx savex
-;ldx #0
-;jsr _printu
-;PUTC ' '
-;ldx savex
-
         sta params-1,y
         dey
         bne :-
 
-;PUTC 10
         lda savea
         rts
 
-
-
-
-
-;;; AX is retained
-restore2:
-;;; +8 B  19c
-        tay
-
-        pla
-        sta params+1+2
-        pla
-        sta params+2
-
-        ;; fall-through
-        SKIPONE
+;;; Specialized
+;;; Restore 1 register
+;;; TODO: maybe remove when add locals?
+;;;  9 B  18c+6=24c
 restore1:
-;;; 9 B  18c+6=24c
         tay
 
         pla
@@ -1743,6 +1604,23 @@ restore1:
 
         tya
         rts
+
+
+;;; TODO: remove, keep for bench refs?
+
+;;; SUBPARAM2
+;;; (- (- 2862601 2849494) (- 3406223 3393485) ) = 369
+;;;   (/ 369 9.0) = 41.0 c slower per call
+;;; (+ 12 27) = 39c ... hmmm, alignment?
+;
+
+;;; (+ 1 12 10 21 6 3)  = 53 B
+;;; saved B: (+ 38 -3) =      - 35 B saved
+;;; (+ 2 22 18 32 10 5) = 89c
+;;; extra C: (+ 22 5)  =      + 27c
+
+;;;        REMOVED ^
+
 
 FUNC _runtimeend
 
@@ -4972,6 +4850,15 @@ storecurF:
         jmp _next
 
 
+;;; nparam*2 => tos (bytes)
+FUNC _calcsubY
+        lda nparam
+        sta tos
+        asl tos
+
+        jmp _next
+
+
 FUNC _hideargs
 ;        PUTC '?'
 ;        jmp _next
@@ -7906,10 +7793,6 @@ ruleN:
         .byte TAILREC
 
 
-;
-ALLFUN=1
-.ifdef ALLFUN
-
 ;;; TODO: need to use as ALLFUN (?)
 ;;;   can't handle Y=0 (for now),
 ;;;   it would require pretest in loop
@@ -7969,14 +7852,10 @@ ALLFUN=1
         .byte _R                ; reads f.arguments
 
         ;; TODO: local variables (?)
-
-        ;; insert code to swap regs <-> stack
-        IMMEDIATE _initsubY
+        IMMEDIATE _calcsubY
       .byte "["
-        ldy #'<'
-;        PUTC 'a'
+        ldy #LOVAL
         jsr subparamY
-;        PUTC 'b'
       .byte "]"
 
         .byte _B
@@ -7985,38 +7864,6 @@ ALLFUN=1
       .byte "]"
         IMMEDIATE _hideargs
         .byte TAILREC
-
-.else
-
-        ;; DEFINE fun(a,b){...} - TWO argument function
-        ;; (+ 
-        .byte "|word","%I(","word","%I,"
-        ;; reverse order, lol
-        IMMEDIATE _initparam
-        IMMEDIATE _newparam_w
-        IMMEDIATE _newname_F
-        .byte "word","%I)"
-        IMMEDIATE _newparam_w
-      .byte "["
-        ;; JSK-calling convention!
-        ;; (keeps the param directly pullable from stack!
-        ;;  and ENDS with return address to be RTSed!)
-
-        ;; 3 B  +19c +12c== +31c, hmmm
-        ;; (+ 3 -38) = -33 B == 33 B saved!
-        jsr subparam2
-      .byte "]"
-
-        .byte _B
-
-      .byte "["
-        rts
-      .byte "]"
-        .byte TAILREC
-
-
-.endif ; ALLFUN
-
 
 
 .ifdef FUNCALL
@@ -11818,8 +11665,7 @@ input:
 ;        .byte 0
 
 
-;
-MUL=1
+;MUL=1
 .ifdef MUL
         .byte "word main(){",10
 ;        .byte "  return 42*101;",10
@@ -11869,20 +11715,17 @@ MUL=1
         .byte "  return z;",10
 .endif
         .byte "}",10
+
         .byte "word main() {",10
-.ifnblank
-        .byte "  return mul(3,4);",10
-.else
+;        .byte "  return mul(3,4);",10
         .byte "  return mul(40,40);",10
-.endif
         .byte "}",10
         .byte 0
 .endif ; MUL2
 
 
 
-;
-ARGSHADOW=1
+;ARGSHADOW=1
 .ifdef ARGSHADOW
         .byte "word a;",10
         .byte "word three(word a, word b, word c){ return a+b+c; }",10
@@ -11928,7 +11771,7 @@ ARGSHADOW=1
 .ifdef FUN2
         .byte "word plus(word a, word b) {",10
 ;        .byte "   putu(17);",10
-        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
         .byte "  return a+b;",10
         .byte "}",10
         .byte "word main() {",10
@@ -11960,6 +11803,7 @@ ARGSHADOW=1
 .endif ; FUN1
 
 
+;;; Just testing sanity of no arg fun
 ;NEWFUN=1
 .ifdef NEWFUN
         .byte "word foo(){ return 4700; }",10 
