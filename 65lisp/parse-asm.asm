@@ -431,7 +431,7 @@
 ;;; - ctype.h   :  99 B - isdigit is...
 ;;; - stdlib.h  :  20 B - 
 ;;; - string.h  : 144 B - strlen strcpy...
-;;; - libmath.h :   0 B - TODO: mul/div/mod
+;;; - libmath.h :  41 B - TODO: div/mod
 ;;; 
 
 
@@ -953,7 +953,8 @@
 ;;; - %V - tos= address; match "Variable" name
 ;;; - %N - define NEW name (use: %I%N)
 ;;; 
-;;; (TODO: might be broken?)
+;;; (TODO: might be broken? TODO: remove this thing)
+;;;        (doesn't nest anyway needed for a=b=c;)
 ;;; - %A - dos= tos= address; address of named
 ;;;        variable (use for assignment)
 ;;; 
@@ -4876,6 +4877,14 @@ FUNC _hideargs
         jmp updatevars
 
 
+negateLOVAL:
+        lda #0
+        sec
+        sbc tos
+        sta tos
+
+        jmp _next
+
 
 FUNC _dummy
 
@@ -5617,10 +5626,6 @@ FUNC _memoryrulesstart
 
 
 .ifdef OPTRULES
-;;; TODO: add ZPRULES opt?
-;;; actually not needed if all vars are in zp...
-;;;  just use indexing!!!!
-;;; peek(%V) === $%V lol deek(%V) === *(word*)%A
         .byte "|peek(%D)"
       .byte '['
         lda VAL0
@@ -7051,8 +7056,11 @@ ruleU:
 .ifdef BYTERULES
 .ifdef OPTRULES
         ;; arr[i]=constant;
+
+;;; TODO: %A fix
+
         .byte "|$arr\[%A\]=%D;"
-      .byte "[#D"
+      .byte "[#D"               ; swap?
         ldx VAR0
         .byte ";"
         lda #'<'
@@ -8430,22 +8438,22 @@ afterELSE:
 
 ;;; TODO: 3 things same result, save bytes?
         ;; simple write byte to memory
-        .byte "|*(char*)%A=",_E,";"
-      .byte "[D"
+        .byte "|*(char*)%V=[#]",_E,";"
+      .byte "[;"
         sta VAR0
       .byte "]"
 
 .ifdef BYTERULES
         ;; %D is ok as it get's "truncated" anyway.
-        .byte "|$%A=%D;"
+        .byte "|$%V[#]=%D;"
       .byte "["
         lda #'<'
-        .byte "D"
+        .byte ";"
         sta VAR0
       .byte "]"
 
-        .byte "|$%A=",_E,";"
-      .byte "[D"
+        .byte "|$%V=[#]",_E,";"
+      .byte "[;"
         sta VAR0
       .byte "]"
 .endif
@@ -8453,10 +8461,10 @@ afterELSE:
 
 .ifdef OPTRULES
         ;; arr[i]=constant;
-        .byte "|arr\[%A\]=%D;"
+        .byte "|arr\[%A\]=[#]%D;"
       .byte "["
         lda #'<'
-        .byte "D"
+        .byte ";"
         ldx VAR0
 ;;; TODO: get address of array...
         sta arr,x
@@ -8489,8 +8497,8 @@ afterELSE:
 
 
 .ifdef OPTRULES
-        .byte "|$%A=0;"
-      .byte "[D"
+        .byte "|$%V=0;"
+      .byte "["
         sta VAR0
       .byte "]"
 .endif ; OPTRULES
@@ -8509,78 +8517,78 @@ FUNC _stmtbyterulestart
         dec VAR0
       .byte "]"
 
-        .byte "|$%A+=",_U,";"
-      .byte "[D"
+        .byte "|$%V+=[#]",_U,";"
+      .byte "[;"
         clc
         adc VAR0
         sta VAR0
       .byte "]"
 
-        .byte "|%A-=",_U,";"
-      .byte "[D"
+        .byte "|%V-=[#]",_U,";"
+      .byte "[;"
         sec
         eor #$ff
         adc VAR0
         sta VAR0
       .byte "]"
 
-        .byte "|$%A&=",_U,";"
-      .byte "[D"
+        .byte "|$%V&=[#]",_U,";"
+      .byte "[;"
         and VAR0
         sta VAR0
       .byte "]"
 
-        .byte "|$%A\|=",_U,";"
-      .byte "[D"
+        .byte "|$%V\|=[#]",_U,";"
+      .byte "[;"
         ora VAR0
         sta VAR0
       .byte "]"
 
-        .byte "|$%A^=",_U,";"
-      .byte "[D"
+        .byte "|$%V^=[#]",_U,";"
+      .byte "[;"
         eor VAR0
         sta VAR0
       .byte "]"
 
-        .byte "|$%A>>=1;"
-      .byte "[D"
+        .byte "|$%V>>=1;"
+      .byte "["
         lsr VAR0
       .byte "]"
 
-        .byte "|$%A<<=1;"
-      .byte "[D"
+        .byte "|$%V<<=1;"
+      .byte "["
         asl VAR0
       .byte "]"
 
-        .byte "|$%A>>=2;"
-      .byte "[D"
+        .byte "|$%V>>=2;"
+      .byte "["
         lsr VAR0
         lsr VAR0
       .byte "]"
 
-        .byte "|$%A<<=2;"
-      .byte "[D"
+        .byte "|$%V<<=2;"
+      .byte "["
         asl VAR0
         asl VAR0
       .byte "]"
 
-        .byte "|$%A>>=3;"
-      .byte "[D"
+        .byte "|$%V>>=3;"
+      .byte "["
         lsr VAR0
         lsr VAR0
         lsr VAR0
       .byte "]"
 
-        .byte "|$%A<<=3;"
-      .byte "[D"
+        .byte "|$%V<<=3;"
+      .byte "["
 ;;; 6B 15c
         asl VAR0
         asl VAR0
         asl VAR0
       .byte "]"
 
-        .byte "|$%A>>=4;"
-      .byte "[D"
+        .byte "|$%V>>=4;"
+      .byte "["
 ;;; 8B 14c
 .ifblank
         lda VAR0
@@ -8598,8 +8606,8 @@ FUNC _stmtbyterulestart
 .endif
       .byte "]"
 
-        .byte "|$%A<<=4;"
-      .byte "[D"
+        .byte "|$%V<<=4;"
+      .byte "["
         lda VAR0
         asl
         asl
@@ -8608,8 +8616,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A>>=5;"
-      .byte "[D"
+        .byte "|$%V>>=5;"
+      .byte "["
 ;;; 9B 16c
         lda VAR0
         lsr
@@ -8620,8 +8628,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A<<=5;"
-      .byte "[D"
+        .byte "|$%V<<=5;"
+      .byte "["
         lda VAR0
         asl
         asl
@@ -8631,8 +8639,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A>>=6;"
-      .byte "[D"
+        .byte "|$%V>>=6;"
+      .byte "["
 ;;; 10B 16c
         lda VAR0
         lsr
@@ -8644,8 +8652,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A<<=6;"
-      .byte "[D"
+        .byte "|$%V<<=6;"
+      .byte "["
         lda VAR0
         asl
         asl
@@ -8656,8 +8664,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A>>=7;"
-      .byte "[D"
+        .byte "|$%V>>=7;"
+      .byte "["
 ;;; 8B 12c
         lda VAR0
         rol
@@ -8666,8 +8674,8 @@ FUNC _stmtbyterulestart
         sta VAR0
       .byte "]"
 
-        .byte "|$%A<<=7;"
-      .byte "[D"
+        .byte "|$%V<<=7;"
+      .byte "["
         lda VAR0
         ror
         ror
@@ -8678,11 +8686,11 @@ FUNC _stmtbyterulestart
 ;;; TODO:: |<<9 >>9 ???
 
 .ifnblank
-        .byte "|$%A>>=%D;"
+        .byte "|$%V>>=[#]%D;"
       .byte "["
 ;;; 11B (tradeoff 
         ldy #'<'
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -8695,10 +8703,10 @@ FUNC _stmtbyterulestart
       .byte "]"
 .endif
 
-        .byte "|$%A>>=%V;"
+        .byte "|$%V>>=[#]%V;"
       .byte "["
         ldy VAR0
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -8711,11 +8719,11 @@ FUNC _stmtbyterulestart
       .byte "]"
 
 .ifnblank
-        .byte "|$%A<<=%D;"
+        .byte "|$%V<<=[#]%D;"
       .byte "["
 ;;; 11B
         ldy #'<'
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -8728,11 +8736,11 @@ FUNC _stmtbyterulestart
       .byte "]"
 .endif
 
-        .byte "|$%A<<=%V;"
+        .byte "|$%V<<=[#]%V;"
       .byte "["
 ;;; 14B
         ldy VAR0
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -8754,11 +8762,11 @@ FUNC _stmtbyteruleend
 ;;;   ++a; is opt, yes
 
 .ifdef OPTRULES
-;;; TODO make ruleC when %A pushes
+;;; TODO make ruleC when %A pushes ???
         .byte "|"
 
-        .byte "++%A;"
-      .byte "[D"
+        .byte "++%V;"
+      .byte "["
         inc VAR0
         bne :+
         inc VAR1
@@ -8766,8 +8774,8 @@ FUNC _stmtbyteruleend
       .byte "]"
 
 ;;; TODO make ruleC when %A pushes
-        .byte "|--%A;"
-      .byte "[D"
+        .byte "|--%V;"
+      .byte "["
         lda VAR0
         bne :+
         dec VAR1
@@ -8777,8 +8785,8 @@ FUNC _stmtbyteruleend
 .endif ; OPTRULES
 
 .ifdef POINTERS
-        .byte "|*%A=",_E,";"
-      .byte "[D"
+        .byte "|*%V=",_E,";"
+      .byte "["
         ldy VAR0
         sty tos
         ldy VAL1
@@ -8795,14 +8803,14 @@ FUNC _stmtbyteruleend
 .ifdef BYTERULES
         ;; TODO: this is now limited to 256 index
         ;; bytes@[%D]= ... fixed address... hmmm
-        .byte "|$%A\[%D\]="
+        .byte "|$%V\[[#]%D\]="
       .byte '['
         ;; prepare index
         lda '<'
         pha
       .byte ']'
         .byte _E,";"
-      .byte "[D"
+      .byte "[;"
         ;; load index
         tax
         pla
@@ -9019,7 +9027,9 @@ FOROPT=1
         ;; autopatches jump to here if false (PUSHLOC)
 
 
-.ifdef BYTERULES
+.ifdef bug_BYTERULES
+
+;;; TDOO: fix... %A
 
         .byte "|while([:]$%A<%d[#])"
       .byte "["
@@ -9045,6 +9055,8 @@ FOROPT=1
 .endif ; BYTERULES
 
 ;;; %A only used here!!!?
+
+;;; todo: FIX
         .byte "|while(%A<"
         ;; similar to while(%A<%D)
       .byte "["
@@ -9572,22 +9584,22 @@ startparsevarfirst:
       .byte "]"
 
 .ifdef OPTRULES
-        .byte "|%A>>=1;"
-      .byte "[D"
+        .byte "|%V>>=1;"
+      .byte "["
 ;;; 6B
         lsr VAR1
         ror VAR0
       .byte "]"
 
-        .byte "|%A<<=1;"
-      .byte "[D"
+        .byte "|%V<<=1;"
+      .byte "["
 ;;; 6B
         asl VAR0
         rol VAR1
       .byte "]"
 
-        .byte "|%A>>=2;"
-      .byte "[D"
+        .byte "|%V>>=2;"
+      .byte "["
 ;;; 12B
         lsr VAR1
         ror VAR0
@@ -9595,8 +9607,8 @@ startparsevarfirst:
         ror VAR0
       .byte "]"
 
-        .byte "|%A<<=2;"
-      .byte "[D"
+        .byte "|%V<<=2;"
+      .byte "["
 ;;; 12B (zp: 8B)
         asl VAR0
         rol VAR1
@@ -9604,8 +9616,8 @@ startparsevarfirst:
         rol VAR1
       .byte "]"
 
-        .byte "|%A>>=3;"
-      .byte "[D"
+        .byte "|%V>>=3;"
+      .byte "["
 ;;; 8B
         lsr VAR1
         ror VAR0
@@ -9615,8 +9627,8 @@ startparsevarfirst:
         ror VAR0
       .byte "]"
 
-        .byte "|%A<<=3;"
-      .byte "[D"
+        .byte "|%V<<=3;"
+      .byte "["
 ;;; 8B
         asl VAR0
         rol VAR1
@@ -9624,12 +9636,40 @@ startparsevarfirst:
         rol VAR1
         asl VAR0
         rol VAR1
+      .byte "]"
+
+        .byte "|%V+=[#]%d;"
+      .byte "["
+        ;; 11 B
+        lda #LOVAL
+        clc
+        .byte ";"
+        adc VAR0
+        sta VAR0
+        bcc :+
+        inc VAR1
+:       
+      .byte "]"
+
+        .byte "|%V-=[#]%d;"
+        IMMEDIATE negateLOVAL
+      .byte "["
+        ;; 11 B
+        lda #LOVAL
+        clc
+        .byte ";"
+        adc VAR0
+        sta VAR0
+        bcs :+
+        dec VAR1
+:       
       .byte "]"
 .endif ; OPTRULES
 
 
-        .byte "|%A+=",_E,";"
-      .byte "[D"
+        .byte "|%V+=[#]",_E,";"
+      .byte "[;"
+        ;; 10 B
         clc
         adc VAR0
         sta VAR0
@@ -9638,8 +9678,8 @@ startparsevarfirst:
         sta VAR1
       .byte "]"
 
-        .byte "|%A-=",_E,";"
-      .byte "[D"
+        .byte "|%V-=[#]",_E,";"
+      .byte "[;"
         sec
         eor #$ff
         adc VAR0
@@ -9650,8 +9690,8 @@ startparsevarfirst:
         sta VAR1
       .byte "]"
 
-        .byte "|%A&=",_E,";"
-      .byte "[D"
+        .byte "|%V&=[#]",_E,";"
+      .byte "[;"               
         and VAR0
         sta VAR0
         txa
@@ -9659,8 +9699,8 @@ startparsevarfirst:
         sta VAR1
       .byte "]"
 
-        .byte "|%A\|=",_E,";"
-      .byte "[D"
+        .byte "|%V\|=[#]",_E,";"
+      .byte "[;"
         ora VAR0
         sta VAR0
         txa
@@ -9668,8 +9708,8 @@ startparsevarfirst:
         sta VAR1
       .byte "]"
 
-        .byte "|%A^=",_E,";"
-      .byte "[D"
+        .byte "|%V^=[#]",_E,";"
+      .byte "[;"
         eor VAR0
         sta VAR0
         txa
@@ -9680,12 +9720,12 @@ startparsevarfirst:
 
 
 
-        .byte "|%A>>=%D;"
+        .byte "|%V>>=[#]%D;"
       .byte "["
 ;;; 14B (tradeoff 14=6*d => d=2+)
 ;;; (zp: 12B)
-        ldy #'<'
-        .byte "D"
+        ldy #LOVAL
+        .byte ";"
 :       
         dey
         bmi :+
@@ -9698,11 +9738,11 @@ startparsevarfirst:
 :       
       .byte "]"
 
-        .byte "|%A>>=%V;"
+        .byte "|%V>>=[#]%V;"
       .byte "["
 ;;; 14B (tradeoff 14=6*d => d=2+)
         ldy VAR0
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -9715,11 +9755,11 @@ startparsevarfirst:
 :       
       .byte "]"
 
-        .byte "|%A<<=%D;"
+        .byte "|%V<<=[#]%D;"
       .byte "["
 ;;; 14B
         ldy #'<'
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -9732,11 +9772,11 @@ startparsevarfirst:
 :       
       .byte "]"
 
-        .byte "|%A<<=%V;"
+        .byte "|%V<<=[#]%V;"
       .byte "["
 ;;; 14B
         ldy VAR0
-        .byte "D"
+        .byte ";"
 :       
         dey
         bmi :+
@@ -9751,7 +9791,7 @@ startparsevarfirst:
 
         ;; TODO: this is now limited to 128 index
         ;; word[%D]= ... fixed address... hmmm
-        .byte "|%A\[%D\]="
+        .byte "|%V\[[#]%D\]="
 ;;; TODO: similar to poke?
       .byte '['
         ;; prepare index (*2)
@@ -9760,7 +9800,7 @@ startparsevarfirst:
         pha
       .byte ']'
         .byte _E,";"
-      .byte "[D"
+      .byte "[;"
         ;; load index
         sta savea
         pla
@@ -11665,6 +11705,17 @@ input:
 ;        .byte "word main(){ abc=4711; return abc; }",10
 ;        .byte "{return 42;};",10
 ;        .byte 0
+
+
+;OPTINCBYTE=1
+.ifdef OPTINCBYTE
+        .byte "word p;",10
+        .byte "word main(){",10
+;        .byte "  p= 40; p+= 2;",10
+        .byte "  p= 64; p-= 22;",10
+        .byte "  return p;",10
+        .byte "}",0
+.endif ; OPTINCBYTE
 
 
 ;MUL=1

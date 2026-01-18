@@ -144,7 +144,8 @@ editrow:        .res 1
 
 
 ;;; CTRL:     @ABCDEFGHIJKLMNOPQRSTUVWXYZ ESC
-;;; FREE:     @         JKLM O  RS UV XY
+;;; NOT USED  @         JK M O   S U W Y
+;;; FREE      @           L  O   
 
 ;;; NOTICE: All these assume Y=0!
 
