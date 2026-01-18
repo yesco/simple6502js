@@ -502,7 +502,7 @@
 ;;;   ; cload(...) - TODO
 ;;;   ; csave(...) - TODO
 ;;;   cwrite(0..255)
-;;;   cread()->0..255 - TODO: erh, should be function
+;;;   cread()->0..255 - todo: erh, should be function
 ;;;   ; cwritehdr() - TODO
 ;;;   ; creadsync() - TODO
 ;;; 
@@ -1292,15 +1292,6 @@ _asmstart:
 ;;; 
 ;NOLIBRARY=1
 
-;;; WARNING:
-;;; if this isn't included it FAILS COMPILATION
-;;; at some random place??? m=8192; ????
-;;; TODO: investigate!
-
-;STDIO=1
-
-
-
 
 
 ;;; BYTESIEVE needs printf/putu
@@ -1744,6 +1735,7 @@ FUNC _stdioend
 
 ;;; TODO
 ;include "lib-printf.asm"       ; not working
+;;; TODO: looks at - https://github.com/charlesnicholson/nanoprintf
 
 FUNC _ctypestart
   .ifdef CTYPE
@@ -5710,6 +5702,7 @@ SMALLER=1
         adc savex
         sta _out+1
         
+        ;; TODO: test if run-out of memory
         tax
         tya     
 .else        
@@ -5753,7 +5746,7 @@ SMALLER=1
 
 .ifdef NOTDEFINEDIN_CC65 ; ???
 .import _heapmemavail
-        .byte "|heapmemevail",_X
+        .byte "|heapmemavail",_X
       .byte "["
         jsr _heapmemavail
       .byte "]"
@@ -11290,10 +11283,10 @@ FUNC _printchar
 ;;; TODO: ridiculus long!!! shorten?
 
 ;;; prints vars
-;;; FORMAT: foo    $varaddr typechar
+;;; FORMAT: foo    $varaddr typechar   @value
 FUNC _printvars
 
-        PRINTZ {10,"=== SYMBOLS ==="}
+        PRINTZ {10,"=== VARS ==="}
         lda _ruleVARS
         sta tos
         lda _ruleVARS+1
@@ -11313,7 +11306,8 @@ FUNC _printvars
         rts
 :       
         cmp #'%'
-        bne @normal
+        beq @percent
+        jmp @normal
 @percent:        
         jsr _incT
         lda (tos),y
@@ -11344,7 +11338,7 @@ FUNC _printvars
         bcs @normal
 
         ;; store how bytes to skip
-        sta dos
+        sta savey
 
         ;; print varaddr
 .ifdef __ATMOS__
@@ -11373,23 +11367,36 @@ FUNC _printvars
         lda (tos),y
         dey
 
+        sta pos
+        stx pos+1
         jsr _printh
 
+        ;; print value
+        jsr tab
+        ldy #1
+        lda (pos),y
+        tax
+        dey
+        lda (pos),y
+        
+        ;; jsr _printn prints garbage???
+        jsr _printh
         ;; print type
         jsr tab
         lda savea
         jsr _printchar
+        ;; Fun extra newline
+        lda savea
         cmp #'F'
         bne :+
         jsr nl
 :       
 
         ;; skip bytes
-:       
         jsr _incT
         lda (tos),y
 ;        jsr _printchar
-        dec dos
+        dec savey
         bne :-
         
         jsr _incT
@@ -11465,7 +11472,7 @@ FUNC _printenv
         cmp #' '+1
         bcs @normal
 
-        sta dos
+        sta savey
 
         ;; print [varaddr]
         putc '['
@@ -11484,7 +11491,7 @@ FUNC _printenv
         jsr _incT
         lda (tos),y
         jsr _printchar
-        dec dos
+        dec savey
         bne :-
 
 @normal:
@@ -12503,10 +12510,9 @@ CANT=1
 
 ;;; 80B
 
-;
-MUL=1
-.ifdef MUL
-        .byte "// MUL",10
+;FMUL=1
+.ifdef FMUL
+        .byte "// FMUL",10
         .byte "word c,b,a;",10
         .byte "word M() {",10
         .byte "  c= 0;",10
@@ -12544,7 +12550,7 @@ MUL=1
         .byte "  return M();",10
         .byte "}",10
         .byte 0
-.endif ; MUL
+.endif ; FMUL
 
 
 
