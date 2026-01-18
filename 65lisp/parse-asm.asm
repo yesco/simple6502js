@@ -4114,9 +4114,8 @@ gendone:
 FUNC _digits
 DEBC '#'
 ;;; 55 B + 18 B char
-
         ;; valid initial digit or fail?
-        ldy #0
+        ;; Y=0
         lda (inp),y
 
         ;; 'c' : is char?
@@ -4135,7 +4134,7 @@ DEBC '#'
         sta tos+1
 
 nextdigit:
-        ldy #0
+        ;; Y=0
         lda (inp),y
 
         ;; change '0'-> 0
@@ -4157,7 +4156,7 @@ nextdigit:
         jmp _next
 
 digit:  
-;;; 20 B
+;;; 23 B
         sta savea
         ldy #10
         jsr _mulTOSyAX          ; AX = tos * 10
@@ -4171,13 +4170,15 @@ digit:
         stx tos+1
 
         jsr _incI
+        ldy #0
         jmp nextdigit
+
 
 ischar: 
 ;;; 18 B
         ;; - get char
         jsr _incI
-        ;; - y is retained by _incI
+        ;; Y=0
         lda (inp),y
         sta tos
         sty tos+1
