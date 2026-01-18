@@ -1438,6 +1438,7 @@ STRING=1
 CTYPE=1
 
 ;;; Runtime
+;;; TODO: fix?
 RECURSION=1
 
 ;;; stdlib
@@ -1445,6 +1446,9 @@ STDLIB=1
 
 ;;; stdio
 STDIO=1
+
+;;; 
+MATH=1
 
 .endif ; NOLIBRARY
 
@@ -6714,6 +6718,55 @@ FUNC _oprulesstart
         .byte TAILREC
 .endif ; OPTRULES
 
+
+.ifdef MATH
+
+.ifdef OPTRULES
+        ;; most common?
+        .byte "|*%d"
+      .byte "["
+        ;; 5 B
+        ldy #LOVAL
+        jsr _mulAXyAX
+      .byte "]"
+        .byte TAILREC
+
+        .byte "|*%D"
+      .byte "["
+        ;; 15 B
+        sta tos
+        stx tos+1
+        lda #LOVAL
+        ldx #HIVAL
+        sta dos
+        stx dos+1
+        jsr _mul
+      .byte "]"
+        .byte TAILREC
+.endif ; OPTRULES
+
+        .byte "|*"
+        ;; 16 B
+      .byte "["
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte _E
+      .byte "["
+        sta dos
+        stx dos+1
+        pla
+        sta tos+1
+        pla
+        sta tos
+        jsr _mul
+      .byte "]"
+        .byte TAILREC
+
+.endif ; MATH
+
+
         .byte "|&%D"
       .byte '['
         and #'<'
@@ -11764,6 +11817,15 @@ input:
 ;        .byte "{return 42;};",10
 ;        .byte 0
 
+
+;
+MUL=1
+.ifdef MUL
+        .byte "word main(){",10
+;        .byte "  return 42*101;",10
+        .byte "  return 42*1010;",10
+        .byte "}",0
+.endif ; MUL
 
 ;FUN4=1
 .ifdef FUN4
