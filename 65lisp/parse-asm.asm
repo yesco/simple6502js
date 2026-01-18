@@ -946,23 +946,24 @@
 ;;; 
 ;;; NAMES (variables, functions, labels)
 ;;; 
-;;; - %V - tos= address; match "Variable" name
-;;; - %A - dos= tos= address; address of named
-;;;        variable (use for assignment)
+;;; - %I - read ident (really %N? but for longname)
+;;;        (push (nameaddr/word, namelength/byte) on stack!)
+;;; - %* - dereference tos { tos= *(int*)tos; } - old %U?
 ;;; 
+;;; - %V - tos= address; match "Variable" name
 ;;; - %N - define NEW name (use: %I%N)
 ;;; 
-
-
-;;; - %I - read ident (really %N? but for longname)
-;;;        (pushes (identaddress/word, name length/byte) on stack!)
-;;; 
-;;; - %* - dereference tos { tos= *(int*)tos; } - old %U?
+;;; (TODO: might be broken?)
+;;; - %A - dos= tos= address; address of named
+;;;        variable (use for assignment)
 ;;; 
 
 ;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
+;;; - "%" jmp dostuff == .byte "% HL" (''==JSR!)
+;;; 
+;;; TODO: remove - DON'T USE!!!! UNSAFE
 ;;; - %{ - immediate code, that runs NOW during parsing
 ;;;        This is used to do one-offs, like test that
 ;;;        last %D matched a byte-value (X=0), if not _fail.
@@ -970,9 +971,9 @@
 ;;;        NOTE: can't RTS, must use IMM_RET ("jsr immret")
 ;;;        FAIL: it's ok to call "jsr _fail" !
 ;;; 
-;;; BINARY DATA (inline!)
+;;; CONTROL FLOW
 ;;;
-;;; - % len BINARYDATA      
+;;; - % len BINARYDATA (skipper!)
 ;;;        len is 7bits < ' '(32), hbit ignored
 ;;;        tos= address after len (TODO: include?)
 ;;;        TODO: mabye set dos too, like %A?
@@ -981,6 +982,7 @@
 ;;;        global/local variable bindings!
 ;;;        Slow linear, but very little code!
 ;;;        
+;;; - %R addr - goto this rule addr!
 
 ;;; 
 ;;; TODO:?
@@ -8288,7 +8290,7 @@ afterELSE:
         ;; (no need generate true/false)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%V[#]==%D)"
+        .byte "|if(%V==[#]%D)"
         .byte "["
 ;;; 17
         ;; load %D
@@ -8353,15 +8355,13 @@ afterELSE:
 .endif ; ELSE
 .endscope
 
-        .byte "|if(%A&%d)"
+        .byte "|if(%V&[#]%d)"
 .scope        
       .byte "["
-        lda #'<'
+        lda #LOVAL
         ;; cmp with VAR
-        .byte 'D'               ; get aDdress
-
-        and VAR0 ; ->  58 ?
-;        and VAL0 ; -> 111 ?
+        .byte ';'               ; get aDdress
+        and VAR0
         bne @ok
 @nah:
         ;; set value for optional else...
@@ -9051,6 +9051,7 @@ FOROPT=1
         ;; autopatches jump to here if false (PUSHLOC)
 .endif ; BYTERULES
 
+;;; %A only used here!!!?
         .byte "|while(%A<"
         ;; similar to while(%A<%D)
       .byte "["
@@ -12502,14 +12503,16 @@ CANT=1
 
 ;;; 80B
 
-;MUL=1
+;
+MUL=1
 .ifdef MUL
-        .byte "// MJL",10
+        .byte "// MUL",10
+        .byte "word c,b,a;",10
         .byte "word M() {",10
         .byte "  c= 0;",10
         .byte "  while(b) {",10
+        .byte "    putu(a); putchar(' '); putu(b); putchar(' '); putu(c); putchar('\n');",10
         .byte "    if (b&1) c+= a;",10
-;        .byte "    putu(a); putchar(32) ; putu(b); putchar(32); putu(c); putchar(10);",10
         .byte "    a<<= 1;",10
         .byte "    b>>= 1;",10
         .byte "  }",10
@@ -12959,7 +12962,9 @@ NOPRINT=1
         .byte "      }",10
         .byte "      ++i;",10
         .byte "    }",10
+.ifndef NOLIBRARY
         .byte "    printf(",34,"%u",34,", c);",10
+.endif
         .byte "    ++n;",10
         .byte "  }",10
         .byte "  free(a);" ;;,10
