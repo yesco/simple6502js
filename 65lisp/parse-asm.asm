@@ -4114,7 +4114,6 @@ gendone:
 .ifblank
 
 FUNC _digits
-PUTC '#'
 ;;; savey = base, savex = minus
         ;; 50 B
 
@@ -4130,7 +4129,6 @@ PUTC '#'
         ;; look at first char
         ;; Y=0
         lda (inp),y
-jsr _printchar
 
         ;; 'c' : is char?
         cmp #'''
@@ -4154,7 +4152,7 @@ jsr _printchar
         bcs failjmp2
         bcc @isdigit
 :       
-        ;; - second char
+        ;; - second char: x=hex b=binary otherwise=octal
         jsr _incI
         ldx #8                  ; default octal!
         lda (inp),y
@@ -4172,39 +4170,44 @@ jsr _printchar
 
         ldx #2
 :
-
+        
 
         ;; ? B
 @start:
         stx savey
+        cpx #8
+        beq @hasnext
 @gonext:
         jsr _incI
         ;; TODO: maybe use Y to count?
         ldy #0
-putc '/'
+;putc '/'
         lda (inp),y
-jsr _printchar
+
         ;; map '0'..'9' -> 0..9, >=10 === END
 ;;; TODO: replace by xor???
 ;;; 7 B
+@hasnext:
         sec
         sbc #'0'
         cmp #10
         bcc @isdigit
         ;; a-f/A-F -> 10-15
+        sbc #'a'-'9'-1
+        cmp #10
+        bcc @done
         and #31
-        adc #'A'-'9'-1-1
 @isdigit:
         ;; ? done (any other char breaks)
 
         cmp #16
         bcc @ok
-
+@done:
         ;; DONE!
         ;; - negate?
         lda savex
         beq :+
-;putc 'n'
+
         sec
         lda #0
         sbc tos
@@ -11855,6 +11858,11 @@ NUMS=1
         .byte "word p(word n){ putu(n); putchar(' '); }",10
         .byte "word main(){",10
         .byte "  p(17); p(42); p(55555); putchar('\n');",10
+        .byte "  p(0x11); p(0x2a); p(0xd903); putchar('\n');",10
+        .byte "  p(0x11); p(0X2A); p(0XD903); putchar('\n');",10
+        .byte "  p(0x11); p('*'); p(0XD903); putchar('\n');",10
+        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); putchar('\n');",10
+        .byte "  p(021); p(052); p(0154403); putchar('\n');",10
         .byte "}",0
 .endif ; NUMS
 
