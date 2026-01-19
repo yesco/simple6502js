@@ -4111,9 +4111,146 @@ gendone:
 
 
 
+.ifblank
+
 FUNC _digits
-DEBC '#'
+PUTC '#'
+;;; savey = base, savex = minus
+        ;; 50 B
+
+        ;; base
+        ldx #10
+        stx savey
+        ;; Y=0
+        sty savex               ; negative? (== 255)
+        ;; start with 0
+        sty tos
+        sty tos+1
+
+        ;; look at first char
+        ;; Y=0
+        lda (inp),y
+jsr _printchar
+
+        ;; 'c' : is char?
+        cmp #'''
+        beq ischar
+
+        ;; ? - negative
+        cmp #'-'
+        bne :+
+
+        dec savex               ; => 255 !
+:       
+        ;; ? $hex
+        cmp #'$'
+        beq @hex
+      
+        ;; ? '0'=>check 0x.. '1'..'9'=>isdigit, otherwise fail 
+        sec
+        sbc #'0'
+        beq :+
+        cmp #9+1
+        bcs failjmp2
+        bcc @isdigit
+:       
+        ;; - second char
+        jsr _incI
+        ldx #8                  ; default octal!
+        lda (inp),y
+
+        ora #32
+        cmp #'x'
+        ;; - ? 0x...
+        bne :+
+@hex:
+        ldx #16
+:       
+        ;; - ? 0b...
+        cmp #'b'
+        bne :+
+
+        ldx #2
+:
+
+
+        ;; ? B
+@start:
+        stx savey
+@gonext:
+        jsr _incI
+        ;; TODO: maybe use Y to count?
+        ldy #0
+putc '/'
+        lda (inp),y
+jsr _printchar
+        ;; map '0'..'9' -> 0..9, >=10 === END
+;;; TODO: replace by xor???
+;;; 7 B
+        sec
+        sbc #'0'
+        cmp #10
+        bcc @isdigit
+        ;; a-f/A-F -> 10-15
+        and #31
+        adc #'A'-'9'-1-1
+@isdigit:
+        ;; ? done (any other char breaks)
+
+        cmp #16
+        bcc @ok
+
+        ;; DONE!
+        ;; - negate?
+        lda savex
+        beq :+
+;putc 'n'
+        sec
+        lda #0
+        sbc tos
+        sta tos
+        lda #0
+        sbc tos+1
+        sta tos+1
+:       
+        jmp _next
+
+@ok:
+        ;; tos = tos*10 + digit
+;;; 17
+        ldy savey
+        sta savea
+        jsr _mulTOSyAX
+        clc
+        adc savea
+        sta tos
+        bcc :+
+        inx
+:       
+        stx tos+1
+
+        ;; check range:
+        ;; ? "%d" and '> 256
+        ;; TODO: bit percentchar? (if shl before/)
+        lda percentchar
+        cmp #'d'
+        bne @gonext
+        
+        ;; %d
+        lda tos+1
+        beq @gonext
+        bne failjmp2
+        
+
+
+.else
+
+;FUNC _olddigits
+FUNC _digits
+;DEBC '#'
 ;;; 55 B + 18 B char
+;;; (+ 19 22 23) = 64
+        ;; 19 B
         ;; valid initial digit or fail?
         ;; Y=0
         lda (inp),y
@@ -4134,10 +4271,11 @@ DEBC '#'
         sta tos+1
 
 nextdigit:
+        ;; 22 B
         ;; Y=0
         lda (inp),y
 
-        ;; change '0'-> 0
+       ;; change '0'-> 0
         sec
         sbc #'0'
         cmp #10
@@ -4156,7 +4294,7 @@ nextdigit:
         jmp _next
 
 digit:  
-;;; 23 B
+        ;; 23 B
         sta savea
         ldy #10
         jsr _mulTOSyAX          ; AX = tos * 10
@@ -4172,6 +4310,8 @@ digit:
         jsr _incI
         ldy #0
         jmp nextdigit
+.endif ; FUNC olddigit
+
 
 
 ischar: 
@@ -11707,6 +11847,16 @@ input:
 ;        .byte "{return 42;};",10
 ;        .byte 0
 
+
+;
+NUMS=1
+.ifdef NUMS
+        .byte "word r;",10
+        .byte "word p(word n){ putu(n); putchar(' '); }",10
+        .byte "word main(){",10
+        .byte "  p(17); p(42); p(55555); putchar('\n');",10
+        .byte "}",0
+.endif ; NUMS
 
 ;OPTINCBYTE=1
 .ifdef OPTINCBYTE
