@@ -4110,21 +4110,41 @@ gendone:
         jmp _generate
 
 
+FUNC _ischar 
+;;; 18 B
+        ;; - get char
+        jsr _incI
+        ;; Y=0
+        lda (inp),y
+        sta tos
+        sty tos+1
+;;; TODO: quoted \n \r \0 \... ? \' \\
+;        cmp #'\'
+        ;; - skip char
+        jsr _incI
+        ;; - skip '
+;;; TODO: jsr _incI!
+        jsr _incI
+        jmp _next
+
+
+
+;;; TODO: this breaks BYTESIEVE.... eats one char too many sometimes?
 
 .ifblank
 
+;;; ChatGPT: 198 B several loops one per base (incl 'x')
+;;;          145 B one loop unified, fixed C flag bug
+;;; JSK: written before compare ShitGPT
+;;;    (- #x763 #x6d2) = 145 + 18 B for _ischar
 FUNC _digits
-;;; savey = base, savex = minus
-        ;; 50 B
 
-        ;; base
-        ldx #10
-        stx savey
-        ;; Y=0
-        sty savex               ; negative? (== 255)
-        ;; start with 0
-        sty tos
-        sty tos+1
+        ;; ++73 bytes compare to old DECIMAL
+
+
+;;; savey = base, savex = minus
+
+;;; 69 B
 
         ;; look at first char
         ;; Y=0
@@ -4132,23 +4152,37 @@ FUNC _digits
 
         ;; 'c' : is char?
         cmp #'''
-        beq ischar
+        beq _ischar
+
+        ;; default base 10
+        ldx #10
+        stx savey
+
+        ;; negative flag = 0 (Y)
+        sty savex
+
+        ;; start with 0 (Y)
+        sty tos
+        sty tos+1
 
         ;; ? - negative
+;;; 12 B to consume one ?
         cmp #'-'
         bne :+
 
-        dec savex               ; => 255 !
+        sta savex
+        jsr _incI
+        lda (inp),y
 :       
-        ;; ? $hex
-        cmp #'$'
-        beq @hex
+        ;; ? $ hex (hmmm - not standard)
+;        cmp #'$'
+;        beq @hex
       
         ;; ? '0'=>check 0x.. '1'..'9'=>isdigit, otherwise fail 
         sec
         sbc #'0'
         beq :+
-        cmp #9+1
+        cmp #10
         bcs failjmp2
         bcc @isdigit
 :       
@@ -4157,9 +4191,10 @@ FUNC _digits
         ldx #8                  ; default octal!
         lda (inp),y
 
+        ;; lowercase
         ora #32
-        cmp #'x'
         ;; - ? 0x...
+        cmp #'x'
         bne :+
 @hex:
         ldx #16
@@ -4170,20 +4205,19 @@ FUNC _digits
 
         ldx #2
 :
-        
-
-        ;; ? B
 @start:
         stx savey
+;;; TODO: little backwards logic (?)
         cpx #8
         beq @hasnext
+
+;;; 74 B
+
 @gonext:
         jsr _incI
         ;; TODO: maybe use Y to count?
         ldy #0
-;putc '/'
         lda (inp),y
-
         ;; map '0'..'9' -> 0..9, >=10 === END
 ;;; TODO: replace by xor???
 ;;; 7 B
@@ -4193,32 +4227,16 @@ FUNC _digits
         cmp #10
         bcc @isdigit
         ;; a-f/A-F -> 10-15
-        sbc #'a'-'9'-1
-        cmp #10
-        bcc @done
-        and #31
+        ora #32
+        sbc #'a'-'0'
+        cmp #6
+        bcs @done
+        adc #10
 @isdigit:
         ;; ? done (any other char breaks)
+        cmp savey
+        bcs @done
 
-        cmp #16
-        bcc @ok
-@done:
-        ;; DONE!
-        ;; - negate?
-        lda savex
-        beq :+
-
-        sec
-        lda #0
-        sbc tos
-        sta tos
-        lda #0
-        sbc tos+1
-        sta tos+1
-:       
-        jmp _next
-
-@ok:
         ;; tos = tos*10 + digit
 ;;; 17
         ldy savey
@@ -4244,6 +4262,21 @@ FUNC _digits
         beq @gonext
         bne failjmp2
         
+@done:
+        ;; DONE!
+        ;; - negate?
+        lda savex
+        beq :+
+
+        sec
+        lda #0
+        sbc tos
+        sta tos
+        lda #0
+        sbc tos+1
+        sta tos+1
+:       
+        jmp _next
 
 
 .else
@@ -4260,7 +4293,7 @@ FUNC _digits
 
         ;; 'c' : is char?
         cmp #'''
-        beq ischar
+        beq _ischar
         ;; TODO: C=1 from cmp if digit
         ;; 0-9 : is digit?
         sec
@@ -4278,7 +4311,7 @@ nextdigit:
         ;; Y=0
         lda (inp),y
 
-       ;; change '0'-> 0
+        ;; change '0'-> 0
         sec
         sbc #'0'
         cmp #10
@@ -4314,25 +4347,6 @@ digit:
         ldy #0
         jmp nextdigit
 .endif ; FUNC olddigit
-
-
-
-ischar: 
-;;; 18 B
-        ;; - get char
-        jsr _incI
-        ;; Y=0
-        lda (inp),y
-        sta tos
-        sty tos+1
-;;; TODO: quoted \n \r \0 \... ? \' \\
-;        cmp #'\'
-        ;; - skip char
-        jsr _incI
-        ;; - skip '
-        jsr _incI
-        jmp _next
-
 
 failjmp2:        
         jmp _fail
@@ -9718,10 +9732,20 @@ startparsevarfirst:
         sta VAR0
         sta VAR1
       .byte "]"
+
 .endif ; OPTRULES
 
         ;; A=7; // simple assignement
+;;; TODO: is E eating up an ";" ???
+
         .byte "|%V=[#]",_E,";"
+
+
+;;; This isin't correct!!!! breaks BYTESIEVE!!!!
+
+; BUG _E eats ';' !!!
+;        .byte "|%V=[#]",_E
+
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -11851,18 +11875,29 @@ input:
 ;        .byte 0
 
 
+;;; Testing of new _digits with different bases...
+;;; some bug makes it wrong for BYTESIEVE! - assignment?
 ;
 NUMS=1
 .ifdef NUMS
         .byte "word r;",10
+        .byte "word nl(){ putchar('\n'); }",10
         .byte "word p(word n){ putu(n); putchar(' '); }",10
         .byte "word main(){",10
-        .byte "  p(17); p(42); p(55555); putchar('\n');",10
-        .byte "  p(0x11); p(0x2a); p(0xd903); putchar('\n');",10
-        .byte "  p(0x11); p(0X2A); p(0XD903); putchar('\n');",10
-        .byte "  p(0x11); p('*'); p(0XD903); putchar('\n');",10
-        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); putchar('\n');",10
-        .byte "  p(021); p(052); p(0154403); putchar('\n');",10
+
+;        .byte "  putchar(r); nl();",10
+        .byte "  r= 33; p(r); nl();",10;
+
+;;; BUG: basically lda/ldx lda/ldx as two parameters w no push!
+;;;    (because no comman, lol!)
+        .byte "  p(0b111666); nl();",10
+
+        .byte "  p(17); p(42); p(55555); nl();",10
+        .byte "  p(0x11); p(0x2a); p(0xd903); nl();",10
+        .byte "  p(0x11); p(0X2A); p(0XD903); nl();",10
+        .byte "  p(0x11); p('*'); p(0XD903); nl();",10
+        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); nl();",10
+        .byte "  p(021); p(052); p(0154403); nl();",10
         .byte "}",0
 .endif ; NUMS
 
@@ -13150,6 +13185,10 @@ NOPRINT=1
         .byte "  m=8192;",10
         ;; used by Bench/Byte Sieve - BCPL/BBC
 ;        .byte "  m=4096;",10
+
+;;; Also gives error... hmmm something wrong in _digits
+;        .byte " m=47;",10
+
         .byte "  a=malloc(m);",10
 ;.byte "x"
         .byte "  n=0; while(n<10) {",10
