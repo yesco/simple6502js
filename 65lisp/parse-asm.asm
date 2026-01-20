@@ -10504,9 +10504,6 @@ done2:
 
 FUNC _OK
 
-jsr _printvars
-
-
 ;;; TODO: detect if overrun OUTPUTSIZE
 ;;;    _out >= _outputend
 
@@ -10828,6 +10825,17 @@ FUNC _hell
         rts
 
 
+;;; Print generated code info
+;;; TODO: bad name
+FUNC _outkey
+        ;; TODO: more elaborate than _info (bottom)
+        lda #BLACK&127+16
+        ldx #WHITE&127
+        jsr _eoscolors
+
+        jsr _printvars
+        jmp _forcecommandmode
+
 
 ;;; PRINTASM uses this function
 ;;; it prints source code from here till next ';'
@@ -11034,6 +11042,9 @@ FUNC _eosnormal
         lda #BLACK&127+16       ; paper
         ldx #GREEN&127          ; ink
         ;; fall-through
+;;; Change default print colors:
+;;;   A= paper
+;;;   X= ink
 FUNC _eoscolors
 .ifdef __ATMOS__
         sta PAPER

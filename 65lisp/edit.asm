@@ -171,7 +171,7 @@ ctrlbranch:
         BR jredraw              ; jredraw LOAD?
         BR jreturn
        BRB enext
-        BR eunused              ; ctrlO (emacs insert nl)
+        BR joutkey
 
         ;; ^P-^T
        BRB eprev
@@ -398,6 +398,8 @@ jinfo:
         jmp getchar
 jcmd:   
         jmp _togglecommand
+joutkey:        
+        jmp _outkey
 jextend:        
         jmp _extend
 jgarnish:       
