@@ -2031,6 +2031,8 @@ FUNC _bnfinterpstart
 ;;; Optimizing rules (bloats but fast!)
 ;;; 
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
+
+;;; TODO: BYTESIEVE can be compiled but doesn't run correctly...
 ;
 OPTRULES=1
 
@@ -10748,7 +10750,7 @@ command:
         bne :+
 @minihelp:
         ;; 82 B
-        PRINTZ {"?",10,"Command",10,YELLOW,"h)elp c)ompile r)un v)info ESC-edit ",10,YELLOW,"z)ource q)asm l)oad w)rite"}
+        PRINTZ {"?",10,"Command",10,YELLOW,"e)dit c)ompile r)un h)elp v)info",10,YELLOW,"q)asm x)tras ESC-edit"}
         jmp command
 :       
 
@@ -11910,10 +11912,32 @@ input:
 ;        .byte 0
 
 
+.FEATURE STRING_ESCAPES
+
+;
+HELLO=1
+.ifdef HELLO
+        .byte "// Hello World!",10
+        .byte "",10
+        .byte "word spaces(word n) {",10
+        .byte "  while(n--) putchar(' ');",10
+        .byte "}",10
+        .byte "",10
+        .byte "word i,j;",10
+        .byte "",10
+        .byte "word main(){",10
+        .byte "  for(i=0; i<150; ++i) {",10
+        .byte "    spaces(i);",10
+        .byte "    printf(\"%s\",\"Hello World!\");",10
+        .byte "  }",10
+        .byte "}",0
+
+.endif ; STARS
+
+
 ;;; Testing of new _digits with different bases...
 ;;; some bug makes it wrong for BYTESIEVE! - assignment?
-;
-NUMS=1
+;NUMS=1
 .ifdef NUMS
         .byte "word r;",10
         .byte "word nl(){ putchar('\n'); }",10
@@ -13122,6 +13146,8 @@ CANT=1
 
 ;;; === Byte magazine ===
 ;;;   287                UCSD PASCAL, APPLE II, 6502
+;;;   390 (!)            interpreted 
+;;; - https://github.com/soegaard/minipascal/blob/master/minipascal/tests-real/primes.rkt
 
 ;;; === BCPL (bytecode) === ( https:projects.drogon.net/retro-basic-and-bcpl-benchmarks/ )
 ;;; 
@@ -13183,7 +13209,7 @@ CANT=1
 ;;;  NOOPT! 366    3.082s - noopt             rules: 2425
 ;;;  BYTES  303                               rules: 4505
 ;;;         302    same   - save one byte on if/clc
-;;; 
+;;;         301    2.6484 - (.sim/10 20250120)
 
 
 ;
