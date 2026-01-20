@@ -34,20 +34,17 @@
 
 ;;; Good to haves!
 tab:    
-.ifdef ATMOS
+.ifdef __ATMOS__
         ;; Atmos doesn't have TAB
-        pha
         ;; at least one space
-        jsr forward
 :       
+        jsr spc
         lda CURCOL
         and #7                  ; "mod 8"
         beq :+
-        ;; move forwward
-        jsr forward
         jmp :-
 :       
-        pla
+        rts
 .else
         lda #9
         SKIPTWO

@@ -11588,6 +11588,7 @@ FUNC _printvars
         ;; print varaddr
 .ifdef __ATMOS__
 :       
+;;; TODO: gotox ?
         lda CURCOL
         cmp #20
         beq :+
@@ -11604,10 +11605,11 @@ FUNC _printvars
         lda (tos),y
         sta savea
         dey
-        ;; get hi
+        ;; print address
+        ;; - get hi
         lda (tos),y
         tax
-        ;; get lo
+        ;; - get lo
         dey
         lda (tos),y
         dey
@@ -11617,7 +11619,7 @@ FUNC _printvars
         jsr _printh
 
         ;; print value
-        jsr tab
+        jsr spc
         ldy #1
         lda (pos),y
         tax
@@ -11625,7 +11627,7 @@ FUNC _printvars
         lda (pos),y
         
         ;; jsr _printn prints garbage???
-        jsr _printh
+        jsr _printu
         ;; print type
         jsr tab
         lda savea
@@ -11914,8 +11916,7 @@ input:
 
 .FEATURE STRING_ESCAPES
 
-;
-HELLO=1
+;HELLO=1
 .ifdef HELLO
         .byte "// Hello World!",10
         .byte "",10
@@ -11923,7 +11924,7 @@ HELLO=1
         .byte "  while(n--) putchar(' ');",10
         .byte "}",10
         .byte "",10
-        .byte "word i,j;",10
+        .byte "word i;",10
         .byte "",10
         .byte "word main(){",10
         .byte "  for(i=0; i<150; ++i) {",10
@@ -11937,10 +11938,11 @@ HELLO=1
 
 ;;; Testing of new _digits with different bases...
 ;;; some bug makes it wrong for BYTESIEVE! - assignment?
-;NUMS=1
+;
+NUMS=1
 .ifdef NUMS
         .byte "word r;",10
-        .byte "word nl(){ putchar('\n'); }",10
+        .byte "word nl(){ putchar('\\n'); }",10
         .byte "word p(word n){ putu(n); putchar(' '); }",10
         .byte "word main(){",10
 
@@ -11949,7 +11951,7 @@ HELLO=1
 
 ;;; BUG: basically lda/ldx lda/ldx as two parameters w no push!
 ;;;    (because no comman, lol!)
-        .byte "  p(0b111666); nl();",10
+;        .byte "  p(0b111666); nl();",10
 
         .byte "  p(17); p(42); p(55555); nl();",10
         .byte "  p(0x11); p(0x2a); p(0xd903); nl();",10
@@ -12006,7 +12008,7 @@ HELLO=1
 .ifdef MUL2
         .byte "word z;",10
         .byte "word mul(word a, word b) {",10
-;        .byte "  putchar(' '); putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+;        .byte "  putchar(' '); putu(a); putchar(' '); putu(b); putchar('\\n') ;",10
         .byte "  if (!a) return 0;",10
 .ifnblank                        
         ;; 2x f calls => more code
@@ -12016,7 +12018,7 @@ HELLO=1
         ;; careful, global variable...
         .byte "  z= mul(a/2, b*2);",10 
 ;;; To debug if right value are restored...
-;        .byte "  putchar('='); putu(a); putchar(' '); putu(b); putchar(' '); putu(z); putchar('\n');",10
+;        .byte "  putchar('='); putu(a); putchar(' '); putu(b); putchar(' '); putu(z); putchar('\\n');",10
         .byte "  if (a&1) return z+b;",10
         .byte "  return z;",10
 .endif
@@ -12043,13 +12045,13 @@ HELLO=1
         .byte "  return geta();",10
         .byte "}",10
         .byte "word main() {",10
-        .byte "  putu(a); putchar('\n');",10
-        .byte "  seta(42); putu(a); putchar('\n');",10
-        .byte "  putu(geta()); putchar('\n');",10
-        .byte "  putu(shadow(666)); putchar('\n');",10
-        .byte "  putu(shadow(17)); putchar('\n');",10
-        .byte "  putu(a); putchar('\n');",10
-        .byte "  putu(geta()); putchar('\n');",10
+        .byte "  putu(a); putchar('\\n');",10
+        .byte "  seta(42); putu(a); putchar('\\n');",10
+        .byte "  putu(geta()); putchar('\\n');",10
+        .byte "  putu(shadow(666)); putchar('\\n');",10
+        .byte "  putu(shadow(17)); putchar('\\n');",10
+        .byte "  putu(a); putchar('\\n');",10
+        .byte "  putu(geta()); putchar('\\n');",10
         .byte "}",10
         .byte 0
 .endif ; ARGSHADOW
@@ -12077,7 +12079,7 @@ HELLO=1
 .ifdef FUN2
         .byte "word plus(word a, word b) {",10
 ;        .byte "   putu(17);",10
-;        .byte "  putu(a); putchar(' '); putu(b); putchar('\n') ;",10
+;        .byte "  putu(a); putchar(' '); putu(b); putchar('\\n') ;",10
         .byte "  return a+b;",10
         .byte "}",10
         .byte "word main() {",10
@@ -12215,13 +12217,13 @@ HELLO=1
         .byte "word fish_42;",10
         .byte "word main(){",10
 ;;; TODO: don't use/allow &var - not safe for local!
-        .byte "  puth(&a); putchar('\n');",10
-        .byte "  puth(&fish_42); putchar('\n');",10
-        .byte "  puth(&fish_42); putchar('\n');",10
-        .byte "  puth(&fish_666); putchar('\n');",10
-        .byte "  puth(&gurka33); putchar('\n');",10
-        .byte "  puth(&hEll0); putchar('\n');",10
-;        .byte "  puth(&not_find); putchar('\n');",10
+        .byte "  puth(&a); putchar('\\n');",10
+        .byte "  puth(&fish_42); putchar('\\n');",10
+        .byte "  puth(&fish_42); putchar('\\n');",10
+        .byte "  puth(&fish_666); putchar('\\n');",10
+        .byte "  puth(&gurka33); putchar('\\n');",10
+        .byte "  puth(&hEll0); putchar('\\n');",10
+;        .byte "  puth(&not_find); putchar('\\n');",10
 
         .byte "  a=0;",10
         .byte "  fish_42=21;",10
@@ -12279,7 +12281,7 @@ CANT=1
         .byte "  putchar(' '); puth(d);",10
         .byte "  putchar(' '); puth(e);",10
         .byte "  putchar(' '); puth(r);",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar('\\n');",10
         .byte "}",10
 .endif ; P4PR
         .byte "word F(word a,word b,word c,word d) {",10
@@ -12492,23 +12494,19 @@ CANT=1
 ;;; exists according to manual... but gives error ca64
 ;        .literal "  s= ",34,"foobar           fiefum",34,";",10
 
-;;; ALSO NOT WORKING \n
-;        .byte "  s= ",34,"foobar\nfiefum",34,";",10
-;        .byte "  s= ",34,"foobar\\nfiefum",34,";",10
-
 ;;; foobar works with +3 on oric but this gives nothing!
 ;;; doesn't work on sim, lol
 ;;; garbage on oric
 ;        .byte "  s= ",34,"0123456789",34,";",10
 ;        .byte "  putz(s+3);",10
 
-       .byte "  putchar('\n');",10
+       .byte "  putchar('\\n');",10
 ;;; works now, but with extra hibit char first? hmmm
 ;;; must e some memory corruption...
 ;        .byte "  putz(s-2);",10
-;        .byte "  putchar('\n');",10
+;        .byte "  putchar('\\n');",10
 
-;        .byte "  putchar('\n');",10
+;        .byte "  putchar('\\n');",10
 
 .ifnblank                       
 ;;; d=0 doesn't give same result...
@@ -12517,39 +12515,39 @@ CANT=1
         .byte "  putchar('>');",10
         .byte "  putz(strlen(s-d));",10
         .byte "  putchar('<');",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar('\\n');",10
 
         .byte "  putu(strlen(s));",10
         .byte "  putchar('>');",10
         .byte "  putz(s);",10
         .byte "  putchar('<');",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar('\\n');",10
 .endif
         .byte "  putu(s);",10
         .byte "  putchar(':');",10
         .byte "  putu(strlen(s));",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar('\\n');",10
         .byte "  putchar('>');",10
 
 ;;; correct on SIM! (sometimes...)
         .byte "  putz(s);",10
         .byte "  putchar('<');",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar('\\n');",10
 
 .ifdef __ATMOS__
 ;        .byte "putz(20278);",10
         .byte "putz(20310);",10
-        .byte "putchar('\n');",10
+        .byte "putchar('\\n');",10
         .byte "putz(20310);",10
 ;        .byte "putz(20278);",10
 .else
 ;;; 7 chars missing, lol
         .byte "putz(19524);",10
-        .byte "putchar('\n');",10
+        .byte "putchar('\\n');",10
         .byte "putz(19642+3);",10
 .endif
 ;;; Add these two lines and SIM no longer happyy
-        .byte "putchar('\n');",10
+        .byte "putchar('\\n');",10
         .byte "  putu(s);",10   ; should be same?
 
 ;        .byte "  puth(s);",10
@@ -12616,8 +12614,8 @@ CANT=1
         .byte "putchar('a');",10
         .byte "a=10;",10
         .byte "b='q';",10
-        .byte "a='\n';",10
-        .byte "putchar(a);putchar(b);putchar('\n');putchar('b');",10
+        .byte "a='\\n';",10
+        .byte "putchar(a);putchar(b);putchar('\\n');putchar('b');",10
         .byte "}",10
         .byte 0
 .endif ; CHARNL
@@ -12771,8 +12769,8 @@ CANT=1
 ;        .byte "word G() { return F()+11; }",10
 ;        .byte "word main(){ return G(); }",0
         .byte "word main(){",10
-        .byte "  puth(&F); putchar('\n');",10
-        .byte "  puth(&G); putchar('\n');",10
+        .byte "  puth(&F); putchar('\\n');",10
+        .byte "  puth(&G); putchar('\\n');",10
         .byte "}",0
 .endif
 
@@ -12821,7 +12819,7 @@ CANT=1
         .byte "word M() {",10
         .byte "  c= 0;",10
         .byte "  while(b) {",10
-        .byte "    putu(a); putchar(' '); putu(b); putchar(' '); putu(c); putchar('\n');",10
+        .byte "    putu(a); putchar(' '); putu(b); putchar(' '); putu(c); putchar('\\n');",10
         .byte "    if (b&1) c+= a;",10
         .byte "    a<<= 1;",10
         .byte "    b>>= 1;",10
