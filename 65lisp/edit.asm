@@ -126,7 +126,11 @@ editcol:        .res 1
 ;;; TODO: just use a tmp in zp?
 editrow:        .res 1
 
+yankp:          .res 2
+
 .code
+
+;;; outside of zeropage so we can init it!
 
 
 
@@ -139,7 +143,7 @@ editrow:        .res 1
 ;;; BackRuB? BRanchBack!
 .macro BRB label
         .byte $100+label-patchbranch-2
-        .assert $100+label-patchbranch-2,error,"%% BR too far BACK"
+        .assert $100+label-patchbranch-2,error,"%% BRB too far BACK"
 .endmacro
 
 
@@ -156,39 +160,39 @@ ctrlbranch:
        BRB ebeginning
         BR eback
         BR jcompile
-        BR edel
+        BR edel                 ; ^D
        BRB eend
 
         ;; ^F-^J
         BR eforward
-        BR jgarnish             ; LOL (pretty print)
+        BR estop                ; ^G
         BR jhelp
        BRB eindent
         BR jreturn
 
         ;; ^K-^O
-        BR eunused              ; jkill?
+        BR jkill
         BR jredraw              ; jredraw LOAD?
-        BR jreturn
-       BRB enext
-        BR joutkey
+        BR jreturn              ; ^M
+       BRB enext                ; ^N
+        BR joutkey              ; ^O
 
         ;; ^P-^T
-       BRB eprev
-        BR jdasm                ; ^Q
-        BR jrun
-        BR eunused              ; ctrlS SEARCH!
-        BR jcaps                ; toggle CAPS
+       BRB eprev                ; ^P
+        BR jdasm                ; ^Qasm
+        BR jrun                 ; ^R
+        BR eunused              ; ^S TODO: SEARCH!
+        BR jcaps                ; ^T toggle CAPS
 
         ;; ^U-^Y
-        BR eunused              ; ctrlU REPEAT
-        BR jinfo                ; ctrlView info
-        BR eunused              ; jwrite? (emacs: wank? - kill region, lol)
-        BR jextend              ; ctrlX
-        BR eunused              ; ctrlY TODO: YANK!
+        BR eunused              ; ^U TODO: repeat
+        BR jinfo                ; ^View info
+        BR eunused              ; ^W jwrite? (emacs: wank? - kill region, lol)
+        BR jextend              ; ^X
+        BR jyank                ; ^Y
 
         ;; ^Z ESC
-        BR jzource              ; reload Zource
+        BR jzource              ; ^Z reload Zource
         BR jcmd                 ; ESC toggle cmd/edit mode
 
         ;; Arrows remapped! 29--31!
@@ -232,9 +236,6 @@ ebtill:
         bcs eret
         bcc @nextc
 
-
-
-
 ;;; putting some routines BEFORE ediaction
 ;;; (to reach them)
 
@@ -261,7 +262,7 @@ rts2:
         rts
 
 ;;; "BUG:" at top line walks to end?
-eprev:  
+eprev: 
 ;;; 19
         jsr eback
         lda #10
@@ -299,8 +300,6 @@ eindent:
         jsr eforward
         jmp :-
         
-
-
 ;;; Editaction is the event-handler
 ;;; 
 ;;; It's jsr:ed into with a key in A
@@ -378,7 +377,7 @@ jrun:
 ;jmystery:       
 ;        jmp _emystery
 jkill:          
-        jmp _ekill
+        jmp ekill
 jzource:  
         jsr _loadfirst
         ;; fall-through
@@ -386,6 +385,8 @@ jredraw:
         jmp _redraw
 jcaps:  
         jmp putchar
+jyank:  
+        jmp eyank
 jhelp:  
         jmp _help
 jdasm:  
@@ -456,6 +457,16 @@ eunused:
         rts
         
 
+estop:  
+        ;; Y=0
+        sty EDITEND-1
+        lda #<(EDITEND-1)
+        sta yankp
+        ldx #>(EDITEND-1)
+        stx yankp+1
+        rts
+
+
 ebs:    
         jsr eback
         ;; fall-through
@@ -491,6 +502,52 @@ edel:
 :       
         dec editend
         rts
+
+
+;;; These are too far vvvvvvvvvvvvvvvvvvvvvvvvvvv
+
+
+;;; Insert yank buffer
+;;; (TODO: move cursor to end of it? difficult)
+eyank: 
+        lda yankp
+        sta dos
+        ldx yankp+1
+        stx dos+1
+        
+:       
+        ldy #0
+        lda (dos),y
+        beq :+
+        jsr einsert
+;;; LOL - animation!
+     jsr _redraw
+        jsr _incD
+        jmp :-
+:       
+        rts
+
+;;; kill till endo of line, or the end of line char
+ekill:  
+:       
+        ;; stuff one char at yankp
+;;; can do celver addr w Y and svae bytes?
+        ldx #yankp
+        jsr _decRX
+        ldy #0
+        lda (editpos),y
+;        jsr edel
+;        beq @done               ; at end of buffer
+        ldy #0
+        sta (yankp),y
+;        ;; stop at newline
+;        cmp #10
+;        bne :-
+@done:
+jsr eforward
+        rts
+
+       
 
 ;;; ------------ END CTRL DISPATCH
         
@@ -725,12 +782,6 @@ einsert:
 
 
 
-FUNC _ekill
-;;; TODO: iplement kill line
-        rts
-
-
-
 ;;; TODO: generalize to load specified file/buffer?
 
 ;;; Load the first buffer from input
@@ -766,11 +817,11 @@ FUNC _loadfirst
         sta editpos
         stx editpos+1
         ;; copy
-        ldy #0
-        jsr _copyz
+        jsr estop               ;  preseves Y=0
+        jsr _copyz      
         ;; calculate end
 
-        ;; TODO: maybe copyz does this? 
+        ;; TODO: maybe copyz does this?
         ;; or dos+a reoutine?
         ;; update edit end
 ;;; 12

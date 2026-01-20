@@ -4544,6 +4544,10 @@ FUNC _incVARS
         ldx #_ruleVARS
         SKIPTWO
 ;;; TODO: is it worth it +3 B, used 2x 3 B=9 B, or 11 B
+FUNC _incD
+;;; 3  32c!
+        ldx #dos
+        SKIPTWO
 FUNC _incT
 ;;; 3  32c!
         ldx #tos
@@ -11219,10 +11223,10 @@ GROUP=YELLOW
 .byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
 .byte KEY,"(^W",MEAN,"rite   - save source)",10
 .byte KEY,"(^L",MEAN,"oad    - load source)",10
-.byte KEY,"(^G",MEAN,"arnish - pretty print source)",10
 .byte 10
 .byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,">|",10
-.byte MEAN,"line:)",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte GROUP,"Line:",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte "      ",KEY,"^K",MEAN,"ill",KEY,"^Y",MEAN,"ank",KEY,"^G",MEAN,"quit/clear",10
 .byte "",10
 .byte MEAN,"// A comment. Types:",CODE,"word",10
 .byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
