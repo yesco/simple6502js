@@ -10754,7 +10754,7 @@ command:
         bne :+
 @minihelp:
         ;; 82 B
-        PRINTZ {"?",10,"Command",10,YELLOW,"e)dit c)ompile r)un h)elp v)info",10,YELLOW,"q)asm x)tras ESC-edit"}
+        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW,"q)asm x)tras ESC-edit"}
         jmp command
 :       
 
