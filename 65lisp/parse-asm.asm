@@ -2160,6 +2160,10 @@ ERRPOS=1
   .endmacro
 .endif
 
+
+
+
+;;; This is where the C-program loader starts
 .export _start
 _start:
 
@@ -2276,6 +2280,9 @@ NMIVEC=$0248                    ; => $F8B2
 .endif ; __ATMOS__
 
 
+;;; Only done here the first time
+        PRINTZ {12,"MeteoriC-Compiler & IDE on 6502 ",VERSION,10,"`2025 Jonas S Karlsson",10,10,"compiling: "}
+        
 
         ;; compile from src first time
         ;; - fall-through
@@ -2307,6 +2314,7 @@ originp:        .res 2
         sta erp
         stx erp+1
 .endif        
+        
 
 ;;; compile same as last time
 FUNC _compile
@@ -2358,6 +2366,8 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
         ;; (write one after (VARS will be overwritten))
         lda #0
         sta VARS+1
+
+        sta compilestatus
 
 
 ;;; INTERRUPT DEBUG TESTING
@@ -2539,9 +2549,6 @@ jsk nl
 ;.endif ; PRINTASM
 
 
-
-
-        
         jmp _next
 
 
@@ -3815,6 +3822,7 @@ failed:
 ;;; After error, it calls _aftercompile
 ;;; A register contains error
 error:
+        sta compilestatus
         pha
         PRINTZ {10,"%"}
         pla
@@ -4834,6 +4842,8 @@ FUNC _newname_Y_out
 nparam: .res 1
 curF:   .res 2                  ; points to "name%b..."
 params: .res NPARAMS*2          ; "registers"
+
+compilestatus:  .res 1          ; 
 
 .code
 
@@ -10380,8 +10390,9 @@ status:
 
         ;; - from
         lda #<status
-        ldx #>status        
-        jsr _memcpyz         
+        ldx #>status
+        ;; - copy to status line of screen
+        jsr _memcpyz
 .endif ; __ATMOS__
 
         ;; failed?
@@ -10389,6 +10400,9 @@ status:
         ldy #0
         lda (inp),y
         and #127
+        ;; stores 0 if no compile error, lol
+        sta compilestatus
+
         bne :+
         jmp _OK
 :       
@@ -10503,6 +10517,11 @@ done2:
 
 
 FUNC _OK
+        ;; reset erp(os)
+        lda inp
+        sta erp
+        ldx inp+1
+        stx erp+1
 
 ;;; TODO: detect if overrun OUTPUTSIZE
 ;;;    _out >= _outputend
@@ -10521,6 +10540,7 @@ FUNC _OK
         ;; print size in bytes
         ;; (save in gos, too)
 ;;; TODO: gos gets overwritten by dasm(?)
+;;; TODO: optimize byte usage, subroutines?
         sec
         lda _out
         sbc #<_output
@@ -10533,8 +10553,10 @@ FUNC _OK
         
         lda tos
         ldx tos+1
+
         jsr _printu
         PRINTZ {" Bytes (libs +"}
+
         sec
         lda #<_libraryend
         sbc #<_librarystart
@@ -10545,9 +10567,10 @@ FUNC _OK
         pha
         tax
         tya
+
         jsr _printu
-        
-        PRINTZ {"+bios)",10,10}
+        PRINTZ {" bios +"}
+
         sec
         lda #<_biosend
         sbc #<_biosstart
@@ -10559,6 +10582,7 @@ FUNC _OK
         tax
         tya
         jsr _printu
+        PRINTZ {")",10,10}
 
 
         jmp _eventloop
@@ -13018,7 +13042,7 @@ CANT=1
         ;;                             7 "ops"/gen
         ;;                        no PRINTREAD vvv
         ;; = CC02: 57 bytes 10580c compile: 51796c=0.052s
-        ;; = CC02: 57 bytes 10580c compile:  9044c
+       ;; = CC02: 57 bytes 10580c compile:  9044c
         ;; = CC02: 57 bytes 2.79cs compile:   24cs
         ;;            100x / 100
         ;; 

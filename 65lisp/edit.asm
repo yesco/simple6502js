@@ -336,7 +336,7 @@ FUNC _editaction
         bit mode
         bpl :+
         cmp #CTRL('E')
-        beq jcmd
+        beq jedit
 :       
         ;; TODO: META (>128 keys?)
 
@@ -396,6 +396,8 @@ jinfo:
         jsr _info
         ;; TODO: depend on mode?
         jmp getchar
+jedit:  
+        jsr _goerrpos
 jcmd:   
         jmp _togglecommand
 joutkey:        
@@ -810,6 +812,23 @@ FUNC _loadfirst
 
 .endif ; BLANK
 
+        rts
+
+
+FUNC _goerrpos       
+        lda compilestatus
+        beq :+
+        ;; ?firsttime => erp not in editor buffer!
+        ;; (cheat: just check same "page")
+        lda originp+1
+        cmp #>EDITSTART
+        bne :+
+        ;; ...move cursor to error
+        lda erp
+        ldx erp+1
+        sta editpos
+        stx editpos+1
+:       
         rts
 
 
