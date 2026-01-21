@@ -1,7 +1,6 @@
 // BYTE SIEVE PRIME benchmark
 word main(){
   m=8192;
-//  m=4096;
   a=malloc(m);
   n=0; while(n<10) {
     c=0;

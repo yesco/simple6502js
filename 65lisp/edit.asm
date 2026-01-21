@@ -855,6 +855,10 @@ FUNC _loadfromAX
 
         ;; mark as not good (?)
         inc compilestatus
+.ifdef __ATMOS__
+        lda #(BLACK+BG)&127
+        sta SCREEN+35
+.endif
 
 ;;; TODO: somehow, cursor isn't always right pos?
         ;; 3

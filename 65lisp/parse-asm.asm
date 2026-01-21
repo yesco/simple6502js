@@ -3830,16 +3830,7 @@ error:
         pla
         jsr putchar
 
-;;; TODO: revisit, what errors are these?
-;;;   aren't they more system/compiler errors
-;;;   like assertions?
-
-        ;; go edit to fix again!
-        jmp _eventloop
-
-
-halt:
-        jmp halt
+        jmp _forcecommandmode
 
 
 
@@ -9426,10 +9417,16 @@ FOROPT=1
         ;; autopatch 'p' at end to go condition
 
         
-.ifdef OPTRULES
+
+;;; TODO: wrong1!! will break
+;;; ;;; TODO: make special ZEROTESTEXPR parse rule?
+
+
+
+.ifdef xOPTRULES
 ;;; OPT: DO ... WHILE(a);
         .byte "|do"
-        .byte "[:]"
+      .byte "[:]"
         .byte _S
 
         .byte "while(%V);"
@@ -9448,13 +9445,13 @@ FOROPT=1
 .ifdef BYTERULES
 ;;; OPT: DO ... WHILE(a);
         .byte "|DO"
-        .byte "[:]"
+      .byte "[:]"
         .byte _S
 
         .byte "WHILE($%V);"
       .byte "["
         lda VAR0
-        .byte ";"               ; pop tos
+        .byte ";"
         ;; don't loop if not true
 ;;; TODO: potentially "b" to generate relative jmp?
         beq :+
@@ -10412,6 +10409,7 @@ status:
         bne :+
         jmp _OK
 :       
+;;;     fall-through
 ;;; ------------ ERROR ----------
 
 FUNC _ERROR
@@ -10534,6 +10532,7 @@ FUNC _OK
 
 
  .ifdef __ATMOS__
+;;; TODO: make function?
         lda #(GREEN+BG)&127
         sta SCREEN+35
 .endif ; __ATMOS__
@@ -10760,7 +10759,7 @@ command:
         bne :+
 @minihelp:
         ;; 82 B
-        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW,"q)asm x)tras ESC-edit"}
+        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW," q)asm x)tras ESC-edit"}
         jmp command
 :       
 
@@ -13697,6 +13696,9 @@ EXAMPLEFILES=1
         .byte "  hires();",10
         .byte "  curset(120,100,0);",10
         .byte "  circle(75,2);",10
+        .byte "  curset(0, 0, 3);",10
+        .byte "  draw(239, 199, 2);",10
+        .byte "  getchar();",10
         .byte "  text();",10
         .byte "}",10
         .byte 0
@@ -13706,17 +13708,20 @@ EXAMPLEFILES=1
         .byte "word i;",10
         .byte "word main(){",10
         .byte "  hires();",10
-;;; TODO: doesn't loop???
         .byte "  for(i=0; i<239; ++i) {",10
+.byte "putu(i); putchar(' ');",10
         .byte "    curset(239-i, 199, 3);",10
-        .byte "    draw(i*2-239, 0-199, 2);",10
+;        .byte "    draw(i*2-239, 0-199, 2);",10
+        .byte "    draw(i+i-239, 0-199, 2);",10
         .byte "  }",10
         .byte "  for(i=0; i<199; ++i) {",10
+.byte "putu(i); putchar(' ');",10
         .byte "    curset(0, i, 3);",10
         .byte "    draw(239, 199-i-i, 2);",10
         .byte "  }",10
         .byte "  curset(120, 100, 3);",10
         .byte "  for(i=0; i<99; ++i) {",10
+.byte "putu(i); putchar(' ');",10
         .byte "    circle(i, 0);",10
         .byte "  }",10
         .byte "  getchar();",10
@@ -13777,8 +13782,26 @@ EXAMPLEFILES=1
         .byte "}",0
 
 ;;; o -
-        .byte "// o -",10
+;
+LOOP=1
+.ifdef LOOP
+        .byte "// optimize size: for vs while",10
+        .byte "word i;",10
+        ;; TODO: tail recursion?
+        .byte "word nl(){ return putchar('\\n'); }",10
+        .byte "word p(word n){putu(n);putchar(' ');}",10
+        .byte "word main(){",10
+        .byte "  // 43 Bytes - cheapest!",10
+        .byte "  i=9; do p(i); while(i--); nl();",10
+        .byte "  // 46 Bytes - ok",10
+        .byte "  i=10; while(i--) p(i); nl();",10
+        .byte "  // 58 Bytes - ugh!",10
+        .byte "  for(i=10; i--; ) p(i); nl();",10
+        .byte "  // 59 Bytes - hmmm",10
+        .byte "  for(i=10; i; ) p(--i); nl();",10
+        .byte "}",10
         .byte 0
+.endif ; LOOP
 
 ;;; p - printing
         .byte "// print functions",10
