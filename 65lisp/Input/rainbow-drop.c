@@ -1,7 +1,6 @@
-// Rainbow-drop
-//#include <stdio.h>
-//unsigned int a,j,b,e,d,s,i,q;
-//#define poke(a,v) *(char*)(a)= v
+// Rainbow-drop (ORIC)
+word a,j,b,e,d,s,i,q;
+
 word main() {
   b= 40960; e= b+8000;
   hires(); //poke(e+120-1,30);//lol

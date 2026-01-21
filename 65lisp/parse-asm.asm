@@ -11110,7 +11110,6 @@ FUNC _listfiles
         lda savea
         jsr putchar
         putc GREEN
-        jsr spc
 
         pla
         ;; print first line
@@ -11920,51 +11919,6 @@ input:
 
 .FEATURE STRING_ESCAPES
 
-;HELLO=1
-.ifdef HELLO
-        .byte "// Hello World!",10
-        .byte "",10
-        .byte "word spaces(word n) {",10
-        .byte "  while(n--) putchar(' ');",10
-        .byte "}",10
-        .byte "",10
-        .byte "word i;",10
-        .byte "",10
-        .byte "word main(){",10
-        .byte "  for(i=0; i<150; ++i) {",10
-        .byte "    spaces(i);",10
-        .byte "    printf(\"%s\",\"Hello World!\");",10
-        .byte "  }",10
-        .byte "}",0
-
-.endif ; STARS
-
-
-;;; Testing of new _digits with different bases...
-;;; some bug makes it wrong for BYTESIEVE! - assignment?
-;
-NUMS=1
-.ifdef NUMS
-        .byte "word r;",10
-        .byte "word nl(){ putchar('\\n'); }",10
-        .byte "word p(word n){ putu(n); putchar(' '); }",10
-        .byte "word main(){",10
-
-;        .byte "  putchar(r); nl();",10
-        .byte "  r= 33; p(r); nl();",10;
-
-;;; BUG: basically lda/ldx lda/ldx as two parameters w no push!
-;;;    (because no comman, lol!)
-;        .byte "  p(0b111666); nl();",10
-
-        .byte "  p(17); p(42); p(55555); nl();",10
-        .byte "  p(0x11); p(0x2a); p(0xd903); nl();",10
-        .byte "  p(0x11); p(0X2A); p(0XD903); nl();",10
-        .byte "  p(0x11); p('*'); p(0XD903); nl();",10
-        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); nl();",10
-        .byte "  p(021); p(052); p(0154403); nl();",10
-        .byte "}",0
-.endif ; NUMS
 
 ;OPTINCBYTE=1
 .ifdef OPTINCBYTE
@@ -12098,22 +12052,6 @@ NUMS=1
         .byte "}",10
         .byte 0
 .endif ; FUN2
-
-;FUN1=1
-.ifdef FUN1
-;;; cc65: 13768c (41)
-;;; MC:   16915c (41=>861)
-        .byte "word summer(word a) {",10
-;        .byte "  putu(a); putchar(' ');",10
-        .byte "  if (a==0) return 0;",10
-        .byte "  return summer(a-1)+a;",10
-        .byte "}",10
-;;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
-;        .byte "word main() { return summer(41); }",10
-        .byte "word main() { return summer(10); }",10
-        .byte 0
-.endif ; FUN1
-
 
 ;;; Just testing sanity of no arg fun
 ;NEWFUN=1
@@ -12346,13 +12284,6 @@ CANT=1
         .byte 0
 .endif ; STRBYTES
 
-;BIGSCROLL=1
-;;; TOOD: not working...
-.ifdef BIGSCROLL
-        .incbin "Input/bigscroll.c"
-        .byte 0
-.endif ; BIGSCROLL
-
 ;FORSMALL=1
 .ifdef FORSMALL
         .byte "word main(){",10
@@ -12440,19 +12371,6 @@ CANT=1
         .byte 0
 .endif ; POKEGEN
 
-
-;COLORCHART=1
-.ifdef COLORCHART
-        .incbin "Input/color-chart.c"
-        .byte 0
-.endif ; COLORCHART
-
-
-;RAINBOW=1
-.ifdef RAINBOW
-        .incbin "Input/rainbow-drop.c"
-        .byte 0
-.endif ; RAINBOW        
 
 
 ;STR=1
@@ -12559,12 +12477,6 @@ CANT=1
         .byte 0
 .endif ; STR
 
-
-;ISCHAR=1
-.ifdef ISCHAR
-        .incbin "Input/test-ctype.c"
-        .byte 0
-.endif ; ISCHAR
 
 ;;; fixed!
 ;;; TODO: move to bugtest verify module?
@@ -12680,70 +12592,6 @@ CANT=1
 ;;; x10 =  n=r<<2+r*2;     n=((r<<2)+r)*2;
 
 
-;;; Conclusion 44B 106c to x40
-;;; optimal is 33B (grok managed eventually, store tmp in A and Y)
-;FOURTY=1
-;;; 62B 119c (program 16B overhead)
-.ifdef FOURTY
-        .byte "// MUL40",10
-        .byte "word main(){",10
-;        .byte "  r=17;",10
-;        .byte "  while(r<28) {",10
-
-;;; 49B => 42 B   84c
-;        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
-
-;;; 47B => 40 B   75c
-;;;  8B extra for << to store and retrieve x
-        .byte "    n=r<<2+r<<3;",10
-
-;;; 
-;        .byte "    n= PIPE r<<2+r<<3;",01
-;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
-
-;        .byte "    putu(n); putchar(' ');",10
-;        .byte "    ++r;",10 
-;        .byte "  }",10
-;        .byte "  return n;",10
-        .byte "}",10
-        .byte 0
-.endif ; FOURTY
-
-;LINEBENCH=1
-.ifdef LINEBENCH
-        .byte "// LINEBENCH",10
-        .byte "word main(){",10
-        .byte "  hires();",10
-        .byte "  for(i=0; i<239; ++i) {",10
-        .byte "    curset(239-i, 199, 3);",10
-        .byte "    draw(i*2-239, 0-199, 2);",10
-        .byte "  }",10
-        .byte "  for(i=0; i<199; ++i) {",10
-        .byte "    curset(0, i, 3);",10
-        .byte "    draw(239, 199-i-i, 2);",10
-        .byte "  }",10
-        .byte "  curset(120, 100, 3);",10
-        .byte "  for(i=0; i<99; ++i) {",10
-        .byte "    circle(i, 0);",10
-        .byte "  }",10
-        .byte "  getchar();",10
-        .byte "  text();",10
-        .byte "}",10
-        .byte 0
-.endif ; LINEBENCH
-
-;CIRCLE=1
-.ifdef CIRCLE
-        .byte "// CIRCLE",10
-        .byte "word main(){",10
-        .byte "  hires();",10
-        .byte "  curset(120,100,0);",10
-        .byte "  circle(75,2);",10
-        .byte "  text();",10
-        .byte "}",10
-        .byte 0
-.endif ; CIRCLE
-
 ;        .byte "word main(){z=0; ++i; ++i; z=arr[i]; ++j; ++j; }",0
 ;        .byte "word main(){arr[i]=42; ++i;}",0
 
@@ -12758,13 +12606,6 @@ CANT=1
 ;;; TODO: can optimized more as we know %D != 0 (check)
 ;        .byte "word main(){ for(i=0; i<8; ++i) putchar(i+65);}",0
 
-
-;FROGMOVE=1
-.ifdef FROGMOVE
-        .byte "// frogmove-simple.c",10
-        .incbin "Play/frogmove-simple.c"
-        .byte 0
-.endif
 
 ;FUN=1
 .ifdef FUN
@@ -13289,8 +13130,6 @@ NOPRINT=1
         .byte "  return c;",10
         .byte "}"
         .byte 0
-        ;; double byte make edit insert happy, lol
-        .byte 0
 .endif ; BYTESIEVE
 ;
 
@@ -13723,6 +13562,245 @@ NOPRINT=1
 .endif ; FOO
 
 .endif ; INCTESTS
+
+        ;; Input include example library
+
+;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
+;;; b - Byte sieve
+        .incbin "Input/byte-sieve.c"
+        .byte 0
+
+;;; c - color char
+        .incbin "Input/color-chart.c"
+        .byte 0
+
+;;; d - rainbow drop
+        .incbin "Input/rainbow-drop.c"
+        .byte 0
+
+;;; e - empty program
+        .byte "// Empty program - template",10
+        .byte "word num,xyz;",10
+        .byte "",10
+        .byte "word main() {",10
+        .byte "  return 4711;",10
+        .byte "}",10
+        .byte 0
+
+;;; f - fib recursion
+        .byte "// fibonacci recursion",10
+        .byte "word fib(word n) {",10
+        .byte "  if (n<3) return n;",10
+        .byte "  return fib(n-1)+fib(n-2);",10
+        .byte "}",10
+        ;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
+        .byte "word main() {",10
+        .byte "  // return fib(41);",10
+        .byte " return fib(10);",10
+        .byte "}",10
+        .byte 0
+
+.ifdef FROGMOVE
+        ;; TODO: not working
+        .byte "// frogmove-simple.c",10
+        .incbin "Play/frogmove-simple.c"
+        .byte 0
+.endif ; FROGMOVE
+
+;;; g - game?
+        .byte "// TODO: game",10
+        .byte 0
+
+;;; h - hello
+        .byte "// Hello World! - loops",10
+        .byte "",10
+        .byte "word spaces(word n) {",10
+        .byte "  while(n--) putchar(' ');",10
+        .byte "}",10
+        .byte "",10
+        .byte "word i;",10
+        .byte "",10
+        .byte "word main(){",10
+        .byte "  for(i=0; i<150; ++i) {",10
+        .byte "    spaces(i);",10
+        .byte "    printf(\"%s\",\"Hello World!\");",10
+        .byte "  }",10
+        .byte "}"
+        .byte 0
+
+;;; i - isascii etc..
+        .incbin "Input/test-ctype.c"
+        .byte 0
+
+;;; j - 
+        .byte "// TODO: Jolly Program",10
+        .byte 0
+
+;;; k - circle
+        .byte "// CIRCLE",10
+        .byte "word main(){",10
+        .byte "  hires();",10
+        .byte "  curset(120,100,0);",10
+        .byte "  circle(75,2);",10
+        .byte "  text();",10
+        .byte "}",10
+        .byte 0
+
+;;; l - line bench
+        .byte "// LINEBENCH",10
+        .byte "word main(){",10
+        .byte "  hires();",10
+        .byte "  for(i=0; i<239; ++i) {",10
+        .byte "    curset(239-i, 199, 3);",10
+        .byte "    draw(i*2-239, 0-199, 2);",10
+        .byte "  }",10
+        .byte "  for(i=0; i<199; ++i) {",10
+        .byte "    curset(0, i, 3);",10
+        .byte "    draw(239, 199-i-i, 2);",10
+        .byte "  }",10
+        .byte "  curset(120, 100, 3);",10
+        .byte "  for(i=0; i<99; ++i) {",10
+        .byte "    circle(i, 0);",10
+        .byte "  }",10
+        .byte "  getchar();",10
+        .byte "  text();",10
+        .byte "}",10
+        .byte 0
+
+;;; TODO: - music?
+;;; m - mul40
+
+;;; Conclusion 44B 106c to x40
+;;; optimal is 33B (grok managed eventually, store tmp in A and Y)
+;FOURTY=1
+;;; 62B 119c (program 16B overhead)
+
+        .byte "// MUL40",10
+        .byte "word main(){",10
+;        .byte "  r=17;",10
+;        .byte "  while(r<28) {",10
+
+;;; 49B => 42 B   84c
+;        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
+
+;;; 47B => 40 B   75c
+;;;  8B extra for << to store and retrieve x
+        .byte "    n=r<<2+r<<3;",10
+
+;;; 
+;        .byte "    n= PIPE r<<2+r<<3;",01
+;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
+
+;        .byte "    putu(n); putchar(' ');",10
+;        .byte "    ++r;",10 
+;        .byte "  }",10
+;        .byte "  return n;",10
+        .byte "}",10
+        .byte 0
+
+;;; n - numeric constants different bases
+        .byte "// numeric C constants",10
+        .byte "word nl(){ putchar('\\n'); }",10
+        .byte "",10
+        .byte "word p(word n){",10
+        .byte "  putu(n);",10
+        .byte "  putchar(' ');",10
+        .byte "}",10
+        .byte "",10
+        .byte "word main(){",10
+;;; BUG: basically lda/ldx lda/ldx as two parameters w no push!
+;;;    (because no comman, lol!)
+;        .byte "  p(0b111666); nl();",10
+        .byte "  p(17); p(42); p(55555); nl();",10
+        .byte "  p(0x11); p(0x2a); p(0xd903); nl();",10
+        .byte "  p(0x11); p(0X2A); p(0XD903); nl();",10
+        .byte "  p(0x11); p('*'); p(0XD903); nl();",10
+        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); nl();",10
+        .byte "  p(021); p(052); p(0154403); nl();",10
+        .byte "}",0
+
+;;; o -
+        .byte "// o -",10
+        .byte 0
+
+;;; p - printing
+        .byte "// print functions",10
+        .byte "word main() {",10
+        .byte "  putchar('H'); putchar(111);",10
+        .byte "  putchar('m'-1); putchar('6'<<1);",10
+        .byte "  putchar('\n');",10
+        .byte "",10
+        .byte "  // strings",10
+        .byte "  puts(\"World\") ; // includes newline",10
+        .byte "",10
+        .byte "  // no newline",10
+        .byte "  putz(\"print \");",10
+        .byte "  fputs(stdout,\"nums:\"); putchar(' ');",10
+        .byte "",10
+        .byte "  puth(488879); putchar(' ');",10
+        .byte "  putu(0x1148); putchar(10);",10
+        .byte "",10
+        .byte "  // simple printf",10
+        .byte "  printf(\"%s\", \"fish\");",10
+        .byte "  printf(\"%u\", 0x29a);",10
+        .byte "  printf(\"%x\", -1);",10
+        .byte "  // NO: printf(\"foo%s\n\", \"bar\");",10
+        .byte "}",10
+        .byte 0
+;;; q -
+        .byte "// q -",10
+        .byte 0
+;;; r - 
+        .byte "// r -",10
+        .byte 0
+;;; s - TODO: sound?
+;;; s - summer recursion
+        ;; cc65: 13768c (41)
+        ;; MC:   16915c (41=>861)
+        .byte "word summer(word a) {",10
+;        .byte "  putu(a); putchar(' ');",10
+        .byte "  if (a==0) return 0;",10
+        ;; tail recursion???
+        .byte "  return summer(a-1)+a;",10
+        .byte "}",10
+        ;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
+        .byte "word main() {",10
+        .byte "  // return summer(41);",10
+        .byte " return summer(10);",10
+        .byte "}",10
+        .byte 0
+
+;;; t - 
+        .byte "// t -",10
+        .byte 0
+;;; u -
+        .byte "// u -",10
+        .byte 0
+;;; v -
+        .byte "// v -",10
+        .byte 0
+;;; w -
+        .byte "// w -",10
+        .byte 0
+;;; x -
+        .byte "// x -",10
+        .byte 0
+;;; y -
+        .byte "// y -",10
+        .byte 0
+;;; z -
+        .byte "// z -",10
+        .byte 0
+
+
+;;; TOOD: not working...
+;BIGSCROLL=1
+.ifdef BIGSCROLL
+        .incbin "Input/bigscroll.c"
+        .byte 0
+.endif ; BIGSCROLL
+
+
 
 endinput:       
 

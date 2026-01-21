@@ -1,4 +1,4 @@
-// test <ctype.h>
+// isalpha... test <ctype.h>
 #include <ctype.h>
 word main() {
 //  for(i=0; i<256; ++i) {

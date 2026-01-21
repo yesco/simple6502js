@@ -1,3 +1,4 @@
+// color chart (ORIC)
 #include <stdio.H>
 word main() {
   r= 0; while(r<8) {
