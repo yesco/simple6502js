@@ -1182,8 +1182,15 @@
 ;;; to get more space remove EXAMPLEFILES!
 
 
-;;; (- 37631 24708 2048 8192) = 2683 bytes
-;;; C-stack is set to 2K ...
+;;; current binary 24708
+;;; (- 37631 24708 2048   2048) = 8827 HEAP!
+;;;          .tap  OUTPUT C-stack
+
+;;; smallest binary/mem:
+;;; (- 24708 3467   1500   4553  976  2048) = 12164
+;;;    .tap  c-code "text" input help C-stack)
+
+;;; (- 37631 12164) = 25467 == OUTPUT+HEAP
 
         OUTPUTSIZE=2*1024
 .else
