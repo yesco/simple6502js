@@ -2253,6 +2253,9 @@ FUNC _init
 ;;; TODO: fix for ROM-less
 .ifdef __ATMOS__
 
+        putc CTRL('T')          ; caps off
+
+
         ;; NMI patching to break running program.
         ;; ORIC ATMOS points to:
         ;; 
@@ -2391,6 +2394,8 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
         stx $101
 .endif
         ;; X=$ff still for init!
+
+
 
 ;;; TODO: move to bios-atos-rom???
 
@@ -10370,6 +10375,8 @@ FUNC _aftercompile
   .endrep
 .endmacro
 
+
+        ;; TOP screen banner
 .ifdef __ATMOS__
 
 .data
@@ -10387,7 +10394,7 @@ status:
         aschi                  "`2025 yesco"
   ;;; END: INVERTED
         .byte YELLOW 
-        .byte                                 "^Help"
+        .byte                                 " ^Help"
         .byte 0
 .code
 
@@ -10589,7 +10596,6 @@ FUNC _OK
         jsr _printu
         PRINTZ {")",10,10}
 
-
         jmp _eventloop
 
 
@@ -10729,8 +10735,6 @@ FUNC _eventloop
         ;; init if first time
         bit mode
         bvc :+
-        ;; == FIRST TIME EDIT/SCEEN INIT ==
-        putc CTRL('T')          ; caps off
         ;; init + "load"
         jsr _loadfirst
         ;; remove init bit (V)

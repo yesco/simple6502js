@@ -787,10 +787,24 @@ FUNC _loadfirst
         ;; load first example 'a'
         lda #<input
         ldx #>input
-        ;; fall-through
+
+        jmp _loadfromAX_noupdate
 
 ;;; Load edit buffer with zero terminated text from AX
 FUNC _loadfromAX
+
+        ;; mark as not good (?)
+        inc compilestatus
+
+.ifdef __ATMOS__
+        pha
+        lda #(BLACK+BG)&127
+        sta SCREEN+35
+        pla
+.endif
+
+FUNC _loadfromAX_noupdate
+
 ;;; (+ 15 22 12 6 3) = 58
         pha
         txa
@@ -852,13 +866,6 @@ FUNC _loadfromAX
         lda dos+1
         sta editend+1
 .endif ; BLANK
-
-        ;; mark as not good (?)
-        inc compilestatus
-.ifdef __ATMOS__
-        lda #(BLACK+BG)&127
-        sta SCREEN+35
-.endif
 
 ;;; TODO: somehow, cursor isn't always right pos?
         ;; 3
