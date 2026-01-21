@@ -429,7 +429,7 @@ eforward:
         lda (editpos),y
         beq ret3
 ;;; TODO: used in _redraw?
-_incEP:                       
+_incEP:
         inc editpos
         bne :+
         inc editpos+1
@@ -592,7 +592,7 @@ FUNC _redraw
 
 
 @nextc:
-;;; 
+        ;; inline for speed (+ 3 B -12c)
         inc pos
         bne :+
         inc pos+1
@@ -639,6 +639,7 @@ FUNC _redraw
         beq @done
 
 :       
+        ;; inline for speed (+ 3 B -12c)
         inc tos
         bne :+
         inc tos+1
@@ -703,12 +704,9 @@ FUNC _redraw
 
 FUNC _editormisc
 
-;;; TODO:O can remove? 
-        ;; clear the cursor bit, used for display
-
-        ;; fall-throught to togglecursor!
+        ;; clear/set the cursor bit, used for display
 togglecursor:
-;;; 9
+;;; 7
         lda (editpos),y
         eor #$80
         sta (editpos),y
@@ -800,12 +798,15 @@ FUNC _loadfirst
 
         jsr _zero
 
-
-;;; 25
-;;; TODO: just to set up! (maybe a block copy?)
-        ;; tos= from
         lda #<input
         ldx #>input
+        ;; fall-through
+
+;;; Load edit buffer with zero terminated text from AX
+FUNC _loadfromAX
+;;; (+ 22 12 6 3) = 43
+        ;; 25
+        ;; tos= from = AX
         sta tos
         stx tos+1
         ;; dos= destination
@@ -816,15 +817,19 @@ FUNC _loadfirst
         ;; sta EDITSTART as editpos, too
         sta editpos
         stx editpos+1
-        ;; copy
+
+        ;; clears yank buffer
         jsr estop               ;  preseves Y=0
+        ;; copy (requires Y=0)
         jsr _copyz      
         ;; calculate end
 
         ;; TODO: maybe copyz does this?
         ;; or dos+a reoutine?
+
         ;; update edit end
-;;; 12
+.ifnblank
+        ;; 12
         tya
         clc
         adc dos
@@ -832,38 +837,16 @@ FUNC _loadfirst
         lda #0
         adc dos+1
         sta editend+1
-
-.ifnblank
-
-;.if ((EDITSTART .mod 256)==0)
-;EDITALIGNED=1
-.scope
-.ifdef EDITALIGNED
-;;; 6
-
+.else
+        ;; 6 (saves 6 bytes)
         .assert ((EDITNULL .mod 256)=0),error,"%% EDITALIGNED"
         sty editend
         lda dos+1
         sta editend+1
-.else
-;;; 14
-        clc
-        tya
-        adc dos
-        bcc :+
-        inc dos+1
-:       
-
-        sta editend
-        ldx dos+1
-        stx editend+1
-.endif
-.endscope
-;;; 3
-
 .endif ; BLANK
 
-        rts
+        ;; 3
+        jmp _redraw
 
 
 FUNC _goerrpos       
