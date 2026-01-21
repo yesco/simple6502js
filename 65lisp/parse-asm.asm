@@ -1176,8 +1176,16 @@
 
 
 .ifndef FROGMOVE
-        ;; basically 1000x: ++a; lol
-        OUTPUTSIZE=6*1024
+        ;; ++s; ===  6 B  (/ 4096 6) = 682x
+
+;;; the bigger OUTPUTSIZE => the smaller heap
+;;; to get more space remove EXAMPLEFILES!
+
+
+;;; (- 37631 24708 2048 8192) = 2683 bytes
+;;; C-stack is set to 2K ...
+
+        OUTPUTSIZE=2*1024
 .else
         OUTPUTSIZE=8*1000+50
 .endif
@@ -1749,6 +1757,32 @@ FUNC _stdlibstart
   .ifdef STDLIB
     .include "lib-stdlib.asm"
   .endif ; STDLIB
+
+  .import _malloc
+
+FUNC _xmalloc  
+        sta savea
+        stx savex
+        jsr _malloc
+        tay
+        bne @OK
+        cpx #0
+        bne @OK
+        ;; AX == 0
+        ;; FAIL
+        jsr nl
+
+        lda savea
+        ldx savex
+        jsr _printn
+        PRINTZ {" bytes",10,"% Malloc failed! ",10,10}
+
+        jmp _NMI_catcher
+
+@OK:       
+        rts
+        
+
 FUNC _stdlibend
 
 
@@ -5834,9 +5868,15 @@ FUNC _memoryrulesstart
 
 ;;; TODO: cheating, using cc65 malloc/free :-(
 
+        ;; gives error if run out of memory
+        .byte "|xmalloc(",_E,")"
+      .byte "["
+        jsr _xmalloc
+      .byte "]"
+
+        ;; return NULL if failed...
         .byte "|malloc(",_E,")"
       .byte "["
-        .import _malloc
         jsr _malloc
       .byte "]"
 
@@ -13002,6 +13042,71 @@ CANT=1
 .endif ; GOOTTEST
 
 
+;;; sim65: 40020 bytes allocatable
+;;;  oric: 12704 bytes allocatable
+
+;;; SIM65: (- 65536 (* 2 256) 17348 4096)
+;;;           64K   0-1 pages .sim  output
+;;;        (- 43580 40020) = 3560 bytes "cc65 stack"?
+
+;;; ORIC:
+;;; (- 65536 (* 5 256) 16384 17421 4096   8000  2000)
+;;;    64KB  0-4 page  ROM   .tap  output hires charset
+;;; (- 16355 12704) = 3651 bytes "cc65 stack"?
+;;; 
+;;; TEXT:  (- 37631 (* 5 256) 17421 2000 1000) = 15930
+;;; HIRES: (- 37631 (* 5 256) 17421 8000 2000) =  8930
+;;; -- cc65 
+
+
+
+;;; TODO: doesn't compile, z get's lost???
+
+
+
+
+;MALLOC=1
+.ifdef MALLOC
+        .byte "// malloc() test",10
+        .byte "word z,a,p;",10
+        .byte "word main() {",10
+;        .byte "  putu(heapmemavail()); putchar(10);",10
+;       .byte "  putu(heapmaxavail()); putchar(10);",10
+        .byte "  z= 32768;",10
+        .byte "  a= 0;",10
+
+        .byte "  while(1) {",10
+;        .byte "X:",10
+
+        .byte "    p= malloc(z);",10
+        .byte "    if (p) {",10
+        .byte "      a+= z;",10
+        .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
+        .byte "      // try same size again till fail!",10
+        .byte "    } else {",10
+
+
+;;; TODO: seems it "forgot" z, doesn't matter if change to s
+;;;     hint: ? look at screen strange debug output?
+;        .byte "      z>>=1;",10
+
+
+        .byte "    }",10
+;        .byte "    if (z==0) return a;",10
+        .byte "    if (!z) return a;",10
+
+;;; crash! errror "1" lol
+;        .byte "  } while(1);",10
+;;; NOT TRUE????
+;        .byte "  goto X;",10
+        .byte "  }",10
+
+        .byte "}",10
+        .byte 0
+.endif
+;
+
+
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
 ;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
@@ -13146,7 +13251,7 @@ NOPRINT=1
 ;;; Also gives error... hmmm something wrong in _digits
 ;        .byte " m=47;",10
 
-        .byte "  a=malloc(m);",10
+        .byte "  a=xmalloc(m);",10
 ;.byte "x"
         .byte "  n=0; while(n<10) {",10
 ;        .byte "  n=0; while(47n<10) {",10
@@ -13187,56 +13292,6 @@ NOPRINT=1
 ;
 
 
-;;; sim65: 40020 bytes allocatable
-;;;  oric: 12704 bytes allocatable
-
-;;; SIM65: (- 65536 (* 2 256) 17348 4096)
-;;;           64K   0-1 pages .sim  output
-;;;        (- 43580 40020) = 3560 bytes "cc65 stack"?
-
-;;; ORIC:
-;;; (- 65536 (* 5 256) 16384 17421 4096   8000  2000)
-;;;    64KB  0-4 page  ROM   .tap  output hires charset
-;;; (- 16355 12704) = 3651 bytes "cc65 stack"?
-;;; 
-;;; TEXT:  (- 37631 (* 5 256) 17421 2000 1000) = 15930
-;;; HIRES: (- 37631 (* 5 256) 17421 8000 2000) =  8930
-;;; -- cc65 
-
-;MALLOC=1
-.ifdef MALLOC
-        .byte "// malloc() test",10
-        .byte "word main() {",10
-;        .byte "  putu(heapmemavail()); putchar(10);",10
-;       .byte "  putu(heapmaxavail()); putchar(10);",10
-        .byte "  z= 32768;",10
-        .byte "  a= 0;",10
-
-        .byte "  while(1) {",10
-;        .byte "X:",10
-
-        .byte "    p= malloc(z);",10
-        .byte "    if (p) {",10
-        .byte "      a+= z;",10
-        .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
-        .byte "      // try same size again till fail!",10
-        .byte "    } else {",10
-        .byte "      z>>=1;",10
-        .byte "    }",10
-;        .byte "    if (z==0) return a;",10
-        .byte "    if (!z) return a;",10
-
-;;; crash! errror "1" lol
-;        .byte "  } while(1);",10
-;;; NOT TRUE????
-;        .byte "  goto X;",10
-        .byte "  }",10
-
-        .byte "}",10
-        .byte 0
-.endif
-
-;
 ;PRIME=1
 ;;; TODO: this crashes in ORIC ????
 ;PRIMBYTE=1
