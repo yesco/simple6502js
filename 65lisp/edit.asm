@@ -784,13 +784,22 @@ einsert:
 
 ;;; Load the first buffer from input
 FUNC _loadfirst
-;;; (+ 15 25 12 6 3) = 61
+        ;; load first example 'a'
+        lda #<input
+        ldx #>input
+        ;; fall-through
 
-;;; +15 B
+;;; Load edit buffer with zero terminated text from AX
+FUNC _loadfromAX
+;;; (+ 15 22 12 6 3) = 58
+        pha
+        txa
+        pha
+
         ;; clear edit area
         lda #<EDITNULL
-        sta tos
         ldx #>EDITNULL
+        sta tos
         stx tos+1
 
         lda #<EDITSIZE
@@ -798,17 +807,12 @@ FUNC _loadfirst
 
         jsr _zero
 
-        lda #<input
-        ldx #>input
-        ;; fall-through
-
-;;; Load edit buffer with zero terminated text from AX
-FUNC _loadfromAX
-;;; (+ 22 12 6 3) = 43
-        ;; 25
         ;; tos= from = AX
+        pla
+        sta tos+1
+        pla
         sta tos
-        stx tos+1
+
         ;; dos= destination
         lda #<EDITSTART
         ldx #>EDITSTART
@@ -822,6 +826,10 @@ FUNC _loadfromAX
         jsr estop               ;  preseves Y=0
         ;; copy (requires Y=0)
         jsr _copyz      
+        ;; zero terminate
+        lda #0
+        sta (dos),y
+
         ;; calculate end
 
         ;; TODO: maybe copyz does this?
@@ -845,6 +853,10 @@ FUNC _loadfromAX
         sta editend+1
 .endif ; BLANK
 
+        ;; mark as not good (?)
+        inc compilestatus
+
+;;; TODO: somehow, cursor isn't always right pos?
         ;; 3
         jmp _redraw
 

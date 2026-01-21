@@ -54,6 +54,8 @@ FUNC _memcpyz
 ;;; if call here set Y=0
 ;;; TOS= text from (lol)
 ;;; DOS= destination
+;;; 
+;;; Does not zero terminate!!!
 FUNC _copyz
 ;;; 16
         lda (tos),y
@@ -67,6 +69,7 @@ FUNC _copyz
         ;; always
         bne _copyz
 @done:       
+        ;; No zero temrination as maybe write to screen?
         rts
 
 

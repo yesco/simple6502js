@@ -1,5 +1,8 @@
 // color chart (ORIC)
 #include <stdio.H>
+
+word r, c;
+
 word main() {
   r= 0; while(r<8) {
     putcraw(16+r); putu(r);

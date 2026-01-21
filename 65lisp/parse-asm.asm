@@ -5451,7 +5451,7 @@ FUNC _iorulesstart
 
   .ifdef __ATMOS__
         ;; ORIC: print character
-        jsr $CCD0 
+        jsr $CCD0
   .else
         ;; I guess it's here? (non oric)
         jsr _putchar
@@ -10595,6 +10595,12 @@ FUNC _OK
 
 
 FUNC _run
+        lda compilestatus
+        beq :+
+        ;; can't run; have error (?)
+        PRINTZ {10,10,YELLOW,"Compile first...",10}
+        jmp _forcecommandmode
+:       
 
         ;; TODO: print something if run from edit mode?
         jsr nl
@@ -11090,6 +11096,15 @@ FUNC _eoscolors
 
 
 FUNC _listfiles
+        lda #0
+
+;;; lda #'p'
+;;; jsr _searechfileA
+;;; beq @notfound
+
+FUNC _searchfileA
+        sta savex
+
         ;; init
         lda #<input
         ldx #>input
@@ -11099,43 +11114,62 @@ FUNC _listfiles
         lda #'a'
         sta savea
 @nextfile:       
-        ;; last file?
-        ldy #0 
+        ;; no more files? (0,0)
+        ldy #0
         lda (tos),y
         beq @done
 
-        pha
+        ;; target file?
+        lda savex               ; target
+        ;; ? target==0 => listing
+        beq @listing
+        ;; ? target==current match!
+        cmp savea
+        bne @goendfile          ; no print
+        
+        ;; match found!
+        lda tos
+        ldx tos+1
+        rts
+
+@listing:
         ;; print 'letter'
         putc WHITE
         lda savea
         jsr putchar
         putc GREEN
 
-        pla
         ;; print first line
 :       
+        lda (tos),y
+        beq @donefile
+        cmp #10
+        beq @donefile
         jsr putchar
         jsr _incT
-        lda (tos),y
-        beq @endfile
-        cmp #10
-        bne :-
+        jmp :-
 
+@donefile:
+        jsr nl
+
+@goendfile:
         ;; skip till end of file
 :       
-        jsr _incT
-        ldy #0 
         lda (tos),y
-        bne :-
-
-        ;; go next pos
+        beq :+
+        jsr _incT
+        jmp :-
+:       
+        ;; go next file
 @endfile:
         jsr _incT
-        jsr nl
         inc savea
         jmp @nextfile
 
 @done:
+        ;; no file
+        lda #0
+        tax
         rts
 
 
@@ -11244,6 +11278,7 @@ GROUP=YELLOW
 
 ;;; TODO: save some chars?
 
+;;; CTRL-X: extras
 FUNC _extend
 ;;; 16 
         jsr _eosnormal
@@ -11256,20 +11291,35 @@ FUNC _extend
 
         ;; get command character
         jsr getchar
-        
-        ;; X-dispatch
+        pha
 
-        ;; - a-z "buffer"/file
-        cmp #'a'
-        bcc :+
-        cmp #'z'+1
-        bcs :+
+        ;; letter: a-z
+        jsr isalpha
+        beq :+
+
         ;; => save current buffer/copy buffer
-;;; TODO: save current letter buffer (if edited?)
-;;; TODO: load named buffer
+        ;; TODO: save current letter buffer (if edited?)
 
-        rts
+;;; TODO:
+.ifdef __ATMOS__
+
+        ;; lowercase
+        pla
+        ora #32
+
+        jsr _searchfileA
+        bne @found
+        PRINTZ "% Not found!"
+        jmp _forcecommandmode
+@found:       
+        jmp _loadfromAX
+.else
+        PRINTZ "% Not implemented!"
+        jmp _forcecommandmode
+.endif 
 :       
+        pla
+      
         ;; CTRL-C : compile "input" (unmodified)
         cmp #CTRL('C')
         bne :+
@@ -13565,12 +13615,17 @@ NOPRINT=1
 
         ;; Input include example library
 
+;;; adds about 3-4 KB
+;
+EXAMPLEFILES=1
+.ifdef EXAMPLEFILES
+
 ;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
 ;;; b - Byte sieve
         .incbin "Input/byte-sieve.c"
         .byte 0
 
-;;; c - color char
+;;; c - color chart
         .incbin "Input/color-chart.c"
         .byte 0
 
@@ -13647,9 +13702,11 @@ NOPRINT=1
         .byte 0
 
 ;;; l - line bench
-        .byte "// LINEBENCH",10
+        .byte "// LINEBENCH - for borken?",10
+        .byte "word i;",10
         .byte "word main(){",10
         .byte "  hires();",10
+;;; TODO: doesn't loop???
         .byte "  for(i=0; i<239; ++i) {",10
         .byte "    curset(239-i, 199, 3);",10
         .byte "    draw(i*2-239, 0-199, 2);",10
@@ -13726,16 +13783,16 @@ NOPRINT=1
 ;;; p - printing
         .byte "// print functions",10
         .byte "word main() {",10
-        .byte "  putchar('H'); putchar(111);",10
+        .byte "  putchar('H');   putchar('@'+5);",10
         .byte "  putchar('m'-1); putchar('6'<<1);",10
-        .byte "  putchar('\n');",10
+        .byte "  putchar(111);   putchar('\\n');",10
         .byte "",10
         .byte "  // strings",10
-        .byte "  puts(\"World\") ; // includes newline",10
+        .byte "  puts(\"World\") ; // adds newline",10
         .byte "",10
         .byte "  // no newline",10
         .byte "  putz(\"print \");",10
-        .byte "  fputs(stdout,\"nums:\"); putchar(' ');",10
+        .byte "  fputs(\"nums:\",stdout); putchar(' ');",10
         .byte "",10
         .byte "  puth(488879); putchar(' ');",10
         .byte "  putu(0x1148); putchar(10);",10
@@ -13744,7 +13801,10 @@ NOPRINT=1
         .byte "  printf(\"%s\", \"fish\");",10
         .byte "  printf(\"%u\", 0x29a);",10
         .byte "  printf(\"%x\", -1);",10
-        .byte "  // NO: printf(\"foo%s\n\", \"bar\");",10
+        .byte "  putchar('\\n');",10
+        .byte "  // NO: printf(\"foo%s\\n\", \"bar\");",10
+        .byte "",10
+        .byte "  putz(\"a\\nb\\nc\\n\");",10
         .byte "}",10
         .byte 0
 ;;; q -
@@ -13801,6 +13861,7 @@ NOPRINT=1
 .endif ; BIGSCROLL
 
 
+.endif ; EXAMPLEFILES
 
 endinput:       
 

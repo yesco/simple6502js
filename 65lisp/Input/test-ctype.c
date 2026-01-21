@@ -1,5 +1,6 @@
 // isalpha... test <ctype.h>
 #include <ctype.h>
+word c;
 word main() {
 //  for(i=0; i<256; ++i) {
   c= 0; while(c<128) {
