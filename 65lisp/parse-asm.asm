@@ -10379,7 +10379,7 @@ FUNC _aftercompile
 status: 
         .word $bb80-2
         ;;     ////////////////////////////////////////
-        ;;     WBMeteoriC v0.60B`2025 yescoB^HelpWWCAPS
+        ;;     YMeteoriC v0.60G`2025 yescoY^HelpWWCAPS
         ;; 
   ;;; BEGIN: INVERTED
         .byte YELLOW            ; => BLUE
@@ -10390,7 +10390,7 @@ status:
         aschi                  "`2025 yesco"
   ;;; END: INVERTED
         .byte YELLOW 
-        .byte                             " ^Help"
+        .byte                                 "^Help"
         .byte 0
 .code
 
