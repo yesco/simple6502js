@@ -9,8 +9,8 @@
 
 ;;; TITLE
 ;;; 
-;;; A 6502 Recursive Descent Data-Driven
-;;; BNF-Parser as micro C Program Compiler
+;;; MeteoriC: A native on-device 6502, minimalist
+;;; C-compiler & IDE using Code Generating BNF-Rules
 ;;; 
 ;;; 
 ;;; It interprets a BNF-description of a programming
