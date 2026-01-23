@@ -3099,7 +3099,7 @@ string:
         ;; Copy
         lda #128
         sta percentchar
-;    putc '!'
+;   putc '!'
 :       
         ;; use "bit percentchar" to test bmi if to Copy
 
