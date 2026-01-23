@@ -535,23 +535,30 @@ eyank:
         rts
 
 ;;; kill till endo of line, or the end of line char
+;;; ?can do celver addr w Y and svae bytes?
 ekill:  
 :       
-        ;; stuff one char at yankp
-;;; can do celver addr w Y and svae bytes?
-        ldx #yankp
-        jsr _decRX
+        ;; - read char
         ldy #0
         lda (editpos),y
-;        jsr edel
-;        beq @done               ; at end of buffer
+        beq @done               ; at end of buffer
+        ;; stuff one char at yankp
+        ldx #yankp
+        jsr _decRX
+        ;; - stuff char
         ldy #0
         sta (yankp),y
-;        ;; stop at newline
-;        cmp #10
-;        bne :-
+
+        pha
+        jsr edel
+     jsr _redraw
+        pla
+
+        ;; stop at newline
+        cmp #10
+        bne :-
 @done:
-jsr eforward
+;        jsr eforward
         rts
 
        

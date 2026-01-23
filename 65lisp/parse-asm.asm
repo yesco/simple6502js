@@ -10619,6 +10619,8 @@ done2:
 .endif ; PRINTINPUT
 .endscope
 
+        PRINTZ {10,YELLOW,"goto e)rror  ?) help",10,10}
+
         jmp _forcecommandmode
 
 
@@ -10696,6 +10698,7 @@ FUNC _OK
 
 
 FUNC _run
+        ;; make sure have succesful compilation
         lda compilestatus
         beq :+
         ;; can't run; have error (?)
@@ -10768,6 +10771,11 @@ TIMPER=8
         eor #$ff
         adc #>TIMCOST
         pha
+
+        ;; make sure we're in textmode
+.ifdef __ATMOS__
+;        jsr $ec21
+.endif
 
         ;; print "[47B 100x: 4711us]"
         PRINTZ {10,WHITE,"["}
@@ -10859,7 +10867,7 @@ command:
         bne :+
 @minihelp:
         ;; 82 B
-        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW," q)asm x)tras ESC-edit"}
+        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW,"q)asm  x)tras ESC-edit"}
         jmp command
 :       
 
@@ -11360,9 +11368,9 @@ GROUP=YELLOW
 .byte KEY,"(^W",MEAN,"rite   - save source)",10
 .byte KEY,"(^L",MEAN,"oad    - load source)",10
 .byte 10
-.byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,">|",10
-.byte GROUP,"Line:",KEY,"^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
-.byte "      ",KEY,"^K",MEAN,"ill",KEY,"^Y",MEAN,"ank",KEY,"^G",MEAN,"quit/clear",10
+.byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<-",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,"->|",10
+.byte GROUP,"Line:",KEY," ^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
+.byte "      ",KEY," ^K",MEAN,"ill",KEY,"^Y",MEAN,"ank",KEY,"^G",MEAN,"quit/clear",10
 .byte "",10
 .byte MEAN,"// A comment. Types:",CODE,"word",10
 .byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
