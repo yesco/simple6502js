@@ -1,4 +1,5 @@
 // BYTE SIEVE PRIME benchmark
+word m, a, n, c, i, i, p, k;
 word main(){
   m=8192;
   a=malloc(m);
@@ -21,6 +22,5 @@ word main(){
     putu(c);
     ++n;
   }
-  free(a);
-  return c;
+  free(a); return c;
 }

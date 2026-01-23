@@ -20,6 +20,7 @@
 // crashes when call from asm...
 // TODO: define nputz(),putz(),putd(),puth(),put2h()...
 
+// NOT USED (remove?)
 #ifdef NEWP
 void puth(unsigned int);
 void putd(int);

@@ -2304,9 +2304,6 @@ FUNC _init
         ;; but then maybe get's overwrriten
         ;; (the vector?)
         ;; 
-;NMIVEC=$FFFA                    ; => $0247
-NMIVEC=$0248                    ; => $F8B2
-
         lda #<_NMI_catcher
         ldx #>_NMI_catcher
         sta NMIVEC
@@ -3102,7 +3099,7 @@ string:
         ;; Copy
         lda #128
         sta percentchar
-        putc '!'
+;    putc '!'
 :       
         ;; use "bit percentchar" to test bmi if to Copy
 
@@ -10987,12 +10984,11 @@ FUNC _NMI_catcher
         ;; reset stack pointer
         ldx #$ff
         txs
-        ;; set command mode
-        lda mode
-        ora #128
-        sta mode
-        ;; print message
+
+        ;; Reset colors
+        jsr _eosnormal
         PRINTZ {10,RED+BG,"RESET",10}
+
         jmp _forcecommandmode
 
 

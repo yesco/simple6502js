@@ -1,0 +1,28 @@
+// --- Mini Tutorial for MeteoriC! ---
+// (Press CTRL-Help anywhere!)
+
+// --- EDITING ---
+// 0) If you mess up - reload: CTRL-Z
+// 1) Move around using arrow keys
+// 2) CTRL-A goes to begining of line
+// 3) Go to end of the line: CTRL-End
+// 4) Use backspace to delete chars
+// 5) CTRL-Delete char after cursor
+// 6) CTRL-Kill till end of line
+// 7) CTRL-Yank to get it back!
+
+// --- COMPILING ---
+// a) ESC: toggle edit or command mode
+// b) ? for command help
+// c) CTRL-Compile (green block!)
+// d) CTRL-Run     (ESC to go back)
+
+word main() {
+  // e) edit text below, CTRL-Run
+  a="foo";
+//  puts("Hello ORiC Wurlllld");
+  // f) uncomment, compile, run
+  // return 0x125c+11;
+  // g) make error (see red corner!)
+  // h) CTRL-Xtra to choose demos!
+}

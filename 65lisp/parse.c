@@ -57,12 +57,13 @@ extern void iasm() {
 
 // disasm from last position/call
 extern void dasm() {
-  if (!last || last==out) iasmstart();
+  if (!last || last>=out) iasmstart();
   // TODO: this hangs as printf data in ZP corrupted?
   // TODO: use my own printf? lol
   // TODO: define putd(),puth(),put2h()...
   //printf("\nDASM $%u-$%u!\n", last, out);
   iasm();
+  if (last<out) printf("  q - to see more");
 }
 
 extern void dasmcc() {

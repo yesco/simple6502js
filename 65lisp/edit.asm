@@ -90,11 +90,18 @@
 
 ;;; For ORIC ATMOS we're going to use part of the
 ;;; HIRES as an editing buffer. '-lol
+
+;;; TODO: this shouldn't work, should overlap VARS env
+;;;   during compilation....
 EDITNULL= HICHARSET
+
+;EDITNULL= HIRES ; this crashes for some reason
 
 ;;; lol
 ;EDITNULL= input-1
 
+
+;;;  means not aligned? 256???
 
 EDITSTART= EDITNULL+1
 

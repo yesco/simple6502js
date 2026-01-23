@@ -6,8 +6,8 @@
 
 
 ;;; TODO: move to atmos constants file?
-HIRES      = $a000
 HICHARSET  = $9800
+HIRES      = $a000
 ;SCREEN     = $bb80
 SC=$bb80
 CHARSET    = $b400
@@ -25,6 +25,9 @@ CURROW		= $268
 CURCOL		= $269
 CURCALC		= $001f      ; ? how to update?
 
+;;; place to patch
+;NMIVEC=$FFFA                    ; => $0247
+NMIVEC=$0248                    ; => $F8B2
 
 ;;; TODO: why are these so late?
 ;;;   used much earlier!
