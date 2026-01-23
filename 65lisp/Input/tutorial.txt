@@ -1,4 +1,4 @@
-// --- Mini Tutorial for MeteoriC! ---
+// - Mini Tutorial for MeteoriC!
 // (Press CTRL-Help anywhere!)
 
 // --- EDITING ---
@@ -19,8 +19,7 @@
 
 word main() {
   // e) edit text below, CTRL-Run
-  a="foo";
-//  puts("Hello ORiC Wurlllld");
+  puts("Hello ORiC Wurlllld");
   // f) uncomment, compile, run
   // return 0x125c+11;
   // g) make error (see red corner!)

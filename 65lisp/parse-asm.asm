@@ -1173,6 +1173,20 @@
 
 ;;; ========================================
 ;;;              O P T I O N S 
+;;; config options
+
+;;; Model:
+;;;   PICO - enable to get compiler+nolibrary
+;;;   NANO - enable to 
+;;;   TINY - enable to only get compiler+ide+library
+;;;   -    - default: compiler+ide+library+help
+;;;   DEMO - compiler+ide+full library+help+examples
+
+;DEMO=1
+
+TUTORIAL=1                      ; + 1   KB
+EXAMPLEFILES=1                  ; + 4.5 KB
+
 
 
 .ifndef FROGMOVE
@@ -8620,6 +8634,7 @@ afterELSE:
         bne :+
         txa
         bne :+
+        clc
         jmp PUSHLOC
 :       
 .endif
@@ -11142,6 +11157,8 @@ FUNC _eoscolors
 
 
 FUNC _listfiles
+        jsr clrscr
+        ;; search for nothing
         lda #0
 
 ;;; lda #'p'
@@ -11217,6 +11234,9 @@ FUNC _searchfileA
         lda #0
         tax
         rts
+
+
+
 
 
 FUNC _help
@@ -11329,10 +11349,13 @@ FUNC _extend
 ;;; 16 
         jsr _eosnormal
         
+.ifnblank
         lda #<_extendinfo
         ldx #>_extendinfo
         jsr _printz
+.endif
 
+;;; Different key? ^X b ?
         jsr _listfiles
 
         ;; get command character
@@ -11354,12 +11377,17 @@ FUNC _extend
         ora #32
 
         jsr _searchfileA
-        bne @found
+        beq @notfound
+@found:
+        jsr _loadfromAX
+        ;; TODO: compile first?
+        jmp _eventloop
+
+@notfound:       
         PRINTZ "% Not found!"
         jmp _forcecommandmode
-@found:       
-        jmp _loadfromAX
 .else
+        ;; TODO: not amos buffer
         PRINTZ "% Not implemented!"
         jmp _forcecommandmode
 .endif 
@@ -11999,6 +12027,14 @@ FUNC _inputstart
 
 input:
 
+.FEATURE STRING_ESCAPES
+
+
+.ifdef TUTORIAL
+        .incbin "Input/tutorial.txt"
+        .byte 0
+.else
+
         ;; MINIMAL PROGRAM
         ;; 7B 19c
 ;        .byte "word main(){}",0
@@ -12011,9 +12047,6 @@ input:
 ;        .byte "word main(){ abc=4711; return abc; }",10
 ;        .byte "{return 42;};",10
 ;        .byte 0
-
-
-.FEATURE STRING_ESCAPES
 
 
 ;OPTINCBYTE=1
@@ -13676,9 +13709,9 @@ NOPRINT=1
 
         ;; Input include example library
 
+.endif ; TUTORIAL
+
 ;;; adds about 3-4 KB
-;
-EXAMPLEFILES=1
 .ifdef EXAMPLEFILES
 
 ;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
@@ -13704,10 +13737,22 @@ EXAMPLEFILES=1
         .byte 0
 
 ;;; f - fib recursion
+.ifblank
+        .byte "// f -",10
+        .byte 0
+.else
         .byte "// fibonacci recursion",10
+        .byte "word add(word a, word b) {",10
+        .byte "  putchar('+'); putu(a); putchar(' '); putu(b);",10
+        .byte "  return a+b;",10
+        .byte "}",10
+        .byte "",10
         .byte "word fib(word n) {",10
+        .byte "  putu(n); putchar(' ');",10
         .byte "  if (n<3) return n;",10
-        .byte "  return fib(n-1)+fib(n-2);",10
+        .byte "  // no complex excpressions, yet",10
+        .byte "  // return fib(n-1) + fib(n-2);",10
+        .byte "  return add(fib(n-1), fib(n-2));",10
         .byte "}",10
         ;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
         .byte "word main() {",10
@@ -13715,6 +13760,7 @@ EXAMPLEFILES=1
         .byte " return fib(10);",10
         .byte "}",10
         .byte 0
+.endif
 
 .ifdef FROGMOVE
         ;; TODO: not working
@@ -13724,7 +13770,7 @@ EXAMPLEFILES=1
 .endif ; FROGMOVE
 
 ;;; g - game?
-        .byte "// TODO: game",10
+        .byte "// TODO: game?",10
         .byte 0
 
 ;;; h - hello
@@ -13766,6 +13812,10 @@ EXAMPLEFILES=1
         .byte 0
 
 ;;; l - line bench
+.ifblank
+        .byte "// LINEBENCH - coming soon!",10
+        .byte 0
+.else
         .byte "// LINEBENCH - for borken?",10
         .byte "word i;",10
         .byte "word main(){",10
@@ -13790,6 +13840,7 @@ EXAMPLEFILES=1
         .byte "  text();",10
         .byte "}",10
         .byte 0
+.endif ; LINEBENCH
 
 ;;; TODO: - music?
 ;;; m - mul40
@@ -13799,9 +13850,11 @@ EXAMPLEFILES=1
 ;FOURTY=1
 ;;; 62B 119c (program 16B overhead)
 
-        .byte "// MUL40",10
+        .byte "// MUL40 - NO operator precedenc",10
+        .byte "word n, r;",10
+        .byte "",10
         .byte "word main(){",10
-;        .byte "  r=17;",10
+        .byte "  r=17;",10
 ;        .byte "  while(r<28) {",10
 
 ;;; 49B => 42 B   84c
@@ -13809,8 +13862,12 @@ EXAMPLEFILES=1
 
 ;;; 47B => 40 B   75c
 ;;;  8B extra for << to store and retrieve x
-        .byte "    n=r<<2+r<<3;",10
-
+        .byte "",10
+        .byte "  // Example of no precedence...",10
+        .byte "  // evaluation is LEFT-TO-RIGHT",10
+        .byte "  // (not correct C ;-)",10 
+        .byte "",10
+        .byte "  n=r<<2 +r <<3;",10
 ;;; 
 ;        .byte "    n= PIPE r<<2+r<<3;",01
 ;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
@@ -13898,6 +13955,7 @@ LOOP=1
 ;;; r - 
         .byte "// r -",10
         .byte 0
+
 ;;; s - TODO: sound?
 ;;; s - summer recursion
         ;; cc65: 13768c (41)

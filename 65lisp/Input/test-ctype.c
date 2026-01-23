@@ -1,21 +1,27 @@
 // isalpha... test <ctype.h>
 #include <ctype.h>
+
+word p(word n) {
+  if (n) putu(1); else putu(0);
+  putchar('\t');
+}
+
 word c;
+
 word main() {
-//  for(i=0; i<256; ++i) {
-  c= 0; while(c<128) {
+  for(c=32; c<128; ++c) {
     putu(c); putchar(' ');
     // indent==no inline
-    putu(isspace(c));putchar('\t');
-      putu(isxdigit(c));putchar('\t');
-    putu(isdigit(c));putchar('\t');
-      putu(isalnum(c));putchar('\t');
-    putu(isalpha(c));putchar('\t');
-      putu(isupper(c));putchar('\t');
-      putu(islower(c));putchar('\t');
-      putu(ispunct(c));putchar('\t');
-    putchar(toupper(c));putchar('\t');
-    putchar(tolower(c));putchar('\t');
+    p(isspace(c));
+      p(isxdigit(c));
+    p(isdigit(c));
+      p(isalnum(c));
+    p(isalpha(c));
+      p(isupper(c));
+      p(islower(c));
+      p(ispunct(c));
+    p(toupper(c));
+    p(tolower(c));
     ++c; putchar('\n');
   }
 }
