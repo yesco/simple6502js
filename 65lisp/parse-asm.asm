@@ -1182,14 +1182,53 @@
 ;;;   -    - default: compiler+ide+library+help
 ;;;   DEMO - compiler+ide+full library+help+examples
 
-;DEMO=1
+;PICO=1
+;NANO=1
+;TINY=1
+;
+DEMO=1
 
-TUTORIAL=1                      ; + 1   KB
-EXAMPLEFILES=1                  ; + 4.5 KB
+
+.ifdef PICO
+        NOBIOS=1                ; save  72 B
+        NOLIBRARY=1             ; save 592 B
+
+        OUTPUTSIZE=8*1024
+        ;; Heap: 
+
+.elseif .def(NANO)
+        ;; BIOS
+        ;; LIBRARY
+        NOHELP=1                ; save 1 KB?
+
+        OUTPUTSIZE=6*1024
+        ;; Heap: 
+
+.elseif .def(TINY)
+        ;; BIOS
+        ;; LIBRARY
+
+        OUTPUTSIZE=8*1024
+
+.elseif .def(DEMO)
+        ;; BIOS
+        ;; LIBRARY
+        TUTORIAL=1              ; + 1   KB
+        EXAMPLEFILES=1          ; + 4.5 KB
+
+        OUTPUTSIZE=2*1024
+        ;; Heap: 8KB
+
+.else ; DEFAULT
+
+        OUTPUTSIZE=4*1024
+        ;; Heap: 
+.endif
 
 
 
-.ifndef FROGMOVE
+
+.ifndef OUTPUTSIZE
         ;; ++s; ===  6 B  (/ 4096 6) = 682x
 
 ;;; the bigger OUTPUTSIZE => the smaller heap
@@ -1206,8 +1245,6 @@ EXAMPLEFILES=1                  ; + 4.5 KB
 
 ;;; (- 37631 12164) = 25467 == OUTPUT+HEAP
 
-        OUTPUTSIZE=2*1024
-.else
         OUTPUTSIZE=8*1000+50
 .endif
 
