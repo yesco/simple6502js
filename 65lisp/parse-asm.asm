@@ -6082,7 +6082,7 @@ FUNC _funcallend
 ;;; TODO: !(...) more safe?
         .byte "|!",_E
       .byte "["
-;;; 12B
+        ;; 12 B
         ldy #0
         cmp #0
         bne @false
@@ -7226,6 +7226,7 @@ FUNC _oprulesstart
 
 ;;; COMPARISIONS
 
+;;; TODO: really shouldn't give -1 lol
         .byte "|==%V"
       .byte '['
         ;; 15
@@ -7242,6 +7243,26 @@ FUNC _oprulesstart
         tax
       .byte ']'
         .byte TAILREC
+
+;;; TODO: useful? TEST? (see EQTEST)
+.ifdef xOPTRULES
+        .byte "|==%d"
+      .byte '['
+        ;; 12 (saves one byte...)
+        ldy #0
+        cmp #'<'
+        bne :+
+        txa
+        bne :+
+        ;; eq => -1
+        dey
+        ;; neq => 0
+:       
+        tya
+        tax
+      .byte ']'
+        .byte TAILREC
+.endif ; OPTRULES
 
         .byte "|==%D"
       .byte '['
@@ -7275,9 +7296,9 @@ FUNC _oprulesstart
       .byte '['
         ;; 13
         ldy #$ff
-        cpx #'>'
+        cpx #HIVAL
         bne :+
-        cmp #'<'
+        cmp #LOVAL
 :       
         bcc :+
         ;; FAIL !< => 0
@@ -7404,7 +7425,9 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-        .byte "|+%D"
+;;; TODO: HMMM, this gives full value? %d?
+;;;   overflow semantics?
+        .byte "|+%d"
       .byte '['
         clc
         adc #'<'
@@ -7412,14 +7435,14 @@ ruleV:
         .byte TAILREC
 
 ;;; 18 *2
-        .byte "|-%D"
+        .byte "|-%d"
       .byte '['
         sec
         sbc VAR0
       .byte ']'
         .byte TAILREC
 
-        .byte "|-%D"
+        .byte "|-%d"
       .byte '['
         sec
         sbc #'<'
@@ -7433,7 +7456,7 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-        .byte "|&$%D"
+        .byte "|&%d"
       .byte '['
         and #'<'
       .byte ']'
@@ -7448,7 +7471,7 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-        .byte "|\|%D"
+        .byte "|\|%d"
       .byte '['
         ora #'<'
       .byte ']'
@@ -7462,7 +7485,7 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-        .byte "|^%D"
+        .byte "|^%d"
       .byte '['
         eor #'<'
       .byte ']'
@@ -7494,11 +7517,12 @@ ruleV:
         ;; neq => 0
 :       
         tya
+;;; if isn't special for byte rules
         ldx #0
       .byte ']'
         .byte TAILREC
 
-        .byte "|==%D"
+        .byte "|==%d"
       .byte '['
         ldy #0
         cmp #'<'
@@ -7508,11 +7532,12 @@ ruleV:
         ;; neq => 0
 :       
         tya
+;;; if isn't special for byte rules
         ldx #0
       .byte ']'
         .byte TAILREC
 
-        .byte "|<%D"
+        .byte "|<%d"
       .byte '['
         ldy #$ff
         cmp #'<'
@@ -7522,6 +7547,7 @@ ruleV:
 :       
         ;; neq => 0
         tya
+;;; if isn't special for byte rules
         ldx #0
       .byte ']'
         .byte TAILREC
@@ -7658,7 +7684,7 @@ ruleV:
         lsr
         jmp :-
 :       
-        .byte ">>%D"
+        .byte ">>%d"
       .byte '['
         ldy #'<'
 :       
@@ -8527,7 +8553,44 @@ afterELSE:
         jmp (VAL0)
       .byte "]"
 
+
+
+.ifnblank
+;;; TO: use as zero detector?
+        ;; 11 B
+        stx savex
+        ora savex
+;        cmp #0
+        ;; C=1 if !0
+;        bcs :+
+        beq :+
+        clc
+        jmp PUSHLOC
+:       
+
+;;; good zero detector to set C opposite!
+        ;; 10 B
+        lda VAR0
+        ora VAR1
+        cmp #1
+        ;; C=1 if !0
+        bcs :+
+;        beq :+
+;        clc
+        jmp PUSHLOC
+:       
+
+
+.endif ; TODO: use this? maybe when generic IF?
+;;; TODO: TEST_EXPRESSION RULE
+
+
+
+
 .ifdef OPTRULES
+
+;;; TODO: add if(%V)
+;;; TODO: add if(!%V)
 
         ;; IF( var == 0 ) ... saves 14 B !
         ;; (no need generate true/false)
@@ -8536,7 +8599,16 @@ afterELSE:
         .byte "|if(%V==0)"
       .byte "["
 .scope
-;;; 13
+.ifnblank
+        ;; 10 B
+        lda VAR0
+        ora VAR1
+        beq :+
+        clc
+        jmp PUSHLOC
+:       
+.else
+        ;; 12
         lda VAR0
         beq @eq1
 @neq:
@@ -8546,6 +8618,7 @@ afterELSE:
 @eq1:
         ldx VAR1
         bne @neq
+.endif
 .endscope
       .byte "]"
         ;; THEN
@@ -8558,19 +8631,39 @@ afterELSE:
         ;; ELSE is optional and depends on C=0 to do ELSE clause!
 
 
+.ifdef OPTRULES
+        .byte "|if(%V==[#]%d)"
+      .byte "["
+        ;; 14
+        lda #LOVAL
+        .byte ";"
+        cmp VAR0
+        beq :++
+:       
+        clc
+        jmp PUSHLOC
+:       
+        ldx VAR1
+        bne :--
+      .byte "]"
+        ;; THEN
+        .byte _S
+      .byte "["
+        sec
+      .byte "]"
+        ;; optional ELSE
+        
+
+.endif ; OPTRULES
 
         ;; IF( var == num ) ... saves 10 B ! (- 88 78)
         ;; (no need generate true/false)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%V==[#]%D)"
-        .byte "["
-;;; 17
-        ;; load %D
-        lda #'<'
-        ldx #'>'
-        ;; ? AX= *%V 
-        .byte ";"                ; use %V
+        .byte "|if(%V==[#]",_E,")"
+      .byte "["
+        ;; 12+1
+        .byte ";"
         cmp VAR0
         beq @eq1
 @neq:
@@ -8661,7 +8754,7 @@ afterELSE:
         .byte "|if(",_E,")"
       .byte '['
 .ifnblank
-        ;; 9B 9-11c
+        ;; 10B 9-13c
         ;; 111*111 => 859us
         stx savex
         ora savex
@@ -8670,7 +8763,7 @@ afterELSE:
         jmp PUSHLOC
 :       
 .else
-        ;; 9B 5-9-11c
+        ;; 10 B 5-9-13c
         ;; 111*111 => 859us same????
         ;; TODO: no savings for 111*111 ???
         ;;    609c if just make jmp PUSHLOC
@@ -9528,7 +9621,6 @@ FOROPT=1
 
 ;;; TODO: wrong1!! will break
 ;;; ;;; TODO: make special ZEROTESTEXPR parse rule?
-
 
 
 .ifdef xOPTRULES
@@ -12077,9 +12169,28 @@ FUNC _inputstart
 ;;; it could be used by memcpyz that need prefix?
 .byte 0,0
 
-input:
 
 .FEATURE STRING_ESCAPES
+input:
+
+;EQTEST=1
+.ifdef EQTEST
+        ;; ==0   => 61-63 B   59-61 B  if(%V==0) improvement
+        ;; ==3+4 => 82-84 B   71-73 B  if(%V==_E general
+        ;; ==7   => 65-67 B   63-65 B  if(%V==%d) specific
+        .byte "word x;",10
+        .byte "word main(){",10
+;        .byte "  x= 7;",10
+        .byte "  x= 0;",10
+;        .byte "  if (x==0) puts(\"zero!\");",10
+        .byte "  if (x==7) puts(\"seven\");",10
+;        .byte "  if (x==3+4) puts(\"seven\");",10
+        .byte "  else puts(\"NOT\");",10
+        .byte "}",10
+        .byte 0
+.endif ; EQTEST        
+
+
 
 
 .ifdef TUTORIAL
