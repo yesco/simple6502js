@@ -5263,7 +5263,7 @@ _rules:
 
 ;ruleK: list of var defined
 ruleL:
-ruleM:
+;ruleM: experimental complex expressions %P jumps!
 ;ruleN: - program var decl
 ;ruleO: - first rule in program/jmp main
 ;ruleP: - program
@@ -7676,6 +7676,13 @@ ruleV:
 
         .byte 0
 FUNC _byterulesend
+
+
+;;; experiments in priorities for expressions
+ruleM:
+;;; TODO: use .include "parse-expr.asm" ???
+;        .byte _C,"*",
+
 
 ;;; printf handling
 ruleH:  
