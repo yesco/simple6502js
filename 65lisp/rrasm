@@ -26,6 +26,9 @@ rm fil
 # TODO: ld65 -D __GRAB__=1 to grab graphics memory =>44K (37K)
 # TODO: linker -D __AUTORUN__=$C7
 
+# TODO: seems impossible to pass in args to asm 
+#         -D RUNTIMES=10 cannot, isn't set
+
 ( cl65 -C sim6502-rrasm.cfg -r -Oirs $* $OPTS '-D__AUTORUN__=$C7' -t sim6502 $name.c $name-asm.asm -o $name.sim -vm -m $name.map 2>&1 | sed 's/(\([0-9]\+\))/:\1/g' ) || (echo "??????????????? FAILED ???????????"; exit 72)
 
 # generate .s file

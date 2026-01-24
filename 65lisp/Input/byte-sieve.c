@@ -3,12 +3,12 @@ word m, a, n, c, i, p, k;
 word main(){
   m=8192;
   a=malloc(m);
-  n=0; while(n<10) {
+  n=0; do {
     c=0;
-    i=0; while(i<m) {
+    i=0; do {
       poke(a+i, 1); ++i;
-    }
-    i=0; while(i<m) {
+    } while(i<m);
+    i=0; do {
       if (peek(a+i)) {
         p= i*2+3;
         k=i+p; while(k<m) {
@@ -18,9 +18,9 @@ word main(){
         ++c;
       }
       ++i;
-    }
+    } while(i<m);
     putu(c);
     ++n;
-  }
+  } while(n<10);
   free(a); return c;
 }

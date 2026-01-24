@@ -5262,8 +5262,8 @@ _rules:
 ;ruleJ: "read byte expression, saving AX totos and sets Y=0"
 
 ;ruleK: list of var defined
-ruleL:
-;ruleM: experimental complex expressions %P jumps!
+ruleL: ;;; experiments in priorities for expressions
+;ruleM: do ... while expressions (M is upside down W
 ;ruleN: - program var decl
 ;ruleO: - first rule in program/jmp main
 ;ruleP: - program
@@ -7704,11 +7704,6 @@ ruleV:
 FUNC _byterulesend
 
 
-;;; experiments in priorities for expressions
-ruleM:
-;;; TODO: use .include "parse-expr.asm" ???
-;        .byte _C,"*",
-
 
 ;;; printf handling
 ruleH:  
@@ -9660,24 +9655,10 @@ FOROPT=1
       .byte "]"
 .endif ; BYTERULES
 
-;;; GENERIC: DO...WHILE
-        .byte "|do"
-      .byte "[:]"
-        .byte _S
 
-        .byte "while(",_E,");"
-      .byte "["
-        stx savex
-        ora savex
-        .byte ";"
-        beq :+
-        jmp VAL0
-:       
-      .byte "]"
-
-
-
-
+        ;; Generic optimized do...while
+        ;; (clever specialization in _M
+        .byte "|do[:]",_S,"while(",_M,"[;]"
 
 
 ;;; ========================================
@@ -10232,7 +10213,135 @@ parsevarcont:
 FUNC _stmtrulesend
 
 
+;;; Common code patterns in large-scale C repositories:
+;;; Condition  Est. Frequency    Typical Expr Pattern
+;;; =========  ==============    ===========================
+;;; Input/Validation     ~45%   `while (val < 0)
+;;; ;Menu/Event Loops    ~25%    while (choice != EXIT_CODE)
+;;; Iterative Calc       ~15%    while (error > threshold)
+;;; Resource/Flag Wait   ~10%    while (!is_ready)
+;;; Digit/Buffer process  ~5%    while (num > 0)
 
+ruleM:  
+;;; Hackey rule we need to lookUP wards many step!
+
+       .byte "1);"
+      .byte "[?2"
+        jmp VAL0
+      .byte "]"
+
+;;; TOOD: add %V==0 too? (same)
+        .byte "|!%V);"
+      .byte "["
+        ;; 12 B
+        ldx VAR1
+        lda VAR0
+        .byte "?2"              ; can't be inside bXX
+        bne :+
+        txa                     ; +1 B because can't mix ??
+        bne :+
+        jmp VAL0
+:       
+      .byte "]"
+
+        .byte "|%V);"
+      .byte "["
+        ;; 12 B
+        ldx VAR1
+        lda VAR0
+        .byte "?2"        
+        beq :++
+:       
+        jmp VAL0
+:       
+        txa                 
+        bne :--
+      .byte "]"
+
+        .byte "|%V[#]<%D[#]);"
+      .byte "["
+        ;; 14 B - optimal!
+        .byte "?1"
+        lda VAR0
+        ldx VAR1
+        .byte "?0"
+        cmp #LOVAL
+        txa
+        sbc #HIVAL
+        .byte "?4"              ; ???
+        bcs :+
+        jmp VAL0
+:       
+      .byte "]"
+
+        .byte "|%V[#]<%V[#]);"
+      .byte "["
+        ;; 14 B - optimal!
+        .byte "?1"
+        lda VAR0
+        ldx VAR1
+        .byte "?0"
+        cmp VAR0
+        txa
+        sbc VAR1
+        .byte "?4"              ; ???
+        bcs :+
+        jmp VAL0
+:       
+      .byte "]"
+
+        ;; Generic rule
+        .byte "|",_E,");"
+      .byte "["
+        .byte "?2"              ; ???? 2 ????
+        tay
+        beq :++
+:       
+        jmp VAL0
+:       
+        txa
+        bne :--
+      .byte "]"
+        
+        .byte 0
+        
+        
+
+.ifnblank
+
+;;; TODO: move where?
+;;; experiments in priorities for expressions
+ruleL:
+;
+LESSTHAN=1
+.ifdef LESSTHAN
+        ;; saves 1 byte!!!
+        .byte "%V<[#]%D[#]"
+      .byte "[?1"
+.scope
+        ldy #$ff
+        lda VAR0
+        ldx VAR1
+        .byte "?0"
+        cmp #LOVAL
+        txa
+        sbc #HIVAL
+        bcc @true
+@false:
+        iny
+@true:
+        tya
+        tax
+.endscope
+      .byte ";;]"
+
+
+        .byte "|"
+.endif ; LESSTHAN
+        .byte _E
+        .byte 0
+
+.endif ; ruleL
 
 FUNC _parametersstart
 
@@ -10820,12 +10929,16 @@ runs:   .res 1
 .code
 
         ;; RUN PROGRAM n TIMES
+;;; Can set on compile?
 ;RUNTIMES=255
 ;RUNTIMES=2
 ;RUNTIMES=100
-;
-RUNTIMES=1
+;RUNTIMES=1
 ;RUNTIMES=10
+.ifndef RUNTIMES
+        RUNTIMES=1
+.endif
+
 .assert (RUNTIMES<256),error,"%% RUNTIMES too large"
 
         lda #RUNTIMES
@@ -12173,6 +12286,64 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;;; BUG: requires var to compile empty stmt in do-whie!
+;BUGVAR=1
+.ifdef BUGVAR
+        ;; if remove this line files compile while???
+        .byte "word x;",10
+
+        .byte "word main(){",10
+        .byte "  do ; while(1);",10
+        .byte "}",10
+        .byte 0
+.endif ; BUGVAR
+
+;WHILE=1
+.ifdef WHILE
+        .byte "word n,x;",10
+        .byte "word main(){",10
+        .byte "  n= 0;",10
+
+        ;; while   : 52 B
+;        .byte "  while(n<10) putchar(n++ + '0');",10
+
+        ;; 46 B (dowhile<) - CHEAPEST!!! special rule
+;        .byte "  do putchar(n++ + '0'); while(n<10);",10
+
+        ;; 46 B special rule (65 generic) (+ x=10 => + 8B)
+;        .byte "x=10;do putchar(n++ + '0'); while(n<x);",10
+
+;;;  LOL because current TRUE == -1 +1 == 0!!! lol
+;        .byte "x=10;do putchar(n++ + '0'); while(n<x+1);",10
+;        .byte "return n<x-1;",10
+
+        ;; 43 B eternal (53 B) special rule
+;        .byte "x=10;do putchar(n++ + '0'); while(1);",10
+;        .byte "x=10;do putchar(n++ + '0'); while(0);",10
+
+        ;; 60 B
+;        .byte "x=10;while(n<x) putchar(n++ + '0');",10
+
+.ifnblank
+        ;; 78 w special rule
+        .byte "  do {",10
+        .byte "    putchar(n++ + '0');",10
+        .byte "    if (n==10) x=1; else x=0;",10;
+        .byte "  } while(!x);",10
+.endif
+
+.ifnblank
+        ;; 78 w special rule
+        .byte "  do {",10
+        .byte "    putchar(n++ + '0');",10
+        .byte "    if (n==10) x=0; else x=1;",10;
+        .byte "  } while(x);",10
+.endif
+        .byte "}",10
+        .byte 0
+.endif ;WHILE
+
+
 ;EQTEST=1
 .ifdef EQTEST
         ;; ==0   => 61-63 B   59-61 B  if(%V==0) improvement
@@ -13410,7 +13581,7 @@ CANT=1
 ;;;  BYTES  303                               rules: 4505
 ;;;         302    same   - save one byte on if/clc
 ;;;         301    2.6484 - (.sim/10 20250120)
-
+;;;         284    2.6806 - (/ 6835663562 255) do-while-opts
 
 ;
 BYTESIEVE=1
@@ -13452,18 +13623,18 @@ NOPRINT=1
 
         .byte "  a=xmalloc(m);",10
 ;.byte "x"
-        .byte "  n=0; while(n<10) {",10
+        .byte "  n=0; do {",10
 ;        .byte "  n=0; while(47n<10) {",10
 
 ;        .byte " xwhile(47n<10) {",10
 
         .byte "    c=0;",10
-        .byte "    i=0; while(i<m) {",10
+        .byte "    i=0; do {",10
         .byte "      poke(a+i, 1); ++i;",10
-        .byte "    }",10
+        .byte "    } while(i<m);",10
 ;;; NOPE
 ;        .byte "    i=0; do { poke(a+i, 1); ++i; } while(i<m);",10
-        .byte "    i=0; while(i<m) {",10
+        .byte "    i=0; do {",10
         .byte "      if (peek(a+i)) {",10
         .byte "        p= i*2+3;",10
 .ifndef NOPRINT
@@ -13477,12 +13648,12 @@ NOPRINT=1
         .byte "        ++c;",10
         .byte "      }",10
         .byte "      ++i;",10
-        .byte "    }",10
+        .byte "    } while(i<m);",10
 .ifndef NOLIBRARY
         .byte "    printf(",34,"%u",34,", c);",10
 .endif
         .byte "    ++n;",10
-        .byte "  }",10
+        .byte "  } while(n<10);",10
         .byte "  free(a);" ;;,10
         .byte "  return c;",10
         .byte "}"
@@ -14310,4 +14481,3 @@ __ZPEND__:        .res 0
 .code
 
 .end
-
