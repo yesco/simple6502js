@@ -1213,6 +1213,7 @@ DEMO=1
 .elseif .def(DEMO)
         ;; BIOS
         ;; LIBRARY
+        INTRO=1                 ; + 1   KB
         TUTORIAL=1              ; + 1   KB
         EXAMPLEFILES=1          ; + 4.5 KB
 
@@ -2375,9 +2376,14 @@ FUNC _init
 
 
 ;;; Only done here the first time
+.ifdef INTRO
+        lda #<_introtext
+        ldx #>_introtext
+        jsr _printz
+.else
         PRINTZ {12,"MeteoriC-Compiler & IDE on 6502 ",VERSION,10,"`2025 Jonas S Karlsson",10,10,"compiling: "}
+.endif        
         
-
         ;; compile from src first time
         ;; - fall-through
 
@@ -10834,6 +10840,14 @@ done2:
 
 
 FUNC _OK
+
+.ifdef INTRO
+        bit mode
+        bvc :+
+        jsr waitesc
+:       
+.endif ; INTRO
+
         ;; reset erp(os)
         lda inp
         sta erp
@@ -10911,7 +10925,7 @@ FUNC _run
         beq :+
         ;; can't run; have error (?)
         PRINTZ {10,10,YELLOW,"Compile first...",10}
-        jmp _forcecommandmode
+        jmp _idecompile
 :       
 
         ;; TODO: print something if run from edit mode?
@@ -11597,6 +11611,39 @@ GROUP=YELLOW
 ;;; TODO:
 ;.byte "  ",CODE,"L: ... goto L;"
 .byte 0
+
+
+
+.ifdef INTRO
+;;; TODO: put where heap will grow? - then overwrite?
+FUNC _introtext
+.byte 10
+.byte DOUBLE,YELLOW,"MeteoriC",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
+.byte DOUBLE,YELLOW,"MeteoriC",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
+.byte 10
+.byte WHITE,"`2026 Jonas S Karlsson jsk@yesco.org",10
+;;;          ----------------------------------------
+.byte 10
+.byte GREEN,"This is an",CYAN,"early alpha demo",GREEN,"version",10
+.byte GREEN,"of a",YELLOW,"minimal",GREEN,"C-language compiler",10
+.byte GREEN,"that runs on 6502:",10
+.byte YELLOW," - a",CYAN,"minimal",YELLOW,"subset of C",10
+.byte YELLOW," - an IDE:",CYAN,"editing & examples",10
+.byte YELLOW," - only",GREEN,"word",YELLOW,"datatype",10
+.byte YELLOW," - functions (recursive <= 8 args)",10
+.byte YELLOW," - no local variables (coming)",10
+.byte YELLOW," -",GREEN,"if for while do-while",WHITE,"< == !",10
+.byte YELLOW," - ops:",CODE,"+-*&|^ *2 /2 << >> ! ++ --",10
+.byte YELLOW," - no op precedence:",GREEN,"1+2*4  =>7!",10
+.byte YELLOW," -",CYAN,"std libraries",YELLOW,"or",CYAN,"libraryless!",10
+.byte YELLOW," -",CYAN,"ATMOS",YELLOW,"API for graphics/sound routines",10
+.byte MAGNENTA,"...more features coming...",10
+.byte 10
+.byte 0
+
+.endif ; INTRO
+
+
 
 
 ;;; TODO: save some chars?

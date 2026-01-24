@@ -386,7 +386,7 @@ jrun:
 jkill:          
         jmp ekill
 jzource:  
-        jsr _loadfirst
+        jsr _loadlater
         ;; fall-through
 jredraw:        
         jmp _redraw
@@ -797,6 +797,14 @@ einsert:
 ;;; TODO: generalize to load specified file/buffer?
 
 ;;; Load the first buffer from input
+FUNC _loadlater
+        lda #0
+        sta mode
+        ;; mark as not good (?)
+        inc compilestatus
+        jsr _loadfirst
+        jsr _idecompile
+
 FUNC _loadfirst
         ;; load first example 'a'
         lda #<input

@@ -9,7 +9,7 @@
 // 4) Use backspace to delete chars
 // 5) CTRL-Delete char after cursor
 // 6) CTRL-Kill till end of line
-// 7) CTRL-Yank it back (CTRL-G clr)
+// 7) CTRL-Yank it back (CTRL-G clear)
 
 // --- COMPILING ---
 // a) ESC: toggle edit or command mode
