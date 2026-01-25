@@ -934,8 +934,8 @@
 ;;;        NOTE: you need to write "%S 
 ;;;        ...\n\"..." - rest of string is matched
 ;;;        only \n is recognized, other \ just inserted
-;;;        NOTE: this COPIES the string
-;;; - %s - like %S but doesn't copy the string
+;;;        NOTE: this COPIES the string to code!
+;;; - %s - like %S but parse only, doesn't copy the string
 ;;; 
 ;;; 
 ;;; TEST
@@ -962,7 +962,7 @@
 ;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
-;;; - "%" jmp dostuff == .byte "% HL" (''==JSR!)
+;;; - "% " == "%" jmp dostuff == .byte "% HL" (SPC==JSR!)
 ;;; 
 ;;; TODO: remove - DON'T USE!!!! UNSAFE
 ;;; - %{ - immediate code, that runs NOW during parsing
@@ -1094,10 +1094,10 @@
 ;;; 
 ;;;   C   - $20 (JSR) non-quoted value (can't JSR "<>")
 ;;;   ]   - ends the generation
-;;;   <   - lo byte of last %D number matched
-;;;   >   - hi byte         - " -
-;;;   <>  - little endian 2 bytes of %D     VAL0
-;;;   +>  -       - " -           of %D+1   VAL1
+;;;   <   - use LOVAL == lo byte of last %D number matched
+;;;   >   - use HIVAL hi byte         - " -
+;;;   <>  - little endian 2 bytes of %D     use VAL0 or VAR0
+;;;   +>  -       - " -           of %D+1   use VAL1 or VAR1
 ;;;         (actually + and next byte will be replaced)
 ;;;         (can't do single '+')
 ;;;  
@@ -1105,15 +1105,16 @@
 ;;;            (NOTE: relative jmps - don't know!)
 ;;; 
 ;;;   {{  - PUSHLOC (push and AUTO patch at accept rule)
-;;;   D   - set %D(igits) value (tos) from %A(ddr) (dos)
-;;;   d   - set dos from tos
-;;;   #   - push tos (on to stack)
+;;;   #   - push tos (on to stack) (don't forget to pop!)
 ;;;   :   - push loc (onto stack, as backpatch! - careful)
 ;;;   ;   - pop loc (from stack) to %D/%A?? (tos)
 ;;;   ?n  - PICK n from stack (last is 0)
 ;;;   B   - BRACH here (patch jmp at TOS) (use ?n first)
 ;;; 
-;;; TODO: keep '#' ':' ';'
+;;; TODO: remove - not used!
+;;;   D   - set tos from dos
+;;;   d   - set dos from tos
+;;; 
 ;;; TODO: 'z' to swap two locs? replaces 'D and 'd'
 ;;; TODO: make a "pickN' rule instead! '#3' '?3'
 ;;; 
@@ -2857,9 +2858,6 @@ jmpaccept:
         inc rule+1
 :       
         ;; comp rule?
-.ifdef DEBUGNAME
-jsr _printchar
-.endif ; DEBUGNAME
         cmp (rule),y
         beq @skipspc
         jmp _next
@@ -2898,9 +2896,38 @@ testeq:
 ;;; LOL: relocate to "middle"?
         bne failjmp
 eq:  
+
+
+
+;;; TODO: never get's here? only one time '/'
+;;;   in Input/strlib.c ????
+
+.ifnblank
+        ;; - "   string" (no skip leading spaces)
+PUTC '/'
+        cmp #'"'                ; "
+        bne :+
+PUTC '?'
+        lda (inp),y
+        cmp #'%'                ; probably %s or %S
+        bne :+
+        ;; we have '%'
+PUTC '!'
+        dey
+        jsr _incR
+        jsr _incI
+        jmp percent
+:       
+.endif
+
     DEBC '='
         jsr _incR
+
+;;; TODO: removed, not needed?
+;        lda (inp),y
+
         jmp _nextI
+
 
 failjmp:
         jmp _fail
@@ -3182,12 +3209,18 @@ str:
         bne :+
         lda #10
 :       
+        ;; - \r => 13
+        cmp #'n'
+        bne :+
+        lda #10
+:       
         ;; - \t => 9
         cmp #'t'
         bne :+
         lda #9
 :       
         ;; TODO: - \xff
+
 @plain:
         ;; skip to next char (keeps A)
         jsr _incI
@@ -3201,8 +3234,8 @@ str:
         ;; 7 B
         ; ldy #0 
         sta (_out),y
-;jsr putchar
         jsr _incO
+
         jmp str
 
 @zero:
@@ -6292,48 +6325,43 @@ FUNC _funcallend
 
 ;;; Simpliest for now
 
-.ifdef STRING
 ;;; TODO: remove routines at endrules
 POS=gos
 
+.ifblank
         .byte "|",34            ; " character
       .byte "["
         ;; jump over inline string
-        jmp PUSHLOC
-        .byte ";"
+        jmp PUSHLOC             ; Branch ?1
+        .byte ":"               ; start of string ?0
       .byte "]"               
 
         ;; copy string to out
         .byte "%S"
-
-        ;; TODO: make a patch routine
-      .byte "%{"
-        ;; patch jump to here
-        lda _out+1
-        ldy #1
-        sta (tos),y
-
-        lda _out
-        dey
-        sta (tos),y
-
-        ;; add 2 to tos to skip bytes
-        clc
-        lda tos
-        adc #2
-        sta tos
-        bcc :+
-        inc tos+1
-:       
-        IMM_RET
-
+        
+      .byte "[?1B"      ; patch Branch to after string
+        .byte "?0"      ; load string address
+        lda #LOVAL
+        ldx #HIVAL
+      .byte ";;]"
+.else
+;;; TODO: almost works, but 2 bytes too much
+;;;   (pointing to path point!)
+        .byte "|",34            ; " character
       .byte "["
-        lda #'<'
-        ldx #'>'
+        ;; jump over inline string
+        jmp PUSHLOC
+      .byte "]"               
+
+        ;; copy string to out
+        .byte "%S"
+        ;; branch to after string!
+      .byte "[;B"
+        ;; load string address
+        lda #LOVAL
+        ldx #HIVAL
       .byte "]"
-.endif ; STRING
-
-
+.endif
 
 
 
@@ -12384,6 +12412,9 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+        .incbin "Input/strlib.c"
+        .byte 0
+
 ;;; BUG: requires var to compile empty stmt in do-whie!
 ;BUGVAR=1
 .ifdef BUGVAR
@@ -14385,11 +14416,7 @@ LOOP=1
         .byte "// q -",10
         .byte 0
 ;;; r - 
-        .byte "// r -",10
-        .byte 0
-
-;;; s - TODO: sound?
-;;; s - summer recursion
+        .byte "// recursive summer",10
         ;; cc65: 13768c (41)
         ;; MC:   16915c (41=>861)
         .byte "word summer(word a) {",10
@@ -14403,6 +14430,10 @@ LOOP=1
         .byte "  // return summer(41);",10
         .byte " return summer(10);",10
         .byte "}",10
+        .byte 0
+
+;;; s - 
+        .incbin "Input/strlib.c"
         .byte 0
 
 ;;; t - 
