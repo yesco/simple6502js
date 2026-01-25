@@ -68,7 +68,8 @@ retC:
 rettrue:   
         lda #$ff
         SKIPTWO
-retfalse:   lda #0
+retfalse:
+        lda #0
         tax
         rts
 
@@ -142,11 +143,12 @@ ispunct:
         bcc retfalse
         bcs rettrue
 
-toupper:        
+toupper:
 ;;; 9
         jsr isalpha
         tya
         bcs :+
+        ldx #0
         and #255-32
 :       
         rts
@@ -156,6 +158,7 @@ tolower:
         jsr isalpha
         tya
         bcs :+
+        ldx #0
         ora #32
 :       
         rts

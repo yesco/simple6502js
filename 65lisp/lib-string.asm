@@ -40,6 +40,8 @@
 ;;; - strtok
 ;;; 
 ;;; - (strerror)
+;;; 
+;;; TESTED: ok!
 strlen: 
 ;;; 22 B
         sta pos
@@ -70,6 +72,7 @@ strAXchrY:
         sta tos
         stx tos+1
 
+;;; TESTED: ok!
 strTOSchrY:
 ;;; (32 B) fastest and smallest!
         sty savey
@@ -141,19 +144,25 @@ strTOScmp:
         rts
 
 
-strTOSstr:
+;;; TODO: ????
+;strTOSstr:
         rts
 
-;;; tos: first arg, copy to
-;;; AX : second, arg, source
+;;; tos: destination, first arg
+;;; AX : source, second arg
 ;;; 
 ;;; TODO: can combine into a strncpy?
+;;; 
+;;; TESTED: ok!
 strTOScpy:
 ;;; 24 B (cc65: 31 B)
-        ;; save destination
+        ;; save source
         sta dos
         stx dos+1
 
+strTOScpyDOS:
+        ;; tos+1 will change, store it
+        ldx tos+1
         ldy #0
 :       
         ;; copy byte, including \0 byte
@@ -167,9 +176,8 @@ strTOScpy:
         inc tos+1
         bne :-
 :       
-        ;; return orig destination
-        ;; X is untouched
-        lda dos
+        ;; return orig destination (tos,x unchanged)
+        lda tos
         rts
 
 ;;; stpcpy, same as strcpy
@@ -177,37 +185,63 @@ strTOScpy:
 ;;; 
 ;;; TODO: is it more efficent to have strpcpy implement
 ;;; and strcpy callling? (turn around?)
+;;; 
+;;; TESTED: ok!
 stpTOScpy:
-;;; 14 B
+;;; 13 B
         jsr strTOScpy
-        ;; AX = dos+Y
-        clc
+        ;; Y=lo end, tos+1 hi end
+        ldx tos+1
         tya
-        adc #dos
+
+        clc
+        adc tos
         bcc :+
-        inc dos+1
+        inx
 :       
-        ldx dos+1
         rts
 
+;;; TODO: funny how this would benefit from reverse args?
+;;; 
 ;;; TOS: first argument: destination
 ;;; AX : second argument: what to concat at end
+;;; 
+;;; TESTED: ok!
 strTOScat: 
 ;;; 16B ~ TODO: finish it...
-        ;; save AX to concat for later, lol
+        sta dos
+        stx dos+1
+
+        ;; save destination to be returned
+        ldy tos
+        tya
         pha
-        txa
+        lda tos+1
         pha
-        ;; search first string for \0 - end of string
-        ldy #0
-        jsr strTOSchrY
-        ;; AX points to \0 at end of string!
-        ;; store lo A in tos (X== value at tos+1 already)
+
+        ;; find \0 in destination
+
+;;; TODO: save bytes using:
+;        jsr strTOSchrY
+
+        lda #0
         sta tos
-        ;; pop revesre destination
+:       
+        lda (tos),y
+        beq :+
+        iny
+        bne :-
+        inc tos+1
+        bne :-                  ; always
+:       
+        sty tos
+        ;; tos points to \0 at end of string!
+        jsr strTOScpyDOS
+
+        ;; return destinatipn
         pla
-        txa
+        tax
         pla
-        ;; concat(TOS,AX)
-        jmp strTOScat
-        ;; STRCAT returns original dest
+
+        rts
+

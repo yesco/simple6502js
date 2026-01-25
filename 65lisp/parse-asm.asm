@@ -1218,7 +1218,7 @@ DEMO=1
         TUTORIAL=1              ; + 1   KB
         EXAMPLEFILES=1          ; + 4.5 KB
 
-        OUTPUTSIZE=2*1024
+        OUTPUTSIZE=1*1024
         ;; Heap: 8KB
 
 .else ; DEFAULT
@@ -2141,10 +2141,6 @@ ELSE=1
 ;;; (only operating on register A, no overflow etc)
 ;
 BYTERULES=1
-
-;;; Pointers: &v *v= *v
-;;; TODO: not working
-;POINTERS=1
 
 ;;; testing data a=0, b=10, ... e=40, ...
 ;;; doesn't take any extra code bytes, or rule bytes
@@ -3204,6 +3200,7 @@ str:
         bne @plain
         ;; -- quoted
         jsr _incI
+        lda (inp),y
         ;; - \n => 10
         cmp #'n'
         bne :+
@@ -5828,6 +5825,11 @@ FUNC _stringrulesstart
         jsr strTOScpy
       .byte ']'
 
+        .byte "|stpcpy(",_G
+      .byte '['
+        jsr stpTOScpy
+      .byte ']'
+
         .byte "|strcat(",_G
       .byte '['
         jsr strTOScat
@@ -5838,10 +5840,12 @@ FUNC _stringrulesstart
         jsr strTOScmp
       .byte ']'
 
-        .byte "|strstr(",_G
-      .byte '['
-        jsr strTOSstr
-      .byte ']'
+;;; TODO: not implemented yet!
+        ;; 
+;        .byte "|strstr(",_G
+;      .byte '['                 
+;        jsr strTOSstr
+;      .byte ']'
 
 
 
@@ -6622,26 +6626,15 @@ jsr axputh
       .byte ']'
 
 
-;;; TODO: semantics of generic dereference?
-;;;    (char*) or (int*) or "none"
-;;;    it'd be nice if var[($)byte] == char
-;;;    TODO: how about larger arrays?
-;;;       intarr[i]== *(int*)(intarr+i*2) - expensive!!!
-;;;       want intarr[[foo]], lol 
-
         .byte "|\*%V"
       .byte '['
-;;; TODO: test
         lda VAR0
         sta tos
         lda VAR1
         sta tos+1
 
-        ldy #1
-        lda (tos),y
-        tax
-        dey
-        lda (tos),y
+        ldx #0
+        lda (tos,x)
       .byte ']'
 
 
@@ -7436,7 +7429,12 @@ ruleU:
         ;; byte
         .byte "|*(char*)%V"
       .byte "["
-        lda VAR0
+        ldy #LOVAL
+        sty tos
+        ldy #HIVAL
+        sty tos+1
+        ldy #0
+        lda (tos),y
         ldx #0
       .byte "]"
         .byte _V
@@ -8831,13 +8829,6 @@ afterELSE:
         ;; Auto-patches at exit!
 .endif ; ELSE
 
-;;; TODO: 3 things same result, save bytes?
-        ;; simple write byte to memory
-        .byte "|*(char*)%V=[#]",_E,";"
-      .byte "[;"
-        sta VAR0
-      .byte "]"
-
 .ifdef BYTERULES
         ;; %D is ok as it get's "truncated" anyway.
         .byte "|$%V[#]=%D;"
@@ -9179,21 +9170,17 @@ FUNC _stmtbyteruleend
       .byte "]"
 .endif ; OPTRULES
 
-.ifdef POINTERS
-        .byte "|*%V=",_E,";"
-      .byte "["
+        ;; assume it's char*
+        .byte "|*%V=[#]",_E,";"
+      .byte "[;"
         ldy VAR0
         sty tos
         ldy VAL1
         sty tos+1
 
-        ldy #0
-        sta (tos),y
-        tax
-        iny
-        sta (tos),y
+        ldx #0
+        sta (tos,x)
       .byte "]"
-.endif ; POINTERS
 
 .ifdef BYTERULES
         ;; TODO: this is now limited to 256 index
@@ -12412,8 +12399,8 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
-        .incbin "Input/strlib.c"
-        .byte 0
+;        .incbin "Input/strlib.c"
+;        .byte 0
 
 ;;; BUG: requires var to compile empty stmt in do-whie!
 ;BUGVAR=1
@@ -14180,6 +14167,7 @@ NOPRINT=1
 ;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
 ;;; b - Byte sieve
         .incbin "Input/byte-sieve.c"
+;        .incbin "Input/byte-sieve-2.c"
         .byte 0
 
 ;;; c - color chart
