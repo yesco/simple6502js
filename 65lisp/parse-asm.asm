@@ -10757,12 +10757,13 @@ FUNC _ERROR
 
 .endif ; ERRPOS
 
-.scope
-.ifdef PRINTINPUT
-        ;; print it
 
         PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
 
+
+.scope
+.ifdef PRINTINPUT
+        ;; print it
         lda originp
         sta pos
         lda originp+1
@@ -10833,7 +10834,51 @@ done2:
 .endif ; PRINTINPUT
 .endscope
 
-        PRINTZ {10,YELLOW,"goto e)rror  ?) help",10,10}
+        ;; print next char (code) input+rule
+        
+        PRINTZ {10,WHITE,"inp  @ "}
+        lda inp
+        ldx inp+1
+        jsr _printh
+
+        putc ' '
+        ldy #0
+:       
+        lda (inp),y
+        jsr _printchar
+        iny
+        cpy #20
+        bne :-
+
+        PRINTZ {10,WHITE,"rule @ "}
+        lda rule
+        ldx rule+1
+        jsr _printh
+
+        putc ' '
+        ldy #0
+:       
+        lda (rule),y
+        jsr _printchar
+        iny
+        cpy #20
+        bne :-
+
+        PRINTZ {10,WHITE,"rule @ "}
+        lda _ruleVARS
+        ldx _ruleVARS+1
+        jsr _printh
+
+        putc ' '
+        ldy #0
+:       
+        lda (_ruleVARS),y
+        jsr _printchar
+        iny
+        cpy #20
+        bne :-
+
+        PRINTZ {10,10,YELLOW,"goto e)rror  ?) help",10,10}
 
         jmp _forcecommandmode
 
@@ -10925,7 +10970,11 @@ FUNC _run
         beq :+
         ;; can't run; have error (?)
         PRINTZ {10,10,YELLOW,"Compile first...",10}
+.ifdef __ATMOS__
         jmp _idecompile
+.else
+        rts
+.endif
 :       
 
         ;; TODO: print something if run from edit mode?
@@ -11591,23 +11640,25 @@ GROUP=YELLOW
 .byte KEY," ^C",MEAN,"ompile  ",KEY," ^X",MEAN,"tras",10
 .byte KEY," ^R",MEAN,"un      ",KEY," ^Z",MEAN,"ource",10
 .byte KEY," ^Q",MEAN,"asm    - shows compiled code",10
-.byte KEY,"(^W",MEAN,"rite   - save source)",10
-.byte KEY,"(^L",MEAN,"oad    - load source)",10
+;.byte KEY,"(^W",MEAN,"rite   - save source)",10
+;.byte KEY,"(^L",MEAN,"oad    - load source)",10
+.byte KEY,"NMI",MEAN,"stop program",10
 .byte 10
 .byte KEY,"DEL",MEAN,"bs",KEY,"^D",MEAN,"del",KEY,"^A",MEAN,"|<-",KEY,"^I",MEAN,"ndent",KEY,"^E",MEAN,"->|",10
 .byte GROUP,"Line:",KEY," ^P",MEAN,"rev",KEY,"^N",MEAN,"ext",KEY,"RET",MEAN,"next indent",10
 .byte "      ",KEY," ^K",MEAN,"ill",KEY,"^Y",MEAN,"ank",KEY,"^G",MEAN,"quit/clear",10
 .byte "",10
-.byte MEAN,"// A comment. Types:",CODE,"word",10
-.byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
-.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S;",MEAN,"]..;",MEAN,"or",CODE,"a+=",GROUP,"S",CODE,"OP=",10
-.byte GROUP,"OP:",CODE,"+ - & | ^ *2 /2 << >> == < !",10
-.byte GROUP,"S :",CODE,"v 4711 25 'c' ",34,"str",34,MEAN,"simple vals",10
+.byte WHITE,"#include <foo.c> // # line ignored",10
+;.byte GROUP,"V :",CODE,"v",CODE,"  v[byte]",MEAN,"==",CODE,"*(char*)v",MEAN,"==",CODE,"$ v",10
+.byte GROUP,"V :",CODE,"word v, abba, x_y, x3;",10
+.byte GROUP,"S :",CODE,"v 17 0x2a 0b1011 'c'",WHITE,34,"simple",34,10
+.byte GROUP,"= :",GROUP,"V",CODE,"=",GROUP,"V",MEAN,"[",GROUP,"OP S",MEAN,"]...",CODE,";",MEAN,"   or",CODE,"a+=",GROUP,"S;",10
+.byte GROUP,"OP:",CODE,"+ - & | ^ *2 /2 << >> == <",10
 .byte GROUP,"FN:",CODE,"word A(...) {... return ...; }",10
-.byte "  ",CODE,"if (...) ...",MEAN,"OPT:",CODE,"else ...",10
-.byte "  ",CODE,"while(...) ...",10
+.byte "  ",CODE,"if (...)...",MEAN,"OPT:",CODE,"else ...",10
+.byte "  ",CODE,"while(...)...",MEAN,"test",CODE,"!v v<",GROUP,"S",CODE," v==",GROUP,"S",10
 .byte "  ",CODE,"do...while(...);",MEAN,"most efficient!",10
-.byte "  ",CODE,"for(...; ...; ...) ...",MEAN,"least",10
+.byte "  ",CODE,"for(...; ...; ...)...",MEAN,"least",10
 ;;; TODO:
 ;.byte "  ",CODE,"L: ... goto L;"
 .byte 0
