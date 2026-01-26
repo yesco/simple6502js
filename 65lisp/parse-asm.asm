@@ -6601,7 +6601,7 @@ jsr axputh
         IMM_RET
 
       .byte "["
-;        .byte "D"               ; tos= dos; addr of string
+wrong;        .byte "D"               ; tos= dos; addr of string
         lda #'<'
         ldx #'>'
 ;        jsr axputh
@@ -8711,18 +8711,42 @@ afterELSE:
         ;; ELSE is optional and depends on C=0 to do ELSE clause!
 
 
+;; TODO:
+
+.ifnblank
+;;; TODO: if(%V<[#]%d) should save (few bytes?)
+        .byte "|if(%V<[#]%d[#])"
+.scope        
+;;; 15 B save 3 B
+      .byte "["
+        ldx VAL1
+        beq @else
+        lda VAR0                ; LOL, nono! VAR0==VAL0
+        cmp #LOVAL
+        bcc @then
+@else:
+        ;; Hmmm, reverse...
+        clc
+        jmp PUSHVAL
+@then:
+        _S
+        sec
+.endscope
+.endif        
+        
+
         ;; IF( var < num ) ... saves 6 B (- 63 57)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%V<%D)"
+        .byte "|if(%V<[#]%D)"
 .scope        
 ;;; 18
       .byte "["
         ;; reverse cmp as <> NUM avail first
-        lda #'<'
-        ldx #'>'
+        lda #LOVAL
+        ldx #HIVAL
         ;; cmp with VAR
-        .byte 'D'               ; get aDdress
+        .byte ';'               ; get aDdress
         ;; test hi byte first
         cpx VAL1
         bne :+                  ; neq determine if <
@@ -12399,8 +12423,22 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
-;        .incbin "Input/strlib.c"
-;        .byte 0
+;IFLT=1
+.ifdef IFLT
+        .byte "word i;",10
+        .byte "word main(){",10
+;        .byte "  i=4; return i<4;",10  ; fine
+        .byte "  i=4; if (i<4) return 1; else return 0;",10
+        .byte "}",10
+        .byte 0
+
+        .incbin "Input/fib.c"
+        .byte 0
+.endif ; IFLT
+
+
+        .incbin "Input/fib.c"
+        .byte 0
 
 ;;; BUG: requires var to compile empty stmt in do-whie!
 ;BUGVAR=1
@@ -14188,28 +14226,25 @@ NOPRINT=1
         .byte 0
 
 ;;; f - fib recursion
+
+;;; - fib(0..24)
+;;; cc65: 2607 B  75731440 - no add
+;;; cc65: 2605 B  91050216 - with add     
+;;; mc02:  187+B  98224959 - with add (runt+91 stdio+114)
+
+;;; - fib(24) (sim)
+;;; cc65:  336 B 33311024 - add, fib(24) no print
+;;; (tap)  518 B          (oric atmos .tap file)
+;;;        319 B 28807992 - no add
+;;;       (105 B  only fib!)
+;;; mc02:  136+B 37270319 - add, fib(24) no print
+;;;        227+tap overhead  (runtime +91)
+
 .ifblank
         .byte "// f -",10
         .byte 0
 .else
-        .byte "// fibonacci recursion",10
-        .byte "word add(word a, word b) {",10
-        .byte "  putchar('+'); putu(a); putchar(' '); putu(b);",10
-        .byte "  return a+b;",10
-        .byte "}",10
-        .byte "",10
-        .byte "word fib(word n) {",10
-        .byte "  putu(n); putchar(' ');",10
-        .byte "  if (n<3) return n;",10
-        .byte "  // no complex excpressions, yet",10
-        .byte "  // return fib(n-1) + fib(n-2);",10
-        .byte "  return add(fib(n-1), fib(n-2));",10
-        .byte "}",10
-        ;; 41 is maximum recursion (/ 256 41.0) = 6.24 (2param+2restore1+2rts) ok
-        .byte "word main() {",10
-        .byte "  // return fib(41);",10
-        .byte " return fib(10);",10
-        .byte "}",10
+        .incbin "Input/fib.c"
         .byte 0
 .endif
 
