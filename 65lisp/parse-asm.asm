@@ -5817,29 +5817,29 @@ FUNC _stringrulesstart
         jsr strAXchrY
       .byte ']'
 
-        .byte "|strcpy(",_G
+        .byte "|strcpy(",_E,",",_G
       .byte '['
         jsr strTOScpy
       .byte ']'
 
-        .byte "|stpcpy(",_G
+        .byte "|stpcpy(",_E,",",_G
       .byte '['
         jsr stpTOScpy
       .byte ']'
 
-        .byte "|strcat(",_G
+        .byte "|strcat(",_E,",",_G
       .byte '['
         jsr strTOScat
       .byte ']'
 
-        .byte "|strcmp(",_G
+        .byte "|strcmp(",_E,",",_G
       .byte '['
         jsr strTOScmp
       .byte ']'
 
 ;;; TODO: not implemented yet!
         ;; 
-;        .byte "|strstr(",_G
+;        .byte "|strstr(",_E,",",_G
 ;      .byte '['                 
 ;        jsr strTOSstr
 ;      .byte ']'
@@ -5910,7 +5910,7 @@ FUNC _memoryrulesstart
       .byte "]"
 
 ;;; TOTEST
-        .byte "|doke(",_G
+        .byte "|doke(",_E,",",_G
       .byte "["
         ;; AX: value to doke
         ;; tos: addrss to put it
@@ -6310,6 +6310,7 @@ POS=gos
 
 .ifblank
         .byte "|",34            ; " character
+parsestring:    
       .byte "["
         ;; jump over inline string
         jmp PUSHLOC             ; Branch ?1
@@ -6332,7 +6333,6 @@ POS=gos
         ;; jump over inline string
         jmp PUSHLOC
       .byte "]"               
-
         ;; copy string to out
         .byte "%S"
         ;; branch to after string!
@@ -7986,65 +7986,86 @@ ruleF:
 
 ;;; Another calling convention!
 ;;; 
-;;; "(",_G:  two argument rule where:
+;;; "(",_E,",",_G:  two argument rule where:
 ;;;    - first arg is saved in TOS
 ;;;    - second arg is in AX
 ruleG:
 
+;;; When entering this code AX contains value to be 
+;;; written to tos. In many cases we can do this without
+;;; using the stack.
+
 .ifdef OPTRULES
-        .byte _E,",0)"
-      .byte '['
-;;; 7
+        .byte "0)"
+      .byte "["
         sta tos
         stx tos+1
 
         lda #0
         tax
-      .byte ']'
-.endif ; OPTRULES
+      .byte "]"
 
-        .byte "|",_E,",%D)"
-      .byte '['
-;;; 8
+        ;; parse string - duplicate code (see parsestring:)
+        .byte "|",34            ; " character
+      .byte "["
+        sta tos
+        stx tos+1
+        ;; jump over inline string
+        jmp PUSHLOC
+        .byte ":"               ; start of string ?0
+      .byte "]"
+        ;; copy string to out
+        .byte "%S"
+        ;; branch to after string!
+      .byte "[?1B"
+        ;; load string address
+        .byte "?0"
+        lda #LOVAL
+        ldx #HIVAL
+      .byte ";;]"
+        .byte ")"
+
+        .byte "|%D)"
+      .byte "["
         sta tos
         stx tos+1
 
-        lda #'<'
-        ldx #'>'
-      .byte ']'
-
-        .byte "|",_E,",%V)"
-      .byte '['
+        lda #LOVAL
+        ldx #HIVAL
+      .byte "]"
+        
+        .byte "|%V)"
+      .byte "["
         sta tos
         stx tos+1
 
         lda VAR0
         ldx VAR1
-      .byte ']'
+      .byte "]"
 
-        ;; Nothing else than Expression could come now
         .byte "|"
+.endif ; OPTRULES
+
       .byte "["
-        ;; reverse save A,X
+        ;; save on stack (tos may be used in _E)
         pha
         txa
         pha
       .byte "]"
-        .byte _E
+        .byte _E,")"
       .byte "["
+        ;; copy from stack to tos
         tay
-        sta savex
-        ;; reverse pop X,A
         pla
         sta tos+1
         pla
         sta tos
-        ;; 
-        ldx savex
         tya
       .byte "]"
 
         .byte 0
+
+
 
 ;;; Exprssion:
 ruleE:  
@@ -12461,6 +12482,31 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;STRPARAM=1
+.ifdef STRPARAM
+        .byte "word s,bar;",10
+        .byte "word main() {",10
+        .byte "  s= \"foo456\";",10
+.ifnblank
+        ;; 68 B
+        .byte "  bar= \"bar\";",10
+        .byte "  strcpy(s+3, bar);",10
+.else
+        ;; 60 B saves 8 B!
+        .byte "  strcpy(s+3, \"bar\");",10
+.endif 
+        .byte "  puts(s);",10
+        .byte "}",10
+        .byte 0
+.endif ; STRPARAM
+
+
+.ifdef TUTORIAL
+        .incbin "Input/tutorial.txt"
+        .byte 0
+
+.else 
+
 ;;; 53 bytes - optimize one param function call -6 B
 ;;;    -> 47 B
 ;ONEPARAM=1
@@ -12473,27 +12519,6 @@ input:
         .byte "}",10
         .byte 0
 .endif ; STRPARAM
-
-;STRPARAM=1
-.ifdef STRPARAM
-        .byte "word x;",10
-        .byte "word main() {",10
-;        .byte "  return *strchr(s, 'b');",10
-;        .byte "  return strchr(\"foobar\", 'b');",10
-
-        .byte "  x= strchr(\"foobar\", 'b');",10
-        .byte "  return putchar(*x);",10
-
-        .byte "}",10
-        .byte 0
-.endif ; STRPARAM
-
-
-.ifdef TUTORIAL
-        .incbin "Input/tutorial.txt"
-        .byte 0
-
-.else 
 
 ;IFLT=1
 .ifdef IFLT
@@ -14517,7 +14542,9 @@ LOOP=1
         .byte 0
 
 ;;; s - strings
-        ;; 647 B -> 621 B
+        ;; 647 B -> 621 B 
+        ;; 565 B - fixed _G rule
+        ;; 533 B - inline strings!
         .incbin "Input/strlib.c"
         .byte 0
 
