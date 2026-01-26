@@ -815,6 +815,10 @@ FUNC _loadfirst
 ;;; Load edit buffer with zero terminated text from AX
 FUNC _loadfromAX
 
+        ;; change to edit mode
+        ldy #0
+        sty mode
+
         ;; mark as not good (?)
         inc compilestatus
 

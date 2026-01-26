@@ -1186,7 +1186,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;
+
 DEMO=1
 
 
@@ -5611,8 +5611,7 @@ FUNC _iorulesstart
         ;; putchar variable - saves 2 bytes!
         .byte "|putchar('\\t')" ;      double \\???
       .byte '['
-        lda #9
-        jsr putchar
+        jsr tab
 ;;; TODO: about return value...
       .byte ']'
 
@@ -11009,6 +11008,8 @@ FUNC _run
         beq :+
         ;; can't run; have error (?)
         PRINTZ {10,10,YELLOW,"Compile first...",10}
+        lda #128
+        sta mode
 .ifdef __ATMOS__
         jmp _idecompile
 .else
@@ -11775,6 +11776,7 @@ FUNC _extend
 @found:
         jsr _loadfromAX
         ;; TODO: compile first?
+        
         jmp _eventloop
 
 @notfound:       
@@ -12423,6 +12425,12 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+.ifdef TUTORIAL
+        .incbin "Input/tutorial.txt"
+        .byte 0
+
+.else 
+
 ;IFLT=1
 .ifdef IFLT
         .byte "word i;",10
@@ -12430,9 +12438,6 @@ input:
 ;        .byte "  i=4; return i<4;",10  ; fine
         .byte "  i=4; if (i<4) return 1; else return 0;",10
         .byte "}",10
-        .byte 0
-
-        .incbin "Input/fib.c"
         .byte 0
 .endif ; IFLT
 
@@ -12514,14 +12519,6 @@ input:
         .byte "}",10
         .byte 0
 .endif ; EQTEST        
-
-
-
-
-.ifdef TUTORIAL
-        .incbin "Input/tutorial.txt"
-        .byte 0
-.else
 
         ;; MINIMAL PROGRAM
         ;; 7B 19c
@@ -14213,7 +14210,8 @@ NOPRINT=1
         .byte 0
 
 ;;; d - rainbow drop
-        .incbin "Input/rainbow-drop.c"
+        .byte "// d -"
+;        .incbin "Input/rainbow-drop.c"
         .byte 0
 
 ;;; e - empty program
@@ -14240,13 +14238,9 @@ NOPRINT=1
 ;;; mc02:  136+B 37270319 - add, fib(24) no print
 ;;;        227+tap overhead  (runtime +91)
 
-.ifblank
-        .byte "// f -",10
+        .incbin "Input/fib-list.c"
         .byte 0
-.else
-        .incbin "Input/fib.c"
-        .byte 0
-.endif
+
 
 .ifdef FROGMOVE
         ;; TODO: not working
@@ -14256,7 +14250,7 @@ NOPRINT=1
 .endif ; FROGMOVE
 
 ;;; g - game?
-        .byte "// TODO: game?",10
+        .byte "// g-",10
         .byte 0
 
 ;;; h - hello
@@ -14281,7 +14275,7 @@ NOPRINT=1
         .byte 0
 
 ;;; j - 
-        .byte "// TODO: Jolly Program",10
+        .byte "// j -",10
         .byte 0
 
 ;;; k - circle
@@ -14336,7 +14330,7 @@ NOPRINT=1
 ;FOURTY=1
 ;;; 62B 119c (program 16B overhead)
 
-        .byte "// MUL40 - NO operator precedenc",10
+        .byte "// MUL40 - NO operator precedence",10
         .byte "word n, r;",10
         .byte "",10
         .byte "word main(){",10
