@@ -6620,20 +6620,27 @@ wrong;        .byte "D"               ; tos= dos; addr of string
 ;;;   in zeropage!)
         .byte "|&%V"
       .byte '['
-        lda #'<'
-        ldx #'>'
+        lda #LOVAL
+        ldx #HIVAL
       .byte ']'
 
 
         .byte "|\*%V"
       .byte '['
+.ifdef ZPVARS
+        ldx #0
+        ;; 1c more than (),y but sets X=0 for free!
+        lda (VAR0,x)
+.else
         lda VAR0
         sta tos
         lda VAR1
         sta tos+1
 
         ldx #0
+        ;; 1c more than (),y but sets X=0 for free!
         lda (tos,x)
+.endif
       .byte ']'
 
 
@@ -9196,6 +9203,10 @@ FUNC _stmtbyteruleend
         ;; assume it's char*
         .byte "|*%V=[#]",_E,";"
       .byte "[;"
+.ifdef ZPVARS
+        ldx #0
+        sta (VAR0,x)
+.else
         ldy VAR0
         sty tos
         ldy VAL1
@@ -9203,6 +9214,7 @@ FUNC _stmtbyteruleend
 
         ldx #0
         sta (tos,x)
+.endif
       .byte "]"
 
 .ifdef BYTERULES
@@ -14449,7 +14461,8 @@ LOOP=1
         .byte "}",10
         .byte 0
 
-;;; s - 
+;;; s - strings
+        ;; 647 B -> 621 B
         .incbin "Input/strlib.c"
         .byte 0
 
