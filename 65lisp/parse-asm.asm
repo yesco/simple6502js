@@ -705,12 +705,11 @@
 ;;; - v0.4 unlimited statements (TAILREC)
 ;;; - v0.5 IDEA/editor
 ;;; - v0.60 long name variables
-;;; - v0.61 TODO: (slow) function calls
+;;; - v0.61 (slow) function calls
+.define VERSION "v0.61"
 ;;; - v0.62 TODO: local variables
 ;;; - v0.63 TODO: (opt) function calls (static params)
 ;;; - v0.64 TODO: array indexing
-
-
 
 ;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;; TODO: before release
@@ -746,7 +745,6 @@
 ;;; - v1.61803...
 ;;; - v1.618033988749
 
-.define VERSION "v0.60"
 
 
 
@@ -1186,7 +1184,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-
+;
 DEMO=1
 
 
@@ -5298,7 +5296,7 @@ _rules:
 ;ruleJ: "read byte expression, saving AX totos and sets Y=0"
 
 ;ruleK: list of var defined
-ruleL: ;;; experiments in priorities for expressions
+;ruleL: one parmeter function call optimization
 ;ruleM: do ... while expressions (M is upside down W
 ;ruleN: - program var decl
 ;ruleO: - first rule in program/jmp main
@@ -6092,28 +6090,7 @@ FUNC _funcallstart
         DOJSR VAL0
       .byte "]"
 
-        ;; CALL fun(a...) { ... }
-        ;; 
-        ;; JSK-calling convention!
-        ;; (keeps the parameter directly pullable from stack!
-        ;;  and ENDS with return address to be RTSed!)
-        ;; (last param in AX, others pha/txa/pha)
-        .byte "|%V([#]"
-        ;; +3+3 = 6 B + 6c extra
-      .byte "["
-        jmp PUSHLOC             ;   jmp doFUN
-        .byte ":"               ; paramsFUN:
-      .byte "]"
-        .byte _W                ;    pha/txa/pha (not last)
-      .byte "["
-        .byte "?2"              ; (get's FUN-address)
-        jmp VAL0                ;    jmp FUN
-      .byte "]"
-      .byte "["
-        .byte "?1B"             ; doFUN:  (patches Branch)
-        .byte ";"
-        DOJSR VAL0              ;    jsr paramsFUN
-      .byte ";;]"               ; (drops 2 values)
+        .byte "|%V([#]",_E,_L,"[;]"
 
 FUNC _funcallend
 
@@ -7918,7 +7895,54 @@ ruleJ:
 
 
 
+;;; function call, optimize one arguemnt
+ruleL:
+        ;; single arguemnt call
+        .byte ")"
+      .byte "[?2"               ; ref up one rule level!
+        DOJSR VAL0
+      .byte "]"
+
+
+        ;; CALL fun(a...) { ... }
+        ;; 
+        ;; JSK-calling convention!
+        ;; (keeps the parameter directly pullable from stack!
+        ;;  and ENDS with return address to be RTSed!)
+        ;; (last param in AX, others pha/txa/pha)
+        .byte "|,"
+        ;; +3+3 = 6 B + 6c extra
+      .byte "["
+        ;; AX already contains first parameter
+        jmp PUSHLOC             ;   jmp doFUN
+        .byte ":"               ; paramsFUN:
+        ;; push first parameter
+        pha
+        txa
+        pha
+      .byte "]"
+        .byte _W                ;    pha/txa/pha (not last)
+      .byte "["
+        .byte "?4"              ; (get's FUN-address)
+.byte "]"
+.byte "%{"
+jsr _printh
+IMM_RET
+.byte "["
+        jmp VAL0                ;    jmp FUN
+      .byte "]"
+      .byte "["
+        .byte "?1B"             ; doFUN:  (patches Branch)
+        .byte ";"
+        DOJSR VAL0              ;    jsr paramsFUN
+      .byte ";;]"               ; (drops 2 values)
+
+        .byte 0
+
+
+
 ;;; TODO: bad routine, at least for poke(_E,byteexpr)
+;;;    why bad?
 ;;; BYTESIEVE: saved 5 bytes using ruleF!
 ;;; 
 ;;; "keepAXsetY"
@@ -7929,10 +7953,12 @@ ruleF:
         ldy #'<'
       .byte ']'
 
+.ifdef ZPVARS
         .byte "|%V"
       .byte '['
         ldy VAR0
       .byte ']'
+.endif ; ZPVARS
 
         ;; Nothing else than Expression could come now
         .byte "|"
@@ -7944,6 +7970,7 @@ ruleF:
       .byte "]"
         .byte _E
       .byte "["
+        ;; only need low byte
         tay
         ;; reverse pop X,A
         pla
@@ -8032,8 +8059,8 @@ ruleE:
         .byte 0
 
 
-;;; TODO: remove, this old for function calls?
-
+;;; Array constant data partsing
+;;;
 ;;; prefix: array= {
 ;;;  ruleQ:  num,num,num }
 
@@ -10365,10 +10392,7 @@ ruleM:
 
 .ifnblank
 
-;;; TODO: move where?
-;;; experiments in priorities for expressions
-ruleL:
-;
+
 LESSTHAN=1
 .ifdef LESSTHAN
         ;; saves 1 byte!!!
@@ -12437,6 +12461,34 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;;; 53 bytes - optimize one param function call -6 B
+;;;    -> 47 B
+;ONEPARAM=1
+.ifdef ONEPARAM
+        .byte "word double(word one) {",10
+        .byte "  return one+one;",10
+        .byte "}",10
+        .byte "word main() {",10
+        .byte "  return double(7);",10
+        .byte "}",10
+        .byte 0
+.endif ; STRPARAM
+
+;STRPARAM=1
+.ifdef STRPARAM
+        .byte "word x;",10
+        .byte "word main() {",10
+;        .byte "  return *strchr(s, 'b');",10
+;        .byte "  return strchr(\"foobar\", 'b');",10
+
+        .byte "  x= strchr(\"foobar\", 'b');",10
+        .byte "  return putchar(*x);",10
+
+        .byte "}",10
+        .byte 0
+.endif ; STRPARAM
+
+
 .ifdef TUTORIAL
         .incbin "Input/tutorial.txt"
         .byte 0
@@ -12454,7 +12506,7 @@ input:
 .endif ; IFLT
 
 
-        .incbin "Input/fib.c"
+        .incbin "Input/fib-list.c"
         .byte 0
 
 ;;; BUG: requires var to compile empty stmt in do-whie!
@@ -14237,11 +14289,6 @@ NOPRINT=1
 
 ;;; f - fib recursion
 
-;;; - fib(0..24)
-;;; cc65: 2607 B  75731440 - no add
-;;; cc65: 2605 B  91050216 - with add     
-;;; mc02:  187+B  98224959 - with add (runt+91 stdio+114)
-
 ;;; - fib(24) (sim)
 ;;; cc65:  336 B 33311024 - add, fib(24) no print
 ;;; (tap)  518 B          (oric atmos .tap file)
@@ -14249,6 +14296,14 @@ NOPRINT=1
 ;;;       (105 B  only fib!)
 ;;; mc02:  136+B 37270319 - add, fib(24) no print
 ;;;        227+tap overhead  (runtime +91)
+
+;;; - fib(0..24)
+;;; cc65: 2607 B  75731440 - no add
+;;; cc65: 2605 B  91050216 - with add     
+;;; 
+;;; mc02:  187+B  98224959 - with add (runt+91 stdio+114)
+;;;        171+B   ...
+;;;        153+B  95318098 - opt one param calls
 
         .incbin "Input/fib-list.c"
         .byte 0
