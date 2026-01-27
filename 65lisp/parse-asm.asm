@@ -10316,16 +10316,13 @@ parsevarcont:
 .endif ; STARTVAROPT
 
 
-        .byte "|NOP;"
-      .byte "["
-        nop
-      .byte "]"
-
-
+;
+ASM=1
+.ifdef ASM
         ;; inline ASM!
         ;; (must be inline as we don't fail on subrule)
         .include "rules-asm.asm"
-
+.endif ; ASM
 
 
 ;;; END: optimize parsing of   "|%V..."
@@ -12517,12 +12514,16 @@ FUNC _inputstart
 input:
 
 
-;TESTASM=1
+;
+TESTASM=1
 .ifdef TESTASM
         .byte "word main(){",10
+        .byte "  0;",10
         .byte "  NOP;",10
         .byte "  NOP;",10
         .byte "  NOP;",10
+        .byte "  INX;",10
+        .byte "  RTS;",10
 .ifnblank
         .byte "  TAY;",10
         .byte "  LSR;",10
