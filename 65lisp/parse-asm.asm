@@ -1226,6 +1226,9 @@ DEMO=1
 .endif
 
 
+;;; Allow inline (fixed-constant) ASM code!
+;;; (adds 1637 bytes!)
+;ASM=1
 
 
 .ifndef OUTPUTSIZE
@@ -1830,10 +1833,11 @@ FUNC _xmalloc
         ;; FAIL
         jsr nl
 
+;;; TODO: too big just "LDA #'m'; jmp error;"
         lda savea
         ldx savex
         jsr _printn
-        PRINTZ {" bytes",10,"% Malloc failed! ",10,10}
+        PRINTZ {" bytes",10,"%malloc failed! ",10,10}
 
         jmp _NMI_catcher
 
@@ -4304,8 +4308,10 @@ FUNC _digits
         lda (inp),y
 :       
         ;; ? $ hex (hmmm - not standard)
-;        cmp #'$'
-;        beq @hex
+        ;; (useful for inline ASM!)
+;;; TODO: byte var problem....
+        cmp #'$'
+        beq @hex
       
         ;; ? '0'=>check 0x.. '1'..'9'=>isdigit, otherwise fail 
         sec
@@ -10316,8 +10322,6 @@ parsevarcont:
 .endif ; STARTVAROPT
 
 
-;
-ASM=1
 .ifdef ASM
         ;; inline ASM!
         ;; (must be inline as we don't fail on subrule)
@@ -12514,22 +12518,22 @@ FUNC _inputstart
 input:
 
 
-;
-TESTASM=1
+;;; TODO: %V variables... %v for 1 byte address? lol
+
+;TESTASM=1
 .ifdef TESTASM
         .byte "word main(){",10
-        .byte "  0;",10
+        .byte "  LDA #41;",10
+        .byte "  LDA #')';",10
+        .byte "  LDA #0x29;",10
+        .byte "  LDA #$29;",10
+        .byte "  LDX #0;",10
+        .byte "  NOP;",10      
         .byte "  NOP;",10
         .byte "  NOP;",10
-        .byte "  NOP;",10
-        .byte "  INX;",10
+        .byte "  CLC;",10
+        .byte "  ADC #1;",10
         .byte "  RTS;",10
-.ifnblank
-        .byte "  TAY;",10
-        .byte "  LSR;",10
-        .byte "  TSX;",10
-        .byte "  CLI;",10
-.endif
         .byte "}",10
         .byte 0
 .endif ; TESTASM
