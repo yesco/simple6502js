@@ -3,7 +3,7 @@
 
 word p(word n) {
   if (n) putu(1); else putu(0);
-  putchar('\t');
+  putchar(' ');
 }
 
 word c;

@@ -5278,6 +5278,22 @@ _rules:
         .word ruleP,ruleQ,ruleR,ruleS,ruleT
         .word ruleU,ruleV,ruleW,ruleX,ruleY
         .word ruleZ
+        .word ruleLeftBracket,ruleBackSlash,ruleRightBracket
+        .word ruleCeiling,ruleUnderScore
+.ifdef EXTRARULES
+;;; TODO: currently rule indirect address is calculated
+;;;   with AND #31... add code (EOR 31?)
+        ;; ...a-z... 96-127
+        .word ruleBackTick
+        .word rule_a,rule_b,rule_c,rule_d,rule_e
+        .word rule_f,rule_g,rule_h,rule_i,rule_j
+        .word rule_k,rule_l,rule_m,rule_n,rule_o
+        .word rule_p,rule_q,rule_r,rule_s,rule_t
+        .word rule_u,rule_v,rule_w,rule_x,rule_y
+        .word rule_z
+        .word ruleLeftCurly,ruleBar,ruleRigthCurlt
+        .word ruleTilde,ruleDel
+.endif ; EXTRARULES
         .word 0                 ; TODO: needed?
 
 ;rule0: use ruleP
@@ -5310,8 +5326,12 @@ _rules:
 ;ruleX: = cc65 parameter list (jsr pushax), last in AX
 ;ruleY: = ORIC parameters init (page 2)
 ;ruleZ: = ORIC list of parameters (page 2)
+ruleLeftBracket:
+ruleBackSlash:  
+ruleRightBracket:       
+ruleCeiling:    
+ruleUnderScore:
         .byte 0
-
 
 _A='A'+128
 _B='B'+128
@@ -5339,6 +5359,13 @@ _W='W'+128
 _X='X'+128
 _Y='Y'+128
 _Z='Z'+128
+_LeftBracket='['+128
+_ASM=_LeftBracket
+_BackSlash='\'+128
+_RightBracket=']'+128
+_Ceiling='^'+128
+_UnderScore='_'+128
+
 
 ;;; Zeroth-rule
 ;;; NOTE: can't backtrack here! do directly other rule!
@@ -7924,11 +7951,6 @@ ruleL:
         .byte _W                ;    pha/txa/pha (not last)
       .byte "["
         .byte "?4"              ; (get's FUN-address)
-.byte "]"
-.byte "%{"
-jsr _printh
-IMM_RET
-.byte "["
         jmp VAL0                ;    jmp FUN
       .byte "]"
       .byte "["
@@ -10293,14 +10315,24 @@ parsevarcont:
         IMM_RET
 .endif ; STARTVAROPT
 
+
+        .byte "|NOP;"
+      .byte "["
+        nop
+      .byte "]"
+
+
+        ;; inline ASM!
+        ;; (must be inline as we don't fail on subrule)
+        .include "rules-asm.asm"
+
+
+
 ;;; END: optimize parsing of   "|%V..."
 ;;; ========================================
 
-
         ;; Expression; // throw away result
         .byte "|",_E,";"
-
-
 
         ;; MUST BE LAST!
         ;; (%N sidoeffects are large, lol)
@@ -10309,8 +10341,10 @@ parsevarcont:
         .byte "|%N:",_S
         ;; set's variable/name to that address!
 
+;;; DON'T PUT ANYTHING HERE!
 
         .byte 0
+
 
 
 
@@ -12482,6 +12516,79 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+
+;TESTASM=1
+.ifdef TESTASM
+        .byte "word main(){",10
+        .byte "  NOP;",10
+        .byte "  NOP;",10
+        .byte "  NOP;",10
+.ifnblank
+        .byte "  TAY;",10
+        .byte "  LSR;",10
+        .byte "  TSX;",10
+        .byte "  CLI;",10
+.endif
+        .byte "}",10
+        .byte 0
+.endif ; TESTASM
+
+
+
+;MUSIC=1
+.ifdef MUSIC
+        .incbin "Input/music.c"
+;        .incbin "Input/noel-retro.c"
+        .byte 0
+.endif ; MUSIC
+
+
+;;; TODO: PARSERING ERROR
+;;;   should say "Expected: 'while'"
+;;;   how difficult (longest parse rule match?)
+;DOPARSE=1
+.ifdef DOPARSE
+        .byte "// foobar fie fum",10
+        .byte "word i;",10
+        .byte "word main() {",10
+        .byte "  for(i=10; --i; ) do {",10
+        .byte "    putchar('x');",10
+        .byte "  }",10
+        .byte "  printz(\"end\\n\");",10
+        .byte "}",10
+        .byte 0
+.endif ; DOPARSE
+
+;;;  for some reason this gives compile errrorr...
+;WAIT=1
+.ifdef WAIT
+        .byte "// foobar fie fum",10
+        .byte "word z;",10
+        .byte "word wait(word cs) {",10
+        .byte "  while(cs--) {",10
+        .byte "  z= 1000; do {;} while(z--);",10
+        .byte "}",10
+        .byte "word main() {",10
+        .byte "  putchar('>');",10
+        .byte "  return wait(1000);",10
+        .byte "  putchar('<');",10
+        .byte "}",10
+        .byte 0
+.endif ; WAIT
+
+
+;SPACEBUG=1
+.ifdef SPACEBUG
+        .byte "word a, b, c, line;",10
+        .byte "word main() {",10
+        .byte "  a= 47; b= a;",10
+;;; TODO: space before + error!
+        .byte "  a>>= 2; c= b*100 +a;",10
+        .byte "  return c;",10
+        .byte "}",10
+        .byte 0
+.endif ; SPACEBUG
+
 ;STRPARAM=1
 .ifdef STRPARAM
         .byte "word s,bar;",10
@@ -12531,8 +12638,8 @@ input:
 .endif ; IFLT
 
 
-        .incbin "Input/fib-list.c"
-        .byte 0
+;        .incbin "Input/fib-list.c"
+;        .byte 0
 
 ;;; BUG: requires var to compile empty stmt in do-whie!
 ;BUGVAR=1
@@ -13755,9 +13862,12 @@ CANT=1
 ;;; FILE   MAIN seconds  WHAT
 ;;; ----   ---- ----.--  ------------------------
 
-;;; === Byte magazine ===
-;;;   287                UCSD PASCAL, APPLE II, 6502
-;;;   390 (!)            interpreted 
+;;; === Byte magazine (10x run, 8192) ===
+;;;   287s          UCSD PASCAL, APPLE II, 6502
+;;;   390s (!)      interpreted (?)
+;;; 
+;;;   425s          hopperBasic (53s @ 8 MHz) f video
+
 ;;; - https://github.com/soegaard/minipascal/blob/master/minipascal/tests-real/primes.rkt
 
 ;;; === BCPL (bytecode) === ( https:projects.drogon.net/retro-basic-and-bcpl-benchmarks/ )
@@ -13778,6 +13888,9 @@ CANT=1
 ;;;            (/ 10.352 1.551) = 6.67
 ;;;         319    1.327s CC02    poke optimized
 ;;;            (/ 10.352 1.327) = 7.80
+;;;              1% BEAT cc65 default! SMALLER! (- 3 bytes
+
+
 
 ;;; === jsk tests === (1x run, 8192)
 ;;; FILE,  MAIN bytes 
@@ -13792,7 +13905,6 @@ CANT=1
 ;;;             12% slower than cc65 -Cl
 ;;;         319    2.665s CC02   ./rrasm 100x (- 17B!)
 ;;;              6% FASTER than cc65 -Cl
-;;;              1% BEAT cc65 default! SMALLER! (- 3 bytes!)
 ;;;             11% bigger than smallest (slowest) cc65 (287)
 ;;;         315    2.665s  CC02   axputu
 
@@ -14303,13 +14415,8 @@ NOPRINT=1
 ;        .incbin "Input/rainbow-drop.c"
         .byte 0
 
-;;; e - empty program
-        .byte "// Empty program - template",10
-        .byte "word num,xyz;",10
-        .byte "",10
-        .byte "word main() {",10
-        .byte "  return 4711;",10
-        .byte "}",10
+;;; e - expr
+        .incbin "Input/expressions.c"
         .byte 0
 
 ;;; f - fib recursion
@@ -14341,8 +14448,20 @@ NOPRINT=1
         .byte 0
 .endif ; FROGMOVE
 
-;;; g - game?
-        .byte "// g-",10
+;;; g - graphics
+        .byte "// graphics - circle/line (ORIC)",10
+        .byte "",10
+        .byte "// note: it looses program after run!",10
+        .byte "",10
+        .byte "word main(){",10
+        .byte "  hires();",10
+        .byte "  curset(120,100,0);",10
+        .byte "  circle(75,2);",10
+        .byte "  curset(0, 0, 3);",10
+        .byte "  draw(239, 199, 2);",10
+        .byte "  getchar();",10
+        .byte "  text();",10
+        .byte "}",10
         .byte 0
 
 ;;; h - hello
@@ -14370,22 +14489,14 @@ NOPRINT=1
         .byte "// j -",10
         .byte 0
 
-;;; k - circle
-        .byte "// CIRCLE",10
-        .byte "word main(){",10
-        .byte "  hires();",10
-        .byte "  curset(120,100,0);",10
-        .byte "  circle(75,2);",10
-        .byte "  curset(0, 0, 3);",10
-        .byte "  draw(239, 199, 2);",10
-        .byte "  getchar();",10
-        .byte "  text();",10
-        .byte "}",10
+;;; k - 
+        .byte "// k -",10
         .byte 0
 
 ;;; l - line bench
 .ifblank
-        .byte "// LINEBENCH - coming soon!",10
+        .incbin "Input/music.c"
+;        .byte "// l -",10
         .byte 0
 .else
         .byte "// LINEBENCH - for borken?",10
@@ -14414,41 +14525,8 @@ NOPRINT=1
         .byte 0
 .endif ; LINEBENCH
 
-;;; TODO: - music?
-;;; m - mul40
-
-;;; Conclusion 44B 106c to x40
-;;; optimal is 33B (grok managed eventually, store tmp in A and Y)
-;FOURTY=1
-;;; 62B 119c (program 16B overhead)
-
-        .byte "// MUL40 - NO operator precedence",10
-        .byte "word n, r;",10
-        .byte "",10
-        .byte "word main(){",10
-        .byte "  r=17;",10
-;        .byte "  while(r<28) {",10
-
-;;; 49B => 42 B   84c
-;        .byte "    n=r; n<<=2; n+=r; n<<=3;",10
-
-;;; 47B => 40 B   75c
-;;;  8B extra for << to store and retrieve x
-        .byte "",10
-        .byte "  // Example of no precedence...",10
-        .byte "  // evaluation is LEFT-TO-RIGHT",10
-        .byte "  // (not correct C ;-)",10 
-        .byte "",10
-        .byte "  n=r<<2 +r <<3;",10
-;;; 
-;        .byte "    n= PIPE r<<2+r<<3;",01
-;        .byte "    n= WITH r SHL 2 PLUS r SHL 3 END;",01
-
-;        .byte "    putu(n); putchar(' ');",10
-;        .byte "    ++r;",10 
-;        .byte "  }",10
-;        .byte "  return n;",10
-        .byte "}",10
+;;; m - music
+        .incbin "Input/music.c"
         .byte 0
 
 ;;; n - numeric constants different bases
@@ -14511,7 +14589,7 @@ LOOP=1
         .byte "  puth(488879); putchar(' ');",10
         .byte "  putu(0x1148); putchar(10);",10
         .byte "",10
-        .byte "  // simple printf",10
+        .byte "  // SIMPLE printf (ONLY these)",10
         .byte "  printf(\"%s\", \"fish\");",10
         .byte "  printf(\"%u\", 0x29a);",10
         .byte "  printf(\"%x\", -1);",10
@@ -14549,7 +14627,12 @@ LOOP=1
         .byte 0
 
 ;;; t - 
-        .byte "// t -",10
+        .byte "// Template empty program",10
+        .byte "word num,xyz;",10
+        .byte "",10
+        .byte "word main() {",10
+        .byte "  return 4711;",10
+        .byte "}",10
         .byte 0
 ;;; u -
         .byte "// u -",10

@@ -1,4 +1,4 @@
-// strXXX functions tests
+// strXXX...  tests <string.h>
 word s, r, c;
 word px(word name, word v) {
   putz(name); putchar('"'); putz(v);
