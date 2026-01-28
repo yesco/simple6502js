@@ -1,4 +1,4 @@
-;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Generated code in tap-files are free,
@@ -1228,7 +1228,8 @@ DEMO=1
 
 ;;; Allow inline (fixed-constant) ASM code!
 ;;; (adds 1637 bytes!)
-;ASM=1
+;
+ASM=1
 
 
 .ifndef OUTPUTSIZE
@@ -2144,8 +2145,7 @@ ELSE=1
 ;
 BYTERULES=1
 
-;;; testing data a=0, b=10, ... e=40, ...
-;;; doesn't take any extra code bytes, or rule bytes
+;;; Write debug info
 ;
 TESTING=1
 
@@ -2612,19 +2612,6 @@ XYZ=1
         lda #_RTS
         sta _output
 
-.ifdef LONGNAMES
-        lda #<vnext
-        sta env
-sta tos
-        lda #>vnext
-        sta env+1
-sta tos+1
-putc '#'
-jsr putu
-jsk nl
-.endif ; LONGNAMES
-
-
 
 ;;; TODO: improve using using ruleP 'P'
         lda #'P'+128
@@ -2995,6 +2982,7 @@ jsr _printchar
         cmp #'R'
         bne :+
         
+PUTC '/'
 ;;; Doesn't even get here, how come it works!?!?!
 ;PUTC'R'
         ;; Y=0
@@ -6168,11 +6156,13 @@ FUNC _funcallend
         ldx #0
       .byte ']'
 
+
+
         ;; Surprisingly ++v and --v expression w value
         ;; arn't smalller or faster than v++ and v-- !
         .byte "|++%V"
       .byte '['
-;;; 14B 17c
+;;; 10B 14-18c
         inc VAR0
         bne :+
         inc VAR1
@@ -6183,8 +6173,8 @@ FUNC _funcallend
 
         .byte "|--%V"
       .byte '['
-.ifnblank
-;;; 17B 21c
+.ifblank
+;;; 12B 17-21c
         lda VAR0
         bne :+
         dec VAR1
@@ -6193,7 +6183,7 @@ FUNC _funcallend
         lda VAR0
         ldx VAR1
 .else
-;;; 17B 19c
+;;; 13B 16-20c
         ldx VAR1
         ldy VAR0
         bne :+
@@ -6208,7 +6198,7 @@ FUNC _funcallend
 
         .byte "|%V++"
       .byte '['
-;;; 14B ! 17c ! - no extra cost!
+;;; 10B ! 14-18c ! - no extra cost!
         lda VAR0
         ldx VAR1
         inc VAR0
@@ -6220,7 +6210,7 @@ FUNC _funcallend
         .byte "|%V--"
       .byte '['
 .ifblank
-;;; 14B ! 17c
+;;; 10B ! 14-18c
         ldx VAR1
         lda VAR0
         bne :+
@@ -6228,7 +6218,7 @@ FUNC _funcallend
 :       
         dec VAR0
 .else
-;;; 17B 19c - faster
+;;; 13B 16-20c
         ldx VAR1
         ldy VAR0
         dey
@@ -8800,6 +8790,7 @@ afterELSE:
         .byte "|if(%V<[#]%d[#])"
 .scope        
 ;;; 15 B save 3 B
+;;???
       .byte "["
         ldx VAL1
         beq @else
@@ -8828,7 +8819,7 @@ afterELSE:
         lda #LOVAL
         ldx #HIVAL
         ;; cmp with VAR
-        .byte ';'               ; get aDdress
+        .byte ";"               ; get aDdress
         ;; test hi byte first
         cpx VAL1
         bne :+                  ; neq determine if <
@@ -9254,10 +9245,11 @@ FUNC _stmtbyteruleend
 ;;;   ++a; is opt, yes
 
 .ifdef OPTRULES
-;;; TODO make ruleC when %A pushes ???
-        .byte "|"
-
-        .byte "++%V;"
+        .byte "|++%V;"
+incinc:
+.byte "%{"
+putc '!'        
+IMM_RET
       .byte "["
         inc VAR0
         bne :+
@@ -9265,8 +9257,15 @@ FUNC _stmtbyteruleend
 :       
       .byte "]"
 
-;;; TODO make ruleC when %A pushes
+        .byte "|%V++;"
+.byte "%{"
+putc '?'        
+IMM_RET
+        .byte "%R"
+        .word incinc
+
         .byte "|--%V;"
+decdec: 
       .byte "["
         lda VAR0
         bne :+
@@ -9274,6 +9273,11 @@ FUNC _stmtbyteruleend
 :       
         dec VAR0
       .byte "]"
+
+        .byte "|%V--;"
+        .byte "%R"
+        .word decdec
+
 .endif ; OPTRULES
 
         ;; assume it's char*
@@ -10364,7 +10368,11 @@ FUNC _stmtrulesend
 ruleM:  
 ;;; Hackey rule we need to lookUP wards many step!
 
-       .byte "1);"
+        ;; do it once
+        .byte "0);"
+        
+        ;; do it forever
+        .byte "|1);"
       .byte "[?2"
         jmp VAL0
       .byte "]"
@@ -10372,6 +10380,15 @@ ruleM:
 ;;; TOOD: add %V==0 too? (same)
         .byte "|!%V);"
       .byte "["
+.ifblank
+        ;; 9B
+        lda VAR0
+        ora VAR1
+        .byte "?2"
+        bne :+
+        jmp VAL0
+:       
+.else
         ;; 12 B
         ldx VAR1
         lda VAR0
@@ -10381,10 +10398,20 @@ ruleM:
         bne :+
         jmp VAL0
 :       
+.endif
       .byte "]"
 
         .byte "|%V);"
       .byte "["
+.ifblank
+        ;; 9 B
+        lda VAR0
+        ora VAR1
+        .byte "?2"
+        beq :+
+        jmp VAL0
+:       
+.else
         ;; 12 B
         ldx VAR1
         lda VAR0
@@ -10395,39 +10422,46 @@ ruleM:
 :       
         txa                 
         bne :--
+.endif
       .byte "]"
 
-        .byte "|%V[#]<%D[#]);"
+        ;; would only save one byte, not worth it!
+        ;.byte "|%V[#]<%d[#]);"
+
+        .byte "|%V<[#]%D[#]);"
       .byte "["
         ;; 14 B - optimal!
         .byte "?1"
         lda VAR0
         ldx VAR1
         .byte "?0"
-        cmp #LOVAL
+        cmp #LOVAL              ; saves 1 byte (sec/sbc)
         txa
         sbc #HIVAL
         .byte "?4"              ; ???
         bcs :+
         jmp VAL0
 :       
+;;; TODO: [;;] cleanup?
       .byte "]"
 
-        .byte "|%V[#]<%V[#]);"
+        .byte "|%V<[#]%V[#]);"
+        ;;      ?1    ?0
       .byte "["
         ;; 14 B - optimal!
         .byte "?1"
         lda VAR0
         ldx VAR1
         .byte "?0"
-        cmp VAR0
+        cmp VAR0                ;lrt7 ???
         txa
         sbc VAR1
-        .byte "?4"              ; ???
+        .byte "?4"              ; access jump from caller
         bcs :+
         jmp VAL0
 :       
-      .byte "]"
+;;; TODO: [;;] cleanup?
+      .byte ";;]"
 
         ;; Generic rule
         .byte "|",_E,");"
@@ -11023,6 +11057,9 @@ FUNC _OK
 :       
 .endif ; INTRO
 
+.ifdef TESTING
+
+.endif
         ;; reset erp(os)
         lda inp
         sta erp
@@ -12517,6 +12554,42 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+; IFTEST=1
+.ifdef IFTEST
+        .byte "word v;",10
+        .byte "word main(){",10
+        .byte "  v=3;",10
+
+        ;; 44 B
+;        .byte "  if(v==3) return 1; else return 0;",10
+        ;; 57 B   (= + 13)
+;        .byte "  if(3==v) return 1; else return 0;",10
+
+        ;; 52
+;        .byte "  if(v==2+1) return 1; else return 0;",10
+
+        ;; 63     (= + 11)
+;        .byte "  if(2+1==v) return 1; else return 0;",10
+
+        ;; 63
+;        .byte "  if(v+1==4711) return 1; else return 0;",10
+        ;; 63
+;        .byte "  if(4711==v+1) return 1; else return 0;",10
+
+        
+
+        .byte "}",10
+        .byte 0
+.endif ; IFTEST
+
+;DODEBUG=1
+.ifdef DODEBUG
+        .incbin "Input/plusplus.c"
+;        .incbin "Input/music.c"
+;        .incbin "Input/noel-retro.c"
+        .byte 0
+.endif ; DODEBUG
+
 
 ;;; TODO: %V variables... %v for 1 byte address? lol
 
@@ -12662,30 +12735,35 @@ input:
 .ifdef WHILE
         .byte "word n,x;",10
         .byte "word main(){",10
-        .byte "  n= 0;",10
+        .byte "  n= 0; x= 10;",10
+        ;; 21 B till here
 
-        ;; while   : 52 B
+        ;; 60 - more expensive (extrea jump)
 ;        .byte "  while(n<10) putchar(n++ + '0');",10
 
-        ;; 46 B (dowhile<) - CHEAPEST!!! special rule
+        ;; 54 B (dowhile<) - CHEAPEST!!! special rule
 ;        .byte "  do putchar(n++ + '0'); while(n<10);",10
 
-        ;; 46 B special rule (65 generic) (+ x=10 => + 8B)
-;        .byte "x=10;do putchar(n++ + '0'); while(n<x);",10
+        ;; 54 B special rule (65 generic) (+ x=10 => + 8B)
+;        .byte "do putchar(n++ + '0'); while(n<x);",10
 
 ;;;  LOL because current TRUE == -1 +1 == 0!!! lol
-;        .byte "x=10;do putchar(n++ + '0'); while(n<x+1);",10
+        ;; 72 B
+;        .byte "do putchar(n++ + '0'); while(n-1<x);",10
+;;; cant' do
+;        .byte "do putchar(n++ + '0'); while(n<x+1);",10
 ;        .byte "return n<x-1;",10
 
         ;; 43 B eternal (53 B) special rule
-;        .byte "x=10;do putchar(n++ + '0'); while(1);",10
-;        .byte "x=10;do putchar(n++ + '0'); while(0);",10
+        .byte "do putchar(n++ + '0'); while(1);",10
+        ;; 40 B
+;        .byte "do putchar(n++ + '0'); while(0);",10 
 
         ;; 60 B
 ;        .byte "x=10;while(n<x) putchar(n++ + '0');",10
 
 .ifnblank
-        ;; 78 w special rule
+        ;; 75 w special rule
         .byte "  do {",10
         .byte "    putchar(n++ + '0');",10
         .byte "    if (n==10) x=1; else x=0;",10;
@@ -12693,7 +12771,7 @@ input:
 .endif
 
 .ifnblank
-        ;; 78 w special rule
+        ;; 75 w special rule
         .byte "  do {",10
         .byte "    putchar(n++ + '0');",10
         .byte "    if (n==10) x=0; else x=1;",10;
@@ -14490,8 +14568,8 @@ NOPRINT=1
         .incbin "Input/test-ctype.c"
         .byte 0
 
-;;; j - 
-        .byte "// j -",10
+;;; j - inc ++ dec -- 
+        .incbin "Input/plusplus.c"
         .byte 0
 
 ;;; k - 
@@ -14706,7 +14784,7 @@ defs:
 ;;; test example
 ;;; TODO: remove?
 .ifdef TESTING
-.ifdef LONGNAMES
+.ifdef LONGNAMESx
 vfoo:   
         .word 0                 ; linked-list end
         .word 4711
@@ -14729,7 +14807,7 @@ vnext:
         .word 0
         .byte 0
 
-.endif ; LONGNAMES
+.endif ; LONGNAMESx
 .endif ; TESTING
 
 
