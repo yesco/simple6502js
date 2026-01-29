@@ -225,8 +225,8 @@
 ;;; MINIMAL C-LANGUAGE SUBSET
 ;;; 
 ;;; - basically just one type: word (uint_16)
-;;; - decimal numbers: 4711 42
-;;; - char constants: 'x' ''' (lol) '\' and '\n' hmmm TODO: fix
+;;; - decimal numbers: 4711 42 0x2a 0052 '*'
+;;; - char constants: 'x' ''' (lol) '\t' and '\n' '\\'
 ;;; - "string" constants and arrays (are just considered a constant number)
 ;;; 
 ;;; - word main() ... - no args
@@ -235,6 +235,7 @@
 ;;; - a= b+10;  // simple expressions, one operator
 ;;; - ++a; --a; // and in expressions
 ;;; - a+= 42;   // simple right-hand expressions (var/const)
+;;; - a=b=c=42+3;
 ;;; - a OP= simple; // += -= /=2; *=2; >>= <<= |= &= ^= 
 ;;; 
 ;;; - return ...;
@@ -244,8 +245,8 @@
 ;;; - do ... while();
 ;;; - while() ...
 ;;; 
-;;; - word F() { ... } - function definitions
-;;; - F() G() - function calls (no parameters)
+;;; - word fun() { ... } - function definitions
+;;; - fun() goo() - function calls (no parameters)
 ;;; 
 ;;; - memory access peek, poke, deek, doke
 ;;; 
@@ -287,10 +288,10 @@
 ;;; - mostly no error messages uneless get stuck
 ;;;   and can't complete compilation
 ;;; - "types" aren't enforced
-;;; - single lower case letter variable
-;;; - single upper case letter functions
+;;; - long variable names
+;;; - same for fucntions
 ;;; - NO parenthesis
-;;; - NO generic / or * (unless add library)
+;;; - NO generic * / % or (unless add library)
 ;;; 
 
 ;;; 
@@ -1184,8 +1185,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;
-DEMO=1
+;DEMO=1
 
 
 .ifdef PICO
@@ -1228,8 +1228,7 @@ DEMO=1
 
 ;;; Allow inline (fixed-constant) ASM code!
 ;;; (adds 1637 bytes!)
-;
-ASM=1
+;ASM=1
 
 
 .ifndef OUTPUTSIZE
@@ -2130,8 +2129,7 @@ FUNC _bnfinterpstart
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
 
 ;;; TODO: BYTESIEVE can be compiled but doesn't run correctly...
-;
-OPTRULES=1
+;OPTRULES=1
 
 ;; 
 
@@ -8088,7 +8086,13 @@ ruleG:
 ;;; Exprssion:
 ruleE:  
         
-        .byte _C,_D
+        .byte "%V=[#]",_E
+      .byte "[;"
+        sta VAR0
+        stx VAR1
+      .byte "]"
+
+        .byte "|",_C,_D
         
 .ifdef BYTERULES
         .byte "|"
@@ -11051,11 +11055,14 @@ done2:
 FUNC _OK
 
 .ifdef INTRO
+        ;; if first time (during init)
         bit mode
         bvc :+
+        ;; then
         jsr waitesc
 :       
 .endif ; INTRO
+
 
 .ifdef TESTING
 
@@ -11128,7 +11135,18 @@ FUNC _OK
         jsr _printu
         PRINTZ {")",10,10}
 
+;;; TODO: make another variant of _OK that compiles in the background...
+
+        ;; if first time (during init)
+        bit mode
+        bvc :+
+        ;; - first time => go editor
         jmp _eventloop
+:       
+        ;; if invoked with CTRL-C go command mode
+        jmp _forcecommandmode
+
+
 
 
 FUNC _run
@@ -12554,6 +12572,7 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+
 ; IFTEST=1
 .ifdef IFTEST
         .byte "word v;",10
@@ -12592,6 +12611,7 @@ input:
 
 
 ;;; TODO: %V variables... %v for 1 byte address? lol
+;;; TODO: $name (byte) var and constant $a4,, lol ambigious!
 
 ;TESTASM=1
 .ifdef TESTASM
@@ -12691,6 +12711,24 @@ input:
         .byte 0
 
 .else 
+
+;;; Multi Assignment
+;MASSIGN=1
+.ifdef MASSIGN
+        .byte "word a,b,c;",10
+        .byte "word main(){",10
+        .byte "  a=b=c=14;",10
+
+;;; more difficult
+;       a=1+(b=1+(c=13));
+;;; actually not legal:
+;        .byte "  a=b=1+c=13;",10
+
+        .byte "  return a+b+c;",10
+        .byte "}",10
+        .byte 0
+.endif ; MASSIGN
+
 
 ;;; 53 bytes - optimize one param function call -6 B
 ;;;    -> 47 B
@@ -13429,7 +13467,28 @@ CANT=1
         .byte 0
 .endif ; CHARNL
 
+
+
 .ifdef FOLDx
+;;;  TODO: provide an EVAL(expr) or CONST(expr) macro!
+;;;    fold/run it during compilation!
+
+;; // from GAI:
+
+;; #define IS_CONSTANT(exp) (sizeof(char[ (exp) || 1 ? 1 : -1 ]))
+;; #define ENSURE_CONST(exp) ((void)sizeof(char[ ( (exp) || 1 ) ? 1 : -1 ]), (exp))
+
+;; // Usage
+;; int a = 10                      ;
+;; int b = 5                       ;
+
+;; // This works:
+;; int x = ENSURE_CONST(10 + 5)    ; 
+
+;; // This will cause a compilation error (variable-sized object):
+;; // int y = ENSURE_CONST(a + b); 
+
+
         .byte "// Folding constants",10
         .byte "const word a=40+2;",10
         .byte "word main(){",10
