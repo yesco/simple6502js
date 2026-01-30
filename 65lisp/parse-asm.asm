@@ -1,4 +1,4 @@
-;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Generated code in tap-files are free,
@@ -1190,8 +1190,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;
-DEMO=1
+;DEMO=1
 
 
 .ifdef PICO
@@ -2977,12 +2976,12 @@ jsr _printchar
         cmp #'!'
         bne :+
 @dotest:
+        ;; lookahead at character
+        jsr nextInp             ; skip spaces!
         lda (inp),y
         sta savea
 @loop:
-;putc '?'
         lda (rule),y
-;jsr _printchar
         ;; A hibit (0x80) indicates end of sequence
         bmi @done
         jsr _incR
@@ -2990,8 +2989,6 @@ jsr _printchar
         beq @done
         bne @loop
 @done:
-        PUTC '!'
-        jsr _printchar
         jsr _incR
         ldx percentchar
         cpx #'='
@@ -3001,8 +2998,8 @@ jsr _printchar
         ;; reverse action
         eor #80
 @eqtest:
-        bpl failjmp
-        bmi nextjmp
+        bmi failjmp
+        bpl nextjmp
 :       
         ;; %b - word boundary test
         cmp #'b'
@@ -4543,9 +4540,12 @@ failjmp2:
 FUNC _incIspc
         jsr _incI
 
+;;; skip white space
+;;; TODO: better name?
 ;;; makes sure inp is pointing at relevant char
 ;;; - skips any char <= ' ' (incl attributes)
 ;;; - skips "// comment till nl"
+;;; - skips "# anything till nl"
 FUNC nextInp
 .scope
 ;;; oops! this was actually important to save all regs!
@@ -6737,6 +6737,8 @@ ruleD:
         jsr cut
         jmp _acceptrule
 
+;;; TODO: use new %!
+
 breakchars:
         ;; '|'+128 so not conflict with '|', not 0!
         .byte ",:;)]?",'|'+128
@@ -7303,7 +7305,7 @@ FUNC _oprulesstart
 ;;; COMPARISIONS
 
 ;;; TODO: really shouldn't give -1 lol
-        .byte "|==%V%=,;)",$80
+        .byte "|==%V%=,;)?",$80
       .byte '['
         ;; 15
         ldy #0
@@ -7322,7 +7324,7 @@ FUNC _oprulesstart
 
 
 ;;; TODO: is one byte saved worth it?
-        .byte "|==%d","%=,;)",$80
+        .byte "|==%d","%=,;)?",$80
       .byte '['
         ;; 12 (saves one byte...)
         ldy #0
@@ -7339,7 +7341,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|==%D","%=,;)",$80 ; end of expression
+        .byte "|==%D","%=,;)?",$80 ; end of expression
 ;        .byte "|==%D"
       .byte '['
         ;; 13
@@ -7375,7 +7377,6 @@ FUNC _oprulesstart
         pla
 
 .ifblank
-;;; posted in mimimal computing (actually <)
         ;; 15
         cmp tos
         bne @false
@@ -7462,6 +7463,7 @@ FUNC _oprulesstart
         txa
         ror
 .endif ; blank
+        .byte "]"
 
 ;;; TODO: signed?
 ;;;    v < -42      => signed comparison
@@ -7474,41 +7476,98 @@ FUNC _oprulesstart
 ;;; - just eor #$80 hi-byte of both values?
 ;;; 
 
-        .byte "|<%D","%=,;)",$80
-      .byte '['
-        ;; 13
-        ldy #$ff
-        cpx #HIVAL
-        bne :+
-        cmp #LOVAL
-:       
-        bcc :+
-        ;; FAIL !< => 0
-        iny
-:       
-        ;; TRUE < => -1
-        tya
-        tax
-      .byte ']'
-        .byte TAILREC
 
-        .byte "|<%V%=,;)",$80
+;;; TODO: something messed up here? | ignored?
+
+        .byte "|<%V%=,;)?",$80
       .byte '['
-        ;; 13
-        ldy #$ff
-        cpx VAR1
-        bne :+
+        ;; 11
         cmp VAR0
-:       
-        bcc :+
-        ;; !< => 0
-        iny
-:       
-        ;;  < => -1
-        tya
         tax
+        sbc VAR1
+        ;; A= !C, lol
+        ldx #0
+        txa
+        ror
+        eor #1
       .byte ']'
-        .byte TAILREC
+
+
+        .byte "|>=%V%=,;)?",$80
+      .byte '['
+        ;; 11
+        cmp VAR0
+        tax
+        sbc VAR1
+        ;; A= C, lol
+        ldx #0
+        txa
+        ror
+      .byte ']'
+
+
+        ;; < constant
+        ;; (42 -> 28 bytes) saves 34 bytes cmp general
+        .byte "|<%D"
+.byte "%{"
+putc '/'
+IMM_RET
+        ;; Restrict to only at end of expression
+        ;; (correct but might miss some)
+        .byte "%=,;)?",$80
+      .byte '['
+        ;; 11
+        cmp #LOVAL
+        tax
+        sbc #HIVAL
+        ;; A= !C, lol
+        ldx #0
+        txa
+        ror
+        eor #1
+      .byte ']'
+
+;;; TODO: is $80 safe, or gets interrpreted as 0 some time?
+        .byte "|>=%D%=,;)?",$80
+      .byte '['
+        ;; 11
+        cmp #LOVAL
+        tax
+        sbc #HIVAL
+        ;; A= C, lol
+        ldx #0
+        txa
+        ror
+      .byte ']'
+
+        ;; general
+        ;; (21 B)
+        .byte "|>="
+      .byte '['
+        ;; 3
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte _E
+      .byte '['
+        ;; 7
+        sta tos
+        stx tos+1
+        
+        pla
+        tax
+        pla
+
+        ;; 11
+        cmp tos
+        tax
+        sbc tos+1
+        ;; A= C, lol
+        ldx #0
+        txa
+        ror
+      .byte ']'
 
         ;; general
         .byte "|<"
@@ -7519,6 +7578,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte _E
       .byte '['
+
 
 .ifblank
 .scope
@@ -7552,7 +7612,7 @@ FUNC _oprulesstart
         pla
         sta tos+1
         pla
-        sta tos
+1        sta tos
         
         ;; 10
         ;; reverse cmp
@@ -7683,13 +7743,14 @@ false:
         tax
 
 .endif
-
       .byte ']'
-        .byte TAILREC
+
 
 .endif ; !MINIMAL
 
-        ;; Empty
+
+
+        ;; Empty match at the end (ends TAILREC)
         .byte '|'
 
         .byte 0
@@ -12902,12 +12963,29 @@ input:
 
 ;LESSTHAN=1
 .ifdef LESSTHAN
-        ;; 25 B
         .byte "word a;",10
         .byte "word main(){",10
-        .byte "  putu(2+1<3+1); putchar('\\n');",10
-        .byte "  putu(3+1<3+1); putchar('\\n');",10
-        .byte "  putu(3+1<2+1); putchar('\\n');",10
+        ;; 7 bytes til here
+
+;;; TODO: 
+;        .byte "  a=3<4;",10
+
+;;; TODO: bug - error! lol
+;;;   TODO: lookahead wrong... lol (what's next input..)
+        .byte "  a=3<4 ;",10
+
+        ;; 37 B
+;        .byte "  a= 3<4+1;",10
+        ;; 33 B ! (- 33 5 7 3 3) = 15 for cmp?
+;        .byte "  putu(3<4); putchar('\\n');",10 
+        ;; 39 B (+ 6)
+;        .byte "  putu(2+1<4); putchar('\\n');",10
+	;; 45 B (+ 6 + 6)
+;        .byte "  putu(2+1<3+1); putchar('\\n');",10
+;        .byte "  putu(3+1<3+1); putchar('\\n');",10
+;        .byte "  putu(3+1<2+1); putchar('\\n');",10
+
+        .byte "  return a;",10
         .byte "}",10
         .byte 0
 .endif ; LESSTHAN
@@ -14420,6 +14498,10 @@ CANT=1
 BYTESIEVE=1
 ;
 NOPRINT=1
+
+;;; 2026-01-31 Compilation 2.000s!
+;;;   32 "lines", 40 ops, 15 dots, 63 commas
+;;; (/ 32 2.000) = 16 ... (* 16 60) = 960 lines/minute!
 
 ; https://thechipletter.substack.com/p/once-again-through-eratosthenes-sieve
 ;;; = 10x == 10x == 10x == 10x == 10x == 10x == 10x =
