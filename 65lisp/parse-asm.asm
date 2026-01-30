@@ -941,6 +941,11 @@
 ;;; 
 ;;; - %b - "word boundary test" (actually just test next char
 ;;;        to not be isident) for "1%b" so not match "12"
+;;; - "%=abc",$80
+;;;      - lookahead FAIL if next input char is NO [abc]
+;;; - "%!abc",$80
+;;;      - lookaread FAIL if next ISs one of [abc]
+;;; 
 ;;; 
 ;;; 
 ;;; NAMES (variables, functions, labels)
@@ -1185,7 +1190,8 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;DEMO=1
+;
+DEMO=1
 
 
 .ifdef PICO
@@ -2129,7 +2135,8 @@ FUNC _bnfinterpstart
 ;;; ++a; --a; &0xff00 &0xff <<8 >>8 >>v <<v 
 
 ;;; TODO: BYTESIEVE can be compiled but doesn't run correctly...
-;OPTRULES=1
+;
+OPTRULES=1
 
 ;; 
 
@@ -2961,6 +2968,42 @@ jsr _printchar
         jsr _incR
         ; pla
 
+        ;; %= -  require one of chars till $80
+        ;; %! -  fail if one of chars till $80
+        ;; that is : , ; ) ] }
+        ;; 37 B
+        cmp #'='
+        beq @dotest
+        cmp #'!'
+        bne :+
+@dotest:
+        lda (inp),y
+        sta savea
+@loop:
+;putc '?'
+        lda (rule),y
+;jsr _printchar
+        ;; A hibit (0x80) indicates end of sequence
+        bmi @done
+        jsr _incR
+        cmp savea
+        beq @done
+        bne @loop
+@done:
+        PUTC '!'
+        jsr _printchar
+        jsr _incR
+        ldx percentchar
+        cpx #'='
+        beq @eqtest
+;        bne @eqtest
+@neqtest:
+        ;; reverse action
+        eor #80
+@eqtest:
+        bpl failjmp
+        bmi nextjmp
+:       
         ;; %b - word boundary test
         cmp #'b'
         bne :+
@@ -4671,6 +4714,7 @@ FUNC _incO
 ;;; 3  22c
         ldx #_out
         SKIPTWO
+;;; TODO: how much faster if _incR and _incI specialized?
 FUNC _incR
 ;;; 3  17c
         ldx #rule
@@ -4686,6 +4730,7 @@ FUNC _incRX
         bne :+
         inc 1,x
 :
+;;; State of flags at exit: Z=0 unless hi wrapped!
         rts
         
 
@@ -7258,7 +7303,7 @@ FUNC _oprulesstart
 ;;; COMPARISIONS
 
 ;;; TODO: really shouldn't give -1 lol
-        .byte "|==%V"
+        .byte "|==%V%=,;)",$80
       .byte '['
         ;; 15
         ldy #0
@@ -7275,9 +7320,9 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-;;; TODO: useful? TEST? (see EQTEST)
-.ifdef xOPTRULES
-        .byte "|==%d"
+
+;;; TODO: is one byte saved worth it?
+        .byte "|==%d","%=,;)",$80
       .byte '['
         ;; 12 (saves one byte...)
         ldy #0
@@ -7293,9 +7338,9 @@ FUNC _oprulesstart
         tax
       .byte ']'
         .byte TAILREC
-.endif ; OPTRULES
 
-        .byte "|==%D"
+        .byte "|==%D","%=,;)",$80 ; end of expression
+;        .byte "|==%D"
       .byte '['
         ;; 13
         ldy #0
@@ -7312,6 +7357,112 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+        ;; general
+        .byte "|=="
+      .byte '['
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte _E
+      .byte '['
+        ;; 7
+        sta tos
+        stx tos+1
+
+        pla
+        txa
+        pla
+
+.ifblank
+;;; posted in mimimal computing (actually <)
+        ;; 15
+        cmp tos
+        bne @false
+        cpx tos+1
+        bne @false
+@true:
+        lda #1
+        SKIPTWO
+@false:       
+        lda #0
+        ldx #0
+.else
+
+        ;; 23 no add 5
+        tay
+        txa
+
+        tsx
+        cpy $101,x
+        bne @false
+        cmp $100,x
+        bne @false
+@true:
+        ;; C=1
+        SKIPONE
+@false:
+        clc
+        pla
+        pla
+
+        ldx #0
+        txa
+        ror                     ; A=C
+        eor #1
+        
+
+;;; All these add 7
+        
+
+        ;; 12
+        cmp tos
+        bne @false
+        cpx tos+1
+        bne @false
+@true:
+        ;; C=1 !!!
+        SKIPONE
+@false:
+        clc
+        tax
+        ror
+        
+  
+        
+
+        ;; 13
+        ldy #0
+        cmp tos
+        bne :+
+        cpx tos+1
+        bne :+
+        ;; eq => -1
+        dey
+        ;; neq => 0
+:       
+        tya
+        tax
+      .byte ']'
+        .byte TAILREC
+
+
+;;; >=  7+ 9
+        sta tos
+        stx tos+1
+        pla
+        tax
+        pla
+        
+        ;; 9 !!!
+        cmp tos
+        tax
+        sbc tos+1
+        ldx #0
+        txa
+        ror
+.endif ; blank
+
 ;;; TODO: signed?
 ;;;    v < -42      => signed comparison
 ;;;    v < 32767    => SIGNED!
@@ -7323,7 +7474,7 @@ FUNC _oprulesstart
 ;;; - just eor #$80 hi-byte of both values?
 ;;; 
 
-        .byte "|<%D"
+        .byte "|<%D","%=,;)",$80
       .byte '['
         ;; 13
         ldy #$ff
@@ -7341,7 +7492,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
-        .byte "|<%V"
+        .byte "|<%V%=,;)",$80
       .byte '['
         ;; 13
         ldy #$ff
@@ -7356,6 +7507,183 @@ FUNC _oprulesstart
         ;;  < => -1
         tya
         tax
+      .byte ']'
+        .byte TAILREC
+
+        ;; general
+        .byte "|<"
+      .byte '['
+        pha
+        txa
+        pha
+      .byte ']'
+        .byte _E
+      .byte '['
+
+.ifblank
+.scope
+;;; < 18 bytes!
+
+        ;; 7 B
+        sta tos
+        stx tos+1
+
+        pla
+        tax
+        pla
+
+        ;; 11 B
+        cmp tos
+        txa
+        sbc tos+1
+
+        ldx #0
+        txa
+        rol
+        eor #1
+.endscope
+
+.else
+
+;;; <= 17 bytes!!!
+.scope
+        ;; 7
+        tay
+        pla
+        sta tos+1
+        pla
+        sta tos
+        
+        ;; 10
+        ;; reverse cmp
+        cpx tos+1
+        bne @done
+        cpy tos
+@done:
+        ldx #0
+        txa
+        rol
+        
+.endscope
+
+
+;;; < 19 bytes
+        ;; 7
+        sta tos
+        stx tos+1
+        
+        pla
+        tax
+        pla
+
+        ;; 12
+        ;; hi
+        cpx tos+1
+        bne @done
+        ;; equal or
+        ;; lo
+        cmp tos
+@done:
+        ldx #0
+        txa
+        rol
+        eor #1
+
+
+.scope
+; ;; posted on minimalist computing
+
+;;; < 22 bytes
+        sta tos                         ; zero page
+        stx tos+1
+
+        pla
+        tax
+        pla
+
+        sec
+        sbc tos
+        txa
+        sbc tos+1
+        bcs false
+true:
+        lda #1
+        SKIPTWO
+false:
+        lda #0
+        ldx #0
+.endscope
+
+;;; < 7+11=18 B  16c
+        cmp tos
+        txa
+        sbc tos+1
+        ldx #0
+        ;; A= !C flag!
+        txa
+        rol
+        eor #1
+:       
+
+
+;;; < 7+13=20 B  13-16c
+        cmp tos
+        txa
+        sbc tos+1
+        ldx #0
+        bcc :+
+        lda #1
+        SKIPONE
+:       
+        txa
+        
+
+        
+
+
+;;; 7+14=21 B  15-19==> 
+        cmp tos
+        txa
+        sbc tos+1
+        bcs :+
+        lda #1
+        SKIPTWO
+:       
+        lda #0
+        ldx #0
+
+        ;; 12 B  17-18c
+        ldy #0
+        cmp tos
+        txa
+;;; TODO: test - I think
+        sbc tos+1
+        bcs :+
+        ;; <   => -1
+        dey
+:       
+        ;; <=  => 0
+        tya
+        tax
+
+
+
+;;; < 7+13=20 B  12c-18c
+        ldy #$ff
+        cpx tos+1
+        bne :+
+        cmp tos
+:       
+        bcc :+
+        ;; !< => 0
+        iny
+:       
+        ;;  < => -1
+        tya
+        tax
+
+.endif
+
       .byte ']'
         .byte TAILREC
 
@@ -12572,6 +12900,17 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;LESSTHAN=1
+.ifdef LESSTHAN
+        ;; 25 B
+        .byte "word a;",10
+        .byte "word main(){",10
+        .byte "  putu(2+1<3+1); putchar('\\n');",10
+        .byte "  putu(3+1<3+1); putchar('\\n');",10
+        .byte "  putu(3+1<2+1); putchar('\\n');",10
+        .byte "}",10
+        .byte 0
+.endif ; LESSTHAN
 
 ; IFTEST=1
 .ifdef IFTEST
