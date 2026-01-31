@@ -1190,7 +1190,8 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;DEMO=1
+;
+DEMO=1
 
 
 .ifdef PICO
@@ -2442,7 +2443,7 @@ FUNC _compile
 
 .ifdef LINECOUNT
 ;        PRINTZ {10,10,"lines accepts rules",10}
-        PRINTZ {10,10,"lines",10}
+        PRINTZ {10,10,"LINES",10}
         jsr tab
 ;        ldy #24
 ;        jsr spaces
@@ -7638,9 +7639,6 @@ FUNC _oprulesstart
         ;; < constant
         ;; (42 -> 28 bytes) saves 34 bytes cmp general
         .byte "|<%D"
-.byte "%{"
-putc '/'
-IMM_RET
         ;; Restrict to only at end of expression
         ;; (correct but might miss some)
         .byte "%=,;)?",$80
@@ -7733,6 +7731,43 @@ IMM_RET
 .endscope
 
 .else
+        
+
+        ;;
+        tay
+        pla
+        
+
+        ;; 17 (but reverse?)
+        stx tos
+        tsx
+        cmp $00fe,x
+        lda tos
+        sbc $00ff,x
+        pla
+        pla
+        ldx #0
+        txa
+        rol
+
+
+;;; minimalist computing - Alan Cashin
+;;; 18 B
+        stx tos
+        tsx
+        sec
+        sbc $00fe,x
+        lda tos
+        sbc $00ff,x
+        pla
+        pla
+        ldx #0
+        txa
+        rol
+        ;; eor #1
+        
+        
+
 
 ;;; <= 17 bytes!!!
 .scope
