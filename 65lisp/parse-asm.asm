@@ -1459,7 +1459,15 @@ savey:  .res 1
 
 ;;; IDE mode: V=64=init Mi=$ff=command Pl=0=editing=
 ;;;   (_init sets it to 64)
-mode:           .res 1
+mode:  .res 1
+
+;;; STATITISTICS
+;;; 
+;;; lines (number of '\n' seen
+;;; (backtracking up may give few more))
+nlines:   .res 2
+naccepts: .res 2
+nrules:   .res 2
 
 .code
 
@@ -1699,6 +1707,7 @@ FUNC _minimallibrarystart
 ;;; but really small library...
 ;;; 
 ;;; (- #xdad #xd4d) = 96 B
+
 
 .ifdef MINIMAL
 ;;; These are totally untested, just written to paly
@@ -2216,6 +2225,10 @@ PRINTREAD=1
 ;
 PRINTDOTS=1
 
+;;; Print lines compiled 2.5%
+;
+LINECOUNT=1
+
 ;
 PRINTNAME=1
 
@@ -2384,7 +2397,7 @@ FUNC _init
         ldx #>_introtext
         jsr _printz
 .else
-        PRINTZ {12,"MeteoriC-Compiler & IDE on 6502 ",VERSION,10,"`2025 Jonas S Karlsson",10,10,"compiling: "}
+        PRINTZ {12,"MeteoriC-Compiler & IDE on 6502 ",VERSION,10,"`2025 Jonas S Karlsson",10,10,"compiling:"}
 .endif        
         
         ;; compile from src first time
@@ -2427,6 +2440,14 @@ FUNC _compile
         sta _out
         stx _out+1
 
+.ifdef LINECOUNT
+;        PRINTZ {10,10,"lines accepts rules",10}
+        PRINTZ {10,10,"lines",10}
+        jsr tab
+;        ldy #24
+;        jsr spaces
+.endif ; LINECOUNT
+
 ;;; Get's decreased by two before use
 VOSSTART=256   ; grow down.
 ;;; TODO: use single ZP address!
@@ -2468,9 +2489,17 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
         ;; zero-terminate the new rule
         ;; (write one after (VARS will be overwritten))
         lda #0
+        ;; TODO: 6*2 bytes set to zero, loop? put together!
         sta VARS+1
 
         sta compilestatus
+
+        sta nlines
+        sta nlines+1
+        sta naccepts
+        sta naccepts+1
+        sta nrules
+        sta nrules+1
 
 
 ;;; INTERRUPT DEBUG TESTING
@@ -2815,26 +2844,92 @@ jmpaccept:
         lda (inp),y
         beq jmpaccept
 
+;;; 3% cost... update lines count each line
+.ifdef LINECOUNT
+        ;; count newlines
+        cmp #10
+        bne :+
+        
+        ;; TODO: not totally accurate, because backtrack?
+        ldx #nlines
+        jsr _incRX
+
+        putc 13
+
+        lda nlines
+        ldx nlines+1
+        jsr _printu
+
+.ifnblank
+        jsr tab
+        lda naccepts
+        ldx naccepts+1
+        jsr _printu
+
+        jsr tab
+        lda nrules
+        ldx nrules+1
+        jsr _printu
+.endif        
+
+        ldy #0
+        lda #10
+:       
+.endif ; LINECOUNT
+
+        ;; skip anything <= ' '  !
+        ;; 
         ;; no need handling # // % [ as they'll
         ;; most likely fail problem is %D or [
         ;; could give strange bugs...
         cmp #' '+1
         bcc @skipspc
 
-;;; TODO: hi-bit makes problem...
+;;; TODO: hi-bit makes problem... ???
 ;;;      and #$7f
 
-.ifdef PRINTDOTS
-;;; print next statement each time when
-;;; there is a ';' or '{'
 
-;;; TODO: 
+.ifdef xPRINTDOTS
+;;; print next statement each time when
+;;; there is a ';'
+
+;;; TODO: it counts too many especially when 
+;;;   matching putu, for every try it counts one ';'
+;;;   not clear why it stands on ';' ???
+;;;   tried "skipping it" but doesn't matter
+
         cmp #';'
-        beq :+
-        cmp #'}'
         bne @nosemi
-:       
+
         putc ','
+
+.ifnblank
+lda rulename
+jsr _printchar
+jsr spc
+lda (inp),y
+jsr _printchar
+jsr spc
+
+lda inp
+ldx inp+1
+jsr _printh
+jsr spc
+
+ldy #0
+:       
+        lda (rule),y
+        beq :+
+        jsr _printchar
+        iny
+        cpy #20
+        bne :-
+:       
+ldy #0
+
+jsr nl
+.endif
+
 @nosemi:
 .endif ; PRINTDOTS
 
@@ -3352,6 +3447,11 @@ PUTC '>'
         
 .endif ; DEBUG
 
+.ifdef xLINECOUNT
+        ldx #nrules
+        jsr _incRX
+.endif ; LINECOUNT
+
         ;; TAILREC?
         cmp #TAILREC
         bne pushnewrule
@@ -3430,6 +3530,11 @@ loadruleptr:
 ;;; rule to continue parsing (or end).
 
 FUNC _acceptrule
+.ifdef xLINECOUNT
+        ldx #naccepts
+        jsr _incRX
+.endif ; LINECOUNT
+
 .ifdef DEBUGVARS
   PUTC '!'
 .endif ; DEBUGVARS
@@ -4578,6 +4683,14 @@ nextc:
         bne @nosemi
 :       
 
+;;; TODO: gives 44 "lines" when there is 32 stmts
+.ifdef xLINECOUNT
+        pha
+        ldx #nlines
+        jsr _incRX
+        pla
+.endif ; LINECOUNT
+
 ;;; TODO: move to subroutine
 ;;; TODO: keep track of last printed src
 ;;;       (and don't print again, lol)
@@ -5491,6 +5604,20 @@ ruleB:
 ;;; START of expression:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
+
+.ifnblank
+        .byte "%=;",$80
+
+;      .byte "%{"
+;        PUTC '/'
+       ;jmp endrule
+;        IMM_RET
+        
+;        .byte "%R"
+;        .word endC
+
+        .byte "|"
+.endif
 
 ;        .byte "%{"
 ;          putc ':'
@@ -6701,6 +6828,8 @@ wrong;        .byte "D"               ; tos= dos; addr of string
         ldx #0
       .byte ']'
 .endif
+
+endC:   
 
         .byte 0
 
@@ -9640,9 +9769,6 @@ FUNC _stmtbyteruleend
 .ifdef OPTRULES
         .byte "|++%V;"
 incinc:
-.byte "%{"
-putc '!'        
-IMM_RET
       .byte "["
         inc VAR0
         bne :+
@@ -9651,9 +9777,6 @@ IMM_RET
       .byte "]"
 
         .byte "|%V++;"
-.byte "%{"
-putc '?'        
-IMM_RET
         .byte "%R"
         .word incinc
 
@@ -11475,7 +11598,14 @@ FUNC _OK
 
         jsr _eosnormal
 
-        PRINTZ {10,10,"OK "}
+        ;; size of text
+        jsr nl
+        lda originp
+        ldx originp+1
+        jsr strlen
+        jsr _printu
+        
+        PRINTZ {" bytes source",10,10,"OK "}
 
         ;; print size in bytes
         ;; (save in gos, too)
@@ -12960,6 +13090,8 @@ FUNC _inputstart
 
 .FEATURE STRING_ESCAPES
 input:
+
+;        .byte 0
 
 ;LESSTHAN=1
 .ifdef LESSTHAN

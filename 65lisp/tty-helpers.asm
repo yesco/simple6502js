@@ -32,6 +32,20 @@
 
 ;;; ----------------- UTILTITY PRINTERS
 
+;;; count in Y
+spaces:
+        lda #32
+;;; put A char Y times
+putnc:  
+        sty savey
+:       
+        beq :+
+        jsr putchar
+        dey
+        bpl :-
+:       
+        rts
+
 ;;; Good to haves!
 tab:    
 .ifdef __ATMOS__
