@@ -37,8 +37,16 @@ rm fil
 echo "--gen .s--"
 #rm $name.s
 #cc65 -r -Oirs $OPTS -T $name.c vm-asm.s 2>/dev/null
-cc65 -r -Os $OPTS -T $name.c vm-asm.s 2>/dev/null
+
+cl65 -r -t atmos -Os $OPTS -S -T $name.c vm-asm.s
+
 ls -l $name.s
+
+# generate .lst file (with "relative" addresses)
+ca65 -t atmos $name.s -l $name.lst # 2>/dev/null 1>/dev/null
+
+ls -l $name.lst
+
 
 echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`"
 

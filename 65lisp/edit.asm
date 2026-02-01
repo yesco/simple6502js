@@ -178,8 +178,8 @@ ctrlbranch:
         BR jreturn
 
         ;; ^K-^O
-        BR jkill
-        BR jredraw              ; jredraw LOAD?
+        BR jkill                ; ^Kill
+        BR jload                ; ^Load
         BR jreturn              ; ^M
        BRB enext                ; ^N
         BR joutkey              ; ^O
@@ -194,12 +194,12 @@ ctrlbranch:
         ;; ^U-^Y
         BR eunused              ; ^U TODO: repeat
         BR jinfo                ; ^View info
-        BR eunused              ; ^W jwrite? (emacs: wank? - kill region, lol)
-        BR jextend              ; ^X
-        BR jyank                ; ^Y
+        BR jwrite               ; ^Write
+        BR jextend              ; ^Xxtras
+        BR jyank                ; ^Yank
 
         ;; ^Z ESC
-        BR jzource              ; ^Z reload Zource
+        BR jzource              ; ^Zource reload
         BR jcmd                 ; ESC toggle cmd/edit mode
 
         ;; Arrows remapped! 29--31!
@@ -336,7 +336,10 @@ FUNC _editaction
 @noctrl:
         ;; DEL key on ORIC (do perform BS)
         cmp #127
-        beq ebs
+;        beq ebs
+        bne :+
+        jmp ebs
+:       
 
         ;; e)dit key in command mode, lol
         bit mode
@@ -388,8 +391,10 @@ jkill:
 jzource:  
         jsr _loadlater
         ;; fall-through
-jredraw:        
-        jmp _redraw
+jwrite: 
+        jmp _savefile
+jload:        
+        jmp _loadbuffer
 jcaps:  
         jmp putchar
 jyank:  
@@ -798,12 +803,16 @@ einsert:
 
 ;;; Load the first buffer from input
 FUNC _loadlater
+        ;; force edit mode
         lda #0
         sta mode
-        ;; mark as not good (?)
+
+        ;; invalidate current status
         inc compilestatus
+
         jsr _loadfirst
         jsr _idecompile
+        ;; fall-through
 
 FUNC _loadfirst
         ;; load first example 'a'
@@ -829,6 +838,8 @@ FUNC _loadfromAX
         pla
 .endif
 
+
+
 FUNC _loadfromAX_noupdate
 
 ;;; (+ 15 22 12 6 3) = 58
@@ -836,16 +847,7 @@ FUNC _loadfromAX_noupdate
         txa
         pha
 
-        ;; clear edit area
-        lda #<EDITNULL
-        ldx #>EDITNULL
-        sta tos
-        stx tos+1
-
-        lda #<EDITSIZE
-        ldx #>EDITSIZE
-
-        jsr _zero
+        jsr _clearedit
 
         ;; tos= from = AX
         pla
@@ -896,6 +898,19 @@ FUNC _loadfromAX_noupdate
 ;;; TODO: somehow, cursor isn't always right pos?
         ;; 3
         jmp _redraw
+
+
+FUNC _clearedit
+        ;; clear edit area
+        lda #<EDITNULL
+        ldx #>EDITNULL
+        sta tos
+        stx tos+1
+
+        lda #<EDITSIZE
+        ldx #>EDITSIZE
+
+        jmp _zero
 
 
 FUNC _goerrpos       

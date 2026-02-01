@@ -37,8 +37,11 @@
 ;;; 
 ;;; - stdin, stdout - vars, lol
 ;;; - stderr - write on screen with INVERSE? lol
-;;; - getline
-;;; - gets
+
+;;; - readline - LOL - allocates string
+;;; - getline - TODO: allocates string
+;;; - fgets - DONE: see below, uses existing buffer
+;;; - gets - unsafe ... (Hmmm) - DON'T DO!
 
 ;;; - fprintf(STDOUT, 
 ;;; - fprintf(STDERR,
@@ -391,4 +394,96 @@ FUCN _iputzz
         jsr axputz
         jmp iputz
 .endif ; PRINTFHELPERS
+
+;;; getline(char*,int*,stdio) => nchars
+FUNC _getline
+        ;; TODO:
+        rts
+
+;;; fgets_stdin(char*,int,stdio) => char*
+;;;   tos: char* buffer
+;;;   AX : word  bufflen (ignore A)
+;;;     NOTE: X is ignred
+;;; Returns
+;;;   AX: NULL if no chars, otherwise buffer
+;;; Note: for stdin it never returns NULL
+;;; 
+;;; TODO: haven't I written a smaller one?
+
+;;; TODO: rename as FUNC _editline ?
+FUNC _fgets_edit
+;;; 57 B + CURSOR_ON/OFF
+        tax
+        ldy #$ff
+        jmp @start
+@count:       
+        jsr putchar
+@start:       
+        dex
+        iny
+        lda (tos),y
+        bne @count
+        ;; X= bytes left
+        ;; Y= number of bytes
+        ;; stands on \0
+
+        inx
+        txa                     ; LOL
+        SKIPTWO
+;;; Edits an empty line
+FUNC _fgets
+        ldy #0
+
+        ;; need 1 byte for zero termination
+        tax
+        dex
+        stx savex
+
+        CURSOR_ON
+@next:
+        ;; zero terminate after current
+        lda #0
+        sta (tos),y
+        ;; read key
+        jsr getchar
+        beq @done               ; 0 ?? ? TODO:
+        ;; - BS & return
+        cmp #127                ; DEL
+        beq @del
+        cmp #13                 ; CR
+        beq @done
+        cmp #' '                ; ignore CTRL
+        bcc @next
+        ;; store normal char
+;        dex
+        dec savex
+        bmi @full
+        sta (tos),y
+        iny
+        ;; echo
+        jsr putchar
+        ;; always
+        bne @next
+
+@del:
+        ;; -> have anything to delete?
+        cpy #0
+        beq @next
+        ;; delete in buffer
+        jsr putchar
+        dey
+@full:
+        ;; ignore key
+;        inx
+        inc savex
+        jmp @next
+
+
+@done:
+        CURSOR_OFF
+
+        lda tos
+        ldx tos+1
+
+        rts
 

@@ -51,22 +51,33 @@ saveyputchar:   .res 1
 
 .code
 
+;;; TODO: make more efficient?
+
 .macro CURSOR_OFF
+.ifblank
+        ;; oric toggle
+        PUTC CTRL('Q')
+.else
 ;;; 10
         pha
         lda $026a
         and #255-1
         sta $026a
         pla
+.endif
 .endmacro
 
 .macro CURSOR_ON
+.ifblank
+        PUTC CTRL('Q')
+.else
 ;;; 10
         pha
         lda $026a
         ora #1
         sta $026a
         pla
+.endif
 .endmacro
 
 ;;; ORIC ATMOS BASIC ROM BIOS

@@ -47,8 +47,9 @@ DOUBLE   =128+10
 
 
 
-
 ;;; ORIC ATMOS
+;;; - github:cc65/asminc/atmos.inc
+
 ;;; 
 ;;; #228 ( 4244) is the address of the ‘fast’ interrupt
 ;;; jump. By altering the jump address at #229,A
@@ -81,3 +82,72 @@ TIMER_START	= $ffff
 SETTIMER        = $0306
 READTIMER	= $0304
 CSTIMER         = $0276
+
+
+;;; ZERO PAGE
+
+SCRPTR          = $12
+BASIC_BUF       = $35
+CHARGOT         = $E8
+TXTPTR          = $E9
+
+;;; address used to choose ping/explode etc ORIC?
+QUIET           = $31
+
+
+;;; Girl on page 2? LOL
+
+MODEKEY         = $0209
+CAPSLOCK        = $020C        ; $7F = not locked, $FF = locked
+PATTERN         = $0213
+IRQVec          = $0245        ; "fast" interrupt vector
+JOINFLAG        = $025A        ; 0 = don't joiu, $4A = join BASIC programs
+VERIFYFLAG      = $025B        ; 0 = load, 1 = verify
+CURS_Y          = $0268
+CURS_X          = $0269
+STATUS          = $026A
+BACKGRND        = $026B
+FOREGRND        = $026C
+TIMER3          = $0276
+CFILE_NAME      = $027F
+CFOUND_NAME     = $0293
+FILESTART       = $02A9
+FILEEND         = $02AB
+AUTORUN         = $02AD        ; $00 = only load, $C7 = autorun
+LANGFLAG        = $02AE        ; $00 = BASIC, $80 = machine code
+LOADERR         = $02B1
+KEYBUF          = $02DF
+PARMERR         = $02E0
+PARAM1          = $02E1        ; & $02E2
+PARAM2          = $02E3        ; & $02E4
+PARAM3          = $02E5        ; & $02E6
+BANGVEC         = $02F5
+
+
+; ROM entries
+
+GETLINE         = $C592
+TEXT            = $EC21
+rHIRES          = $EC33
+CURSET          = $F0C8
+CURMOV          = $F0FD
+DRAW            = $F110
+CHAR            = $F12D
+POINT           = $F1C8
+rPAPER          = $F204
+rINK            = $F210
+PRINT           = $F77C
+
+; Sound Effects (is PING1 for ORIC-1?)
+PING            = $FA9F
+PING1           = $FA85
+SHOOT           = $FAB5
+SHOOT1          = $FA9B
+EXPLODE         = $FACB
+EXPLODE1        = $FAB1
+ZAP             = $FAE1
+ZAP1            = $FAC7
+TICK            = $FB14
+TICK1           = $FAFA
+TOCK            = $FB2A
+TOCK1           = $FB10

@@ -70,19 +70,6 @@
       .byte "]"
 
 
-;;; from cc65 - libsrc/atmos/atmos_save.s (orig: Twilite)
-
-JOINFLAG    = $025A        ; 0 = don't joiu, $4A = join BASIC programs
-VERIFYFLAG  = $025B        ; 0 = load, 1 = verify
-
-CFILE_NAME  = $027F
-CFOUND_NAME = $0293
-FILESTART   = $02A9
-FILEEND     = $02AB
-AUTORUN     = $02AD        ; $00 = only load, $C7 = autorun
-LANGFLAG    = $02AE        ; $00 = BASIC, $80 = machine code
-LOADERR     = $02B1
-
         ;; .byte "|cwritehdr();" - $e607
         ;; .byte "|creadsync();" - $e735 
 

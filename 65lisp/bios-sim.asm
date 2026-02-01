@@ -25,6 +25,15 @@
 BIOSINCLUDED=1
 
 
+;;; TOOD: vt100?
+
+.macro CURSOR_ON
+.endmacro
+
+.macro CURSOR_OFF
+.endmacro
+
+
 
 .define CTRL(c) c-'@'
 

@@ -2529,6 +2529,12 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
 
 ;;; Init ORIC
 .ifdef __ATMOS__
+
+
+;;; TODO:    cleanup!
+;;; TODO:   move away from here to bios!
+
+
 ;;; #26A -- Oric status byte. Each bit relates to
 ;;; one aspect: from high bit to low bit – unused,
 ;;; double-height, protected-columns, ESC pressed,
@@ -2546,14 +2552,6 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
 ;;; TODO: not working?
         lda #1
         sta $24f
-
-.else
-
-.macro CURSOR_ON
-.endmacro
-
-.macro CURSOR_OFF
-.endmacro
 
 .endif
 
@@ -11385,6 +11383,20 @@ __ZPIDE__:        .res 0
 
 FUNC _idestart
 
+FUNC _editorstart
+.ifndef __ATMOS__
+        ;; ironic, as this is not editor for
+        ;; generic...
+
+        ;; outdated (no cursor anymore)
+        .include "edit-atmos-screen.asm"
+.else
+        ;; EMACS buffer RAW REDRAW
+        .include "edit.asm"
+.endif
+FUNC _editorend
+
+
 
 FUNC _aftercompile
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
@@ -11721,8 +11733,8 @@ FUNC _run
         ;; TODO: print something if run from edit mode?
         jsr nl
 
-        ;; set ink for new rows
-        lda #BLACK+16           ; paper
+        ;; set "BAR" TERMINAL program output colors 
+        lda #BLACK+16           ; paper "WHITE BAR"
         ldx #WHITE&127          ; ink
         jsr _eoscolors
 
@@ -11871,9 +11883,14 @@ command:
 ;        jsr _eosnormal
 
         ;; 'Q' to temporary turn on cursor!
+.ifdef __ATMOS__
         PRINTZ {10,">",'Q'-'@'}
+.else
+        PRINTZ {10,">"}
+        CURSOR_ON
+.endif
         jsr getchar
-        PUTC CTRL('Q')
+        CURSOR_OFF
 
         ;; ignore return
         cmp #13
@@ -11935,9 +11952,7 @@ FUNC _idecompile
         sta SCREEN+35
 .endif ; __ATMOS__
         jsr nl
-        lda #(BLACK+BG)&127
-        ldx #WHITE&127
-        jsr _eoscolors
+        jsr _eosinfo
         PRINTZ {10,YELLOW,"compiling...",10,10}
         
         ;; Compile directly from editor!
@@ -11987,11 +12002,7 @@ FUNC _hell
 ;;; Print generated code info
 ;;; TODO: bad name
 FUNC _outkey
-        ;; TODO: more elaborate than _info (bottom)
-        lda #BLACK&127+16
-        ldx #WHITE&127
-        jsr _eoscolors
-
+        jsr _eosinfo
         jsr _printvars
         jmp _forcecommandmode
 
@@ -12064,6 +12075,8 @@ FUNC _NMI_catcher
         ;; Reset colors
         jsr _eosnormal
         PRINTZ {10,RED+BG,"RESET",10}
+
+;;; TODO: keyboard disabled if NMI during "loading..."
 
         jmp _forcecommandmode
 
@@ -12195,11 +12208,26 @@ PUTC '*'
 .endif ; INTERRUPT
 
 
-FUNC _eosnormal
-        ;; reset to normal/default
-        lda #BLACK&127+16       ; paper
-        ldx #GREEN&127          ; ink
+
+;;; set colors for COMMAND menu/hints (yellow)
+FUNC _eoscommand
+        ldx #YELLOW&127
+        SKIPTWO
         ;; fall-through
+
+;;; set colors for INFO by IDE
+FUNC _eosinfo
+        ldx #WHITE&127
+        SKIPTWO
+        ;; fall-through
+
+;;; reset to EDITOR normal/default/user input
+FUNC _eosnormal
+        ldx #GREEN&127          ; ink
+@skipshere:
+        lda #BLACK&127+BG       ; paper
+        ;; fall-through
+
 ;;; Change default print colors:
 ;;;   A= paper
 ;;;   X= ink
@@ -12209,12 +12237,15 @@ FUNC _eoscolors
         stx INK
         GOTOXY 2,27
 .else
+        ;; LOL, ./oric-terminal changes to ANSI
         jsr putchar
         txa
         jsr putchar
 .endif ; __ATMOS__        
 
+        jsr nl
         jmp nl
+
 
 
 FUNC _listfiles
@@ -12436,37 +12467,139 @@ FUNC _introtext
 .endif ; INTRO
 
 
+;;; TODO: sim65 interact with files?
+
+.ifdef __ATMOS__
+
+;;; ORIC tape max length 16
+FILENAMESIZE=17
+
+;filename:       .res FILENAMESIZE+1
+;;; TODO: dummy for now
+filename:              
+        .byte "userfile.c",0
+        .res FILENAMESIZE-.strlen("userfile.c")-1
 
 
-;;; TODO: save some chars?
+copyfilename:
+;;; this code is stupid, just copies 15 bytes
+;;; from CC65 store_filename, doesn't care about length?
+        ldy #$0f
+        lda #<filename
+        ldx #>filename
+        sta tos
+        stx tos+1
+@nextc:
+        lda (tos),y
+        sta $027f,y
+        dey
+        bpl @nextc
+        
+        rts
 
-;;; CTRL-X: extras
-FUNC _extend
-;;; 16 
+
+FUNC _writefileas
         jsr _eosnormal
         
-.ifnblank
-        lda #<_extendinfo
-        ldx #>_extendinfo
-        jsr _printz
-.endif
+        PRINTZ {10,YELLOW,"Write to file as:",WHITE}
 
-;;; Different key? ^X b ?
-        jsr _listfiles
+        ;; fgets(char*,int len,stdio) => ptr
+        lda #<filename
+        ldx #>filename
+        sta tos
+        stx tos+1
 
-        ;; get command character
-        jsr getchar
-        pha
+        lda #FILENAMESIZE
+        ldx #0
 
-        ;; letter: a-z
-        jsr isalpha
+        jsr _fgets_edit
+
+        ;; 0 bytes => abort, otherwise save!
+        stx savex
+        ora savex
         beq :+
 
+putc 'c'
+
+FUNC _savefile
+
+PUTC 'd'
+;;; crashes during save? HMMM, WHY?
+        PRINTZ {10,"Writing..."}
+        lda #<filename
+        ldx #>filename
+        jsr _printz
+        jsr nl
+putc 'e'
+
+.ifblank
+        ;; _atmos_save see cc65
+        ;; CC65 calling convention
+
+        sei
+        ;; store file start address
+        lda #<EDITSTART
+        ldx #>EDITEND
+        sta $02a9               ; file start lo
+        stx $02aa               ; file start hi
+        ;; store file end address
+        lda editend
+        ldx editend+1
+        sta $02ab               ; file end lo
+        stx $02ac               ; file end hi
+
+        jsr copyfilename
+
+        ;; what data is this?
+        lda #$00
+        sta AUTORUN
+
+        ;; mark as "machinecode", otherwise pops to basic?
+        lda #$80
+        sta LANGFLAG
+
+        ;; calling interrupt subroutine?
+        jsr csave_bit
+        cli
+
+        jmp _eventloop
+
+csave_bit:      
+        php
+        jmp $e92c
+
+.endif
+
+:       
+        jmp _eventloop
+
+
+
+FUNC _loadbuffer
+        jsr _eoscommand
+        PRINTZ {"? - list preloaded examples",10}
+
+        ;; get user selection
+        jsr _eosnormal
+        jsr getchar
+
+        ;; or ?
+        cmp #'?'
+        bne :+
+listbuffers:
+        jsr _listfiles
+        ;; let user choose buffer
+        jsr getchar
+:       
+
+        ;; save it (isupper destroys)
+        pha
+
+        ;; ? check if 'a-z' (A-Z) or abort
+        jsr isalpha
+        beq :+
         ;; => save current buffer/copy buffer
         ;; TODO: save current letter buffer (if edited?)
-
-;;; TODO:
-.ifdef __ATMOS__
 
         ;; lowercase
         pla
@@ -12483,14 +12616,144 @@ FUNC _extend
 @notfound:       
         PRINTZ "% Not found!"
         jmp _forcecommandmode
-.else
-        ;; TODO: not amos buffer
-        PRINTZ "% Not implemented!"
-        jmp _forcecommandmode
-.endif 
-:       
+
+:      
         pla
+
+        ;; load tape file?
+        pha
+        jsr isalpha
+        beq :+
+
+        pla
+
+;;; load file (ask for name)
+openfile:
+        jsr _eosnormal
+        
+        PRINTZ {10,YELLOW,"Open file:",WHITE}
+
+        ;; fgets(char*,int len,stdio) => ptr
+        lda #<filename
+        ldx #>filename
+        sta tos
+        stx tos+1
+
+        lda #FILENAMESIZE
+        ldx #0
+
+        jsr _fgets_edit
+
+        ;; 0 bytes => abort, otherwise save!
+        stx savex
+        ora savex
+        beq :+
+
+        jsr _clearedit
+
+        ;;; _atmos_load cc65
+        sei
+        jsr     copyfilename
+        ldx     #$00
+        stx     AUTORUN       ; $00 = only load, $C& = run
+        stx     JOINFLAG      ; don't join it to another BASIC program
+        stx     VERIFYFLAG    ; load the file
+
+        ldx     #$80          ; machinecode
+        stx     LANGFLAG      ; BASIC
+
+        jsr     cload_bit
+        cli
+        jmp loadedfile
+cload_bit:
+        pha
+        jmp     $e874
+loadedfile:
+
+        ;; update editend (search \0!)
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        sta editend
+        stx editend+1
+        
+        ;; TODO: use strlen, fewer bytes?
+;;; 13 B
+        ldy #0
+@loop:       
+        lda (editend),y
+        beq :+
+
+        ldx #editend
+        jsr _incRX
+        ;; Z=1
+        bne @loop
+
+        ;; force edit mode
+        lda #0
+        sta mode
+
+        jmp _eventloop
+
+:       
+        ;; get key back
+        pla
+
+        ;;  more commands
+
+        jmp _forcecommandmode
+
+.else
+FUNC _writefileas
+FUNC _savefile       
+FUNC _loadfile
+openfile:       
+        ;; TODO: not amos buffer
+        PRINTZ {10,"% Not implemented"}
+
+        rts
+.endif ; __ATMOS__
+
+
+
+
+;;; CTRL-X: extras
+FUNC _extend
+;;; 16 
+        jsr _eoscommand
+
+        lda #<_extendinfo
+        ldx #>_extendinfo
+        jsr _printz
       
+        jsr _eosnormal
+        jsr getchar
+        ;; everything becomes CTRL-A .. CTRL-Z !
+        ;; (a-z, A-Z)
+        and #31
+
+.ifdef __ATMOS__
+        ;; ^X^B - emacs list buffers!
+        cmp #CTRL('B')
+        bne :+
+        jmp listbuffers
+:       
+        ;; ^X^F - open file from tape/disk
+        cmp #CTRL('F')
+        bne :+
+        jmp openfile
+:       
+        ;; ^X^S - save current file
+        cmp #CTRL('S')
+        bne :+
+        jmp _savefile
+:       
+        ;; ^X^W - write/save file as
+        cmp #CTRL('W')
+        bne :+
+        jmp _writefileas
+
+.endif ; __ATMOS__
+
         ;; CTRL-C : compile "input" (unmodified)
         cmp #CTRL('C')
         bne :+
@@ -12514,12 +12777,12 @@ FUNC _extend
 
 FUNC _extendinfo
 .byte 10
-.byte "TODO:",10
-.byte "^Files to load from tape/disk",10
-.byte "^Save current file",10
-.byte "^Write as new file",10
-.byte "^Crash/exit",10
-.byte "^Zleep",10
+.byte "b - ^Buffers: show examples",10
+.byte "f - ^Files open from tape/disk",10
+.byte "s - ^Save current file",10
+.byte "w - ^Write/save new file as (new name)",10
+;.byte "^Crash/exit",10
+;.byte "^Zleep",10
 
 .byte 0
 
@@ -12628,20 +12891,6 @@ CSRESET=1
         sta READTIMER+1
 .endif
         rts
-
-       
-FUNC _editorstart
-.ifndef __ATMOS__
-        ;; ironic, as this is not editor for
-        ;; generic...
-
-        ;; outdated (no cursor anymore)
-        .include "edit-atmos-screen.asm"
-.else
-        ;; EMACS buffer RAW REDRAW
-        .include "edit.asm"
-.endif
-FUNC _editorend
 
 
 FUNC _ideend
@@ -15211,7 +15460,7 @@ NOPRINT=1
         .byte "}"
         .byte 0
 
-;;; i - isascii etc..
+;;; i - isalph etc..
         .incbin "Input/test-ctype.c"
         .byte 0
 
