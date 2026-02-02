@@ -1,3 +1,13 @@
+// NOTICE:
+// 
+// The cl65 sim65 of termux doesn't have cycles stuff
+// enabled, you need to compile your own version
+
+// It's assuemd to be on a sisterlevel: ../../cc65/
+
+// ../../cc65/bin/cl65 -t sim6502 Play/cycles.c -o cycles.sim && ../../cc65/bin/sim65 cycles.sim
+
+
 // sim6502 works!
 //
 // cl65 -t sim6502 Play/fopen.c && sim65 fopen.sim ; echo "Exitcode $?"
