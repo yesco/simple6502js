@@ -1,7 +1,7 @@
 // BYTE SIEVE PRIME benchmark
 word m, a, n, c, i, p, k;
 word main(){
-  m= 8192;
+  m= 2048;
   a= xmalloc(m);
   n=0; do {
     c=0;

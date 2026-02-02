@@ -1,3 +1,68 @@
+;;; This is for debugging... lol
+
+.ifnblank
+;;; These gives trouble...
+commit 988a90bfdbdc9750ceb748b59fba51e7429e95d2
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 22:30:27 2026 +0700
+
+    printvariables: update comment about code sizes
+
+commit 11e4eb7cdfdac95703d8749331fcdcd273247c57
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 21:30:26 2026 +0700
+
+    printvariables: delimit functions
+
+commit c52ae3cc5a3c40c039e2fa013d05a75a05600db4
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 21:24:39 2026 +0700
+
+    parse:
+    - printvariables() in C, make a better one, lol
+    - -q disasm
+    - -pv print vars
+    - -pe print env
+    - -pV printvariables()
+
+commit 7f98b785192fe21c7b09b783c5121421d540d86f
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 17:43:25 2026 +0700
+
+    parse:
+    - got rid of warnings
+    - command line parameters
+    - c compile
+    - f file input
+    - r run (1)
+    - r10 run 10 times
+    - when exiting the (byte) exitcode of the last program is returned
+
+commit 2e1b9e9ce9612f20f2632cfdfc45ac79824ed815
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 14:44:44 2026 +0700
+
+    cycles: need new cc65 and sim65
+
+commit d329549cfcdaf2bf33d551adc302226b5c35d6c1
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Mon Feb 2 14:39:59 2026 +0700
+
+    cycles,fopen: Play with io on sim65 and getting cycles
+
+;;; This one ok!
+commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
+Author: Jonas S Karlsson <jsk@yesco.org>
+Date:   Sun Feb 1 23:19:46 2026 +0700
+
+    IDE:
+    -
+    atmos-constants.asm:
+    - updated from cc65
+
+
+.endif
+
 ;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
 ;;; 
 ;;; ALL RIGHTS RESERVED
@@ -1195,25 +1260,27 @@ DEMO=1
 
 
 .ifdef PICO
-        NOBIOS=1                ; save  72 B
-        NOLIBRARY=1             ; save 592 B
+;        NOBIOS=1                ; save  72 B
+;        NOLIBRARY=1             ; save 592 B
+;        STDIO=1
 
-        OUTPUTSIZE=8*1024
-        ;; Heap: 
+;;; Library used by IDE, 
+;;; TODO: remove IDE!
+;        NOIDE=1
 
+        OUTPUTSIZE=12*1024
 .elseif .def(NANO)
         ;; BIOS
         ;; LIBRARY
+;;; TODO:
         NOHELP=1                ; save 1 KB?
 
-        OUTPUTSIZE=6*1024
-        ;; Heap: 
-
+        OUTPUTSIZE=12*1024
 .elseif .def(TINY)
         ;; BIOS
         ;; LIBRARY
 
-        OUTPUTSIZE=8*1024
+        OUTPUTSIZE=12*1024
 
 .elseif .def(DEMO)
         ;; BIOS
@@ -1223,12 +1290,44 @@ DEMO=1
         EXAMPLEFILES=1          ; + 4.5 KB
 
         OUTPUTSIZE=1*1024
+
+        ;; Biggest on ORIC ATMOS
+        ;; (- 64 30  16  2    2      8) = 6!!!
+        ;;   RAM tap ROM CHAR CSTACK HIRES
+;        OUTPUTSIZE=6*1024
+
+        ;; Biggest on sim65
+        ; (+ (* 31 1024) 512 256 32 16 2 1)
+;         OUTPUTSIZE=31*1024   ... 32563 bytes!
+;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
         ;; Heap: 8KB
 
 .else ; DEFAULT
 
-        OUTPUTSIZE=4*1024
-        ;; Heap: 
+;;; TDOO: fix... why fails? (32K limit somewhere?)
+;;; 
+;;; 
+;;; fails at 352 lines Input/lps-100.c
+;;; (* 352 6) = 2112 should fit
+
+
+;;; PRIME malloc gives bad mem and crashes
+
+;;; somethign is fckskcs!
+
+        OUTPUTSIZE=2*1024
+
+        ;; Biggest on ORIC ATMOS
+
+;;; TODO: enable when HEAP is gone
+
+
+;        OUTPUTSIZE=12*1024    
+
+        ;; Biggest on sim65
+;         OUTPUTSIZE=38*1024
+
+       ;; Heap: 
 .endif
 
 
@@ -6169,6 +6268,7 @@ FUNC _memoryrulesstart
       .byte ']'
 
 
+;.ifdef NONO_cc65_STDLIB
 .ifdef STDLIB
 
 ;;; TODO: cheating, using cc65 malloc/free :-(
@@ -6201,6 +6301,31 @@ FUNC _memoryrulesstart
 
         ;; Simple dummies
         ;; (just allocate directly after code, no free()) 
+
+        .byte "|xmalloc(",_E,")"
+;;; TODO: this is exactly the same as malloc
+;;;   how to fix
+      .byte "["
+        ;; 21 B  33c - works!
+        sta savea
+        stx savex
+
+        lda _out
+        tay
+        
+        clc
+        adc savea
+        sta _out
+        
+        lda _out+1
+        tax
+        adc savex
+        sta _out+1
+        
+        ;; TODO: test if run-out of memory
+        tax
+        tya     
+      .byte "]"
 
         .byte "|malloc(",_E,")"
       .byte "["
@@ -13409,6 +13534,12 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;;; LinesPerSecond - 300 x "++i;\n"
+;;; to test "maximum" lines/s ~ 31 on 1 MHz!
+;;; 
+;        .incbin "Input/lps-300.c"
+;        .byte 0
+
 ;        .byte 0
 
 ;LESSTHAN=1
@@ -15415,8 +15546,31 @@ NOPRINT=1
 
 ;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
 ;;; b - Byte sieve
+.ifdef DEMO
+
+
+
+
+
+
+
+;;;  BYTESIEVE crashes on ORIC ATMOS...
+
+;;; it's good at:
+;;; 
+;;; commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
+
+;;; this DEMO: OUTPUTSIZE = 1 K still crash...
+
+;;; but any later gives crash... ??? hmmmm
+
+
+        .incbin "Input/byte-sieve-2K.c"
+
+
+.else
         .incbin "Input/byte-sieve.c"
-;        .incbin "Input/byte-sieve-2.c"
+.endif
         .byte 0
 
 ;;; c - color chart
