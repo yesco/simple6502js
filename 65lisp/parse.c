@@ -17,6 +17,12 @@ extern void run();
 extern void runN(unsigned int);
 extern unsigned int runs; // exitcode, lol
 #pragma zpsym ("runs")
+extern void tab();
+extern void printchar(char c);
+extern void printvars();
+extern void printenv();
+extern char* ruleVARS;
+#pragma zpsym ("ruleVARS")
 
 void Cstart(){}
 void disasmStart(){}
@@ -290,6 +296,51 @@ void error(char* msg, char* data) {
 #endif // __ATMOS__
 
 
+void printvariables() {
+  char * p= ruleVARS, c, t, * name;
+  unsigned int v, * a;
+
+  printf("=== VARIABLES ===");
+
+  while((c= *++p)) {
+    putchar('\n');
+    //printf("$%04X: ", p);
+    // print name
+    name= p;
+    while(*p!='%') putchar(*p++);
+
+next:
+    ++p; // skip %
+    //printf(" {%%%c} ", *p);
+    switch((c= *p)) {
+    case 'R': p+= 2; break; // jumper
+    case 'b': ++p; goto next; // wordbreak: ignore
+    default:
+      if (c & 0x80) {
+        // skipper - print variable data
+        ++p;
+        t= p[2]; a= *(unsigned int**)p; v= *a;
+        tab();
+        printf("= %5u ('%c' $%04x):%c @$%04x ",
+                v, (v&127)<' '?0 : v<127?v: 0, v, t, a);
+        // for debugging: any var "sfoo" is assumed string
+        if (*name=='s' || t==('C' && 127)) {
+          // print string: array=p pointer=v
+          char * s= t&0x80? (char*)v: p;
+          printf("%3d \"", strlen(s));
+          while(*s) printchar(*s++);
+          putchar('"');
+        }
+
+        p+= 3;
+        break;
+      } else printf("Unknown %%c operator\n", c);
+    }
+  }
+  putchar('\n');
+}
+
+
 
 int argc;
 char** argv;
@@ -329,11 +380,15 @@ extern int processnextarg() {
   char* a= *++argv;
 
   putchar('\n');
-  if (--argc<=0) exit(runs | (runs>>8)); // only returns byte?
+  if (--argc<=0) {
+    putchar('\n');
+    exit(runs | (runs>>8)); // only returns byte?
+  }
 
   //printf("\n== %d: %s\n", argc, a);
     
   if (isalpha(*a)) {
+
     inputfile(a);
 
     // compileAX doesn't return, so let's hack:
@@ -343,7 +398,9 @@ extern int processnextarg() {
       
     printf("--------------------\n");
     compileAX((char*)EDITSTART);
+
   } else if (*a== '-') {
+
     // process other args -?
     switch (a[1]) {
       // these DO NOT return!
@@ -352,12 +409,23 @@ extern int processnextarg() {
       // these do return
     case 'f':
     case 'l': --argc; ++argv; inputfile(*argv); break;
+    case 'q': dasm(); break;
+    case 'p': // print 
+      switch(a[2]) {
+      case 'V': printvariables(); break;
+      case 'v': printvars(); break;
+      case 'e': printenv(); break;
+      case 's': // print source
+      default: error("Unknown 'p'rint option(-pv -pe): ",a);
+      }
+      break;
       // TODO:
     case 'b': // benchmark
     case 'e': // expression
     case 'h': // help
     default: error("Unkown option: ", a);
     }
+
   } else error("Unknown option: ", a);
 
   return processnextarg();

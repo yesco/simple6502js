@@ -3153,7 +3153,8 @@ jsr _printchar
         cmp #'R'
         bne :+
         
-PUTC '/'
+;PUTC '/'
+;;; TODO: what's this?
 ;;; Doesn't even get here, how come it works!?!?!
 ;PUTC'R'
         ;; Y=0
@@ -12035,7 +12036,8 @@ FUNC _hell
 ;;; TODO: bad name
 FUNC _outkey
         jsr _eosinfo
-        jsr _printvars
+        .import _printvariables ; from C
+        jsr _printvariables
         jmp _forcecommandmode
 
 

@@ -830,6 +830,7 @@ FUNC _resetcompilation
         ;; mark as not good (?)
         inc compilestatus
         
+
         rts
 
 ;;; Load edit buffer with zero terminated text from AX

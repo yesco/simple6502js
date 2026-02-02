@@ -32,6 +32,10 @@
 
 ;;; ----------------- UTILTITY PRINTERS
 
+;;; TODO: export _ ???
+.export spaces, putnc, spc, _tab, clrscr
+.export forward, bs, newline, nl, spc
+
 ;;; count in Y
 spaces:
         lda #32
@@ -47,6 +51,7 @@ putnc:
         rts
 
 ;;; Good to haves!
+_tab:   
 tab:    
 .ifdef __ATMOS__
         ;; Atmos doesn't have TAB
