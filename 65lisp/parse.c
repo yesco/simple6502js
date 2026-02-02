@@ -331,6 +331,8 @@ next:
           while(*s) printchar(*s++);
           putchar('"');
         }
+        // delimit function+params
+        if (t=='F') putchar('\n');
 
         p+= 3;
         break;
