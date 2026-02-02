@@ -1290,10 +1290,23 @@ NSTARGS=8
 .export _asmstart
 _asmstart:      
 
+;;; This is like a "continuation"
+;;; Treat it like a what to do next!
+;;; This is because we "null" the stack in:
+;;; - compilation
+;;; - run/error
+;;; 
+;;; These routines will call this function
+;;; 
+;;; TODO: make it one level of indirection?
+
+.import _processnextarg
+
 .import _iasmstart, _iasm, _dasm, _dasmcc
 .export _endfirstpage
 .export _output, _out
 .export _rules
+
 
 
 .include "atmos-constants.asm"
@@ -1433,6 +1446,32 @@ FUNC _biosend
 .zeropage
 __ZPCOMPILER__:
 .code
+
+
+.zeropage
+
+;;; Data abouit current function being built
+;;; number of parameters (0..n), 255==not valid
+nparam: .res 1
+curF:   .res 2                  ; points to "name%b..."
+params: .res NPARAMS*2          ; "registers"
+
+compilestatus:  .res 1          ; 
+
+.code
+
+
+;;; TODO:
+.export _ruleVARS
+
+.zeropage
+;;; Vector pointing to beginning of current "ENVIRONMENT"
+;;; (address bindings encoded as matching rules)
+_ruleVARS:        .res 2
+.code
+
+
+
 
 .zeropage
 ;;; reserved, lol
@@ -5007,15 +5046,6 @@ cut:
 ;;;   Y = w c W C 'w 'c 'W 'C (word/const, W/C=pointer, 'hibit)
 ;;;   A = ++ value (redundant from Y)
 
-;;; TODO:
-.export _ruleVARS
-
-.zeropage
-;;; Vector pointing to beginning of current "ENVIRONMENT"
-;;; (address bindings encoded as matching rules)
-_ruleVARS:        .res 2
-.code
-
 ;;; parse identifier name
 ;;; pushes (address/word, len/byte) on stack
 ;;; (get's cleaned up correctly if _fail called!)
@@ -5109,17 +5139,6 @@ FUNC _newname_Y_out
         jmp _newvar_Y_AX
 
 
-.zeropage
-
-;;; Data abouit current function being built
-;;; number of parameters (0..n), 255==not valid
-nparam: .res 1
-curF:   .res 2                  ; points to "name%b..."
-params: .res NPARAMS*2          ; "registers"
-
-compilestatus:  .res 1          ; 
-
-.code
 
 
 FUNC _initparam
@@ -5237,7 +5256,7 @@ jsr _printchar
 
         dey
         bpl :-
-:       
+
 .ifdef PRINTNAME
         ldy #1
 :       
@@ -11399,6 +11418,8 @@ FUNC _editorend
 
 
 FUNC _aftercompile
+        jsr _processnextarg
+
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
 
 ;;; doesn't set A!=0 if no match/fail just errors!
@@ -11715,7 +11736,25 @@ FUNC _OK
 
 
 
+
+.export _runs
+
+.zeropage
+_runs:   .res 1
+.code
+
 FUNC _run
+        lda #1
+        ldx #0
+FUNC _runN
+        ;; 0 => 1
+        sta _runs
+        txa
+        ora _runs
+        beq _run
+
+        stx _runs+1
+
         ;; make sure have succesful compilation
         lda compilestatus
         beq :+
@@ -11726,7 +11765,8 @@ FUNC _run
 .ifdef __ATMOS__
         jmp _idecompile
 .else
-        rts
+        ;; rts
+        jsr _processnextarg
 .endif
 :       
 
@@ -11738,27 +11778,7 @@ FUNC _run
         ldx #WHITE&127          ; ink
         jsr _eoscolors
 
-.export runs
-
-.zeropage
-runs:   .res 1
-.code
-
-        ;; RUN PROGRAM n TIMES
-;;; Can set on compile?
-;RUNTIMES=255
-;RUNTIMES=2
-;RUNTIMES=100
-;RUNTIMES=1
-;RUNTIMES=10
-.ifndef RUNTIMES
-        RUNTIMES=1
-.endif
-
-.assert (RUNTIMES<256),error,"%% RUNTIMES too large"
-
-        lda #RUNTIMES
-        sta runs
+        ;; RUN PROGRAM _runs TIMES
 
 .ifdef TIM
         ;; initiate CYCLE EXACT MEASUREMENT!
@@ -11770,8 +11790,10 @@ runs:   .res 1
 again:
         jsr _output
 
-        dec runs
+        dec _runs
         bne again
+        dec _runs+1
+        bpl again
 
         ;; save result "reverse"
         pha
@@ -11789,6 +11811,9 @@ again:
         ;; (may depend on code-location/page boundary?)
 TIMONCE=10
 TIMPER=8
+
+;;; TODO: RUNTIMES ... was in run, not gone.... lol
+
         TIMCOST=$ffff - TIMONCE - TIMPER*RUNTIMES
         ;; saved lo, hi
         sec
@@ -11843,6 +11868,11 @@ TIMPER=8
         pla
         tax
         pla
+
+        ;; store it in runs! lol
+        sta _runs
+        stx _runs+1
+
         jsr _printu
         ;; (run finished)
 
@@ -11852,6 +11882,8 @@ FUNC _forcecommandmode
         lda mode
         ora #128
         sta mode
+
+        jsr _processnextarg
 
         ;; fall-through
 

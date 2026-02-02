@@ -821,15 +821,20 @@ FUNC _loadfirst
 
         jmp _loadfromAX_noupdate
 
-;;; Load edit buffer with zero terminated text from AX
-FUNC _loadfromAX
 
+FUNC _resetcompilation
         ;; change to edit mode
         ldy #0
         sty mode
 
         ;; mark as not good (?)
         inc compilestatus
+        
+        rts
+
+;;; Load edit buffer with zero terminated text from AX
+FUNC _loadfromAX
+        jsr _resetcompilation
 
 .ifdef __ATMOS__
         pha

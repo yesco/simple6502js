@@ -9,6 +9,15 @@
 // linmker can't find
 //extern char mygetc() { return cgetc(); }
 
+#include <stdlib.h>
+
+extern void compileInput();
+extern void compileAX(char*);
+extern void run();
+extern void runN(unsigned int);
+extern unsigned int runs; // exitcode, lol
+#pragma zpsym ("runs")
+
 void Cstart(){}
 void disasmStart(){}
 
@@ -68,7 +77,7 @@ extern void dasm() {
 
 extern void dasmcc() {
 //  disasm((void*)start, (void*)&endfirstpage, 0);
-  disasm((int)&OK, ((int)&OK)+20, 0);
+  disasm((char*)(int)&OK, (char*)((int)&OK)+20, 0);
 }
 
 // TODO: remove?
@@ -263,7 +272,105 @@ void prettyprintEnd(){}
 extern void info();
 
 
-void main() {
+void error(char* msg, char* data) {
+  fprintf(stderr, "\n%%%s %s\n", msg, data);
+  fprintf(stderr, "\nUsage: mc [-f filename] [-s] [filename]\n");
+  exit(1);
+}
+
+
+
+#ifdef __ATMOS___
+  // #define EDITSTART HICHARSET;
+  #define EDITSTART 0x9800
+#else  
+  // TODO: lol, we haven't even allocated it!
+  //   will (!) get corrupted
+  #define EDITSTART 0x9800
+#endif // __ATMOS__
+
+
+
+int argc;
+char** argv;
+
+
+#ifdef __ATMOS__
+
+//void inputfile(char* filename) {
+//}
+
+extern int processnextarg() { return 0; }
+
+#else
+
+void inputfile(char* filename) {
+  // filename
+  char* p= (char*)EDITSTART;
+  int c;
+  FILE* f= fopen(filename, "r");
+  if (!f) error("Not such file:", filename);
+
+  while((c= fgetc(f))!=EOF) {
+    *p= c; ++p;
+    // TODO: catch TOO BIG file!
+  }
+  // zero terminate
+  *p++= 0;
+
+  fclose(f);
+  fprintf(stderr, "\nLoaded file: %s\n", filename);
+}
+
+// process args
+// (ignores first==program name)
+
+extern int processnextarg() {
+  char* a= *++argv;
+
+  putchar('\n');
+  if (--argc<=0) exit(runs | (runs>>8)); // only returns byte?
+
+  //printf("\n== %d: %s\n", argc, a);
+    
+  if (isalpha(*a)) {
+    inputfile(a);
+
+    // compileAX doesn't return, so let's hack:
+    a[0]= '-'; a[1]= 'r'; // replacde filename w "-r"
+    ++argc; // run one extra time
+    --argv; // step back to "-r"
+      
+    printf("--------------------\n");
+    compileAX((char*)EDITSTART);
+  } else if (*a== '-') {
+    // process other args -?
+    switch (a[1]) {
+      // these DO NOT return!
+    case 'c': compileAX((char*)EDITSTART); break;
+    case 'r': runN(atoi(a+2)); break;
+      // these do return
+    case 'f':
+    case 'l': --argc; ++argv; inputfile(*argv); break;
+      // TODO:
+    case 'b': // benchmark
+    case 'e': // expression
+    case 'h': // help
+    default: error("Unkown option: ", a);
+    }
+  } else error("Unknown option: ", a);
+
+  return processnextarg();
+}
+
+#endif
+
+
+void main(int iargc, char** iargv) {
+  // save for processnextarg()
+  argc= iargc; argv= iargv;
+
+  
 #ifdef FIHS
   int i;
   printf("%d\n", myfun(17, 42));
@@ -283,21 +390,29 @@ void main() {
 
 #endif // __ATMOS__
 
+
   clrscr();
 
-//  printf("Hello World!\n");
+#ifdef __ATMOS__
+  TEXTSCREEN[0]= 'A';
+#endif // __ATMOS__
 
-  //exit(42);
-  
-  *TEXTSCREEN= 'A';
-
-//  showsize();
-//  info();
-//  printf("\n\n");
+  // if args, don't go interactive
+  if (argc>1) {
+    while(processnextarg()) ;
+    // TODO: this is not the output of the script
+    exit(0);
+  } else {
+    argc= 0;
+  }
 
   start();
+  // never returns, but if it did
 
+#ifdef __ATMOS__
   TEXTSCREEN[2]= 'C';
+#endif // __ATMOS__
+
 }
 
 // show sizes info

@@ -133,6 +133,7 @@ void disasm(char* mc, char* end, char indent) {
 //#pragma zpsym ("vars")
 
 void pvar(int a) {
+  (void) a; // "use var" lol
   return;
 #ifdef PVAR
   char c= a;
