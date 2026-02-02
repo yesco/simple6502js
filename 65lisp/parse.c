@@ -296,6 +296,8 @@ void error(char* msg, char* data) {
 #endif // __ATMOS__
 
 
+// C; 537 B   _printvar ASM: 217 B _printenv: 167 B
+// double in C? hmmmm
 void printvariables() {
   char * p= ruleVARS, c, t, * name;
   unsigned int v, * a;
