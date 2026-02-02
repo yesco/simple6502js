@@ -1,0 +1,18 @@
+name=$1
+shift
+
+stty raw
+# stty raw onlcuc # blocks input till return
+
+stty raw -echo opost onlcr
+
+(cl65 -t sim6502 $name.c -o $name.sim || exit) && sim65 -c $name.sim "$*"
+
+e=$?
+stty sane
+echo
+echo
+echo
+echo "Exitcode $e"
+
+

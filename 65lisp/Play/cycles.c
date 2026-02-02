@@ -1,89 +1,128 @@
+// sim6502 works!
+//
+// cl65 -t sim6502 Play/fopen.c && sim65 fopen.sim ; echo "Exitcode $?"
 #include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
 
-//#include <conio.h>
+#define LATCH_CYCLES() __asm__("sta $FFC0")
 
-#include <assert.h>
+unsigned int cycles() {
+//  *(volatile char*)0xFFC0 = 0;
+  LATCH_CYCLES();
+  *(volatile char*)0xFFC1 = 0;
+  return *(volatile unsigned int*)0xFFC2;
+}
 
-//#define PROGSIZE
-#include "progsize.c"
+#define CYCLES() ( *(volatile char*)0xffc0= 0, \
+                   *(volatile char*)0xffc1= 0, \
+                   *(volatile unsigned long*)0xffc2 )
 
-#include <stdint.h>
+unsigned long lcycles() {
+  LATCH_CYCLES();
+  *(volatile char*)0xFFC1 = 0;
+//  *(volatile char*)0xFFC0 = 0;
+  return *(volatile unsigned long*)0xFFC2;
+}
 
-typedef int16_t L;
-typedef uint16_t uint;
-typedef unsigned uchar;
+unsigned long lnanos() {
+  *(volatile char*)0xFFC0 = 0;
+  *(volatile char*)0xFFC1 = 0x80;
+  return *(volatile unsigned long*)0xFFC2;
+}
 
-#include "extern-vm.c"
 
-// These needs to be constants during AMS code-gen
-extern unsigned int T=42; // TODO: constant
+#ifdef FISH
+int main(void) {
+  long start, end, diff;
+//  start= lcycles();
+//  end= lcycles();
+  start = CYCLES();
+  end= CYCLES();
+  diff= end-start;
+  printf("DIFF=%lu\n", diff);
+} 
 
-// this isn't recognized if used in another constant by cc65
-//extern const unsigned int nil=1; 
-// TODO: if this is ever changed, need to change codegen "[9=I" and "UI"
-const unsigned int nil=1;
+#else
 
-#define NIL (1)
-
-typedef int (*F1)(int);
-typedef void (*F)();
-
-unsigned char bytes= 0;
-
-unsigned char gen[256]= {0};
+// put inside main and get garbage?
+volatile unsigned long calib,start,end;
 
 int main(void) {
-  static unsigned int bench= 50000, n;
-//  static unsigned long bench= 50000, n; // nothing: 17 021 329  ASM.RTS.noax: 17 621 342
-// (/ (- 17621342 17021329) 50000.0) = 12 !!!
-// (/ (- 17720613 17021329) 50000.0) = 13.98 !!!
-//    static unsigned int  bench= 50000, n; // nothing: 1 265 812, gen.RTS: 10 718 610, ASM.RTS: 5 118 609, ASM.RTS.noax: 1 865 530
-// (/ 1865530 50000) = 37c/call
+  volatile int i;
 
-//  unsigned int bench= 3000, n= bench+1;
-//  unsigned int bench= 3000, n= bench+1;
-//  unsigned int bench= 100, n= bench+1; // for fib21
-//  unsigned int bench= 1, n= bench+1;
-//  unsigned int bench= 100, n= bench+1;
-  int r, i;
+   calib= lcycles();
+   calib= lcycles()-calib;
 
-  n= bench+1;
+    while(1) {
+      start= lcycles();
+      asm("nop");
+      end= lcycles()-calib;
 
-  if (1) {
-    // 3.96s
-    gen[0]= 0xEA;
-    gen[1]= 0x60;
-  } else {
-    // 3.86s (/ (- 3864523 3964514) 50000.0) = -2 (#nop!)
-    // (/ 3864523 50000) = 77c looping overhead using unsigned int!
-    gen[0]= 0x60;
+      printf("Raw Value, diff: %lu %lu\n", lcycles(), end-start);
+    }
+} 
+#endif
+
+#ifdef foo
+int main(int argc, char** argv) {
+  FILE* f= fopen("fil", "r");
+  int c;
+  volatile unsigned long start, end;
+
+  printf("f= $%04x\n", f);
+  while((c= fgetc(f))!=EOF) {
+    putchar(c); putchar('.');
+  }
+  fclose(f);
+
+  printf("\n\nKeybaord input:\n");
+
+  while((c= fgetc(stdin))!=EOF) {
+    putchar(c); putchar(c); putchar(c);
+    printf("\n");
+    if (c=='C'-'@') break;
   }
 
-  bytes= 0;
+  printf("a\nb\nc\n   bar\rfoo\n");
 
-  i= 0xbeef;
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
+  asm("nop");
+  asm("nop");
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
+  asm("nop");
+  asm("nop");
+  asm("nop");
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
+  printf("\nc= %d\n", c);
+  printf("\nc= %d\n", c);
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
+  printf("Cycles: %lu, %lu ns\n", lcycles(), lnanos());
 
-while(--n>0) {
-  if (0) { // 3.26s unsigned int // 1 265 534 static uint (/ 1265534 50000.0) = 25c / loop 
-    //printf("foo\n");
-//    3;
-  } else if (0) { // 12.82s
-    // 25% overhead cmp next...
-    // 39.32s
-    r= ((F1)gen)(i);
-  } else { // 3.96s
-//    __AX__= i;
-    asm(" jsr %v", gen);
-//    r= __AX__;
+#define LATCH_CYCLES() ((*(volatile char*)0xFFC0 = 0,\
+  *(volatile char*)0xFFC1 = 0))
+
+  // Inside main...
+  LATCH_CYCLES();
+  printf("Cycles: %lu\n", *(unsigned long*)0xFFC2);
+  LATCH_CYCLES();
+  start= *(unsigned long*)0xFFC2;
+  printf("\noutput %d", c);
+  LATCH_CYCLES();
+  end= *(unsigned long*)0xFFC2;
+
+  printf("\n\nDIFF= %lu\n\n\n", end-start);
+
+  LATCH_CYCLES();
+  printf("Cycles: %lu\n", *(unsigned long*)0xFFC2);
+
+  {
+    unsigned long c1, c2;
+    LATCH_CYCLES(); c1 = *(unsigned long*)0xFFC2;
+    LATCH_CYCLES(); c2 = *(unsigned long*)0xFFC2;
+    printf("Do we get diff cycles: %lu\n", c2 - c1);
   }
-}
 
-printf("bench: %u times - Code(%d)=%d (%04X) n=%u (%04x)\n", bench, i/2, r/2, r, n, n);
 
-  PROGSIZE;
-  return 0;
+  return 42;
 }
+#endif
