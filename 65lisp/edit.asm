@@ -1,7 +1,3 @@
-;;; edit.asm - ORIC EMACS EDITOR for MeteoriC
-;;; 
-;;; (c) 2025 Jonas S Karlsson, jsk@yesco.org
-;;; 
 ;;; 
 ;;; A simple emacs style editor for ORIC ATMOS
 ;;; written in pure assembly.
@@ -801,19 +797,22 @@ einsert:
 
 ;;; TODO: generalize to load specified file/buffer?
 
-;;; Load the first buffer from input
+;;; Load the first buffer (tutorial) from input
+;;; compile and go to editor.
 FUNC _loadlater
         ;; force edit mode
         lda #0
         sta mode
 
-        ;; invalidate current status
-        inc compilestatus
-
+        jsr _resetcompilation
         jsr _loadfirst
-        jsr _idecompile
-        ;; fall-through
+        jmp _idecompile
 
+;;; We already compiled once, first thing.
+;;; Now copy to edit buffer (and keep status)
+;;; 
+;;; TODO: do we want to make it so it doesn't
+;;;   compile first before entering IDE?
 FUNC _loadfirst
         ;; load first example 'a'
         lda #<input
@@ -822,6 +821,7 @@ FUNC _loadfirst
         jmp _loadfromAX_noupdate
 
 
+;;; Don't mess up AX
 FUNC _resetcompilation
         ;; change to edit mode
         ldy #0
@@ -830,13 +830,7 @@ FUNC _resetcompilation
         ;; mark as not good (?)
         inc compilestatus
         
-
-        rts
-
-;;; Load edit buffer with zero terminated text from AX
-FUNC _loadfromAX
-        jsr _resetcompilation
-
+        ;; update right hand corner on screen
 .ifdef __ATMOS__
         pha
         lda #(BLACK+BG)&127
@@ -844,7 +838,11 @@ FUNC _loadfromAX
         pla
 .endif
 
+        rts
 
+;;; Load edit buffer with zero terminated text from AX
+FUNC _loadfromAX
+        jsr _resetcompilation
 
 FUNC _loadfromAX_noupdate
 

@@ -1,64 +1,64 @@
-;;; This is for debugging... lol
+;; This is for debugging... lol
 
 .ifnblank
 ;;; These gives trouble...
-commit 988a90bfdbdc9750ceb748b59fba51e7429e95d2
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 22:30:27 2026 +0700
+;; commit 988a90bfdbdc9750ceb748b59fba51e7429e95d2
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 22:30:27 2026 +0700
 
-    printvariables: update comment about code sizes
+;;     printvariables: update comment about code sizes
 
-commit 11e4eb7cdfdac95703d8749331fcdcd273247c57
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 21:30:26 2026 +0700
+;; commit 11e4eb7cdfdac95703d8749331fcdcd273247c57
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 21:30:26 2026 +0700
 
-    printvariables: delimit functions
+;;     printvariables: delimit functions
 
-commit c52ae3cc5a3c40c039e2fa013d05a75a05600db4
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 21:24:39 2026 +0700
+;; commit c52ae3cc5a3c40c039e2fa013d05a75a05600db4
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 21:24:39 2026 +0700
 
-    parse:
-    - printvariables() in C, make a better one, lol
-    - -q disasm
-    - -pv print vars
-    - -pe print env
-    - -pV printvariables()
+;;     parse:
+;;     - printvariables() in C, make a better one, lol
+;;     - -q disasm
+;;     - -pv print vars
+;;     - -pe print env
+;;     - -pV printvariables()
 
-commit 7f98b785192fe21c7b09b783c5121421d540d86f
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 17:43:25 2026 +0700
+;; commit 7f98b785192fe21c7b09b783c5121421d540d86f
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 17:43:25 2026 +0700
 
-    parse:
-    - got rid of warnings
-    - command line parameters
-    - c compile
-    - f file input
-    - r run (1)
-    - r10 run 10 times
-    - when exiting the (byte) exitcode of the last program is returned
+;;     parse:
+;;     - got rid of warnings
+;;     - command line parameters
+;;     - c compile
+;;     - f file input
+;;     - r run (1)
+;;     - r10 run 10 times
+;;     - when exiting the (byte) exitcode of the last program is returned
 
-commit 2e1b9e9ce9612f20f2632cfdfc45ac79824ed815
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 14:44:44 2026 +0700
+;; commit 2e1b9e9ce9612f20f2632cfdfc45ac79824ed815
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 14:44:44 2026 +0700
 
-    cycles: need new cc65 and sim65
+;;     cycles: need new cc65 and sim65
 
-commit d329549cfcdaf2bf33d551adc302226b5c35d6c1
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Mon Feb 2 14:39:59 2026 +0700
+;; commit d329549cfcdaf2bf33d551adc302226b5c35d6c1
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Mon Feb 2 14:39:59 2026 +0700
 
-    cycles,fopen: Play with io on sim65 and getting cycles
+;;     cycles,fopen: Play with io on sim65 and getting cycles
 
-;;; This one ok!
-commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
-Author: Jonas S Karlsson <jsk@yesco.org>
-Date:   Sun Feb 1 23:19:46 2026 +0700
+;; ;;; This one ok!
+;; commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
+;; Author: Jonas S Karlsson <jsk@yesco.org>
+;; Date:   Sun Feb 1 23:19:46 2026 +0700
 
-    IDE:
-    -
-    atmos-constants.asm:
-    - updated from cc65
+;;     IDE:
+;;     -
+;;     atmos-constants.asm:
+;;     - updated from cc65
 
 
 .endif
@@ -1017,10 +1017,25 @@ Date:   Sun Feb 1 23:19:46 2026 +0700
 ;;; 
 ;;; - %I - read ident (really %N? but for longname)
 ;;;        (push (nameaddr/word, namelength/byte) on stack!)
+;;; - %V - tos= address; match "Variable" name, pos= metaaddr
+;;;        pos[0] == lo-addr of var
+;;;        pos[1] == hi-addr of var
+;;;        pos[2] == 'w' word 'W' - word* 'w'+128= `word[]`
+;;;                  'c' char 'C' - char* 'c'+128= `char[]`
+;;;        -- the following are optional --
+;;;        pos[3] optional == lo-sizeof
+;;;        pos[4] optional == hi-sizeof
+;;;        -- arrays and pointer++ may need this
+;;;        pos[5] optional == lo-element sizeof (array)
+;;;        -- array indexing optimizations if < 255?
+;;;        pos[6] optional == lo-items
+;;;        pos[7] optional == hi-items
+
+;;;        
+;;; - %N - define NEW name (use: %I%N)
+;;;
 ;;; - %* - dereference tos { tos= *(int*)tos; } - old %U?
 ;;; 
-;;; - %V - tos= address; match "Variable" name
-;;; - %N - define NEW name (use: %I%N)
 ;;; 
 ;;; (TODO: might be broken? TODO: remove this thing)
 ;;;        (doesn't nest anyway needed for a=b=c;)
@@ -1032,6 +1047,17 @@ Date:   Sun Feb 1 23:19:46 2026 +0700
 ;;; IMMEDATE (run code inline)
 ;;; 
 ;;; - "% " == "%" jmp dostuff == .byte "% HL" (SPC==JSR!)
+;;;        This jumps to immmediate code, typcially
+;;;        to set things up or to test conditions,
+;;;        like "disallowlocal";
+;;; 
+;;;        to exit suceessfuly
+;;;              jmp _next
+;;; 
+;;;        and if the parsing rule should fail
+;;;              jmp _fail
+;;; 
+;;; 
 ;;; 
 ;;; TODO: remove - DON'T USE!!!! UNSAFE
 ;;; - %{ - immediate code, that runs NOW during parsing
@@ -1048,9 +1074,13 @@ Date:   Sun Feb 1 23:19:46 2026 +0700
 ;;;        tos= address after len (TODO: include?)
 ;;;        TODO: mabye set dos too, like %A?
 ;;; 
+;;;        pos= base address of BINARYDATA
+;;; 
 ;;;        This is used to keep environment of
 ;;;        global/local variable bindings!
 ;;;        Slow linear, but very little code!
+;;; 
+;;;        
 ;;;        
 ;;; - %R addr - goto this rule addr!
 
@@ -1064,8 +1094,8 @@ Date:   Sun Feb 1 23:19:46 2026 +0700
 
 
 ;;; 
-;;; Don't use: usafe - quoting problem | and \0 ...
-;;; 
+;;; Don't use: usafe - quoting problem | and \0 ...;
+;; 
 ;;; %{IMMEDIATE machien code ... IMM_RET (or IMM_FAIL)
 
 
@@ -1554,6 +1584,7 @@ __ZPCOMPILER__:
 nparam: .res 1
 curF:   .res 2                  ; points to "name%b..."
 params: .res NPARAMS*2          ; "registers"
+endparams:      
 
 compilestatus:  .res 1          ; 
 
@@ -2465,9 +2496,11 @@ VAL1 = '+'   + 256* HIVAL
 .ifdef ZPVARS
   VAR0= LOVAL
   VAR1= '+'
+  VARRAY= VAL0
 .else
   VAR0= VAL0
   VAR1= VAL1
+  VARRAY= VAL0
 .endif
 
 PUSHLOC= '{' + 256*'{'
@@ -2841,7 +2874,7 @@ FUNC _next
         cmp $101
         bne stackerror
         jmp :+
-stackerror:     
+stackerror:
         jsr nl
         jsr _printstack
 
@@ -3170,6 +3203,9 @@ jsr _printchar
 
         ;; Identifier?
         ;; (this goes to subrule and will do it's own _incR)
+
+;;; TODO: %A - REMOVE!
+
         cmp #'A'                ; %A used often for Assign
         beq @vars
 
@@ -3179,6 +3215,7 @@ jsr _printchar
 @vars:
         ;; HACK! - remove once we figure out the flow...
         ;; (maybe remove %A or it's usage of DOS? use stack)
+        ;; (needed for %S and %s too)
         sta whatvarpercentchar
 
         ;; - make sure start with ident
@@ -3192,12 +3229,13 @@ jsr _printchar
         lda #VARRULENAME
         jmp enterrulebyname
 
-        ;; try next matces
+        ;; try next %... matces
 :       
+
+;;; TODO: no need skip for %V ?
+
         ;; - skip it assumes A not modified
-        ; pha
         jsr _incR
-        ; pla
 
         ;; %= -  require one of chars till $80
         ;; %! -  fail if one of chars till $80
@@ -3369,7 +3407,7 @@ noimm:
         ;; C= 0
         jsr skipperPlusC
 
-        ;; -- %* - dereference tos= *dos;
+        ;; -- %* - dereference tos= *pos;
         ldy #1
         lda (pos),y
         sta tos+1
@@ -4213,10 +4251,6 @@ illegalvar:
 gotendall:
         lda #'E'
         SKIPTWO
-;;; ???
-failrule:
-        lda #'Z'
-        SKIPTWO
 ;;; Unexpected char?
 failed:
         lda #'F'
@@ -4231,7 +4265,7 @@ error:
         pla
         jsr putchar
 
-        jmp _forcecommandmode
+        jmp _ERROR
 
 
 
@@ -5438,6 +5472,47 @@ FUNC _hideargs
         jmp updatevars
 
 
+;;; will FAIL if identifier isn't array
+;;; (pointer give error too)
+checkisarray:
+        ;; load type char
+        lda (pos),y
+        cmp #'A'
+        bcs :+
+        ;; not array (a-z)
+        jmp _fail
+:       
+        jmp _next
+        
+        
+
+;;; will give ERROR! if tos address is local
+disallowlocal:
+.ifdef ZPVARS
+.scope
+        lda tos
+        ldx tos+1
+        cpx #0
+        bne isarray
+        cmp #endparams
+        bcs notstackedparameter
+        ;; is a params address
+        ;; (These can't be pointed to as they might be saved
+        ;;  on the stack by other safe/recursive caller)
+localerror:     
+        lda #'L'
+        jmp error
+        
+        
+notstackedparameter:
+isarray:
+        jmp _next
+
+.endscope
+.else
+        .assert("disallowlocal: for !ZPVARS")
+.endif ; ZPVARS
+
 negateLOVAL:
         lda #0
         sec
@@ -5723,6 +5798,7 @@ ruleB:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
 
+;;; TODO: It seems it should be useful but not
 .ifnblank
         .byte "%=;",$80
 
@@ -6460,15 +6536,89 @@ FUNC _funcallend
 ;;; TODO: lol funny way of skipping name/id/type
         .byte "|(%V\*)",_C
 
-        ;; array index
-;;; TODO: simulated
-;;; TODO: _E or _V ???
-        .byte "|arr\[",_E,"\]"
-      .byte '['
-        tax
+        
+.ifdef OPTRULES
+        ;; char array index [const]
+        .byte "|%V[#]"
+        IMMEDIATE checkisarray
+        .byte "\[%d\]"
+      .byte "["
+        ;; 6 B
+;;; TODO: can optimize, fold tos=LOVAL+VARRAY!
+;;;   would save one byte, but youd allow for %D
+        ldx #LOVAL
+        .byte ";"
+        lda VARRAY,x
+        ldx #0
+      .byte "]"
+
+        ;; char array index [char var]
+        .byte "|%V[#]"
+        IMMEDIATE checkisarray
+        .byte "\[(char)%V\]"
+      .byte "["
+        ;; 6 B
+        ldx VAR0
+        .byte ";"
         lda arr,x
         ldx #0
-      .byte ']'
+      .byte "]"
+
+        ;; char array index [char]
+        .byte "|%V[#]"
+        IMMEDIATE checkisarray
+        .byte "\[(char)",_E,"\]"
+      .byte "[;"
+        ;; 5 B
+        tax
+        lda VAR0,x
+        ldx #0
+      .byte "]"
+.endif ; OPTRULES
+
+;;; TODO: word[] - word array
+
+        ;; char array index [word]
+        ;; (most generic and expensive)
+        .byte "|%V[#]"
+        IMMEDIATE checkisarray
+        .byte "\[",_E,"\]"
+      .byte "[:"
+        ;; 16 B
+        ;; calculate address
+        clc
+        adc #LOVAL
+        sta tos
+        txa
+        adc #HIVAL
+        sta tos+1
+        
+        ;; load it
+        ldy #0
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
+        ;; ?pointer, as it wasn't array
+        .byte "|%V[#]"
+        ;; LOL: we will happily use any var as ponter!
+        .byte "\[",_E,"\]"
+      .byte "[:"
+        ;; 16 B
+        ;; calculate address
+        clc
+        adc VAR0
+        sta tos
+        txa
+        adc VAR1
+        sta tos+1
+        
+        ;; load it
+        ldy #0
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
 
 
 
@@ -6933,10 +7083,11 @@ wrong;        .byte "D"               ; tos= dos; addr of string
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
         .byte "|&%V"
-      .byte '['
+        IMMEDIATE disallowlocal
+      .byte "["
         lda #LOVAL
         ldx #HIVAL
-      .byte ']'
+      .byte "]"
 
 
         .byte "|\*%V"
@@ -10245,6 +10396,17 @@ FOROPT=1
         ;; autopatches jump to here if false (PUSHLOC)
 .endif ; BYTERULES
 
+.ifdef OPTRULES
+        ;; eternal loop
+        ;; (saves (- 33 20) = 13 bytes!
+        .byte "|while(1)[:]"
+        .byte _S
+      .byte "[;"
+        jmp VAL0
+      .byte "]"
+.endif ; OPTRULES
+
+
 ;;; %A only used here!!!?
 
 ;;; todo: FIX
@@ -11542,12 +11704,23 @@ FUNC _editorstart
 FUNC _editorend
 
 
-
 FUNC _aftercompile
+        ;; failed?
+        ;; (not stand at end of source \0)
+        ldy #0
+        lda (inp),y
+        and #127
+        ;; stores 0 if no compile error, lol
+        sta compilestatus
+        ;; fall-through
+
+FUNC _reportcompilestatus
+        ;; this is like a continuation;
+        ;; it'll:
         jsr _processnextarg
 
-;;; TODO: reset S stackpointer! (editaction C-C goes here)
 
+;;; TODO: reset S stackpointer! (editaction C-C goes here)
 ;;; doesn't set A!=0 if no match/fail just errors!
 ;        sta err
 
@@ -11589,17 +11762,22 @@ status:
         jsr _memcpyz
 .endif ; __ATMOS__
 
-        ;; failed?
-        ;; (not stand at end of source \0)
-        ldy #0
-        lda (inp),y
-        and #127
-        ;; stores 0 if no compile error, lol
-        sta compilestatus
-
+        ;; check if error (== letter)
+        ;; 0 means "OK"
+        ;; 1(--31) means "unknown" (need compile)
+        lda compilestatus
         bne :+
+
         jmp _OK
 :       
+        ;; unknown
+        cmp #' '+1
+        bcs :+
+
+        jmp _eventloop
+:       
+        ;; error letter (A-Z or >' ')
+
 ;;;     fall-through
 ;;; ------------ ERROR ----------
 
@@ -11709,7 +11887,7 @@ done2:
 .endscope
 
         ;; print next char (code) input+rule
-        
+.ifdef PRINTRULES
         PRINTZ {10,WHITE,"inp  @ "}
         lda inp
         ldx inp+1
@@ -11751,6 +11929,7 @@ done2:
         iny
         cpy #20
         bne :-
+.endif ; PRINTRULES
 
         PRINTZ {10,10,YELLOW,"goto e)rror  ?) help",10,10}
 
@@ -12031,6 +12210,11 @@ FUNC _eventloop
         lda mode
         eor #64
         sta mode
+        ;; compiled ok?
+        lda compilestatus
+        beq :+
+        ;; not
+        jmp _ERROR
 :       
         jmp editstart
 
@@ -12134,7 +12318,7 @@ FUNC _togglecommand
         bpl @ed
         ;; re-sshow compilation result
         jsr _eosnormal
-        jmp _aftercompile
+        jmp _reportcompilestatus
 
 @ed:
         jmp _redraw
@@ -13533,6 +13717,64 @@ FUNC _inputstart
 
 .FEATURE STRING_ESCAPES
 input:
+
+;ETERNAL=1
+.ifdef ETERNAL
+        .byte "word main(){",10
+        .byte "  while(1) putchar('.');",10
+        .byte "  return 666;",10
+        .byte "}",10
+        .byte 0
+.endif ; ETERNAL
+
+;
+ARRAY=1
+.ifdef ARRAY
+        .byte "char bytes[7];",10
+        .byte "char array[]={'F','o','o','b','a','r','0'};",10
+        .byte "char string[]=\"foobar\";",10
+        .byte "",10
+        .byte "word p(word s){",10
+        .byte "  putu(strlen(s)); puts(s);",10
+        .byte "}",10
+        .byte "word i=0;",10
+        .byte "word main(){",10
+        .byte "  puth(bytes); putchar(' ');",10
+        .byte "  puth(array); putchar(' ');",10
+        .byte "  puth(string); putchar(' ');",10
+        .byte "  putchar('\n');",10
+        .byte "  puth(&bytes); putchar(' ');",10
+        .byte "  puth(&array); putchar(' ');",10
+        .byte "  puth(&string); putchar(' ');",10
+        .byte "  putchar('\n');",10
+.ifdef DODO
+        .byte "  strcpy(bytes,\"FOOBAR\");",10
+        .byte "  putchar(bytes[0]);",10
+        .byte "  putchar(bytes[(char)i]);",10
+        .byte "  putchar(bytes[(char)1-1]);",10
+        .byte "  putchar(bytes[i]);",10
+        .byte "  putchar(bytes[1-1]);",10
+.endif
+        .byte "  p(bytes);",10
+        .byte "  p(array);",10
+        .byte "  p(string);",10
+        .byte "}",10
+        .byte 0
+
+.endif ; ARRAY
+
+
+;POINTERLOCAL=1
+.ifdef POINTERLOCAL
+        .byte "word global;",10
+        ;; .byte "_regcall" then it's ok
+        .byte "word fun(word local) {",10
+        .byte "  return &global;",10
+        .byte "  return &local;",10
+        .byte "}",10
+        .byte "word main(){}",10
+        .byte 0
+.endif ; POINTERLOCAL
 
 ;;; LinesPerSecond - 300 x "++i;\n"
 ;;; to test "maximum" lines/s ~ 31 on 1 MHz!
