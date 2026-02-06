@@ -772,7 +772,7 @@
 ;;; - v0.5 IDEA/editor
 ;;; - v0.60 long name variables
 ;;; - v0.61 (slow) function calls
-.define VERSION "v0.61"
+.define VERSION "v0.61a"
 ;;; - v0.62 TODO: local variables
 ;;; - v0.63 TODO: (opt) function calls (static params)
 ;;; - v0.64 TODO: array indexing
@@ -1285,7 +1285,8 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;DEMO=1
+;
+DEMO=1
 
 
 .ifdef PICO
@@ -1628,6 +1629,8 @@ savey:  .res 1
 
 ;;; IDE mode: V=64=init Mi=$ff=command Pl=0=editing=
 ;;;   (_init sets it to 64)
+.export _mode
+_mode:  
 mode:  .res 1
 
 ;;; STATITISTICS
@@ -2442,12 +2445,6 @@ ERRPOS=1
 
 
 
-
-;;; This is where the C-program loader starts
-.export _start
-_start:
-
-
 .export percentchar,whatvarpercentchar
 .export rule,inp,_out,erp,env,valid,rulename,pframe
 
@@ -2477,14 +2474,6 @@ rulename:       .res 1
 ;;; stackframe for parameter start
 pframe: 
 
-.code
-
-;;; Magical references in [generate]
-.macro DOJSR addr
-        .byte 'C'
-        .word addr
-.endmacro
-
 ;;; TODO: chagne '>' is bad, so better change all!
 LOVAL= '<'
 HIVAL= '>'
@@ -2509,10 +2498,22 @@ DONE= '$'
 ;;; TODO: maybe not ZP, not used that mutch
 .export dirty, showbuffer
 
-.zeropage
 dirty:          .res 1
 showbuffer:     .res 1
+
 .code
+
+
+;;; This is where the C-program loader starts
+.export _start
+_start:
+
+;;; Magical references in [generate]
+.macro DOJSR addr
+        .byte 'C'
+        .word addr
+.endmacro
+
 
 
 ;;; parser to compile _
@@ -11729,10 +11730,6 @@ FUNC _aftercompile
         ;; fall-through
 
 FUNC _reportcompilestatus
-        ;; this is like a continuation;
-        ;; it'll:
-        jsr _processnextarg
-
 
 ;;; TODO: reset S stackpointer! (editaction C-C goes here)
 ;;; doesn't set A!=0 if no match/fail just errors!
@@ -12215,6 +12212,9 @@ FUNC _forcecommandmode
 
 ;;; TODO: this is more like "entereditor(again)"
 FUNC _eventloop
+        ;; this is like a continuation;
+        jsr _processnextarg
+
         ;; init if first time
         bit mode
         bvc :+
@@ -12286,6 +12286,10 @@ editstart:
 .else 
 
 FUNC _eventloop
+        ;; this is like a continuation;
+        jsr _processnextarg
+
+        ;; TODO: hmmm...
         jmp _ide
 
 .endif ; __ATMOS__
@@ -13741,8 +13745,7 @@ input:
         .byte 0
 .endif ; ETERNAL
 
-;
-ARRAY=1
+;ARRAY=1
 .ifdef ARRAY
         .byte "char bytes[7];",10
         .byte "char array[]={'F','o','o','b','a','r','0'};",10

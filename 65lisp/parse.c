@@ -17,6 +17,8 @@ extern void run();
 extern void runN(unsigned int);
 extern unsigned int runs; // exitcode, lol
 #pragma zpsym ("runs")
+extern char mode;
+#pragma zpsym ("mode")
 extern void tab();
 extern void printchar(char c);
 extern void printvars();
@@ -380,17 +382,24 @@ void inputfile(char* filename) {
 // process args
 // (ignores first==program name)
 
-extern int processnextarg() {
+extern processnextarg() {
   char* a= *++argv;
 
-  putchar('\n');
-  if (--argc<=0) {
+  // not processing arguments
+  if (argc < 0) return;
+
+  // finished arguments: exit
+  if (argc <= 1) {
     putchar('\n');
-    exit(runs | (runs>>8)); // only returns byte?
+    exit(runs); // only returns byte?
   }
 
-  //printf("\n== %d: %s\n", argc, a);
-    
+  putchar('\n');
+
+  printf("\n--- arg %d: %s\n", argc, a);
+
+  --argc;
+
   if (isalpha(*a)) {
 
     inputfile(a);
@@ -432,7 +441,8 @@ extern int processnextarg() {
 
   } else error("Unknown option: ", a);
 
-  return processnextarg();
+  // we "recurse"
+  processnextarg();
 }
 
 #endif
@@ -470,12 +480,17 @@ void main(int iargc, char** iargv) {
 #endif // __ATMOS__
 
   // if args, don't go interactive
-  if (argc>1) {
+  if (argc > 1) {
+    // don't do intro in batchmode
+    // no buffer to init
+    mode = 0;
+
     while(processnextarg()) ;
     // TODO: this is not the output of the script
     exit(0);
   } else {
-    argc= 0;
+    // mark that we're NOT processing args
+    argc= -1;
   }
 
   start();
