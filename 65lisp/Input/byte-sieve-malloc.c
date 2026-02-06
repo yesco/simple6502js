@@ -1,6 +1,10 @@
 // BYTE SIEVE PRIME benchmark
 typedef unsigned int word;
 
+#ifdef __CC65__
+  #include <stdlib.h>
+#endif
+
 #include <stdio.h>
 
 #define SIZE 8192

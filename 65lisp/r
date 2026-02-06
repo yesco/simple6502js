@@ -1,7 +1,7 @@
 OPTS=" -DPROGSIZE "
-OPTS=" -DPROGSIZE -Cl -Or " # no recursion???
 OPTS=" -Cl "
-OPTS=" -O"
+OPTS=" -Oirs"
+OPTS=" -DPROGSIZE -Cl -Or " # no recursion???
 OPTS=" -DPROGSIZE -Oi"
 
 echo "unix> ./r $*"
