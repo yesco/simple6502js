@@ -1285,8 +1285,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;
-DEMO=1
+;DEMO=1
 
 
 .ifdef PICO
@@ -5289,8 +5288,7 @@ FUNC _newparam_w
         adc #params
         ldx #0
         
-        ldy #'w'
-        jmp _newvar_Y_AX
+        jmp _newvar_Y_AX_w
 
 ;;; TODO: _newlocal_w
 
@@ -5301,10 +5299,18 @@ FUNC _newvar_w
         lda vos
         ldx vos+1
 
+        ;; fall-through
+
+FUNC _newvar_Y_AX_w
+        pha
+        lda #2
+        sta tos
+        lda #0
+        sta tos+1
+        pla
+        
         ;; type
         ldy #'w'
-
-        ;; fall-through
 
 ;;; STACK: addrofname/w len/b JSR _newvar
 ;;; AX=addr, Y=typechar
@@ -5329,17 +5335,25 @@ FUNC _newname
 ;;;           (A or X could be zero ... so minimal 3?)
 ;;; 
         sty savex
-        tya
-        pha
-
         ldy #0
 
         ;; store a '|' to end sub-match
         lda #'|'
         jsr _stuffVARS
 
+;;; TODO: skipper wrong?
+        ;; dummy 1 byte non-zero at end, LOL
+        lda #255
+        jsr _stuffVARS
+
+        ;; push sizeof of var (other data func)
+        lda tos+1
+        jsr _stuffVARS
+        lda tos
+        jsr _stuffVARS
+        
         ;; store type letter (last!)
-        pla
+        lda savex
         jsr _stuffVARS
 
         ;; store address of var
@@ -5349,7 +5363,7 @@ FUNC _newname
         jsr _stuffVARS
 
         ;; store skip chars "%<3+128>"
-        lda #3+128              ; 3 bytes to skip
+        lda #6+128              ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
