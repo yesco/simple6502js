@@ -5329,26 +5329,26 @@ FUNC _newarr
 
         ;; allocate tos bytes space (move _out)
         ;; (zero out tos bytes at _out; _out+= tos)
-        lda #0
+;;; 23
         ldx tos+1
+        stx savex               ; hi counter
+        
+        lda #0
+        tay
+        ldx tos                 ; lo counter
 
-        ldy tos
-        beq :+
-:       
+        ;; Ysavex= size; result: _out+= size
+        beq @page
+        ;; partial page write first time
+@loop:
         sta (_out),y
-        dey
-        bne :-
+        jsr _incO
         dex
-        bpl :-
-:       
-        ;; _out+= tos
-        clc
-        lda _out
-        adc tos
-        sta _out
-        lda _out+1
-        adc tos+1
-        sta _out+1
+        bne @loop
+@page:       
+        ;; more page copy?
+        dec savex
+        bpl @loop
 
         ldy savey
         jmp _newname
@@ -10839,6 +10839,9 @@ FUNC _oricend
         jsr _gotoxy
       .byte "]"
 
+
+
+;;; TODO: bzero(char*, len); // legacy unix
 
 .ifdef OPTRULES
         ;; Feature (BUG): 0=>256 bytes set!

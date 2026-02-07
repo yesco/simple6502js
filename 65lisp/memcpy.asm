@@ -14,7 +14,7 @@ FUNC _zero
         
 ;;; memset a memory area
 ;;;
-;;; tos: address
+;;; tos: address (hi modified, hi+1 too much)
 ;;; YX : length (lo,hi)
 ;;; A  : byte
 FUNC _memset
