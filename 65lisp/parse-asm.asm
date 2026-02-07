@@ -1326,75 +1326,98 @@ DEMO=1
 
 
 .ifdef PICO
-;        NOBIOS=1                ; save  72 B
-;        NOLIBRARY=1             ; save 592 B
-;        STDIO=1
+
+;        NOBIOS=1       ; needed by IDE save  72 B
+;        NOLIBRARY=1    ; ? needed by compiler - 592 B
+;        STDIO=1        ; ? needed by compiler - (100?)
+
+;        NODISASM=1     ; 1580 B
+;        NOPRETTYPRINT  ;  809 B
+;        NOINFO=1       ; 1792 B
 
 ;;; Library used by IDE, 
 ;;; TODO: remove IDE!
-;        NOIDE=1
+;        NOIDE=1        ; 3580 B
+
+        ;; POTENTIALL ++++
+        ;; (+ 72 592 1580 809 1792 3580) = 8425 extra!
+
+        ;; should be... lol
+        ;; (- 64 8   1  16  2    2      8) = 27
+        ;;   RAM TAP ZP ROM CHAR CSTACK HIRES
+
 
         OUTPUTSIZE=12*1024
+
 .elseif .def(NANO)
+
         ;; BIOS
         ;; LIBRARY
 ;;; TODO:
         NOHELP=1                ; save 1 KB?
 
         OUTPUTSIZE=12*1024
+
 .elseif .def(TINY)
+
         ;; BIOS
         ;; LIBRARY
 
         OUTPUTSIZE=12*1024
 
 .elseif .def(DEMO)
+
         ;; BIOS
         ;; LIBRARY
         INTRO=1                 ; + 1   KB
         TUTORIAL=1              ; + 1   KB
         EXAMPLEFILES=1          ; + 4.5 KB
 
-        OUTPUTSIZE=1*1024
+.ifndef __ATMOS__
 
-        ;; Biggest on ORIC ATMOS
-        ;; (- 64 30  16  2    2      8) = 6!!!
-        ;;   RAM tap ROM CHAR CSTACK HIRES
-;        OUTPUTSIZE=6*1024
+        ;; --- SIM65 --- 31K binary+heap!
 
-        ;; Biggest on sim65
         ; (+ (* 31 1024) 512 256 32 16 2 1)
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
-        ;; Heap: 8KB
+
+        OUTPUTSIZE=31*1024
+
+.else
+        ;; --- ATMOS --- 7K in demo...
+
+        ;; Biggest on ORIC ATMOS
+        ;; (- 64 30  1  16  2    2      8) = 5!!!
+        ;;   RAM tap ZP ROM CHAR CSTACK HIRES
+        OUTPUTSIZE=5*1024
+
+;        OUTPUTSIZE=1*1024
+.endif ; !__ATMOS__
+
 
 .else ; DEFAULT
 
-;;; TDOO: fix... why fails? (32K limit somewhere?)
-;;; 
+;;; TODO: fix... why fails? (32K limit somewhere?)
 ;;; 
 ;;; fails at 352 lines Input/lps-100.c
 ;;; (* 352 6) = 2112 should fit
 
+.ifndef __ATMOS__
+        
+        ;; --- SIM65 ---
 
-;;; PRIME malloc gives bad mem and crashes
+        OUTPUTSIZE=37*1024
 
-;;; somethign is fckskcs!
+.else
 
-        OUTPUTSIZE=2*1024
+        ;; --- ATMOS ---
 
-        ;; Biggest on ORIC ATMOS
+        OUTPUTSIZE=12*1024
 
-;;; TODO: enable when HEAP is gone
+.endif ; !__ATMOS__
 
 
-;        OUTPUTSIZE=12*1024    
-
-        ;; Biggest on sim65
-;         OUTPUTSIZE=38*1024
-
-       ;; Heap: 
-.endif
+.endif ; default target
 
 
 ;;; Allow inline (fixed-constant) ASM code!
