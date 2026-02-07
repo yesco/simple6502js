@@ -982,9 +982,9 @@
 ;;;   of the same rule. This replaces KlEENE operators *+?[].
 ;;; 
 ;;; 
-;;;         ABCDEFGHIJKLMNOPQRSTUVWXYZ {   <32
+;;;      ' 'ABCDEFGHIJKLMNOPQRSTUVWXYZ {!=   <32
 ;;; Free:   ABC EFGH JKLM OPQR T  WXYZ
-;;; Used:   A  D    I    N    S UV     {   -31
+;;; Used:' 'A  D    I  L N   RS UV     {!=   -31
 ;;;          b d              s
 ;;; 
 ;;; CONSTANTS
@@ -994,22 +994,31 @@
 ;;;        'c'  - char constant
 ;;; - %d - tos= number; only accept if <256!
 ;;; 
-;;; - %S - parses string till "
-;;;        NOTE: you need to write "%S 
-;;;        ...\n\"..." - rest of string is matched
-;;;        only \n is recognized, other \ just inserted
-;;;        NOTE: this COPIES the string to code!
+;;; - %S - parses string till " copying to code!
+;;;        NOTE: you need to write >"%S<
+;;;        "...\n\"..." - rest of string is matched
+;;;        \0 \n \t is recognized, and \ANYCHAR
+;;;     BUG: string cannot start with " " spaces, lol
+;;; 
+;;;        Returns:
+;;;          gos= address of string
+;;;          dos= count bytes of string (including \0)
+;;;
 ;;; - %s - like %S but parse only, doesn't copy the string
 ;;; 
 ;;; 
-;;; TEST
+;;; 
+;;; TEST CONDITIONS ("asserts")
 ;;; 
 ;;; - %b - "word boundary test" (actually just test next char
 ;;;        to not be isident) for "1%b" so not match "12"
+;;; 
 ;;; - "%=abc",$80
 ;;;      - lookahead FAIL if next input char is NO [abc]
 ;;; - "%!abc",$80
 ;;;      - lookaread FAIL if next ISs one of [abc]
+;;; 
+;;; - IMMEDIATE addr (ends with _fail or _next)
 ;;; 
 ;;; 
 ;;; 
@@ -1046,8 +1055,11 @@
 ;;; 
 ;;; IMMEDATE (run code inline)
 ;;; 
-;;; - "% " == "%" jmp dostuff == .byte "% HL" (SPC==JSR!)
-;;;        This jumps to immmediate code, typcially
+;;; 
+;;;   IMMEDIATE addr
+;;; 
+;;; - "%L" == "%" jmp dostuff == .byte "%L<>"
+;;;        This jumps to immmediate code, typically
 ;;;        to set things up or to test conditions,
 ;;;        like "disallowlocal";
 ;;; 
@@ -1057,6 +1069,15 @@
 ;;;        and if the parsing rule should fail
 ;;;              jmp _fail
 ;;; 
+;;;   JSRIMMEDIATE addr
+;;; 
+;;; - "% " == "%" jsr dostuff == .byte "% <>" (jsr=' ')
+;;;        This calls immmediate code, typically
+;;;        to make action/sideeffect.
+;;; 
+;;;        Return with RTS
+;;; 
+;;;      NOTE: Do not call _next or _fail (use IMMEDIATE)
 ;;; 
 ;;; 
 ;;; TODO: remove - DON'T USE!!!! UNSAFE
@@ -1067,9 +1088,13 @@
 ;;;        NOTE: can't RTS, must use IMM_RET ("jsr immret")
 ;;;        FAIL: it's ok to call "jsr _fail" !
 ;;; 
+;;; 
+;;; 
 ;;; CONTROL FLOW
 ;;;
-;;; - % len BINARYDATA (skipper!)
+;;; TODO: bug? if last byte 0 get ENV stuff messed up
+;;; 
+;;; - %len BINARYDATA (skipper!)
 ;;;        len is 7bits < ' '(32), hbit ignored
 ;;;        tos= address after len (TODO: include?)
 ;;;        TODO: mabye set dos too, like %A?
@@ -1082,7 +1107,8 @@
 ;;; 
 ;;;        
 ;;;        
-;;; - %R addr - goto this rule addr!
+;;; - %R addr - goto this rule addr, jump nil-willy!
+
 
 ;;; 
 ;;; TODO:?
@@ -1096,14 +1122,24 @@
 ;;; 
 ;;; Don't use: usafe - quoting problem | and \0 ...;
 ;; 
-;;; %{IMMEDIATE machien code ... IMM_RET (or IMM_FAIL)
+;;; %{ machien code ... IMM_RET (or IMM_FAIL)
 
 
-;;; IMMEDIATE jmpaddr   (replaces unsafe %{ ...)
+;;; Use:
+;;;
+;;; IMMEDIATE    addr   (replaces unsafe %{ ...)
+;;; JSRIMMEDIATE addr   (replaces unsafe %{ ...)
 ;;; 
+;;; TODO: rename to "CHECK disallowlocal" ?
 .macro IMMEDIATE addr
       .byte "%"
         jmp addr
+.endmacro
+
+;;; TODO: rename to "ACTION dostuff" ?
+.macro JSRIMMEDIATE addr
+      .byte "%"
+        jsr addr
 .endmacro
 
 ;;; 
@@ -1584,7 +1620,7 @@ __ZPCOMPILER__:
 nparam: .res 1
 curF:   .res 2                  ; points to "name%b..."
 params: .res NPARAMS*2          ; "registers"
-endparams:      
+endparams:                      ; used for test
 
 compilestatus:  .res 1          ; 
 
@@ -3308,6 +3344,22 @@ jsr _printchar
         jmp _next
 
 :
+        ;; "% " (JSR to routine that ends with RTS)
+        ;;      (it cannot (easily) call _fail (palpla))
+        ;; 
+        ;;      .byte "%"
+        ;;      jsr doseomthign
+        ;; 
+        ;;      .byte "%"
+        ;;      jmp checkbobar
+        ;; 
+        cmp #' '
+        bne :+
+        
+        jsr dojmp
+        jmp _next
+
+:       
         ;; "%L" (jmp to routine that ends w jmp _next)
         ;; 
         ;;      .byte "%"
@@ -3315,6 +3367,7 @@ jsr _printchar
         cmp #'L'
         bne :+
 
+dojmp:  
         ;; Y=0
         ;; - load address
         lda (rule),y
@@ -3467,9 +3520,18 @@ jmpvar:
         ;;   %V (or %A %N %...)
         jmp _var
 
+        ;; - "constant string" inline!
 
-        ;; - "constant string"
-        ;; (store inline!?)
+        ;; -- save address in gos
+        lda _out
+        sta gos
+        lda _out+1
+        sta gos+1
+        ;; -- keep counting size in dos
+        lda #0
+        sta dos
+        sta dos+1
+
 string: 
         ;; determine if to Copy (%S not %s)
         lda percentchar
@@ -3500,6 +3562,10 @@ str:
         ;; -- quoted
         jsr _incI
         lda (inp),y
+        ;; - \0 =>  0
+        bne :+
+        lda #0
+:       
         ;; - \n => 10
         cmp #'n'
         bne :+
@@ -3530,6 +3596,7 @@ str:
         ;; 7 B
         ; ldy #0 
         sta (_out),y
+        jsr _incD
         jsr _incO
 
         jmp str
@@ -3542,6 +3609,7 @@ str:
         ;; zero-terminate if gen
         lda #0
         sta (_out),y
+        jsr _incD
         jsr _incO
 @noout:       
         ;; skip "
@@ -5235,37 +5303,66 @@ jsr putchar
 
 ;;; TODO: not here yet
 
-;;; TOS = array size in bytes, Y = type of elements
+
+;;; size not known
+FUNC _newarr_c_unknown
+        ;; set size 0
+        lda #0
+        sta tos
+        sta tos+1
+        ;; fall-through
+
+;;; tos= size in bytes
+FUNC _newarr_c
+        ldy #'c'+128
+        ;; fall-through
+
+;;; tos= array size in bytes, Y = type of elements
 FUNC _newarr
-        tya
-        pha
+        sty savey
 
-        ;; store sizeof before array! (clever?)
-        ;; TODO: issue with records in future/who init this?
-        ;;       (or just store in ENV below?)
-        ldy #0
-        lda tos
+        ;; save address
+        lda _out
+        ldx _out+1
+        sta gos
+        stx gos+1
+
+        ;; allocate tos bytes space (move _out)
+        ;; (zero out tos bytes at _out; _out+= tos)
+        lda #0
+        ldx tos+1
+
+        ldy tos
+        beq :+
+:       
         sta (_out),y
-        jsr _incO
+        dey
+        bne :-
+        dex
+        bpl :-
+:       
+        ;; _out+= tos
+        clc
+        lda _out
+        adc tos
+        sta _out
+        lda _out+1
+        adc tos+1
+        sta _out+1
 
-        lda tos+1
-        sta (_out),y
-        jsr _incO
-        
-        ;; standing at _out at start of array!
+        ldy savey
+        jmp _newname
 
-        pla
-        tay
-        jmp _newname_Y_out
-
-
-FUNC _newname_F
+;;; register a new funciton name (after %I)
+FUNC _newfun
         lda #0
         sta nparam
+        ;; TODO: return type?
         ldy #'F'
         ;; fall-through
 
 FUNC _newname_Y_out
+        ;; AX= _out address (inline array data)
         ;; push backwards (lo, hi)
         lda _out
         ldx _out+1
@@ -5327,6 +5424,18 @@ FUNC _newvar_Y_AX
 ;;; 
 ;;; In the end, not clear if save code memory
 ;;; as "stuffing" takes lots of bytes
+
+;;; Register new name
+;;;   (on stack %I result record pointing toname)
+;;;   gos= address of variable/function/array
+;;;   tos= sizeof
+;;; 
+;;; Result:
+;;;   tos= points to %DATA
+;;;   pos= points to "VARNAME" in source (unverified)
+;;;   (these values used by _stuffarray_c/w)
+;;;     gos= address of data
+;;;     dos= 0
 FUNC _newname
 ;;;             >>>  %b%'3<ADDRw><TYPEc>| <<<
 
@@ -5369,12 +5478,18 @@ FUNC _newname
         lda #'%'
         jsr _stuffVARS
 
+        ;; save pointer to here in tos
+        lda _ruleVARS
+        sta tos
+        lda _ruleVARS+1
+        sta tos+1
+
         ;; store skip 'breakchar' "%b"
         lda #'b'            ; 3 bytes to skip
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
-        
+
         ;; copy varname BACKWARDS from address on stack
         ;; - len
         pla
@@ -5437,10 +5552,13 @@ updatevars:
 storecurF:      
         ;; store "current function ptr"
         ;; TODO: minimize if can do earlier?
-        lda savex
+        lda savex               ; bit can test SV
+        ;; ?array ???
+        ;; ?function
         cmp #'F'
         bne @done
         ;; - is Function store in curF
+        ;; (used for skipping over local)
         ldx _ruleVARS+1
         ldy _ruleVARS
         iny
@@ -5450,6 +5568,11 @@ storecurF:
 :       
         stx curF+1
 @done:       
+        ;; needed to count array size
+        lda #0
+        sta dos
+        sta dos+1
+
         jmp _next
 
 
@@ -5490,16 +5613,44 @@ FUNC _hideargs
 ;;; will FAIL if identifier isn't array
 ;;; (pointer give error too)
 checkisarray:
-        ;; load type char
-        lda (pos),y
-        cmp #'A'
-        bcs :+
+        ;; array is not in zeropage
+        cpx #0
+        bne :+
         ;; not array (a-z)
         jmp _fail
 :       
         jmp _next
         
+
+;;; call with "%" jsr ...
+_stuffarray_w:  
+        jsr _stuffarray_c
+        lda tos+1
+        SKIPTWO
+_stuffarray_c:  
+        lda tos
+        ldy #0
+        sta (gos),y
+        ldx #gos
+        jsr _incRX
+        jsr _incD               ; count of bytes
+        rts
+
+;;; pos= after array data
+;;; dos= size in bytes of array data
+;;; tos= ^ENV-array record to update size in
+_newarr_updatesize:
+        lda dos
+        ldy #3
+        sta (tos),y
+
+        lda dos+1
+        iny
+        sta (tos),y
         
+        rts
+        
+
 
 ;;; will give ERROR! if tos address is local
 disallowlocal:
@@ -5507,7 +5658,6 @@ disallowlocal:
 .scope
         lda tos
         ldx tos+1
-        cpx #0
         bne isarray
         cmp #endparams
         bcs notstackedparameter
@@ -8974,27 +9124,12 @@ ruleQ:
         ;; end
         .byte "};"
 
+        ;; ',' - one more item, skip ','
         .byte "|,",TAILREC
 
         .byte "|%d"
-;TODO: data inline!
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        ;; TODO: remove as this is hack
-        lda tos
-;;; TODO: this 0 may cause problem.. to skip!
-        ldy #0
-        sta (pos),y
-        jsr _incP
-        IMM_RET
-
+        JSRIMMEDIATE _stuffarray_c
         .byte TAILREC
-
-        .byte "|"
-      .byte "%{"
-        ;; TODO: this may not be easily skippable
-        PRINTZ "got arr end"
-        IMM_RET
 
         .byte 0
 
@@ -9036,7 +9171,7 @@ ruleN:
         ;; DEFINE fun(){...} - ZERO argument function
         ;; (no overhead)
         .byte "|word","%I()"
-        IMMEDIATE _newname_F
+        IMMEDIATE _newfun
         .byte _B
       .byte '['
         ;; TODO: This maybe be redundant if there is
@@ -9065,7 +9200,7 @@ ruleN:
 .ifblank
         ;; fun(Expr){...} - ONE argument function
         .byte "|word","%I(","word"
-        IMMEDIATE _newname_F
+        IMMEDIATE _newfun
         ;; TODO: make part of newname_F?
         ;; TODO: how about other types?
         IMMEDIATE _initparam
@@ -9111,7 +9246,7 @@ ruleN:
 ;;;   it relies on that ONE arg parse have
 ;;;   registred the name already, lol
 ;;;   make a way to detect how many args before?
-;        IMMEDIATE _newname_F
+;        IMMEDIATE _newfun
 
         IMMEDIATE _initparam
         .byte _R                ; reads f.arguments
@@ -9207,70 +9342,71 @@ ruleN:
 .endif ; PERCENT_N
 
 
+;;; If enabled breaks parsing in of main?
 ;ARRAYS=1
-
 .ifdef ARRAYS
-;;; TODO: %I;%N ...
-        .byte "|word\*","%I;"
-      .byte "%{"
-        ldy #'W'
-;;; Can't do this: use IMMEDIATE and only jmp to routine
-        jsr _newarr
-        .byte TAILREC
+        ;; declare define ARRAYS
 
-        .byte "|char","$%I;"
-      .byte "%{"
-        ldy #'c'
-;;; Can't do this: use IMMEDIATE and only jmp to routine
-        jsr _newarr
-        .byte TAILREC
-
-        ;; TODO: special case ={0};
-        .byte "|word","%I\[%D\];"
-      .byte "%{"
-        ;; word is double bytes
-        asl tos
-        rol tos+1
-        ldy #'W'+128
-;;; Can't do this: use IMMEDIATE and only jmp to routine
-        jsr _newarr
-        .byte TAILREC
-
-
-        ;; TODO: special case ={0};
+        ;; char foo[4];
         .byte "|char","%I\[%D\];"
-      .byte "%{"
-        lda #'C'+128
-;;; Can't do this: use IMMEDIATE and only jmp to routine
-        jsr _newarr
+        ;; TODO change calling to JSRIMMEDIATE
+        IMMEDIATE _newarr_c
         .byte TAILREC
 
-        ;; TODO: special case ={0};
-        .byte "|word","%I\[%D\]={"
-      .byte "%{"
-        ldy #'W'+128
-;;; Can't do this: use IMMEDIATE and only jmp to routine
-        jsr _newarr
- ;; TODO: do WORD, _Q only reads bytes
-;;;   (how can do { "foo", "bar", "fie", fum" } ???
-        .byte _Q
+        ;; char foo[4]= {0};
+        .byte "|char","%I\[%D\]={0};"
+        IMMEDIATE _newarr_c
         .byte TAILREC
 
+        ;; char foo[]= "foo"; // 4 bytes
+        .byte "|char","%I\[\]=",34
+        IMMEDIATE _newarr_c
+        .byte "%S;"
+        JSRIMMEDIATE _newarr_updatesize
+        .byte TAILREC
+
+        ;; char foo[]= {102,'o',0x64,0}; // 4 bytes
         .byte "|char","%I\[\]={"
-      .byte "%{"
-        lda #'C'+128
-        jsr _newarr
-        ;; newarr sets pos
+        IMMEDIATE _newarr_c_unknown
+        .byte "[#]"             ; push ^ENV
         .byte _Q
+        .byte "[;]"             ; pop ^ENV
+        JSRIMMEDIATE _newarr_updatesize
         .byte TAILREC
 
-        ;; TODO: special case ={0};
-;        .byte "|char* %V[%D]={"
-        ;; TODO: _Q reads bytes do word... or stringconst
-;;; MEMSET zero
+.ifnblank
+;;; TODO: is it needed?
+;;; 
+;;; TODO: &var is different from var!
+        .byte "|char\*","%I=",34
+;;; TODO: sizeof must be 2
+        ;; "word" ops same as "char*", lol
+        IMMEDIATE _newvar_w
+        .byte "%S;"
+        .byte TAILREC
+.endif
+
+;;; TODO:
+;        .byte "|word\*","%I="...
+;        IMMEDIATE _newarr_w
+;        .byte TAILREC
+
+
+;;; TODO: word array[] ...
+
+;        .byte "|word","%I\[%D\];"
+;        IMMEDATE _newarr_w_ptr
+;        jsr _newarr
+;        .byte TAILREC
+
+;        .byte "|word","%I\[\]={"
+;        IMMEDIATE _newarr_w
 ;        .byte _Q
+;        .byte TAILREC
 
 .endif ; ARRAYS
+
+
 
         .byte "|"
 
@@ -13752,23 +13888,24 @@ input:
 
 ;ARRAY=1
 .ifdef ARRAY
+        .byte "char array[]={70,111,111,66,65,,0};",10
+        .byte "char gurka[]={'f','o','o','b','a','r',0};",10
         .byte "char bytes[7];",10
-        .byte "char array[]={'F','o','o','b','a','r','0'};",10
-        .byte "char string[]=\"foobar\";",10
+        .byte "char string[]=\"FOOBAR\";",10
         .byte "",10
         .byte "word p(word s){",10
-        .byte "  putu(strlen(s)); puts(s);",10
+        .byte "  putu(strlen(s)); putchar('>'); puts(s); putchar('<'); putchar('\\n');",10
         .byte "}",10
-        .byte "word i=0;",10
+        .byte "word ph(word a){",10
+        .byte "  puth(a); putchar(' ');",10
+        .byte "}",10
         .byte "word main(){",10
-        .byte "  puth(bytes); putchar(' ');",10
-        .byte "  puth(array); putchar(' ');",10
-        .byte "  puth(string); putchar(' ');",10
-        .byte "  putchar('\n');",10
-        .byte "  puth(&bytes); putchar(' ');",10
-        .byte "  puth(&array); putchar(' ');",10
-        .byte "  puth(&string); putchar(' ');",10
-        .byte "  putchar('\n');",10
+        .byte "  ph(array); ph(gurka); ph(string); ph(bytes); putchar('\\n');"
+        .byte "  ph(&array); ph(&gurka); ph(&string); ph(&bytes); putchar('\\n');"
+        .byte "  p(bytes);",10
+        .byte "  p(gurka);",10
+        .byte "  p(array);",10
+        .byte "  p(string);",10
 .ifdef DODO
         .byte "  strcpy(bytes,\"FOOBAR\");",10
         .byte "  putchar(bytes[0]);",10
@@ -13777,9 +13914,6 @@ input:
         .byte "  putchar(bytes[i]);",10
         .byte "  putchar(bytes[1-1]);",10
 .endif
-        .byte "  p(bytes);",10
-        .byte "  p(array);",10
-        .byte "  p(string);",10
         .byte "}",10
         .byte 0
 

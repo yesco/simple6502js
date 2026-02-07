@@ -382,7 +382,7 @@ void inputfile(char* filename) {
 // process args
 // (ignores first==program name)
 
-extern processnextarg() {
+extern void processnextarg() {
   char* a= *++argv;
 
   // not processing arguments
@@ -485,9 +485,9 @@ void main(int iargc, char** iargv) {
     // no buffer to init
     mode = 0;
 
-    while(processnextarg()) ;
-    // TODO: this is not the output of the script
-    exit(0);
+    processnextarg();
+    // doesn't return 
+
   } else {
     // mark that we're NOT processing args
     argc= -1;

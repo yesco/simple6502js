@@ -1,0 +1,17 @@
+#!/bin/env perl
+
+$s= shift @ARGV;
+while ($s) {
+
+$o= $s;
+$s=~ s/^(.)$/ord($1)/e;
+$s=~ s/^\$/0x/;
+$s=~ s/^#//;
+$n= eval($s);
+
+print sprintf("$o\t#%d\t\$%x\t0%o\t%%%b\t'%c'\n", $n, $n, $n, $n, $n>=' '?$n:127);
+
+$s= shift @ARGV;
+}
+
+
