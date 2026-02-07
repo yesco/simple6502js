@@ -9031,6 +9031,8 @@ ruleN:
 ;        .byte _T,"%N()",_B
 
 
+        ;; define function
+
         ;; DEFINE fun(){...} - ZERO argument function
         ;; (no overhead)
         .byte "|word","%I()"
@@ -9050,6 +9052,8 @@ ruleN:
         ;;  will fall through to next function...)
         rts
       .byte ']'
+        ;; Not really needed
+        ;; IMMEDIATE _hideargs
         .byte TAILREC
 
 
@@ -9067,6 +9071,7 @@ ruleN:
         IMMEDIATE _initparam
         .byte "%I)"
         IMMEDIATE _newparam_w
+;;; TODO: (too much?)
 ;;; (+ 11 6) = 17 B overhead/function
       .byte "["
         ;; save register used for param
