@@ -6681,9 +6681,6 @@ FUNC _memoryrulesend
 
 
 
-;
-FUNCALL=1
-
 FUNC _funcallstart
 
 ;.include "lib-runtime-funcall.asm"
@@ -9301,9 +9298,11 @@ ruleN:
         .byte TAILREC
 
 
-.ifdef FUNCALL
 
-;.include "parse-func-def.asm"
+        ;; TODO: old stuff, remove? maybe contains
+        ;;   timting tests and optideas?
+        ;; 
+        ;;.include "parse-func-def.asm"
 
 
 
@@ -9337,70 +9336,27 @@ ruleN:
         .byte TAILREC
 
 
-;;; TODO: this TAILREC messes with ruleP and several F
-;;;   TAILREC does something wrong! ???
-;;; 
-;;;  still matters?
-        
-;        .byte "|"
+        ;; DECLARE/DEFINE ARRAYS
 
-.endif ; FUNCALL
-
-
-
-
-
-
-        ;; Define variable
-
-;PERCENT_N=1
-
-;;; TODO: these should be equivalent...
-.ifdef PERCENT_N
-
-;;; TODO: use %N in else branch
-
-        .byte "|word","%I;%N"
-        ;; NOTE: %N after ; otherwise maybe mix w 
-        ;;       function def: "word","%I(%N",_E ... lol
-;      .byte "%{"
-;        putc '!'
-;        IMM_RET
-        .byte TAILREC
-.else
-
-	;; TDOO: parse functions before this
-
-        .byte "|word",_K
-        .byte TAILREC
-
-.endif ; PERCENT_N
-
-
-;;; If enabled breaks parsing in of main?
-;ARRAYS=1
-.ifdef ARRAYS
-        ;; declare define ARRAYS
-
-        ;; char foo[4];
+        ;; -- char foo[4];
         .byte "|char","%I\[%D\];"
         ;; TODO change calling to JSRIMMEDIATE
         IMMEDIATE _newarr_c
         .byte TAILREC
 
-        ;; char foo[4]= {0};
+        ;; -- char foo[4]= {0};
         .byte "|char","%I\[%D\]={0};"
         IMMEDIATE _newarr_c
         .byte TAILREC
 
-        ;; char foo[]= "foo"; // 4 bytes
+        ;; -- char foo[]= "foo"; // 4
         .byte "|char","%I\[\]=",34
         IMMEDIATE _newarr_c
         .byte "%S;"
         JSRIMMEDIATE _newarr_updatesize
         .byte TAILREC
 
-        ;; char foo[]= {102,'o',0x64,0}; // 4 bytes
+        ;; -- char foo[]= {102,'o',0x64,0};
         .byte "|char","%I\[\]={"
         IMMEDIATE _newarr_c_unknown
         .byte "[#]"             ; push ^ENV
@@ -9408,6 +9364,7 @@ ruleN:
         .byte "[;]"             ; pop ^ENV
         JSRIMMEDIATE _newarr_updatesize
         .byte TAILREC
+
 
 .ifnblank
 ;;; TODO: is it needed?
@@ -9420,6 +9377,7 @@ ruleN:
         .byte "%S;"
         .byte TAILREC
 .endif
+
 
 ;;; TODO:
 ;        .byte "|word\*","%I="...
@@ -9439,7 +9397,16 @@ ruleN:
 ;        .byte _Q
 ;        .byte TAILREC
 
-.endif ; ARRAYS
+
+
+
+
+        ;; DEFINE VARIABLES
+
+        ;; TODO: use %N in else branch
+        .byte "|word",_K
+        .byte TAILREC
+
 
 
 
@@ -9496,30 +9463,25 @@ ruleO:
         ;; Autopatches skip over definitions in _N
 
 
-;;; PROGRAM ::= DEFSSKIP TYPE main() BLOCK | 
 ruleP:  
-      .byte "%{"
-;        jsr _iasmstart
-        IMM_RET
+        ;; TODO: ?
+        ; JSRIMMEDIATE _iasmstart
 
-        ;; this rule with jump over definitions and arrive at main
+        ;; jump over definitions and arrive at main
         .byte _O
 
         ;; TODO: not to have special case for main()?
         ;;   just lookup and patch?
         ;; TODO: works with _S
-        ;; (reason is _T error doesn't propagate up
-;        .byte _T,"main()",_B
+        ;;   (_T error doesn't propagate up)
 
-        .byte "word","main()",_B
-
-;.byte "%{"
-;putc '.'
-;IMM_RET
-
-
-
-
+	;.byte _T,"main()",_B
+        ;; TODO: allow "int" even if...
+        .byte "word","main()"
+        ;; TODO: allow { var w init ... }
+        ;;   they can be global, at this point doesn't
+        ;;   matter, not allow recursion on main(), LOL?
+        .byte _B
       .byte '['
         ;; if main not return, return 0
         lda #0
@@ -9528,13 +9490,11 @@ ruleP:
       .byte ']'
 
 .ifdef PRINTASM
-      .byte "%{"
-        jsr _asmprintsrc
-        IMM_RET
+        JSRIMMEDIATE _asmprintsrc
 .endif ; PRINTASM
 
-;;; We also accept simple expressions...
-;;; TODO: have a look/test
+        ;; We also accept simple expressions...
+        ;; TODO: have a look/test
 
         .byte "|"
 
@@ -9544,10 +9504,10 @@ ruleP:
       .byte "]"            
 
 .ifdef PRINTASM
-      .byte "%{"
-        jsr _asmprintsrc
-        IMM_RET
+        JSRIMMEDIATE _asmprintsrc
 .endif ; PRINTASM
+
+;;; TODO: ???
 
 ;        .byte "|",_E,TAILREC
 ;        .byte "|;",TAILREC
@@ -9555,9 +9515,17 @@ ruleP:
         
         .byte 0
 
+
+
+
+
+;;; TODO: this isproblematic to use as error's
+;;;   aren't currently propagated
+
+;;; TODO: "%_T" - propagate error (one level)
+;;; 
 ;;; Type
 ruleT:  
-        ;; don't use SIGNED int/char
 .ifdef FROGMOVE
         .byte "static",TAILREC
         ;; we don't care
@@ -9569,8 +9537,11 @@ ruleT:
 
 
 
+
+
+        ;; STATEMENTS
+
 FUNC _stmtrulesstart
-;;; Statement
 ruleS:
 
         ;; empty statement is legal
