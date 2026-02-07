@@ -1850,7 +1850,40 @@ subparamY:
         jmp (tos)
 
 
-;;; Restores Y+2 byte registers
+;;; TODO: do this optimization
+
+;;; restore, in an optimized program, will onlyh
+;;; get called for recursive functions,
+;;; for "complicated", it only becomes a problem
+;;; once we "return", so we could put a sentinel 
+;;; on the stack the first thing (if a compiler-
+;;; flag is set) to call to the extended version here
+;;; instead. It only needs to check that the sentinel
+;;; hasn't been overwritten. This isn't fool-proof
+;;; but depending on the value (?) may in simple
+;;; terms give a 254/255 chance to detect such an
+;;; issue. I'd suggest to use 'S'+128, lol
+;;; 
+;;; 
+SENTINEL='S'+128
+
+restoreerror:   
+        lda #'S'
+runtimeerror:
+        PUTC '%'
+        jsr putchar
+        jsr nl
+
+;;; TODO: need to add to runtime!
+        jmp _NMI_catcher
+        
+
+restorecheckstack:      
+        ldy $01ff
+        cpy #SENTINEL
+        bne restoreerror
+
+;;; Restores PLA byte registers
 ;;; preserves AX, trashes Y
 
 ;;; 15 B  16+6 +   13c x bytes
@@ -9238,9 +9271,11 @@ ruleN:
         .byte TAILREC
 .endif
 
-        ;; DEFIEN fun(a,b...) - TWO or MORE args
+        ;; DEFINE fun(a,b...) - TWO or MORE args
 
         .byte "|word","%I("
+
+;;; TODO: is this relevant still - cleanup?
 
 ;;; TODO: this is kindof messed up, lol
 ;;;   it relies on that ONE arg parse have
