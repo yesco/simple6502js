@@ -7228,68 +7228,6 @@ jsr puth
 .endif ; STRING_DEBUG
 
 
-;;; TODO: what is this stuff?
-
-.ifdef STRING1
-        ;; string
-        .byte "|",34            ; really >"<
-      .byte "["
-        jmp PUSHLOC
-;        .byte ':'               ; push address here
-      .byte "]"
-      
-        ;; copies string inline till "
-        .byte "%S"
-        ;; fix so that iasm doesn't get confused
-.ifdef PRINTASM
-      .byte "%{"
-        .import _last
-        lda _out
-        sta _last
-        ldx _out+1
-        stx _last+1
-        jsr _iasm
-        IMM_RET
-.endif ; PRINTASM
-
-      .byte "["
-        ;; load patch address => tos
-        .byte ";"
-      .byte "]"
-      .byte "%{"
-        ;; PATCH jump NOW, to HERE!
-        lda _out
-        ldy #0
-        sta (tos),y
-
-        lda _out+1
-        iny
-        sta (tos),y
-
-;;; I get correct code ldx, ldx but running not?
-clc
-lda tos
-adc #2                          ; to skip jmp ADDRESS
-sta tos
-lda tos+1
-adc #0
-sta tos+1
-
-;;; prints address of string (?)
-lda tos
-ldx tos+1
-jsr axputh
-        IMM_RET
-
-      .byte "["
-wrong;        .byte "D"               ; tos= dos; addr of string
-        lda #'<'
-        ldx #'>'
-;        jsr axputh
-      .byte "]"
-
-.endif ; STRING1
-
 
 ;;; TODO: maybe no need this operator at all?
 ;;;   only case to allow pointer to variable
@@ -7348,16 +7286,6 @@ endC:
 
 
 
-.ifdef MINIMAL
-;;; Just save (TODO:push?) AX
-;;; TODO: remove!!!!
-ruleU:
-      .byte '['
-        jsr _SAVE
-      .byte ']'
-        .byte 0
-.endif
-
 ;;; aDDons (::= op %d | op %V)
 ruleD:
 
@@ -7411,66 +7339,8 @@ FUNC _oprulesstart
         .byte TAILREC
 
 
-;;; ----------------------------------------
-
-.ifdef MINIMAL
-
-;;; TODO: _U used elsewhere...
-        .byte "|+",_U
-      .byte '['
-        jsr _PLUS
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|-",_U
-      .byte '['
-        jsr _MINUS
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|&",_U
-      .byte '['
-        jsr _AND
-      .byte ']'
-        .byte TAILREC
-
-        .byte '|',"\|",_U
-      .byte '['
-        jsr _OR
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|^",_C
-      .byte '['
-        jsr _EOR
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|/2%b"
-      .byte '['
-        jsr _SHR
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|\*2%b"
-      .byte '['
-        jsr _SHL
-      .byte ']'
-        .byte TAILREC
-
-;;; ==
-
-        .byte "|==",_U
-      .byte '['
-        jsr _EQ
-      .byte ']'
-        .byte TAILREC
-
-        ;; Empty
-        .byte '|'
 
 
-.else ; !MINIMAL
 
         .byte "|+%V"
       .byte '['
@@ -8420,9 +8290,6 @@ false:
 
 .endif
       .byte ']'
-
-
-.endif ; !MINIMAL
 
 
 
