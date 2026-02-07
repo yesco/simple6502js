@@ -8292,12 +8292,140 @@ false:
       .byte ']'
 
 
+;
+LOGIC=1
+.ifdef LOGIC
 
-        ;; Empty match at the end (ends TAILREC)
-        .byte '|'
+;;; TODO: these should have very low priority
+;;;   we should also have rules thhat tkaes
+;;;   conditions and these things but out
+;;;   generating only a C boolean result!
+
+        ;; || OR operator
+
+
+;;; TODO: trouble with | operator matching and skipping!
+.ifdef xOPTRULES
+        ;; || %V
+        .byte "|\|\|","%V"
+;;; TODO: & suspect, but how about |
+        .byte "%=&,:;)]?",$80
+      .byte "["
+;;; 14 B vs 23 B saves 9 B
+        stx savex
+        ora savex
+        ora VAR0
+        ora VAR1
+        ;; 0 false
+        cmp #1                  ; C=1 if A>=1
+        lda #0
+        txa
+        rol
+      .byte "]"
+        .byte TAILREC
+.endif ; OPTRULES
+
+;;; TODO: trouble with | operator matching and skipping!
+.ifnblank
+        .byte "|\|\|"
+;;; 19 B
+        .byte "%{"
+;        jsr nl                 
+        putc '?'
+;        jsr nl
+        IMM_RET
+
+      .byte "["
+        ;; 9 B
+        stx savex
+        ora savex
+        ;; zero go _E, otheriwse skip!
+        beq :+
+        ;; - true: AX!=0
+        jmp PUSHLOC
+:       
+        ;; - false = continue
+      .byte "]"
+        .byte _E
+      .byte "["
+        ;; 10 B
+        ;; we need to make the value 0 or 1
+        stx savex
+        ora savex
+
+        .byte ";B"              ; patch to branch here
+        ;; 0 => 0, _ => 1
+        cmp #1
+        lda #0
+        tax
+        rol
+      .byte "]"
+.endif         
+
+        ;; && AND operator
+
+.ifdef OPTRULES
+        .byte "|&&","%V"
+;;; TODO: & suspect, but how about |
+;        .byte "%=&,:;)]?",$80
+      .byte "["
+;;; 16 B vs 23 B saves 7 B
+        stx savex
+        ora savex
+        ;; eq => false
+        beq :+
+
+        lda VAR0
+        ora VAR1
+:       
+        ;; A=0 if false
+        cmp #1
+        lda #0
+        tax
+        rol
+      .byte "]"
+;;; TODO: messed up ordering...||| &&& | &||&
+        .byte TAILREC
+.endif ; OPTRULES
+
+        .byte "|&&"
+;;; 19 B
+      .byte "["
+        ;; 9 B
+        stx savex
+        ora savex
+        ;; zero done, return 0
+        bne :+
+        ;; - false
+        jmp PUSHLOC
+:       
+        ;; - true = continue 
+      .byte "]"
+        .byte _E
+      .byte "["
+        ;; 10 B  14c - STABLE! faster
+        stx savex
+        ora savex
+
+        .byte ";B"            ; jumps here
+        ;; we need to make the value 0 or 1
+        cmp #1                  ; 0 => C=0, _ => C=1
+        lda #0
+        tax
+        rol
+      .byte "]"
+
+.endif ; LOGIC
+
+;;; DID we used to do fallthrough?
 
         .byte 0
+
+
 FUNC _oprulesend
+
+
+
 
 ;;; BYTERULES variant of ruleC:
 ruleU:  
@@ -13775,6 +13903,46 @@ FUNC _inputstart
 
 .FEATURE STRING_ESCAPES
 input:
+
+;ANDOR=1
+.ifdef ANDOR
+        .byte "word o,z;",10
+        .byte "word main(){",10
+        .byte "  o=1; z=0;",10
+        .byte "  putu(0);",10
+        .byte "  putu(1);",10
+
+.ifnblank
+;;; 384 B
+        .byte "  putu(0&&0);",10
+        .byte "  putu(0&&1);",10
+        .byte "  putu(1&&0);",10
+        .byte "  putu(1&&1);",10
+        .byte "  putu(1&&1);",10
+        .byte "  putu(1&&1&&1);",10
+        .byte "  putu(1&&1&&1&&1);",10
+        .byte "  putu(1&&1&&1&&0);",10
+.else
+;;; 419 B - no opt
+;;; 321 B - opt (/ (- 419 321) 14) = ~7 saved/&&
+        .byte "  putu(z&&z);",10
+        .byte "  putu(z&&o);",10
+        .byte "  putu(z&&o);",10
+        .byte "  putu(o&&z);",10
+        .byte "  putu(o&&o);",10
+        .byte "  putu(o&&o);",10
+        .byte "  putu(o&&o&&o);",10
+        .byte "  putu(o&&o&&o&&o);",10
+        .byte "  putu(o&&o&&o&&z);",10
+.endif ; !vars
+
+;        .byte "  putu(0||0);",10
+;        .byte "  putu(0||1);",10
+;        .byte "  putu(1||0);",10
+;        .byte "  putu(1||1);",10
+        .byte "}",10
+        .byte 0
+.endif ; ANDOR
 
 ;ETERNAL=1
 .ifdef ETERNAL
