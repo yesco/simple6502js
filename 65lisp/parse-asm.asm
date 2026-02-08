@@ -8301,6 +8301,11 @@ LOGIC=1
 ;;;   conditions and these things but out
 ;;;   generating only a C boolean result!
 
+;;; TODO: use hibit!
+
+ALT='|'+128
+;       .byte ALT "foobar"
+
         ;; || OR operator
 
 
