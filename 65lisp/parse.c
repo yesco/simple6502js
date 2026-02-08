@@ -302,7 +302,7 @@ void error(char* msg, char* data) {
 // double in C? hmmmm
 void printvariables() {
   char * p= ruleVARS, c, t, * name;
-  unsigned int v, * a;
+  unsigned int v, * a, z;
 
   printf("=== VARIABLES ===\n");
 
@@ -324,28 +324,31 @@ next:
         // skipper - print variable data
         ++p;
         t= p[2]; a= *(unsigned int**)p; v= *a;
+        z= *(unsigned int**)(p+3);
         tab();
 
         printf("@$%04x:", a); printchar(t);
         if (t<128) putchar(' ');
+        printf(" %4dz ", z);
         // for debugging: any var "sfoo" is assumed string
         if (*name=='s' || t==('C' && 127)) {
           // print string: array=p pointer=v
-          char * s= t&0x80? (char*)v: p;
-          printf(" @$%04x #%3d=\"",
-                 a,strlen(s));
+          char * s= t&0x80? *(char**)p: (char*)v;
+          printf("#%3d=\"", strlen(s));
           while(*s) printchar(*s++);
           puts("\"");
         } else {
           // number
           if (v<256) {
             // char
-            printf(" @$%04x:%c  =%3u '%c' ($%02x)\n",
-                   a, t, v, (v&127)<' '?0 : v<127?v: 0, v);
+            printf("=%3u '%c' ($%02x)\n",
+                   v,
+                   (v&127)<' '?0 : v<127?v: 0,
+                   v);
           } else {
             // word
-            printf(" @$%04x:%c  = %5u ($%04x)\n",
-                   a, t, v, v);
+            printf("= %5u ($%04x)\n",
+                   v, v);
           }
         }
 

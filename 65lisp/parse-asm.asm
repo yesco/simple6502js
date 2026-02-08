@@ -1321,8 +1321,7 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;
-DEMO=1
+;DEMO=1
 
 
 .ifdef PICO
@@ -1406,13 +1405,13 @@ DEMO=1
         
         ;; --- SIM65 ---
 
-        OUTPUTSIZE=37*1024
+        OUTPUTSIZE=36*1024
 
 .else
 
         ;; --- ATMOS ---
 
-        OUTPUTSIZE=12*1024
+        OUTPUTSIZE=11*1024
 
 .endif ; !__ATMOS__
 
@@ -3299,6 +3298,8 @@ percent:
         ldy #0
         lda (rule),y
 
+
+
         sta percentchar
 
 .ifdef DEBUGFUN
@@ -3534,9 +3535,24 @@ noimm:
         ldy #1
         lda (pos),y
         sta tos+1
+    tax
         dey
         lda (pos),y
         sta tos
+PUTC '@'
+lda pos
+ldx pos+1
+jsr _printh
+
+    PUTC '!'
+ldy #1
+lda (pos),y
+tax
+dey
+lda (pos),y
+    jsr _printh
+    jsr nl
+    ldy #0
 
 ;;; TODO: jmp _next ???
 
@@ -5399,7 +5415,7 @@ FUNC _newarr
 
         ;; allocate tos bytes space (move _out)
         ;; (zero out tos bytes at _out; _out+= tos)
-;;; 23
+;;; 26
         ldx tos+1
         stx savex               ; hi counter
         
@@ -5412,7 +5428,12 @@ FUNC _newarr
         ;; partial page write first time
 @loop:
         sta (_out),y
-        jsr _incO
+        PUTC '_'
+        ;; inline jsr _incO as it uses x...
+        inc _out
+        bne :+
+        inc _out+1
+:       
         dex
         bne @loop
 @page:       
@@ -5427,7 +5448,11 @@ FUNC _newarr
 FUNC _newfun
         lda #0
         sta nparam
-        ;; TODO: return type?
+        ;; TODO: return type? doesn't matter?
+        ;; - # args
+        ;; - # locals
+        ;; - # max ceiling of sub-funcs
+        ;; - # ceiling = (args+locals+max)
         ldy #'F'
         ;; fall-through
 
@@ -5466,7 +5491,6 @@ FUNC _newvar_w
         jsr _decV
         lda vos
         ldx vos+1
-
         ;; fall-through
 
 FUNC _newvar_Y_AX_w
@@ -5523,7 +5547,7 @@ FUNC _newname
 
 ;;; TODO: skipper wrong?
         ;; dummy 1 byte non-zero at end, LOL
-        lda #255
+        lda #':'
         jsr _stuffVARS
 
         ;; push sizeof of var (other data func)
@@ -5542,6 +5566,13 @@ FUNC _newname
         lda gos                 ; lo
         jsr _stuffVARS
 
+.ifnblank
+        jsr nl
+        lda gos
+        ldx gos+1
+        jsr _printh
+        jsr nl
+.endif
         ;; store skip chars "%<3+128>"
         lda #6+128              ; 3 bytes to skip
         jsr _stuffVARS
@@ -5711,7 +5742,7 @@ _stuffarray_c:
 ;;; tos= ^ENV-array record to update size in
 _newarr_updatesize:
         lda dos
-        ldy #3
+        ldy #6
         sta (tos),y
 
         lda dos+1
@@ -7266,7 +7297,7 @@ jsr puth
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
         .byte "|&%V"
-        IMMEDIATE disallowlocal
+;        IMMEDIATE disallowlocal
       .byte "["
         lda #LOVAL
         ldx #HIVAL
@@ -13936,6 +13967,45 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+        .incbin "Input/debug-array.c"
+        .byte 0
+
+;ARRAY=1
+.ifdef ARRAY
+        .byte "char array[]={70,111,111,66,65,,0};",10
+        .byte "char gurka[]={'f','o','o','b','a','r',0};",10
+        .byte "char bytes[7];",10
+        .byte "char string[]=\"FOOBAR\";",10
+        .byte "",10
+        .byte "word p(word s){",10
+        .byte "  putu(strlen(s)); putchar('>'); puts(s); putchar('<'); putchar('\\n');",10
+        .byte "}",10
+        .byte "word ph(word a){",10
+        .byte "  puth(a); putchar(' ');",10
+        .byte "}",10
+        .byte "word main(){",10
+        .byte "return 4711;",10
+        .byte "  ph(p); putchar('\\n');",10
+        .byte "  ph(array); ph(gurka); ph(string); ph(bytes); putchar('\\n');"
+        .byte "  ph(&array); ph(&gurka); ph(&string); ph(&bytes); putchar('\\n');"
+        .byte "  p(bytes);",10
+        .byte "  p(gurka);",10
+        .byte "  p(array);",10
+        .byte "  p(string);",10
+.ifdef DODO
+        .byte "  strcpy(bytes,\"FOOBAR\");",10
+        .byte "  putchar(bytes[0]);",10
+        .byte "  putchar(bytes[(char)i]);",10
+        .byte "  putchar(bytes[(char)1-1]);",10
+        .byte "  putchar(bytes[i]);",10
+        .byte "  putchar(bytes[1-1]);",10
+.endif
+        .byte "}",10
+        .byte 0
+
+.endif ; ARRAY
+
+
 ;EQ=1
 .ifdef EQ
         .byte "word main(){",10
@@ -13993,38 +14063,6 @@ input:
         .byte 0
 .endif ; ETERNAL
 
-;ARRAY=1
-.ifdef ARRAY
-        .byte "char array[]={70,111,111,66,65,,0};",10
-        .byte "char gurka[]={'f','o','o','b','a','r',0};",10
-        .byte "char bytes[7];",10
-        .byte "char string[]=\"FOOBAR\";",10
-        .byte "",10
-        .byte "word p(word s){",10
-        .byte "  putu(strlen(s)); putchar('>'); puts(s); putchar('<'); putchar('\\n');",10
-        .byte "}",10
-        .byte "word ph(word a){",10
-        .byte "  puth(a); putchar(' ');",10
-        .byte "}",10
-        .byte "word main(){",10
-        .byte "  ph(array); ph(gurka); ph(string); ph(bytes); putchar('\\n');"
-        .byte "  ph(&array); ph(&gurka); ph(&string); ph(&bytes); putchar('\\n');"
-        .byte "  p(bytes);",10
-        .byte "  p(gurka);",10
-        .byte "  p(array);",10
-        .byte "  p(string);",10
-.ifdef DODO
-        .byte "  strcpy(bytes,\"FOOBAR\");",10
-        .byte "  putchar(bytes[0]);",10
-        .byte "  putchar(bytes[(char)i]);",10
-        .byte "  putchar(bytes[(char)1-1]);",10
-        .byte "  putchar(bytes[i]);",10
-        .byte "  putchar(bytes[1-1]);",10
-.endif
-        .byte "}",10
-        .byte 0
-
-.endif ; ARRAY
 
 
 ;POINTERLOCAL=1
