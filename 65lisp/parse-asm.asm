@@ -1381,7 +1381,7 @@ DEMO=1
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
 
-        OUTPUTSIZE=31*1024
+        OUTPUTSIZE=30*1024
 
 .else
         ;; --- ATMOS --- 7K in demo...
@@ -6014,28 +6014,33 @@ ruleA:
 
 
 
+
 ;;; Block
 ruleB:  
         .byte "{}"
 
         .byte "|{",_A
 .ifdef PRINTASM
-      .byte "%{"
-        jsr _asmprintsrc
-        IMM_RET
+        JSRIMMEDIATE _asmprintsrc
 .endif ; PRINTASM
         .byte "}"
 
         .byte 0
 
 
+
+
+
 ;;; START of expression:
 ;;;   var/const/arrayelt/funcall()
 ruleC:
 
+
 ;;; TODO: It seems it should be useful but not
+;;; TODO: cleanup!
 .ifnblank
         .byte "%=;",$80
+
 
 ;      .byte "%{"
 ;        PUTC '/'
@@ -6052,10 +6057,14 @@ ruleC:
 ;          putc ':'
 ;          IMM_RET
 
+
+
+
+
 ;;; TODO: these are "more" statements...
 FUNC _iorulesstart
 
-        ;; TODO: fix
+;;; TODO: fix
         ;; dummy rule to make | start - LOL
         .byte "d43fj3"
 
@@ -6183,7 +6192,7 @@ FUNC _iorulesstart
         lda (pos),y
         beq :+
 
-;;; TODO: cleanup
+;;; TODO: cleanup - which one is in "library"? lol
 .ifndef NOBIOS ; BIOS
         jsr putchar
 .else ; !BIOS
@@ -6285,6 +6294,12 @@ FUNC _iorulesstart
         jsr getchar
         ldx #0
       .byte ']'
+
+        .byte "|kbhit()"
+      .byte '['
+        jsr kbhit
+        ldx #0
+      .byte ']'
 .else
 
 .ifdef __ATMOS__
@@ -6313,12 +6328,22 @@ FUNC _iorulesstart
         jsr $C5E8
         ldx #0
       .byte ']'
+
+        .byte "|kbhit()"
+      .byte '['
+        jsr kbhit
+        ldx #0
+      .byte ']'
 .else
         
 .endif ; __ATMOS__
         
 
 .endif ; !NOBIOS
+
+
+
+
 
 
 FUNC _iorulesend
@@ -7304,6 +7329,7 @@ endC:
 ruleD:
 
 ;;; TODO: generalize!
+;;; TDOO: rewrite using %! %=
 
 .ifdef CUT
         ;; "CUT" operator
@@ -7331,7 +7357,12 @@ breakchars:
 nextrule:       
 .endif ; CUT
 
+
+
+
 FUNC _oprulesstart
+
+
         ;; 7=>A; // Extention to C:
         ;; Forward assignment 3=>a; could work! lol
         ;; TODO: make it multiple 3=>a=>b+7=>c; ...
@@ -7828,65 +7859,80 @@ FUNC _oprulesstart
         .byte TAILREC
 .endif ; OPTRULES
 
-;;; COMPARISIONS
 
-;;; TODO: really shouldn't give -1 lol
-        .byte "|==%V%=,;)?",$80
+
+
+;;; EQUAL and NOT EQUAL == !=
+
+.ifdef EQEQ
+
+.ifdef OPTRULES
+        .byte "|==%V"
+        .byte "%=,;)?",$80
       .byte '['
-        ;; 15
-        ldy #0
+.scope
+        ;; 13 B
         cmp VAR0
-        bne :+
+        bne false
         cpx VAR1
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
-:       
-        tya
+        beq true
+false:
+        clc
+true:  
+        ;; C=1 when eq aleady (cmp)
+        lda #0
         tax
+        rol
+.endscope
       .byte ']'
         .byte TAILREC
 
 
 ;;; TODO: is one byte saved worth it?
-        .byte "|==%d","%=,;)?",$80
+;        .byte "|==%d","%=,;)]?",$80
+        .byte "|==%d"
+.byte "%{"
+        jsr nl
+        putc '!'
+        jsr nl
+        IMM_RET
+
+;        .byte "%=,;)]?",$80
       .byte '['
-        ;; 12 (saves one byte...)
-        ldy #0
-        cmp #'<'
+        ;; 12 B saves one byte
+        cmp #LOVAL
         bne :+
         txa
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
+        beq :+
+        clc
 :       
-        tya
+        ;; C=1 already from CMP
+        lda #0
         tax
+        rol
       .byte ']'
         .byte TAILREC
 
-        .byte "|==%D","%=,;)?",$80 ; end of expression
-;        .byte "|==%D"
+        .byte "|==%D","%=,;)]?",$80
       .byte '['
-        ;; 13
-        ldy #0
-        cmp #'<'
+        ;; 13 B saves one byte
+        cmp #LOVAL
         bne :+
-        cpx #'>'
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
+        cpx #HIVAL
+        beq :+
+        clc
 :       
-        tya
+        ;; C=1 already from CMP
+        lda #0
         tax
+        rol
       .byte ']'
         .byte TAILREC
+.endif ; OPTRULES
 
         ;; general
         .byte "|=="
+        ;; 3+18= 21 B
       .byte '['
         pha
         txa
@@ -7894,87 +7940,67 @@ FUNC _oprulesstart
       .byte ']'
         .byte _E
       .byte '['
-        ;; 7
+.scope
+        ;; 7+11 = 18
         sta tos
         stx tos+1
-
         pla
-        txa
+        tax
         pla
-
-.ifblank
-        ;; 15
+        ;; 11
         cmp tos
-        bne @false
+        bne false
         cpx tos+1
-        bne @false
-@true:
-        lda #1
-        SKIPTWO
-@false:       
-        lda #0
-        ldx #0
-.else
-
-        ;; 23 no add 5
-        tay
-        txa
-
-        tsx
-        cpy $101,x
-        bne @false
-        cmp $100,x
-        bne @false
-@true:
-        ;; C=1
-        SKIPONE
-@false:
+        beq true
+false:
         clc
-        pla
-        pla
-
-        ldx #0
-        txa
-        ror                     ; A=C
-        eor #1
-        
-
-;;; All these add 7
-        
-
-        ;; 12
-        cmp tos
-        bne @false
-        cpx tos+1
-        bne @false
-@true:
-        ;; C=1 !!!
-        SKIPONE
-@false:
-        clc
+true:
+        ;; C=1 already
         tax
         ror
-        
-  
-        
+.endscope
+        .byte "]"
 
-        ;; 13
-        ldy #0
-        cmp tos
-        bne :+
-        cpx tos+1
-        bne :+
-        ;; eq => -1
-        dey
-        ;; neq => 0
-:       
-        tya
-        tax
+
+        ;; general !=
+        .byte "|!="
+        ;; 3+20= 23 B
+      .byte '['
+        pha
+        txa
+        pha
       .byte ']'
-        .byte TAILREC
+        .byte _E
+      .byte '['
+        ;; 20 B
+        sta tos
+        stx tos+1
+        ;; hi
+        pla
+        eor tos+1
+        sta tos+1
+        ;; lo
+        pla
+        eor tos
+        ora tos+1
+        
+        ;; A=0 if equal => 0, otherise 1
+        cmp #1                  ; C=1 if A!=0
+        lda #0
+        tax
+        rol
+        .byte "]"
+.endif ; EQEQ
 
 
-;;; >=  7+ 9
+
+
+;;; TODO: something messed up here? | ignored?
+
+.ifnblank
+;;; ; ??????
+;;;  TODO: useful?
+;;; >=  7+ 9 = 16
         sta tos
         stx tos+1
         pla
@@ -7983,13 +8009,13 @@ FUNC _oprulesstart
         
         ;; 9 !!!
         cmp tos
-        tax
+        txa
         sbc tos+1
         ldx #0
         txa
         ror
-.endif ; blank
-        .byte "]"
+.endif
+
 
 ;;; TODO: signed?
 ;;;    v < -42      => signed comparison
@@ -8001,9 +8027,6 @@ FUNC _oprulesstart
 ;;; How to ipmlement signed comparison on 6502
 ;;; - just eor #$80 hi-byte of both values?
 ;;; 
-
-
-;;; TODO: something messed up here? | ignored?
 
         .byte "|<%V%=,;)?",$80
       .byte '['
@@ -9165,7 +9188,13 @@ ruleG:
 ;;; Exprssion:
 ruleE:  
         
-        .byte "%V=[#]",_E
+        ;; just fine
+        .byte "(",_E,")"
+
+        .byte "|%V="
+        ;; Don't mess with == (no backtrack here!)
+        .byte "%!=",$80
+        .byte "[#]",_E
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -9985,7 +10014,10 @@ afterELSE:
         sta VAR0
       .byte "]"
 
-        .byte "|$%V=[#]",_E,";"
+        .byte "|$%V="
+        ;; Don't mess with == (no backtrack here!)
+        .byte "%!=",$80
+        .byte "[#]",_E,";"
       .byte "[;"
         sta VAR0
       .byte "]"
@@ -10325,6 +10357,7 @@ decdec:
 .endif ; OPTRULES
 
         ;; assume it's char*
+        ;; TODO: ?
         .byte "|*%V=[#]",_E,";"
       .byte "[;"
 .ifdef ZPVARS
@@ -11126,13 +11159,20 @@ startparsevarfirst:
         ;; A=7; // simple assignement
 ;;; TODO: is E eating up an ";" ???
 
-        .byte "|%V=[#]",_E,";"
+        .byte "|%V="
+        ;; Don't mess with == (no backtrack here!)
+        .byte "%!=",$80
+        .byte "[#]",_E,";"
 
+
+;;; TODO: remove???
 
 ;;; This isin't correct!!!! breaks BYTESIEVE!!!!
 
 ; BUG _E eats ';' !!!
 ;        .byte "|%V=[#]",_E
+
+;;; Whny no ";"
 
       .byte "[;"
         sta VAR0
@@ -13923,6 +13963,9 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+        .incbin "Input/keyboard.c"
+        .byte 0
+
 ;ANDOR=1
 .ifdef ANDOR
         .byte "word o,z;",10
@@ -16140,8 +16183,8 @@ NOPRINT=1
         .incbin "Input/plusplus.c"
         .byte 0
 
-;;; k - 
-        .byte "// k -",10
+;;; k - keyboard
+        .incbin "Input/keyboard.c"
         .byte 0
 
 ;;; l - line bench
