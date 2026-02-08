@@ -45,6 +45,13 @@ saveyputchar:   .res 1
 
 .code
 
+;;; TODO: fix, use read(1) non-blocking?
+kbhit:  
+        ;; dummy, just return 0
+        lda #0
+        rts
+
+
 .export getchar
 
 ;sos:    .byte 0

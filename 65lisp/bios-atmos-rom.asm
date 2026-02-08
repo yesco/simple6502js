@@ -115,6 +115,19 @@ UPKEY    = 11
 ;;; Peek key: Hi-bit set if have key, lower==KEY!
 KBHIT= $023B                  ; ORIC ATMOS only
 
+;;; A= 0 if no key, otherwise A= key
+kbhit:  
+        cli
+        jsr KBHIT
+        bmi :+
+        ;; no key
+        lda #0
+:
+        ;;  have key (lower 7 bits)
+        and #$7f
+        sei
+        rts
+
 ;;; TODO: remove -- too much code!!!
 .ifnblank
 
