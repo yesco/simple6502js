@@ -422,7 +422,7 @@ extern void processnextarg() {
     inputfile(a);
 
     // compileAX doesn't return, so let's hack:
-    a[0]= '-'; a[1]= 'r'; // replacde filename w "-r"
+    strcpy(a, "-r"); // replacde filename w "-r"
     ++argc; // run one extra time
     --argv; // step back to "-r"
       

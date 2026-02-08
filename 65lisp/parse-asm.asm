@@ -3535,24 +3535,10 @@ noimm:
         ldy #1
         lda (pos),y
         sta tos+1
-    tax
+
         dey
         lda (pos),y
         sta tos
-PUTC '@'
-lda pos
-ldx pos+1
-jsr _printh
-
-    PUTC '!'
-ldy #1
-lda (pos),y
-tax
-dey
-lda (pos),y
-    jsr _printh
-    jsr nl
-    ldy #0
 
 ;;; TODO: jmp _next ???
 
@@ -7050,11 +7036,8 @@ FUNC _funcallend
       .byte ']'
         
 
+;;; TODO: cleanup?
 
-;;; TODO:       FAILS on sim65 !
-
-;;; fine on ORIC - why?
-;;; 
 ;;; It seems the address is 3 bytes too small,
 ;;; (if it was 2 it'd make sense as it's what PUSHLOC
 ;;;  is, but it ISN'T!)
@@ -7072,7 +7055,6 @@ FUNC _funcallend
 ;;; TODO: remove routines at endrules
 POS=gos
 
-.ifblank
         .byte "|",34            ; " character
 parsestring:    
       .byte "["
@@ -7080,211 +7062,13 @@ parsestring:
         jmp PUSHLOC             ; Branch ?1
         .byte ":"               ; start of string ?0
       .byte "]"               
-
         ;; copy string to out
         .byte "%S"
-        
       .byte "[?1B"      ; patch Branch to after string
         .byte "?0"      ; load string address
         lda #LOVAL
         ldx #HIVAL
       .byte ";;]"
-.else
-;;; TODO: almost works, but 2 bytes too much
-;;;   (pointing to path point!)
-        .byte "|",34            ; " character
-      .byte "["
-        ;; jump over inline string
-        jmp PUSHLOC
-      .byte "]"               
-        ;; copy string to out
-        .byte "%S"
-        ;; branch to after string!
-      .byte "[;B"
-        ;; load string address
-        lda #LOVAL
-        ldx #HIVAL
-      .byte "]"
-.endif
-
-
-
-.ifdef STRING_DIDNTWORK_ON_EITHER
-;.ifdef STRING
-;;; TODO: remove routines at endrules
-POS=gos
-
-        .byte "|",34            ; " character
-      .byte "["
-        ;; jump over inline string
-        jmp PUSHLOC
-        .byte ":;d;"
-      .byte "]"
-
-        ;; TODO: make a "swap" code
-      .byte "%{"
-        lda tos
-        ldy dos
-        sta dos
-        sty tos
-
-        lda tos+1
-        ldy dos+1
-        sta dos+1
-        sty tos+1
-
-        IMM_RET
-
-        ;; push str addr back on stack
-        .byte "[#D]"
-
-        ;; copy string to out
-        .byte "%S"
-
-        ;; TODO: make a patch routine
-      .byte "%{"
-        ;; patch jump to here
-        lda _out+1
-        ldy #1
-        sta (tos),y
-
-        lda _out
-        dey
-        sta (tos),y
-
-        IMM_RET
-
-      .byte "[;"
-        lda #'<'
-        ldx #'>'
-      .byte "]"
-.endif ; STRING
-
-
-
-
-;;; TODO: only works on ORIC, sim65 fails... wtf?
-
-.ifdef STRING_HMM
-POS=gos ;works
-;POS=pos ;workd
-;POS=dos ; FAILS! who messes with dos?
-
-        .byte "|",34            ; " character
-      .byte "["
-        ;; jump over inline string
-        jmp PUSHLOC
-        .byte ";"               ; TOS= PUSHLOC
-      .byte "]"
-
-      .byte "%{"                ; POS= addr of str
-        jsr TOS2POS
-        IMM_RET
-
-        ;; copy string to out
-        .byte "%S"
-
-      .byte "%{"
-        jsr TOSpatch
-        jsr POS2TOS             ; TOS= POS
-        IMM_RET
-
-      .byte "["
-        lda #'<'
-        ldx #'>'
-      .byte "]"
-.endif ; STRING
-
-
-;;; TODO: debug why dos get's changed value? (sometimes?)
-
-.ifdef STRING_DEBUG
-;.ifdef STRING
-        .byte "|",34            ; " character
-      .byte "["
-        jmp PUSHLOC
-
-;;; neither works on sim65... lol
-
-POS=gos ;works
-;POS=pos ;workd
-;POS=dos ; FAILS! who messes with dos?
-
-.ifndef POS
-        .byte ":;d;"
-      .byte "]"
-.else
-        .byte ";"               ; load PUSHLOC in tos
-      .byte "]"
-
-      .byte "%{"
-        lda _out
-        sta POS
-        ldx _out+1
-        stx POS+1
-        IMM_RET
-.endif ; POS
-
-        .byte "%S"
-
-      .byte "%{"
-        ;; tos = PUSHLOC
-        ;; dos = string address
-        
-        ;; patch jmp (over string) to here
-        ldy #1                  ; void inline 0 !!! LOL
-        lda _out+1
-        sta (tos),y
-        dey
-        lda _out
-        sta (tos),y
-        
-.ifdef POS
-        lda POS
-        sta tos
-        lda POS+1
-        sta tos+1
-        IMM_RET
-      .byte "["
-.else
-        IMM_RET
-      .byte "[D"
-.endif ; POS
-
-        jsr nl
-;        putc 'D' ;ugh!!!!
-        putc '/'
-        ;; load string address
-        lda #'<'
-        ldx #'>'
-;;; print it just to see!
-        sta tos
-        stx tos+1
-jsr puth
-        ldy #0
-:       
-        lda (tos),y
-        beq :+
-        jsr putchar
-        iny
-        bne :-
-:       
-        jsr nl
-
-        lda #'<'
-        ldx #'>'
-      .byte "]"
-
-      .byte "%{"
-        jsr nl
-        jsr nl
-        
-      lda dos
-      ldx dos+1
-      jsr axputh
-        IMM_RET
-
-.endif ; STRING_DEBUG
 
 
 
@@ -11833,16 +11617,9 @@ PUTC 'A'
 ruleW:  
 
         ;; End
+        ;; (last parameter stays in AX)
         .byte ")"
-.ifnblank
-        ;; TODO: for now all parameters are put
-        ;;   on stack!
-      .byte "["
-        pha
-        txa
-        pha
-      .byte "]"
-.endif
+
 
         ;; Comma pushes!
         .byte "|,"
@@ -11879,7 +11656,6 @@ ruleW:
 
         ;; Generic expression 2 B value
         .byte "|",_E
-        ;; TODO: can we optimize if same constant twice? (10,10)??
         .byte TAILREC
         
 
@@ -11890,35 +11666,8 @@ ruleW:
 
 FUNC _parametersend
 
-;;; TODO: remove
-.ifnblank
 
-;;; TODO: what was this for?
 
-;;; TODO: find better place...
-TOS2POS:
-        lda _out
-        sta POS
-        ldx _out+1
-        stx POS+1
-        rts
-
-POS2TOS:        
-        lda POS
-        sta tos
-        lda POS+1
-        sta tos+1
-        rts
-
-TOSpatch:       
-        ldy #1                  ; void inline 0 !!! LOL
-        lda _out+1
-        sta (tos),y
-        dey
-        lda _out
-        sta (tos),y
-        rts
-.endif
 
 endrules:       
         .byte "|",$ff

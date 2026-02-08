@@ -6,10 +6,15 @@ char sd[]="FooBar";
 word fun(){}
 word main(){
   puth(&a); puth(&b); puth(&c); putchar('\\n');
+  // TODO: array should "degrade" to pointer
   puth(&sa); puts(sa);
   puth(&sb); puts(sb);
   puth(&sc); puts(sc);
   puth(&sd); puts(sd);
   puth(&fun); putchar('\n');
+  c= "fish:";
+  putz(c);
+  putz("That's all ");
+  puts("folk's");
   return 4711;
 }
