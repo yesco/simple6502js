@@ -509,7 +509,7 @@
 ;;; printf("%u", X)              // == putu
 ;;; printf("%x", X)              // == puth
 ;;; printf("%s", X)              // == putz (no nl)
-;;; fputs(stdout, X)             // == putz (no nl)
+;;; fputs(X, stdout)             // == putz (no nl)
 ;;; 
 ;;; // if SIGNED support has been enabled
 ;;; printf("%d", X);             // == putd
@@ -2073,7 +2073,21 @@ FUNC _minimallibraryend
 ;;; saves 7 B at each puts/z("...");
 ;;; is it worth it?
 ;
-INLINEPRINTZ=1  
+INLINEPRINTZ=1
+
+;;; enables parsing inline (after jsr) strings
+;;; saving 7 B per puts/fputs/putz call!
+;;; 
+;;; + 53 B in compiler/IDE
+;;; (/ (- 182 154) 4) for 'p';
+
+
+
+; TODO: BUG? broken!!! crashes, something about inlining?
+
+
+
+;INLINEPUTZOPT=1
 
 FUNC _stdiostart
   .ifdef STDIO
@@ -6078,7 +6092,7 @@ FUNC _iorulesstart
 .ifdef INLINEPUTZOPT
         .byte "|putz(",34
       .byte '['
-        jsr iputz
+        jsr _iprintz
       .byte ']'
         .byte "%S)"
 
@@ -6086,13 +6100,13 @@ FUNC _iorulesstart
         ;; NO newline!
         .byte "|fputs(",34
       .byte '['
-        jsr iputs
+        jsr _iprintz
       .byte ']'
         .byte "%S,stdout)"
 
         .byte "|puts(",34
       .byte '['
-        jsr iputs
+        jsr _iprints
       .byte ']'
         .byte "%S)"
 .endif ; INLINEPUTZOPT

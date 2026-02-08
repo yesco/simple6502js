@@ -260,6 +260,10 @@ done:
 ;;; +19 B  each usage saves 7 B
 ;;;        compared to: puts("foo\n")
 
+FUNC _iprints
+        jsr _iprintz
+        jmp nl
+
 FUNC _iprintz
 ;;; 11
         pla
