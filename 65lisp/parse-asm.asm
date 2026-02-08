@@ -6320,8 +6320,21 @@ FUNC _iorulesstart
 
 .endif ; !NOBIOS
 
+;;; TODO: move all that don't change here?
+
+        .byte "|kbhit()"
+      .byte '['
+        jsr kbhit
+        ldx #0
+      .byte ']'
+ 
+
 
 FUNC _iorulesend
+
+
+
+
 
 .ifdef CTYPE
         .byte "|isxdigit(",_E,")"
@@ -13923,11 +13936,13 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
+;EQ=1
+.ifdef EQ
         .byte "word main(){",10
         .byte "  return 7==7;",10
         .byte "}",10
         .byte 0
-
+.endif ; EQ
 
 ;ANDOR=1
 .ifdef ANDOR
@@ -16146,8 +16161,20 @@ NOPRINT=1
         .incbin "Input/plusplus.c"
         .byte 0
 
-;;; k - 
-        .byte "// k -",10
+;;; k - keyboard
+
+;;; TODO: Somehow - one more example here
+;;;   make error in compilation... lol
+;;;   overlapping memory somewhere?
+
+
+;;; At least same error on BOTH
+;;; - ./rrasm parse
+;;; - ./rasm parse (when run on oric)
+
+;        .incbin "Input/color-chart.c"
+;        .incbin "Input/keyboard.c"
+        .byte "// k - "
         .byte 0
 
 ;;; l - line bench
