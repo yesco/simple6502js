@@ -5447,12 +5447,14 @@ FUNC _newarr
 ;;; register a new funciton name (after %I)
 FUNC _newfun
         lda #0
+        ;; counting
         sta nparam
-        ;; TODO: return type? doesn't matter?
-        ;; - # args
-        ;; - # locals
-        ;; - # max ceiling of sub-funcs
-        ;; - # ceiling = (args+locals+max)
+        ;; # args
+        ;; # locals
+        ;; # max ceiling of sub-funcs
+        ;; # ceiling = (args+locals+max)
+        sta tos
+        sta tos+1
         ldy #'F'
         ;; fall-through
 
@@ -5731,9 +5733,8 @@ _stuffarray_w:
 _stuffarray_c:  
         lda tos
         ldy #0
-        sta (gos),y
-        ldx #gos
-        jsr _incRX
+        sta (_out),y
+        jsr _incO
         jsr _incD               ; count of bytes
         rts
 

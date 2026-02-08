@@ -327,14 +327,14 @@ next:
         z= *(unsigned int**)(p+3);
         tab();
 
-        printf("@$%04x:", a); printchar(t);
+        printf("@ $%04x:", a); printchar(t);
         if (t<128) putchar(' ');
-        printf(" %4dz ", z);
+        printf("%3dz ", z);
         // for debugging: any var "sfoo" is assumed string
         if (*name=='s' || t==('C' && 127)) {
           // print string: array=p pointer=v
           char * s= t&0x80? *(char**)p: (char*)v;
-          printf("#%3d=\"", strlen(s));
+          printf("#%2d=\"", strlen(s));
           while(*s) printchar(*s++);
           puts("\"");
         } else {
