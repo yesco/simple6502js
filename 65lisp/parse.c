@@ -304,10 +304,10 @@ void printvariables() {
   char * p= ruleVARS, c, t, * name;
   unsigned int v, * a;
 
-  printf("=== VARIABLES ===");
+  printf("=== VARIABLES ===\n");
 
   while((c= *++p)) {
-    putchar('\n');
+    //putchar('\n');
     //printf("$%04X: ", p);
     // print name
     name= p;
@@ -325,25 +325,39 @@ next:
         ++p;
         t= p[2]; a= *(unsigned int**)p; v= *a;
         tab();
-        printf("= %5u ('%c' $%04x):%c @$%04x ",
-                v, (v&127)<' '?0 : v<127?v: 0, v, t, a);
+
+        printf("@$%04x:", a); printchar(t);
+        if (t<128) putchar(' ');
         // for debugging: any var "sfoo" is assumed string
         if (*name=='s' || t==('C' && 127)) {
           // print string: array=p pointer=v
           char * s= t&0x80? (char*)v: p;
-          printf("%3d \"", strlen(s));
+          printf(" @$%04x #%3d=\"",
+                 a,strlen(s));
           while(*s) printchar(*s++);
-          putchar('"');
+          puts("\"");
+        } else {
+          // number
+          if (v<256) {
+            // char
+            printf(" @$%04x:%c  =%3u '%c' ($%02x)\n",
+                   a, t, v, (v&127)<' '?0 : v<127?v: 0, v);
+          } else {
+            // word
+            printf(" @$%04x:%c  = %5u ($%04x)\n",
+                   a, t, v, v);
+          }
         }
+
         // delimit function+params
         if (t=='F') putchar('\n');
 
-        p+= 3;
+        p+= 6; // 5+1 // used to be 3 // TODO:???
         break;
       } else printf("Unknown %%c operator\n", c);
     }
   }
-  putchar('\n');
+  //putchar('\n');
 }
 
 
