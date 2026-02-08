@@ -5702,7 +5702,7 @@ FUNC _hideargs
 ;;; will FAIL if identifier isn't array
 ;;; (pointer give error too)
 checkisarray:
-        ;; array is not in zeropage
+        ;; array is not in zeropage, lol
         cpx #0
         bne :+
         ;; not array (a-z)
@@ -5738,6 +5738,14 @@ _newarr_updatesize:
         
         rts
         
+load_sizeof:    
+        ldy #3
+        lda (pos),y
+        sta tos
+        iny
+        lda (pos),y
+        sta tos+1
+        rts
 
 
 ;;; will give ERROR! if tos address is local
@@ -6788,6 +6796,15 @@ FUNC _funcallend
         tax
       .byte "]"
 
+
+        .byte "|sizeof(%V)"
+        JSRIMMEDIATE load_sizeof
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+      .byte "]"
+
+
         ;; cast to char == &0xff !
         .byte "|(char)",_C
       .byte '['
@@ -6968,6 +6985,15 @@ FUNC _funcallend
 ;;; TDOO: $ arr\[\] ... redundant?
 ;;; TODO: store addresss of arr in variable
 
+        ;; ARRAY-TO-POINTER DECAY!
+        ;; degrade array to pointer
+        .byte "|%V"
+        IMMEDIATE checkisarray
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+      .byte "]"
+
         ;; variable
         .byte "|%V"
       .byte '['
@@ -7087,7 +7113,6 @@ parsestring:
         lda #LOVAL
         ldx #HIVAL
       .byte "]"
-
 
         .byte "|\*%V"
       .byte '['
