@@ -318,6 +318,29 @@ getchar:
 plaputchar:     
         pla
 putchar:        
+;
+TABOK=1
+.ifdef TABOK
+        cmp #9                  ; '\t'
+        bne :+
+        ;; tab
+        ;; (need tosave x y as we're called recursively)
+        tya
+        pha
+        txa
+        pha
+        
+        jsr _tab
+        
+        pla
+        tax
+        pla
+        tay
+
+        rts
+:       
+.endif ; TABOK
+
         stx savexputchar
         sty saveyputchar
         ;; '\n' -> '\n\r' = CRLF

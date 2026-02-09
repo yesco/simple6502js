@@ -1321,7 +1321,8 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;DEMO=1
+;
+DEMO=1
 
 
 .ifdef PICO
@@ -1376,11 +1377,7 @@
 
         ;; --- SIM65 --- 31K binary+heap!
 
-        ; (+ (* 31 1024) 512 256 32 16 2 1)
-;         OUTPUTSIZE=31*1024   ... 32563 bytes!
-;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
-
-        OUTPUTSIZE=31*1024
+        OUTPUTSIZE=30*1024
 
 .else
         ;; --- ATMOS --- 7K in demo...
@@ -1388,9 +1385,9 @@
         ;; Biggest on ORIC ATMOS
         ;; (- 64 30  1  16  2    2      8) = 5!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
-        OUTPUTSIZE=5*1024
 
-;        OUTPUTSIZE=1*1024
+        OUTPUTSIZE=4*1024
+
 .endif ; !__ATMOS__
 
 
@@ -2110,33 +2107,86 @@ FUNC _stdlibstart
     .include "lib-stdlib.asm"
   .endif ; STDLIB
 
-  .import _malloc
-
-FUNC _xmalloc  
+;;; Allocate AX bytes
+;;; 
+;;; NOTE: no error, no limit, just wraps around!
+;;; 
+;;; Result:
+;;;   AX= pointer to allocated bytes
+;;;   savea,savex= allocation size
+;;; 
+FUNC _malloc
+;;; 21 B  33c! (+ 20 => 41 B)
         sta savea
         stx savex
+
+        ;; move _out forward AX bytes
+        clc
+        lda _out
+        tay                     ; save _out
+        adc savea
+        sta _out
+
+        lda _out+1
+        tax                     ; save _out+1
+        adc savex
+        sta _out+1
+
+        ;; overflow heap?
+;;; 20 B
+        cmp #>ENDOFHEAP
+        bne :+
+        lda _out
+        cmp #<ENDOFHEAP
+:       
+        bcs :+
+        ;; OK
+        tya                     ; restore lo
+        rts
+:       
+        ;; restore _out
+        sty _out
+        stx _out+1
+        ;; return 0
+        lda #0
+        tax
+        rts
+
+;;; TODO: combine malloc and xmalloc
+;;;   shouldn't need a second test
+
+;;; Xallocate AX bytes
+;;; 
+;;; if malloc fails, halt and print error
+;;; 
+;;; Returns same as _malloc
+;;;  But never 0!
+FUNC _xmalloc
+;;; 11+12 = 23 B
         jsr _malloc
+        ;; malloc cannot happen on 0 page
         tay
         bne @OK
         cpx #0
-        bne @OK
+        beq @fail
+@OK:
+        rts
+@fail:
         ;; AX == 0
         ;; FAIL
-        jsr nl
 
-;;; TODO: too big just "LDA #'m'; jmp error;"
+;;; TODO: remove once we have runtimeerrorwdata
         lda savea
         ldx savex
         jsr _printn
-        PRINTZ {" bytes",10,"%malloc failed! ",10,10}
 
-        jmp _NMI_catcher
-
-@OK:       
-        rts
+        ldy #'M'
+        jmp runtimeerror
         
-
 FUNC _stdlibend
+
+
+
 
 
 FUNC _stringstart
@@ -5703,7 +5753,7 @@ FUNC _hideargs
 ;;; (pointer give error too)
 checkisarray:
         ;; array is not in zeropage, lol
-        cpx #0
+        ldx tos+1
         bne :+
         ;; not array (a-z)
         jmp _fail
@@ -6647,14 +6697,12 @@ FUNC _memoryrulesstart
         jsr _realloc
       .byte "]"
 
-.else
+.else ; LIBRARYLESS/ !STDLIB
 
-        ;; Simple dummies
-        ;; (just allocate directly after code, no free()) 
-
-        .byte "|xmalloc(",_E,")"
-;;; TODO: this is exactly the same as malloc
-;;;   how to fix
+        ;; NOTE: no xmalloc as it
+        ;;   we don't check anything!
+        
+        .byte "|malloc(",_E,")"
       .byte "["
         ;; 21 B  33c - works!
         sta savea
@@ -6677,67 +6725,13 @@ FUNC _memoryrulesstart
         tya     
       .byte "]"
 
-        .byte "|malloc(",_E,")"
-      .byte "["
-SMALLER=1
-.ifdef SMALLER
-;;; 21 B  33c - works!
-        sta savea
-        stx savex
+        ;; NOTE: no free and no realloc
 
-        lda _out
-        tay
-        
-        clc
-        adc savea
-        sta _out
-        
-        lda _out+1
-        tax
-        adc savex
-        sta _out+1
-        
-        ;; TODO: test if run-out of memory
-        tax
-        tya     
-.else        
-;;; 21 B   42c per call! ; - DOESN'T WORK????
-        tay
-        ;; save return pointer
-        lda _out
-        pha
-        lda _out+1
-        pha
-
-        tya
-        
-        ;; move "heap" ahead
-        clc
-        adc _out
-        sta _out
-        txa
-        adc _out+1
-        sta _out+1
-        
-        ;; restore pointer
-        pla
-        tax
-        pla
-.endif
-      .byte "]"
-
-        .byte "|free(",_E,")"
-      .byte "["
-        ;; nothing to do, lol
-      .byte "]"
-
-        ;; NONO!
-        ;.byte "|realloc",_X
-
-.endif ; STDLIB
+.endif ; !STDLIB
 
 
-;;; TODO: fix?
+
+;;; TODO: can we make this work? no need?
 
 .ifdef NOTDEFINEDIN_CC65 ; ???
 .import _heapmemavail
@@ -10981,13 +10975,9 @@ startparsevarfirst:
 ;;; TODO: is E eating up an ";" ???
 
         .byte "|%V=[#]",_E,";"
-
-
 ;;; This isin't correct!!!! breaks BYTESIEVE!!!!
-
 ; BUG _E eats ';' !!!
 ;        .byte "|%V=[#]",_E
-
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -13742,8 +13732,8 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
-        .incbin "Input/debug-array.c"
-        .byte 0
+;        .incbin "Input/debug-array.c"
+;        .byte 0
 
 ;ARRAY=1
 .ifdef ARRAY
@@ -15238,50 +15228,6 @@ CANT=1
 ;;; TODO: doesn't compile, z get's lost???
 
 
-
-
-;MALLOC=1
-.ifdef MALLOC
-        .byte "// malloc() test",10
-        .byte "word z,a,p;",10
-        .byte "word main() {",10
-;        .byte "  putu(heapmemavail()); putchar(10);",10
-;       .byte "  putu(heapmaxavail()); putchar(10);",10
-        .byte "  z= 32768;",10
-        .byte "  a= 0;",10
-
-        .byte "  while(1) {",10
-;        .byte "X:",10
-
-        .byte "    p= malloc(z);",10
-        .byte "    if (p) {",10
-        .byte "      a+= z;",10
-        .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
-        .byte "      // try same size again till fail!",10
-        .byte "    } else {",10
-
-
-;;; TODO: seems it "forgot" z, doesn't matter if change to s
-;;;     hint: ? look at screen strange debug output?
-;        .byte "      z>>=1;",10
-
-
-        .byte "    }",10
-;        .byte "    if (z==0) return a;",10
-        .byte "    if (!z) return a;",10
-
-;;; crash! errror "1" lol
-;        .byte "  } while(1);",10
-;;; NOT TRUE????
-;        .byte "  goto X;",10
-        .byte "  }",10
-
-        .byte "}",10
-        .byte 0
-.endif
-;
-
-
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
 ;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
@@ -15865,27 +15811,7 @@ NOPRINT=1
 ;;; a - ^^^^^^^^^^^^^^^^^^^^ - current prog for testing...
 ;;; b - Byte sieve
 .ifdef DEMO
-
-
-
-
-
-
-
-;;;  BYTESIEVE crashes on ORIC ATMOS...
-
-;;; it's good at:
-;;; 
-;;; commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
-
-;;; this DEMO: OUTPUTSIZE = 1 K still crash...
-
-;;; but any later gives crash... ??? hmmmm
-
-
         .incbin "Input/byte-sieve-2K.c"
-
-
 .else
         .incbin "Input/byte-sieve.c"
 .endif
@@ -16096,10 +16022,11 @@ LOOP=1
         .byte "  putz(\"a\\nb\\nc\\n\");",10
         .byte "}",10
         .byte 0
-;;; q -
-        .byte "// q -",10
+;;; q - malloc
+        .incbin "Input/malloc.c"
         .byte 0
-;;; r - 
+
+;;; r - recursive summer
         .byte "// recursive summer",10
         ;; cc65: 13768c (41)
         ;; MC:   16915c (41=>861)
@@ -16275,14 +16202,17 @@ FUNC _outputstart
 ;;; compiler, and memmove compiler to end of mem
 ;;; Probably can do by explicit .org (and then memmove)
 
-_output:
 .bss
+
+_output:
 ;;; not physicaly allocated in binary
 ;;; ++a; x 2000
 ;;;  free tap inp output
 ;;; (- 37 11    8   16  ) = 2K left
 
         .res OUTPUTSIZE
+
+ENDOFHEAP=*
 
 FUNC _outputend
 
