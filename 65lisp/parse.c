@@ -5,7 +5,13 @@
 //#include <stdio.h>
 
 // this makes compiling cgetc() ok but linker fails!
+
 //#include <conio.h>
+
+#include <ctype.h>
+
+extern void clrscr();
+
 // linmker can't find
 //extern char mygetc() { return cgetc(); }
 
@@ -39,6 +45,11 @@ void disasmStart(){}
 
 //
 #define EXTRAS
+
+// -- enable pretty print of C code 
+// 1900 bytes or so!
+//#define PRETTYPRINT
+
 
 #ifdef EXTRAS
   #include "disasm.c"
@@ -249,23 +260,29 @@ void CparseEnd(){}
 #endif // CPARSE
 
 
+
 // empty main: 284 Bytes (C overhead)
-
 // 423 bytes w printz (- 423 284 30)= 109
-
 // (- 495 423) = 72 bytes for test 28*3 etc...
-
 // 618 bytes w _nil,_t,_eval (- 618 423 72 109) = 14 bytes(?)
-
 // 741 bytes printh (- 741 690) = 51 bytes for printhex
 
-#include <conio.h>
+#include <string.h>
 
 void prettyprintStart(){}
 
 #ifdef EXTRAS
 
+#ifdef PRETTYPRINT
+
   #include "cprettyprint.c"
+
+#else
+
+  // dummy
+  extern void prettyprint(char* s) {}
+  
+#endif
 
 #else
 
@@ -275,6 +292,8 @@ void prettyprintStart(){}
 #endif
 
 void prettyprintEnd(){}
+
+
 
 
 extern void info();
@@ -490,6 +509,7 @@ void main(int iargc, char** iargv) {
 #endif // __ATMOS__
 
 
+  // from tty-helpers.asm (?)
   clrscr();
 
 #ifdef __ATMOS__

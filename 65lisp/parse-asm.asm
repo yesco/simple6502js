@@ -1346,8 +1346,9 @@ DEMO=1
         ;; (- 64 8   1  16  2    2      8) = 27
         ;;   RAM TAP ZP ROM CHAR CSTACK HIRES
 
+;;; TODO: make it work, remove IDE!
 
-        OUTPUTSIZE=12*1024
+        OUTPUTSIZE=27*1024
 
 .elseif .def(NANO)
 
@@ -1356,14 +1357,15 @@ DEMO=1
 ;;; TODO:
         NOHELP=1                ; save 1 KB?
 
-        OUTPUTSIZE=12*1024
+;;; TODO: not tested
+        OUTPUTSIZE=15*1024
 
 .elseif .def(TINY)
 
         ;; BIOS
         ;; LIBRARY
 
-        OUTPUTSIZE=12*1024
+        OUTPUTSIZE=13*1024
 
 .elseif .def(DEMO)
 
@@ -1373,22 +1375,22 @@ DEMO=1
         TUTORIAL=1              ; + 1   KB
         EXAMPLEFILES=1          ; + 4.5 KB
 
-.ifndef __ATMOS__
+    .ifndef __ATMOS__
 
         ;; --- SIM65 --- 31K binary+heap!
 
-        OUTPUTSIZE=30*1024
+        OUTPUTSIZE=32*1024
 
-.else
+    .else
         ;; --- ATMOS --- 7K in demo...
 
         ;; Biggest on ORIC ATMOS
-        ;; (- 64 30  1  16  2    2      8) = 5!!!
+        ;; (- 64 28  1  16  2    2      8) = 7!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
 
-        OUTPUTSIZE=4*1024
+        OUTPUTSIZE=7*1024
 
-.endif ; !__ATMOS__
+     .endif ; !__ATMOS__
 
 
 .else ; DEFAULT
@@ -1398,19 +1400,19 @@ DEMO=1
 ;;; fails at 352 lines Input/lps-100.c
 ;;; (* 352 6) = 2112 should fit
 
-.ifndef __ATMOS__
+    .ifndef __ATMOS__
         
         ;; --- SIM65 ---
 
-        OUTPUTSIZE=36*1024
+        OUTPUTSIZE=39*1024
 
-.else
+    .else
 
         ;; --- ATMOS ---
 
-        OUTPUTSIZE=11*1024
+        OUTPUTSIZE=13*1024
 
-.endif ; !__ATMOS__
+    .endif ; !__ATMOS__
 
 
 .endif ; default target
