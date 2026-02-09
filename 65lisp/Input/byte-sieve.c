@@ -22,5 +22,6 @@ word main(){
     putu(c);
     ++n;
   } while(n<10);
-  free(a); return c;
+//  free(a); return c;
+  release(a); return c;
 }

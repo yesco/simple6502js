@@ -2152,6 +2152,9 @@ FUNC _malloc
         tax
         rts
 
+FUNC _free
+
+
 ;;; TODO: combine malloc and xmalloc
 ;;;   shouldn't need a second test
 
@@ -6687,14 +6690,22 @@ FUNC _memoryrulesstart
 
         .byte "|free(",_E,")"
       .byte "["
-        .import _free
         jsr _free
       .byte "]"
 
+.ifnblank
         .byte "|realloc(",_E,")"
       .byte "["
-        .import _realloc
         jsr _realloc
+      .byte "]"
+.endif
+        ;; Like pascal, this just sets free space
+        ;; to start at the given address (as previously
+        ;; returned from an xmalloc or malloc)
+        .byte "|release(",_E,")"
+      .byte "["
+        sta _out
+        stx _out+1
       .byte "]"
 
 .else ; LIBRARYLESS/ !STDLIB
