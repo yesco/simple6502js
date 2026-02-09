@@ -1379,7 +1379,7 @@ DEMO=1
 
         ;; --- SIM65 --- 31K binary+heap!
 
-        OUTPUTSIZE=32*1024
+        OUTPUTSIZE=31*1024
 
     .else
         ;; --- ATMOS --- 7K in demo...
@@ -3422,16 +3422,19 @@ jsr _printchar
         bne @loop
 @done:
         jsr _incR
-        ldx percentchar
-        cpx #'='
-        beq @eqtest
+        ;; '!' 0b100001
+        ;; '=' 0b111101
+        ;;        ^ ==> V flag
+        ldx #0
+        bit percentchar
+        bvs @eqtest
 ;        bne @eqtest
 @neqtest:
-        ;; reverse action
-        eor #80
+        iny
 @eqtest:
-        bmi failjmp
-        bpl nextjmp
+        txa
+        beq failjmp
+        bne nextjmp
 :       
         ;; %b - word boundary test
         cmp #'b'
@@ -9024,9 +9027,15 @@ ruleG:
 
 
 ;;; Exprssion:
-ruleE:  
+ruleE:
         
-        .byte "%V=[#]",_E
+        .byte "(",_E,")",_D
+        
+        ;; make sure it's not '==' lol
+        ;; (remember subexpr not fail!)
+        .byte "|%V="
+        .byte "%!=",$80
+        .byte "[#]",_E
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -13744,6 +13753,9 @@ FUNC _inputstart
 
 .FEATURE STRING_ESCAPES
 input:
+
+        .incbin "Input/parenthesis.c"
+        .byte 0
 
 ;        .incbin "Input/debug-array.c"
 ;        .byte 0
