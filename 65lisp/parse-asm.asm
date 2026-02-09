@@ -6787,23 +6787,46 @@ FUNC _funcallstart
 FUNC _funcallend
 
 
-;;; TODO: a&!b .. hmmmm
-        ;; ! - NOT
-;;; TODO: "!%V" ...?
-;;; TODO: !(...) more safe?
-        .byte "|!",_E
+        ;; !! - NOT variable
+        .byte "|!!%V"
+      .byte "["
+        ;; 10 B
+        lda VAR0
+        ora VAR1
+
+        cmp #1
+        lda #0
+        tax
+        rol
+      .byte "]"
+
+        ;; ! - NOT variable
+        .byte "|!%V"
       .byte "["
         ;; 12 B
-        ldy #0
-        cmp #0
-        bne @false
-        txa
-        bne @false
-@true:  
-        dey
-@false:
-        tya
+        lda VAR0
+        ora VAR1
+
+        cmp #1
+        lda #0
         tax
+        rol
+
+        eor #1
+      .byte "]"
+
+        ;; ! - NOT expression
+        .byte "|!(",_E,")"
+      .byte "["
+        ;; 12 B  16c
+        stx savex
+        ora savex
+
+        cmp #1
+        lda #0
+        tax
+        rol
+        eor #1
       .byte "]"
 
 
