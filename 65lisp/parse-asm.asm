@@ -1388,7 +1388,7 @@ DEMO=1
         ;; (- 64 28  1  16  2    2      8) = 7!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
 
-        OUTPUTSIZE=7*1024
+        OUTPUTSIZE=6*1024
 
      .endif ; !__ATMOS__
 
@@ -13777,8 +13777,11 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
-        .incbin "Input/parenthesis.c"
-        .byte 0
+;        .incbin "Input/hello.c"
+;        .byte 0
+
+;        .incbin "Input/parenthesis.c"
+;        .byte 0
 
 ;        .incbin "Input/debug-array.c"
 ;        .byte 0
@@ -15924,20 +15927,7 @@ NOPRINT=1
         .byte 0
 
 ;;; h - hello
-        .byte "// Hello World! - loops",10
-        .byte "",10
-        .byte "word spaces(word n) {",10
-        .byte "  while(n--) putchar(' ');",10
-        .byte "}",10
-        .byte "",10
-        .byte "word i;",10
-        .byte "",10
-        .byte "word main(){",10
-        .byte "  for(i=0; i<150; ++i) {",10
-        .byte "    spaces(i);",10
-        .byte "    printf(\"%s\",\"Hello World!\");",10
-        .byte "  }",10
-        .byte "}"
+        .incbin "Input/hello.c"
         .byte 0
 
 ;;; i - isalph etc..
