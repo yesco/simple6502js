@@ -6,7 +6,10 @@ stty raw
 
 stty raw -echo opost onlcr
 
-(cl65 -t sim6502 $name.c -o $name.sim || exit) && sim65 -c $name.sim "$*"
+#(cl65 -t sim6502 $name.c -o $name.sim || exit) && sim65 -c $name.sim "$@"
+
+sim65 -c $name.sim "$@"
+
 
 e=$?
 stty sane

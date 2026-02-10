@@ -6324,6 +6324,32 @@ FUNC _iorulesstart
         inc pos+1
         bne :-
 :       
+
+        .byte "|fgets(%V,"
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+        sta tos
+        stx tos+1
+      .byte "]"
+        .byte _E,",stdin)"     ; cheat!
+      .byte "["
+        jsr _fgets
+      .byte "]"
+
+        .byte "|fgets_edit(%V,"
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+        sta tos
+        stx tos+1
+      .byte "]"
+        .byte _E,",stdin)"
+      .byte "["
+        jsr _fgets_edit
+      .byte "]"
+
+
 .endif ; STDIO
 
 

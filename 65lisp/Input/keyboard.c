@@ -5,7 +5,7 @@ word main() {
   puts("End with 'z'");
   do {
     c= kbhit();
-    if (c) putchar(c);
+    if (c) putchar(getchar());
     else putchar('.');
   } while(c<'q');
   //} while(c!=27); // < >  problem, lol
