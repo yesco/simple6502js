@@ -2565,6 +2565,9 @@ LINECOUNT=1
 PRINTNAME=1
 
 ;;; TODO: make it a runtime flag, if asm is included?
+
+;;; TODO: make this work again, doesn't print source right... (or anything?)
+
 ;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
@@ -2794,7 +2797,33 @@ VOSSTART=256   ; grow down.
 ;;; TODO: bad name, pointer to start VAR rule
 
 ;;; TODO: better name
-VARS=HIRES-256
+
+;;; TODO: grow down at end of free space
+;;; TODO: this may get overwritten when "run"
+;;;       if enough heap is used, prohibit
+;;;       have dynamic ENDOFHEAP?
+;;;   (-1 because it writes a zero there)
+
+;;;  to compile big file we could
+;;;  put it and OUTPUTEND as we 
+;;;  *shouldn't* backtrack once code
+;;;  is generated, that could then be
+;;;  reused, in priciple (except IDE?)
+
+;;; EDITSTART?
+;;; sim: (- #x4a03 #x2f13) = 6896 B
+
+
+;VARS=ENDOFHEAP-1
+VARS= varENV
+
+;;; TODO: how the hell does varRULES end
+;;;   up pointing to "input: source memory???"
+.bss
+.res 256
+varENV:  .res 256
+        
+.code
 
         ;; We name our dynamic rule '[' (hibit)
 VARRULENAME='['+128
@@ -13134,6 +13163,67 @@ FUNC _extend
         and #31
 
 .ifdef __ATMOS__
+;;; 7 B per key
+;;; dispatch table 64+ dispath
+;;; (/ 64 7) = 9 trade off
+;;; TODO: How about search list?
+;;;   3 B/key (/ (+ 29 3 3 (* 10 3)) 7.0)
+;;; 9.3 keys 7 B is break even point for 10 keys
+;;; total dispatched (all over) then start saving.
+.ifnblank
+
+.macro KEYDO key,addr
+        ;; key, hi, lo (reverse)
+        ;; (-1 because use RTS)
+        .byte key, >(addr-1), <(addr-1)
+.endmacro
+
+        lda #CTRL('F')
+
+;;; 3*7+1=22 B
+        jsr dokey
+        KEYDO CTRL('B'), listbuffers
+        KEYDO CTRL('F'), openfile
+        KEYDO CTRL('S'), _savefile
+        KEYDO CTRL('W'), _writefileas
+        KEYDO CTRL('C'), _compileInput
+        KEYDO CTRL('J'), bytesieve
+        ;; No match
+        KEYDO 0, _wrongkey
+
+;;; Dispatch on A to addresslist after "jsr dokey'
+dokey:  
+;;; 29 B
+        sta savea
+        pla
+        sta tos
+        pla
+        sta tos+1
+        ldy #$100-3+1
+@next:
+        lda (tos),y
+        beq @fail               ; 0 match all!
+        iny
+        cmp savea
+@skip:
+        iny
+        iny
+        ;; always
+        bne @next
+@fail:
+@match:
+        ;; hi first
+        lda (tos),y
+        iny
+        pha
+        ;; lo
+        lda (tos),y
+        pha
+        ;; call lo,hi (from stack)
+        rts
+
+.endif
+
         ;; ^X^B - emacs list buffers!
         cmp #CTRL('B')
         bne :+
@@ -13153,7 +13243,7 @@ FUNC _extend
         cmp #CTRL('W')
         bne :+
         jmp _writefileas
-
+:       
 .endif ; __ATMOS__
 
         ;; CTRL-C : compile "input" (unmodified)
@@ -13583,6 +13673,7 @@ FUNC _printenv
         jsr _printh
         putc ']'
         
+        jsr _incT
         jsr _incT
         jmp @nextline
 :       

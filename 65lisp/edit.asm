@@ -322,6 +322,24 @@ eindent:
 ;;; With almost all keys allocated, it's
 ;;; a break even to do jump table dispatch. LOL
 ;;; 
+;;; (+ 3 32) = 35 keys dispatched
+;;; Plain code:
+;;;   245 B ;; 7 B = cmp/bne/jmp== (* 7 35)
+;;; BRANCH-dispatch:
+;;;   102 B ;; (+ 10 32 (* 13 3)  (* 3 7)) = 102
+;;;             disp  #  jmp tramp special
+;;; JUMP-dispatch (!!!!)
+;;;    96 B ;; (+ 11 (* 32 2) (* 3 7)) = 96
+;;; dokey:
+;;;   137 B ;; (+ 29 (* (+ 35 1) 3)) = 137
+;;; 
+;;; dokey+editor (shared with ^Xtra)
+;;;   158 B ;; (+ 29 (* (+ 35 1 7) 3)) = 158
+;;; editor+simple CMP/BNE/JM<P 
+;;;   151 B    (+ 102 (* 7 7)) = 151
+;;; 
+;;; Still "BRANCH-dispatch" is cheaper!
+
 FUNC _editaction
         ;; most rourtines rely on Y=0
         ldy #0

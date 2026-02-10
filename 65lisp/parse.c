@@ -341,7 +341,9 @@ next:
     ++p; // skip %
     //printf(" {%%%c} ", *p);
     switch((c= *p)) {
-    case 'R': p+= 2; continue; // jumper
+// crazy, print one char and you get memory messed up
+//    case 'R': p+= 2; putchar('.'); continue; // jumper
+    case 'R': p+= 2; printf("\n"); continue; // jumper
     case 'b': ++p; goto next; // wordbreak: ignore
     default:
       if (c & 0x80) {
@@ -409,7 +411,14 @@ void inputfile(char* filename) {
 
   while((c= fgetc(f))!=EOF) {
     *p= c; ++p;
+
+
+
     // TODO: catch TOO BIG file!
+    //   EDITEND (sim: _inputend)
+
+
+
   }
   // zero terminate
   *p++= 0;
