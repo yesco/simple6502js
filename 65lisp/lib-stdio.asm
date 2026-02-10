@@ -415,6 +415,13 @@ FUNC _getline
 ;;; TODO: haven't I written a smaller one?
 
 ;;; TODO: rename as FUNC _editline ?
+
+
+
+;;; BUG: TODO: somehow make string 0?
+
+
+
 FUNC _fgets_edit
 ;;; 57 B + CURSOR_ON/OFF
         tax
@@ -423,6 +430,7 @@ FUNC _fgets_edit
 @count:       
         jsr putchar
 @start:       
+        ;; move to end of string
         dex
         iny
         lda (tos),y
@@ -438,6 +446,7 @@ FUNC _fgets_edit
 FUNC _fgets
         ldy #0
 
+        ;; X= bytes left
         ;; need 1 byte for zero termination
         tax
         dex

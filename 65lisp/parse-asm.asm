@@ -1321,7 +1321,8 @@
 ;PICO=1
 ;NANO=1
 ;TINY=1
-;DEMO=1
+;
+DEMO=1
 
 
 .ifdef PICO
@@ -1380,7 +1381,13 @@
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
 
-        OUTPUTSIZE=31*1024
+;        OUTPUTSIZE=29*1024
+
+;;; leave space for now to do xmalloc...
+;;; segmentation fault! (w added fgets???)
+;;; code size too big???
+
+        OUTPUTSIZE=30*1024
 
 .else
         ;; --- ATMOS --- 7K in demo...
@@ -1388,7 +1395,7 @@
         ;; Biggest on ORIC ATMOS
         ;; (- 64 30  1  16  2    2      8) = 5!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
-        OUTPUTSIZE=5*1024
+        OUTPUTSIZE=4*1024
 
 ;        OUTPUTSIZE=1*1024
 .endif ; !__ATMOS__
@@ -6355,6 +6362,33 @@ FUNC _iorulesstart
       .byte ']'
  
 
+.ifdef STDIO
+        .byte "|fgets(%V,"
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+        sta tos
+        stx tos+1
+      .byte "]"
+        .byte _E,",stdin)"      ; cheat!
+      .byte "["
+        jsr _fgets
+      .byte "]"
+
+        .byte "|fgets_edit(%V,"
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+        sta tos
+        stx tos+1
+      .byte "]"
+        .byte _E,",stdin)"
+      .byte "["
+        jsr _fgets_edit
+      .byte "]"
+.endif ; STDIO
+
+
 
 FUNC _iorulesend
 
@@ -9781,7 +9815,7 @@ afterELSE:
         ;; IF(E)S; // no else
         .byte "|if(",_E,")"
       .byte '['
-.ifnblank
+.ifblank
         ;; 10B 9-13c
         ;; 111*111 => 859us
         stx savex
@@ -10738,11 +10772,15 @@ FUNC _oricend
 
 
 
-;;; TODO: bzero(char*, len); // legacy unix
 
 .ifdef OPTRULES
+;        .byte "|bzero(%V[#],%d)"
+;        .byte "%R"
+;        .word genpagememset
+
         ;; Feature (BUG): 0=>256 bytes set!
         .byte "|memset(%D[#],%d[#],%d);"
+genpagememset:      
       .byte "["
         ;; 10 B !
         ldy #'<'
@@ -10785,6 +10823,12 @@ FUNC _oricend
 .endif ; CANT_UNGEN_EXPRESSION
         
 .endif ; OPTRULES
+
+        ;; TODO: bzero(%V,sizeof(%W));
+        ;; where %W == same as last var!!!
+
+        ;; TODO:
+;        .byte "|bzero(%V,",_E,",",_E,")"
 
 
         ;; LIMIT: can only set max 32KB
@@ -13742,8 +13786,8 @@ FUNC _inputstart
 .FEATURE STRING_ESCAPES
 input:
 
-        .incbin "Input/debug-array.c"
-        .byte 0
+;        .incbin "Input/debug-array.c"
+;        .byte 0
 
 ;ARRAY=1
 .ifdef ARRAY
@@ -15868,10 +15912,6 @@ NOPRINT=1
 
 
 
-
-
-
-
 ;;;  BYTESIEVE crashes on ORIC ATMOS...
 
 ;;; it's good at:
@@ -15986,8 +16026,7 @@ NOPRINT=1
 ;;; - ./rasm parse (when run on oric)
 
 ;        .incbin "Input/color-chart.c"
-;        .incbin "Input/keyboard.c"
-        .byte "// k - "
+        .incbin "Input/keyboard.c"
         .byte 0
 
 ;;; l - line bench
