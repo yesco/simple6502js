@@ -1,0 +1,21 @@
+name=$1
+
+# stty raw
+# stty raw onlcuc # blocks input till return
+
+#(cl65 -t sim6502 $name.c -o $name.sim || exit) && sim65 -c $name.sim "$@"
+
+./rrasm parse -
+
+stty raw -echo opost onlcr
+sim65 -c parse.sim "$@"
+
+
+e=$?
+stty sane
+echo
+echo
+echo
+echo "Exitcode $e"
+
+

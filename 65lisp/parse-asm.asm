@@ -1387,7 +1387,7 @@ DEMO=1
 ;;; segmentation fault! (w added fgets???)
 ;;; code size too big???
 
-        OUTPUTSIZE=30*1024
+        OUTPUTSIZE=20*1024
 
     .else
         ;; --- ATMOS --- 7K in demo...
@@ -1396,7 +1396,7 @@ DEMO=1
         ;; (- 64 28  1  16  2    2      8) = 7!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
 
-        OUTPUTSIZE=6*1024
+        OUTPUTSIZE=3*1024
 
      .endif ; !__ATMOS__
 
@@ -6266,21 +6266,32 @@ FUNC _iorulesstart
 
         .byte "|puts(",_E,")"
       .byte '['
+;PRINTIT=1
 .ifdef PRINTIT
 ;;; 20 B inline only...
-        sta pos
-        stx pos+1
+        sta tos
+        stx tos+1
         ldy #0
 :       
-        lda (pos),y
+        lda (tos),y
         beq :+
         jsr putchar
         iny
         bne :-
-        inc pos+1
+        inc tos+1
         bne :-
 :       
 .else
+
+.ifnblank
+sta tos
+stx tos+1
+PUTC '/'
+jsr _printh
+lda tos
+ldx tos+1
+.endif
+
         jsr _prints
 .endif ; PRINTIT
       .byte ']'
@@ -6325,10 +6336,8 @@ FUNC _iorulesstart
         bne :-
 :       
 
-        .byte "|fgets(%V,"
+        .byte "|fgets(",_E,","
       .byte "["
-        lda #LOVAL
-        ldx #HIVAL
         sta tos
         stx tos+1
       .byte "]"
@@ -6337,10 +6346,8 @@ FUNC _iorulesstart
         jsr _fgets
       .byte "]"
 
-        .byte "|fgets_edit(%V,"
+        .byte "|fgets_edit(",_E,","
       .byte "["
-        lda #LOVAL
-        ldx #HIVAL
         sta tos
         stx tos+1
       .byte "]"
@@ -6348,7 +6355,6 @@ FUNC _iorulesstart
       .byte "["
         jsr _fgets_edit
       .byte "]"
-
 
 .endif ; STDIO
 
@@ -7107,6 +7113,7 @@ FUNC _funcallend
 
 ;;; TDOO: $ arr\[\] ... redundant?
 ;;; TODO: store addresss of arr in variable
+
 
         ;; ARRAY-TO-POINTER DECAY!
         ;; degrade array to pointer
@@ -13560,6 +13567,51 @@ FUNC _printchar
         pla
         rts
 
+
+;PRINTREGS=1
+.ifdef PRINTREGS
+FUNC _printregs
+        php
+        php
+
+        ;; borrow from cc65, lol
+        .import tmp1,tmp2,tmp3
+
+        sta tmp1
+        stx tmp2
+        sty tmp3
+
+        PRINTZ {10,"--Regs: A="}
+        lda tmp1
+        jsr _print2h
+        PRINTZ " X="
+        lda tmp2
+        jsr _print2h
+        PRINTZ " Y="
+        lda tmp3
+        jsr _print2h
+        PRINTZ " S="
+        tsx
+        txa
+        jsr _print2h
+        PRINTZ " P="
+        pla
+        jsr _print2h
+        PRINTZ {" AX="}
+        jsr _printh
+        jsr spc
+        lda tmp1
+        ldx tmp2
+        jsr _printn
+        jsr nl
+
+        lda tmp1
+        ldx tmp2
+        ldy tmp3
+
+        plp
+        rts
+.endif ; PRINTREGS
 
 ;;; TODO: ridiculus long!!! shorten?
 

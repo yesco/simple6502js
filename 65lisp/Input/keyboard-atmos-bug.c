@@ -1,9 +1,11 @@
 // keyboard input char
 word i, s, c;
+// remove comment to compile,
+// here edit edits using different addresss
+// than input initilzied?
+// works fine on ./rawmcr Input/keyboard-atmos-bug.c
 char input[]="123456";
 word main() {
-  // where the hell is this writing?
-  strcpy(input+3, "foo");
   putz("before: "); puts(input);
 
   putz("Name: ");

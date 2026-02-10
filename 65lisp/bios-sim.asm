@@ -93,7 +93,14 @@ putchar:
         .import _getchar
         .import _putchar
 
-getchar=_getchar
+getchar:        
+        stx savexputchar
+        sty savexputchar
+        ;; modifies Y (for sure)
+        jsr _getchar
+        ldx savexputchar
+        ldy savexputchar
+        rts
 
 ;;; NON-BLOCKING ? - how to do?
 

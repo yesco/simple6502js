@@ -1,9 +1,13 @@
 // keyboard input char
 word i, s, c;
-char input[]="123456";
+char input[7]={0};
 word main() {
-  // where the hell is this writing?
-  strcpy(input+3, "foo");
+  do {
+    c= kbhit();
+    if (c) putchar(c=getchar());
+    else putchar('.');
+  } while(c<'z');
+
   putz("before: "); puts(input);
 
   putz("Name: ");

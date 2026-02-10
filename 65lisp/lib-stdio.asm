@@ -270,7 +270,6 @@ FUNC _iprintz
         sta pos
         pla
         sta pos+1
-        
         ;; skip first char
         ldy #0
         jsr _incposYprintz
@@ -324,6 +323,7 @@ FUNC _printz
 ;;; 4
         sta pos
         stx pos+1
+
 FUNC _posprintz
 ;;; 18
         ldy #0
@@ -422,6 +422,7 @@ FUNC _getline
 
 
 
+;;; tos= line to edit
 FUNC _fgets_edit
 ;;; 57 B + CURSOR_ON/OFF
         tax
@@ -443,6 +444,7 @@ FUNC _fgets_edit
         txa                     ; LOL
         SKIPTWO
 ;;; Edits an empty line
+;;; tos= memory where to store input
 FUNC _fgets
         ldy #0
 
@@ -459,16 +461,29 @@ FUNC _fgets
         sta (tos),y
         ;; read key
         jsr getchar
-        beq @done               ; 0 ?? ? TODO:
-        ;; - BS & return
-        cmp #127                ; DEL
-        beq @del
+;        beq @done               ; 0 ?? ? TODO:
+
+        ;; return
+        ;; 
+        ;; TODO: add LF for some platform?
+        ;;   (or does it depend on stty?)
         cmp #13                 ; CR
         beq @done
-        cmp #' '                ; ignore CTRL
+
+        cmp #127                ; DEL
+        beq @del
+
+        ;; BS/DEL
+.ifdef __ATMOS__
+.else
+;        cmp #8                  ; BS (CTRL-H)
+;        beq @del
+.endif 
+        ;; ignore other CTRL (< ' ')
+        cmp #' '
         bcc @next
+
         ;; store normal char
-;        dex
         dec savex
         bmi @full
         sta (tos),y
@@ -480,16 +495,24 @@ FUNC _fgets
 
 @del:
         ;; -> have anything to delete?
-        cpy #0
+        tya
         beq @next
-        ;; delete in buffer
-        jsr putchar
+
         dey
+        ;; delete on screen
+.ifdef __ATMOS__
+        putc 127
+.else
+;        PRINTZ {8,' ',8}
+        putc 8
+        jsr spc
+        putc 8
+.endif
+
 @full:
         ;; ignore key
-;        inx
         inc savex
-        jmp @next
+        bpl @next
 
 
 @done:
