@@ -326,17 +326,22 @@ void printvariables() {
   printf("=== VARIABLES ===\n");
 
   while((c= *++p)) {
+    // address in ENV
     //putchar('\n');
     //printf("$%04X: ", p);
-    // print name
-    name= p;
-    while(*p!='%') putchar(*p++);
 
+    // print name, and skip till end of it: '%'
+    name= p;
+    v= 0;
+    while(*p!='%') { putchar(*p++); ++v; }
+    // gotox(10+1+4+15); //29 (- 38 29)
+    while(v && v++<9) putchar(' ');
+    
 next:
     ++p; // skip %
     //printf(" {%%%c} ", *p);
     switch((c= *p)) {
-    case 'R': p+= 2; break; // jumper
+    case 'R': p+= 2; continue; // jumper
     case 'b': ++p; goto next; // wordbreak: ignore
     default:
       if (c & 0x80) {
@@ -344,11 +349,10 @@ next:
         ++p;
         t= p[2]; a= *(unsigned int**)p; v= *a;
         z= *(unsigned int**)(p+3);
-        tab();
 
-        printf("@ $%04x:", a); printchar(t);
-        if (t<128) putchar(' ');
-        printf("%3dz ", z);
+        printf("@ $%04x:", a); printchar(t); //10
+        if (t<128) putchar(' '); //1
+        printf("%3dz ", z); //4
         // for debugging: any var "sfoo" is assumed string
         if (*name=='s' || t==('C' && 127)) {
           // print string: array=p pointer=v
@@ -363,11 +367,10 @@ next:
             printf("=%3u '%c' ($%02x)\n",
                    v,
                    (v&127)<' '?0 : v<127?v: 0,
-                   v);
+                   v); //14
           } else {
             // word
-            printf("= %5u ($%04x)\n",
-                   v, v);
+            printf("= %5u ($%04x)\n", v, v); //15
           }
         }
 
