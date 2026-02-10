@@ -1,3 +1,5 @@
+./oscar64 Input/byte-sieve-mallo.c
+
 #xfc = 252 bytes -Os
 #xf3 = 243 bytes -Oz -Os === this file
 

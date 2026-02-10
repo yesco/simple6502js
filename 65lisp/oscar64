@@ -1,0 +1,9 @@
+#OPT="-O3"    # 2169 Bytes  12,869,229 
+#OPT="-Os"    # 1693 Bytes  13,633,501
+#OPT="-Oz"    # 1899 Bytes  12,896,201 == # of PRIMES!
+#OPT=""       # 1908 Bytes  
+
+# -- best!!!
+OPT="-Oz -Os" # 1684 Bytes  12,896,201 same -Os, smaller)
+
+../../oscar64/bin/oscar64 $OPT -DNOFLOAT -DNOLONG -ep -gp $1.c ; ls -l $1.[ap]* ; wc $1.asm

@@ -1,1 +1,2 @@
-git status | head -30
+git status | head -40
+

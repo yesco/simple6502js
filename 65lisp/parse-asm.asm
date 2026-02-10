@@ -777,7 +777,6 @@
 ;;; - v0.63 TODO: (opt) function calls (static params)
 ;;; - v0.64 TODO: array indexing
 
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 ;;; TODO: before release
 ;;; - save edit buffer in compile snapshot
 ;;;   (this allows hires to be entered)
@@ -785,7 +784,6 @@
 ;;; - copy compile snapshot back to buffer
 ;;; 
 ;;; - when running; save, run, restore
-;;; >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 ;;; - v0.69 TODO: ORIC DEMO release
 
@@ -1346,8 +1344,9 @@ DEMO=1
         ;; (- 64 8   1  16  2    2      8) = 27
         ;;   RAM TAP ZP ROM CHAR CSTACK HIRES
 
+;;; TODO: make it work, remove IDE!
 
-        OUTPUTSIZE=12*1024
+        OUTPUTSIZE=27*1024
 
 .elseif .def(NANO)
 
@@ -1356,14 +1355,15 @@ DEMO=1
 ;;; TODO:
         NOHELP=1                ; save 1 KB?
 
-        OUTPUTSIZE=12*1024
+;;; TODO: not tested
+        OUTPUTSIZE=15*1024
 
 .elseif .def(TINY)
 
         ;; BIOS
         ;; LIBRARY
 
-        OUTPUTSIZE=12*1024
+        OUTPUTSIZE=13*1024
 
 .elseif .def(DEMO)
 
@@ -1373,7 +1373,7 @@ DEMO=1
         TUTORIAL=1              ; + 1   KB
         EXAMPLEFILES=1          ; + 4.5 KB
 
-.ifndef __ATMOS__
+    .ifndef __ATMOS__
 
         ;; --- SIM65 --- 31K binary+heap!
 
@@ -1389,16 +1389,16 @@ DEMO=1
 
         OUTPUTSIZE=30*1024
 
-.else
+    .else
         ;; --- ATMOS --- 7K in demo...
 
         ;; Biggest on ORIC ATMOS
-        ;; (- 64 30  1  16  2    2      8) = 5!!!
+        ;; (- 64 28  1  16  2    2      8) = 7!!!
         ;;   RAM tap ZP ROM CHAR CSTACK HIRES
-        OUTPUTSIZE=4*1024
 
-;        OUTPUTSIZE=1*1024
-.endif ; !__ATMOS__
+        OUTPUTSIZE=6*1024
+
+     .endif ; !__ATMOS__
 
 
 .else ; DEFAULT
@@ -1408,19 +1408,19 @@ DEMO=1
 ;;; fails at 352 lines Input/lps-100.c
 ;;; (* 352 6) = 2112 should fit
 
-.ifndef __ATMOS__
+    .ifndef __ATMOS__
         
         ;; --- SIM65 ---
 
-        OUTPUTSIZE=36*1024
+        OUTPUTSIZE=39*1024
 
-.else
+    .else
 
         ;; --- ATMOS ---
 
-        OUTPUTSIZE=11*1024
+        OUTPUTSIZE=13*1024
 
-.endif ; !__ATMOS__
+    .endif ; !__ATMOS__
 
 
 .endif ; default target
@@ -2117,33 +2117,89 @@ FUNC _stdlibstart
     .include "lib-stdlib.asm"
   .endif ; STDLIB
 
-  .import _malloc
-
-FUNC _xmalloc  
+;;; Allocate AX bytes
+;;; 
+;;; NOTE: no error, no limit, just wraps around!
+;;; 
+;;; Result:
+;;;   AX= pointer to allocated bytes
+;;;   savea,savex= allocation size
+;;; 
+FUNC _malloc
+;;; 21 B  33c! (+ 20 => 41 B)
         sta savea
         stx savex
+
+        ;; move _out forward AX bytes
+        clc
+        lda _out
+        tay                     ; save _out
+        adc savea
+        sta _out
+
+        lda _out+1
+        tax                     ; save _out+1
+        adc savex
+        sta _out+1
+
+        ;; overflow heap?
+;;; 20 B
+        cmp #>ENDOFHEAP
+        bne :+
+        lda _out
+        cmp #<ENDOFHEAP
+:       
+        bcs :+
+        ;; OK
+        tya                     ; restore lo
+        rts
+:       
+        ;; restore _out
+        sty _out
+        stx _out+1
+        ;; return 0
+        lda #0
+        tax
+        rts
+
+FUNC _free
+
+
+;;; TODO: combine malloc and xmalloc
+;;;   shouldn't need a second test
+
+;;; Xallocate AX bytes
+;;; 
+;;; if malloc fails, halt and print error
+;;; 
+;;; Returns same as _malloc
+;;;  But never 0!
+FUNC _xmalloc
+;;; 11+12 = 23 B
         jsr _malloc
+        ;; malloc cannot happen on 0 page
         tay
         bne @OK
         cpx #0
-        bne @OK
+        beq @fail
+@OK:
+        rts
+@fail:
         ;; AX == 0
         ;; FAIL
-        jsr nl
 
-;;; TODO: too big just "LDA #'m'; jmp error;"
+;;; TODO: remove once we have runtimeerrorwdata
         lda savea
         ldx savex
         jsr _printn
-        PRINTZ {" bytes",10,"%malloc failed! ",10,10}
 
-        jmp _NMI_catcher
-
-@OK:       
-        rts
+        ldy #'M'
+        jmp runtimeerror
         
-
 FUNC _stdlibend
+
+
+
 
 
 FUNC _stringstart
@@ -2517,6 +2573,9 @@ LINECOUNT=1
 PRINTNAME=1
 
 ;;; TODO: make it a runtime flag, if asm is included?
+
+;;; TODO: make this work again, doesn't print source right... (or anything?)
+
 ;PRINTASM=1
 
 ;;; If asm is on, you also want to see some code
@@ -2746,7 +2805,33 @@ VOSSTART=256   ; grow down.
 ;;; TODO: bad name, pointer to start VAR rule
 
 ;;; TODO: better name
-VARS=HIRES-256
+
+;;; TODO: grow down at end of free space
+;;; TODO: this may get overwritten when "run"
+;;;       if enough heap is used, prohibit
+;;;       have dynamic ENDOFHEAP?
+;;;   (-1 because it writes a zero there)
+
+;;;  to compile big file we could
+;;;  put it and OUTPUTEND as we 
+;;;  *shouldn't* backtrack once code
+;;;  is generated, that could then be
+;;;  reused, in priciple (except IDE?)
+
+;;; EDITSTART?
+;;; sim: (- #x4a03 #x2f13) = 6896 B
+
+
+;VARS=ENDOFHEAP-1
+VARS= varENV
+
+;;; TODO: how the hell does varRULES end
+;;;   up pointing to "input: source memory???"
+.bss
+.res 256
+varENV:  .res 256
+        
+.code
 
         ;; We name our dynamic rule '[' (hibit)
 VARRULENAME='['+128
@@ -3374,16 +3459,19 @@ jsr _printchar
         bne @loop
 @done:
         jsr _incR
-        ldx percentchar
-        cpx #'='
-        beq @eqtest
+        ;; '!' 0b100001
+        ;; '=' 0b111101
+        ;;        ^ ==> V flag
+        ldx #0
+        bit percentchar
+        bvs @eqtest
 ;        bne @eqtest
 @neqtest:
-        ;; reverse action
-        eor #80
+        iny
 @eqtest:
-        bmi failjmp
-        bpl nextjmp
+        txa
+        beq failjmp
+        bne nextjmp
 :       
         ;; %b - word boundary test
         cmp #'b'
@@ -5710,7 +5798,7 @@ FUNC _hideargs
 ;;; (pointer give error too)
 checkisarray:
         ;; array is not in zeropage, lol
-        cpx #0
+        ldx tos+1
         bne :+
         ;; not array (a-z)
         jmp _fail
@@ -6671,24 +6759,30 @@ FUNC _memoryrulesstart
 
         .byte "|free(",_E,")"
       .byte "["
-        .import _free
         jsr _free
       .byte "]"
 
+.ifnblank
         .byte "|realloc(",_E,")"
       .byte "["
-        .import _realloc
         jsr _realloc
       .byte "]"
+.endif
+        ;; Like pascal, this just sets free space
+        ;; to start at the given address (as previously
+        ;; returned from an xmalloc or malloc)
+        .byte "|release(",_E,")"
+      .byte "["
+        sta _out
+        stx _out+1
+      .byte "]"
 
-.else
+.else ; LIBRARYLESS/ !STDLIB
 
-        ;; Simple dummies
-        ;; (just allocate directly after code, no free()) 
-
-        .byte "|xmalloc(",_E,")"
-;;; TODO: this is exactly the same as malloc
-;;;   how to fix
+        ;; NOTE: no xmalloc as it
+        ;;   we don't check anything!
+        
+        .byte "|malloc(",_E,")"
       .byte "["
         ;; 21 B  33c - works!
         sta savea
@@ -6711,67 +6805,13 @@ FUNC _memoryrulesstart
         tya     
       .byte "]"
 
-        .byte "|malloc(",_E,")"
-      .byte "["
-SMALLER=1
-.ifdef SMALLER
-;;; 21 B  33c - works!
-        sta savea
-        stx savex
+        ;; NOTE: no free and no realloc
 
-        lda _out
-        tay
-        
-        clc
-        adc savea
-        sta _out
-        
-        lda _out+1
-        tax
-        adc savex
-        sta _out+1
-        
-        ;; TODO: test if run-out of memory
-        tax
-        tya     
-.else        
-;;; 21 B   42c per call! ; - DOESN'T WORK????
-        tay
-        ;; save return pointer
-        lda _out
-        pha
-        lda _out+1
-        pha
-
-        tya
-        
-        ;; move "heap" ahead
-        clc
-        adc _out
-        sta _out
-        txa
-        adc _out+1
-        sta _out+1
-        
-        ;; restore pointer
-        pla
-        tax
-        pla
-.endif
-      .byte "]"
-
-        .byte "|free(",_E,")"
-      .byte "["
-        ;; nothing to do, lol
-      .byte "]"
-
-        ;; NONO!
-        ;.byte "|realloc",_X
-
-.endif ; STDLIB
+.endif ; !STDLIB
 
 
-;;; TODO: fix?
+
+;;; TODO: can we make this work? no need?
 
 .ifdef NOTDEFINEDIN_CC65 ; ???
 .import _heapmemavail
@@ -6811,23 +6851,46 @@ FUNC _funcallstart
 FUNC _funcallend
 
 
-;;; TODO: a&!b .. hmmmm
-        ;; ! - NOT
-;;; TODO: "!%V" ...?
-;;; TODO: !(...) more safe?
-        .byte "|!",_E
+        ;; !! - NOT variable
+        .byte "|!!%V"
+      .byte "["
+        ;; 10 B
+        lda VAR0
+        ora VAR1
+
+        cmp #1
+        lda #0
+        tax
+        rol
+      .byte "]"
+
+        ;; ! - NOT variable
+        .byte "|!%V"
       .byte "["
         ;; 12 B
-        ldy #0
-        cmp #0
-        bne @false
-        txa
-        bne @false
-@true:  
-        dey
-@false:
-        tya
+        lda VAR0
+        ora VAR1
+
+        cmp #1
+        lda #0
         tax
+        rol
+
+        eor #1
+      .byte "]"
+
+        ;; ! - NOT expression
+        .byte "|!(",_E,")"
+      .byte "["
+        ;; 12 B  16c
+        stx savex
+        ora savex
+
+        cmp #1
+        lda #0
+        tax
+        rol
+        eor #1
       .byte "]"
 
 
@@ -9051,9 +9114,15 @@ ruleG:
 
 
 ;;; Exprssion:
-ruleE:  
+ruleE:
         
-        .byte "%V=[#]",_E
+        .byte "(",_E,")",_D
+        
+        ;; make sure it's not '==' lol
+        ;; (remember subexpr not fail!)
+        .byte "|%V="
+        .byte "%!=",$80
+        .byte "[#]",_E
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -11025,13 +11094,9 @@ startparsevarfirst:
 ;;; TODO: is E eating up an ";" ???
 
         .byte "|%V=[#]",_E,";"
-
-
 ;;; This isin't correct!!!! breaks BYTESIEVE!!!!
-
 ; BUG _E eats ';' !!!
 ;        .byte "|%V=[#]",_E
-
       .byte "[;"
         sta VAR0
         stx VAR1
@@ -13143,6 +13208,67 @@ FUNC _extend
         and #31
 
 .ifdef __ATMOS__
+;;; 7 B per key
+;;; dispatch table 64+ dispath
+;;; (/ 64 7) = 9 trade off
+;;; TODO: How about search list?
+;;;   3 B/key (/ (+ 29 3 3 (* 10 3)) 7.0)
+;;; 9.3 keys 7 B is break even point for 10 keys
+;;; total dispatched (all over) then start saving.
+.ifnblank
+
+.macro KEYDO key,addr
+        ;; key, hi, lo (reverse)
+        ;; (-1 because use RTS)
+        .byte key, >(addr-1), <(addr-1)
+.endmacro
+
+        lda #CTRL('F')
+
+;;; 3*7+1=22 B
+        jsr dokey
+        KEYDO CTRL('B'), listbuffers
+        KEYDO CTRL('F'), openfile
+        KEYDO CTRL('S'), _savefile
+        KEYDO CTRL('W'), _writefileas
+        KEYDO CTRL('C'), _compileInput
+        KEYDO CTRL('J'), bytesieve
+        ;; No match
+        KEYDO 0, _wrongkey
+
+;;; Dispatch on A to addresslist after "jsr dokey'
+dokey:  
+;;; 29 B
+        sta savea
+        pla
+        sta tos
+        pla
+        sta tos+1
+        ldy #$100-3+1
+@next:
+        lda (tos),y
+        beq @fail               ; 0 match all!
+        iny
+        cmp savea
+@skip:
+        iny
+        iny
+        ;; always
+        bne @next
+@fail:
+@match:
+        ;; hi first
+        lda (tos),y
+        iny
+        pha
+        ;; lo
+        lda (tos),y
+        pha
+        ;; call lo,hi (from stack)
+        rts
+
+.endif
+
         ;; ^X^B - emacs list buffers!
         cmp #CTRL('B')
         bne :+
@@ -13162,7 +13288,7 @@ FUNC _extend
         cmp #CTRL('W')
         bne :+
         jmp _writefileas
-
+:       
 .endif ; __ATMOS__
 
         ;; CTRL-C : compile "input" (unmodified)
@@ -13593,6 +13719,7 @@ FUNC _printenv
         putc ']'
         
         jsr _incT
+        jsr _incT
         jmp @nextline
 :       
         cmp #0
@@ -13785,6 +13912,12 @@ FUNC _inputstart
 
 .FEATURE STRING_ESCAPES
 input:
+
+;        .incbin "Input/hello.c"
+;        .byte 0
+
+;        .incbin "Input/parenthesis.c"
+;        .byte 0
 
 ;        .incbin "Input/debug-array.c"
 ;        .byte 0
@@ -15282,50 +15415,6 @@ CANT=1
 ;;; TODO: doesn't compile, z get's lost???
 
 
-
-
-;MALLOC=1
-.ifdef MALLOC
-        .byte "// malloc() test",10
-        .byte "word z,a,p;",10
-        .byte "word main() {",10
-;        .byte "  putu(heapmemavail()); putchar(10);",10
-;       .byte "  putu(heapmaxavail()); putchar(10);",10
-        .byte "  z= 32768;",10
-        .byte "  a= 0;",10
-
-        .byte "  while(1) {",10
-;        .byte "X:",10
-
-        .byte "    p= malloc(z);",10
-        .byte "    if (p) {",10
-        .byte "      a+= z;",10
-        .byte "      putu(a); putchar(' '); puth(p); putchar(' '); putu(z); putchar(10);",10
-        .byte "      // try same size again till fail!",10
-        .byte "    } else {",10
-
-
-;;; TODO: seems it "forgot" z, doesn't matter if change to s
-;;;     hint: ? look at screen strange debug output?
-;        .byte "      z>>=1;",10
-
-
-        .byte "    }",10
-;        .byte "    if (z==0) return a;",10
-        .byte "    if (!z) return a;",10
-
-;;; crash! errror "1" lol
-;        .byte "  } while(1);",10
-;;; NOT TRUE????
-;        .byte "  goto X;",10
-        .byte "  }",10
-
-        .byte "}",10
-        .byte 0
-.endif
-;
-
-
 ;;; Byte Sieve Benchmark! (OLD)
 ;;; ===========================
 ;;; Normalized: 1MHz onthe6502.pdf (1M cycles/s)
@@ -15910,8 +15999,6 @@ NOPRINT=1
 ;;; b - Byte sieve
 .ifdef DEMO
 
-
-
 ;;;  BYTESIEVE crashes on ORIC ATMOS...
 
 ;;; it's good at:
@@ -15924,8 +16011,6 @@ NOPRINT=1
 
 
         .incbin "Input/byte-sieve-2K.c"
-
-
 .else
         .incbin "Input/byte-sieve.c"
 .endif
@@ -15990,20 +16075,7 @@ NOPRINT=1
         .byte 0
 
 ;;; h - hello
-        .byte "// Hello World! - loops",10
-        .byte "",10
-        .byte "word spaces(word n) {",10
-        .byte "  while(n--) putchar(' ');",10
-        .byte "}",10
-        .byte "",10
-        .byte "word i;",10
-        .byte "",10
-        .byte "word main(){",10
-        .byte "  for(i=0; i<150; ++i) {",10
-        .byte "    spaces(i);",10
-        .byte "    printf(\"%s\",\"Hello World!\");",10
-        .byte "  }",10
-        .byte "}"
+        .incbin "Input/hello.c"
         .byte 0
 
 ;;; i - isalph etc..
@@ -16135,10 +16207,11 @@ LOOP=1
         .byte "  putz(\"a\\nb\\nc\\n\");",10
         .byte "}",10
         .byte 0
-;;; q -
-        .byte "// q -",10
+;;; q - malloc
+        .incbin "Input/malloc.c"
         .byte 0
-;;; r - 
+
+;;; r - recursive summer
         .byte "// recursive summer",10
         ;; cc65: 13768c (41)
         ;; MC:   16915c (41=>861)
@@ -16314,14 +16387,17 @@ FUNC _outputstart
 ;;; compiler, and memmove compiler to end of mem
 ;;; Probably can do by explicit .org (and then memmove)
 
-_output:
 .bss
+
+_output:
 ;;; not physicaly allocated in binary
 ;;; ++a; x 2000
 ;;;  free tap inp output
 ;;; (- 37 11    8   16  ) = 2K left
 
         .res OUTPUTSIZE
+
+ENDOFHEAP=*
 
 FUNC _outputend
 

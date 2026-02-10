@@ -318,6 +318,29 @@ getchar:
 plaputchar:     
         pla
 putchar:        
+;
+TABOK=1
+.ifdef TABOK
+        cmp #9                  ; '\t'
+        bne :+
+        ;; tab
+        ;; (need tosave x y as we're called recursively)
+        tya
+        pha
+        txa
+        pha
+        
+        jsr _tab
+        
+        pla
+        tax
+        pla
+        tay
+
+        rts
+:       
+.endif ; TABOK
+
         stx savexputchar
         sty saveyputchar
         ;; '\n' -> '\n\r' = CRLF
@@ -366,17 +389,22 @@ rawputc:
 
 putcraw:        
         pha
+        stx savexputchar
+        sty saveyputchar
+        
         ;; need to move first as ORIC ROM
         ;; removes hibit!
-        lda #9
-        jsr putchar
+        ldx #9
+        jsr $0238               ; ROM direct
         ldy CURCOL
         ;; anum, and if col= 0, lol wraphell
         dey
         pla
         sta (ROWADDR),y
-        rts
 
+        ldy saveyputchar
+        ldx savexputchar
+        rts
 
 SCR=$bb80
 SCREND=SCR+40*28

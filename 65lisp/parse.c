@@ -5,7 +5,13 @@
 //#include <stdio.h>
 
 // this makes compiling cgetc() ok but linker fails!
+
 //#include <conio.h>
+
+#include <ctype.h>
+
+extern void clrscr();
+
 // linmker can't find
 //extern char mygetc() { return cgetc(); }
 
@@ -39,6 +45,11 @@ void disasmStart(){}
 
 //
 #define EXTRAS
+
+// -- enable pretty print of C code 
+// 1900 bytes or so!
+//#define PRETTYPRINT
+
 
 #ifdef EXTRAS
   #include "disasm.c"
@@ -249,23 +260,29 @@ void CparseEnd(){}
 #endif // CPARSE
 
 
+
 // empty main: 284 Bytes (C overhead)
-
 // 423 bytes w printz (- 423 284 30)= 109
-
 // (- 495 423) = 72 bytes for test 28*3 etc...
-
 // 618 bytes w _nil,_t,_eval (- 618 423 72 109) = 14 bytes(?)
-
 // 741 bytes printh (- 741 690) = 51 bytes for printhex
 
-#include <conio.h>
+#include <string.h>
 
 void prettyprintStart(){}
 
 #ifdef EXTRAS
 
+#ifdef PRETTYPRINT
+
   #include "cprettyprint.c"
+
+#else
+
+  // dummy
+  extern void prettyprint(char* s) {}
+  
+#endif
 
 #else
 
@@ -275,6 +292,8 @@ void prettyprintStart(){}
 #endif
 
 void prettyprintEnd(){}
+
+
 
 
 extern void info();
@@ -307,17 +326,24 @@ void printvariables() {
   printf("=== VARIABLES ===\n");
 
   while((c= *++p)) {
+    // address in ENV
     //putchar('\n');
     //printf("$%04X: ", p);
-    // print name
-    name= p;
-    while(*p!='%') putchar(*p++);
 
+    // print name, and skip till end of it: '%'
+    name= p;
+    v= 0;
+    while(*p!='%') { putchar(*p++); ++v; }
+    // gotox(10+1+4+15); //29 (- 38 29)
+    while(v && v++<9) putchar(' ');
+    
 next:
     ++p; // skip %
     //printf(" {%%%c} ", *p);
     switch((c= *p)) {
-    case 'R': p+= 2; break; // jumper
+// crazy, print one char and you get memory messed up
+//    case 'R': p+= 2; putchar('.'); continue; // jumper
+    case 'R': p+= 2; printf("\n"); continue; // jumper
     case 'b': ++p; goto next; // wordbreak: ignore
     default:
       if (c & 0x80) {
@@ -325,11 +351,10 @@ next:
         ++p;
         t= p[2]; a= *(unsigned int**)p; v= *a;
         z= *(unsigned int**)(p+3);
-        tab();
 
-        printf("@ $%04x:", a); printchar(t);
-        if (t<128) putchar(' ');
-        printf("%3dz ", z);
+        printf("@ $%04x:", a); printchar(t); //10
+        if (t<128) putchar(' '); //1
+        printf("%3dz ", z); //4
         // for debugging: any var "sfoo" is assumed string
         if (*name=='s' || t==('C' && 127)) {
           // print string: array=p pointer=v
@@ -344,11 +369,10 @@ next:
             printf("=%3u '%c' ($%02x)\n",
                    v,
                    (v&127)<' '?0 : v<127?v: 0,
-                   v);
+                   v); //14
           } else {
             // word
-            printf("= %5u ($%04x)\n",
-                   v, v);
+            printf("= %5u ($%04x)\n", v, v); //15
           }
         }
 
@@ -387,7 +411,14 @@ void inputfile(char* filename) {
 
   while((c= fgetc(f))!=EOF) {
     *p= c; ++p;
+
+
+
     // TODO: catch TOO BIG file!
+    //   EDITEND (sim: _inputend)
+
+
+
   }
   // zero terminate
   *p++= 0;
@@ -490,6 +521,7 @@ void main(int iargc, char** iargv) {
 #endif // __ATMOS__
 
 
+  // from tty-helpers.asm (?)
   clrscr();
 
 #ifdef __ATMOS__
