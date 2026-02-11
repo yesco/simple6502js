@@ -1,0 +1,8 @@
+// BUG: using lab instead of expect crashes compiler!
+word pc(word expect, word got){
+  putz(lab); putchar(got); putchar('\n');
+}
+
+word main() {
+  pc("f: ", 'f');
+}
