@@ -36,9 +36,9 @@ stty raw -echo opost onlcr
 # seems to work without effecting interaction?
 if test -f oric-terminal
 then
-  sim65 -c parse.sim $ARGPREFIX "$@" | ./oric-terminal
+  sim65 -c mc.sim $ARGPREFIX "$@" | ./oric-terminal
 else
-  sim65 -c parse.sim $ARGPREFIX "$@"
+  sim65 -c mc.sim $ARGPREFIX "$@"
   echo "%% clang not found, it's used for compiling the ./oric-terminal to pretty-fy putput for ANSI."
 fi
 
