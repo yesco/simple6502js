@@ -18,15 +18,12 @@ else
     exit 42
 fi
 
-# - if no mc.sim copy dev
-if command -v mc.sim >/dev/null 2>&1; then
-    echo "sim65 is in the path."
-else
-    ./rrasm parse -
+# - build a new if in dev env...
+if command -v ./rrasm >/dev/null 2>&1; then
+    ./rrasm parse - >/dev/null 2>&1
     cp parse.sim mc.sim
 fi
-
-
+    
 
 # - if no args - print help
 if [ $# -eq 0 ]; then
