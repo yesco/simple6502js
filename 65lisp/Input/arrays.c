@@ -35,6 +35,6 @@ word main(){
   pc("s[(char)(a)]: b=", s[(char)(a)], _PC());
   pc("s[300]      : ?=", s[300], _PC());
   pc("s[a]        : b=", s[a], _PC());
-  pc("s[(a)]      : b=", s[(b)], _PC());
+  pc("s[(a)]      : b=", s[(a)], _PC());
   return 4711;
 }

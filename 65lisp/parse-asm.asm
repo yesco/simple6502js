@@ -7220,18 +7220,16 @@ parsestring:
 
 
 .ifdef OPTRULES
-        ;; char array index [const]
-        .byte "|%V\[[#]"
+        ;; char array index [char]
+        .byte "|%V\[(char)([#]"
         IMMEDIATE checkisarray
-        ;;  only use of 'd' anymore? lol
-        .byte "%d\][d;]"
-        JSRIMMEDIATE addDOStoTOS
-      .byte "["
-        ;; 5 B
-        lda VARRAY
+        .byte _E,")\]"
+      .byte "[;"
+        ;; 6++ B ==> 10
+        tax
+        lda VARRAY,x
         ldx #0
       .byte "]"
-
 
         ;; char array index [char var]
         .byte "|%V\[(char)[#]"
@@ -7245,18 +7243,17 @@ parsestring:
         ldx #0
       .byte "]"
 
-
-        ;; char array index [char]
-        .byte "|%V\[(char)([#]"
+        ;; char array index [const]
+        .byte "|%V\[[#]"
         IMMEDIATE checkisarray
-        .byte _E,")\]"
-      .byte "[;"
-        ;; 6++ B ==> 10
-        tax
-        lda VARRAY,x
+        ;;  only use of 'd' anymore? lol
+        .byte "%d\][d;]"
+        JSRIMMEDIATE addDOStoTOS
+      .byte "["
+        ;; 5 B
+        lda VARRAY
         ldx #0
       .byte "]"
-
 .endif ; OPTRULES
 
 ;;; TODO: word[] - word array
@@ -7281,13 +7278,59 @@ parsestring:
         lda (tos,x)
       .byte "]"
 
-.ifnblank
+
+
+
+        ;; INDEX using POINTER to array
+
+.ifdef OPTRULES
+        .byte "|%V\[(char)([#]",_E,")\]"
+      .byte "["
+        ;; 13 B
+        ;; calculate address
+        clc
+        adc VAR0
+        sta tos
+        lda #0
+        sta tos+1
+        ;; load it
+        ldx #0
+        lda (tos),y
+      .byte "]"
+
+        .byte "|%V\[(char)[#]%V\]"
+      .byte "["
+        ;; 14, save 6 B
+        ldy LOVAL
+        .byte ";"
+        lda #LOVAL
+        sta tos
+        lda #HIVAL
+        sta tos+1
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
+        .byte "|%V\[[#]%d\]"
+      .byte "["
+        ;; 14, save 6 B
+        ldy #LOVAL
+        .byte ";"
+        lda #LOVAL
+        sta tos
+        lda #HIVAL
+        sta tos+1
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
+.endif ; OPTRULES
+
         ;; ?pointer, as it wasn't array
-        .byte "|%V\[[#]"
         ;; LOL: we will happily use any var as ponter!
-        .byte _E,"\]"
+        .byte "|%V\[[#]",_E,"\]"
       .byte "[;"
-        ;; 16 B
+        ;; 16 B 
         ;; calculate address
         clc
         adc VAR0
@@ -7301,7 +7344,6 @@ parsestring:
         lda (tos),y
         ldx #0
       .byte "]"
-.endif
 
 
         ;; ARRAY-TO-POINTER DECAY!
@@ -8498,7 +8540,7 @@ ruleU:
 
 ;;; TODO: %A fix
 
-        .byte "|$arr\[%A\]=%D;"
+        .byte "|$arr\[%V\]=[#]%D;"
       .byte "[#D"               ; swap?
         ldx VAR0
         .byte ";"
