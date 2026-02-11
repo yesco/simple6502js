@@ -6692,6 +6692,7 @@ FUNC _memoryrulesstart
 ;;; TODO: too many |POKE( rules!!!!
 
 ;;; OK
+;;; here arrassign
         .byte "|poke(%d,"
         .byte "[#]",_I
       .byte "[;"
@@ -6699,6 +6700,7 @@ FUNC _memoryrulesstart
       .byte "]"
 
 ;;; OK
+;;; here arrassign
         .byte "|poke(%D,[#]",_I
       .byte "[;"
         sta VAL0
@@ -6707,6 +6709,7 @@ FUNC _memoryrulesstart
 
 .ifdef ZPVARS
 ;;; OK
+;;; here arrassign
         .byte "|poke(%V,0)"
       .byte "["
         ;; save 1 B
@@ -6716,6 +6719,7 @@ FUNC _memoryrulesstart
       .byte "]"
 
 ;;; OK
+;;; here arrassign
         .byte "|poke(%V,[#]",_I
       .byte "[;"
         ldy #0
@@ -6725,6 +6729,7 @@ FUNC _memoryrulesstart
 
 
 ;;; TOTEST
+;;; here arrassign
         .byte "|doke(%D[#],",_E,")"
       .byte "[;"
 ;;; TODO: how about zero page addresses! save 2B
@@ -6736,12 +6741,14 @@ FUNC _memoryrulesstart
 
 
 ;;; OK
+;;; here arrassign
         .byte "|poke(",_E,",",_J
       .byte "["
         sta (tos),y
       .byte "]"
 
 ;;; TOTEST
+;;; here arrassign
         .byte "|doke(",_E,",",_G
       .byte "["
         ;; AX: value to doke
@@ -6757,12 +6764,14 @@ FUNC _memoryrulesstart
 
 
 .ifdef OPTRULES
+;;; here arrassign
         .byte "|peek(%D)"
       .byte '['
         lda VAL0
         ldx #0
       .byte ']'
 
+;;; here arrassign
         .byte "|deek(%D)"
       .byte '['
         lda VAL0
@@ -6770,6 +6779,7 @@ FUNC _memoryrulesstart
       .byte ']'
 .endif ; OPTRULES
 
+;;; here arrassign
         .byte "|peek(",_E,")"
       .byte '['
         sta tos
@@ -6779,6 +6789,7 @@ FUNC _memoryrulesstart
         ldx #0
       .byte ']'
 
+;;; here arrassign
         .byte "|deek(",_E,")"
       .byte '['
         sta tos
@@ -7211,11 +7222,19 @@ parsestring:
 
 
 
-        ;; VARIABLES INDEX and access
+        ;; VARIABLES INDEXing and access
 
         ;; (Checking variables is expensive put last!)
         ;; TODO: consider using a subrule;
         ;;   first parse var then all that use it
+
+
+
+;;; TODO: can we use sub-rule shared mostly
+;;;   for both, LVALUE as well as VALUE addressing?
+        
+;;; seach for "here arrassign"
+
 
 
 
@@ -7277,8 +7296,6 @@ parsestring:
         ldx #0
         lda (tos,x)
       .byte "]"
-
-
 
 
         ;; INDEX using POINTER to array
@@ -8538,6 +8555,8 @@ ruleU:
 .ifdef OPTRULES
         ;; arr[i]=constant;
 
+;;; here: arrassign
+
 ;;; TODO: %A fix
 
         .byte "|$arr\[%V\]=[#]%D;"
@@ -8549,6 +8568,8 @@ ruleU:
         sta arr,x
       .byte "]"
 .endif ; OPTRULES
+
+;;; here: arrasign
 
         ;; array index
 ;;; TODO: simulated
@@ -9472,10 +9493,14 @@ ruleN:
         IMMEDIATE _newarr_c
         .byte TAILREC
 
+;;; here: arrassign
+
         ;; -- char foo[4]= {0};
         .byte "|char","%I\[%D\]={0};"
         IMMEDIATE _newarr_c
         .byte TAILREC
+
+;;; here: arrassign
 
         ;; -- char foo[]= "foo"; // 4
         .byte "|char","%I\[\]=",34
@@ -9484,6 +9509,7 @@ ruleN:
         JSRIMMEDIATE _newarr_updatesize
         .byte TAILREC
 
+;;; here: arrassign
         ;; -- char foo[]= {102,'o',0x64,0};
         .byte "|char","%I\[\]={"
         IMMEDIATE _newarr_c_unknown
@@ -10069,6 +10095,7 @@ afterELSE:
 
 .ifdef BYTERULES
         ;; %D is ok as it get's "truncated" anyway.
+;;; here: arrassign
         .byte "|$%V[#]=%D;"
       .byte "["
         lda #'<'
@@ -10076,6 +10103,7 @@ afterELSE:
         sta VAR0
       .byte "]"
 
+;;; here: arrassign
         .byte "|$%V=[#]",_E,";"
       .byte "[;"
         sta VAR0
