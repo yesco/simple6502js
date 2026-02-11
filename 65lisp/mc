@@ -18,6 +18,14 @@ else
     exit 42
 fi
 
+# - if no mc.sim copy dev
+if command -v mc.sim >/dev/null 2>&1; then
+    echo "sim65 is in the path."
+else
+    ./rrasm parse -
+    cp parse.sim mc.sim
+fi
+
 
 
 # - if no args - print help
