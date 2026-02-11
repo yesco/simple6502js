@@ -6933,6 +6933,36 @@ FUNC _funcallend
         ldx #HIVAL
       .byte "]"
 
+.ifnblank
+        ;; current PC!
+        .byte "|_PC()"
+//  z= _PC(); zz= _PC(); putu(zz-z); putchar('\n');
+  
+      .byte "%{"
+        lda _out
+        sta tos
+        ldx _out+1
+        sta tos+1
+        IMM_RET
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+      .byte "]"
+
+        ;; current RETPC!
+        .byte "|_RETPC()"
+      .byte "["
+        ;; copy word from stack
+        pla
+        tay
+        pla
+        tax
+        pha
+        tya
+        pha
+      .byte "]"
+.endif
+       
 
         ;; cast to char == &0xff !
         .byte "|(char)",_C
@@ -6946,88 +6976,6 @@ FUNC _funcallend
         .byte "|(%V\*)",_C
 
         
-.ifdef OPTRULES
-        ;; char array index [const]
-        .byte "|%V[#]"
-        IMMEDIATE checkisarray
-        .byte "\[%d\]"
-      .byte "["
-        ;; 6 B
-;;; TODO: can optimize, fold tos=LOVAL+VARRAY!
-;;;   would save one byte, but youd allow for %D
-        ldx #LOVAL
-        .byte ";"
-        lda VARRAY,x
-        ldx #0
-      .byte "]"
-
-        ;; char array index [char var]
-        .byte "|%V[#]"
-        IMMEDIATE checkisarray
-        .byte "\[(char)%V\]"
-      .byte "["
-        ;; 6 B
-        ldx VAR0
-        .byte ";"
-        lda arr,x
-        ldx #0
-      .byte "]"
-
-        ;; char array index [char]
-        .byte "|%V[#]"
-        IMMEDIATE checkisarray
-        .byte "\[(char)",_E,"\]"
-      .byte "[;"
-        ;; 5 B
-        tax
-        lda VAR0,x
-        ldx #0
-      .byte "]"
-.endif ; OPTRULES
-
-;;; TODO: word[] - word array
-
-        ;; char array index [word]
-        ;; (most generic and expensive)
-        .byte "|%V[#]"
-        IMMEDIATE checkisarray
-        .byte "\[",_E,"\]"
-      .byte "[:"
-        ;; 16 B
-        ;; calculate address
-        clc
-        adc #LOVAL
-        sta tos
-        txa
-        adc #HIVAL
-        sta tos+1
-        
-        ;; load it
-        ldy #0
-        lda (tos),y
-        ldx #0
-      .byte "]"
-
-        ;; ?pointer, as it wasn't array
-        .byte "|%V[#]"
-        ;; LOL: we will happily use any var as ponter!
-        .byte "\[",_E,"\]"
-      .byte "[:"
-        ;; 16 B
-        ;; calculate address
-        clc
-        adc VAR0
-        sta tos
-        txa
-        adc VAR1
-        sta tos+1
-        
-        ;; load it
-        ldy #0
-        lda (tos),y
-        ldx #0
-      .byte "]"
-
 
 
 
@@ -7114,22 +7062,6 @@ FUNC _funcallend
 ;;; TDOO: $ arr\[\] ... redundant?
 ;;; TODO: store addresss of arr in variable
 
-
-        ;; ARRAY-TO-POINTER DECAY!
-        ;; degrade array to pointer
-        .byte "|%V"
-        IMMEDIATE checkisarray
-      .byte "["
-        lda #LOVAL
-        ldx #HIVAL
-      .byte "]"
-
-        ;; variable
-        .byte "|%V"
-      .byte '['
-        lda VAR0
-        ldx VAR1
-      .byte ']'
 
         .byte "|'\\n'"
 ;      .byte "%{"
@@ -7261,6 +7193,123 @@ parsestring:
         lda (tos,x)
 .endif
       .byte ']'
+
+        ;; VARIABLES INDEX and access
+
+        ;; (Checking variables is expensive put last!)
+        ;; TODO: consider using a subrule;
+        ;;   first parse var then all that use it
+
+.ifdef OPTRULES
+        ;; char array index [const]
+        .byte "|%V\[[#]"
+.byte "%{"
+putc 'a'
+jsr nl
+IMM_RET
+        IMMEDIATE checkisarray
+.byte "%{"
+putc 'b'
+jsr nl
+IMM_RET
+        .byte "%d\]"
+.byte "%{"
+putc 'c'
+jsr nl
+IMM_RET
+      .byte "["
+        ;; 6 B
+;;; TODO: can optimize, fold tos=LOVAL+VARRAY!
+;;;   would save one byte, but youd allow for %D
+        ldx #LOVAL
+        .byte ";"
+        lda VARRAY,x
+        ldx #0
+      .byte "]"
+
+        ;; char array index [char var]
+        .byte "|%V\[[#]"
+        IMMEDIATE checkisarray
+        .byte "(char)%V\]"
+      .byte "["
+        ;; 6 B
+        ldx VAR0
+        .byte ";"
+        lda arr,x
+        ldx #0
+      .byte "]"
+
+        ;; char array index [char]
+        .byte "|%V\[[#]"
+        IMMEDIATE checkisarray
+        .byte "(char)",_E,"\]"
+      .byte "[;"
+        ;; 5 B
+        tax
+        lda VAR0,x
+        ldx #0
+      .byte "]"
+.endif ; OPTRULES
+
+;;; TODO: word[] - word array
+
+        ;; char array index [word]
+        ;; (most generic and expensive)
+        .byte "|%V\[[#]"
+        IMMEDIATE checkisarray
+        .byte _E,"\]"
+      .byte "[:"
+        ;; 16 B
+        ;; calculate address
+        clc
+        adc #LOVAL
+        sta tos
+        txa
+        adc #HIVAL
+        sta tos+1
+        
+        ;; load it
+        ldy #0
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
+        ;; ?pointer, as it wasn't array
+        .byte "|%V\[[#]"
+        ;; LOL: we will happily use any var as ponter!
+        .byte _E,"\]"
+      .byte "[:"
+        ;; 16 B
+        ;; calculate address
+        clc
+        adc VAR0
+        sta tos
+        txa
+        adc VAR1
+        sta tos+1
+        
+        ;; load it
+        ldy #0
+        lda (tos),y
+        ldx #0
+      .byte "]"
+
+        ;; ARRAY-TO-POINTER DECAY!
+        ;; degrade array to pointer
+        .byte "|%V"
+        IMMEDIATE checkisarray
+      .byte "["
+        lda #LOVAL
+        ldx #HIVAL
+      .byte "]"
+
+        ;; variable
+        .byte "|%V"
+      .byte '['
+        lda VAR0
+        ldx VAR1
+      .byte ']'
+
 
 
 ;;; last chance, try BYTERULES
