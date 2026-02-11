@@ -1,0 +1,57 @@
+DATE="`date +"%FT%H%M%S" -u`"
+TARNAME="MeteoriC_$DATE.tgz"
+
+LISTFILES=( 
+"README-MeteoriC.md"
+"mc"
+"mc.sim"
+"mc.tap"
+"oric-terminal.c"
+"Input/byte-sieve.c"
+"Input/byte-sieve-2K.c"
+"Input/byte-sieve-4K.c"
+"Input/color-chart.c"
+"Input/debug-array.c"
+"Input/expressions.c"
+"Input/fib-list.c"
+"Input/fib.c"
+"Input/fun.c"
+"Input/hello.c"
+"Input/hex.c"
+"Input/keyboard.c"
+"Input/lps-300.c"
+"Input/malloc.c"
+"Input/music.c"
+"Input/noel-retro.c"
+"Input/parenthesis.c"
+"Input/plusplus.c"
+"Input/strlib.c"
+"Input/test-ctype.c"
+"Input/tutorial.txt"
+)
+
+FILES="${LISTFILES[@]}"
+
+# --- generate .sim
+./mcr -
+cp parse.sim mc.sim
+
+# --- generate .tap
+./mctap
+cp parse.tap mc.tap
+
+# -- copy manual
+
+cp ../../meteoric/README.md README-MeteoriC.md
+
+echo
+echo
+tar -czvf $TARNAME $FILES
+echo
+tar -tvf $TARNAME
+echo
+ls -l $TARNAME
+
+
+
+

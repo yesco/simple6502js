@@ -8,7 +8,13 @@ name=$1
 ./rrasm parse -
 
 stty raw -echo opost onlcr
-sim65 -c parse.sim "$@"
+
+# this works for sure, captures CTRL-C
+
+#sim65 -c parse.sim "$@"
+
+# seems to work without effecting interaction?
+sim65 -c parse.sim "$@" | ./oric-terminal
 
 
 e=$?

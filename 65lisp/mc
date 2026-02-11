@@ -1,1 +1,53 @@
-./rasm parse
+# - make sure bash will complete filenames
+# 
+#  To enable tab completion:
+#
+#      > source ./mc
+#
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    complete -o default -o bashdefault ./mc
+    echo "Completion enabled for ./mc"
+    return
+fi
+
+# - make sure we have 
+if command -v sim65 >/dev/null 2>&1; then
+    echo "sim65 is in the path."
+else
+    echo "%% sim65 not found. Please install cc65."
+    exit 42
+fi
+
+
+
+# - if no args - print help
+if [ $# -eq 0 ]; then
+  ARGPREFIX="-h"
+fi
+
+# - converts ORIC terminal codes to ANSI/VT100
+clang oric-terminal.c -o oric-terminal
+
+# - if no parameters - then IDE - interactive
+
+# change terminal so mc can read CTRL-C
+stty raw -echo opost onlcr
+
+# seems to work without effecting interaction?
+if test -f oric-terminal
+then
+  sim65 -c parse.sim $ARGPREFIX "$@" | ./oric-terminal
+else
+  sim65 -c parse.sim $ARGPREFIX "$@"
+  echo "%% clang not found, it's used for compiling the ./oric-terminal to pretty-fy putput for ANSI."
+fi
+
+E=$?
+stty sane
+echo
+echo
+echo "Exitcode $E"
+
+
+
+
