@@ -5794,6 +5794,17 @@ FUNC _hideargs
         jmp updatevars
 
 
+addDOStoTOS:     
+        clc
+        lda dos
+        adc tos
+        sta tos
+        txa
+        lda dos+1
+        adc tos+1
+        sta tos+1
+        rts
+
 ;;; will FAIL if identifier isn't array
 ;;; (pointer give error too)
 checkisarray:
@@ -7212,14 +7223,12 @@ parsestring:
         ;; char array index [const]
         .byte "|%V\[[#]"
         IMMEDIATE checkisarray
-        .byte "%d\]"
+        ;;  only use of 'd' anymore? lol
+        .byte "%d\][d;]"
+        JSRIMMEDIATE addDOStoTOS
       .byte "["
-        ;; 6 B
-;;; TODO: can optimize, fold tos=LOVAL+VARRAY!
-;;;   would save one byte, but youd allow for %D
-        ldx #LOVAL
-        .byte ";"
-        lda VARRAY,x
+        ;; 5 B
+        lda VARRAY
         ldx #0
       .byte "]"
 
@@ -7229,7 +7238,7 @@ parsestring:
         IMMEDIATE checkisarray
         .byte "%V\]"
       .byte "["
-        ;; 6 B
+        ;; 7 B
         ldx VAR0
         .byte ";"
         lda VARRAY,x
@@ -7242,11 +7251,12 @@ parsestring:
         IMMEDIATE checkisarray
         .byte _E,")\]"
       .byte "[;"
-        ;; 5 B
+        ;; 6++ B ==> 10
         tax
         lda VARRAY,x
         ldx #0
       .byte "]"
+
 .endif ; OPTRULES
 
 ;;; TODO: word[] - word array
@@ -7257,7 +7267,7 @@ parsestring:
         IMMEDIATE checkisarray
         .byte _E,"\]"
       .byte "[;"
-        ;; 16 B
+        ;; 14 B
         ;; calculate address
         clc
         adc #LOVAL
@@ -7267,9 +7277,8 @@ parsestring:
         sta tos+1
         
         ;; load it
-        ldy #0
-        lda (tos),y
         ldx #0
+        lda (tos,x)
       .byte "]"
 
 .ifnblank

@@ -28,7 +28,7 @@ word main(){
   // calibration to remove overhead
   puts("\nINDEX       CHECK BYTES");
   puts(  "=====       ===== =====");
-  zo= 46; zz= _PC()+8;
+  zo= 43; zz= _PC()+9;
   pc("calibrate   : ?=", s[3], _PC());
   pc("s[3]        : b=", s[3], _PC());
   pc("s[(char)a]  : b=", s[(char)a], _PC());
