@@ -1,4 +1,4 @@
-git status | head -40
+git status | head -25
 printf "\t...\n"
 printf "\t...\n"
 printf "\t... and many more. Run: 'git status' to see all.\n"
