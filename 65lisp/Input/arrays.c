@@ -1,4 +1,4 @@
-// indeXing: arr[ INDEX ] cost in bytes
+//  arr[ INDEX ] cost in bytes
 char s[]={'f','o','o','b','a','r',0};
 word a,b,c,z,zz,zd,zo;
 

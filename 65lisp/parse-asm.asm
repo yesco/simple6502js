@@ -1896,10 +1896,25 @@ subparamY:
 ;;; 
 SENTINEL='S'+128
 
-restoreerror:   
-        lda #'S'
+asserterror:    
+        sta erp
+        stx erp+1
+        jmp _ERROR
+
+;;; prints AX
+runtimeerrorwithdata:
+        PUTC 10
+        jsr _printh
+        PUTC ' '
+        jsr _printn
 runtimeerror:
-        PUTC '%'
+        sty savey
+        jsr nl
+;;; TODO: PRINTZ (defined later)
+        putc RED+BG
+        putc YELLOW
+        putc '%'
+        lda savey
         jsr putchar
         jsr nl
 
@@ -1910,7 +1925,10 @@ runtimeerror:
 restorecheckstack:      
         ldy $01ff
         cpy #SENTINEL
-        bne restoreerror
+        beq :+
+
+        ldy #'S'
+        bne runtimeerror
 
 ;;; Restores PLA byte registers
 ;;; preserves AX, trashes Y
@@ -5805,6 +5823,15 @@ addDOStoTOS:
         sta tos+1
         rts
 
+getinp:
+        tsx
+        lda $103,x
+        tya
+        lda $104,x
+        tax
+        tya
+        rts
+
 ;;; will FAIL if identifier isn't array
 ;;; (pointer give error too)
 checkisarray:
@@ -6232,6 +6259,7 @@ FUNC _iorulesstart
 .ifdef INLINEPUTZOPT
         .byte "|putz(",34
       .byte '['
+;;; TODO: ?
         jsr _iprintz
       .byte ']'
         .byte "%S)"
@@ -6240,12 +6268,14 @@ FUNC _iorulesstart
         ;; NO newline!
         .byte "|fputs(",34
       .byte '['
+;;; TODO: ?
         jsr _iprintz
       .byte ']'
         .byte "%S,stdout)"
 
         .byte "|puts(",34
       .byte '['
+;;; TODO: ?
         jsr _iprints
       .byte ']'
         .byte "%S)"
@@ -11509,6 +11539,26 @@ parsevarcont:
 .endif ; STARTVAROPT
 
 
+ASSERT=1
+.ifdef ASSERT
+        .byte "|"
+        .byte "assert(",_E,")"
+        JSRIMMEDIATE getpc
+      .byte "[?2"
+        ;; 13 B
+        stx savex
+        ora savex
+        bne :+
+        ;; assert error (0)
+        ;; AX= source error pos!
+        lda #LOVAL
+        ldx #HIVAL
+        jmp asserterror
+:       
+      .byte "]"
+.endif ; ASSERT
+
+
 .ifdef ASM
         ;; inline ASM!
         ;; (must be inline as we don't fail on subrule)
@@ -12712,7 +12762,7 @@ FUNC _NMI_catcher
 
         ;; Reset colors
         jsr _eosnormal
-        PRINTZ {10,RED+BG,"RESET",10}
+        PRINTZ {10,YELLOW+BG,BLACK,"RESET",10}
 
 ;;; TODO: keyboard disabled if NMI during "loading..."
 
@@ -16227,9 +16277,8 @@ NOPRINT=1
         .incbin "Input/color-chart.c"
         .byte 0
 
-;;; d - rainbow drop
-        .byte "// d -"
-;        .incbin "Input/rainbow-drop.c"
+;;; d - debug assert
+        .incbin "Input/assert.c"
         .byte 0
 
 ;;; e - expr
@@ -16456,7 +16505,8 @@ LOOP=1
 ;;; v -
         .byte "// v -",10
         .byte 0
-;;; w -
+;;; w - wave? lol
+;        .incbin "Input/rainbow-drop.c"
         .byte "// w -",10
         .byte 0
 ;;; x - indeXing
