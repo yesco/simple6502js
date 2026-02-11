@@ -5806,6 +5806,14 @@ checkisarray:
         jmp _next
         
 
+;;; a "here" word! lol
+getpc:  
+        lda _out
+        sta tos
+        ldx _out+1
+        stx tos+1
+        rts
+
 ;;; call with "%" jsr ...
 _stuffarray_w:  
         jsr _stuffarray_c
@@ -6933,22 +6941,18 @@ FUNC _funcallend
         ldx #HIVAL
       .byte "]"
 
-.ifnblank
+
+
         ;; current PC!
         .byte "|_PC()"
-//  z= _PC(); zz= _PC(); putu(zz-z); putchar('\n');
-  
-      .byte "%{"
-        lda _out
-        sta tos
-        ldx _out+1
-        sta tos+1
-        IMM_RET
+        JSRIMMEDIATE getpc
       .byte "["
         lda #LOVAL
         ldx #HIVAL
       .byte "]"
 
+.ifnblank
+;;; TODO: this returns cleanstack! lol
         ;; current RETPC!
         .byte "|_RETPC()"
       .byte "["
@@ -6961,8 +6965,7 @@ FUNC _funcallend
         tya
         pha
       .byte "]"
-.endif
-       
+.endif       
 
         ;; cast to char == &0xff !
         .byte "|(char)",_C
@@ -7194,29 +7197,22 @@ parsestring:
 .endif
       .byte ']'
 
+
+
+
         ;; VARIABLES INDEX and access
 
         ;; (Checking variables is expensive put last!)
         ;; TODO: consider using a subrule;
         ;;   first parse var then all that use it
 
+
+
 .ifdef OPTRULES
         ;; char array index [const]
         .byte "|%V\[[#]"
-.byte "%{"
-putc 'a'
-jsr nl
-IMM_RET
         IMMEDIATE checkisarray
-.byte "%{"
-putc 'b'
-jsr nl
-IMM_RET
         .byte "%d\]"
-.byte "%{"
-putc 'c'
-jsr nl
-IMM_RET
       .byte "["
         ;; 6 B
 ;;; TODO: can optimize, fold tos=LOVAL+VARRAY!
@@ -7227,26 +7223,28 @@ IMM_RET
         ldx #0
       .byte "]"
 
+
         ;; char array index [char var]
-        .byte "|%V\[[#]"
+        .byte "|%V\[(char)[#]"
         IMMEDIATE checkisarray
-        .byte "(char)%V\]"
+        .byte "%V\]"
       .byte "["
         ;; 6 B
         ldx VAR0
         .byte ";"
-        lda arr,x
+        lda VARRAY,x
         ldx #0
       .byte "]"
 
+
         ;; char array index [char]
-        .byte "|%V\[[#]"
+        .byte "|%V\[(char)([#]"
         IMMEDIATE checkisarray
-        .byte "(char)",_E,"\]"
+        .byte _E,")\]"
       .byte "[;"
         ;; 5 B
         tax
-        lda VAR0,x
+        lda VARRAY,x
         ldx #0
       .byte "]"
 .endif ; OPTRULES
@@ -7258,7 +7256,7 @@ IMM_RET
         .byte "|%V\[[#]"
         IMMEDIATE checkisarray
         .byte _E,"\]"
-      .byte "[:"
+      .byte "[;"
         ;; 16 B
         ;; calculate address
         clc
@@ -7274,11 +7272,12 @@ IMM_RET
         ldx #0
       .byte "]"
 
+.ifnblank
         ;; ?pointer, as it wasn't array
         .byte "|%V\[[#]"
         ;; LOL: we will happily use any var as ponter!
         .byte _E,"\]"
-      .byte "[:"
+      .byte "[;"
         ;; 16 B
         ;; calculate address
         clc
@@ -7293,6 +7292,8 @@ IMM_RET
         lda (tos),y
         ldx #0
       .byte "]"
+.endif
+
 
         ;; ARRAY-TO-POINTER DECAY!
         ;; degrade array to pointer
@@ -16230,8 +16231,8 @@ NOPRINT=1
 
 ;;; l - line bench
 .ifblank
-        .incbin "Input/music.c"
-;        .byte "// l -",10
+;        .incbin "Input/music.c"
+        .byte "// l -",10
         .byte 0
 .else
         .byte "// LINEBENCH - for borken?",10
@@ -16379,8 +16380,8 @@ LOOP=1
 ;;; w -
         .byte "// w -",10
         .byte 0
-;;; x -
-        .byte "// x -",10
+;;; x - indeXing
+        .incbin "Input/arrays.c"
         .byte 0
 ;;; y -
         .byte "// y -",10

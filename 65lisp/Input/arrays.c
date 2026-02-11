@@ -1,28 +1,40 @@
-// 5 ways of arrays
-char sa[4];
-char sb[4]={0};
-char sc[]={'f','o','o','b','a','r',0};
-char sd[]="FooBar";
-word a,b,c,z,zz;
+// indeXing: arr[ INDEX ] cost in bytes
+char s[]={'f','o','o','b','a','r',0};
+word a,b,c,z,zz,zd,zo;
 
-word pc(word expect, word got){
-  putz(expect); putchar(got); putchar('\n');
+word ph(word name, word u) {
+  putz(name); putz(": "); puth(u);
+  putchar(' '); puts(u);
 }
-word ph(word name, word u){
-  putz(name); putz(": "); puth(u); putchar(' '); puts(u);
+
+word pc(word expect, word got, word z){
+  putz(expect);
+  // no || or
+  if (got<' ')       putchar('?');
+  else if (126<got)  putchar('?');
+  else               putchar(got);
+  putchar(' '); putchar(' ');
+  zd= z-zz-zo; putu(zd);
+  zz= z;
+  putchar('\n');
+  return zd;
 }
+
 word main(){
   a= 3; b= a+1;
-  strcpy(sa, "fie"); strcpy(sb, "fum");
 
-  puts("started...");
-  ph("sa", sa); ph("sb", sb); ph("sc", sc); ph("sd", sd);
+  ph("s", s);
 
-  pc("foo : x=", 'x');
-  pc("3   : b=", sc[3]);
-  pc("300 : ?=", sc[300]); // lol, crap
-  pc("2+1 : b=", sc[2+1]); // wrong
-  pc("a   : b=", sc[a]); // wrong
-  pc("b-1 : b=", sc[b-1]); // wrong
+  // calibration to remove overhead
+  puts("\nINDEX       CHECK BYTES");
+  puts(  "=====       ===== =====");
+  zo= 46; zz= _PC()+8;
+  pc("calibrate   : ?=", s[3], _PC());
+  pc("s[3]        : b=", s[3], _PC());
+  pc("s[(char)a]  : b=", s[(char)a], _PC());
+  pc("s[(char)(a)]: b=", s[(char)(a)], _PC());
+  pc("s[300]      : ?=", s[300], _PC());
+  pc("s[a]        : b=", s[a], _PC());
+  pc("s[(a)]      : b=", s[(b)], _PC());
   return 4711;
 }
