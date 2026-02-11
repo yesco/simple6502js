@@ -300,8 +300,17 @@ extern void info();
 
 
 void error(char* msg, char* data) {
-  fprintf(stderr, "\n%%%s %s\n", msg, data);
-  fprintf(stderr, "\nUsage: mc [-f filename] [-s] [filename]\n");
+  if (msg && *msg)
+    fprintf(stderr, "\n%%%s %s\n", msg, data);
+  fprintf(stderr, "\nUsage: mc\n"
+"  filename\t\t# compile and run\n"
+"  -f filename\t# load file\n"
+"  -c\t\t\t# compile\n"
+"  -q\t\t\t# disasm\n"
+"  -r[N]\t\t\t# run N times (defaualt 1)\n"
+"  -pV\t\t\t# print Variables\n"
+"  -pe\t\t\t# print ENV\n"
+);
   exit(1);
 }
 
@@ -464,6 +473,7 @@ extern void processnextarg() {
 
     // process other args -?
     switch (a[1]) {
+    case 0: break;
       // these DO NOT return!
     case 'c': compileAX((char*)EDITSTART); break;
     case 'r': runN(atoi(a+2)); break;
@@ -481,9 +491,9 @@ extern void processnextarg() {
       }
       break;
       // TODO:
+    case 'h': error("", ""); // help
     case 'b': // benchmark
     case 'e': // expression
-    case 'h': // help
     default: error("Unkown option: ", a);
     }
 

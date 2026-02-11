@@ -1,2 +1,5 @@
 git status | head -40
-
+printf "\t...\n"
+printf "\t...\n"
+printf "\t... and many more. Run: 'git status' to see all.\n"
+echo
