@@ -1,0 +1,28 @@
+#!/bin/env perl
+
+$name= shift @ARGV;
+$snap= shift @ARGV;
+
+print "========== $name ==========\n";
+
+$addr= "0000";
+
+open(SNAP, $snap);
+open(IN, $name.".syms");
+while(<IN>) {
+    if (/^..([0-9a-fA-F]+)\s+(\d+)\s+(\w+)$/) {
+        $a= $1; $name= $3;
+        if ($a eq $addr) {
+        } else {
+            # end names at address
+            $addr= $a;
+            print "\n$addr";
+        }
+        print "  ".$name;
+    } else {
+        print "\n%%$_";
+    }
+
+}
+close(IN);
+close(SNAP);

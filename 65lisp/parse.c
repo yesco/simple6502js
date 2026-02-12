@@ -307,6 +307,7 @@ void error(char* msg, char* data) {
 "  -f filename\t# load file\n"
 "  -c\t\t\t# compile\n"
 "  -q\t\t\t# disasm\n"
+"  -sbug -c -s_compile -r -s_run\t# take 3 snapshots\n"
 "  -r[N]\t\t\t# run N times (defaualt 1)\n"
 "  -pV\t\t\t# print Variables\n"
 "  -pe\t\t\t# print ENV\n"
@@ -436,6 +437,66 @@ void inputfile(char* filename) {
   fprintf(stderr, "\nLoaded file: %s\n", filename);
 }
 
+// write whole RAM to a binary snapshot file
+int nsnap= 0;
+char* snapname= "mc";
+char fn[32];
+
+void snapshot(char* arg) {
+  char * key= "", * p;
+  FILE * f;
+  unsigned int a= 0;
+
+  if (*arg) {
+    if (*arg=='_') key= arg;
+    else           snapname= arg;
+  }
+
+  memset(fn, 0, sizeof(fn));
+// remove these two adn fail compile on 6502?
+  puts("");
+
+// works
+//  printf("snap-%s-%02d%s.ram\n",
+//         snapname, nsnap, key);
+
+// doesn't work?!?!?!
+//  snprintf(fn, sizeof(fn), "snap-%s-%02d%s.ram",
+//           snapname, nsnap, key);
+
+  // TODO: doesn't work!? cc65
+  //sprintf(&fn[0]+strlen(fn)-1, "%02u", nsnap);
+
+  strcat(fn, "snap-");
+  strcat(fn, snapname);
+  p= fn+strlen(fn);
+  p[0]= '-';
+  p[1]= nsnap/10+'0';
+  p[2]= nsnap%10+'0';
+  strcat(fn, key);
+  strcat(fn, ".ram");
+
+  printf("Snapshot: %s\n", fn+0);
+
+  f= fopen(fn, "w");
+  // write out 64K
+  if (1) {
+    p= a= 0; do {
+      fputc(*p++, f);
+    } while(++a);
+    printf("Snapshot generated: %s\n", fn);
+  } else {
+    // TODO: cc65 - doesn't do anything!
+    if (256==fwrite((char*)0, 256, 256, f)) 
+      printf("Snapshot generated: %s\n", fn);
+    else
+      error("Problem writing snapshot:", fn);
+  }
+  fclose(f);
+
+  ++nsnap;
+}
+
 // process args
 // (ignores first==program name)
 
@@ -478,6 +539,7 @@ extern void processnextarg() {
     case 'c': compileAX((char*)EDITSTART); break;
     case 'r': runN(atoi(a+2)); break;
       // these do return
+    case 's': snapshot(a+2); break;
     case 'f':
     case 'l': --argc; ++argv; inputfile(*argv); break;
     case 'q': dasm(); break;
