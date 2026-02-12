@@ -1642,6 +1642,8 @@ __ZPCOMPILER__:
 .code
 
 
+.export nparam, curF, params, compilestatus
+
 .zeropage
 
 ;;; Data abouit current function being built
@@ -1702,6 +1704,7 @@ mode:  .res 1
 ;;; 
 ;;; lines (number of '\n' seen
 ;;; (backtracking up may give few more))
+.export nlines, naccepts, nrules
 nlines:   .res 2
 naccepts: .res 2
 nrules:   .res 2
@@ -2840,16 +2843,18 @@ VOSSTART=256   ; grow down.
 ;;; sim: (- #x4a03 #x2f13) = 6896 B
 
 
-;VARS=ENDOFHEAP-1
-VARS= varENV
 
 ;;; TODO: how the hell does varRULES end
 ;;;   up pointing to "input: source memory???"
 .bss
-.res 256
-varENV:  .res 256
-        
+.export varENV
+varENV:      .res 512
+varENV_end:
 .code
+
+;;; grows down
+VARS= varENV_end
+
 
         ;; We name our dynamic rule '[' (hibit)
 VARRULENAME='['+128

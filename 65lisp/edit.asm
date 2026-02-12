@@ -90,6 +90,8 @@
 ;;; TODO: this shouldn't work, should overlap VARS env
 ;;;   during compilation....
 EDITNULL= HICHARSET
+.export EDITNULL
+.export EDITSTART
 
 ;EDITNULL= HIRES ; this crashes for some reason
 

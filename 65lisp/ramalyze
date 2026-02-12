@@ -1,0 +1,18 @@
+FILE=$1
+
+./mcr -smc -f $FILE -s_load -c -s_compile -r -s_run ; echo ; ls -l *.ram
+
+./rammap parse snap-mc-00.ram         > 00.tmp
+./rammap parse snap-mc-01_load.ram    > 01.tmp
+./rammap parse snap-mc-02_compile.ram > 02.tmp
+./rammap parse snap-mc-03_run.ram     > 03.tmp
+
+(
+printf "\n\n\n\n\e[7m=== 01_load ==============================\e[0m\n"
+diff -U 5 00.tmp 01.tmp
+printf "\n\n\n\n\e[7m=== 02_compile ===========================\e[0m\n"
+diff -U 5 01.tmp 02.tmp
+printf "\n\n\n\n\e[7m=== 03_run -==============================\e[0m\n"
+diff -U 5 02.tmp 03.tmp
+)  > ramdiff.tmp
+
