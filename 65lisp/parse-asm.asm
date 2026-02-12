@@ -6128,7 +6128,8 @@ rule0:
         
 
 ;;; Aggregate statements, terminated by "}"
-ruleA:
+FUNC ruleA_aggregate_statement
+ruleA:  
 
 .ifdef CUT2
         ;; PEEK '}' marks end - CUT
@@ -6187,6 +6188,7 @@ ruleA:
 
 
 ;;; Block
+FUNC ruleB_block
 ruleB:  
         .byte "{}"
 
@@ -6203,7 +6205,8 @@ ruleB:
 
 ;;; START of expression:
 ;;;   var/const/arrayelt/funcall()
-ruleC:
+FUNC ruleC_startof_expression
+ruleC:  
 
 ;;; TODO: It seems it should be useful but not
 .ifnblank
@@ -6947,6 +6950,7 @@ FUNC _funcallstart
 
 FUNC _funcallend
 
+FUNC _ruleC_continue
 
         ;; !! - NOT variable
         .byte "|!!%V"
@@ -7438,7 +7442,8 @@ endC:
 
 
 ;;; aDDons (::= op %d | op %V)
-ruleD:
+FUNC ruleD_expression_operators
+ruleD:  
 
 ;;; TODO: generalize!
 
@@ -8583,7 +8588,10 @@ FUNC _oprulesend
 
 
 
+FUNC _byterulesstart
+
 ;;; BYTERULES variant of ruleC:
+FUNC ruleU_C_startof_byterules
 ruleU:  
 
 .ifdef BYTERULES
@@ -8668,8 +8676,7 @@ ruleU:
 
 
 ;;; BYTERULES variant of ruleD:
-FUNC _byterulesstart
-
+FUNC ruleV_byterules_operators
 ruleV:  
         ;; TODO:        // .byte "=>
         
@@ -8962,6 +8969,7 @@ FUNC _byterulesend
 
 
 ;;; printf handling
+FUNC ruleH_printf
 ruleH:  
 ;;; 111 B not finished,
 ;;; how big is an asm printf?
@@ -9060,6 +9068,7 @@ ruleH:
         .byte 0
 
 ;;; load byte expression
+FUNC ruleI_byte_expressions
 ruleI:  
         .byte "%D)"
       .byte '['
@@ -9084,6 +9093,7 @@ ruleI:
 ;;; LOL: only used by poke...
 
 ;;; TODO:   can we use all these for foo[...]= ....; ????
+FUNC ruleJ_byteexpressions_more
 ruleJ:  
         .byte "0)"
       .byte '['
@@ -9137,7 +9147,8 @@ ruleJ:
 
 
 ;;; function call, optimize one arguemnt
-ruleL:
+FUNC ruleL_function_calls
+ruleL:  
         ;; single arguemnt call
         .byte ")"
       .byte "[?2"               ; ref up one rule level!
@@ -9182,7 +9193,9 @@ ruleL:
 ;;; BYTESIEVE: saved 5 bytes using ruleF!
 ;;; 
 ;;; "keepAXsetY"
+FUNC ruleF_keepAXsetY
 ruleF:  
+
 ;;; TODO: remove? only used by strchr?
         .byte "%D"
       .byte '['
@@ -9225,7 +9238,8 @@ ruleF:
 ;;; "(",_E,",",_G:  two argument rule where:
 ;;;    - first arg is saved in TOS
 ;;;    - second arg is in AX
-ruleG:
+FUNC ruleG_calling_convention_TOS_AX
+ruleG:  
 
 ;;; When entering this code AX contains value to be 
 ;;; written to tos. In many cases we can do this without
@@ -9304,7 +9318,8 @@ ruleG:
 
 
 ;;; Exprssion:
-ruleE:
+FUNC ruleE_expression
+ruleE:  
         
         .byte "(",_E,")",_D
         
@@ -9334,7 +9349,8 @@ ruleE:
 ;;;  ruleQ:  num,num,num }
 
 ;;; TODO:allow for expressions if have constant folding
-ruleQ:
+FUNC ruleQ_arrayelements
+ruleQ:  
         ;; end
         .byte "};"
 
@@ -9350,7 +9366,8 @@ ruleQ:
         
 
 ;;; DEFS ::= TYPE %NAME() BLOCK TAILREC |
-ruleN:
+FUNC ruleN_definitions
+ruleN:  
 
       .byte "%{"
 ;        putc 'a'
@@ -9618,6 +9635,7 @@ after:
 
 
 ;;; define list of variables
+FUNC ruleK_list_of_variables
 ruleK:  
 
         ;; one more,,,
@@ -9635,7 +9653,8 @@ ruleK:
 ;;; This is the first rule applied on program.
 ;;; Generates a jmp to main(). If no functions/decl
 ;;; is wasting 3B. Bah.
-ruleO:
+FUNC ruleO_program_skip_definitions
+ruleO:  
       .byte '['
         jmp PUSHLOC
       .byte ']'
@@ -9652,6 +9671,7 @@ ruleO:
         ;; Autopatches skip over definitions in _N
 
 
+FUNC ruleP_program
 ruleP:  
         ;; TODO: ?
         ; JSRIMMEDIATE _iasmstart
@@ -9714,6 +9734,7 @@ ruleP:
 ;;; TODO: "%_T" - propagate error (one level)
 ;;; 
 ;;; Type
+FUNC ruleT_typenames
 ruleT:  
 .ifdef FROGMOVE
         .byte "static",TAILREC
@@ -9731,7 +9752,8 @@ ruleT:
         ;; STATEMENTS
 
 FUNC _stmtrulesstart
-ruleS:
+FUNC ruleS_statements
+ruleS:  
 
         ;; empty statement is legal
         .byte ";"
@@ -11603,6 +11625,7 @@ FUNC _stmtrulesend
 ;;; Resource/Flag Wait   ~10%    while (!is_ready)
 ;;; Digit/Buffer process  ~5%    while (num > 0)
 
+FUNC ruleM_while_conditions
 ruleM:  
 ;;; Hackey rule we need to lookUP wards many step!
 
@@ -11754,6 +11777,7 @@ LESSTHAN=1
 FUNC _parametersstart
 
 ;;; - formal JSK-calling parameters
+FUNC ruleR_JSK_calling_convention
 ruleR:  
         
         ;; lol, just "eat" the commas
@@ -11772,6 +11796,7 @@ ruleR:
 
 
 ;;; - oric paramters
+FUNC ruleY_oric_parameters
 ruleY:  
         .byte "("
 ;;; Don't care?
@@ -11794,6 +11819,7 @@ ruleY:
         .byte _Z
         .byte 0
 
+FUNC ruleZ_oric_paramters_more
 ruleZ:  
         .byte ",",TAILREC
 
@@ -11837,10 +11863,12 @@ ruleZ:
 .import pushax, popax, pusha0, pusha, popa
 
 .ifnblank ;.ifdef __CC65__
-ruleX:
+FUNC ruleX_calling_convention_cc65
+ruleX:  
         .byte 0
 .else
 ;;; TODO: think hard, does it handle nesting correctly?
+FUNC ruleX_calling_convention_cc65
 ruleX:  
         .byte "("
 ;      .byte "%{"
@@ -11965,6 +11993,7 @@ PUTC 'A'
 ;;; TODO: think hard, does it handle nesting correctly?
 
 
+FUNC ruleW_calling_conventions_hwstack
 ruleW:  
 
         ;; End

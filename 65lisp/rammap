@@ -30,25 +30,54 @@ while(<IN>) {
             print "\n------------------------------";
             # print memory [$start,$addr[
             $n= 0;
+            $alphas= "";
             for $m (hex($start)..(hex($addr)-1)) {
-                # newline
                 if ($n % 16==0) {
-                    printf("\n%04X: ", $m);
+                    printf(" $alphas\n");
+                    $alphas= "";
+                    # newline
+                    printf("%04X: ", $m);
                 }
 
                 $v= $ram[$m];
                 $w= $v & 0x7f;
+
                 # print it
-                if ($w==32) { print "  "; }
-                elsif ($w>32 && $w<126) {
-                    print (($v & 0x80)? "\e[7m": "");
-#                    printf("%c#%3d", $w+$fullwidth-32, $w);
-                    printf("%c", $w+$fullwidth-32);
-                    print "\e[0m";
-                } else { printf("%02x", $v); }
-#                print " ";
+                if (1) {
+
+                    # hexdump
+
+                    printf("%02x ", $v);
+
+                    if ($w==0) { $alphas.= "\$"; }
+                    elsif ($w>32 && $w<126) {
+                        if ($v & 0x80) {
+                            $alphas.= sprintf("\e[7m%c\e[0m", $w);
+                        } else {
+                            $alphas.= sprintf("%c", $w);
+                        }
+                    } else { $alphas.= "."; }
+                        
+
+                } else {
+
+                    # fancy inline widechars
+
+                    if ($w==32) { print "  "; }
+                    elsif ($w>32 && $w<126) {
+                        print (($v & 0x80)? "\e[7m": "");
+                        printf("%c", $w+$fullwidth-32);
+                        print "\e[0m";
+                    } else { printf("%02x", $v); }
+
+                }
+
                 ++$n;
             }
+
+            # print overflow
+            while(($n % 16)) { ++$n; print "   "; }
+            printf(" $alphas");
 
             print "\n\n\n\n$addr";
             $start= $addr;
