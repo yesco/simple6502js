@@ -1381,13 +1381,13 @@ DEMO=1
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
 
-;        OUTPUTSIZE=29*1024
+        OUTPUTSIZE=29*1024
 
 ;;; leave space for now to do xmalloc...
 ;;; segmentation fault! (w added fgets???)
 ;;; code size too big???
 
-        OUTPUTSIZE=20*1024
+;        OUTPUTSIZE=20*1024
 
     .else
         ;; --- ATMOS --- 7K in demo...
@@ -5532,7 +5532,11 @@ FUNC _newarr
         ;; partial page write first time
 @loop:
         sta (_out),y
+
+;;; remove this and compiler error?
+;;; try Input/debug-array.c
         PUTC '_'
+
         ;; inline jsr _incO as it uses x...
         inc _out
         bne :+
@@ -10189,7 +10193,9 @@ afterELSE:
 
 .ifdef OPTRULES
         ;; arr[(char)i]=constant;
-        .byte "|%V\[(char)[#]%V\]=[#]%D;"
+        .byte "|%V\[(char)"
+        IMMEDIATE checkisarray
+        .byte "[#]%V\]=[#]%D;"
         ;; 7 B !
       .byte "["
         lda #LOVAL
@@ -10204,7 +10210,9 @@ afterELSE:
 
         ;; arr[CONST]=consxtant;
         ;; 5 B (was 38???)
-        .byte "|%V\[[#]%D\]="
+        .byte "|%V\["
+        IMMEDIATE checkisarray
+        .byte "[#]%D\]="
         .byte "[d;]"            ; dos= tos; tos= pop
         JSRIMMEDIATE addDOStoTOS
         .byte "[#]"
@@ -10220,9 +10228,10 @@ afterELSE:
       .byte "]"
 
 
-;;; TODO: not correct?
         ;; arr[(char)(...)]=
-        .byte "|%V\[(char)([#]",_E,")\]="
+        .byte "|%V\[(char)"
+        IMMEDIATE checkisarray
+        .byte "([#]",_E,")\]="
         ;; 9 B 
       .byte "["
         ;; prepare index
@@ -10240,7 +10249,9 @@ afterELSE:
       .byte "]"
 
         ;; arr[i]= ...
-        .byte "|%V\[[#]%V\]=[#]%D;"
+        .byte "|%V\["
+        IMMEDIATE checkisarray
+        .byte "[#]%V\]=[#]%D;"
         ;; 21 B (saves 7)
       .byte "["
         ;; stuff value
@@ -10265,9 +10276,10 @@ afterELSE:
         sta (tos),y
       .byte "]"
 
-;;; TODO: not correct w compiling?
         ;; arr[i]= ...
-        .byte "|%V\[[#]%V\]=[#]%",_E,";"
+        .byte "|%V\["
+        IMMEDIATE checkisarray
+        .byte "[#]%V\]=[#]%",_E,";"
         ;; 20 B (saves 8)
       .byte "["
         ;; stuff value
@@ -10301,9 +10313,9 @@ afterELSE:
         ;; ASSIGN GENERIC ARRAY [ INDEX ]
 
         .byte "|%V\["
+        IMMEDIATE checkisarray
         ;; 8+12= 20 B
         ;;  +4 +4 => 28 (in array-assign.c?)
-        IMMEDIATE checkisarray
         .byte "[#]",_E,"\]="
       .byte "[;"
         ;; add computed index to array address, push
@@ -10312,6 +10324,36 @@ afterELSE:
         pha
         txa
         adc #HIVAL
+        pha
+      .byte "]"
+        ;; TODO: byte rule and save 2 byte?
+        .byte _E,";"
+      .byte "["
+        ;; pop write address
+        tay
+        pla
+        sta tos+1
+        pla
+        sta tos
+        tya
+        ldy #0
+        sta (tos),y
+     .byte "]"
+
+
+        ;; GENERIC ASSIGN PTR [ INDEX ]
+
+        .byte "|%V\["
+        ;; 8+12= 20 B
+        ;;  +4 +4 => 28 (in array-assign.c?)
+        .byte "[#]",_E,"\]="
+      .byte "[;"
+        ;; add computed index to array address, push
+        clc
+        adc VAR0
+        pha
+        txa
+        adc VAR1
         pha
       .byte "]"
         ;; TODO: byte rule and save 2 byte?
