@@ -6131,6 +6131,9 @@ rule0:
 FUNC ruleA_aggregate_statement
 ruleA:  
 
+;;; TODO: combine with %! and %?
+;;;    may need an jmp _abortruel (uprule?)
+
 .ifdef CUT2
         ;; PEEK '}' marks end - CUT
       .byte "%{"
@@ -7301,11 +7304,11 @@ parsestring:
         ldx #0
       .byte "]"
 
-        ;; char array index [const]
+        ;; char array index [CONST]
         .byte "|%V\[[#]"
         IMMEDIATE checkisarray
         ;;  only use of 'd' anymore? lol
-        .byte "%d\][d;]"
+        .byte "%D\][d;]"
         JSRIMMEDIATE addDOStoTOS
       .byte "["
         ;; 5 B
@@ -10150,6 +10153,11 @@ afterELSE:
         ;; Auto-patches at exit!
 .endif ; ELSE
 
+
+
+
+;;; TODO: why here?
+
 .ifdef BYTERULES
         ;; %D is ok as it get's "truncated" anyway.
 ;;; here: arrassign
@@ -10160,6 +10168,12 @@ afterELSE:
         sta VAR0
       .byte "]"
 
+
+
+
+        ;; ASSIGN VARIABLE
+
+
 ;;; here: arrassign
         .byte "|$%V=[#]",_E,";"
       .byte "[;"
@@ -10168,41 +10182,103 @@ afterELSE:
 .endif
 
 
+
+
+        ;; ASSIGN ARRAY ELEMENT
+
+
 .ifdef OPTRULES
-        ;; arr[i]=constant;
-        .byte "|arr\[%A\]=[#]%D;"
+        ;; arr[(char)i]=constant;
+        .byte "|%V\[(char)[#]%V\]=[#]%D;"
+        ;; 7 B !
       .byte "["
-        lda #'<'
+        lda #LOVAL
+        ;; get index
         .byte ";"
         ldx VAR0
-;;; TODO: get address of array...
-        sta arr,x
+        ;; get array
+        .byte ";"
+        sta VARRAY,x
       .byte "]"
 
-;;; this makes it work, but isn't correct?
-;        .byte TAILREC
 
+        ;; arr[CONST]=consxtant;
+        ;; 5 B (was 38???)
+        .byte "|%V\[[#]%D\]="
+        .byte "[d;]"            ; dos= tos; tos= pop
+        JSRIMMEDIATE addDOStoTOS
+        .byte "[#]"
+        ;; TODO: this adds 2 bytes
+        ; .byte _E,";"
+        ;; TODO: replace this with _BYTEEXPR ?
+        .byte "%D;"
+      .byte "["
+        lda #LOVAL
+        ;; get array
+        .byte ";"
+        sta VARRAY
+      .byte "]"
+
+
+;;; TODO: not correct?
+        ;; arr[(char)(...)]=
+        .byte "|%V\[(char)([#]",_E,")\]="
+        ;; 9 B 
+      .byte "["
+        ;; prepare index
+        pha
+      .byte "]"
+        .byte _E,";"
+      .byte "[;"
+        tax
+        ;; load index
+        pla
+        tay
+
+        txa
+        sta VARRAY,y
+      .byte "]"
 .endif ; OPTRULES
 
-        ;; array index
-;;; TODO: simulated
-        .byte "|arr\[",_E,"\]="
-      .byte '['
-        ;; save index
+
+;;; TODO: make lvalue?
+;;;   if not _E might be compiled several time?
+
+;        .byte "|%V\[",_E,"\]=",_E,";"
+        
+
+        ;; ASSIGN GENERIC ARRAY [ INDEX ]
+
+        .byte "|%V\["
+        ;; 8+12= 20 B
+        ;;  +4 +4 => 28 (in array-assign.c?)
+        IMMEDIATE checkisarray
+        .byte "[#]",_E,"\]="
+      .byte "[;"
+        ;; add computed index to array address, push
+        clc
+        adc #LOVAL
         pha
-      .byte ']'
-;;; TODO: _U in other rule???
+        txa
+        adc #HIVAL
+        pha
+      .byte "]"
+        ;; TODO: byte rule and save 2 byte?
         .byte _E,";"
-      .byte '['
-        ;; save value to store
+      .byte "["
+        ;; pop write address
         tay
-        ;; get index
         pla
-        tax
+        sta tos+1
+        pla
+        sta tos
         tya
-;;; TODO: get address of array...
-        sta arr,x
-      .byte ']'
+        ldy #0
+        sta (tos),y
+     .byte "]"
+
+
+
 
 
 .ifdef OPTRULES
@@ -10500,6 +10576,8 @@ decdec:
 
 .endif ; OPTRULES
 
+
+
         ;; assume it's char*
         .byte "|*%V=[#]",_E,";"
       .byte "[;"
@@ -10516,29 +10594,6 @@ decdec:
         sta (tos,x)
 .endif
       .byte "]"
-
-.ifdef BYTERULES
-        ;; TODO: this is now limited to 256 index
-        ;; bytes@[%D]= ... fixed address... hmmm
-        .byte "|$%V\[[#]%D\]="
-      .byte '['
-        ;; prepare index
-        lda '<'
-        pha
-      .byte ']'
-        .byte _E,";"
-      .byte "[;"
-        ;; load index
-        tax
-        pla
-        tay
-        txa
-
-        sta VAR0,y
-      .byte "]"
-.endif ; BYTERULES
-
-
 
 
 
