@@ -10238,6 +10238,57 @@ afterELSE:
         txa
         sta VARRAY,y
       .byte "]"
+
+        ;; arr[i]= ...
+        .byte "|%V\[[#]%V\]=[#]%D;"
+        ;; 21 B (saves 7)
+      .byte "["
+        ;; stuff value
+        ldy #LOVAL
+        ;; get index variable
+        .byte ";"
+        lda VAR0
+        ldx VAR1
+        ;; add array to it
+        .byte ";"
+        clc
+        adc #LOVAL
+        sta tos
+        ;; TODO: could optmize away jsut do ldx DOS!
+        ;;   (but wee have no access to DO)
+        txa
+        adc #HIVAL
+        sta tos+1
+        ;; store value
+        tya
+        ldy #0
+        sta (tos),y
+      .byte "]"
+
+;;; TODO: not correct w compiling?
+        ;; arr[i]= ...
+        .byte "|%V\[[#]%V\]=[#]%",_E,";"
+        ;; 20 B (saves 8)
+      .byte "["
+        ;; stuff value
+        pha
+        ;; get index variable
+        .byte ";"
+        lda VAR0
+        ldx VAR1
+        ;; add array to it
+        .byte ";"
+        clc
+        adc #LOVAL
+        sta tos
+        txa
+        adc #HIVAL
+        sta tos+1
+        ;; store value
+        ldy #0
+        pla
+        sta (tos),y
+      .byte "]"
 .endif ; OPTRULES
 
 

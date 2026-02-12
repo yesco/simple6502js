@@ -36,7 +36,7 @@ s[3]= 'A';
 s[(char)a]= 'B';
   pc("s[(char)a]=  : B=", s[3], _PC());
 s[(char)(a)]= 'C';
-  pc("s[(char)(a)]=: C=", s[3], _PC());
+  pc("s[(char)(X)]=: C=", s[3], _PC());
   zo+= 6;
   pc(".   calibrate: ?=", s[300], _PC()+10);
 s[300]= 'D';
@@ -46,6 +46,6 @@ s[300]= 'D';
 s[a]= 'E';
   pc("s[a]=        : E=", s[3], _PC());
 s[(a)]= 'F';
-  pc("s[(a)]=      : F=", s[3], _PC());
+  pc("s[(EXPR)]=   : F=", s[3], _PC());
   return 4711;
 }
