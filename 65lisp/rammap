@@ -30,7 +30,7 @@ while(<IN>) {
             print "\n------------------------------";
             # print memory [$start,$addr[
             $n= 0;
-            for $m (hex($start)..hex($addr)) {
+            for $m (hex($start)..(hex($addr)-1)) {
                 # newline
                 if ($n % 16==0) {
                     printf("\n%04X: ", $m);
