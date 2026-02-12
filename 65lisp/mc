@@ -20,6 +20,7 @@ fi
 
 # - build a new if in dev env...
 if command -v ./rrasm >/dev/null 2>&1; then
+    echo "Dev version: building a new mc.sim"
     ./rrasm parse - >/dev/null 2>&1
     cp parse.sim mc.sim
 fi
