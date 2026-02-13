@@ -10251,74 +10251,102 @@ afterELSE:
         ;; arr[i]= ...
         .byte "|%V\["
         IMMEDIATE checkisarray
-        .byte "[#]%V\]=[#]%D;"
-        ;; 21 B (saves 7)
+        .byte "[#]%V\]=[#]%D;[#]"
+        ;; 15 B
       .byte "["
-        ;; stuff value
-        ldy #LOVAL
         ;; get index variable
-        .byte ";"
-        lda VAR0
-        ldx VAR1
-        ;; add array to it
-        .byte ";"
+        .byte "?1"
+        ldy VAR0
+        lda VAR1
+        ;; add hi index to hi array
+        .byte "?2"
         clc
-        adc #LOVAL
+        adc #HIVAL
+        sta tos+1
+        ;; lo
+        lda #LOVAL
         sta tos
         ;; TODO: could optmize away jsut do ldx DOS!
         ;;   (but wee have no access to DO)
-        txa
-        adc #HIVAL
-        sta tos+1
+
         ;; store value
-        tya
-        ldy #0
+        .byte "?0"
+        lda #LOVAL
         sta (tos),y
-      .byte "]"
+      .byte ";;;]"
+
 
         ;; arr[i]= ...
         .byte "|%V\["
         IMMEDIATE checkisarray
-        .byte "[#]%V\]=[#]%",_E,";"
-        ;; 20 B (saves 8)
+        .byte "[#]%V\]=[#]",_E,";"
+        ;; 17 B (saves 8)
       .byte "["
         ;; stuff value
-        pha
+        tax
         ;; get index variable
         .byte ";"
-        lda VAR0
-        ldx VAR1
-        ;; add array to it
+        ldy VAR0
+        lda VAR1
+        ;; hi add array to it
         .byte ";"
         clc
-        adc #LOVAL
-        sta tos
-        txa
         adc #HIVAL
         sta tos+1
+        ;; lo array
+        lda #LOVAL
+        sta tos
         ;; store value
-        ldy #0
-        pla
+        txa
         sta (tos),y
       .byte "]"
 .endif ; OPTRULES
 
 
-;;; TODO: make lvalue?
-;;;   if not _E might be compiled several time?
-
-;        .byte "|%V\[",_E,"\]=",_E,";"
-        
+;;; TODO: make lvalue? lots of "duplication"
 
         ;; ASSIGN GENERIC ARRAY [ INDEX ]
 
         .byte "|%V\["
         IMMEDIATE checkisarray
-        ;; 8+12= 20 B
         ;;  +4 +4 => 28 (in array-assign.c?)
         .byte "[#]",_E,"\]="
-      .byte "[;"
+      .byte "["
+.ifblank
+        ;; 18 B, save 2 bytes
+        ;; push index lo
+        pha
+        ;; add index hi to addr, push it
+        .byte "?0"
+        txa
+        clc
+        adc #HIVAL
+        pha
+      .byte "]"
+        .byte _E,";"
+      .byte "["
+        ;; stuff value
+        tax
+        ;; restore index hi => tos
+        pla
+        sta tos+1
+        ;; restore index lo
+        pla
+        sta tos
+        ;; load table lo => tos+1 (hi)
+        .byte "?0"
+        ldy #LOVAL
+        ;; save it
+        txa
+        sta (tos),y
+        ;; most messy, lol: (saves 2 bytes)
+        ;; TODO: Can we use this trick for loading
+        ;; !! sta (indexlo, tablehi+indehi),Y=tablelo
+     .byte ";]"
+.else
+        ;; 8+12= 20 B
         ;; add computed index to array address, push
+        .byte ";"
         clc
         adc #LOVAL
         pha
@@ -10339,34 +10367,170 @@ afterELSE:
         ldy #0
         sta (tos),y
      .byte "]"
+.endif
 
+
+        ;; OPTIMIZED ASSIGN PTR [ INDEX ]
+
+
+.ifdef OPTRULES
+        ;; ptr[(char)i]=constant;
+        .byte "|%V\[(char)[#]%V\]=[#]%D;"
+        ;; 6 B !
+      .byte "["
+        lda #LOVAL
+        ;; get index
+        .byte ";"
+        ldy VAR0
+        ;; get array
+        .byte ";"
+        sta (VAR0),y
+      .byte "]"
+
+
+        ;; ptr[const]=constant;
+        ;; 6 B (was 38???)
+        .byte "|%V\[[#]%d\]=[#]"
+        ;; TODO: this adds 2 bytes
+        ; .byte _E,";"
+        ;; TODO: replace this with _BYTEEXPR ?
+        .byte "%D;"
+      .byte "["
+        lda #LOVAL
+        ;; get index
+        .byte ";"
+        ldy #LOVAL
+        ;; get array
+        .byte ";"
+        sta (VAR0),y
+      .byte "]"
+
+
+        ;; ptr[CONST]=constant;
+        ;; 17 B
+        .byte "|%V\[[#]%D\]=[#]"
+        ;; TODO: this adds 2 bytes
+        ; .byte _E,";"
+        ;; TODO: replace this with _BYTEEXPR ?
+        .byte "%D;[#]"
+      .byte "["
+        ;; get address
+        .byte "?2"
+        lda VAR0
+        sta tos
+        lda VAR1
+        ;; get index
+        ;; - add hi
+        .byte "?1"
+        clc 
+        adc #HIVAL
+        sta tos+1
+        ;; - lo index => Y
+        ldy #LOVAL
+        ;; store it
+        .byte "?0"
+        lda #LOVAL
+        sta (tos),y
+      .byte ";;;]"
+
+        ;; ptr[(char)(...)]=
+        .byte "|%V\[(char)([#]",_E,")\]="
+        ;; 9 B 
+      .byte "["
+        ;; prepare index
+        pha
+      .byte "]"
+        .byte _E,";"
+      .byte "[;"
+        tax
+        ;; load index
+        pla
+        tay
+
+        txa
+        sta (VAR0),y
+      .byte "]"
+
+        ;; ptr[i]= ...
+        .byte "|%V\[[#]%V\]=[#]%D;"
+      .byte "["
+        ;; 18 B
+        ;; stuff value
+        ldx #LOVAL
+        ;; get index variable
+        .byte ";"
+        ;; hi => Y! (no need to add)
+        ldy VAR0
+        ;; add hi to hiarray
+        lda VAR1
+        .byte ";"
+        clc
+        adc VAR1
+        sta tos+1
+
+        lda VAR0
+        sta tos
+        txa
+        ;; store it
+        sta (tos),y
+      .byte "]"
+
+        ;; arr[i]= ...
+        .byte "|%V\[[#]%V\]=[#]%",_E,";"
+        ;; 17 B (saves 8)
+      .byte "["
+        ;; stuff value
+        tax
+        ;; get index variable
+        .byte ";"
+        ;; hi => Y! (no need to add)
+        ldy VAR0
+        ;; add hi to hiarray
+        lda VAR1
+        .byte ";"
+        clc
+        adc VAR1
+        sta tos+1
+
+        lda VAR0
+        sta tos
+        txa
+        ;; store it
+        sta (tos),y
+      .byte "]"
+.endif ; OPTRULES
 
         ;; GENERIC ASSIGN PTR [ INDEX ]
 
         .byte "|%V\["
-        ;; 8+12= 20 B
-        ;;  +4 +4 => 28 (in array-assign.c?)
+        ;; 19
+        ;;  +4 +4 => 27 (in array-ptr-assign.c?)
         .byte "[#]",_E,"\]="
-      .byte "[;"
-        ;; add computed index to array address, push
-        clc
-        adc VAR0
+      .byte "["
+        ;; 19 B  38 c
+        ;; stuff index
         pha
         txa
-        adc VAR1
         pha
       .byte "]"
-        ;; TODO: byte rule and save 2 byte?
         .byte _E,";"
       .byte "["
-        ;; pop write address
-        tay
+        ;; stuff value
+        tax
+        ;; hi index add address
+        .byte ";"
         pla
+        clc
+        adc VAR1
         sta tos+1
+        ;; lo index => Y!
         pla
+        tay
+        ;; set low index
+        lda VAR0
         sta tos
-        tya
-        ldy #0
+        ;; store it
+        txa
         sta (tos),y
      .byte "]"
 
