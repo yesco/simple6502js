@@ -15,5 +15,5 @@ word fib(word n) {
 }
 
 word main() {
-  _ return fib(24);
+  _ _ _ _ return fib(24);
 }

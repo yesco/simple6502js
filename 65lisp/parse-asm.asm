@@ -5669,7 +5669,9 @@ FUNC _newvar_Y_AX_w
         ldy #'w'
 
 ;;; STACK: addrofname/w len/b JSR _newvar
-;;; AX=addr, Y=typechar
+;;;   AX=addr, Y=typechar
+;;;   tos= sizeof
+;;;   
 FUNC _newvar_Y_AX
 ;;; ??? 70 B
 
@@ -13382,7 +13384,8 @@ FUNC _searchfileA
         jsr putchar
         putc GREEN
 
-        jsr printline
+        ;; Y=0
+        jsr printlineTOSY
 
 @donefile:
         jsr nl
@@ -13409,11 +13412,12 @@ FUNC _searchfileA
 
 
 ;;; print one line text (stop before \0 or LF/10)
-;;; tos= lineptr
+;;;   Y= offset where to start printing
+;;;   tos= lineptr
 ;;; Returns:
 ;;;   A= 0 or LF
 ;;;   tos= pointing at \0 or LF
-printline:      
+printlineTOSY:      
 @nextc:
         lda (tos),y
         bne :+
@@ -14103,6 +14107,13 @@ isbrk:
         sta dos
         lda $103+2,x
         sta dos+1
+        ;; save AX in pos, lol
+        lda $103+2+1,x
+        sta savea
+        lda $103+2+2,x
+        sta savex
+        lda $103+2+2,x
+        sta savey
         ;; step back one char
         ldx #dos
         jsr _decRX
@@ -14113,6 +14124,15 @@ isbrk:
         iny
         lda (dos),y
         sta tos+1
+
+        ;jsr clrscr
+
+        ;; print stack dpeth
+        putc 'S'
+        tsx
+        txa
+        jsr _print2h
+        jsr spc
 
         ;; search beginning of source line
         ldy #0
@@ -14136,15 +14156,29 @@ isbrk:
         ;;  restore pointer to _
         inc tos+1
 
-
         ;; print debug parts in green
         putc '_'
         putc GREEN
         ldy #2                  ; replaced _ with GREEN
         ;; print string pointed to by TOS
-        jsr printline
+        jsr printlineTOSY
         jsr nl
+
         ;; TODO: print (changed) vars
+        ;; - print AX
+
+        ;jsr _printvariables
+
+.ifnblank
+        ;; I think savea savex used elsewhere...
+        PRINTZ {"  AX="}
+        lda savea
+        ldx savex
+        jsr _printh
+        PUTC ' '
+        jsr _printu
+        putc 10
+.endif
 
         ;; restore regs
         pla
