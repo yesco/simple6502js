@@ -3522,14 +3522,15 @@ jsr _printchar
         ;; '!' 0b100001
         ;; '=' 0b111101
         ;;        ^ ==> V flag
-        ldx #0
+        ;; Y=0
         bit percentchar
         bvs @eqtest
-;        bne @eqtest
 @neqtest:
+        ;; make it !0
         iny
 @eqtest:
-        txa
+        ;; update flags if come from bvs
+        tya
         beq failjmp
         bne nextjmp
 :       
@@ -9390,12 +9391,22 @@ ruleE:
         
         .byte "(",_E,")",_D
         
+.ifnblank
+;;; TODO: remove ?
+        ;; Pascal style := works fine... LOL
+        .byte "|%V:=[#]",_E
+      .byte "[;"
+        sta VAR0
+        stx VAR1
+      .byte "]"
+.endif
+
         ;; make sure it's not '==' lol
         ;; (remember subexpr not fail!)
         .byte "|%V="
         .byte "%!=",$80
         .byte "[#]",_E
-      .byte "[;"
+     .byte "[;"
         sta VAR0
         stx VAR1
       .byte "]"
