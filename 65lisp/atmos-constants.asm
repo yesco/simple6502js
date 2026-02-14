@@ -25,9 +25,17 @@ CURROW		= $268
 CURCOL		= $269
 CURCALC		= $001f      ; ? how to update?
 
-;;; place to patch
+;;; NMI place to patch
 ;NMIVEC=$FFFA                    ; => $0247
 NMIVEC=$0248                    ; => $F8B2
+
+;;; BRK handler pointer (normal int)
+
+;;; 6502:
+INTVEC=$FFFE
+
+;;; ORIC_ATMOS
+;INTVEC=$0245 ; ?
 
 ;;; TODO: why are these so late?
 ;;;   used much earlier!

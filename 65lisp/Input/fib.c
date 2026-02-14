@@ -4,16 +4,16 @@
 //typedef unsigned int word;
 
 word add(word a, word b) {
-  return a+b;
+  _ return a+b;
 }
 
 word fib(word n) {
-  if (n<2) return n;
+  _ if (n<2) _ return n;
   // no complex expressions (yet)
   // return fib(n-1) + fib(n-2);
-  return add(fib(n-1), fib(n-2));
+  _ return _ add(_ fib(n-1), _ fib(n-2));
 }
 
 word main() {
-  return fib(24);
+  _ return fib(24);
 }

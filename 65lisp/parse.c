@@ -11,6 +11,7 @@
 #include <ctype.h>
 
 extern void clrscr();
+extern void init();
 
 // linmker can't find
 //extern char mygetc() { return cgetc(); }
@@ -572,6 +573,7 @@ void main(int iargc, char** iargv) {
   // save for processnextarg()
   argc= iargc; argv= iargv;
 
+  init();
   
 #ifdef FIHS
   int i;

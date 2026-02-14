@@ -2611,6 +2611,10 @@ PRINTNAME=1
 .endif ; PRINTASM
 
 
+;;; Breakpoint _ charater enabled
+;
+BREAKPOINTS=1
+
 
 
 ;;; TODO:
@@ -2696,19 +2700,13 @@ showbuffer:     .res 1
 .code
 
 
-;;; This is where the C-program loader starts
-.export _start
-_start:
-
 ;;; Magical references in [generate]
 .macro DOJSR addr
         .byte 'C'
         .word addr
 .endmacro
 
-
-
-;;; parser to compile _
+;;; parser to compile
 FUNC _init
 
         ;; editor states
@@ -2720,6 +2718,36 @@ FUNC _init
         lda #64
         sta mode
 
+.ifdef BREAKPOINTS
+
+.bss
+savedintvec:    .res 2
+.code
+
+
+.ifdef __ATMOS__
+
+;;; TODO:
+
+.else
+
+        ;; Save INTVEC
+        lda INTVEC
+        ldx INTVEC+1
+        sta savedintvec
+        stx savedintvec+1
+
+        ;; install new
+        lda #<IRQ_Handler
+        ldx #>IRQ_Handler
+        sta INTVEC
+        stx INTVEC+1
+
+.endif ; sim65 (== !__ATMOS__)
+
+.endif ; BREAKPOINTS
+
+
 
 
 ;;; ATMOS w BASIC ROM
@@ -2727,7 +2755,6 @@ FUNC _init
 .ifdef __ATMOS__
 
         putc CTRL('T')          ; caps off
-
 
         ;; NMI patching to break running program.
         ;; ORIC ATMOS points to:
@@ -2754,6 +2781,16 @@ FUNC _init
 
 .endif ; __ATMOS__
 
+
+        rts
+        ;; END of _init
+
+
+
+;;; This is where the C-program loader starts
+.export _start
+_start:
+        jsr _init
 
 ;;; Only done here the first time
 .ifdef INTRO
@@ -5094,11 +5131,28 @@ nextc:
         ldy #0
         lda (inp),y
         bpl :+
+        ;; TODO: not reset? use for optimization hints?
         ;; hi-bit set => reset, lol (cursor?)
         and #$7f
         sta (inp),y
 :       
         beq done
+
+.ifdef BREAKPOINTS
+        ;; ? a single '_' - set breakpoint
+        cmp #'_'
+        bne :+
+        iny
+        lda (inp),y
+        dey
+        cmp #' '+1
+        bcs :+
+        
+        jsr genbreakpoint
+        jmp nextc
+:       
+.endif ; BREAKPOINTS
+
 
 .ifdef PRINTDOTS
         ;; at each newline print a dot
@@ -13328,15 +13382,7 @@ FUNC _searchfileA
         jsr putchar
         putc GREEN
 
-        ;; print first line
-:       
-        lda (tos),y
-        beq @donefile
-        cmp #10
-        beq @donefile
-        jsr putchar
-        jsr _incT
-        jmp :-
+        jsr printline
 
 @donefile:
         jsr nl
@@ -13362,7 +13408,26 @@ FUNC _searchfileA
         rts
 
 
+;;; print one line text (stop before \0 or LF/10)
+;;; tos= lineptr
+;;; Returns:
+;;;   A= 0 or LF
+;;;   tos= pointing at \0 or LF
+printline:      
+@nextc:
+        lda (tos),y
+        bne :+
+@ret:
+        rts
+:       
+        cmp #10                 ; LF
+        beq @ret
 
+        jsr putchar
+        jsr _incT
+        ;; always
+        jmp @nextc
+        bne @nextc
 
 
 FUNC _help
@@ -13993,6 +14058,129 @@ FUNC _ideend
 
 
 FUNC _debugstart
+
+.ifdef BREAKPOINTS
+
+IRQ_Handler:    
+        ;; should skip over one more byte
+        ;; (BRK lo hi)
+        pha
+        txa
+        pha
+
+        ;; read saved P reg
+        tsx
+        lda $101+2
+        and #%10000             ; B-flag
+        bne isbrk
+nobrk:
+        ;; jmp IRQ saved vector
+        pla
+        tax
+        pla
+
+.ifdef __ATMOS__
+
+        jmp (savedintvec)
+
+.else                         
+        ;; sim65
+
+        rti
+
+.endif
+
+
+isbrk:  
+        tya
+        pha
+        ;; now can use all regs
+
+        ;; read return address
+        ;; (points at 1 byte after BRK)
+        ;; (X=S already)
+        lda $102+2,x
+        sta dos
+        lda $103+2,x
+        sta dos+1
+        ;; step back one char
+        ldx #dos
+        jsr _decRX
+        ;; load print address
+        ldy #0
+        lda (dos),y
+        sta tos
+        iny
+        lda (dos),y
+        sta tos+1
+
+        ;; search beginning of source line
+        ldy #0
+        dec tos+1
+:       
+        dey
+        lda (tos),y
+        beq :+
+        cmp #10
+        bne :-
+:       
+        ;; print beginning of string (before _)
+:       
+
+        iny
+        beq :+
+        lda (tos),y
+        jsr putchar
+        jmp :-
+:       
+        ;;  restore pointer to _
+        inc tos+1
+
+
+        ;; print debug parts in green
+        putc '_'
+        putc GREEN
+        ldy #2                  ; replaced _ with GREEN
+        ;; print string pointed to by TOS
+        jsr printline
+        jsr nl
+        ;; TODO: print (changed) vars
+
+        ;; restore regs
+        pla
+        tay
+        pla
+        tax
+        pla
+        ;; PLP/RTS=RTI+1 from BRK!
+        plp
+        rts
+
+
+;;; generate code for breakpoint
+;;; inserts: 
+;;; (BRK lo_inp hi_inp) - pointer to source (at '_')
+genbreakpoint:  
+        ldy #0                  ; BRK
+        tya
+        sta (_out),y
+        jsr _incO
+
+        lda inp
+        sta (_out),y
+        jsr _incO
+        
+        lda inp+1
+        sta (_out),y
+        jsr _incO
+        
+        ;; tail-call
+        jmp _incI
+
+.endif ; BREAKPOINTS
+
+
+
 ;;; print "$4711@$34 "
 FUNC _printvar
 ;;; 32
