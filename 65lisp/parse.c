@@ -318,6 +318,7 @@ void error(char* msg, char* data) {
 
 
 
+
 #ifdef __ATMOS___
   // #define EDITSTART HICHARSET;
   #define EDITSTART 0x9800
@@ -328,9 +329,12 @@ void error(char* msg, char* data) {
 #endif // __ATMOS__
 
 
-// C; 537 B   _printvar ASM: 217 B _printenv: 167 B
+//#define PRINTVARIABLES
+
+// C; 736 B   _printvar ASM: 217 B _printenv: 167 B
 // double in C? hmmmm
 void printvariables() {
+#ifdef PRINTVARIABLES
   char * p= ruleVARS, c, t, * name;
   unsigned int v, * a, z;
 
@@ -396,6 +400,69 @@ next:
     }
   }
   //putchar('\n');
+#endif // PRINTVARIABLES
+}
+
+// 428 B!
+// just names
+void prvars() {
+#ifndef PRINTVARIABLES
+  char * p= ruleVARS, c, t, * name;
+  unsigned int v, * a, z;
+
+  while((c= *++p)) {
+    // print name, and skip till end of it: '%'
+    name= p;
+    v= 0;
+    while(*p!='%') { putchar(*p++); ++v; }
+next:
+    ++p; // skip %
+    switch((c= *p)) {
+    case 'R': p+= 2; putchar('('); continue; // jumper
+    case 'b': ++p; goto next; // wordbreak: ignore
+    default:
+      //if (z && z!=2) printf("[%d]", z);
+      if (c & 0x80) {
+        // skipper - print variable data
+        ++p;
+        t= p[2]; a= *(unsigned int**)p; v= *a;
+        z= *(unsigned int**)(p+3);
+
+        // TODO: BUG: 0 parameter no '(' printed...
+        if (t=='F') printf(") ");
+        else if (z && z!=2) printf("[%d] ", z);
+        else if (t!='w') { putchar(':'); printchar(t); }
+        else putchar(' ');
+
+#ifdef PRINTVAL
+        if (*name=='s' || t==('C' && 127)) {
+          // print string: array=p pointer=v
+          char * s= t&0x80? *(char**)p: (char*)v;
+          printf("#%2d=\"", strlen(s));
+          while(*s) printchar(*s++);
+          printf("\"");
+          //putchar('"');
+        } else {
+          // number
+          if (v<256) {
+            // char
+            //printf("=%3u '%c' ($%02x)",
+            //v,
+            //(v&127)<' '?0 : v<127?v: 0,
+            //v); //14
+          } else {
+            // word
+            //printf("= %5u ($%04x)", v, v); //15
+          }
+        }
+#endif // PRINTVAL
+        p+= 6; // 5+1 // used to be 3 // TODO:???
+        break;
+      } else error("op:?", 0);
+    }
+  }
+  putchar('\n');
+#endif // !PRINTVARIABLES
 }
 
 
@@ -547,7 +614,8 @@ extern void processnextarg() {
     case 'p': // print 
       switch(a[2]) {
       case 'V': printvariables(); break;
-      case 'v': printvars(); break;
+      case 'v': printvars(); break; // bad?
+      case 'n': prvars(); break;
       case 'e': printenv(); break;
       case 's': // print source
       default: error("Unknown 'p'rint option(-pv -pe): ",a);
