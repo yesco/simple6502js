@@ -14377,13 +14377,11 @@ FUNC _printnames
         cmp #'|'
         beq :+
         ;; ? not | must be %R
-;        jsr _decT               ; skip |
-;        jsr _decT               ; skip hirule
-;        jsr _decT               ; skip lorule
-;       jsr _decT               ; skip 'R'
+        jsr _decT               ; skip |
+        jsr _decT               ; skip hirule
+        jsr _decT               ; skip lorule
+        jsr _decT               ; skip 'R'
         jsr _decT       
-putc '?'
-jsr nl
         jmp @nextname
 :       
         jsr _decT
@@ -14404,8 +14402,13 @@ jsr nl
 ;       PUTC ':'
 ;     jsr _printchar
         jsr _decT
-        ;; skip addr
+        ;; skip addr => gos
+        lda (tos),y
+        sta gos+1
         jsr _decT
+
+        lda (tos),y
+        sta gos
         jsr _decT
         ;; skip skipper
         jsr _decT
@@ -14424,27 +14427,43 @@ jsr nl
         
         ;; standing at |
         ;; - print color for type
-        ldx savex
-        txa
-        jsr _printchar
-        putc ':'
         lda #128+3              ; YELLOW is global
         ;; ? function
+pha
+      lda savex
+;      jsr _printchar
+;      putc ':'
+pla
+        ldx savex
+        bpl :+
+        ;; is array
+.ifnblank
+;;; TODO: because we look at type here?
+;;;   just look at varaddr?
+        ;; doesn't get here for last array
+        ;; - print size
+        putc '#'
+        lda dos
+        ldx dos+1
+        jsr _printn
+.endif        
+        lda #128+7              ; WHITE array
+:       
         cpx #'F'
         bne :+
         
-        lda #128+2              ; GREEN for function
+        lda #128+2              ; GREEN function
         bne @printname
 :       
-        ;; ? local
-        ldx dos+1
-        beq @isarray
+        ;; ? local ( addr < endparams)
+        ldx gos+1
+        bne @isarray
 
-        ldx dos
-        cmp #endparams
+        ldx gos
+        cpx #endparams
         bcs :+
         ;; IS local
-        lda #128+4              ; local is blue
+        lda #128+4              ; BLUE local (params)
 :       
 
 @isarray:
@@ -14455,10 +14474,12 @@ jsr nl
 :       
         lda (tos),y
         cmp #'%'
-        beq @nextname
+        bne :+
+        jmp @nextname
+:
         jsr putchar
         iny
-        bne :-
+        bne :--
 
 @done:
         rts
