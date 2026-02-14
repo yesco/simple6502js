@@ -27,6 +27,8 @@ fil
 fil2
 fil2.*
 
+*.tmp
+
 *.lst
 a.out
 *.o
@@ -37,6 +39,11 @@ a.out
 *.bin
 *.out
 *.tap
+
+*.dsk
+
+*.sizes
+*.syms
 *.x
 
 
