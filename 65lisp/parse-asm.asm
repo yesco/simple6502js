@@ -5861,6 +5861,9 @@ FUNC _hideargs
         ;;           <----------N----------->
         ;; put new rule address
         ;; (have to put values from the BACK!)
+        lda #'|'+128
+        jsr _stuffVARS
+
 ;;; TODO: generalize?
         lda curF+1
         jsr _stuffVARS
@@ -5958,9 +5961,9 @@ load_sizeof:
 disallowlocal:
 .ifdef ZPVARS
 .scope
-        lda tos
         ldx tos+1
         bne isarray
+        lda tos
         cmp #endparams
         bcs notstackedparameter
         ;; is a params address
@@ -7009,6 +7012,7 @@ FUNC _funcallstart
         DOJSR VAL0
       .byte "]"
 
+        ;; CALL fun(...) { ... }
         .byte "|%V([#]",_E,_L,"[;]"
 
 FUNC _funcallend
@@ -7297,7 +7301,7 @@ parsestring:
 ;;;   variables (as they are copied and reused
 ;;;   in zeropage!)
         .byte "|&%V"
-;        IMMEDIATE disallowlocal
+        IMMEDIATE disallowlocal
       .byte "["
         lda #LOVAL
         ldx #HIVAL
@@ -9452,7 +9456,7 @@ ruleN:
 .include "parse-fold.asm"
 
 
-;;; DEFINING FUNCTIONS
+        ;; DEFINE DECLARE FUNCTIONS
 
 
         ;; TODO: _T never fails...
@@ -9481,8 +9485,7 @@ ruleN:
         ;;  will fall through to next function...)
         rts
       .byte ']'
-        ;; Not really needed
-        ;; IMMEDIATE _hideargs
+        IMMEDIATE _hideargs     ; useful for pretty print
         .byte TAILREC
 
 
@@ -9535,15 +9538,12 @@ ruleN:
         ;; DEFINE fun(a,b...) - TWO or MORE args
 
         .byte "|word","%I("
-
 ;;; TODO: is this relevant still - cleanup?
-
 ;;; TODO: this is kindof messed up, lol
 ;;;   it relies on that ONE arg parse have
 ;;;   registred the name already, lol
 ;;;   make a way to detect how many args before?
 ;        IMMEDIATE _newfun
-
         IMMEDIATE _initparam
         .byte _R                ; reads f.arguments
 
@@ -14360,7 +14360,116 @@ FUNC _printregs
         rts
 .endif ; PRINTREGS
 
+
+FUNC _printnames
+        lda #<VARS
+        ldx #>VARS
+        sta tos
+        stx tos+1
+;;; TODO: expects at least one var?
+@nextname:
+        jsr spc
+
+        ldy #0
+        ;; skip |
+        lda (tos),y
+        bpl :+
+        cmp #'|'
+        beq :+
+        ;; ? not | must be %R
+;        jsr _decT               ; skip |
+;        jsr _decT               ; skip hirule
+;        jsr _decT               ; skip lorule
+;       jsr _decT               ; skip 'R'
+        jsr _decT       
+putc '?'
+jsr nl
+        jmp @nextname
+:       
+        jsr _decT
+        ;; skip dummy
+        jsr _decT
+        ;; get size
+        lda (tos),y
+        sta dos+1
+        jsr _decT
+
+        lda (tos),y
+        sta dos
+        jsr _decT
+        ;; get typechar
+        lda (tos),y
+        sta savex
+;;; These modifies somethingin regs?
+;       PUTC ':'
+;     jsr _printchar
+        jsr _decT
+        ;; skip addr
+        jsr _decT
+        jsr _decT
+        ;; skip skipper
+        jsr _decT
+        ;; skip %b
+        jsr _decT
+        jsr _decT
+        ;; scan name (backwards)
+:       
+        jsr _decT
+        inc savey
+        lda (tos),y
+        beq @done
+        and #$7f
+        cmp #'|'
+        bne :-
+        
+        ;; standing at |
+        ;; - print color for type
+        ldx savex
+        txa
+        jsr _printchar
+        putc ':'
+        lda #128+3              ; YELLOW is global
+        ;; ? function
+        cpx #'F'
+        bne :+
+        
+        lda #128+2              ; GREEN for function
+        bne @printname
+:       
+        ;; ? local
+        ldx dos+1
+        beq @isarray
+
+        ldx dos
+        cmp #endparams
+        bcs :+
+        ;; IS local
+        lda #128+4              ; local is blue
+:       
+
+@isarray:
+@printname:
+        jsr putchar
+        ;; Y=0
+        iny
+:       
+        lda (tos),y
+        cmp #'%'
+        beq @nextname
+        jsr putchar
+        iny
+        bne :-
+
+@done:
+        rts
+        
+        
+
+
+
+
 ;;; TODO: ridiculus long!!! shorten?
+;;;   203
 
 ;;; prints vars
 ;;; FORMAT: foo    $varaddr typechar   @value
