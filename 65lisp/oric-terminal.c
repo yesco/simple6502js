@@ -3,7 +3,16 @@
 
 int fullwidth= 0xFF00; // "space"
 
-//#define DOUBLE
+// Enable to get fullwidth wide chars
+//#define WIDE
+
+#ifdef WIDE
+  #define SPACE "  "
+#else
+  #define SPACE " "
+#endif
+
+
 
 // UTF-8 in this range 1110xxxx10xxxxxx10xxxxxx
 void u8put_r(int uc, int m) {
@@ -37,62 +46,65 @@ void gotorc(int r, int c) {
 
 void fullputc(int c) {
   switch(c) {
+
+  // ^L clear screen
   case 12:
     clear(); break;
+
   case ' ':
-    putchar(' ');
-#ifdef DOUBLE
-    putchar(' ');
-#endif
+    printf(SPACE);
     break;
+
+  // normal characters
   case 33 ... 126:
-#ifdef DOUBLE
+#ifdef WIDE
     u8put(fullwidth-32+c); break;
 #else
     putchar(c); break;
 #endif
+
   case '\n':
-    clearend(); // hmmm?
+    // each new text line on ORIC resets colros
+    // to BLACK background and WHITE foreground
     resetcolors();
-    printf("\n  ");
-#ifdef DOUBLE
-    printf("  ");
-#endif
+    putchar('\n');
+    // two attribute columns are not printable
+    printf(SPACE SPACE);
     break;
   case '\r':
-    printf("\r  ");
-#ifdef DOUBLE
-    printf("  ");
-#endif
+    putchar('\r');
+    printf("\e[2C"); // forward 2 steps
     break;
 
-  // TODO: 30,31? setink/setpaper
+  // 28,29,30,31 cursor movements (MeteoriC bios)
 
   // text colors
   case (128) ... (128+7):
     // ORIC attributes take up one space
     // TODO: why two spaces? one gets eaten up!
-    printf("\e[%dm ", c-128+30); break;
-#ifdef DOUBLE
-    putchar(' ');
-#endif
+    printf("\e[%dm", c-128+30); break;
+    printf(SPACE);
+
   // background colors
   case (128+16) ... (128+16+7):
-    printf("\e[%dm  ", c-128-16+40); break;
-#ifdef DOUBLE
-    putchar(' ');
-#endif
+    printf("\e[%dm", c-128-16+40); break;
+    printf(SPACE);
+
   // inverse
   case (128+32) ... 255:
-//    printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
+    // ???
+    // printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
+
     // ORIC console doesn't invert, just print chars
     fullputc(c&0x7f); break;
 
-  // double up
+  // backspace - double up
   case 8:
-#ifdef DOUBLE
-    putchar(c);
-#endif
+    #ifdef WIDE
+      putchar(c);
+    #endif
+
+  // what chars remains?
   default:
     putchar(c);
     //printf("%02x", c); break;
@@ -112,14 +124,17 @@ int main(void) {
   setvbuf(stdout, NULL, _IONBF, 0);
 
   clear();
-  fullputs("\nORIC 65LISP>02                     CAPS");
-
-//  printf("\e[30;47;1m\n    "); // background white, black text bold
+  // status line? lol
+  // fullputs("\nORIC 65LISP>02                     CAPS");
 
   clearend();
-//  printf("\e[3;29r"); // set scroll region
+
+  // set scroll region
+  // printf("\e[3;29r");
+
   gotorc(1, 1);
 
+  // Hmmm (?)
   for(int i=1; i<28; i++) {
     printf("\n");
     clearend();
@@ -127,6 +142,7 @@ int main(void) {
   gotorc(2, 1);
   printf("   ");
 
+  // process characters
   int c;
   while((c=getchar())!=EOF) {
     fullputc(c);
@@ -137,7 +153,9 @@ int main(void) {
   printf("\n");
   printf("\e[r\n"); // no more scroll region
 
+  // TODO: got end of screen, need to get size...
   gotorc(34, 1);
+
   return 0;
 }
 
