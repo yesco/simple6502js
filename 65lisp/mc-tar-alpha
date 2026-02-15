@@ -7,6 +7,9 @@ LISTFILES=(
 "mc.sim"
 "mc.tap"
 "oric-terminal.c"
+"Input/arrays-assign.c"
+"Input/arrays-ptr-assign.c"
+"Input/arrays-ptr.c"
 "Input/byte-sieve.c"
 "Input/byte-sieve-2K.c"
 "Input/byte-sieve-4K.c"
@@ -51,7 +54,3 @@ echo
 tar -tvf $TARNAME
 echo
 ls -l $TARNAME
-
-
-
-
