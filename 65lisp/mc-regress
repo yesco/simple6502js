@@ -46,7 +46,7 @@ echo
 diff --strip-trailing-cr --color -F "^=== " -U 3 mc-regress.out mc-regress.log
 
 echo "^^^ ENDIFF -----------------------"
-echo "If differs, inspect changes, merge, or: cp mc-regression.log mc-regression.out"
+echo "If differs, inspect changes, merge, or: cp mc-regress.log mc-regress.out"
 
 
 

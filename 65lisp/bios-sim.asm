@@ -76,11 +76,11 @@ putchar:
         cmp #10
         bne :+
         ;; cr
+        lda #13
         jsr rawputc
         ;; lf
-        lda #13
+        lda #10
 :       
-
         jsr rawputc
 
         lda saveaputchar
