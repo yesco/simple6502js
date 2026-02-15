@@ -1,0 +1,52 @@
+# regression testing for the MeteoriC-compiler
+
+DATE="`date +"%FT%H%M%S" -u`"
+
+# LIMIT execution to:
+# 5 minutes simulated time
+# ~ (/ 300 36) = 8s "real time"
+MAXTIME=300000000
+
+rm mc-regress.log Tests/*.log Tests/*/*.log
+
+
+FILES=(Tests/*.c Tests/*/*.c)
+
+# build once
+./mc -
+
+for file in "${FILES[@]}"; do
+    echo "===================================" | tee -a mc-regress.log
+    echo "=== $file" | tee -a mc-regress.log
+   
+    # this is similar to ./mc-test, only
+    # that this one compiles mc.sim only once...
+    sim65 -x $MAXTIME -c mc.sim $file | tee $file.log | tee -a mc-regress.log
+    echo | tee -a mc-regress.log
+    echo | tee -a mc-regress.log
+    echo | tee -a mc-regress.log
+done
+
+echo "//////////////////////////////////////"
+echo "//////////////////////////////////////"
+echo "//////////////////////////////////////"
+echo 
+echo
+
+# ls -l Tests/*.log Tests/*/*.log
+
+#ls -l Tests/*.log Tests/*/*.log
+
+find Tests/*.log Tests/*/*.log -maxdepth 1 -printf "%7s %p\n" 2&>1
+
+echo
+echo "vvv DIFF: ------------------------"
+echo
+
+diff --strip-trailing-cr --color -F "^=== " -U 3 mc-regress.out mc-regress.log
+
+echo "^^^ ENDIFF -----------------------"
+echo "If differs, inspect changes, merge, or: cp mc-regression.log mc-regression.out"
+
+
+

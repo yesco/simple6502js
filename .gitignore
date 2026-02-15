@@ -2,10 +2,21 @@
 65lisp/Play/**
 !65lisp/Play/*.*
 
+65lisp/Input/**
+!65lisp/Input/*.*
+
+65lisp/Tests/**
+!65lisp/Tests/*.*
+
+65lisp/Tests/*/Tests/**
+!65lisp/Tests/*/Tests/*.*
+
 65lisp/*
 !65lisp/Play
 !65lisp/*.*
 !65lisp/Docs
+!65lisp/Input
+!65lisp/Tests
 
 
 
@@ -39,8 +50,16 @@ a.out
 *.bin
 *.out
 *.tap
+*.prg
+*.int
+*.csz
+*.dbj
+*.lbl
 
 *.dsk
+
+*.jz
+*.zip
 
 *.sizes
 *.syms

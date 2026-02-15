@@ -1,0 +1,90 @@
+===================================
+=== Tests/main-empty.c
+
+
+--- arg 2: Tests/main-empty.c
+--------------------
+
+
+LINES
+	.12
+
+
+16 bytes source
+
+OK 7 Bytes (libs +785 bios +41)
+
+
+
+--- arg 2: -r
+
+
+
+
+
+
+=> 0
+449948 cycles
+
+
+
+===================================
+=== Tests/main-return.c
+
+
+--- arg 2: Tests/main-return.c
+--------------------
+
+
+LINES
+	.12.34
+
+
+31 bytes source
+
+OK 12 Bytes (libs +785 bios +41)
+
+
+
+--- arg 2: -r
+
+
+
+
+
+
+=> 4711
+506946 cycles
+
+
+
+===================================
+=== Tests/10/main-void.c
+
+
+--- arg 2: Tests/10/main-void.c
+--------------------
+
+
+LINES
+	.1234
+
+
+165 bytes source
+
+OK 7 Bytes (libs +785 bios +41)
+
+
+
+--- arg 2: -r
+
+
+
+
+
+
+=> 0
+545020 cycles
+
+
+

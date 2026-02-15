@@ -1,0 +1,29 @@
+# run one test
+
+$file=$1
+shift
+
+# LIMIT execution to:
+# 5 minutes simulated time
+# ~ (/ 300 36) = 8s "real time"
+MAXTIME=300000000
+
+rm $file.log
+
+# - compile (if in dev)
+./mc - > /dev/null
+
+echo "=== $file"
+
+    echo "===================================" | tee -a $file.log
+    echo "=== $file" | tee -a $file.log
+
+    # this is similar to ./mc-test, only
+    # that this one compiles mc.sim only once...
+    sim65 -x $MAXTIME -c mc.sim $file | tee -a $file.log
+    echo
+    echo
+    echo
+
+
+
