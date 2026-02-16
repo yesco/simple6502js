@@ -5901,6 +5901,51 @@ getinp:
         tya
         rts
 
+
+;;; These keywords can legally be followed by
+;;; a letter and potentially give problems
+;;; with the simple kind of parsing we do:
+;;; 
+;;;   int char void long (word)
+;;;   do else case goto return 
+;;; 
+;;;   (struct union)
+;;;   (unsigned signed extern static)
+checkisdelimited:
+        ;; peek ahead
+        ldy #0
+        lda (inp),y
+        ;; ? '{'
+        cmp #'{'
+        bne :+
+        ;; ok we got '{'
+        jmp _next
+:       
+        ;; ? prev is white-space?
+        dey                     ; Y= 255
+        dec inp+1
+        lda (inp),y
+        inc inp+1
+
+        cmp #' '+1
+        bcs :+
+        ;; got whitespace
+        jmp _next
+:       
+        ;; Nah, not DO
+        jmp _fail
+
+        
+;;; TODO: remove, peek at next inp
+peekahead:      
+        jsr nl
+        putc '?'
+        ldy #0
+        lda (inp),y
+        jsr _printchar
+        jsr nl   
+        rts
+
 ;;; will FAIL if identifier isn't array
 ;;; (pointer give error too)
 checkisarray:
@@ -6567,7 +6612,7 @@ ldx tos+1
 .ifdef __ATMOS__
         ;; potentially first so no "|"
 
-        .byte "clrscr()"
+        .byte "|clrscr()"
       .byte '['
         ;; ORIC: CLS command (LDA #$0C)
         jsr $CCCE
@@ -6789,19 +6834,23 @@ FUNC _stringrulesend
 
 FUNC _memoryrulesstart
 
-;;; ORIC peek/poke deek/doke
+
+
+        ;; ORIC peek/poke deek/doke
+
+
+
 .ifdef OPTRULES
 
-
-
 ;;; TODO: too many |POKE( rules!!!!
+;;;   (same as indexing?)
 
-;;; OK
+;;; OK zeropage write
 ;;; here arrassign
         .byte "|poke(%d,"
         .byte "[#]",_I
       .byte "[;"
-        sta '<'
+        sta LOVAL
       .byte "]"
 
 ;;; OK
@@ -6835,9 +6884,9 @@ FUNC _memoryrulesstart
 
 ;;; TOTEST
 ;;; here arrassign
-        .byte "|doke(%D[#],",_E,")"
+        .byte "|doke(%D,[#]",_E,")"
       .byte "[;"
-;;; TODO: how about zero page addresses! save 2B
+        ;; TODO: zero page addresses? save 2B
         sta VAL0
         stx VAL1
       .byte "]"
@@ -6855,7 +6904,6 @@ FUNC _memoryrulesstart
 ;;; TOTEST
 ;;; here arrassign
         .byte "|doke(",_E,",",_G
-      .byte "["
         ;; AX: value to doke
         ;; tos: addrss to put it
       .byte "["
@@ -6866,7 +6914,6 @@ FUNC _memoryrulesstart
         iny
         sta (tos),y
       .byte "]"
-
 
 .ifdef OPTRULES
 ;;; here arrassign
@@ -6889,9 +6936,8 @@ FUNC _memoryrulesstart
       .byte '['
         sta tos
         stx tos+1
-        ldy #0
-        lda (tos),y
         ldx #0
+        lda (tos,x)
       .byte ']'
 
 ;;; here arrassign
@@ -9480,7 +9526,9 @@ ruleN:
 
         ;; DEFINE fun(){...} - ZERO argument function
         ;; (no overhead)
-        .byte "|word","%I()"
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+        .byte "%I()"
         IMMEDIATE _newfun
         .byte _B
       .byte '['
@@ -9508,7 +9556,11 @@ ruleN:
 ;;; - on the other hand this optimizes ONE arg function...
 .ifblank
         ;; fun(Expr){...} - ONE argument function
-        .byte "|word","%I(","word"
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+        .byte "%I(","word"
+        IMMEDIATE checkisdelimited
+
         IMMEDIATE _newfun
         ;; TODO: make part of newname_F?
         ;; TODO: how about other types?
@@ -9549,7 +9601,9 @@ ruleN:
 
         ;; DEFINE fun(a,b...) - TWO or MORE args
 
-        .byte "|word","%I("
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+        .byte "%I("
 ;;; TODO: is this relevant still - cleanup?
 ;;; TODO: this is kindof messed up, lol
 ;;;   it relies on that ONE arg parse have
@@ -9662,18 +9716,22 @@ ruleN:
 
 ;;; TODO:
 ;        .byte "|word\*","%I="...
+;        IMMEDIATE checkisdelimited
 ;        IMMEDIATE _newarr_w
 ;        .byte TAILREC
 
 
 ;;; TODO: word array[] ...
 
-;        .byte "|word","%I\[%D\];"
+;        .byte "|word"
+;        IMMEDIATE checkisdelimited
+;        .byte ""%I\[%D\];"
 ;        IMMEDATE _newarr_w_ptr
 ;        jsr _newarr
 ;        .byte TAILREC
 
 ;        .byte "|word","%I\[\]={"
+;        IMMEDIATE checkisdelimited
 ;        IMMEDIATE _newarr_w
 ;        .byte _Q
 ;        .byte TAILREC
@@ -9685,7 +9743,9 @@ ruleN:
         ;; DEFINE VARIABLES
 
         ;; TODO: use %N in else branch
-        .byte "|word",_K
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+        .byte _K
         .byte TAILREC
 
 
@@ -9761,7 +9821,9 @@ ruleP:
 
 	;.byte _T,"main()",_B
         ;; TODO: allow "int" even if...
-        .byte "word","main()"
+        .byte "word"
+        IMMEDIATE checkisdelimited
+        .byte "main()"
         ;; TODO: allow { var w init ... }
         ;;   they can be global, at this point doesn't
         ;;   matter, not allow recursion on main(), LOL?
@@ -9816,7 +9878,23 @@ ruleT:
         ;; we don't care
         .byte "|word|char*|char|void*|void|int*|int",0
 .else
-        .byte "word|char*|char|void|void*",0
+        .byte "word*"
+
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+
+        .byte "|char*"
+
+        .byte "|char"
+        IMMEDIATE checkisdelimited
+
+        .byte "|void*"
+
+        .byte "|void"
+        IMMEDIATE checkisdelimited
+
+        .byte 0
+
 ;;; TODO: change word to int... lol
 .endif
 
@@ -9842,6 +9920,7 @@ ruleS:
 
         ;; return from void function, no checks
         .byte "|return;"
+        IMMEDIATE checkisdelimited
       .byte '['
         rts
       .byte ']'
@@ -9946,7 +10025,9 @@ afterELSE:
 
         ;; goto
 ;;; TODO: %A can be %V ???
-        .byte "|goto%V;"
+        .byte "|goto"
+        IMMEDIATE checkisdelimited
+        .byte "%V;"
       .byte "["                ; get aDdress
         jmp (VAL0)
       .byte "]"
@@ -11368,6 +11449,7 @@ FOROPT=1
 .ifdef xOPTRULES
 ;;; OPT: DO ... WHILE(a);
         .byte "|do"
+        IMMEDIATE checkisdelimited
       .byte "[:]"
         .byte _S
 
@@ -11387,6 +11469,7 @@ FOROPT=1
 .ifdef BYTERULES
 ;;; OPT: DO ... WHILE(a);
         .byte "|DO"
+        IMMEDIATE checkisdelimited
       .byte "[:]"
         .byte _S
 
@@ -11405,7 +11488,9 @@ FOROPT=1
 
         ;; Generic optimized do...while
         ;; (clever specialization in _M
-        .byte "|do[:]",_S,"while(",_M,"[;]"
+        .byte "|do"
+        IMMEDIATE checkisdelimited
+        .byte "[:]",_S,"while(",_M,"[;]"
 
 
 ;;; ========================================
@@ -11433,6 +11518,7 @@ FUNC _oricend
 ;;; void gotoxy(unsigned char, unsigned char);
 .import _gotoxy
 
+;;; TODO: potential prefix problem gotoxyfoo?
         .byte "|gotoxy",_X
       .byte "["
         jsr _gotoxy
@@ -12168,7 +12254,9 @@ ruleR:
         .byte "|)"
 
         ;; parse one argument
-        .byte "|word","%I"
+        .byte "|word"
+        IMMEDIATE checkisdelimited
+        .byte "%I"
         IMMEDIATE _newparam_w
         .byte TAILREC
 

@@ -23,7 +23,8 @@ word my_deek(word idx) {
 
 word main() {
   arr = xmalloc(4);
-  // doke(arr, 300); // doesn't work
+  doke(42, 300);
+  doke(arr, 300);
   my_doke(0, 300);
   my_doke(1, 88);
 
