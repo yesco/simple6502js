@@ -1496,10 +1496,12 @@ _asmstart:
 
 .import _processnextarg
 
+;;; From parse.c:
 .import _iasmstart, _iasm, _dasm, _dasmcc
 .export _endfirstpage
 .export _output, _out
 .export _rules
+.import _printvariables
 
 
 
@@ -2614,6 +2616,12 @@ PRINTNAME=1
 ;;; Breakpoint _ charater enabled
 ;
 BREAKPOINTS=1
+
+;;; Trace variables - detect changes
+;;; Stores a copy of scalar variables value
+;;; in the dictionary since last breakpoint
+;TRACEVARS=1
+
 
 
 
@@ -5717,6 +5725,13 @@ FUNC _newname
         lda #':'
         jsr _stuffVARS
 
+.ifdef TRACEVARS
+        ;; push "stored snapshot" of var
+        lda #$00
+        jsr _stuffVARS
+        jsr _stuffVARS
+.endif ; TRACEVARS
+
         ;; push sizeof of var (other data func)
         lda tos+1
         jsr _stuffVARS
@@ -5741,7 +5756,13 @@ FUNC _newname
         jsr nl
 .endif
         ;; store skip chars "%<3+128>"
-        lda #6+128              ; 3 bytes to skip
+        ;; (+128 makes it store address in tos when parsed)
+.ifdef TRACEVARS
+        ;; store 2 extra old value
+        lda #8+128
+.else
+        lda #6+128
+.endif ; TRACEVARS
         jsr _stuffVARS
         lda #'%'
         jsr _stuffVARS
@@ -13192,7 +13213,6 @@ FUNC _hell
 ;;; TODO: bad name
 FUNC _outkey
         jsr _eosinfo
-        .import _printvariables ; from C
         jsr _printvariables
         jmp _forcecommandmode
 
@@ -14163,6 +14183,10 @@ FUNC _ideend
 
 FUNC _debugstart
 
+
+;;; Enable a BRK handler that handles breakpoints
+;;; a "BRK lo hi" points to source codee address
+;;; where the '_' break is (or beginning of line)
 .ifdef BREAKPOINTS
 
 IRQ_Handler:    
@@ -14228,7 +14252,7 @@ isbrk:
         ;jsr clrscr
 
         ;; print stack dpeth
-        putc 'S'
+        PRINTZ {10,10,'S'}
         tsx
         txa
         jsr _print2h
@@ -14268,6 +14292,7 @@ isbrk:
         ;; - print AX
 
         ;jsr _printvariables
+        jsr _checkvars
 
 .ifnblank
         ;; I think savea savex used elsewhere...
@@ -14291,7 +14316,7 @@ isbrk:
         rts
 
 
-;;; generate code for breakpoint
+;;; instrument/generate code for breakpoint
 ;;; inserts: 
 ;;; (BRK lo_inp hi_inp) - pointer to source (at '_')
 genbreakpoint:  
@@ -14461,6 +14486,9 @@ FUNC _printregs
 .endif ; PRINTREGS
 
 
+;;; TODO: make them distinct...
+FUNC _checkvars
+;;; 156 B (now ++)
 FUNC _printnames
         lda #<VARS
         ldx #>VARS
@@ -14478,10 +14506,25 @@ FUNC _printnames
         beq :+
         ;; ? not | must be %R
         jsr _decT               ; skip |
+        jsr _decT               ; skip dummy
+
+.ifdef TRACEVARS
+        ;; skip old val => pos
+        lda (tos),y
+        sta pos+1
+        jsr _decT
+
+        lda (tos),y
+        sta pos
+        jsr _decT
+.endif ; TRACEVARS
+
         jsr _decT               ; skip hirule
         jsr _decT               ; skip lorule
-        jsr _decT               ; skip 'R'
-        jsr _decT       
+        jsr _decT               ; skip 'R'       
+;;; ?
+        jsr _decT               ; hmmmm????
+
         jmp @nextname
 :       
         jsr _decT
@@ -14512,18 +14555,28 @@ FUNC _printnames
         jsr _decT
         ;; skip skipper
         jsr _decT
+        ;; standing before %SKIPER... ???
+.ifdef TRACEVARS
+        ;; save for check val (hi,lo)
+        lda tos+1
+        pha
+        lda tos
+        pha
+.endif ; TRACEVARS
         ;; skip %b
         jsr _decT
         jsr _decT
         ;; scan name (backwards)
-:       
+@scanname:       
         jsr _decT
         inc savey
         lda (tos),y
-        beq @done
+        bne :+
+        jmp @done
+:
         and #$7f
         cmp #'|'
-        bne :-
+        bne @scanname
         
         ;; standing at |
         ;; - print color for type
@@ -14567,6 +14620,8 @@ pla
 :       
 
 @isarray:
+
+        ;; print name (forwards)
 @printname:
         jsr putchar
         ;; Y=0
@@ -14580,6 +14635,49 @@ pla
         jsr putchar
         iny
         bne :--
+
+.ifdef TRACEVARS
+        ;; cmp new and old value
+        ;; (old value in pos)
+        ;; (new value pointed to by gos)
+        ldy #1
+        ;; cmp hi
+        lda (gos),y
+        cmp pos+1
+        bne @changed
+        tax
+        ;; equal: test lo
+        dey
+        lda (gos),y
+        cmp pos
+        beq :+
+@changed:
+        ;; print AX new value
+        jsr _printn
+        PUTC '('
+        jsr _printh
+        pha
+        txa
+        pha
+        PRINTZ ") was "
+        ;; print old
+        lda pos
+        ldx pos+1
+        jsr _printn
+        PUTC '('
+        jsr _printh
+        putc ')'
+
+        ;; update old
+        ldy #6
+        pla
+        sta (gos),y
+        iny
+        pla
+        sta (gos),y
+:       
+.endif ; TRACEVARS
+
 
 @done:
         rts
