@@ -82,13 +82,11 @@ void fullputc(int c) {
   case (128) ... (128+7):
     // ORIC attributes take up one space
     // TODO: why two spaces? one gets eaten up!
-    printf("\e[%dm", c-128+30); break;
-    printf(SPACE);
+    printf("\e[%dm" SPACE, c-128+30); break;
 
   // background colors
   case (128+16) ... (128+16+7):
-    printf("\e[%dm", c-128-16+40); break;
-    printf(SPACE);
+    printf("\e[%dm" SPACE, c-128-16+40); break;
 
   // inverse
   case (128+32) ... 255:
