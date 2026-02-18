@@ -14206,19 +14206,25 @@ nobrk:
         pla
         tax
         pla
-
 .ifdef __ATMOS__
-
         jmp (savedintvec)
-
 .else                         
         ;; sim65
-
         rti
-
 .endif
 
 
+        ;; at a BREAKPOINT:
+        ;; 
+        ;; It's our "BRK losrc hisrc"
+        ;; 
+        ;; Register usage:
+        ;;   dos  : pointer to ENV traversed backwards
+        ;;   tos  : pointer to source break point
+        ;;   savea: saved AX from interrupt
+        ;;   savex:
+        ;;   savey: 
+        ;; 
 isbrk:  
         tya
         pha
@@ -14231,7 +14237,7 @@ isbrk:
         sta dos
         lda $103+2,x
         sta dos+1
-        ;; save AX in pos, lol
+        ;; save AX in pos, lol -- TODO: verify correct?
         lda $103+2+1,x
         sta savea
         lda $103+2+2,x
@@ -14291,11 +14297,12 @@ isbrk:
         ;; TODO: print (changed) vars
         ;; - print AX
 
-        ;jsr _printvariables
         jsr _checkvars
 
 .ifnblank
         ;; I think savea savex used elsewhere...
+        ;; TODO: they are messed up by now...
+        ;; (just read again?)
         PRINTZ {"  AX="}
         lda savea
         ldx savex
