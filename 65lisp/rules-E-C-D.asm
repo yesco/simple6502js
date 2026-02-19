@@ -674,6 +674,18 @@ FUNC _memoryrulesstart
 ;.ifdef NONO_cc65_STDLIB
 .ifdef STDLIB
 
+        .byte "|srand(",_E,")"
+      .byte "["
+;;; rng at address $xx20 == "jsr" lol
+        sta rng
+        stx rng+1
+      .byte "]"
+
+        .byte "|rand()"
+      .byte "["
+        jsr rand
+      .byte "]"
+
 ;;; TODO: cheating, using cc65 malloc/free :-(
 
         ;; gives error if run out of memory
@@ -737,7 +749,6 @@ FUNC _memoryrulesstart
       .byte "]"
 
         ;; NOTE: no free and no realloc
-
 .endif ; !STDLIB
 
 

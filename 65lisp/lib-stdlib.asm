@@ -44,40 +44,98 @@
 
 
 
+;;; - https://wimcouwenberg.wordpress.com/2020/11/15/a-fast-24-bit-prng-algorithm-for-the-6502-processor/
+
+
+
+
+;;; 16 bit, maybe wrongly ported? 
+;;; - http://www.retroprogramming.com/2017/07/xor
+
+;;; set random seed, can be anything except 0
+;;; unsigned xorshift( )
+;;; {
+;;;     xs ^= xs << 7;
+;;;     xs ^= xs >> 9;
+;;;     xs ^= xs << 8;
+;;;     return xs;    
+;;; }
+;;; 
+;;; There are 60 shift triplets with the maximum
+;;; period 216-1. Four triplets pass a series of
+;;; lightweight randomness tests including randomly
+;;; plotting various n × n matrices using the high
+;;; bits, low bits, 
+
 .zeropage
-;;; 8-bit seed the generator, write here
-seedrand:       .byte 42
+rng:    .res 2
 .code
 
-;;; new rnadom valuie in AX
-FUNC rand
-        jsr rand8
-        tax
-        ;; fall-through for A
+rand:   
 
-;;; Simple 8-bit LFSR
-;;; 
-;;; The 8-bit LFSR (0–254 range, excluding all-zero),
-;;; use a Galois configuration with the primitive
-;;; polynomial \(x^8 + x^4 + x^3 + x^2 + 1\)
-;;; (mask `#$1D`). This gives a maximum period of 255
-;;; before repeating.
-;;; 
-;;; Consider using Mersenne Twister (?)
-FUNC rand8
-        lda seedrand
-        beq do_xor
-        asl
-        beq no_xor
-        bcc no_xor
-        lda seedrand
-do_xor:  
-        eor #$10
-no_xor: 
-        sta seedrand
+
+.ifblank
+;;; my version
+
+        ;; xs ^= xs << 7;
+.ifblank
+;;; 25 B
+      ldx rng+1
+        lda rng
+        lsr
+        eor rng+1
+        sta rng+1
+        lda #0
+        ror
+        eor rng
+        sta rng
+      txa
+      lsr
+      lda #0
+      ror
+      eor rng+1
+      sta rng+1
+.else
+        ;; TODO: make it smaller?
+
+.endif
+
+        ;; xs ^= xs >> 9;
+        ;lda rng+1
+        lsr
+        eor rng
+        sta rng
+
+        tax
+        ;; xs ^= xs << 8;
+        ;lda rng
+        eor rng+1
+        sta rng+1
+        
+        ;; AX reversed but doesn't matter
+        ;; - each value is generated!
         rts
 
+.else
+;;; from link - wrong!
+        lda rng+1
+        lsr
+        lda rng
+        ror
+        eor rng+1
+        sta rng+1  ; x ^= x << 7 done
+        ror        ; A x >> 9 high bit comes from low
+        eor rng
+        sta rng    ; x ^= x >> 9 low part of x ^= x << 7
 
+        tax
+        
+        eor rng+1
+        sta rng+1  ; x ^= x << 8 done
+
+        ;; hi/lo swapped, but who care? LOL
+        rts
+.endif
 
 
 ;FUNC _atoiAX

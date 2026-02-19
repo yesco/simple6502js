@@ -7453,6 +7453,28 @@ ruleO:
 
 FUNC ruleP_program
 ruleP:  
+
+
+
+        ;; INIT MODULES
+
+
+      .byte "["
+
+.ifdef nSTDLIB
+;;; 7 B
+        ;; srand(1) for rand()
+        ldx #1
+        stx rng
+        dex
+        stx rng+1
+.endif ; STDLIB
+
+      .byte "]"
+
+
+
+
         ;; TODO: ?
         ; JSRIMMEDIATE _iasmstart
 
@@ -8784,10 +8806,6 @@ FOROPT=1
 
 .endif ; ZEROPAGE
 
-
-.endif ; FOROPT
-        
-
         ;; i > 255
         ;; (saves 20B for PRIME for)
         .byte "|for(i=0;i<%D[d];++%V)"
@@ -8848,6 +8866,10 @@ FOROPT=1
         .byte "D#"
       .byte "]"
         ;; autopatches jump to here if false (PUSHLOC)
+
+.endif ; FOROPT
+        
+
 
 
 .ifdef bug_BYTERULES
@@ -8968,7 +8990,15 @@ FOROPT=1
 ;;; TODO: _S just to do assignment.
 ;;;       but should be _E that allows _E,_E,_E
 ;;;       (like sequence)
-        .byte "|for(",_S
+;        .byte "|for(",_S
+        .byte "|for("
+;;; OTOD: never gets here?????
+.byte "%{"
+putc '?'
+jsr nl
+halt:    jmp halt
+IMM_RET
+        .byte _S
       ;; INITIALIZER
       ;; CONDITION
       .byte "["
