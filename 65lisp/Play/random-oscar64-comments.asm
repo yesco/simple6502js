@@ -1,11 +1,16 @@
 #x7b= 123 B       861,946,225   includes C xorshift!
   no print(sum)    22,619,142   132 B (incl xorshift)
 
-mine: 134 B     1,709,830,292
-  no print(sum)    34,990,442    96 B (no print at end, using rand())
-  xorshift in C   136,089,546   174 B (incl xorshift)
-    opt <<7 >>9    50,907,895   157 B      - " -
-  jsr               3,932,160
+mine: 134 B     1,709,830,292   using rand()
+  no print(sum)    34,990,442   101 B (no print at end
+  do while         32,147,857    95 B
+  jsr               3,932,160   + 10% cmp inline
+
+  xorshift in C   136,089,546   180 B (incl xorshift)
+    opt <<7 >>9    50,907,895   163 B      - "" -
+    do while       49,487,771   156 B
+
+
 
 TOTAL             861,946,225   inlined C xorshift
    0 : divmod :   466,452,180

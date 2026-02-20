@@ -31,6 +31,7 @@ LISTFILES=(
 "Input/parenthesis.c"
 "Input/plusplus.c"
 "Input/random.c"
+"Input/random-xorshift.c"
 "Input/strlib.c"
 "Input/test-ctype.c"
 "Input/tutorial.txt"

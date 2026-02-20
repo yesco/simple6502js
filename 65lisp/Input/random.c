@@ -1,24 +1,14 @@
-word x,j,i,s;
-
-word xs;
-
-word xorshift() {
-  xs ^= xs << 7;
-  xs ^= xs >> 9;
-  xs ^= xs << 8;
-  return xs;    
-}
+word j,i,s;
 
 word main() {
-//  srand(1);
-  xs= 1;
+  srand(1);
   s= 0;
-  j=0; while(j<5) { ++j;
-    i= 0; while(++i) {
-//      x+= rand();
-      x+= xorshift();
-//      putu(rand()); putchar('\n');
-//      putu(xorshift()); putchar('\n');
-    }
-  }
+  j=5; do {
+    i= 0; do {
+//      s+= rand();
+      putu(rand()); putchar('\n');
+;
+    } while(--i);
+  } while(--j);
+//  return s;
 }
