@@ -78,7 +78,7 @@ rand:
 ;;; my version
 
         ;; xs ^= xs << 7;
-.ifblank
+.ifnblank
 ;;; 25 B
       ldx rng+1
         lda rng
@@ -96,8 +96,22 @@ rand:
       eor rng+1
       sta rng+1
 .else
-        ;; TODO: make it smaller?
-
+;;; 19 B (gen from oscar64, lol)
+        LDA rng+1
+        LSR
+        LDA rng
+        ROR
+;        lsr
+        TAX
+        LDA #$00
+        ROR
+        EOR rng
+        STA rng
+        TXA
+        EOR rng+1
+        STA rng+1
+;;; TODO: doesn't that skip the low bit of
+;;;    rng+1, shouldn't it be flipping the hi bit?
 .endif
 
         ;; xs ^= xs >> 9;
@@ -128,12 +142,15 @@ rand:
         eor rng
         sta rng    ; x ^= x >> 9 low part of x ^= x << 7
 
-        tax
+        tay
         
         eor rng+1
         sta rng+1  ; x ^= x << 8 done
 
-        ;; hi/lo swapped, but who care? LOL
+        ;; return AX=rng,rng+1
+        tax
+        tya
+
         rts
 .endif
 
