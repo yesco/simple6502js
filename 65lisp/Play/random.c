@@ -19,8 +19,8 @@ int main() {
   s= 0;
   j=0; while(j<5) { ++j;
     i= 0; while(++i) {
-s+= xorshift();
-//      printf("%u", xorshift()); putchar('\n');
+//s+= xorshift();
+      printf("%u", xorshift()); putchar('\n');
     }
   }
 //  printf("%u\n", s);

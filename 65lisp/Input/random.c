@@ -18,6 +18,7 @@ word main() {
 //      x+= rand();
       x+= xorshift();
 //      putu(rand()); putchar('\n');
+//      putu(xorshift()); putchar('\n');
     }
   }
 }

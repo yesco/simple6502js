@@ -4,6 +4,7 @@
 mine: 134 B     1,709,830,292
   no print(sum)    34,990,442    96 B (no print at end, using rand())
   xorshift in C   136,089,546   174 B (incl xorshift)
+    opt <<7 >>9    50,907,895   157 B      - " -
   jsr               3,932,160
 
 TOTAL             861,946,225   inlined C xorshift

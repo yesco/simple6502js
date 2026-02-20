@@ -8874,16 +8874,18 @@ FOROPT=1
 
 .ifdef bug_BYTERULES
 
-;;; TDOO: fix... %A
+;;; TODO: test!
 
-        .byte "|while([:]$%A<%d[#])"
+        .byte "|while([:]$%V<[#]%d[#])"
       .byte "["
-      .byte "]"
-.scope        
-      .byte "[D"
+.scope 
+        ;; get variable
+        .byte "?1"
         lda VAR0
+        ;; get number
         .byte ";"
-        cmp #'<'
+        cmp #LOVAL
+        .byte ";"
         bcc @okwhile            ; NUM+1>=VAR === num>VAR
 @nahwhile:
         ;; jmp to end if false
@@ -8892,12 +8894,15 @@ FOROPT=1
 .endscope
       .byte "]"
         .byte _S
-      .byte "[;d;"              ; pop tos, dos=tos; pop tos
+      .byte "["
         ;; jump to beginning of loop (:)
+        .byte "?1"
         jmp VAL0
-      .byte "D#]"               ; tos= dos, push tos (patch)
+        .byte "?0d;D"           ; over drop
+      .byte "]"
         ;; autopatches jump to here if false (PUSHLOC)
 .endif ; BYTERULES
+
 
 .ifdef OPTRULES
         ;; eternal loop
@@ -8910,10 +8915,9 @@ FOROPT=1
 .endif ; OPTRULES
 
 
-;;; %A only used here!!!?
-
-;;; todo: FIX
-        .byte "|while(%A<"
+;;; todo: FIX ??? done?
+ 
+        .byte "|while(%V<"
         ;; similar to while(%A<%D)
       .byte "["
         ;; reverse cmp as <> NUM avail first
@@ -8948,7 +8952,8 @@ FOROPT=1
 
 
 
-;;; TODO: while(--a) ???
+
+;;; TODO: while(--a) ... ;
 
 
 ;;; TODO: cleanup using "?2" positional parameters
@@ -8957,7 +8962,6 @@ FOROPT=1
 ;;; OPT: WHILE(a)...
         .byte "|while(%V)"
         .byte "[:]"
-
       .byte "["
         lda VAR0
         ora VAR1
@@ -9802,6 +9806,32 @@ ruleM:
 :       
 .endif
       .byte "]"
+
+
+;;; TODO: no savings!
+.ifnblank
+        // do ... while(--a);
+        .byte "|while(--%V)"
+      .byte "["
+        ;; 17 B
+        ldy VAR0
+        bne :+
+        dec VAR1
+:       
+        dey
+        sty VAR0
+        tya
+        ora VAR1
+        ;; get do address
+        .byte "?2"
+        beq :+
+        ;; loop back
+        jmp VAL0
+:       
+        ;; done
+      .byte "]"
+.endif
+
 
         .byte "|%V);"
       .byte "["

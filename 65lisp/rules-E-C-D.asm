@@ -1606,6 +1606,32 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
         
+        ;; especially easy
+        .byte "|>>9%b"
+      .byte "["
+        ;; 4 B
+        txa
+        lsr
+        ldx #0
+      .byte "]"
+        .byte TAILREC
+
+        ;; especially easy
+        .byte "|<<7%b"
+      .byte "["
+        ;; 9 B
+        tay
+        txa
+        asl
+        tya
+        ror
+        tax
+        lda #0
+        ror
+      .byte "]"
+        .byte TAILREC
+
+
         .byte "|<<1%b"
       .byte '['
 .ifblank
@@ -1730,6 +1756,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|<<%D"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1749,8 +1776,11 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+
 ;;; TODO: so many duplicates...
 ;;;   can just do _C or _E ? priorities?
+
+;;; TODO: optimize if >8
         .byte "|<<%V"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1773,6 +1803,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|>>%D"
       .byte '['
 ;PUTC '/'
@@ -1783,7 +1814,7 @@ FUNC _oprulesstart
         dey
         bmi :+
         
-        lsr tos
+        lsr tos+1
         ror
 
         sec
@@ -1793,6 +1824,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|>>%V"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1802,7 +1834,7 @@ FUNC _oprulesstart
         dey
         bmi :+
         
-        lsr tos
+        lsr tos+1
         ror
 
         sec
