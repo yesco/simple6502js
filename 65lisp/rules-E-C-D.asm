@@ -276,9 +276,9 @@ ldx tos+1
         ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%D)"
       .byte '['
-        lda #'<'
-        jsr putchar
-;;; TODO: about return value...
+        lda #LOVAL
+        jsr putcraw
+;;; TODO: about return value...?
       .byte ']'
 
         ;; putchar variable - saves 2 bytes!

@@ -112,6 +112,8 @@ getchar:
 
 rawputc=_putchar
 
+putcraw=_putchar
+
 .macro GOTOXY xx,yy
 ;;; ansi codes not working?
         pha

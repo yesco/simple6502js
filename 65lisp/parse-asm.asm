@@ -9824,12 +9824,34 @@ ruleM:
       .byte "]"
 
 
-;;; TODO: no savings!
 .ifnblank
-        // do ... while(--a);
-        .byte "|while(--%V)"
+;;; oscar is slower... lol
+        ;; do ... while(--a);
+        .byte "|--%V);"
       .byte "["
-        ;; 17 B
+;;; TODO: this is what oscar64 does
+        ;; 20 B saves 2 bytes!
+        clc
+        lda VAR0
+        adc #$ff
+        sta VAR0
+        lda VAR1
+        adc #$ff
+        sta VAR1
+        ora VAR0
+        ;; get do address
+        .byte "?2"
+        beq :+
+        ;; loop back
+        jmp VAL0
+:       
+        ;; done
+      .byte "]"
+.else
+        ;; do ... while(--a);
+        .byte "|--%V);"
+      .byte "["
+        ;; 17 B saves 4 bytes!
         ldy VAR0
         bne :+
         dec VAR1
