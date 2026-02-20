@@ -4219,6 +4219,7 @@ lda savea
 
 
 
+;; TODO: double __fail?
 FUNC _fail
 
 ;;; TODO: seems to disturbe correct exec?
@@ -4342,7 +4343,6 @@ FUNC nextskip
         inc rule+1
         ;; always!
         bne loopfail
-
         ;; skip [...0...] gen
 FUNC skipgen
         iny
@@ -4352,6 +4352,7 @@ FUNC skipgen
         lda (rule),y
         cmp #']'
         bne skipgen
+
         beq nextskip
         
 ;;; we're done skipping! (standing at '|')
@@ -5964,7 +5965,7 @@ checkisdelimited:
 ;;; TODO: remove, peek at next inp
 peekahead:      
         jsr nl
-        putc '?'
+;        putc '?'
         ldy #0
         lda (inp),y
         jsr _printchar
@@ -7139,9 +7140,9 @@ ruleQ:
 FUNC ruleN_definitions
 ruleN:  
 
-      .byte "%{"
+;      .byte "%{"
 ;        putc 'a'
-        IMM_RET
+;        IMM_RET
 
         ;; SPECIAL HACK!
 
@@ -7154,6 +7155,18 @@ ruleN:
         .byte "word","main("
       .byte "%{"
         jmp gotmain_goendfail
+
+        ;; "compatibility"
+        .byte "|int","main("
+      .byte "%{"
+        jmp gotmain_goendfail
+
+
+        ;; "compat" - ignore!
+        .byte "|typedef","unsigned","int","word;"
+        .byte TAILREC
+        .byte "|typedef","unsigned","uint16_t","word;"
+        .byte TAILREC
 
 
 .include "parse-fold.asm"
@@ -7460,7 +7473,6 @@ ruleP:
 
 
       .byte "["
-
 .ifdef nSTDLIB
 ;;; 7 B
         ;; srand(1) for rand()
@@ -7469,10 +7481,7 @@ ruleP:
         dex
         stx rng+1
 .endif ; STDLIB
-
       .byte "]"
-
-
 
 
         ;; TODO: ?
@@ -7481,19 +7490,25 @@ ruleP:
         ;; jump over definitions and arrive at main
         .byte _O
 
+
+
+
         ;; TODO: not to have special case for main()?
         ;;   just lookup and patch?
         ;; TODO: works with _S
         ;;   (_T error doesn't propagate up)
 
 	;.byte _T,"main()",_B
-        ;; TODO: allow "int" even if...
-        .byte "word"
-        IMMEDIATE checkisdelimited
-        .byte "main()"
+        ;; In practice we don't care of the type of main!
+        .byte "%I"
+        ;; LOL: require a single space before " main..."
+        ;;   then it works!
+;        IMMEDIATE checkisdelimited
+        .byte " main()"
         ;; TODO: allow { var w init ... }
         ;;   they can be global, at this point doesn't
         ;;   matter, not allow recursion on main(), LOL?
+;;; TODO: special _B replacement...
         .byte _B
       .byte '['
         ;; if main not return, return 0
@@ -7501,6 +7516,7 @@ ruleP:
         tax
         rts
       .byte ']'
+
 
 .ifdef PRINTASM
         JSRIMMEDIATE _asmprintsrc
