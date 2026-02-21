@@ -4390,9 +4390,41 @@ FUNC skipgen
         inc rule+1
 :       
         lda (rule),y
+        ;; various jsr skips
+        ;; (need if addr contains ']' lol)
+        cmp #$20                ; JSR
+        beq @skipjsr
+        cmp #'$'                ; LIBCALL
+        beq @skipjsr
+        cmp #'C'                ; DOJSR
+        bne :+
+@skipjsr:
+.ifblank
+        iny
+        bne @noinc3
+        inc rule+1
+@noinc3:
+
+;;; TODO: should skip 2!!! ???? Hmmmm?
+
+;;; TODO: $ rand - crash if skip 2 ? lol
+;        iny
+;        bne @noinc4
+;        inc rule+1
+@noinc4:
+.else
+        iny
+        iny
+        cpy #2
+        bcs skipgen
+        inc rule+1
+.endif
+:       
+        ;; ? ']' - doneskipgen
         cmp #']'
         bne skipgen
-
+@doneskipgen:
+        ;; == ']'
         beq nextskip
         
 ;;; we're done skipping! (standing at '|')
@@ -4808,7 +4840,7 @@ PRINTZ {"]$",10}
         ;; finally generate a normal JSR
         jmp @outjsr
 :       
-        ;; ' '- JSR skip 2 bytes (QUOTE THEM!)
+        ;; ' '- JSR out 2 bytes (QUOTE THEM!)
         cmp #$20                ; JSR xx xx 
         ; ldx #1 ; ???
         bne :+
