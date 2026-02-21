@@ -152,13 +152,14 @@ FUNC _print1h
 ;;; This implementation by jsk@yesco.org 2025-06-08
 
 ;;; Kindof early C "standard"
-FUNC _printn
+;FUNC _printn
 
-FUNC _printu 
+LIBFUN _printu
 ;;; 4
         sta pos
         stx pos+1
         
+;;; Cannot use in codegen
 FUNC _posprintu
 ;;; 31
 .scope
@@ -215,6 +216,8 @@ next:   LIT 10
         DO _exit
 .endproc        
 .endif
+
+LIBENDFUN _printu
 
 
 ;;; TODO: 
@@ -427,7 +430,7 @@ FUNC _fgets_edit
 ;;; 57 B + CURSOR_ON/OFF
         tax
         ldy #$ff
-        jmp @start
+        bne @start
 @count:       
         jsr putchar
 @start:       
@@ -522,4 +525,3 @@ FUNC _fgets
         ldx tos+1
 
         rts
-

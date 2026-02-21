@@ -72,14 +72,14 @@ FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "|putu(",_E,")"
       .byte '['
-        jsr _printu
+        LIBCALL _printu
       .byte ']'
 
         ;; compatibility
 
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
-        jsr _printu
+        LIBCALL _printu
       .byte ']'
 
         .byte "|printf(",34,"\%x",34,",",_E,")"

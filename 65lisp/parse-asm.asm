@@ -1948,7 +1948,7 @@ runtimeerrorwithdata:
         PUTC 10
         jsr _printh
         PUTC ' '
-        jsr _printn
+        jsr _printu
 runtimeerror:
         sty savey
         jsr nl
@@ -2251,7 +2251,7 @@ FUNC _xmalloc
 ;;; TODO: remove once we have runtimeerrorwdata
         lda savea
         ldx savex
-        jsr _printn
+        jsr _printu
 
         ldy #'M'
         jmp runtimeerror
@@ -4830,7 +4830,7 @@ FUNC _generate
 PRINTZ "$["
 pla
 ldx #0
-jsr _printn
+jsr _printu
 PRINTZ {"]$",10}
 
         ;; TODO: verify libf pointer?
@@ -12345,7 +12345,7 @@ FUNC _printregs
         jsr spc
         lda tmp1
         ldx tmp2
-        jsr _printn
+        jsr _printu
         jsr nl
 
         lda tmp1
@@ -12469,7 +12469,7 @@ pla
         putc '#'
         lda dos
         ldx dos+1
-        jsr _printn
+        jsr _printu
 .endif        
         lda #128+7              ; WHITE array
 :       
@@ -12524,7 +12524,7 @@ pla
         beq :+
 @changed:
         ;; print AX new value
-        jsr _printn
+        jsr _printu
         PUTC '('
         jsr _printh
         pha
@@ -12534,7 +12534,7 @@ pla
         ;; print old
         lda pos
         ldx pos+1
-        jsr _printn
+        jsr _printu
         PUTC '('
         jsr _printh
         putc ')'
@@ -12660,7 +12660,7 @@ FUNC _printvars
         dey
         lda (pos),y
         
-        ;; jsr _printn prints garbage???
+        ;; jsr _printu prints garbage???
         jsr _printu
         ;; print type
         jsr tab
