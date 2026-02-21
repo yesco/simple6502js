@@ -683,7 +683,7 @@ FUNC _memoryrulesstart
 
         .byte "|rand()"
       .byte "["
-        jsr rand
+        LIBCALL rand
       .byte "]"
 
 ;;; TODO: cheating, using cc65 malloc/free :-(

@@ -71,8 +71,7 @@
 rng:    .res 2
 .code
 
-rand:   
-
+LIBFUN rand
 
 .ifblank
 ;;; my version
@@ -153,6 +152,8 @@ rand:
 
         rts
 .endif
+
+LIBENDFUN rand
 
 
 ;FUNC _atoiAX

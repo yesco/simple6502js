@@ -1550,6 +1550,43 @@ _asmstart:
 .endmacro
 
 
+
+;;; A library function is prefixed by some data
+;;; 
+;;; 
+;;; 
+.macro LIBCALL name
+        .byte '$'
+        .word name
+.endmacro
+
+;;;       .byte '$',#bytes  .word patchvector
+;;; fun:  ..... RTS
+;;; name_SIZE:  one level of indirection!
+.macro LIBFUN name
+        .byte '$'
+        .byte .ident(.concat(.string(name),"_SIZE"))
+        .word $0000
+
+        .export .ident(.string(name))
+        .proc .ident(.string(name))
+.endmacro
+
+;; name_SIZE= after .endproc we can get size!
+.macro LIBENDFUN name
+        .endproc
+        .ident(.concat(.string(name),"_SIZE"))=.sizeof(.ident(.string(name)))
+.endmacro
+
+;;; TODO: how to clear patchvectors?
+;;;   we'd need to be able to enumerate them...
+;;;   should we just keep a meta table somewhere?
+;;; TODO: alt, make parsing of each function part
+;;;   of the function/prefix?
+
+
+
+
 ;;; ----------------------------------------
 ;;;      L I B R A R Y   C O N F I G 
 
@@ -1702,15 +1739,15 @@ savey:  .res 1
 _mode:  
 mode:  .res 1
 
-;;; STATITISTICS
+;;; STATISTICS
 ;;; 
 ;;; lines (number of '\n' seen
 ;;; (backtracking up may give few more))
-.export nlines, naccepts, nrules
-nlines:   .res 2
-naccepts: .res 2
-nrules:   .res 2
-
+.export nlines, naccepts, nrules, nlibbytes
+nlines:         .res 2
+naccepts:       .res 2
+nrules:         .res 2
+nlibbytes:      .res 2
 .code
 
 
@@ -2927,6 +2964,7 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
         ;; (write one after (VARS will be overwritten))
         lda #0
         ;; TODO: 6*2 bytes set to zero, loop? put together!
+        ;; my compiler "bss"!
         sta VARS+1
 
         sta compilestatus
@@ -2937,6 +2975,8 @@ VARRRULEVEC=_rules+(VARRULENAME&31)*2
         sta naccepts+1
         sta nrules
         sta nrules+1
+        sta nlibbytes
+        sta nlibbytes+1
 
 
 ;;; INTERRUPT DEBUG TESTING
@@ -4683,7 +4723,10 @@ jmpnext:
         ;; %??? no match - ERROR
         jmp error
 
-;;; TODO: can conflict w data
+
+
+
+;;; TODO: [foo] can conflict w data, $20=' '
 ;;;   write .pl script look at .lst output?
 FUNC _generate
 ;;; ??? 19 B
@@ -4704,8 +4747,66 @@ FUNC _generate
         cmp #'C'
         bne :+
         
-        lda #$20                ; JSR
+        ;; JSR call
+        lda #$20                ; needed?
         jmp @skipjsr
+:       
+        ;; library call indicator
+        cmp #'$'
+        bne :+
+
+        ;; get call address
+        ;; and get pointer to size
+        ;; - lo
+        iny
+        lda (rule),y
+        sec
+        sbc #3
+        sta tos
+        ;; - hi
+        iny
+        lda (rule),y
+        sbc #0
+        sta tos+1
+        dey
+        dey
+
+        ;; get size
+        lda (tos),y
+        pha
+
+        ;; TODO: mark the function to be 
+        ;;   copied, and point to PATCHLOC
+        ;; (use _newname?)
+
+        ;; store:
+        ;; - bytes to copy      1 B
+        ;; - orig address       2 B
+        ;; - link to patchloc   2 B
+        ;;(- name for info?)    ? B
+
+        ;;; update running bytes
+        ;; TODO: only once... lol
+        clc
+        adc nlibbytes
+        sta nlibbytes
+        bcc @noinc2
+        inc nlibbytes+1
+@noinc2:
+
+;;; for now just print "cost"
+PRINTZ "$["
+pla
+ldx #0
+jsr _printn
+PRINTZ {"]$",10}
+
+        ;; TODO: verify libf pointer?
+        ;; (addr-4)=='$' lol
+        ;; (for now just take their word)
+
+        ;; finally generate a normal JSR
+        jmp @outjsr
 :       
         ;; ' '- JSR skip 2 bytes (QUOTE THEM!)
         cmp #$20                ; JSR xx xx 
@@ -4714,7 +4815,10 @@ FUNC _generate
         ;; TODO: jmp?
         ;cmp #$4c                ;JMP xx xx
         ;; out JSR (' ')
+
+@outjsr:
 ;;; 28B
+        lda #$20
         sta (_out),y
         jsr _incO
 
@@ -4732,6 +4836,11 @@ FUNC _generate
 
 ;;; TODO: hmmm
 ;;; 21...?
+
+
+;;; TODO: this code not used?
+
+
         sta (_out),y
         jsr _incO
 
@@ -4750,6 +4859,7 @@ FUNC _generate
         pla
         jmp genoutAX
 
+;;; TODO: bad name more like
 @skipjsr:
 :       
 ;;; '<' LO %d
