@@ -42,7 +42,8 @@
 ;;; - (strerror)
 ;;; 
 ;;; TESTED: ok!
-strlen: 
+;LIBFUN strlen
+strlen:
 ;;; 22 B
         sta pos
         stx pos+1
@@ -61,6 +62,7 @@ strlen:
 :       
         tya
         rts
+;LIBENDFUN strlen
         
 ;;; TODO: strchrnul really?
 

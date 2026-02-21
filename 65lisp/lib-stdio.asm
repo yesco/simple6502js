@@ -220,7 +220,7 @@ next:   LIT 10
 LIBENDFUN _printu
 
 
-;;; TODO: 
+;;; TODO:  remove?
 .ifdef PRINTBASE
 
 FUNC _printu
@@ -424,6 +424,11 @@ FUNC _getline
 ;;; BUG: TODO: somehow make string 0?
 
 
+;;; TODO: LIBFUN
+;;;   problem is _fgets_edit needs _fgets
+;;; a) make two independent functions
+;;;    make generated code call both (in one case)
+;;; b) _fgets generates LDA #0/STA tos/JSR _edit
 
 ;;; tos= line to edit
 FUNC _fgets_edit

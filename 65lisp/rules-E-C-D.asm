@@ -134,20 +134,17 @@ FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "|putd(",_E,")"
       .byte '['
-;;; TODO: change printers to use AX
-        jsr axputd
+        jsr _printd
       .byte ']'
 .endif ; SIGNED
 
         .byte "|puth(",_E,")"
       .byte '['
-;;; TODO: change printers to use AX
         jsr _printh
       .byte ']'
 
         .byte "|putz(",_E,")"
       .byte '['
-;;; TODO: fix, strings borken?
         jsr _printz
       .byte ']'
 
@@ -507,7 +504,8 @@ FUNC _stringrulesstart
 
         .byte "|strlen(",_E,")"
       .byte '['
-        jsr strlen
+        LIBCALL strlen
+;        jsr strlen
       .byte ']'
 
         ;; all these takes 2 args

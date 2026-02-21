@@ -247,19 +247,15 @@ FUNC _negate
         rts
 
 ;;; print signed decimal
-FUNC _putd
-putd:
-;;; 19 b
+FUNC _printd
+printd:
+;;; 15 b
         cpx #0
         bpl :+
         putc '-'
 :       
-        ;; negate
         jsr _negate
-        
-        sta tos
-        stx tos+1
-        jmp putu
+        jmp _printu
 
 FUNC _dummyd
 .endif ; SIGNED
