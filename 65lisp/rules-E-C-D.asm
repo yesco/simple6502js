@@ -499,6 +499,17 @@ FUNC _iorulesend
 .endif ; !CTYPE
 
 
+;;; TODO: used for debugging LIBCALL
+.ifnblank
+        .byte "|dummy()"
+      .byte "["
+        lda #$12
+        LIBCALL $5634
+        lda #$78
+      .byte "]"
+.endif
+
+
 FUNC _stringrulesstart
 .ifdef STRING
 

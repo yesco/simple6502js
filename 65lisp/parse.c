@@ -545,6 +545,8 @@ void snapshot(char* arg) {
 extern void processnextarg() {
   char* a= *++argv;
 
+  putchar('\n');
+
   // not processing arguments
   if (argc < 0) return;
 

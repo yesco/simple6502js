@@ -4404,13 +4404,12 @@ FUNC skipgen
         bne @noinc3
         inc rule+1
 @noinc3:
-
 ;;; TODO: should skip 2!!! ???? Hmmmm?
-
-;;; TODO: $ rand - crash if skip 2 ? lol
-;        iny
-;        bne @noinc4
-;        inc rule+1
+;;; TODO: $ rand - crash if skip 2 ? lol - ok now???
+        iny
+        bne @noinc4
+        inc rule+1
+;        bne skipgen
 @noinc4:
 .else
         iny
@@ -14482,6 +14481,27 @@ CANT=1
 ;;;   390s (!)      interpreted (?)
 ;;; 
 ;;;   425s          hopperBasic (53s @ 8 MHz) f video
+;;;   120s          Kyan Pascal Atari ST, screen on
+;;;    80s                 (8 Mhz 68000), screen off
+;;;    85s          ST Basic                    |
+;;;     3.8s        Atari ST C-language         | from 
+;;;     7-13s       Macintoch 68000             |   Google AI
+;;;     4.8s        Z8000 Unix mini             |
+;;;     1.1-1.4     assembly Apple II/C64       |
+;;;     2.69        Action (1.5 Atari 800)      |
+;;;     11.5        Kyan Pascal Apple II        |
+;;;     26.0        Aztec C (v1.05)             | 
+;;;     35.0        TML Pascal                  |
+;;;    190.0        Applesoft BASIC             |
+;;;    225.0        Commodore BASIC 2.0         |
+;;;    331.2        Atari BASIC (1.69Mhz A800)  |
+;;;      9.5-10.3s  oscar64                     |
+;;;     23.1s       cc65 (according to          |
+
+;;;     12.914743   oscar64 Input/byte-sieve-malloc.c | jsk
+;;;     33.44s      cc65    Input/byte-sieve-malloc.c | jsk
+;;;     26.800s     mc      Input/byte-sieve.c        | jsk
+
 
 ;;; - https://github.com/soegaard/minipascal/blob/master/minipascal/tests-real/primes.rkt
 
@@ -14543,13 +14563,13 @@ CANT=1
 ;;;                    - 1a45336b30cc787f668c83dd4e4c7dff4baa7a99
 ;;;         303         -1 B !!! better poke (?)
 ;;; 
-;;;         303    2.458s - opt still stable: rules: 3610
+;;;         303    2.458s - opt still stable: 3610
 ;;;  NOOPT! 366    3.082s - noopt             rules: 2425
 ;;;  BYTES  303                               rules: 4505
 ;;;         302    same   - save one byte on if/clc
 ;;;         301    2.6484 - (.sim/10 20250120)
 ;;;         284    2.6806 - (/ 6835663562 255) do-while-opts
-
+;;;         282    2.68   - (extra garbage???)
 ;
 BYTESIEVE=1
 ;
@@ -14570,8 +14590,10 @@ NOPRINT=1
 
 ;;; === my compiler ===
 ;;;   36.3           363    - sim65   ./rrasm parse  
-;;;   43s            363    - ORIC    ./rasm parse   
-
+;;;   43s            363    - ORIC    ./rasm parse
+;;; 
+;;;                OLD OLD OLD OLD OLD
+;;; 
 ;;;  #x142 322 
 ;;;  #x11f 287
 
