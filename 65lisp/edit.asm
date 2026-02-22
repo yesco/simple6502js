@@ -112,7 +112,7 @@
         EDITEND= editareaafter
 
 editarea:       
-        .res 8000, 0
+        .res 7000, 0
 editareaafter:  
 
 .code

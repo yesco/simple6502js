@@ -10421,16 +10421,16 @@ __ZPIDE__:        .res 0
 FUNC _idestart
 
 FUNC _editorstart
-.ifndef __ATMOS__
+;.ifndef __ATMOS__
         ;; ironic, as this is not editor for
         ;; generic...
 
         ;; outdated (no cursor anymore)
         .include "edit-atmos-screen.asm"
-.else
+;.else
         ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
-.endif
+;.endif
 FUNC _editorend
 
 
@@ -11016,7 +11016,7 @@ FUNC _eventloop
 
 
 
-.ifdef __ATMOS__
+;.ifdef __ATMOS__
 
 FUNC _idecompile
         ;; We need to make sure no hibit (cursor)
@@ -11059,7 +11059,7 @@ FUNC _togglecommand
 @ed:
         jmp _redraw
 
-.endif ;  __ATMOS__
+;.endif ;  __ATMOS__
 
 
 
@@ -11558,36 +11558,22 @@ FUNC _introtext
 .endif ; INTRO
 
 
-;;; TODO: sim65 interact with files?
 
 .ifdef __ATMOS__
-
-;;; ORIC tape max length 16
-FILENAMESIZE=17
+	;;; ORIC tape max length 16
+	FILENAMESIZE=17
+.else
+        ;; enough path name size?
+        ;; TODO: consider using malloc?
+        ;;   (hmm, how to mix with my own?/progs?)
+	FILENAMESIZE=80
+.endif 
 
 ;filename:       .res FILENAMESIZE+1
 ;;; TODO: dummy for now
 filename:              
         .byte "userfile.c",0
         .res FILENAMESIZE-.strlen("userfile.c")-1
-
-
-copyfilename:
-;;; this code is stupid, just copies 15 bytes
-;;; from CC65 store_filename, doesn't care about length?
-        ldy #$0f
-        lda #<filename
-        ldx #>filename
-        sta tos
-        stx tos+1
-@nextc:
-        lda (tos),y
-        sta $027f,y
-        dey
-        bpl @nextc
-        
-        rts
-
 
 FUNC _writefileas
         jsr _eosnormal
@@ -11687,12 +11673,18 @@ FUNC _listbuffers
 :      
         pla
 
+        jmp _eventloop
+
+;;; TODO: cleanup
+.ifnblank
         ;; load tape file?
         pha
         jsr isalpha
         beq :+
 
         pla
+.endif
+
 
 ;;; load file (ask for name)
 FUNC _openfile
@@ -11750,23 +11742,27 @@ FUNC _openfile
 
         jmp _forcecommandmode
 
-.else
-
-FUNC _writefileas
-FUNC _savefile       
-FUNC _loadfile
-openfile:       
-        ;; TODO: not amos buffer
-        PRINTZ {10,"% Not implemented"}
-
-        rts
-.endif ; __ATMOS__
-
-
 
 
 
 .ifdef __ATMOS__
+
+
+copyfilename:
+;;; this code is stupid, just copies 15 bytes
+;;; from CC65 store_filename, doesn't care about length?
+        ldy #$0f
+        lda #<filename
+        ldx #>filename
+        sta tos
+        stx tos+1
+@nextc:
+        lda (tos),y
+        sta $027f,y
+        dey
+        bpl @nextc
+        
+        rts
 
 
 FUNC buffer_load_file
