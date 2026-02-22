@@ -10990,9 +10990,12 @@ editstart:
         bit mode
         bmi command
 
+.ifdef __ATMOS__
         ;; don't redraw if key waiting!'
         jsr KBHIT
         bmi :+
+.endif ; __ATMOS__
+
         ;; redraw
         jsr _redraw
 :       
@@ -11780,12 +11783,15 @@ FUNC buffer_load_file
 
         jsr     cload_bit
         cli
-        jmp loadedfile
+        ;; done
+        rts
+        
+;;; ? clever way to jump into middle of ROM-code?
 cload_bit:
         pha
         jmp     $e874
-loadedfile:
-        rts
+
+
 
 FUNC buffer_save_file
         sei
@@ -11812,6 +11818,7 @@ csave_bit:
 
 .else
 
+;;; TODO: call to C (for now)
 
 FUNC buffer_load_file
 FUNC buffer_save_file
