@@ -1381,7 +1381,8 @@ DEMO=1
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
 
-        OUTPUTSIZE=29*1024
+        OUTPUTSIZE=29*1024-8000
+        ;;         memleft editarea
 
 ;;; leave space for now to do xmalloc...
 ;;; segmentation fault! (w added fgets???)
@@ -4406,6 +4407,7 @@ FUNC skipgen
 @noinc3:
 ;;; TODO: should skip 2!!! ???? Hmmmm?
 ;;; TODO: $ rand - crash if skip 2 ? lol - ok now???
+;;;   gives syntax errors (on like first statement)??? wtf?
         iny
         bne @noinc4
         inc rule+1
