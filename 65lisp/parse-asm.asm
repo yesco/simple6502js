@@ -11619,12 +11619,9 @@ PUTC 'd'
         jsr _printz
         jsr nl
 putc 'e'
-
-.ifblank
         ;; _atmos_save see cc65
         ;; CC65 calling convention
 
-        sei
         ;; store file start address
         lda #<EDITSTART
         ldx #>EDITEND
@@ -11636,31 +11633,8 @@ putc 'e'
         sta $02ab               ; file end lo
         stx $02ac               ; file end hi
 
-        jsr copyfilename
-
-        ;; what data is this?
-        lda #$00
-        sta AUTORUN
-
-        ;; mark as "machinecode", otherwise pops to basic?
-        lda #$80
-        sta LANGFLAG
-
-        ;; calling interrupt subroutine?
-        jsr csave_bit
-        cli
-
+        jsr buffer_save_file
         jmp _eventloop
-
-csave_bit:      
-        php
-        jmp $e92c
-
-.endif
-
-:       
-        jmp _eventloop
-
 
 
 FUNC _loadbuffer
@@ -11741,6 +11715,58 @@ FUNC _openfile
 
         jsr _clearedit
 
+        jsr buffer_load_file
+
+        ;; update editend (search \0!)
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        sta editend
+        stx editend+1
+        
+        ;; TODO: use strlen, fewer bytes?
+;;; 13 B
+        ldy #0
+@loop:       
+        lda (editend),y
+        beq :+
+        ldx #editend
+        jsr _incRX
+        ;; Z=1
+        bne @loop
+
+        ;; force edit mode
+        lda #0
+        sta mode
+
+        jmp _eventloop
+:       
+        ;; get key back
+        pla
+
+        ;;  more commands
+
+        jmp _forcecommandmode
+
+.else
+
+FUNC _writefileas
+FUNC _savefile       
+FUNC _loadfile
+openfile:       
+        ;; TODO: not amos buffer
+        PRINTZ {10,"% Not implemented"}
+
+        rts
+.endif ; __ATMOS__
+
+
+
+
+
+.ifdef __ATMOS__
+
+
+FUNC buffer_load_file
         ;;; _atmos_load cc65
         sei
         jsr     copyfilename
@@ -11759,50 +11785,40 @@ cload_bit:
         pha
         jmp     $e874
 loadedfile:
+        rts
 
-        ;; update editend (search \0!)
-        lda #<EDITSTART
-        ldx #>EDITSTART
-        sta editend
-        stx editend+1
-        
-        ;; TODO: use strlen, fewer bytes?
-;;; 13 B
-        ldy #0
-@loop:       
-        lda (editend),y
-        beq :+
+FUNC buffer_save_file
+        sei
+        jsr copyfilename
 
-        ldx #editend
-        jsr _incRX
-        ;; Z=1
-        bne @loop
+        ;; what data is this?
+        lda #$00
+        sta AUTORUN
 
-        ;; force edit mode
-        lda #0
-        sta mode
+        ;; mark as "machinecode", otherwise pops to basic?
+        lda #$80
+        sta LANGFLAG
 
-        jmp _eventloop
-
-:       
-        ;; get key back
-        pla
-
-        ;;  more commands
-
-        jmp _forcecommandmode
-
-.else
-FUNC _writefileas
-FUNC _savefile       
-FUNC _loadfile
-openfile:       
-        ;; TODO: not amos buffer
-        PRINTZ {10,"% Not implemented"}
+        ;; calling interrupt subroutine?
+        jsr csave_bit
+        cli
 
         rts
-.endif ; __ATMOS__
 
+csave_bit:      
+        php
+        jmp $e92c
+
+
+.else
+
+
+FUNC buffer_load_file
+FUNC buffer_save_file
+
+        
+        rts
+.endif ; !__ATMOS__
 
 
 
