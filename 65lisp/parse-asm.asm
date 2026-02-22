@@ -11674,7 +11674,9 @@ FUNC _loadbuffer
         ;; or ?
         cmp #'?'
         bne :+
-listbuffers:
+
+        ;; - fallthrough
+FUNC _listbuffers
         jsr _listfiles
         ;; let user choose buffer
         jsr getchar
@@ -11716,7 +11718,7 @@ listbuffers:
         pla
 
 ;;; load file (ask for name)
-openfile:
+FUNC _openfile
         jsr _eosnormal
         
         PRINTZ {10,YELLOW,"Open file:",WHITE}
@@ -11820,76 +11822,18 @@ FUNC _extend
         and #31
 
 .ifdef __ATMOS__
-;;; 7 B per key
-;;; dispatch table 64+ dispath
-;;; (/ 64 7) = 9 trade off
-;;; TODO: How about search list?
-;;;   3 B/key (/ (+ 29 3 3 (* 10 3)) 7.0)
-;;; 9.3 keys 7 B is break even point for 10 keys
-;;; total dispatched (all over) then start saving.
-.ifnblank
-
-.macro KEYDO key,addr
-        ;; key, hi, lo (reverse)
-        ;; (-1 because use RTS)
-        .byte key, >(addr-1), <(addr-1)
-.endmacro
-
-        lda #CTRL('F')
-
-;;; 3*7+1=22 B
-        jsr dokey
-        KEYDO CTRL('B'), listbuffers
-        KEYDO CTRL('F'), openfile
-        KEYDO CTRL('S'), _savefile
-        KEYDO CTRL('W'), _writefileas
-        KEYDO CTRL('C'), _compileInput
-        KEYDO CTRL('J'), bytesieve
-        ;; No match
-        KEYDO 0, _wrongkey
-
-;;; Dispatch on A to addresslist after "jsr dokey'
-dokey:  
-;;; 29 B
-        sta savea
-        pla
-        sta tos
-        pla
-        sta tos+1
-        ldy #$100-3+1
-@next:
-        lda (tos),y
-        beq @fail               ; 0 match all!
-        iny
-        cmp savea
-@skip:
-        iny
-        iny
-        ;; always
-        bne @next
-@fail:
-@match:
-        ;; hi first
-        lda (tos),y
-        iny
-        pha
-        ;; lo
-        lda (tos),y
-        pha
-        ;; call lo,hi (from stack)
-        rts
-
-.endif
+        ;; === key dispatch ===
+        ;; (see Play/key-dispatch.asm for alternative)
 
         ;; ^X^B - emacs list buffers!
         cmp #CTRL('B')
         bne :+
-        jmp listbuffers
+        jmp _listbuffers
 :       
         ;; ^X^F - open file from tape/disk
         cmp #CTRL('F')
         bne :+
-        jmp openfile
+        jmp _openfile
 :       
         ;; ^X^S - save current file
         cmp #CTRL('S')
