@@ -7,14 +7,24 @@ name=$1
 
 ./rrasm parse -
 
-stty raw -echo opost onlcr
+#stty raw -echo opost onlcr
+
+#stty raw -echo opost onlcr intr q
+
+# enable ^C ^Z "interrupt"
+stty raw -echo opost onlcr isig
 
 # this works for sure, captures CTRL-C
 
 #sim65 -c parse.sim "$@"
 
+# this allows sim65 to capture CTRL-C
+# but allows ^Z to suspend process, lol
+
+trap '' INT
+
 # seems to work without effecting interaction?
-sim65 -c parse.sim "$@" | ./oric-terminal
+(sim65 -c parse.sim "$@" || stty sane) | ./oric-terminal
 
 
 e=$?

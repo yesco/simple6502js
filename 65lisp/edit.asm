@@ -634,6 +634,13 @@ EDITCOLOR=GREEN & 127
 ;;; This is fast enough for a normal typer.
 
 FUNC _redraw 
+
+.ifndef __ATMOS__
+        ;; vt100 HOME
+        PRINTZ {27,"[H}"}
+.endif
+
+
 ;;; (+ 24 55) = 79
 ;;; (16)
         ;; we need to set the cursor when drawing!
@@ -687,6 +694,9 @@ FUNC _redraw
 @putc:
         ;; write to screen
         sta (tos),y
+.ifndef __ATMOS__
+        jsr putchar
+.endif
         ;; at cursor, save COL
         bpl :+
         stx editcol
@@ -731,6 +741,9 @@ FUNC _redraw
         lda #' '
 @colorln:
         sta (tos),y
+.ifndef __ATMOS__
+        jsr putchar
+.endif
 
 @noclearlastchar:
         inc tos
@@ -756,6 +769,11 @@ FUNC _redraw
 @color:
         lda #EDITCOLOR
         sta (tos),y
+.ifndef __ATMOS__
+;        PUTC 10
+        jsr putchar
+        cmp #0
+.endif
         ;; Always
 ;        bne @putc
         bne @forw
