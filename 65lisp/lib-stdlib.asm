@@ -232,3 +232,117 @@ FUNC _atoibaseXR
 .endif ; ATOI
 
 
+;;; ------------ HEAP MEMORY MANAGMENT -----------
+
+.zeropage
+_heap:    .res 2
+.code
+
+;;; Allocate AX bytes
+;;; 
+;;; NOTE: no error, no limit, just wraps around!
+;;; 
+;;; Result:
+;;;   AX= pointer to allocated bytes
+;;;   savea,savex= allocation size
+;;; 
+
+;;; TODO: rename to sbrk? LOL?
+
+FUNC _malloc
+;;; 21 B  33c! (+ 20 => 41 B)
+        sta savea
+        stx savex
+
+        ;; move _out forward AX bytes
+        clc
+        lda _heap
+        tay                     ; save _out
+        adc savea
+        sta _heap
+
+        lda _heap+1
+        tax                     ; save _out+1
+        adc savex
+        sta _heap+1
+
+        ;; overflow heap?
+;;; 20 B
+        ;; TODO: use a _heapend (for alloca)
+        cmp #>ENDOFHEAP
+        bne :+
+        lda _heap
+        cmp #<ENDOFHEAP
+:       
+        bcs :+
+        ;; OK
+        tya                     ; restore lo
+        rts
+:       
+        ;; restore _out
+        sty _heap
+        stx _heap+1
+        ;; return 0
+        lda #0
+        tax
+        rts
+
+
+
+;;; TODO: lol
+
+FUNC _free
+        rts
+
+
+
+;;; TODO: combine malloc and xmalloc
+;;;   shouldn't need a second test
+
+;;; Xallocate AX bytes
+;;; 
+;;; if malloc fails, halt and print error
+;;; 
+;;; Returns same as _malloc
+;;;  But never 0!
+FUNC _xmalloc
+;;; 11+12 = 23 B
+        jsr _malloc
+        ;; malloc cannot happen on 0 page
+        tay
+        bne @OK
+        cpx #0
+        beq @fail
+@OK:
+        rts
+@fail:
+        ;; AX == 0
+        ;; FAIL
+
+;;; TODO: remove once we have runtimeerrorwdata
+        lda savea
+        ldx savex
+        jsr _printu
+
+        ldy #'M'
+        jmp runtimeerror
+
+
+
+LIBFUN init_stdlib
+
+;;; 8 B
+        ;; heap init
+        lda _out
+        ldx _out+1
+        sta _heap
+        stx _heap+1
+
+;;; 7 B
+        ;; srand(1) for rand()
+        ldx #1
+        stx rng
+        dex
+        stx rng+1
+
+LIBENDFUN init_stdlib

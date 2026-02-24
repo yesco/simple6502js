@@ -2185,86 +2185,6 @@ FUNC _stdlibstart
   .ifdef STDLIB
     .include "lib-stdlib.asm"
   .endif ; STDLIB
-
-;;; Allocate AX bytes
-;;; 
-;;; NOTE: no error, no limit, just wraps around!
-;;; 
-;;; Result:
-;;;   AX= pointer to allocated bytes
-;;;   savea,savex= allocation size
-;;; 
-FUNC _malloc
-;;; 21 B  33c! (+ 20 => 41 B)
-        sta savea
-        stx savex
-
-        ;; move _out forward AX bytes
-        clc
-        lda _out
-        tay                     ; save _out
-        adc savea
-        sta _out
-
-        lda _out+1
-        tax                     ; save _out+1
-        adc savex
-        sta _out+1
-
-        ;; overflow heap?
-;;; 20 B
-        cmp #>ENDOFHEAP
-        bne :+
-        lda _out
-        cmp #<ENDOFHEAP
-:       
-        bcs :+
-        ;; OK
-        tya                     ; restore lo
-        rts
-:       
-        ;; restore _out
-        sty _out
-        stx _out+1
-        ;; return 0
-        lda #0
-        tax
-        rts
-
-FUNC _free
-
-
-;;; TODO: combine malloc and xmalloc
-;;;   shouldn't need a second test
-
-;;; Xallocate AX bytes
-;;; 
-;;; if malloc fails, halt and print error
-;;; 
-;;; Returns same as _malloc
-;;;  But never 0!
-FUNC _xmalloc
-;;; 11+12 = 23 B
-        jsr _malloc
-        ;; malloc cannot happen on 0 page
-        tay
-        bne @OK
-        cpx #0
-        beq @fail
-@OK:
-        rts
-@fail:
-        ;; AX == 0
-        ;; FAIL
-
-;;; TODO: remove once we have runtimeerrorwdata
-        lda savea
-        ldx savex
-        jsr _printu
-
-        ldy #'M'
-        jmp runtimeerror
-        
 FUNC _stdlibend
 
 
@@ -7686,14 +7606,11 @@ ruleP:
 
 
       .byte "["
-.ifdef nSTDLIB
-;;; 7 B
-        ;; srand(1) for rand()
-        ldx #1
-        stx rng
-        dex
-        stx rng+1
+
+.ifdef STDLIB
+        LIBCALL init_stdlib
 .endif ; STDLIB
+
       .byte "]"
 
 
