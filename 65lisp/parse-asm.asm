@@ -6370,7 +6370,7 @@ _rules:
 ;ruleF: byte rule, keeps AX, get byte expr => Y
 ;ruleG: calling convention "(@tos,AX) like ruleC
 
-;ruleH: printf parsing
+ruleH: ;;printf parsing
 ;ruleI: "load byte expression" - opt
 ;ruleJ: "read byte expression, saving AX totos and sets Y=0"
 
@@ -6944,6 +6944,8 @@ FUNC _byterulesend
 
 
 
+.ifnblank
+
 ;;; printf handling
 FUNC ruleH_printf
 ruleH:  
@@ -7042,6 +7044,10 @@ ruleH:
         .byte "|);"
 .endif ; rulePRINTF
         .byte 0
+
+.endif ; blank
+
+
 
 ;;; load byte expression
 FUNC ruleI_byte_expressions

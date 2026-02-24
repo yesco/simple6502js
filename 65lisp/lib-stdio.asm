@@ -327,14 +327,18 @@ FUNC _printz
         sta pos
         stx pos+1
 
+;;; X= number of chars printed (if < 256)
 FUNC _posprintz
 ;;; 18
         ldy #0
+        ldx #0
 FUNC _posYprintz
         lda (pos),y
         beq endprint
         jsr putchar
+        inx
 FUNC _incposYprintz
+        ;; we rely on this for iprintz
         inc pos
         bne :+
         inc pos+1
@@ -343,9 +347,210 @@ FUNC _incposYprintz
         bne _posYprintz
 
 endprint:
+        ;; Y= number of chars printed?
         rts
 
 
+popprintyTOSz:
+        pla
+        tay
+        ;; fall-through
+        
+;;; print Y=0 print till \0 or Y char
+;;; Result
+;;;   X= number of chars printed (if < 256)
+;;; 
+;;; 27 B
+printyTOSz:        
+        cpy #0
+        beq _printz
+        ;; print Y chars
+        sty savey
+        ldy #0
+:       
+        lda (pos),y
+        beq :+
+        jsr putchar
+        iny
+        cpy savey
+        bne :-
+:       
+        tya
+        tax
+        rts
+
+
+stackputu:
+        sta tos
+        stx tos+1
+        ;; store RTS address
+        pla                     ; lo
+        tya
+        pla
+        iny
+        bne :+
+:       
+
+;;; TODO: call new printu
+
+        ;; "RTS"
+        jmp (dos)
+
+
+
+LIBFUN printfx
+        jsr _printh
+LIBENDFUN printfx
+
+
+;;; TODO: math library?
+
+FUNC _negate
+;;; 12 b
+        sec
+        eor #$ff
+        adc #0
+        tay
+        txa
+        eor #$ff
+        tax
+        tya
+        rts
+
+
+LIBFUN printfd
+;;; 15 b
+        stx savex
+        cpx #0
+        bpl :+
+
+        jsr _negate
+:       
+        jsr stackputu
+
+        ldx savex
+        bpl :+
+        
+        ;; push a '-' in front of all digits
+        lda #'-'
+        pha
+:       
+;;; TODO: library calling library...
+        jmp printfs
+
+LIBENDFUN printfd
+
+
+;;; Y number of chars printed
+LIBFUN printu
+;;; 16 B
+        jsr stackputu
+        ldy #$ff
+:       
+        iny
+        pla
+        beq :+
+        jsr putchar
+        jmp :-
+:       
+        rts
+LIBENDFUN printu
+
+
+LIBFUN printfu
+;;; 14 B
+        sty savey
+        jsr stackputu
+
+        ;; AX = point to string on stack!
+        tsx
+        txa
+        ldx #1
+        
+        ldy savey
+
+;;; TODO: library calling library...
+        jmp printfs
+
+LIBENDFUN printfu
+
+        ;; TODO: handle negative precision
+        ;; (push more zeros?)
+
+.zeropage
+precision:      .res 1
+.code
+
+;;; 55 B
+LIBFUN printfs
+        sty savey
+
+        sta pos
+        stx pos+1
+
+        cpy #0
+        bpl @rightjustify
+@leftjustify:
+        ldy precision
+        jsr printyTOSz
+        ;; X= number of chars printed (if < 256)
+        jmp @skipcalc
+@rightjustify:
+        ;; - push a print for later
+        ;; (will be called when we RTS)
+        tya
+        pha
+        lda #>(popprintyTOSz-1)
+        pha
+        lda #<(popprintyTOSz-1)
+        pha
+
+        ;; just calculate X (how many chars will print)
+        ;; - L= strlen(AX)
+        tya
+        jsr strlen
+        ;; - L<precision
+        cmp precision
+        bcs :+
+        ;; - '<' X= L
+        cpx #0
+        beq :+
+        ;; - '>>' lol, X= 255
+        lda #255
+:       
+        ;; - '>=' X= precision
+        tax
+@skipcalc:        
+
+        ;; TODO: zero pad
+
+        ;; space pad
+        ;; - calculate after pad n= width-X
+        txa
+        sec
+        eor #255
+;;; TODO: negative width
+        adc savey
+        ;; pad (if Y<128 (no overflow))
+        tay
+        bmi :+
+        jsr spaces
+:       
+        ;; print string if right justified
+        ldy savey
+        bmi :+
+        ;; restore string
+        pla
+        tax
+        pla
+
+        jsr printyTOSz
+:       
+        ;; print constant string after call
+        jmp _iprintz
+        ;; and it has returned!
+LIBENDFUN printfs        
+        
 
 
 ;;; TODO: printf!
