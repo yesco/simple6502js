@@ -306,11 +306,11 @@ void error(char* msg, char* data) {
     fprintf(stderr, "\n%%%s %s\n", msg, data);
 
   fprintf(stderr, "\nUsage: mc\n"
-"  filename\t\t# compile and run\n"
+"  filename\t\t# load, compile and run\n"
 "  -f filename\t\t# load file\n"
 "  -c\t\t\t# compile\n"
-"  -d\t\t\t# disasm\n"
 "  -r[N]\t\t\t# run N times (defaualt 1)\n"
+"  -d\t\t\t# disasm\n"
 "\n"
 "  -pN\t\t\t# print variable names\n"
 "  -pe\t\t\t# print ENV\n"
@@ -463,6 +463,7 @@ void inputfile(char* filename) {
   char* p= (char*)EDITSTART;
   int c;
   FILE* f= fopen(filename, "r");
+  // TODO: ifnot found try add ".c"
   if (!f) error("Not such file:", filename);
 
   while((c= fgetc(f))!=EOF) {
