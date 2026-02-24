@@ -3197,7 +3197,6 @@ FUNC _nextI
         ;; - fall-through from above
 FUNC _next
 
-
 ;;; TODO: remove, disable here, maybe check and end of rule?
 
 ;;; This is very expensive, but keep to find overflow bugs
@@ -3294,7 +3293,18 @@ beq :--
 
         ldy #0
         lda (rule),y
-
+.ifdef LEADSTR
+pha
+putc ':'
+pla
+pha
+jsr _printchar
+iny
+lda (rule),y
+dey
+jsr _printchar
+pla
+.endif ; LEADSTR
         ;; hibit - new rule?
         bpl @nohi
 
@@ -3341,11 +3351,33 @@ jmpaccept:
         cmp (inp),y
         bne @noteq
 @skipspc:
-;        jsr _incI
+;        jsr _incI ; faster:
         inc inp
         bne :+
         inc inp+1
 :       
+
+.ifdef LEADSTR
+PUTC '.'
+jsr _printchar
+
+        ;; don't actually skip space after "
+        cmp #'"'                ; "
+        bne :+
+;        beq _next             
+
+        putc '!'
+        iny
+        lda (rule),y
+        dey
+        jsr _printchar
+        jsr _incR
+        jsr nl
+        jsr nl
+        
+        jmp _next
+:       
+.endif ; LEADSTR
 
         lda (inp),y
         beq jmpaccept
@@ -3441,13 +3473,15 @@ jsr nl
 
         ;; A is current inp char
        
+;;; TODO: test speed?
+
 ;;; Speed
 ;        jsr _incR
         inc rule
         bne :+
         inc rule+1
 :       
-        ;; comp rule?
+        ;; eqaual?
         cmp (rule),y
         beq @skipspc
         jmp _next
@@ -3479,9 +3513,9 @@ quoted:
         ;; - \[ for example, match special chars
         jsr _incR
         lda (rule),y
-
 testeq: 
         ;; - lit eq?
+        jsr nextInp
         cmp (inp),y
 ;;; LOL: relocate to "middle"?
         bne failjmp
@@ -10564,7 +10598,7 @@ FUNC _ERROR
 .endif ; ERRPOS
 
 
-        PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
+        PRINTZ {10,10,YELLOW+BG,BLACK,"ERROR",10,10}
 
 
 .scope
