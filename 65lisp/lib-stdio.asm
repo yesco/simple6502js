@@ -481,7 +481,11 @@ LIBENDFUN printfu
 
 
 .zeropage
+
+;;; TODO: reuse some other?
+.export precision
 precision:      .res 1
+
 .code
 
 

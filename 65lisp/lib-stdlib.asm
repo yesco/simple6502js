@@ -68,7 +68,11 @@
 ;;; bits, low bits, 
 
 .zeropage
+
+.export rng
+
 rng:    .res 2
+
 .code
 
 LIBFUN rand
@@ -235,7 +239,11 @@ FUNC _atoibaseXR
 ;;; ------------ HEAP MEMORY MANAGMENT -----------
 
 .zeropage
+
+.export _heap
+
 _heap:    .res 2
+
 .code
 
 ;;; Allocate AX bytes

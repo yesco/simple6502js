@@ -1690,7 +1690,7 @@ __ZPCOMPILER__:
 .code
 
 
-.export nparam, curF, params, compilestatus
+.export nparam, curF, params, endparams, compilestatus
 
 .zeropage
 
@@ -1757,6 +1757,7 @@ nlines:         .res 2
 naccepts:       .res 2
 nrules:         .res 2
 nlibbytes:      .res 2
+
 .code
 
 
@@ -3507,6 +3508,8 @@ jsr _printchar
 @vars:
         ;; HACK! - remove once we figure out the flow...
         ;; (maybe remove %A or it's usage of DOS? use stack)
+;;; TODO: look at this????
+
         ;; (needed for %S and %s too)
         sta whatvarpercentchar
 
@@ -10400,17 +10403,17 @@ endrules:
 FUNC _rulesend
 
 
-.export __ZPIDE__
-.zeropage
-__ZPIDE__:        .res 0
-.code
-
 FUNC _idestart
 
 FUNC _editorstart
         ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
 FUNC _editorend
+
+.export __ZPIDE__
+.zeropage
+__ZPIDE__:        .res 0
+.code
 
 
 FUNC _aftercompile
