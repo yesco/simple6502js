@@ -16,7 +16,5 @@ word main() {
     }
     if (!size) return total;
   } while(size);
-  // lol, total not found!
-  // BUG: TODO: env gets messed up!
   return total;
 }
