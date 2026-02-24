@@ -1,5 +1,6 @@
 DATE="`date +"%FT%H%M%S" -u`"
-TARNAME="MeteoriC_$DATE.tgz"
+VERSION="`cat mc-version.txt`"
+TARNAME="MeteoriC_$VERSION-$DATE.tgz"
 
 LISTFILES=( 
 "README-MeteoriC.md"
@@ -8,6 +9,7 @@ LISTFILES=(
 "mc.sim"
 "mc.tap"
 "oric-terminal.c"
+"mepoc.c"
 "Input/arrays.c"
 "Input/arrays-assign.c"
 "Input/arrays-ptr-assign.c"
