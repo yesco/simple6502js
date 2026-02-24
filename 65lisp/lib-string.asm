@@ -43,7 +43,12 @@
 ;;; 
 ;;; TESTED: ok!
 ;LIBFUN strlen
-;;; Length of string in AX to AX
+;;; strlen
+;;;   AX= pointer, stored in POS
+;;; Returns:
+;;;   AX= length of string
+;;;   pos   unmodified
+;;;   pos+1 modified
 ;;; 
 strlen:
 ;;; 22 B

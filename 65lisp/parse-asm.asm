@@ -5461,7 +5461,7 @@ nextc:
 ;;; TODO: keep track of last printed src
 ;;;       (and don't print again, lol)
 
-        PUTC '.'
+;        PUTC '.'
 @nosemi:
 .endif ;PRINTDOTS
 
