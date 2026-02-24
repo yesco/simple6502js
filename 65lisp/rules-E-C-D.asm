@@ -72,14 +72,62 @@ FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "|putu(",_E,")"
       .byte '['
-        jsr _printu
+        LIBCALL _printu
       .byte ']'
+
+
+        ;; miniprintf!
+
+        .byte "|putfu(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfu
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfd(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfd
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfx(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfx
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfs(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfs
+      .byte "]"
+        .byte "%S);"
+
 
         ;; compatibility
 
         .byte "|printf(",34,"\%u",34,",",_E,")"
       .byte '['
-        jsr _printu
+        LIBCALL _printu
       .byte ']'
 
         .byte "|printf(",34,"\%x",34,",",_E,")"
@@ -134,20 +182,17 @@ FUNC _iorulesstart
         ;; "IO-lib" hack
         .byte "|putd(",_E,")"
       .byte '['
-;;; TODO: change printers to use AX
-        jsr axputd
+        jsr _printd
       .byte ']'
 .endif ; SIGNED
 
         .byte "|puth(",_E,")"
       .byte '['
-;;; TODO: change printers to use AX
         jsr _printh
       .byte ']'
 
         .byte "|putz(",_E,")"
       .byte '['
-;;; TODO: fix, strings borken?
         jsr _printz
       .byte ']'
 
@@ -276,9 +321,9 @@ ldx tos+1
         ;; putchar constant - saves 2 bytes!
         .byte "|putchar(%D)"
       .byte '['
-        lda #'<'
-        jsr putchar
-;;; TODO: about return value...
+        lda #LOVAL
+        jsr putcraw
+;;; TODO: about return value...?
       .byte ']'
 
         ;; putchar variable - saves 2 bytes!
@@ -502,12 +547,24 @@ FUNC _iorulesend
 .endif ; !CTYPE
 
 
+;;; TODO: used for debugging LIBCALL
+.ifnblank
+        .byte "|dummy()"
+      .byte "["
+        lda #$12
+        LIBCALL $5634
+        lda #$78
+      .byte "]"
+.endif
+
+
 FUNC _stringrulesstart
 .ifdef STRING
 
         .byte "|strlen(",_E,")"
       .byte '['
-        jsr strlen
+        LIBCALL strlen
+;        jsr strlen
       .byte ']'
 
         ;; all these takes 2 args
@@ -674,6 +731,18 @@ FUNC _memoryrulesstart
 ;.ifdef NONO_cc65_STDLIB
 .ifdef STDLIB
 
+        .byte "|srand(",_E,")"
+      .byte "["
+;;; rng at address $xx20 == "jsr" lol
+        sta rng
+        stx rng+1
+      .byte "]"
+
+        .byte "|rand()"
+      .byte "["
+        LIBCALL rand
+      .byte "]"
+
 ;;; TODO: cheating, using cc65 malloc/free :-(
 
         ;; gives error if run out of memory
@@ -737,7 +806,6 @@ FUNC _memoryrulesstart
       .byte "]"
 
         ;; NOTE: no free and no realloc
-
 .endif ; !STDLIB
 
 
@@ -1595,6 +1663,32 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
         
+        ;; especially easy
+        .byte "|>>9%b"
+      .byte "["
+        ;; 4 B
+        txa
+        lsr
+        ldx #0
+      .byte "]"
+        .byte TAILREC
+
+        ;; especially easy
+        .byte "|<<7%b"
+      .byte "["
+        ;; 9 B
+        tay
+        txa
+        asl
+        tya
+        ror
+        tax
+        lda #0
+        ror
+      .byte "]"
+        .byte TAILREC
+
+
         .byte "|<<1%b"
       .byte '['
 .ifblank
@@ -1719,6 +1813,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|<<%D"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1738,8 +1833,11 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+
 ;;; TODO: so many duplicates...
 ;;;   can just do _C or _E ? priorities?
+
+;;; TODO: optimize if >8
         .byte "|<<%V"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1762,6 +1860,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|>>%D"
       .byte '['
 ;PUTC '/'
@@ -1772,7 +1871,7 @@ FUNC _oprulesstart
         dey
         bmi :+
         
-        lsr tos
+        lsr tos+1
         ror
 
         sec
@@ -1782,6 +1881,7 @@ FUNC _oprulesstart
       .byte ']'
         .byte TAILREC
 
+;;; TODO: optimize if >8
         .byte "|>>%V"
       .byte '['
 ;;; 15B (breakeven: D=4-)
@@ -1791,7 +1891,7 @@ FUNC _oprulesstart
         dey
         bmi :+
         
-        lsr tos
+        lsr tos+1
         ror
 
         sec

@@ -55,7 +55,13 @@ ls -l $name.o $name.sim $name.tap
 # -- simulation
 #echo "=== RUN ==="
 #(time sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---") | tee ${name}.log
-(sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---" ; stty sane) | tee $name.log
+#(sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---" ) | tee $name.log
+
+(sim65 -c $name.sim "$@" ; echo "--- EXIT=$? ---") | tee $name.log
+
+#stty sane
+echo
+cat $name.log
 echo
 (echo "`grep ' cycles' $name.log | sed -e 's/ cycles//'` /1000/1000" | bc -l ; echo "seconds simulated time");
 
@@ -71,9 +77,9 @@ cl65 -vm -m $name.map $name.o
 #echo
 echo "`./wcode $name.c ` LOC of $name  C-code (wc: `wc $name.c`)"
 echo
-echo "`./wcode singlisp.c ` LOC of LISP  C-code (wc: `wc singlisp.c`)"
-echo "`./wcode lisp.c ` LOC of LISP  C-code (wc: `wc lisp.c`)"
-echo "`./wcode dec30.c` LOC of DEC30 C-code (wc: `wc dec30.c`)"
+#echo "`./wcode singlisp.c ` LOC of LISP  C-code (wc: `wc singlisp.c`)"
+#echo "`./wcode lisp.c ` LOC of LISP  C-code (wc: `wc lisp.c`)"
+#echo "`./wcode dec30.c` LOC of DEC30 C-code (wc: `wc dec30.c`)"
 
-stty sane
+#stty sane
 

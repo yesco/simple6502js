@@ -1,0 +1,6 @@
+clang mepoc.c -o mepoc.x && ./mepoc.x "$@"
+
+WORDS=5-letter-words.lst
+
+# aspell -l en dump master | grep -E '^[a-z]{5}$' > $WORDS
+

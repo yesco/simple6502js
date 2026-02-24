@@ -27,6 +27,10 @@
 ;dos:            .res 2
 
 
+;;; TODO: LIBFUN
+;;;   -- problem is fallthroughs!
+;;;   if Y=0 skip sta tos/sty dos? lol
+
 FUNC _mulAXyAX
         sta tos
         stx tos+1
@@ -34,7 +38,6 @@ FUNC _mulTOSyAX
         sty dos
         ldy #0
         sty dos+1
-
 
 ;;; pos x dos => AX
 ;;; 31

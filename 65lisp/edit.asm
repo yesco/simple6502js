@@ -89,9 +89,37 @@
 
 ;;; TODO: this shouldn't work, should overlap VARS env
 ;;;   during compilation....
-EDITNULL= HICHARSET
+
+
 .export EDITNULL
 .export EDITSTART
+
+
+.ifdef __ATMOS__
+        EDITNULL= HICHARSET
+        ;; non inclusive
+        ;; TEXTSCREEN CHARSET start
+        EDITEND= CHARSET
+.else ; sim65
+
+        ;; TODO: nothing is safe unless been allocated
+        ;;   in the sim6502.cfg file!
+
+
+        EDITNULL= editarea
+
+        ;; non inclusive
+        EDITEND= editareaafter
+
+editarea:       
+        .res 7000, 0
+editareaafter:  
+
+.code
+
+.endif ; !__ATMOS__
+
+
 
 ;EDITNULL= HIRES ; this crashes for some reason
 
@@ -103,9 +131,6 @@ EDITNULL= HICHARSET
 
 EDITSTART= EDITNULL+1
 
-;;; non inclusive
-;;; TEXTSCREEN CHARSET start
-EDITEND= CHARSET
 ;;; 
 EDITSIZE= EDITEND-EDITSTART
 
@@ -346,9 +371,18 @@ FUNC _editaction
         ;; most rourtines rely on Y=0
         ldy #0
 
+.ifdef __ATMOS__
         ;; noctrl: special keys without cTRL
         cpx #sCTRL
         beq ctrl
+.else ; sim65
+        ;; we can't distinguish between
+        ;; ^M and RETURN
+        ;; ^H and BACKSPACE (capture F1 for help?)
+        cmp #' '
+        bcc ctrl
+.endif
+
 @noctrl:
         ;; DEL key on ORIC (do perform BS)
         cmp #127
@@ -378,6 +412,8 @@ FUNC _editaction
 	;; Using dispatch table intead of cmp/beq (4 B)
         ;; 
         ;; (- 18790 18706) = 84 bytes saved (only?)
+        ;; (I think less now, as many JMP)
+        ;; (see Play/key-dispatch.c for alternative)
         ;; 
         ;; 10 B relative BRANCH dispatch!
 ctrl:   
@@ -592,7 +628,19 @@ EDITCOLOR=GREEN & 127
 
 
 ;;; raw raw raw - relatively fast!
+;;; 
+;;; For every keystroke we rewrite the ORIC text screen
+;;; (editor part, skipping the top line)
+;;; This is fast enough for a normal typer.
+
 FUNC _redraw 
+
+.ifndef __ATMOS__
+        ;; vt100 HOME
+        PRINTZ {27,"[H}"}
+.endif
+
+
 ;;; (+ 24 55) = 79
 ;;; (16)
         ;; we need to set the cursor when drawing!
@@ -646,6 +694,9 @@ FUNC _redraw
 @putc:
         ;; write to screen
         sta (tos),y
+.ifndef __ATMOS__
+        jsr putchar
+.endif
         ;; at cursor, save COL
         bpl :+
         stx editcol
@@ -690,6 +741,9 @@ FUNC _redraw
         lda #' '
 @colorln:
         sta (tos),y
+.ifndef __ATMOS__
+        jsr putchar
+.endif
 
 @noclearlastchar:
         inc tos
@@ -715,6 +769,11 @@ FUNC _redraw
 @color:
         lda #EDITCOLOR
         sta (tos),y
+.ifndef __ATMOS__
+;        PUTC 10
+        jsr putchar
+        cmp #0
+.endif
         ;; Always
 ;        bne @putc
         bne @forw
@@ -902,7 +961,10 @@ FUNC _loadfromAX_noupdate
         ;; or dos+a reoutine?
 
         ;; update edit end
-.ifnblank
+;;; "constant expression expected"
+;.if (EDITNULL .mod 256) != 0
+.ifblank
+        .assert ((EDITNULL .mod 256)=0),warning,"%% EDITALIGNED"
         ;; 12
         tya
         clc

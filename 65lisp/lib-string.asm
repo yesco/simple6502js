@@ -42,7 +42,10 @@
 ;;; - (strerror)
 ;;; 
 ;;; TESTED: ok!
-strlen: 
+;LIBFUN strlen
+;;; Length of string in AX to AX
+;;; 
+strlen:
 ;;; 22 B
         sta pos
         stx pos+1
@@ -61,6 +64,7 @@ strlen:
 :       
         tya
         rts
+;LIBENDFUN strlen
         
 ;;; TODO: strchrnul really?
 

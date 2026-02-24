@@ -45,9 +45,13 @@ saveyputchar:   .res 1
 
 .code
 
+KBHIT=kbhit
 ;;; TODO: fix, use read(1) non-blocking?
 kbhit:  
         ;; dummy, just return 0
+        ;; TODO: this might cause problem if waiting...
+        ;;    but also may skip some updating screen
+        ;;    action if say have key...
         lda #0
         rts
 
@@ -111,6 +115,8 @@ getchar:
 
 
 rawputc=_putchar
+
+putcraw=_putchar
 
 .macro GOTOXY xx,yy
 ;;; ansi codes not working?

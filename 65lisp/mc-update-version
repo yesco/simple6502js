@@ -1,0 +1,6 @@
+VERSION="`./mepoc @now`"
+
+echo ".define VERSION \"$VERSION\"" > mc-version.inc
+echo $VERSION > mc-version.txt
+
+

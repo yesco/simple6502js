@@ -3,7 +3,8 @@
 ;;; possibly:
 ;;; 
 ;;; Part of library for parse CC02 C-compiler
-
+;;; 
+;;; #x66 = 102 bytes
 
 
 
@@ -29,10 +30,25 @@
 ;;; adds about 1900 bytes! (or so)
 
 
-;PRINTF=1
-.ifdef PRINTF
+.zeropage
+tos:    .res 2
+pos:    .res 2
+savex:  .res 1
+savea:  .res 1
+savey:  .res 1
+.code
 
-FUNC _printf
+;;; dummies
+_incT:  
+putchar:        
+putz:
+putx:   
+putd:   
+putu:   
+        rts
+
+.export _printf
+_printf:        
 ;;; according to printf.c minimal *restricted*
 ;;; implementation (no .7 max limit) the 
 ;;; cc65 - printf will "include" funs giving
@@ -113,9 +129,9 @@ FUNC _printf
         tax
         ;; - load first argument==format - I hope!
 ;;; 12
-        lda (101),x
+        lda $101,x
         sta pos
-        lda (102),x
+        lda $102,x
         sta pos+1
         stx savex
         ;; - pos points to the format string
@@ -169,7 +185,7 @@ FUNC _printf
 ;;; 3
         jmp (tos)
 
-@processarg:
+processarg:
 ;;; 31
         ;; - save char after % in Y
         tay
@@ -178,31 +194,25 @@ FUNC _printf
         ldx savex
         dex
         dex
-        lda (102),x             ; hi
+        lda $102,x             ; hi
         tax
-        lda (101),x             ; lo
+        lda $101,x             ; lo
         ;; AX is argument, Y is type char
 
 @dispatch:
 ;;; TODO: put all this routines/trampoiles NEAR!
         ;; tail-calls!
         cpy #'u'
-        beq axputu
+        beq putu
         cpy #'d'
-        beq axputd
+        beq putd
         cpy #'x'
-        beq axputx
+        beq putx
         cpy #'s'
-        beq axputz
+        beq putz
         cpy #'c'
         bne :+
         jmp putchar
 :       
         ;; fail to match type char
         rts
-
-
-.endif ; PRINTF
-
-
-

@@ -1,0 +1,48 @@
+; Byte Sieve Benchmark (10 Iterations)
+; Finding primes up to 16,384
+
+BYTE ARRAY flags[8191]
+
+PROC Sieve()
+  CARD i, j, k, count, iter
+  BYTE n_iterations = 10
+
+  PrintE("10 iterations")
+
+  FOR iter = 1 TO n_iterations
+  DO
+    count = 0
+    FOR i = 0 TO 8190
+    DO
+      flags[i] = 1
+    OD
+
+    FOR i = 0 TO 8190
+    DO
+      IF flags[i] = 1 THEN
+        j = i + i + 3
+        k = i + j
+        WHILE k <= 8190
+        DO
+          flags[k] = 0
+          k ==+ j
+        OD
+        count ==+ 1
+      FI
+    OD
+  OD
+
+  PrintF("%D primes found.%N", count)
+RETURN
+
+PROC Main()
+  ; Disable ANTIC DMA to maximize CPU speed
+  BYTE dmactl = $D400
+  dmactl = 0 
+
+  Sieve()
+
+  ; Re-enable ANTIC DMA after completion
+  dmactl = $22 
+RETURN
+

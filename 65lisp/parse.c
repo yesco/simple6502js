@@ -5,7 +5,7 @@
 //#include <stdio.h>
 
 // this makes compiling cgetc() ok but linker fails!
-
+// (I think not defined for sim6502!)
 //#include <conio.h>
 
 #include <ctype.h>
@@ -549,6 +549,8 @@ void snapshot(char* arg) {
 extern void processnextarg() {
   char* a= *++argv;
 
+  putchar('\n');
+
   // not processing arguments
   if (argc < 0) return;
 
@@ -644,6 +646,7 @@ void main(int iargc, char** iargv) {
 
   // from tty-helpers.asm (?)
   clrscr();
+  // cputc('X'); // not on sim!
 
 #ifdef __ATMOS__
   TEXTSCREEN[0]= 'A';

@@ -44,40 +44,116 @@
 
 
 
+;;; - https://wimcouwenberg.wordpress.com/2020/11/15/a-fast-24-bit-prng-algorithm-for-the-6502-processor/
+
+
+
+
+;;; 16 bit, maybe wrongly ported? 
+;;; - http://www.retroprogramming.com/2017/07/xor
+
+;;; set random seed, can be anything except 0
+;;; unsigned xorshift( )
+;;; {
+;;;     xs ^= xs << 7;
+;;;     xs ^= xs >> 9;
+;;;     xs ^= xs << 8;
+;;;     return xs;    
+;;; }
+;;; 
+;;; There are 60 shift triplets with the maximum
+;;; period 216-1. Four triplets pass a series of
+;;; lightweight randomness tests including randomly
+;;; plotting various n × n matrices using the high
+;;; bits, low bits, 
+
 .zeropage
-;;; 8-bit seed the generator, write here
-seedrand:       .byte 42
+rng:    .res 2
 .code
 
-;;; new rnadom valuie in AX
-FUNC rand
-        jsr rand8
-        tax
-        ;; fall-through for A
+LIBFUN rand
 
-;;; Simple 8-bit LFSR
-;;; 
-;;; The 8-bit LFSR (0–254 range, excluding all-zero),
-;;; use a Galois configuration with the primitive
-;;; polynomial \(x^8 + x^4 + x^3 + x^2 + 1\)
-;;; (mask `#$1D`). This gives a maximum period of 255
-;;; before repeating.
-;;; 
-;;; Consider using Mersenne Twister (?)
-FUNC rand8
-        lda seedrand
-        beq do_xor
-        asl
-        beq no_xor
-        bcc no_xor
-        lda seedrand
-do_xor:  
-        eor #$10
-no_xor: 
-        sta seedrand
+.ifblank
+;;; my version
+
+        ;; xs ^= xs << 7;
+.ifnblank
+;;; 25 B
+      ldx rng+1
+        lda rng
+        lsr
+        eor rng+1
+        sta rng+1
+        lda #0
+        ror
+        eor rng
+        sta rng
+      txa
+      lsr
+      lda #0
+      ror
+      eor rng+1
+      sta rng+1
+.else
+;;; 19 B (gen from oscar64, lol)
+        LDA rng+1
+        LSR
+        LDA rng
+        ROR
+;        lsr
+        TAX
+        LDA #$00
+        ROR
+        EOR rng
+        STA rng
+        TXA
+        EOR rng+1
+        STA rng+1
+;;; TODO: doesn't that skip the low bit of
+;;;    rng+1, shouldn't it be flipping the hi bit?
+.endif
+
+        ;; xs ^= xs >> 9;
+        ;lda rng+1
+        lsr
+        eor rng
+        sta rng
+
+        tax
+        ;; xs ^= xs << 8;
+        ;lda rng
+        eor rng+1
+        sta rng+1
+        
+        ;; AX reversed but doesn't matter
+        ;; - each value is generated!
         rts
 
+.else
+;;; from link - wrong!
+        lda rng+1
+        lsr
+        lda rng
+        ror
+        eor rng+1
+        sta rng+1  ; x ^= x << 7 done
+        ror        ; A x >> 9 high bit comes from low
+        eor rng
+        sta rng    ; x ^= x >> 9 low part of x ^= x << 7
 
+        tay
+        
+        eor rng+1
+        sta rng+1  ; x ^= x << 8 done
+
+        ;; return AX=rng,rng+1
+        tax
+        tya
+
+        rts
+.endif
+
+LIBENDFUN rand
 
 
 ;FUNC _atoiAX
@@ -156,34 +232,3 @@ FUNC _atoibaseXR
 .endif ; ATOI
 
 
-.ifdef SIGNED
-;;; 31B
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-;;; print signed decimal
-FUNC _putd
-putd:
-;;; 19 b
-        cpx #0
-        bpl :+
-        putc '-'
-:       
-        ;; negate
-        jsr _negate
-        
-        sta tos
-        stx tos+1
-        jmp putu
-
-FUNC _dummyd
-.endif ; SIGNED

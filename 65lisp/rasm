@@ -9,6 +9,8 @@
 #
 # configure this by creating a ORIC link to your download/upload directory
 
+./mc-update-version
+
 OPTS=" -DPROGSIZE "
 
 echo "unix> ./tap $*"
