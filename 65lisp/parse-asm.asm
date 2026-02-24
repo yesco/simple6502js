@@ -772,7 +772,7 @@
 ;;; - v0.5 IDEA/editor
 ;;; - v0.60 long name variables
 ;;; - v0.61 (slow) function calls
-.define VERSION "v0.61a"
+.define VERSION "v0.61c"
 ;;; - v0.62 TODO: local variables
 ;;; - v0.63 TODO: (opt) function calls (static params)
 ;;; - v0.64 TODO: array indexing
@@ -15183,25 +15183,8 @@ NOPRINT=1
         .byte 0
 
 ;;; n - numeric constants different bases
-        .byte "// numeric C constants",10
-        .byte "word nl(){ putchar('\\n'); }",10
-        .byte "",10
-        .byte "word p(word n){",10
-        .byte "  putu(n);",10
-        .byte "  putchar(' ');",10
-        .byte "}",10
-        .byte "",10
-        .byte "word main(){",10
-;;; BUG: basically lda/ldx lda/ldx as two parameters w no push!
-;;;    (because no comman, lol!)
-;        .byte "  p(0b111666); nl();",10
-        .byte "  p(17); p(42); p(55555); nl();",10
-        .byte "  p(0x11); p(0x2a); p(0xd903); nl();",10
-        .byte "  p(0x11); p(0X2A); p(0XD903); nl();",10
-        .byte "  p(0x11); p('*'); p(0XD903); nl();",10
-        .byte "  p(0b10001); p(0B101010); p(0b1101100100000011); nl();",10
-        .byte "  p(021); p(052); p(0154403); nl();",10
-        .byte "}",0
+        .incbin "Input/numerals.c"
+        .byte 0
 
 ;;; o -
 ;

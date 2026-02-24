@@ -28,6 +28,7 @@ LISTFILES=(
 "Input/malloc.c"
 "Input/music.c"
 "Input/noel-retro.c"
+"Input/numerals.c"
 "Input/parenthesis.c"
 "Input/plusplus.c"
 "Input/random.c"
