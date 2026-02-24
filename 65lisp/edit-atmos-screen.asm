@@ -1,3 +1,13 @@
+;;; NOTE: this is no longer used.
+;;; 
+;;; It was "novel" as it implemented EMACS-style
+;;; editing using ORIC ATMOS full-screen.
+;;; 
+;;; It was abonded because of limitations:
+;;; - limited to 26 lines
+;;; - lines couildn't really be longer than 37 (?) chars
+;;; - not "portable"
+
 ;;; edit's text on ORIC ATMOS hardware text screen
 ;;; 
 ;;; 

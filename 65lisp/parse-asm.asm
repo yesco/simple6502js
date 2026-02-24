@@ -764,18 +764,7 @@
 ;;; 
 ;;; gives a parse.tap in ORIC folder (symlink)
 
-;;; VERSION
-;;; - v0.1 void main() return
-;;; - v0.2 putc etc...
-;;; - v0.3 expr
-;;; - v0.4 unlimited statements (TAILREC)
-;;; - v0.5 IDEA/editor
-;;; - v0.60 long name variables
-;;; - v0.61 (slow) function calls
-.define VERSION "v0.61c"
-;;; - v0.62 TODO: local variables
-;;; - v0.63 TODO: (opt) function calls (static params)
-;;; - v0.64 TODO: array indexing
+.include "mc-version.inc"
 
 ;;; TODO: before release
 ;;; - save edit buffer in compile snapshot
@@ -1381,7 +1370,8 @@ DEMO=1
 ;         OUTPUTSIZE=31*1024   ... 32563 bytes!
 ;         OUTPUTSIZE= 31*1024+512+256+32+16+2+1
 
-        OUTPUTSIZE=29*1024
+        OUTPUTSIZE=28*1024-8000
+        ;;         memleft editarea
 
 ;;; leave space for now to do xmalloc...
 ;;; segmentation fault! (w added fgets???)
@@ -1505,7 +1495,26 @@ _asmstart:
 
 
 
-.include "atmos-constants.asm"
+.include "atmos-terminal-codes.asm"
+
+.ifdef __ATMOS__
+        .include "atmos-constants.asm"
+.else ; sim65
+
+        ;;; 6502:
+        INTVEC=$FFFE
+
+        ;; for now, for editor; allocate and draw
+        ;; in "virtual simulated screen"
+        SC=screen
+.bss
+screen: 
+        .res 28*40,' '
+
+.code
+
+.endif ; __ATMOS__
+        
 
 
 ;;; TODO: why is this not accepted?
@@ -2391,6 +2400,28 @@ FUNC _graphicsend
 
 
 FUNC _libraryend
+
+;
+OUTPUTEARLY=1
+
+.ifdef OUTPUTEARLY
+
+_output:
+;;; not physicaly allocated in binary
+;;; ++a; x 2000
+;;;  free tap inp output
+;;; (- 37 11    8   16  ) = 2K left
+
+        .res OUTPUTSIZE
+
+;;; TODO: this is only for running inside the IDE!
+
+ENDOFHEAP=*
+
+
+.endif ; OUTPUTEARLY
+
+
 
 
 ;;; IDE needs "fancy bios"
@@ -4406,6 +4437,7 @@ FUNC skipgen
 @noinc3:
 ;;; TODO: should skip 2!!! ???? Hmmmm?
 ;;; TODO: $ rand - crash if skip 2 ? lol - ok now???
+;;;   gives syntax errors (on like first statement)??? wtf?
         iny
         bne @noinc4
         inc rule+1
@@ -6333,7 +6365,7 @@ _rules:
 ;ruleF: byte rule, keeps AX, get byte expr => Y
 ;ruleG: calling convention "(@tos,AX) like ruleC
 
-;ruleH: printf parsing
+ruleH: ;;printf parsing
 ;ruleI: "load byte expression" - opt
 ;ruleJ: "read byte expression, saving AX totos and sets Y=0"
 
@@ -6907,6 +6939,8 @@ FUNC _byterulesend
 
 
 
+.ifnblank
+
 ;;; printf handling
 FUNC ruleH_printf
 ruleH:  
@@ -7005,6 +7039,10 @@ ruleH:
         .byte "|);"
 .endif ; rulePRINTF
         .byte 0
+
+.endif ; blank
+
+
 
 ;;; load byte expression
 FUNC ruleI_byte_expressions
@@ -10419,16 +10457,8 @@ __ZPIDE__:        .res 0
 FUNC _idestart
 
 FUNC _editorstart
-.ifndef __ATMOS__
-        ;; ironic, as this is not editor for
-        ;; generic...
-
-        ;; outdated (no cursor anymore)
-        .include "edit-atmos-screen.asm"
-.else
         ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
-.endif
 FUNC _editorend
 
 
@@ -10916,7 +10946,9 @@ FUNC _forcecommandmode
 
         ;; fall-through
 
-.ifdef __ATMOS__
+
+FUNC _ide
+
 ;;; eventloop
 ;;; 
 ;;; Depending on "mode", you're either in
@@ -10943,11 +10975,23 @@ FUNC _eventloop
         ;; not
         jmp _ERROR
 :       
+
+.ifdef __ATMOS__
+
         jmp editstart
 
+.else
+        
+        ;; set command mode (no edit yet)
+        lda mode
+        ora #128
+        sta mode
+        
+        jmp command
 
-;;; TODO: seems a bit roudabout the flow
-;;;   works but...
+.endif ; !__ATMOS__
+
+;;; TODO: seems a bit roundabout the flow but works
 command:
 ;        jsr _eosnormal
 
@@ -10955,23 +10999,101 @@ command:
 .ifdef __ATMOS__
         PRINTZ {10,">",'Q'-'@'}
 .else
+        ;; TODO: make ./oric-terminal mimic oric!
         PRINTZ {10,">"}
         CURSOR_ON
 .endif
         jsr getchar
         CURSOR_OFF
 
-        ;; ignore return
+        ;; === these DON'T return ===
+        ;; (and resets the stack)
+        
+        ;; Q)uit - TODO: too easy
+        cmp #'Q'
+        bne :+
+
+        .import _exit
+        jsr nl
+        jmp _exit
+:       
+        ;; r)un
+        cmp #'r'
+        bne :+
+
+        jmp _run
+:       
+        ;; c)ompile
+        cmp #'c'        
+        bne :+
+
+        jmp _idecompile
+:       
+        ;; i)nput compile
+        cmp #'i'        
+        bne :+
+
+        jmp _compileInput
+:       
+        ;; h)elp
+        cmp #'h'
+        bne :+
+        
+        jmp _help
+:       
+        ;; x)extras (file)
+        cmp #'x'
+        bne :+
+        
+        jmp _extend
+:       
+        ;; l)oad buffer
+        cmp #'l'
+        bne :+
+        
+        jmp _loadbuffer
+:       
+        ;; w)rite file
+        cmp #'l'
+        bne :+
+        
+        jmp _savefile
+:       
+
+        ;; === these DO return
+
+        ;; z)ource
+        cmp #'z'
+        bne :+
+
+        jsr _loadlater
+        jmp command
+:       
+        ;; d)isasm
+        cmp #'d'
+        bne :+
+
+        jsr _dasm
+        jmp _forcecommandmode
+:       
+        ;; p)rint source - TODO: remove
+        cmp #'p'
+        bne :+
+        jmp print_buffer
+:       
+        ;; RET) ignore return
         cmp #13
         beq command
-        ;; ?help
+
+        ;; ?) help
         cmp #'?'
         bne :+
 @minihelp:
         ;; 82 B
-        PRINTZ {"?",10,"Command",10,YELLOW,"e)rror c)ompile r)un h)elp v)info",10,YELLOW,"q)asm  x)tras ESC-edit"}
+        PRINTZ {"?",10,"Command",10,YELLOW,"r)un c)ompile e)rror v)info  Q)uit",10,YELLOW,"h)elp d)isasm x)tras z)ource ESC-edit"}
         jmp command
 :       
+;        jmp command
 
         ;; lowercase whatever to print!
         ora #64+32           
@@ -10986,32 +11108,36 @@ editing:
 
 editstart:
         bit mode
-        bmi command
+        bpl :+
+        jmp command
+:       
 
+.ifblank
+;.ifdef __ATMOS__
         ;; don't redraw if key waiting!'
         jsr KBHIT
         bmi :+
+.endif ; __ATMOS__
+
         ;; redraw
         jsr _redraw
 :       
         jsr getchar
         jmp editing
-.else 
-
-FUNC _eventloop
-        ;; this is like a continuation;
-        jsr _processnextarg
-
-        ;; TODO: hmmm...
-        jmp _ide
-
-.endif ; __ATMOS__
 
 
 
 
+print_buffer:
+        jsr nl
+        lda #<EDITSTART
+        ldx #>EDITSTART
+        jsr _printz
 
-.ifdef __ATMOS__
+        jmp command
+
+
+
 
 FUNC _idecompile
         ;; We need to make sure no hibit (cursor)
@@ -11053,9 +11179,6 @@ FUNC _togglecommand
 
 @ed:
         jmp _redraw
-
-.endif ;  __ATMOS__
-
 
 
 
@@ -11444,6 +11567,8 @@ FUNC _listsymbols
         cmp #$ff
         beq @donelist
         ;; standing at name (maybe)
+
+.ifdef __ATMOS__
         ;; - print space if no have
         pha
         ldy CURCOL
@@ -11454,6 +11579,11 @@ FUNC _listsymbols
         jsr spc
 :       
         pla
+.else
+        ;; TODO: may print many spaces...
+        PUTC ' '
+.endif ; !__ATMOS__
+
 @nextchar:       
         cmp #'a'
         bcc @nextbar
@@ -11527,8 +11657,8 @@ GROUP=YELLOW
 ;;; TODO: put where heap will grow? - then overwrite?
 FUNC _introtext
 .byte 10
-.byte DOUBLE,YELLOW,"MeteoriC",NORMAL,MEAN,"alpha",GREEN,DOUBLE,"minimal C-compiler",10
-.byte DOUBLE,YELLOW,"MeteoriC",NORMAL,' ',"     ",' ',DOUBLE,"minimal C-compiler",10
+.byte YELLOW,DOUBLE,"MeteoriC",NORMAL,MEAN," alpha",GREEN,DOUBLE,"mini C-compiler",10
+.byte YELLOW,DOUBLE,"MeteoriC",NORMAL,CYAN,VERSION,YELLOW,DOUBLE,"mini C-compiler",10
 .byte 10
 .byte WHITE,"`2026 Jonas S Karlsson jsk@yesco.org",10
 ;;;          ----------------------------------------
@@ -11545,44 +11675,28 @@ FUNC _introtext
 .byte YELLOW," - ops:",CODE,"+-*&|^ *2 /2 << >> ! ++ --",10
 .byte YELLOW," - no op precedence:",GREEN,"1+2*4  =>7!",10
 .byte YELLOW," -",CYAN,"std libraries",YELLOW,"or",CYAN,"libraryless!",10
-.byte YELLOW," -",CYAN,"ATMOS",YELLOW,"API for graphics/sound routines",10
-.byte MAGNENTA,"...more features coming...",10
-.byte 10
-.byte 0
+.byte YELLOW," -",CYAN,"ATMOS",YELLOW,"API for graphics/sound",10
+.byte WHITE,"...more features coming...",0
 
 .endif ; INTRO
 
 
-;;; TODO: sim65 interact with files?
 
 .ifdef __ATMOS__
-
-;;; ORIC tape max length 16
-FILENAMESIZE=17
+	;;; ORIC tape max length 16
+	FILENAMESIZE=17
+.else
+        ;; enough path name size?
+        ;; TODO: consider using malloc?
+        ;;   (hmm, how to mix with my own?/progs?)
+	FILENAMESIZE=80
+.endif 
 
 ;filename:       .res FILENAMESIZE+1
 ;;; TODO: dummy for now
 filename:              
         .byte "userfile.c",0
         .res FILENAMESIZE-.strlen("userfile.c")-1
-
-
-copyfilename:
-;;; this code is stupid, just copies 15 bytes
-;;; from CC65 store_filename, doesn't care about length?
-        ldy #$0f
-        lda #<filename
-        ldx #>filename
-        sta tos
-        stx tos+1
-@nextc:
-        lda (tos),y
-        sta $027f,y
-        dey
-        bpl @nextc
-        
-        rts
-
 
 FUNC _writefileas
         jsr _eosnormal
@@ -11617,12 +11731,9 @@ PUTC 'd'
         jsr _printz
         jsr nl
 putc 'e'
-
-.ifblank
         ;; _atmos_save see cc65
         ;; CC65 calling convention
 
-        sei
         ;; store file start address
         lda #<EDITSTART
         ldx #>EDITEND
@@ -11634,31 +11745,8 @@ putc 'e'
         sta $02ab               ; file end lo
         stx $02ac               ; file end hi
 
-        jsr copyfilename
-
-        ;; what data is this?
-        lda #$00
-        sta AUTORUN
-
-        ;; mark as "machinecode", otherwise pops to basic?
-        lda #$80
-        sta LANGFLAG
-
-        ;; calling interrupt subroutine?
-        jsr csave_bit
-        cli
-
+        jsr buffer_save_file
         jmp _eventloop
-
-csave_bit:      
-        php
-        jmp $e92c
-
-.endif
-
-:       
-        jmp _eventloop
-
 
 
 FUNC _loadbuffer
@@ -11672,7 +11760,9 @@ FUNC _loadbuffer
         ;; or ?
         cmp #'?'
         bne :+
-listbuffers:
+
+        ;; - fallthrough
+FUNC _listbuffers
         jsr _listfiles
         ;; let user choose buffer
         jsr getchar
@@ -11706,15 +11796,21 @@ listbuffers:
 :      
         pla
 
+        jmp _eventloop
+
+;;; TODO: cleanup
+.ifnblank
         ;; load tape file?
         pha
         jsr isalpha
         beq :+
 
         pla
+.endif
+
 
 ;;; load file (ask for name)
-openfile:
+FUNC _openfile
         jsr _eosnormal
         
         PRINTZ {10,YELLOW,"Open file:",WHITE}
@@ -11737,24 +11833,7 @@ openfile:
 
         jsr _clearedit
 
-        ;;; _atmos_load cc65
-        sei
-        jsr     copyfilename
-        ldx     #$00
-        stx     AUTORUN       ; $00 = only load, $C& = run
-        stx     JOINFLAG      ; don't join it to another BASIC program
-        stx     VERIFYFLAG    ; load the file
-
-        ldx     #$80          ; machinecode
-        stx     LANGFLAG      ; BASIC
-
-        jsr     cload_bit
-        cli
-        jmp loadedfile
-cload_bit:
-        pha
-        jmp     $e874
-loadedfile:
+        jsr buffer_load_file
 
         ;; update editend (search \0!)
         lda #<EDITSTART
@@ -11768,7 +11847,6 @@ loadedfile:
 @loop:       
         lda (editend),y
         beq :+
-
         ldx #editend
         jsr _incRX
         ;; Z=1
@@ -11779,7 +11857,6 @@ loadedfile:
         sta mode
 
         jmp _eventloop
-
 :       
         ;; get key back
         pla
@@ -11788,17 +11865,86 @@ loadedfile:
 
         jmp _forcecommandmode
 
-.else
-FUNC _writefileas
-FUNC _savefile       
-FUNC _loadfile
-openfile:       
-        ;; TODO: not amos buffer
-        PRINTZ {10,"% Not implemented"}
+
+
+
+.ifdef __ATMOS__
+
+
+copyfilename:
+;;; this code is stupid, just copies 15 bytes
+;;; from CC65 store_filename, doesn't care about length?
+        ldy #$0f
+        lda #<filename
+        ldx #>filename
+        sta tos
+        stx tos+1
+@nextc:
+        lda (tos),y
+        sta $027f,y
+        dey
+        bpl @nextc
+        
+        rts
+
+
+FUNC buffer_load_file
+        ;;; _atmos_load cc65
+        sei
+        jsr     copyfilename
+        ldx     #$00
+        stx     AUTORUN       ; $00 = only load, $C& = run
+        stx     JOINFLAG      ; don't join it to another BASIC program
+        stx     VERIFYFLAG    ; load the file
+
+        ldx     #$80          ; machinecode
+        stx     LANGFLAG      ; BASIC
+
+        jsr     cload_bit
+        cli
+        ;; done
+        rts
+        
+;;; ? clever way to jump into middle of ROM-code?
+cload_bit:
+        pha
+        jmp     $e874
+
+
+
+FUNC buffer_save_file
+        sei
+        jsr copyfilename
+
+        ;; what data is this?
+        lda #$00
+        sta AUTORUN
+
+        ;; mark as "machinecode", otherwise pops to basic?
+        lda #$80
+        sta LANGFLAG
+
+        ;; calling interrupt subroutine?
+        jsr csave_bit
+        cli
 
         rts
-.endif ; __ATMOS__
 
+csave_bit:      
+        php
+        jmp $e92c
+
+
+.else
+
+;;; TODO: call to C (for now)
+
+FUNC buffer_load_file
+FUNC buffer_save_file
+
+        
+        rts
+.endif ; !__ATMOS__
 
 
 
@@ -11818,76 +11964,18 @@ FUNC _extend
         and #31
 
 .ifdef __ATMOS__
-;;; 7 B per key
-;;; dispatch table 64+ dispath
-;;; (/ 64 7) = 9 trade off
-;;; TODO: How about search list?
-;;;   3 B/key (/ (+ 29 3 3 (* 10 3)) 7.0)
-;;; 9.3 keys 7 B is break even point for 10 keys
-;;; total dispatched (all over) then start saving.
-.ifnblank
-
-.macro KEYDO key,addr
-        ;; key, hi, lo (reverse)
-        ;; (-1 because use RTS)
-        .byte key, >(addr-1), <(addr-1)
-.endmacro
-
-        lda #CTRL('F')
-
-;;; 3*7+1=22 B
-        jsr dokey
-        KEYDO CTRL('B'), listbuffers
-        KEYDO CTRL('F'), openfile
-        KEYDO CTRL('S'), _savefile
-        KEYDO CTRL('W'), _writefileas
-        KEYDO CTRL('C'), _compileInput
-        KEYDO CTRL('J'), bytesieve
-        ;; No match
-        KEYDO 0, _wrongkey
-
-;;; Dispatch on A to addresslist after "jsr dokey'
-dokey:  
-;;; 29 B
-        sta savea
-        pla
-        sta tos
-        pla
-        sta tos+1
-        ldy #$100-3+1
-@next:
-        lda (tos),y
-        beq @fail               ; 0 match all!
-        iny
-        cmp savea
-@skip:
-        iny
-        iny
-        ;; always
-        bne @next
-@fail:
-@match:
-        ;; hi first
-        lda (tos),y
-        iny
-        pha
-        ;; lo
-        lda (tos),y
-        pha
-        ;; call lo,hi (from stack)
-        rts
-
-.endif
+        ;; === key dispatch ===
+        ;; (see Play/key-dispatch.asm for alternative)
 
         ;; ^X^B - emacs list buffers!
         cmp #CTRL('B')
         bne :+
-        jmp listbuffers
+        jmp _listbuffers
 :       
         ;; ^X^F - open file from tape/disk
         cmp #CTRL('F')
         bne :+
-        jmp openfile
+        jmp _openfile
 :       
         ;; ^X^S - save current file
         cmp #CTRL('S')
@@ -11980,10 +12068,12 @@ TODO:    this will not work, A destroyed
 ;        sta READTIMER+1
 .else
 
+.ifdef __ATMOS__
         ;; software interrupt ORIC timer
         ;; 100 ticks/s
         lda CSTIMER
         ldx CSTIMER+1
+.endif ; __ATMOS__
         
         ;; $ffff-AX
 CSRESET=1
@@ -12022,6 +12112,8 @@ CSRESET=1
 .endif
         PRINTZ {"]",GREEN,10}
 
+.ifdef __ATMOS__
+
 .ifdef CSRESET
         lda #$ff
         sta CSTIMER
@@ -12030,6 +12122,7 @@ CSRESET=1
         sta lastcs
         stx lastcs+1
 .endif
+.endif ; __ATMOS__
 
 .ifdef TIM
         lda #$ff
@@ -15411,12 +15504,48 @@ vnext:
 ;;;            TODO:concstants/vars ???
 ;;;   _outend: 
 
-FUNC _outputstart
+
+
+;;; ======= parse-asm.lst:
+;;; 
+;;; $0000r       BIOS
+;;;              kbhit:
+;;; $006cr       -end
+;;; 
+;;; $006cr       tty-helpers: spaces, putnc...
+;;; $0098r       runtime
+;;;     
+;;;       libraries
+;;;             929 bytes
+;;; 
+;;; $03a1r	 output:
+;;;                    ORIC: 3072 B (demo)
+;;; $0FA1r       ENDOFHEAP
+;;;
+;;; $0FA1r       FUNC _init
+;;; $0FCFr       FUNC _compileInput
+;;;       compiler
+;;;         bnf
+;;;         rules
+;;;       ide
+;;;       debug
+;;;       cc65 codes
+
+;;; TODO: move to ENDOFHEAP
+;;;   that would allow us to "steal it"
+;;;   (just detect)
+
+;;; $45e1r       input:
+;;; $65BDr
+
 ;;; ideally this should be *overlapping* the
 ;;; compiler, and memmove compiler to end of mem
 ;;; Probably can do by explicit .org (and then memmove)
+.ifndef OUTPUTEARLY
 
 .bss
+
+FUNC _outputstart
 
 _output:
 ;;; not physicaly allocated in binary
@@ -15428,8 +15557,11 @@ _output:
 
 ENDOFHEAP=*
 
+.code
+
 FUNC _outputend
 
+.endif ; !OUTPUTEARLY
 
 
 
@@ -15437,8 +15569,6 @@ FUNC _outputend
 ;;; Some variants save on codegen by using a library
 
 ;;; LIBRARY
-
-.code
 
 .export __ZPEND__
 .zeropage

@@ -43,6 +43,8 @@
 ;;; 
 ;;; TESTED: ok!
 ;LIBFUN strlen
+;;; Length of string in AX to AX
+;;; 
 strlen:
 ;;; 22 B
         sta pos

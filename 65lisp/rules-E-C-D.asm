@@ -75,6 +75,54 @@ FUNC _iorulesstart
         LIBCALL _printu
       .byte ']'
 
+
+        ;; miniprintf!
+
+        .byte "|putfu(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfu
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfd(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfd
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfx(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfx
+      .byte "]"
+        .byte "%S);"
+
+        .byte "|putfs(",_E,",%D,[#]%D,",34
+      .byte "["
+        ldy #LOVAL
+        sty precision
+        .byte ";"
+        ldy #LOVAL
+
+        LIBCALL printfs
+      .byte "]"
+        .byte "%S);"
+
+
         ;; compatibility
 
         .byte "|printf(",34,"\%u",34,",",_E,")"

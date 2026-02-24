@@ -232,30 +232,3 @@ FUNC _atoibaseXR
 .endif ; ATOI
 
 
-.ifdef SIGNED
-;;; 31B
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-;;; print signed decimal
-FUNC _printd
-printd:
-;;; 15 b
-        cpx #0
-        bpl :+
-        putc '-'
-:       
-        jsr _negate
-        jmp _printu
-
-FUNC _dummyd
-.endif ; SIGNED
