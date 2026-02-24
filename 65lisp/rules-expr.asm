@@ -5,6 +5,7 @@
 
 
 ruleE:
+        .byte "%?",5,"Expr",10
         .byte "(",_E,")",_D
         
 
@@ -21,18 +22,25 @@ assignment:
 
         .byte "|"
 unary:  
+        .byte "%d",_D
+        .byte "|%D",_D
         .byte "!(",_E,")",_D
         .byte "|!%V",_D
+        .byte "|&%V",_D
         .byte "|++%V",_D
         .byte "|--%V",_D
         .byte "|%V++",_D
+        .byte "|%V++",_D
         .byte "|%V--",_D
+        .byte "|%V",_D
 
 ;;; Not needed anymore?
 ruleC:  
         .byte 0
 
-ruleD:  
+
+
+ruleD:
 
 multiply:       
         .byte "\*2"
@@ -41,7 +49,7 @@ multiply:
         .byte "|/2"
         GOTO multiply
 
-        .byte "\*%D"
+        .byte "|\*%D"
         GOTO multiply
 
         .byte "|\*%V"
@@ -66,6 +74,9 @@ add:
 
         ;; Done/nothing
         .byte "|"
+.byte "%{"
+putc '$'
+IMM_RET        
         
         .byte 0
 

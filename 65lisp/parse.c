@@ -304,15 +304,19 @@ extern void info();
 void error(char* msg, char* data) {
   if (msg && *msg)
     fprintf(stderr, "\n%%%s %s\n", msg, data);
+
   fprintf(stderr, "\nUsage: mc\n"
 "  filename\t\t# compile and run\n"
-"  -f filename\t# load file\n"
+"  -f filename\t\t# load file\n"
 "  -c\t\t\t# compile\n"
 "  -q\t\t\t# disasm\n"
-"  -sbug -c -s_compile -r -s_run\t# take 3 snapshots\n"
 "  -r[N]\t\t\t# run N times (defaualt 1)\n"
-"  -pV\t\t\t# print Variables\n"
+"\n"
 "  -pe\t\t\t# print ENV\n"
+"  -pN\t\t\t# print variable names\n"
+"\n"
+"  -sNAME\t\t\t# take snap-NAME-00.ram\n"
+"  -s_ACT\t\t\t# take snap-NAME-0N_ACT\n"
 );
   exit(1);
 }
