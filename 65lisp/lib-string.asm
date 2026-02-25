@@ -60,6 +60,7 @@ strlen:
 :       
         lda (pos),y
         beq :+
+;PUTC '.'
         iny
         bne :-
         ;; inc hibyte

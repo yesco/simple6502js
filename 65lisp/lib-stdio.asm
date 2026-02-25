@@ -347,22 +347,21 @@ FUNC _incposYprintz
         bne _posYprintz
 
 endprint:
-        ;; Y= number of chars printed?
+        ;; A= X= number of chars printed?
+        ;; (if < 256)
+        txa
         rts
 
 
-popprintyTOSz:
-        pla
-        tay
-        ;; fall-through
-        
 ;;; print Y=0 print till \0 or Y char
 ;;;   pos= address
 ;;; Result
 ;;;   X= number of chars printed (if < 256)
 ;;; 
 ;;; 27 B
-printyPOSz:        
+
+;;; TODO: harmonize name _posprintz/printyPOSz
+printyPOSz:
         cpy #0
         beq _posprintz
         ;; print Y chars
@@ -377,26 +376,76 @@ printyPOSz:
         bne :-
 :       
         tya
-        tax
         rts
 
 
+;;; ("itoa") stack digits of AX as unsigned int
+;;; 
+;;; tos, dos used by this routine, trashed
+;;; 
+;;; Returns:
+;;;   After the return to caller the stack contains
+;;;   '1' '4' '7' '7' \0
+;;; 
+;;;   S+$100 points to the string that can be printed
+;;;   directly as a string!
+;;; 
+;;; NOTE: caller need to remove items from stack,
+;;;   either by PLA till 0, or puts and adjust stack
+
+;;; pos
+
+;;; TODO: consider put inline, as this is... long
 stackputu:
-        sta tos
-        stx tos+1
-        ;; store RTS address
+        ;; dos= RTS address + 1
         pla                     ; lo
-        tya
+        tay
         pla
+        tax
         iny
+        sty dos
         bne :+
+        inx
 :       
+        stx dos+1
 
-;;; TODO: call new printu
+        ;; push sentinel 0 (end string)
+        lda #0
+        pha
 
+;;; TODO: duplicate of printu, remove other!
+
+.scope
+digit:  
+        lda #0
+        tay
+        ldx #16
+
+        ;; TODO: can this be generalized for BASE?
+div10: 
+        cmp #10/2
+        bcc under10
+        sbc #10/2
+        iny
+under10:
+        rol tos
+        rol tos+1
+        rol
+
+        dex
+        bne div10
+
+        ;; make digit
+        ora #'0'
+        pha
+        
+        dey
+        bpl digit
+
+.endscope
+        ;; (we cannot disturb stack)
         ;; "RTS"
         jmp (dos)
-
 
 
 LIBFUN printfx
@@ -460,11 +509,16 @@ LIBENDFUN printu
 
 LIBFUN printfu
 ;;; 14 B
+        sta tos
+        stx tos+1
+
         sty savey
+
         jsr stackputu
 
         ;; AX = point to string on stack!
         tsx
+        inx
         txa
         ldx #1
         
@@ -509,7 +563,6 @@ LIBFUN printfs
         ldy precision
         jsr printyPOSz
         ;; X= number of chars printed (if < 256)
-        txa
         jmp @calc
 @right:
         ;; just calculate X (how many chars will print)
@@ -520,7 +573,13 @@ LIBFUN printfs
         ;; TODO: uses AX
         jsr strlen
         ;; A=length.lo
- 
+;;; TODO: strlen wrong?
+.ifnblank
+pha
+ora #'0'
+jsr putchar
+pla
+.endif 
 ;;; TODO: simplify
         ;; if (L<=precision) A=L
         cmp precision
@@ -545,6 +604,12 @@ LIBFUN printfs
 
         ;; A= length of string to print
 @calc:
+.ifnblank
+pha
+ora #'@'
+jsr putchar
+pla
+.endif
         ;; TODO: zero pad
 
         ;; space pad
@@ -552,10 +617,11 @@ LIBFUN printfs
         ldy savex
         bmi :+
 
-        sec
         eor #255
 ;;; TODO: negative width
+        sec
         adc savex
+;        adc #1
         jmp :++
 :       
         clc
@@ -563,18 +629,27 @@ LIBFUN printfs
         eor #255
         adc #1
 :       
-
         ;; pad (if Y<128 (no overflow))
         tay
         bmi :+
         jsr spaces
 :       
+;PUTC '|'
         ;; if left-justified
         ldy savex
         bmi :+
         
         ldy precision
         jsr printyPOSz
+:       
+        ;; potentially clean up stack (from printfu)
+        ldx pos+1
+        cpx #1
+        bne :++
+:       
+;putc ';'
+        pla
+        bne :-
 :       
         ;; print constant string after call
         jmp _iprintz
