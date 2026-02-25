@@ -306,14 +306,14 @@ void error(char* msg, char* data) {
     fprintf(stderr, "\n%%%s %s\n", msg, data);
 
   fprintf(stderr, "\nUsage: mc\n"
-"  filename\t\t# compile and run\n"
+"  filename\t\t# load, compile and run\n"
 "  -f filename\t\t# load file\n"
 "  -c\t\t\t# compile\n"
-"  -q\t\t\t# disasm\n"
 "  -r[N]\t\t\t# run N times (defaualt 1)\n"
+"  -d\t\t\t# disasm\n"
 "\n"
-"  -pe\t\t\t# print ENV\n"
 "  -pN\t\t\t# print variable names\n"
+"  -pe\t\t\t# print ENV\n"
 "\n"
 "  -sNAME\t\t\t# take snap-NAME-00.ram\n"
 "  -s_ACT\t\t\t# take snap-NAME-0N_ACT\n"
@@ -463,6 +463,7 @@ void inputfile(char* filename) {
   char* p= (char*)EDITSTART;
   int c;
   FILE* f= fopen(filename, "r");
+  // TODO: ifnot found try add ".c"
   if (!f) error("Not such file:", filename);
 
   while((c= fgetc(f))!=EOF) {
@@ -586,11 +587,12 @@ extern void processnextarg() {
       // these DO NOT return!
     case 'c': compileAX((char*)EDITSTART); break;
     case 'r': runN(atoi(a+2)); break;
+    case 'Q': exit(0); break;
       // these do return
     case 's': snapshot(a+2); break;
-    case 'f':
-    case 'l': --argc; ++argv; inputfile(*argv); break;
-    case 'q': dasm(); break;
+    case 'l': // TODO: load from "buffer"
+    case 'f': --argc; ++argv; inputfile(*argv); break;
+    case 'd': dasm(); break;
     case 'p': // print 
       switch(a[2]) {
       case 'V': printvariables(); break;

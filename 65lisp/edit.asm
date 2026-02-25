@@ -141,7 +141,7 @@ ROWS=27
 
 
 .export __ZPEDITOR__
-.export editpos,editend,editcol,editrow
+.export editpos,editend,editcol,editrow,yankp
 
 .zeropage
 __ZPEDITOR__:

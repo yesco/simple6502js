@@ -357,13 +357,14 @@ popprintyTOSz:
         ;; fall-through
         
 ;;; print Y=0 print till \0 or Y char
+;;;   pos= address
 ;;; Result
 ;;;   X= number of chars printed (if < 256)
 ;;; 
 ;;; 27 B
-printyTOSz:        
+printyPOSz:        
         cpy #0
-        beq _printz
+        beq _posprintz
         ;; print Y chars
         sty savey
         ldy #0
@@ -467,6 +468,9 @@ LIBFUN printfu
         txa
         ldx #1
         
+        ;; TODO: handle negative precision
+        ;; (push more zeros?)
+
         ldy savey
 
 ;;; TODO: library calling library...
@@ -474,77 +478,103 @@ LIBFUN printfu
 
 LIBENDFUN printfu
 
-        ;; TODO: handle negative precision
-        ;; (push more zeros?)
+
 
 .zeropage
+
+;;; TODO: reuse some other?
+.export precision
 precision:      .res 1
+
 .code
 
-;;; 55 B
-LIBFUN printfs
-        sty savey
 
+
+;;; 82 (was 55?) B
+;;; print formatted string
+;;;   Y= width
+;;;   precision (zp) 1B
+;;; Returns:
+;;;   TODO: AX number of chars printed?
+LIBFUN printfs
+        sty savex
+
+        ;; store string to print
         sta pos
         stx pos+1
 
-        cpy #0
-        bpl @rightjustify
-@leftjustify:
+        tya
+        bpl @right
+@left:
         ldy precision
-        jsr printyTOSz
+        jsr printyPOSz
         ;; X= number of chars printed (if < 256)
-        jmp @skipcalc
-@rightjustify:
-        ;; - push a print for later
-        ;; (will be called when we RTS)
-        tya
-        pha
-        lda #>(popprintyTOSz-1)
-        pha
-        lda #<(popprintyTOSz-1)
-        pha
-
+        txa
+        jmp @calc
+@right:
         ;; just calculate X (how many chars will print)
-        ;; - L= strlen(AX)
-        tya
+
+        ;; lol, we just put it there!
+        lda pos
+        ldx pos+1
+        ;; TODO: uses AX
         jsr strlen
-        ;; - L<precision
+        ;; A=length.lo
+ 
+;;; TODO: simplify
+        ;; if (L<=precision) A=L
         cmp precision
-        bcs :+
-        ;; - '<' X= L
+        beq :+
+        bcc :+
+        ;; if (!precision) then A== L
+        ldy precision
+        beq :+
+
+        ;; else A= precision
+        tya
+        jmp :+
+
+;;; TODO: > 256 ...
+        ;; then A= L
         cpx #0
         beq :+
-        ;; - '>>' lol, X= 255
-        lda #255
+        ;; else A= 255
+        ;; TODO: no effect ?
+        lda #1
 :       
-        ;; - '>=' X= precision
-        tax
-@skipcalc:        
 
+        ;; A= length of string to print
+@calc:
         ;; TODO: zero pad
 
         ;; space pad
         ;; - calculate after pad n= width-X
-        txa
+        ldy savex
+        bmi :+
+
         sec
         eor #255
 ;;; TODO: negative width
-        adc savey
+        adc savex
+        jmp :++
+:       
+        clc
+        adc savex
+        eor #255
+        adc #1
+:       
+
         ;; pad (if Y<128 (no overflow))
         tay
         bmi :+
         jsr spaces
 :       
-        ;; print string if right justified
-        ldy savey
+        ;; if left-justified
+        ldy savex
         bmi :+
-        ;; restore string
-        pla
-        tax
-        pla
-
-        jsr printyTOSz
+        
+        ldy precision
+        jsr printyPOSz
 :       
         ;; print constant string after call
         jmp _iprintz

@@ -87,7 +87,7 @@ FUNC _iorulesstart
 
         LIBCALL printfu
       .byte "]"
-        .byte "%S);"
+        .byte "%S)"
 
         .byte "|putfd(",_E,",%D,[#]%D,",34
       .byte "["
@@ -98,7 +98,7 @@ FUNC _iorulesstart
 
         LIBCALL printfd
       .byte "]"
-        .byte "%S);"
+        .byte "%S)"
 
         .byte "|putfx(",_E,",%D,[#]%D,",34
       .byte "["
@@ -109,7 +109,7 @@ FUNC _iorulesstart
 
         LIBCALL printfx
       .byte "]"
-        .byte "%S);"
+        .byte "%S)"
 
         .byte "|putfs(",_E,",%D,[#]%D,",34
       .byte "["
@@ -120,7 +120,7 @@ FUNC _iorulesstart
 
         LIBCALL printfs
       .byte "]"
-        .byte "%S);"
+        .byte "%S)"
 
 
         ;; compatibility

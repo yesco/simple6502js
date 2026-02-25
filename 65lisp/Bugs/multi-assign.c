@@ -2,6 +2,6 @@
 word a, b, c;
 
 word main() {
-    a=b=c=42;
+    a = b = c = 42;
     return 0;
 }

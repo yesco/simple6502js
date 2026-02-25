@@ -1690,7 +1690,7 @@ __ZPCOMPILER__:
 .code
 
 
-.export nparam, curF, params, compilestatus
+.export nparam, curF, params, endparams, compilestatus
 
 .zeropage
 
@@ -1757,6 +1757,7 @@ nlines:         .res 2
 naccepts:       .res 2
 nrules:         .res 2
 nlibbytes:      .res 2
+
 .code
 
 
@@ -2185,86 +2186,6 @@ FUNC _stdlibstart
   .ifdef STDLIB
     .include "lib-stdlib.asm"
   .endif ; STDLIB
-
-;;; Allocate AX bytes
-;;; 
-;;; NOTE: no error, no limit, just wraps around!
-;;; 
-;;; Result:
-;;;   AX= pointer to allocated bytes
-;;;   savea,savex= allocation size
-;;; 
-FUNC _malloc
-;;; 21 B  33c! (+ 20 => 41 B)
-        sta savea
-        stx savex
-
-        ;; move _out forward AX bytes
-        clc
-        lda _out
-        tay                     ; save _out
-        adc savea
-        sta _out
-
-        lda _out+1
-        tax                     ; save _out+1
-        adc savex
-        sta _out+1
-
-        ;; overflow heap?
-;;; 20 B
-        cmp #>ENDOFHEAP
-        bne :+
-        lda _out
-        cmp #<ENDOFHEAP
-:       
-        bcs :+
-        ;; OK
-        tya                     ; restore lo
-        rts
-:       
-        ;; restore _out
-        sty _out
-        stx _out+1
-        ;; return 0
-        lda #0
-        tax
-        rts
-
-FUNC _free
-
-
-;;; TODO: combine malloc and xmalloc
-;;;   shouldn't need a second test
-
-;;; Xallocate AX bytes
-;;; 
-;;; if malloc fails, halt and print error
-;;; 
-;;; Returns same as _malloc
-;;;  But never 0!
-FUNC _xmalloc
-;;; 11+12 = 23 B
-        jsr _malloc
-        ;; malloc cannot happen on 0 page
-        tay
-        bne @OK
-        cpx #0
-        beq @fail
-@OK:
-        rts
-@fail:
-        ;; AX == 0
-        ;; FAIL
-
-;;; TODO: remove once we have runtimeerrorwdata
-        lda savea
-        ldx savex
-        jsr _printu
-
-        ldy #'M'
-        jmp runtimeerror
-        
 FUNC _stdlibend
 
 
@@ -3197,7 +3118,6 @@ FUNC _nextI
         ;; - fall-through from above
 FUNC _next
 
-
 ;;; TODO: remove, disable here, maybe check and end of rule?
 
 ;;; This is very expensive, but keep to find overflow bugs
@@ -3294,7 +3214,18 @@ beq :--
 
         ldy #0
         lda (rule),y
-
+.ifdef LEADSTR
+pha
+putc ':'
+pla
+pha
+jsr _printchar
+iny
+lda (rule),y
+dey
+jsr _printchar
+pla
+.endif ; LEADSTR
         ;; hibit - new rule?
         bpl @nohi
 
@@ -3341,11 +3272,33 @@ jmpaccept:
         cmp (inp),y
         bne @noteq
 @skipspc:
-;        jsr _incI
+;        jsr _incI ; faster:
         inc inp
         bne :+
         inc inp+1
 :       
+
+.ifdef LEADSTR
+PUTC '.'
+jsr _printchar
+
+        ;; don't actually skip space after "
+        cmp #'"'                ; "
+        bne :+
+;        beq _next             
+
+        putc '!'
+        iny
+        lda (rule),y
+        dey
+        jsr _printchar
+        jsr _incR
+        jsr nl
+        jsr nl
+        
+        jmp _next
+:       
+.endif ; LEADSTR
 
         lda (inp),y
         beq jmpaccept
@@ -3441,13 +3394,15 @@ jsr nl
 
         ;; A is current inp char
        
+;;; TODO: test speed?
+
 ;;; Speed
 ;        jsr _incR
         inc rule
         bne :+
         inc rule+1
 :       
-        ;; comp rule?
+        ;; eqaual?
         cmp (rule),y
         beq @skipspc
         jmp _next
@@ -3479,9 +3434,9 @@ quoted:
         ;; - \[ for example, match special chars
         jsr _incR
         lda (rule),y
-
 testeq: 
         ;; - lit eq?
+        jsr nextInp
         cmp (inp),y
 ;;; LOL: relocate to "middle"?
         bne failjmp
@@ -3553,6 +3508,8 @@ jsr _printchar
 @vars:
         ;; HACK! - remove once we figure out the flow...
         ;; (maybe remove %A or it's usage of DOS? use stack)
+;;; TODO: look at this????
+
         ;; (needed for %S and %s too)
         sta whatvarpercentchar
 
@@ -5427,7 +5384,7 @@ nextc:
 ;;; TODO: keep track of last printed src
 ;;;       (and don't print again, lol)
 
-        PUTC '.'
+;        PUTC '.'
 @nosemi:
 .endif ;PRINTDOTS
 
@@ -7652,14 +7609,11 @@ ruleP:
 
 
       .byte "["
-.ifdef nSTDLIB
-;;; 7 B
-        ;; srand(1) for rand()
-        ldx #1
-        stx rng
-        dex
-        stx rng+1
+
+.ifdef STDLIB
+        LIBCALL init_stdlib
 .endif ; STDLIB
+
       .byte "]"
 
 
@@ -10449,17 +10403,17 @@ endrules:
 FUNC _rulesend
 
 
-.export __ZPIDE__
-.zeropage
-__ZPIDE__:        .res 0
-.code
-
 FUNC _idestart
 
 FUNC _editorstart
         ;; EMACS buffer RAW REDRAW
         .include "edit.asm"
 FUNC _editorend
+
+.export __ZPIDE__
+.zeropage
+__ZPIDE__:        .res 0
+.code
 
 
 FUNC _aftercompile
@@ -10564,7 +10518,7 @@ FUNC _ERROR
 .endif ; ERRPOS
 
 
-        PRINTZ {10,YELLOW+BG,BLACK,"ERROR",10,10}
+        PRINTZ {10,10,YELLOW+BG,BLACK,"ERROR",10,10}
 
 
 .scope

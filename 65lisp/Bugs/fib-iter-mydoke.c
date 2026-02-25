@@ -1,4 +1,3 @@
-----------------------------------------
 // yet another example of fibonaci
 // using arrays, but this time it uses
 // word. Doke/Deek didn't work as as
