@@ -1,1 +1,1 @@
-.define VERSION "@arlss"
+.define VERSION "@armaq"

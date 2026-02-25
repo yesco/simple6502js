@@ -1,12 +1,40 @@
-;;; lib-stdio.asm
+;; lib-stdio.asm
 ;;; 
 ;;; Part of library for parse CC02 C-compiler
+
+
+;;;todo:    Input/color-chart.c break!
+;;;         Input/byte-sieve.c break!
 
 
 ;;; -------- <stdio.h> - LOL
 ;;; 
 ;;; TODO: ... fix...
 ;;; --- basis for PRINTF modular
+
+
+
+;;; TODO: update
+;;;    - putfu putfd putfs putfx
+
+;;; printu OLD      35
+;;; 
+;;; ---NEW--- (formatting)
+;;; 
+;;; printu          22 (2x pla)  
+;;; stackputu       44
+;;; 
+;;; printyPOSz	22
+;;; printfx        TODO
+;;; negate          14   TODO: mvoe to math?
+;;; printfd         38   TODO: too big, share w printfu
+;;; printfu         19
+;;; printfs         89   TODO: maybe can optimize?
+;;; 
+;;; (+ 20 44 22 14 38 19 89 -35) = 211
+
+;;; (- #x2a0  #xe) = 658 !!!
+
 ;;; 20 - puth, put4h, put2h
 ;;; 13 - plaprinth (to reverse)
 ;;; 22 - axputz==printz, writez tos+Y
@@ -154,14 +182,31 @@ FUNC _print1h
 ;;; Kindof early C "standard"
 ;FUNC _printn
 
-LIBFUN _printu
-;;; 4
+
+;;; New one "slightly" faster!!!
+
+
+
+
+;;; TODO: this is borken! Input/byte-sieve.c HANGS!
+;;;   Input/color-chart.c goes wrong!
+;_printu= printu      ; 17 B  307879c
+
+;;; OLD works fine! lol
+_printu= x_printu    ; 17 B  308202c  OLD
+
+
+
+;;; OLD: slightly slower as more JSR
+.ifblank
+LIBFUN x_printu
+;;; +4= 35 B
         sta pos
         stx pos+1
         
 ;;; Cannot use in codegen
 FUNC _posprintu
-;;; 31
+;;; 31 B
 .scope
 digit:  
         lda #0
@@ -195,6 +240,10 @@ under10:
 
         rts
 .endscope
+LIBENDFUN x_printu
+
+.endif ; nblank
+
 
 
 ;;; TDDO: ???
@@ -216,8 +265,6 @@ next:   LIT 10
         DO _exit
 .endproc        
 .endif
-
-LIBENDFUN _printu
 
 
 ;;; TODO:  remove?
@@ -313,23 +360,23 @@ FUNC _posRTS
 .endif ; INLINEPRINTZ
 
 
-;;; (+ 19 4 6) = 29 B
+;;; (+ 22 4 6) = 32 B
 ;;; 
-;;; 29 B gives _printz _prints
+;;; 32 B gives _printz _prints
 
 FUNC _prints
-;;; 6
+;;; +6
         jsr _printz
         jmp nl
 
 FUNC _printz
-;;; 4
+;;; +4
         sta pos
         stx pos+1
 
 ;;; X= number of chars printed (if < 256)
 FUNC _posprintz
-;;; 18
+;;; 22
         ldy #0
         ldx #0
 FUNC _posYprintz
@@ -358,7 +405,7 @@ endprint:
 ;;; Result
 ;;;   X= number of chars printed (if < 256)
 ;;; 
-;;; 27 B
+;;; 21 B
 
 ;;; TODO: harmonize name _posprintz/printyPOSz
 printyPOSz:
@@ -396,6 +443,8 @@ printyPOSz:
 ;;; pos
 
 ;;; TODO: consider put inline, as this is... long
+
+;;; 44 B
 stackputu:
         ;; dos= RTS address + 1
         pla                     ; lo
@@ -453,48 +502,18 @@ LIBFUN printfx
 LIBENDFUN printfx
 
 
-;;; TODO: math library?
+;;; Print unsigned int from AX
+;;; 
+;;; Returns 
+;;;   AX TODO: retain value
+;;;   Y number of chars printed
 
-FUNC _negate
-;;; 12 b
-        sec
-        eor #$ff
-        adc #0
-        tay
-        txa
-        eor #$ff
-        tax
-        tya
-        rts
-
-
-LIBFUN printfd
-;;; 15 b
-        stx savex
-        cpx #0
-        bpl :+
-
-        jsr _negate
-:       
-        jsr stackputu
-
-        ldx savex
-        bpl :+
-        
-        ;; push a '-' in front of all digits
-        lda #'-'
-        pha
-:       
-;;; TODO: library calling library...
-        jmp printfs
-
-LIBENDFUN printfd
-
-
-;;; Y number of chars printed
 LIBFUN printu
-;;; 16 B
+;;; 22 B
+        sta tos
+        stx tos+1
         jsr stackputu
+
         ldy #$ff
 :       
         iny
@@ -503,12 +522,72 @@ LIBFUN printu
         jsr putchar
         jmp :-
 :       
+
         rts
 LIBENDFUN printu
 
 
+;;; TODO: math library?
+
+FUNC _negate
+;;; 14 b
+        eor #$ff
+        sec
+        adc #0
+        tay
+        txa
+        eor #$ff
+        adc #0
+        tax
+        tya
+        rts
+
+
+LIBFUN printfd
+;;; 38 B
+;;; TODO: share with printfu.... (19B)
+        sty savey
+
+        ;; negate neg number
+        stx savex
+        cpx #0
+        bpl :+
+        jsr _negate
+:       
+
+        sta tos
+        stx tos+1
+
+        jsr stackputu
+
+
+        ;; TODO: handle negative precision
+        ;; (push more zeros?)
+
+        ;; ?negative
+        ldx savex
+        bpl :+
+        ;; - push a '-' in front of all digits
+        lda #'-'
+        pha
+:       
+
+        ;; AX = point to string on stack+1!
+        tsx
+        inx
+        txa
+        ldx #1
+
+        ldy savey
+;;; TODO: library calling library...
+        jmp printfs
+
+LIBENDFUN printfd
+
+
+
 LIBFUN printfu
-;;; 14 B
+;;; 19 B
         sta tos
         stx tos+1
 
@@ -516,7 +595,7 @@ LIBFUN printfu
 
         jsr stackputu
 
-        ;; AX = point to string on stack!
+        ;; AX = point to string on stack+1!
         tsx
         inx
         txa
@@ -544,12 +623,13 @@ precision:      .res 1
 
 
 
-;;; 82 (was 55?) B
 ;;; print formatted string
 ;;;   Y= width
 ;;;   precision (zp) 1B
 ;;; Returns:
 ;;;   TODO: AX number of chars printed?
+;;; 
+;;; 89 (was 55? LOL) B
 LIBFUN printfs
         sty savex
 
@@ -579,7 +659,8 @@ pha
 ora #'0'
 jsr putchar
 pla
-.endif 
+.endif
+ 
 ;;; TODO: simplify
         ;; if (L<=precision) A=L
         cmp precision
@@ -651,6 +732,7 @@ pla
         pla
         bne :-
 :       
+
         ;; print constant string after call
         jmp _iprintz
         ;; and it has returned!
