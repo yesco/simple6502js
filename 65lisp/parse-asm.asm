@@ -1129,7 +1129,19 @@
         jsr addr
 .endmacro
 
-;;; 
+.macro IMMPRINT text
+        .byte "%?", (.strlen(text))
+        .byte text
+.endmacro
+
+
+
+
+;;; UNSAFE! don't use - see IMMEDATE and JSRIMEDIATE
+
+
+
+
 ;;; Code can be executed inline *while* parsing.
 ;;; It's prefixed like this
 ;;; 
@@ -3605,8 +3617,30 @@ jsr _printchar
         stx rule
 
         jmp _next
+:       
 
-:
+;;; TODO: not working correctly
+.ifnblank
+        ;; "%?\0x06Hello\n"  - prints hello\n
+        ;; 
+        cmp #'?'
+        bne :+
+
+        lda (rule),y
+        tax
+@printchar:
+        jsr _incR
+        lda (rule),y
+        jsr _printchar
+        dex
+        bpl @printchar
+
+        jmp _next
+:       
+.endif ; blank
+
+        ;; '%P' -- ????
+
         ;; "% " (JSR to routine that ends with RTS)
         ;;      (it cannot (easily) call _fail (palpla))
         ;; 

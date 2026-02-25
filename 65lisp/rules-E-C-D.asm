@@ -753,6 +753,8 @@ FUNC _memoryrulesstart
 
         ;; return NULL if failed...
         .byte "|malloc(",_E,")"
+;;; TODO: experiment test IMMPRINT
+;        IMMPRINT "malloc"      
       .byte "["
         jsr _malloc
       .byte "]"
