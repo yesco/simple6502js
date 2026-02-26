@@ -40,7 +40,7 @@
 // void draw(w, h);
 // void filledbox(w, h);
 // void curset(x, y, v);
-// char curget(x, y);
+// char point(x,y);
 
 
 // TODO: no effect on draw long line...
