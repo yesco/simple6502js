@@ -6,7 +6,17 @@
 #include "../sound.c"
 typedef unsigned int word;
 #define curset(x,y,c) CURSET(x,y,c)
-#define hires() hires();gclear();
+#define hires() do { hires();gclear(); } while(0)
+#define poke(a, v) (*(char*)a)= v
+
+#define call(a) (((*)())a)()
+//typedef (*f)(
+
+#define ping() asm("jsr $fa9f")
+#define shoot() asm("jsr $fab5")
+#define explode() asm("jsr $facb")
+#define zap() asm("jsr $fae1")
+
 // sfx disables keyboard, lol
 #define sfx(a)
 
@@ -40,12 +50,12 @@ word randombox() {
   x= random(38);
   y= random(150);
 
-  _area= random(30) + 2;
+  _area= random(100) + 2;
 
   _w= random(15) + 2;
   if (x+_w>40) _w= 40-x;
 
-  _h= 6*_area/_w + 6;
+  _h= 6*_area/_w + 1;
   if (y+_h>200) _h= 200-y;
 
   _c= random(7)+1; // 1-7 avoid black
@@ -59,7 +69,7 @@ word randombox() {
   // something there...
   if (_s) return 0;
 
-  // A block INVERTED fills as follows
+  // A block INVERTED; fills as follows
   // ink colors on the right _c
   gfill(x, y, _w, _h, _c+128);
   // first col: background invertse _c
@@ -68,21 +78,45 @@ word randombox() {
   gfill(x+_w-1, y, 1, _h, 0+128+16);
 }
 
+word step(word b) {
+  if (b) {
+    ++x; if (x>=240) x= 12;
+  } else {
+    ++y; if (y>=200) y= 0;
+  }
+}
+
 word move(word b) {
+  // This will interpret each git until
+  // no more bit set, shifting up
   while(b) {
-    if (b&128) {
-      x+= d; if (x>=240) x= 6;
-    } else {
-      y+= d; if (y>=200) y= 0;
-    }
-    if (point(x, y) && !(*gcurp & 128)) {
-      sfx(SHOOT);
-      ++d; // make it harder
-      if (lives) --lives;
-      gfill(0, 0, 1, 200, lives+16);
-      gfill(1, 0, 1, 200, 0);
-    }
-    curset(x, y, 1);
+
+    // set d pixel steps for each bit
+    i= d; do {
+      step(b&128);
+      // detect hit path walked before
+      // or hti block
+      if (point(x, y) || (*gcurp & 128)) {
+
+        // first hit this block
+        if (i<8) {
+          shoot();
+          ++d; // make it harder
+          if (lives) --lives;
+          // chagne back color (count down)
+          gfill(0, 0, 1, 200, lives+16);
+          gfill(1, 0, 1, 200, 0);
+        }
+
+        // keep going till out of block
+        i= 255;
+      } else {
+        // setpixel
+        --i; if (i>8) i= 0;
+        curset(x, y, 1);
+      }
+    } while(i);
+
     b*= 2;
     b&= 0xff;
   }
@@ -91,33 +125,36 @@ word move(word b) {
 void main() {
   spacek= keypos(' ');
 
-  putchar(17); // ^O cursor off
-  putchar(6); // ^F keyclick off
-
-  clrscr();
+  // cursor off
+  poke(0x22d, 0);
+  // keyclick off
+  poke(0x22e, 0);
 
   do {
-    // start new game
+    // prepare
     clrscr();
     hires();
-    sfx(PING);
+    ping();
     
+    // fill screen with boxes
     do {
       randombox();
     } while(getchar()==' ');
 
+    // start game
     x= 5; y= 0; lives= 7; d= 1;
 
+    // loop
     do {
       move(cgetc());
       wait(5);
     } while(lives);
 
-    // Dead
+    // DEAD
+    explode();
     text();
-    sfx(EXPLODE);
 
-    y= 0;
+    lives= y= 0;
     do {
       ++lives; lives&= 127;
       paper(lives & 7);
@@ -125,7 +162,7 @@ void main() {
       printf("DEAD");
       //wait(1);
     } while(!keypressed(spacek));
-    sfx(ZAP);
+    zap();
 
   } while(1);
 }
