@@ -99,16 +99,15 @@ word walk(word b) {
   // This will interpret each git until
   // no more bit set, shifting up
 
-  play(1, 0, 1, 380);
+  play(1, 0, 0, 380);
 
   while(b) {
 
     // set d pixel steps for each bit
     i= d; do {
-//      sound(1+3*(i>8), b, 10); // supposed to add noice
       sound(1, b+lives, 10);
       step(b&128);
-      wait(10);
+      wait(lives/2+7);
       // detect hit path walked before
       // or hti block
       if (point(x, y) || (*gcurp & 128)) {
@@ -116,6 +115,7 @@ word walk(word b) {
         // first hit this block
         if (i<8) {
           shoot();
+          freq(2, 220+lives*2, 15);
           ++d; // make it harder
           if (lives) --lives;
           // chagne back color (count down)
@@ -174,7 +174,7 @@ void main() {
 //      poke(0x380, 0x00);
 //      walk(mygetc());
       walk(cgetc());
-      wait(5);
+//      wait(5);
     } while(lives);
 
     // DEAD
