@@ -19,7 +19,7 @@ word T,nil,doapply1,print;
 //#include <atmos.h>
 //#include <tgi.h>
 
-word i, x, y, d, lives, spacek;
+word i, j, x, y, d, lives, spacek;
 
 // give a random nubmer [0..below[
 word _r, _m; // locals
@@ -35,20 +35,29 @@ word random(word below) {
   return _r;
 }
   
-word _area, _w, _h, _c; // locals
+word _area, _w, _h, _c, _s; // locals
 word randombox() {
   x= random(38);
   y= random(150);
 
-  _area= random(20) + 2;
+  _area= random(30) + 2;
 
   _w= random(15) + 2;
   if (x+_w>40) _w= 40-x;
 
-  _h= 6*_area/_w + 12;
+  _h= 6*_area/_w + 6;
   if (y+_h>200) _h= 200-y;
 
   _c= random(7)+1; // 1-7 avoid black
+
+  // make sure no overlap with existing!
+  _s= 0;
+  for(i= y; i<y+_h; ++i)
+    for(j= x; j<x+_w; ++j)
+      _s+= HIRESSCREEN[i*40+j]&(255-64);
+
+  // something there...
+  if (_s) return 0;
 
   // A block INVERTED fills as follows
   // ink colors on the right _c
