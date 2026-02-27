@@ -20,6 +20,15 @@ typedef unsigned int word;
 // sfx disables keyboard, lol
 #define sfx(a)
 
+int mygetc() {
+  int x;
+  asm("jsr $EB78");
+  asm("ldx #0");
+  x= __AX__;
+  putchar('.');
+  return x;
+}
+
 // dummies
 word T,nil,doapply1,print;
 
@@ -86,14 +95,20 @@ word step(word b) {
   }
 }
 
-word move(word b) {
+word walk(word b) {
   // This will interpret each git until
   // no more bit set, shifting up
+
+  play(1, 0, 1, 380);
+
   while(b) {
 
     // set d pixel steps for each bit
     i= d; do {
+//      sound(1+3*(i>8), b, 10); // supposed to add noice
+      sound(1, b+lives, 10);
       step(b&128);
+      wait(10);
       // detect hit path walked before
       // or hti block
       if (point(x, y) || (*gcurp & 128)) {
@@ -120,6 +135,9 @@ word move(word b) {
     b*= 2;
     b&= 0xff;
   }
+
+  // silencio
+  play(0, 0, 0, 0);
 }
 
 void main() {
@@ -146,7 +164,16 @@ void main() {
 
     // loop
     do {
-      move(cgetc());
+//      asm("cli");
+//      *(char*)0x30f=0xff;
+//      *(char*)0x30c=0xdd;
+
+// good, enables all keys
+      asm("jsr $E93D"); // reenable keyboard & intr
+
+//      poke(0x380, 0x00);
+//      walk(mygetc());
+      walk(cgetc());
       wait(5);
     } while(lives);
 

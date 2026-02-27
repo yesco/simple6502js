@@ -353,12 +353,23 @@ void fx(char* sound) {
 // - https://ym2149.org/ym2149.org/w/YM2149.org
 
 void setAYreg(char r, char v) {
+  // bit 6 must be 0 for register 7
+//  if (r==7) v&= (255-64); // doesn't seem to do the job?
+  if (r==7) v|= 64;
+
+  // Set VIA Port A to OUTPUT so we can talk to the AY chip
+  *(char*)0x0303 = 0xff; 
+
   *(char*)0x030f= r;       // Set the register
   *(char*)0x030c= 0xff;    //   toggle
   *(char*)0x030c= 0xdd;    //   toggle
   *(char*)0x030f= v;       // Set the Value for this register
   *(char*)0x030c= 0xfd;    //   toogle
   *(char*)0x030c= 0xdd;    //   toggle Reset the state of the control lines
+
+  // Set VIA Port A back to INPUT
+  // This allows the ROM IRQ to use Port A to scan the keyboard
+  *(char*)0x0303 = 0x00;
 }
 
 void setAYword(char ch, unsigned int w) {
@@ -482,6 +493,8 @@ void music(char ch, char oct, char note, char vol) {
 void play(char tonemap, char noisemap, char env, unsigned int env_period) {
   setAYword(11, env_period);                 // env period
   setAYreg(13, env);                         // set envelope
+// TODO: bit 6 supposed to be 0!
+// this one messes keyboard up!!!
   setAYreg(7, (7-tonemap) + (7-noisemap)*8); // channel activation
 }
 
