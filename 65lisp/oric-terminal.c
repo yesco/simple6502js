@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <assert.h>
 
+int bgcol= 0, fgcol= 7;
+
 int fullwidth= 0xFF00; // "space"
 
 // Enable to get fullwidth wide chars
@@ -11,7 +13,6 @@ int fullwidth= 0xFF00; // "space"
 #else
   #define SPACE " "
 #endif
-
 
 
 // UTF-8 in this range 1110xxxx10xxxxxx10xxxxxx
@@ -36,7 +37,7 @@ void u8put(int uc) {
 void clear() { printf("\x1b[2J\x1b[H"); }
 void clearend() { printf("\x1b[K"); }
 void cleareos() { printf("\x1b[J"); }
-void resetcolors() { printf("\x1b[0m"); }
+void resetcolors() { printf("\x1b[0m"); bgcol= 0; fgcol= 7; }
 
 void gotorc(int r, int c) {
   // negative values breaks the ESC seq giving garbage on the screen!
@@ -49,6 +50,7 @@ void fullputc(int c) {
 
   // ^L clear screen
   case 12:
+  case 12+128:
     clear(); break;
 
   case ' ':
@@ -63,7 +65,31 @@ void fullputc(int c) {
     putchar(c); break;
 #endif
 
+  // inverse
+  case (128+32) ... 255:
+    // this is 'inverse video' vt100
+#define VT100INVERSE
+#ifdef VT100INVERSE
+    printf("\e[7m");
+#else
+    // TODO: real ORIC color inversion
+    printf("\e[%dm", 7-fgcol+30); break;
+    printf("\e[%dm", 7-bgcol+40); break;
+#endif
+    fullputc(c&0x7f);
+
+#ifdef VT100INVERSE
+    printf("\e[27m");
+#else
+    // TODO: real ORIC color inversion
+    printf("\e[%dm", fgcol+30); break;
+    printf("\e[%dm", bgcol+40); break;
+#endif
+
+    break;
+
   case '\n':
+  case '\n'+128:
     // each new text line on ORIC resets colros
     // to BLACK background and WHITE foreground
     resetcolors();
@@ -72,6 +98,7 @@ void fullputc(int c) {
     printf(SPACE SPACE);
     break;
   case '\r':
+  case '\r'+128:
     putchar('\r');
     printf("\e[2C"); // forward 2 steps
     break;
@@ -82,19 +109,13 @@ void fullputc(int c) {
   case (128) ... (128+7):
     // ORIC attributes take up one space
     // TODO: why two spaces? one gets eaten up!
-    printf("\e[%dm" SPACE, c-128+30); break;
+    fgcol= c-128;
+    printf("\e[%dm" SPACE, fgcol+30); break;
 
   // background colors
   case (128+16) ... (128+16+7):
-    printf("\e[%dm" SPACE, c-128-16+40); break;
-
-  // inverse
-  case (128+32) ... 255:
-    // ???
-    // printf("\e[7m"); fullputc(c&0x7f); printf("\x1b[m"); break;
-
-    // ORIC console doesn't invert, just print chars
-    fullputc(c&0x7f); break;
+    bgcol= c-16-128;
+    printf("\e[%dm" SPACE, bgcol+40); break;
 
   // backspace - double up
   case 8:

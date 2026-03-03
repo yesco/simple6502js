@@ -152,8 +152,6 @@ editpos:        .res 2
 editend:        .res 2
 
 editcol:        .res 1
-
-;;; TODO: just use a tmp in zp?
 editrow:        .res 1
 
 yankp:          .res 2
@@ -633,9 +631,101 @@ EDITCOLOR=GREEN & 127
 ;;; (editor part, skipping the top line)
 ;;; This is fast enough for a normal typer.
 
+.ifndef __ATMOS__
+
+
+
+FUNC _redraw
+        ldy #0
+        sty dos                 ; x
+        sty dos+1               ; y
+
+        ;; cursor off
+        PRINTZ {27,"[?25l"}
+
+        ;; set cursor bit
+        jsr togglecursor
+
+        ;; vt100 HOME
+        PRINTZ {27,"[H"}
+
+        ;; skip/save status line (TODO:)
+        putc 10
+        
+        ;; Text pos
+        lda #<EDITNULL
+        ldx #>EDITNULL
+        sta pos
+        stx pos+1
+
+.ifdef EDITCOLOR
+        putc 10
+        putc EDITCOLOR|128
+.endif
+
+@nextc:       
+        jsr _incP
+        lda (pos),y
+        beq @done
+
+        jsr putchar
+
+        ;; ?cursor (hibit set)
+        bpl :+
+        
+        ldx dos
+        stx editcol
+        ldx dos+1
+        stx editrow
+:       
+        ;; moved one col
+        inc dos
+
+        ;; ?newline
+        and #$7f
+        cmp #10
+        bne @nextc
+        
+        ;; clear end of line
+
+;;; TODO: totally messes up screen!
+;;;   nothing more printed next lines!!!
+;        PRINTZ {27,"[K"}
+
+.ifdef EDITCOLOR
+        putc EDITCOLOR|128
+.endif
+        inc dos+1
+        sty dos
+        bne @nextc
+
+
+@done:
+
+;;; crash?
+;        lda editcol
+;        pha
+;        lda editrow
+;        jsr _gotoxy
+        
+        ;; cursor on
+        PRINTZ {27,"[?25h"}
+
+        ;; reset cursor bit
+        jsr togglecursor
+
+        rts
+
+
+.else
+
+
+
 FUNC _redraw 
 
 .ifndef __ATMOS__
+;;; TODO: remove
+        putc 12                 ; clrscr
         ;; vt100 HOME
         PRINTZ {27,"[H}"}
 .endif
@@ -658,11 +748,15 @@ FUNC _redraw
         sta tos
         stx tos+1
 ;;; (8)
+        ;; dos=rows left on screen
         lda #ROWS
-        sta editrow
+        sta dos
         
         ldx #WIDTH
+
         ldy #0
+        sty editcol
+        sty editrow
 
 
 .ifdef EDITCOLOR
@@ -699,9 +793,12 @@ FUNC _redraw
 .endif
         ;; at cursor, save COL
         bpl :+
+.ifndef __ATMOS__
+        PUTC '|'
+.endif
         stx editcol
-        ;; store editrow? currently used as loopvar
-:
+        ldx dos
+        stx editrow
         ;; remove "hibit" cursor indicator/inverse from text
         and #$7f
         sta (pos),y
@@ -721,7 +818,7 @@ FUNC _redraw
         ldx #WIDTH
 ;;; TODO: COLOR? no color/truncate?
         ;; no more screen rows?
-        dec editrow
+        dec dos
         beq @done
 
 :       
@@ -754,7 +851,7 @@ FUNC _redraw
         bne @clreol
 
         ;; no more screen rows?
-        dec editrow
+        dec dos
         beq @done
 
         ;; prepare for next line
@@ -767,10 +864,12 @@ FUNC _redraw
 
 .ifdef EDITCOLOR
 @color:
+.ifdef __ATMOS__
         lda #EDITCOLOR
         sta (tos),y
-.ifndef __ATMOS__
-;        PUTC 10
+.else
+        PUTC 10
+        lda #EDITCOLOR+128
         jsr putchar
         cmp #0
 .endif
@@ -783,7 +882,9 @@ FUNC _redraw
         bne @nextc
 .endif ; EDITCOLOR
 
+
 @done:
+
         ;; reverse editcol
 .ifdef EDITCOLOR
         lda #WIDTH-1
@@ -794,7 +895,16 @@ FUNC _redraw
         sbc editcol
         sta editcol
 
+        ;; reverse editrow
+        lda #ROWS
+        sec
+        sbc editrow
+        sta editrow
+
     rts
+
+.endif ; __ATMOS__ FUNC _redraw
+
 
 FUNC _editormisc
 
