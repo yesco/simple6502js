@@ -1,5 +1,1 @@
-<<<<<<< HEAD
-.define VERSION "@arlzz"
-=======
-.define VERSION "@armaq"
->>>>>>> 349807b47f35b43942c3312c43f02e4ea8a53eed
+.define VERSION "@asenc"

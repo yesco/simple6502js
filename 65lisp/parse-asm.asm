@@ -7331,6 +7331,11 @@ ruleN:
       .byte "%{"
         jmp gotmain_goendfail
 
+        ;; "compatibility"
+        .byte "|void","main("
+      .byte "%{"
+        jmp gotmain_goendfail
+
 
         ;; "compat" - ignore!
         .byte "|typedef","unsigned","int","word;"

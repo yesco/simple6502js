@@ -33,6 +33,7 @@ LISTFILES=(
 "Input/numerals.c"
 "Input/parenthesis.c"
 "Input/plusplus.c"
+"Input/putf-format.c"
 "Input/random.c"
 "Input/random-xorshift.c"
 "Input/strlib.c"
