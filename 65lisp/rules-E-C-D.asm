@@ -1413,9 +1413,7 @@ rule_mul:
         ldy #LOVAL
         jsr _mulAXyAX
       .byte "]"
-        .byte "%T"
-        .word rule_mul
-
+        TAILJMP rule_mul
 
         .byte "|*%D"
       .byte "["
@@ -1428,8 +1426,7 @@ rule_mul:
         stx dos+1
         jsr _mul
       .byte "]"
-        .byte "%T"
-        .word rule_mul
+        TAILJMP rule_mul
 
 .endif ; OPTRULES
 
@@ -1453,8 +1450,7 @@ rule_mul:
         sta tos
         jsr _mul
       .byte "]"
-        .byte "%T"
-        .word rule_mul
+        TAILJMP rule_mul
 
 
 .endif ; MATH
@@ -1470,8 +1466,7 @@ rule_mul:
         tya
         ror
       .byte ']'
-        .byte "%T"
-        .word rule_mul
+        TAILJMP rule_mul
 
         .byte "|*2%b"
       .byte '['
@@ -1483,8 +1478,9 @@ rule_mul:
         tax
         tya
       .byte ']'
-        .byte "%T"
-        .word rule_mul
+        TAILJMP rule_mul
+
+
 
 rule_plus:      
         .byte "|+%V"
@@ -1497,8 +1493,7 @@ rule_plus:
         tax
         tya
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
 
 .ifdef OPTRULES
         ;; +BYTE
@@ -1511,8 +1506,8 @@ rule_plus:
         inx
 :
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
+
 .endif ; OPTRULES
 
         .byte "|+%D"
@@ -1526,8 +1521,7 @@ rule_plus:
         tax
         tya
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
 
 ;;; 18 *2
         .byte "|-%V"
@@ -1540,8 +1534,7 @@ rule_plus:
         tax
         tya
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
 
 .ifdef OPTRULES
         ;; -BYTE
@@ -1554,8 +1547,8 @@ rule_plus:
         dex
 :       
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
+
 .endif ; OPTRULES
 
         .byte "|-%D"
@@ -1569,8 +1562,7 @@ rule_plus:
         tax
         tya
       .byte ']'
-        .byte "%T"
-        .word rule_plus
+        TAILJMP rule_plus
 
 
 ;;; 17 *2

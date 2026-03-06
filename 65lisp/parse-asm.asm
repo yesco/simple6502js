@@ -1094,9 +1094,17 @@
 ;;; 
 ;;;        
 ;;;        
-;;; - %R addr - goto this rule addr, jump nil-willy!
 ;;; - %L addr - JMP to IMMEDATE (checker/validator)
 ;;; -'% 'addr - JSR to sideeffect (generate?)
+;;; 
+;;; - TAILREC ('*'+128) - accept+goto start rule
+;;; 
+;;; - %R addr - goto this rule addr, jump nil-willy!
+;;; 
+;;;   TAILJMP addr
+;;; - %T addr - accept+goto this (in-middel) rule addr
+;;;             (this also skips leading '|')
+;;;             (this is used for "preceedence")
 
 ;;; 
 ;;; TODO:?
@@ -1135,7 +1143,10 @@
         .byte text
 .endmacro
 
-
+.macro TAILJMP addr
+        .byte "%T"
+        .word addr
+.endmacro
 
 
 ;;; UNSAFE! don't use - see IMMEDATE and JSRIMEDIATE
@@ -3646,9 +3657,6 @@ nextjmp2:
         cmp #'T'
         bne nottailjmp
 
-TAILJMP=1
-.ifdef TAILJMP
-
         ;; - load new rule ptr
         lda (rule),y
         pha
@@ -3685,7 +3693,6 @@ TAILJMP=1
         ;; - continue parsing at new loc
         jmp _next
 
-.endif ; TAILJMP
 nottailjmp:
 
         ;; '%P' -- ????
