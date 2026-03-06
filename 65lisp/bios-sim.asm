@@ -28,10 +28,42 @@ BIOSINCLUDED=1
 ;;; TOOD: vt100?
 
 .macro CURSOR_ON
+        jsr setcursoron
 .endmacro
 
 .macro CURSOR_OFF
+        jsr setcursoroff
 .endmacro
+
+setcursoron:    
+        pha
+
+;        PRINTZ {27,"[?25h"}
+.data
+curon: .byte 27,"[?25h",0
+.code
+        lda #<curon
+        ldx #>curon
+        jsr _printz
+        
+        pla
+        rts
+
+
+setcursoroff:
+        pha
+
+;        PRINTZ {27,"[?25l"}
+.data
+curoff: .byte 27,"[?25l",0
+.code
+        lda #<curoff
+        ldx #>curoff
+        jsr _printz
+
+        pla
+        rts
+
 
 
 
@@ -119,33 +151,46 @@ rawputc=_putchar
 putcraw=_putchar
 
 .macro GOTOXY xx,yy
-;;; ansi codes not working?
+.scope
+
+.data
+@foo:   .byte sprintf( {27,"[%d;%dH"}, yy, xx)
+
+.code
+        lda #<@foo
+        ldx #>@foo
+        jsr _printz
+
+.endscope
+.endmacro
+
+
+gotoxy:
         pha
         txa
         pha
-        tya
-        pha
 
-        putc 27
-        putc '['
+        lda #27
+        jsr putchar
+
+        lda #'['
+        jsr putchar
 
         ;; row
-        lda #<yy
-        ldx #>yy
+        tya
+        ldx #0
         jsr _printu
 
-        putc ';'
+        lda #';'
+        jsr putchar
 
         ;; col
-        lda #<xx
-        ldx #>xx
+        pla
         jsr _printu
 
-        putc 'H'
-        
+        lda #'H'
+        jsr putchar
+
         pla
-        tay
-        pla
-        tax
-        pla
-.endmacro
+        rts
+

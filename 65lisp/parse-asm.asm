@@ -11125,33 +11125,6 @@ command:
 ;;; Q)uit r)un c)ompile i)nput h)elp x)tras l)oad
 ;;; w)rite z)ource d)isasm p)rint RET) ?)help 
 
-;;; TODO: make edit work?
-        ;; ^L display editor
-        cmp #CTRL('L')
-        bne :+
-
-        jsr clrscr
-        jsr _redraw
-        jmp command
-:       
-        ;; ^F forward
-        cmp #CTRL('F')
-        bne :+
-
-;;; DOES work
-        jsr eforward
-        jsr _redraw             ; LOL
-        jmp command
-:       
-        ;; ^N Next line
-        cmp #CTRL('N')
-        bne :+
-
-;;; doesNOT work
-        jsr enext
-        jsr _redraw             ; LOL
-        jmp command
-:       
         ;; z)ource
         cmp #'z'
         bne :+
@@ -11194,7 +11167,6 @@ command:
         ;; then convert any char to CTRL to run it!
         and #31
 
-
 editing:
         jsr _editaction
 
@@ -11204,8 +11176,7 @@ editstart:
         jmp command
 :       
 
-.ifblank
-;.ifdef __ATMOS__
+.ifdef __ATMOS__
         ;; don't redraw if key waiting!'
         jsr KBHIT
         bmi :+
@@ -11227,6 +11198,8 @@ print_buffer:
         jsr _printz
 
         jmp command
+
+
 
 
 
@@ -11270,6 +11243,9 @@ FUNC _togglecommand
         jmp _reportcompilestatus
 
 @ed:
+:       
+        ;; clear screen and redraw (when switching)
+        jsr clrscr
         jmp _redraw
 
 

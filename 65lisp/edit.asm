@@ -109,8 +109,14 @@
         EDITNULL= editarea
 
         ;; non inclusive
-        EDITEND= editareaafter
+        EDITEND= editareaafter-1
 
+
+
+
+;;; TODO: most likely get's overwritten!
+
+;.bss
 editarea:       
         .res 7000, 0
 editareaafter:  
@@ -132,7 +138,7 @@ editareaafter:
 EDITSTART= EDITNULL+1
 
 ;;; 
-EDITSIZE= EDITEND-EDITSTART
+EDITSIZE= EDITEND-EDITNULL-89
 
 
 WIDTH=40
@@ -637,11 +643,10 @@ EDITCOLOR=GREEN & 127
 
 FUNC _redraw
         ldy #0
-        sty dos                 ; x
-        sty dos+1               ; y
+        sty gos                 ; x
+        sty gos+1               ; y
 
-        ;; cursor off
-        PRINTZ {27,"[?25l"}
+        CURSOR_OFF
 
         ;; set cursor bit
         jsr togglecursor
@@ -668,25 +673,29 @@ FUNC _redraw
         lda (pos),y
         beq @done
 
-        jsr putchar
-
         ;; ?cursor (hibit set)
         bpl :+
         
-        ldx dos
+        ;; - save screen x,y
+        ldx gos
         stx editcol
-        ldx dos+1
+        ldx gos+1
         stx editrow
 :       
+        and #$7f
+        jsr putchar
+
         ;; moved one col
-        inc dos
+        inc gos
 
         ;; ?newline
-        and #$7f
         cmp #10
         bne @nextc
         
         ;; clear end of line
+        lda #0
+        sta gos
+        
 
 ;;; TODO: totally messes up screen!
 ;;;   nothing more printed next lines!!!
@@ -695,8 +704,8 @@ FUNC _redraw
 .ifdef EDITCOLOR
         putc EDITCOLOR|128
 .endif
-        inc dos+1
-        sty dos
+        ;; moved one line
+        inc gos+1
         bne @nextc
 
 
@@ -708,8 +717,32 @@ FUNC _redraw
 ;        lda editrow
 ;        jsr _gotoxy
         
-        ;; cursor on
-        PRINTZ {27,"[?25h"}
+jsr nl
+lda editrow
+ldx #0
+jsr _printu
+jsr spc
+lda editcol
+ldx #0
+jsr _printu
+jsr spc
+jsr spc
+jsr nl
+
+        ldx editcol
+.ifdef EDITCOLOR
+        inx
+        inx
+        inx
+        inx
+.endif
+        ldy editrow
+        iny
+        iny
+        iny
+        jsr gotoxy
+
+        CURSOR_ON
 
         ;; reset cursor bit
         jsr togglecursor
