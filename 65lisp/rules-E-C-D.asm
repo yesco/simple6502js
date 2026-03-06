@@ -1399,7 +1399,94 @@ FUNC _oprulesstart
 
 
 
+.ifdef MATH
 
+
+.export rule_mul
+rule_mul:       
+
+.ifdef OPTRULES
+        ;; most common?
+        .byte "|*%d"
+      .byte "["
+        ;; 5 B
+        ldy #LOVAL
+        jsr _mulAXyAX
+      .byte "]"
+        .byte "%T"
+        .word rule_mul
+
+
+        .byte "|*%D"
+      .byte "["
+        ;; 15 B
+        sta tos
+        stx tos+1
+        lda #LOVAL
+        ldx #HIVAL
+        sta dos
+        stx dos+1
+        jsr _mul
+      .byte "]"
+        .byte "%T"
+        .word rule_mul
+
+.endif ; OPTRULES
+
+        .byte "|*"
+        ;; 16 B
+      .byte "["
+        pha
+        txa
+        pha
+      .byte "]"
+;;; TODO: this is very "generous"
+;;;   and potentially very wrong:
+;;;     1+2*3+1== (1 +2) *3 +1
+        .byte _C
+      .byte "["
+        sta dos
+        stx dos+1
+        pla
+        sta tos+1
+        pla
+        sta tos
+        jsr _mul
+      .byte "]"
+        .byte "%T"
+        .word rule_mul
+
+
+.endif ; MATH
+
+;;; 24
+        .byte "|/2%b"
+      .byte '['
+;;; 6B 12c
+        tay
+        txa
+        lsr
+        tax
+        tya
+        ror
+      .byte ']'
+        .byte "%T"
+        .word rule_mul
+
+        .byte "|*2%b"
+      .byte '['
+;;; 6B 12c
+        asl
+        tay
+        txa
+        rol
+        tax
+        tya
+      .byte ']'
+        .byte "%T"
+        .word rule_mul
+
+rule_plus:      
         .byte "|+%V"
       .byte '['
         clc
@@ -1410,7 +1497,8 @@ FUNC _oprulesstart
         tax
         tya
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
 
 .ifdef OPTRULES
         ;; +BYTE
@@ -1423,7 +1511,8 @@ FUNC _oprulesstart
         inx
 :
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
 .endif ; OPTRULES
 
         .byte "|+%D"
@@ -1437,7 +1526,8 @@ FUNC _oprulesstart
         tax
         tya
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
 
 ;;; 18 *2
         .byte "|-%V"
@@ -1450,7 +1540,8 @@ FUNC _oprulesstart
         tax
         tya
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
 
 .ifdef OPTRULES
         ;; -BYTE
@@ -1463,7 +1554,8 @@ FUNC _oprulesstart
         dex
 :       
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
 .endif ; OPTRULES
 
         .byte "|-%D"
@@ -1477,7 +1569,9 @@ FUNC _oprulesstart
         tax
         tya
       .byte ']'
-        .byte TAILREC
+        .byte "%T"
+        .word rule_plus
+
 
 ;;; 17 *2
         .byte "|&%V"
@@ -1512,53 +1606,6 @@ FUNC _oprulesstart
         .byte TAILREC
 .endif ; OPTRULES
 
-
-.ifdef MATH
-
-.ifdef OPTRULES
-        ;; most common?
-        .byte "|*%d"
-      .byte "["
-        ;; 5 B
-        ldy #LOVAL
-        jsr _mulAXyAX
-      .byte "]"
-        .byte TAILREC
-
-        .byte "|*%D"
-      .byte "["
-        ;; 15 B
-        sta tos
-        stx tos+1
-        lda #LOVAL
-        ldx #HIVAL
-        sta dos
-        stx dos+1
-        jsr _mul
-      .byte "]"
-        .byte TAILREC
-.endif ; OPTRULES
-
-        .byte "|*"
-        ;; 16 B
-      .byte "["
-        pha
-        txa
-        pha
-      .byte "]"
-        .byte _E
-      .byte "["
-        sta dos
-        stx dos+1
-        pla
-        sta tos+1
-        pla
-        sta tos
-        jsr _mul
-      .byte "]"
-        .byte TAILREC
-
-.endif ; MATH
 
 
         .byte "|&%D"
@@ -1619,32 +1666,6 @@ FUNC _oprulesstart
         tay
         txa
         eor #'>'
-        tax
-        tya
-      .byte ']'
-        .byte TAILREC
-
-;;; 24
-        
-        .byte "|/2%b"
-      .byte '['
-;;; 6B 12c
-        tay
-        txa
-        lsr
-        tax
-        tya
-        ror
-      .byte ']'
-        .byte TAILREC
-
-        .byte "|*2%b"
-      .byte '['
-;;; 6B 12c
-        asl
-        tay
-        txa
-        rol
         tax
         tya
       .byte ']'

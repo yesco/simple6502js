@@ -1095,7 +1095,8 @@
 ;;;        
 ;;;        
 ;;; - %R addr - goto this rule addr, jump nil-willy!
-
+;;; - %L addr - JMP to IMMEDATE (checker/validator)
+;;; -'% 'addr - JSR to sideeffect (generate?)
 
 ;;; 
 ;;; TODO:?
@@ -1114,8 +1115,8 @@
 
 ;;; Use:
 ;;;
-;;; IMMEDIATE    addr   (replaces unsafe %{ ...)
-;;; JSRIMMEDIATE addr   (replaces unsafe %{ ...)
+;;; '%L' IMMEDIATE    addr   (replaces unsafe %{ ...)
+;;; '% ' JSRIMMEDIATE addr   (replaces unsafe %{ ...)
 ;;; 
 ;;; TODO: rename to "CHECK disallowlocal" ?
 .macro IMMEDIATE addr
@@ -2698,6 +2699,7 @@ VAL1 = '+'   + 256* HIVAL
 
 PUSHLOC= '{' + 256*'{'
 TAILREC= '*'+128
+TAILPARSE= '*'+128
 DONE= '$'
 
 ;;; TODO: maybe not ZP, not used that mutch
@@ -3580,7 +3582,7 @@ jsr _printchar
         ;; update flags if come from bvs
         tya
         beq failjmp
-        bne nextjmp
+        bne nextjmp2
 :       
         ;; %b - word boundary test
         cmp #'b'
@@ -3591,7 +3593,7 @@ jsr _printchar
         lda (inp),y
         jsr isident
         tax
-        beq nextjmp
+        beq nextjmp2
         bne failjmp
 
 :       
@@ -3616,6 +3618,7 @@ jsr _printchar
         sta rule+1
         stx rule
 
+nextjmp2:
         jmp _next
 :       
 
@@ -3638,6 +3641,52 @@ jsr _printchar
         jmp _next
 :       
 .endif ; blank
+
+        ;; ? '%T' - Tail jump
+        cmp #'T'
+        bne nottailjmp
+
+TAILJMP=1
+.ifdef TAILJMP
+
+        ;; - load new rule ptr
+        lda (rule),y
+        pha
+
+        jsr _incR
+        lda (rule),y
+
+        sta rule+1
+        pla
+        sta rule
+
+        ;; - skip initial '|'
+        lda (rule),y
+        cmp #'|'
+        bne :+
+        
+        jsr _incR
+
+        ;; - pop old 'inp'
+@nextpop:
+        pla
+        cmp #'i'
+        bne @nextpop
+        pla
+        pla
+        ;; - commit inp so far
+        lda inp+1
+        pha
+        lda inp
+        pha
+        lda #'i'
+        pha
+
+        ;; - continue parsing at new loc
+        jmp _next
+
+.endif ; TAILJMP
+nottailjmp:
 
         ;; '%P' -- ????
 
@@ -4209,13 +4258,13 @@ uprule:
         ;; put it back
         pha
 
-        ;; is it TAILREC?
+        ;; ? TAILREC
         ldy #0
         lda (rule),y
         cmp #TAILREC
-        bne yesgoup
-        
-        ;; - commit inp so far
+        bne notailrec
+@tailrec:
+        ;; yes - commit inp so far
         lda inp+1
         pha
         lda inp
@@ -4226,7 +4275,7 @@ uprule:
         lda rulename
         jmp loadruleptr
 
-yesgoup:
+notailrec:      
         pla
 
 .ifdef DEB3
@@ -4343,8 +4392,9 @@ dey
 dey
 pla
 .endif ; PRINTSKIP
-        beq endrule
-
+        bne :+
+        jmp endrule
+:       
         cmp #'|'
         beq nextalt
 
@@ -4363,9 +4413,19 @@ pla
 @noincinc:
         lda (rule),y
 
-        ;; - skip 2 chars if "%L" ('L'= jmp!)
+        ;; - '% ' - skip 2 (' ' = JSR)
+        cmp #' '
+        beq @skip2
+        ;; - '%R' - skip 2 ('R' = goto rule)
+        cmp #'R'
+        beq @skip2
+        ;; - '%T' - skip 2 ('T' = tail jump rule)
+        cmp #'T'
+        beq @skip2
+        ;; - '%L' - skip 2 ('L' = JMP)
         cmp #'L'
         bne :+
+@skip2:
 
         lda #2
         ;; fall-through and it'll skip 2!
@@ -6724,7 +6784,7 @@ ruleV:
       .byte ']'
         .byte TAILREC
 
-        .byte "|\*2%b"
+        .byte "|*2%b"
       .byte '['
         asl
       .byte ']'
