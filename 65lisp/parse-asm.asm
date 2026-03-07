@@ -11025,9 +11025,8 @@ FUNC _eventloop
         bvc :+
         ;; init + "load"
         jsr _loadfirst
-        ;; remove init bit (V)
-        lda mode
-        eor #64
+        ;; set edit mode
+        lda #0
         sta mode
         ;; compiled ok?
         lda compilestatus
@@ -11036,26 +11035,16 @@ FUNC _eventloop
         jmp _ERROR
 :       
 
-.ifdef __ATMOS__
-
         jmp editstart
 
-.else
-        
-        ;; set command mode (no edit yet)
-        lda mode
-        ora #128
-        sta mode
-        
-        jmp command
-
-.endif ; !__ATMOS__
 
 ;;; TODO: seems a bit roundabout the flow but works
 command:
 ;        jsr _eosnormal
 
-        ;; 'Q' to temporary turn on cursor!
+        ;; Show prompt and get command
+
+        ;; ('Q' to temporary turn on cursor)
 .ifdef __ATMOS__
         PRINTZ {10,">",'Q'-'@'}
 .else
@@ -11066,28 +11055,19 @@ command:
         jsr getchar
         CURSOR_OFF
 
+
         ;; === these DON'T return ===
-        ;; (and resets the stack)
-        
-        ;; Q)uit - TODO: too easy
+        ;; (and potentially resets the stack)
+        ;; (we capture their "return" by continuation)
+
+        ;; Q)uit
         cmp #'Q'
         bne :+
 
+        ;; TODO: don't depend on cc65
         .import _exit
         jsr nl
         jmp _exit
-:       
-        ;; r)un
-        cmp #'r'
-        bne :+
-
-        jmp _run
-:       
-        ;; c)ompile
-        cmp #'c'        
-        bne :+
-
-        jmp _idecompile
 :       
         ;; i)nput compile
         cmp #'i'        
@@ -11095,31 +11075,6 @@ command:
 
         jmp _compileInput
 :       
-        ;; h)elp
-        cmp #'h'
-        bne :+
-        
-        jmp _help
-:       
-        ;; x)extras (file)
-        cmp #'x'
-        bne :+
-        
-        jmp _extend
-:       
-        ;; l)oad buffer
-        cmp #'l'
-        bne :+
-        
-        jmp _loadbuffer
-:       
-        ;; w)rite file
-        cmp #'l'
-        bne :+
-        
-        jmp _savefile
-:       
-
         ;; === these DO return
 
 ;;; Q)uit r)un c)ompile i)nput h)elp x)tras l)oad
@@ -11130,6 +11085,7 @@ command:
         bne :+
 
         jsr _loadlater
+        ;; TODO: redo this to a RTS (JSR handler)
         jmp command
 :       
         ;; d)isasm
@@ -11149,7 +11105,24 @@ command:
         bne :+
         jmp command
 :       
+        ;; q) 'Q' to quit, lol
+        cmp #'q'
+        bne :+
 
+        PRINTZ {10,YELLOW,"Q) to quit"}
+        jmp command
+:       
+        cmp #'k'
+        bne :+
+
+@nextc:
+        jsr getchar
+        jsr _printchar
+        cmp #13
+        bne @nextc
+
+        jmp command
+:       
         ;; ?) help
         cmp #'?'
         bne :+
@@ -11158,10 +11131,8 @@ command:
         PRINTZ {"?",10,"Command",10,YELLOW,"r)un c)ompile e)rror v)info  Q)uit",10,YELLOW,"h)elp d)isasm x)tras z)ource ESC-edit"}
         jmp command
 :       
-;        jmp command
-
         ;; lowercase whatever to print!
-        ora #64+32           
+        ora #64+32
         jsr putchar
 
         ;; then convert any char to CTRL to run it!
@@ -11669,6 +11640,7 @@ FUNC _listsymbols
 waitesc:
         PRINTZ {CYAN,"    ESC>"}
         jsr getchar
+        jsr clrscr
         jmp _eosnormal
 FUNC _helpend
 

@@ -379,18 +379,12 @@ FUNC _editaction
         ;; noctrl: special keys without cTRL
         cpx #sCTRL
         beq ctrl
-.else ; sim65
-        ;; we can't distinguish between
-        ;; ^M and RETURN
-        ;; ^H and BACKSPACE (capture F1 for help?)
-        cmp #' '
-        bcc ctrl
 .endif
+
 
 @noctrl:
         ;; DEL key on ORIC (do perform BS)
         cmp #127
-;        beq ebs
         bne :+
         jmp ebs
 :       
@@ -484,6 +478,11 @@ jgarnish:
 
 
 jreturn:        
+.ifndef __ATMOS__
+        ;; clear screen becasause clrln not working
+        ;; on termux
+        jsr clrscr
+.endif
         lda #10
         ;; fall-through
         ;; normal char - insert
@@ -593,6 +592,12 @@ eyank:
         jsr _incD
         jmp :-
 :       
+
+.ifndef __ATMOS__
+        ;; clear screen becasause clrln not working
+        ;; on termux
+        jsr clrscr
+.endif
         rts
 
 ;;; kill till endo of line, or the end of line char
@@ -620,6 +625,12 @@ ekill:
         bne :-
 @done:
 ;        jsr eforward
+
+.ifndef __ATMOS__
+        ;; clear screen becasause clrln not working
+        ;; on termux
+        jsr clrscr
+.endif
         rts
 
        
@@ -681,26 +692,37 @@ FUNC _redraw
         stx editcol
         ldx gos+1
         stx editrow
-:       
+        ;; remove hibit
         and #$7f
+:       
+        ;; ?newline
+        cmp #10
+        beq @newline
         jsr putchar
 
         ;; moved one col
         inc gos
+        ;; TODO: handle line longer than screen
+        ;;  (ORIC: wrap and show in white)
 
-        ;; ?newline
-        cmp #10
-        bne @nextc
-        
-        ;; clear end of line
+        jmp @nextc
+
+@newline:
+        ;; reset column
         lda #0
         sta gos
         
-
+        ;; clear end of line
 ;;; TODO: totally messes up screen!
 ;;;   nothing more printed next lines!!!
-;        PRINTZ {27,"[K"}
+;        PRINTZ {27,"[0K"}
 
+        ;; TODO: crappy fix for ^D/DEL
+        ;; (overwrite last char, lol)
+        putc ' '
+        putc 10
+
+        ;; put coloor first at new line
 .ifdef EDITCOLOR
         putc EDITCOLOR|128
 .endif
@@ -708,40 +730,43 @@ FUNC _redraw
         inc gos+1
         bne @nextc
 
-
 @done:
 
-;;; crash?
-;        lda editcol
-;        pha
-;        lda editrow
-;        jsr _gotoxy
-        
-jsr nl
-lda editrow
-ldx #0
-jsr _printu
-jsr spc
-lda editcol
-ldx #0
-jsr _printu
-jsr spc
-jsr spc
-jsr nl
+        ;; clear till end of screen
+        PRINTZ {27,"[J"}
 
+        ;; print cursor pos
+        ;; (TODO: remove?)
+        jsr nl
+        lda editrow
+        ldx #0
+        jsr _printu
+        jsr spc
+        lda editcol
+        ldx #0
+        jsr _printu
+        jsr spc
+        jsr spc
+        jsr nl
+
+        ;; move real cursor
         ldx editcol
 .ifdef EDITCOLOR
+        ;; 2 spaces for attr/oric
         inx
         inx
+        ;; 1 for COLOR
         inx
         inx
 .endif
         ldy editrow
+        ;; two lines at top not used?
         iny
         iny
         iny
         jsr gotoxy
 
+        ;; show cursor so we know where we are
         CURSOR_ON
 
         ;; reset cursor bit
@@ -1142,7 +1167,7 @@ FUNC _clearedit
         jmp _zero
 
 
-FUNC _goerrpos       
+FUNC _goerrpos
         lda compilestatus
         beq :+
         ;; ?firsttime => erp not in editor buffer!
