@@ -1,21 +1,30 @@
 #!/bin/env perl
 
+# generate input for this program:
+
+# > ../../cc65/bin/sim65 --trace parse.sim -f Tests/cmp-lt.c -c >compile.trace2
+
+
 # Typical output line from sim65 --trace
 #
-# 9180701      26130074
-#   E181  A0 04     ldy  #$04
-#   A=0A X=00 Y=01 S=F7
-#   Flags=nvdIzC    SP=FF89
+# 9180701      26130074  E181    A0 04     ldy  #$04
+#   A=0A X=00 Y=01 S=F7 Flags=nvdIzC    SP=FF89
 
 %freq=();
+%asm=();
 
 while(<>) {
-#    if (/^\s*(\d+)\s+(\d+)\s+(\x+).*S=(\x+)/) {
+    # NINSTR CYC ADDR...
     if (/^\s*(\d+)\s+(\d+)\s+([\da-fA-F]+)/) {
-        my ($ninstr, $cyc, $addr, $S)= ($1, $2, $3, $4);
+        my ($ninstr, $cyc, $addr)= ($1, $2, $3);
         $freq{$addr}++;
-#        print STDERR "$cyc\t$addr\t$S\n";
-        print STDERR "$ninstr\r";
+
+        if (/(\s\w\w\w\s+\S*)/) {
+            $asm{$addr}= $1;
+        }
+
+        # show progress
+        print STDERR "$ninstr\r" if ($ninstr % 1000)==0;
     } else {
         # anything else print (stdout)
         # (mixed with trace lines interrrupted)
@@ -26,8 +35,6 @@ while(<>) {
 
 
 # report
-if (($ninstr % 1000)==0) {
-    foreach $a (sort(keys %freq)) {
-        print "$a : ".$freq{$a}."\n";
-    }
+foreach $a (sort(keys %freq)) {
+    print "$a : ".$freq{$a}."\t".$asm{$a}."\n";
 }

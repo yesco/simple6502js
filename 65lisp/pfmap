@@ -12,22 +12,27 @@ print "========== $name ==========\n";
 
 $start= $addr= "0000";
 
-$fullwidth= 0xff00; # "space"
 my $all;
 my %freq;
+my %asm;
 
 open(PF, $pf) or die "no .pf";
 while(<PF>) {
-    if (/([\da-hA-H]+)\s+:\s+(\d+)/) {
+    if (/([\da-hA-H]+)\s+:\s+(\d+)\s+(.*)/) {
         $freq{$1}= $2;
+        $asm{$1}= $3;
+    } elsif (/^0 0 \$([\da-hA-h]+)\s+(.*)/) {
+        $freq{$1}++;
+        $asm{$1}= $2;
+    } else {
+        #print STDERR "%%$_";
     }
 }
 close(PF);
 
-binmode(STDOUT, ":utf8");
-
 $names= "";
 my %tots;
+my %maxcount;
 $all= 0;
 
 open(IN, $name.".syms") or die "no .syms";
@@ -41,7 +46,7 @@ while(<IN>) {
             $addr= $a;
             print "\n------------------------------\n";
             # print memory [$start,$addr[
-            $total= 0;
+            $max= $total= 0;
             $alphas= "";
             for $m (hex($start)..(hex($addr)-1)) {
                 $x= sprintf("%04X", $m);
@@ -49,7 +54,8 @@ while(<IN>) {
                 if ($v) {
                     # TODO: should be counting cyc, lol
                     $total+= $v;
-                    print sprintf("\t$x\t%10d\n", $v);
+                    $max= $v if $v > $max;
+                    print sprintf("$x %8d        %s\n", $v, $asm{$x});
                 }
             }
             $start= $addr;
@@ -57,7 +63,8 @@ while(<IN>) {
             if ($total) {
                 $tots{$names}= $total;
                 $all+= $total;
-                print "$total\n\n\n";
+                print "\nmax: $max\t total: $total\n\n\n";
+                $maxcount{$names}= $max;
             }
             $names = "";
         }
@@ -66,7 +73,8 @@ while(<IN>) {
         $names.= "$name ";
     } else {
         # ??
-        print "\n%%$_";
+# TODO: "few" items
+#        print "\n%%$_";
     }
 
 }
@@ -84,11 +92,11 @@ print "\n====================================\n";
 foreach $n (sort { $tots{$a} <=> $tots{$b} } keys %tots) {
     if (1) {
         $cyc= int($cpi * $tots{$n});
-        print sprintf("%4.1f%% %5.1fs\t%d\t= $n\n", 100*$tots{$n}/$all, $cyc/$hz, $cyc);
+        print sprintf("%4.1f%% %5.1fs\t# %7d\t= %10d: $n\n", 100*$tots{$n}/$all, $cyc/$hz, $maxcount{$n}, $cyc);
     } else {
         print $tots{$n}."\t= $n\n";
     }
 }
 
-print sprintf("\n\nTOTAL:\t%5.2fs\t$all instt\n", $cpi*$all/$hz);
+print sprintf("\n\nTOTAL:\t%5.2fs\t%d c\t$all instr\n", $cpi*$all/$hz, $cpi*$all);
 

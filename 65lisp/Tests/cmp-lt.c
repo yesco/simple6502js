@@ -84,7 +84,8 @@ int main() {
   TRUE(0<-1u, "0<-1u"); // lol
   putchar('\n');
 
-  FALSE(-2u<0xffffu, "-2u<0xffffu"); // lol
+  // TODO: cc65 things this should be FALSE?
+  TRUE(-2u<0xffffu, "-2u<0xffffu"); // lol
   TRUE(0<-1u, "0<-1u");
   TRUE(-2u<-1u, "-2u<-1u"); // lol
   FALSE(-2u<2, "-2u<2"); // lol

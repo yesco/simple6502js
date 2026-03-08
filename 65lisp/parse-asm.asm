@@ -3143,6 +3143,45 @@ FUNC _nextI
         ;; - fall-through from above
 FUNC _next
 
+;;; add to --trace rule access position
+;
+TRACEMEMRULE=1
+
+SIM65_TRACE=$FFCB
+
+.macro TRACE_ON
+    lda #$7f
+    sta SIM65_TRACE
+.endmacro
+
+.macro TRACE_OFF
+    lda #0
+    sta SIM65_TRACE
+.endmacro
+
+TRACE_OFF
+
+.ifdef TRACEMEMRULE
+        PRINTZ {10,"0 0 "}
+        lda rule
+        ldx rule+1
+        jsr _printh
+        PRINTZ {9,"RUL ",34}
+        ldy #0
+:       
+        lda (rule),y
+        jsr _printchar
+        iny
+        cpy #10
+        bne :-
+
+        PRINTZ {34,10}
+.endif ; TRACEMEMRULE
+
+TRACE_ON
+
+
+
 ;;; TODO: remove, disable here, maybe check and end of rule?
 
 ;;; This is very expensive, but keep to find overflow bugs
@@ -12453,11 +12492,12 @@ FUNC _printchar
         and #127
         PUTC '_'
 :       
-        bne :+
+;        bne :+
         ;; ? zero - print $ and newline
-        putc '$'
-        SKIPTWO
+;        putc '$'
+;        SKIPTWO
 :       
+.ifnblank
         ;; ? newline
         cmp #10
         bne :+
@@ -12467,9 +12507,12 @@ FUNC _printchar
         jsr putchar
         pla
 :       
+.endif
         ;; print [CODE] or plain (c < 128)
         cmp #' '
-        bcs @printplain
+        bcc @printcode
+        cmp #126
+        bcc @printplain
 @printcode:
         PUTC '['
         ldx #0

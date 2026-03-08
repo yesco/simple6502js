@@ -37,7 +37,8 @@ clang oric-terminal.c -o oric-terminal
 # - if no parameters - then IDE - interactive
 
 # change terminal so mc can read CTRL-C
-stty raw -echo opost onlcr
+# --- TODO: enable only for "IDE"
+##stty raw -echo opost onlcr
 
 # seems to work without effecting interaction?
 if test -f oric-terminal

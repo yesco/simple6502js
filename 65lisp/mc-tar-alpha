@@ -39,6 +39,7 @@ LISTFILES=(
 "Input/strlib.c"
 "Input/test-ctype.c"
 "Input/tutorial.txt"
+"Tests/cmp-lt.c"
 )
 
 FILES="${LISTFILES[@]}"
