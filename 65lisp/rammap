@@ -1,5 +1,10 @@
 #!/bin/env perl
 
+# reading a complete 64K RAM snapshot
+# and showing $name.map labels interleaved
+
+# Usage: ./rammap NAME SNAP
+
 $name= shift @ARGV;
 $snap= shift @ARGV;
 
@@ -21,6 +26,7 @@ push @ram, unpack "C*", $all;
 
 open(IN, $name.".syms") or die "no .syms";
 while(<IN>) {
+    # 00ADDR   42   name
     if (/^..([0-9a-fA-F]+)\s+(\d+)\s+(\w+)$/) {
         $a= $1; $name= $3;
         if ($a eq $addr) {

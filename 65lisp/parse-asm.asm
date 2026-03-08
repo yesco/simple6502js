@@ -3572,14 +3572,24 @@ jsr _printchar
         sta savea
 @loop:
         lda (rule),y
+;PUTC '?'
+;jsr _printchar
+;PUTC 10
         ;; A hibit (0x80) indicates end of sequence
-        bmi @done
+        bmi @nomatch
         jsr _incR
         cmp savea
-        beq @done
+        beq @match
         bne @loop
-@done:
-        jsr _incR
+@nomatch:
+        ;; make Y=$ff
+        ;; (iny => 0 instead of 1)
+        ;; effectively "reversing result"
+        dey
+@match:
+;PUTC '!'
+;jsr nl
+;        jsr _incR
         ;; '!' 0b100001
         ;; '=' 0b111101
         ;;        ^ ==> V flag
@@ -4339,6 +4349,7 @@ lda savea
 
 ;; TODO: double __fail?
 FUNC _fail
+;putc 'F'
 
 ;;; TODO: seems to disturbe correct exec?
 ;.ifdef TRACERULE
@@ -4402,23 +4413,27 @@ pla
         bne :+
         jmp endrule
 :       
-        cmp #'|'
-        beq nextalt
-
+        ;; ? '['
         cmp #'['
         beq skipgen
 
-        ;; ? % operator?
-        cmp #'%'
-        bne @nopercent
+        ;; ? '%' operator?
+        cmp #'%'        
+        bne skipnopercent
         
+.export skippercent
+skippercent:
         ;; - get char after %
         ;; (notice not jsr _incR as we're INY!)
-        INY
+        iny
         bne @noincinc
         inc rule+1
 @noincinc:
         lda (rule),y
+
+;;; TODO: most common, skip tests?
+        ;; - '%D' 
+        ;; - '%V'
 
         ;; - '% ' - skip 2 (' ' = JSR)
         cmp #' '
@@ -4463,8 +4478,15 @@ pla
 
         jmp loopfail
 :       
-@nopercent:
+.export skipnopercent
+skipnopercent:
+
+        ;; ? '|' ? done!
+        cmp #'|'
+        beq nextalt
+
         ;; normal char: skip
+
 FUNC nextskip
         ;; loop w Y
         INY
@@ -4473,6 +4495,8 @@ FUNC nextskip
         ;; always!
         bne loopfail
         ;; skip [...0...] gen
+
+
 FUNC skipgen
         iny
         bne :+
@@ -5302,6 +5326,15 @@ FUNC _digits
         bne failjmp2
         
 @done:
+        ;; skip trailing 'u' (unsigned const)
+        ldy #0
+        lda (inp),y
+        ora #32
+        cmp #'u'
+        bne :+
+        
+        jsr _incIspc
+:       
         ;; DONE!
         ;; - negate?
         lda savex
@@ -5617,11 +5650,15 @@ FUNC _incO
 ;;; 3  22c
         ldx #_out
         SKIPTWO
+
+.ifnblank
 ;;; TODO: how much faster if _incR and _incI specialized?
 FUNC _incR
 ;;; 3  17c
         ldx #rule
         SKIPTWO
+.endif
+
 FUNC _incI      
 ;;; 2  12c
         ldx #inp
@@ -5636,6 +5673,15 @@ FUNC _incRX
 ;;; State of flags at exit: Z=0 unless hi wrapped!
         rts
         
+
+;;; inline - save 1.4% cpu
+;;; 7 B  14c  26 x called
+FUNC _incR
+        inc rule
+        bne :+
+        inc rule+1
+:       
+        rts
 
 
 ; 18 B
@@ -7407,7 +7453,7 @@ ruleN:
         ;; "compat" - ignore!
         .byte "|typedef","unsigned","int","word;"
         .byte TAILREC
-        .byte "|typedef","unsigned","uint16_t","word;"
+        .byte "|typedef","uint16_t","word;"
         .byte TAILREC
 
 

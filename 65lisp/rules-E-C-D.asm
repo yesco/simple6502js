@@ -1,4 +1,4 @@
-ruleE:  
+ruleE:
         
         .byte "(",_E,")",_D
         
@@ -2183,6 +2183,10 @@ rule_plus:
 
         ;; general
         .byte "|<"
+.byte "%{"
+putc '/'
+IMM_RET
+
       .byte '['
         pha
         txa

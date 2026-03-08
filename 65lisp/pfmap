@@ -1,0 +1,94 @@
+#!/bin/env perl
+
+# reading ./pf65 file.trace > file.pf
+# showing $name.map labels interleaved
+
+# Usage: ./pfmap NAME file.pf
+
+$name= shift @ARGV;
+$pf= shift @ARGV;
+
+print "========== $name ==========\n";
+
+$start= $addr= "0000";
+
+$fullwidth= 0xff00; # "space"
+my $all;
+my %freq;
+
+open(PF, $pf) or die "no .pf";
+while(<PF>) {
+    if (/([\da-hA-H]+)\s+:\s+(\d+)/) {
+        $freq{$1}= $2;
+    }
+}
+close(PF);
+
+binmode(STDOUT, ":utf8");
+
+$names= "";
+my %tots;
+$all= 0;
+
+open(IN, $name.".syms") or die "no .syms";
+while(<IN>) {
+    # 00ADDR   42   name
+    if (/^..([0-9a-fA-F]+)\s+(\d+)\s+(\w+)$/) {
+        $a= $1; $name= $3;
+        if ($a eq $addr) {
+        } else {
+            # end names at address
+            $addr= $a;
+            print "\n------------------------------\n";
+            # print memory [$start,$addr[
+            $total= 0;
+            $alphas= "";
+            for $m (hex($start)..(hex($addr)-1)) {
+                $x= sprintf("%04X", $m);
+                $v= $freq{$x};
+                if ($v) {
+                    # TODO: should be counting cyc, lol
+                    $total+= $v;
+                    print sprintf("\t$x\t%10d\n", $v);
+                }
+            }
+            $start= $addr;
+
+            if ($total) {
+                $tots{$names}= $total;
+                $all+= $total;
+                print "$total\n\n\n";
+            }
+            $names = "";
+        }
+        print "\n";
+        print "  ".$name;
+        $names.= "$name ";
+    } else {
+        # ??
+        print "\n%%$_";
+    }
+
+}
+close(IN);
+
+# report summary per "$names"
+
+# Trace last line: cyc/ninstr = 
+# 2.84619735707003372284 cyc/instr
+
+$cpi= 26130141/9180720;
+$hz= 1000000;
+
+print "\n====================================\n";
+foreach $n (sort { $tots{$a} <=> $tots{$b} } keys %tots) {
+    if (1) {
+        $cyc= int($cpi * $tots{$n});
+        print sprintf("%4.1f%% %5.1fs\t%d\t= $n\n", 100*$tots{$n}/$all, $cyc/$hz, $cyc);
+    } else {
+        print $tots{$n}."\t= $n\n";
+    }
+}
+
+print sprintf("\n\nTOTAL:\t%5.2fs\t$all instt\n", $cpi*$all/$hz);
+
