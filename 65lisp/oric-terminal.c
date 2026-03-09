@@ -166,14 +166,14 @@ int main(void) {
   while((c=getchar())!=EOF) {
     fullputc(c);
   }
-  clearend();
+//  clearend();
 
   printf("\n[m");
   printf("\n");
   printf("\e[r\n"); // no more scroll region
 
   // TODO: got end of screen, need to get size...
-  gotorc(34, 1);
+  gotorc(1000, 1);
 
   return 0;
 }

@@ -311,6 +311,7 @@ void error(char* msg, char* data) {
 "  -c\t\t\t# compile\n"
 "  -r[N]\t\t\t# run N times (defaualt 1)\n"
 "  -d\t\t\t# disasm\n"
+"  -Q[N]\t\t\t# exit with N (default 0)\n"
 "\n"
 "  -pN\t\t\t# print variable names\n"
 "  -pe\t\t\t# print ENV\n"
@@ -587,7 +588,7 @@ extern void processnextarg() {
       // these DO NOT return!
     case 'c': compileAX((char*)EDITSTART); break;
     case 'r': runN(atoi(a+2)); break;
-    case 'Q': exit(0); break;
+    case 'Q': exit(atoi(a+2)); break;
       // these do return
     case 's': snapshot(a+2); break;
     case 'l': // TODO: load from "buffer"

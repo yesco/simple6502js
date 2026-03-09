@@ -8210,30 +8210,25 @@ afterELSE:
         ;; IF( var < num ) ... saves 6 B (- 63 57)
         ;; note: this is safe as if it doesn't match,
         ;;   not code has been emitted! If use subrule... no
-        .byte "|if(%V<[#]%D)"
+;         .byte "|if(%V<[#]%D)"
+        .byte "|if(%V<[#]%D[#])"
 .scope        
-;;; 18
       .byte "["
-        ;; reverse cmp as <> NUM avail first
-        lda #LOVAL
-        ldx #HIVAL
-        ;; cmp with VAR
-        .byte ";"               ; get aDdress
-        ;; test hi byte first
-        cpx VAL1
-        bne :+                  ; neq determine if <
-        ;; equal: test lo byte; NUM>=VAR ... VAR<=NUM
-        cmp VAR0
-        beq @nah
-:       
-        bcs @ok                 ; NUM>=VAR
-@nah:
-        ;; set value for optional else...
-        ;; C=0 ! (nothing to do)
+        ;; 14
+        .byte "?1"
+        lda VAR0
+        ldx VAR1
+        .byte "?0"
+        cmp #LOVAL
+        txa
+        sbc #HIVAL
+        .byte ";;"
+        bcc @ok
+@fail:
+        ;; C=1
+        clc
         jmp PUSHLOC
-@ok:        
-        ;; C=1 !
-        ;; THEN-branch
+@ok:
       .byte "]"
         .byte _S
 .ifdef ELSE
@@ -8243,6 +8238,8 @@ afterELSE:
       .byte ']'
 .endif ; ELSE
 .endscope
+
+
 
         .byte "|if(%V&[#]%d)"
 .scope        

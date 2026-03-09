@@ -91,6 +91,71 @@ int main() {
   FALSE(-2u<2, "-2u<2"); // lol
   putchar('\n');
 
+  // IF (var<CONST)
+  a= 3;
+  if (a<4) TRUE(1, "if(a<4) ...");
+  else     TRUE(0, "if(a<4) ...");
+  a= 4;
+  if (a<4) FALSE(1, "if(a<4) ...");
+  else     FALSE(0, "if(a<4) ...");
+  a= 5;
+  if (a<4) FALSE(1, "if(a<4) ...");
+  else     FALSE(0, "if(a<4) ...");
+  putchar('\n');
+
+  a= 0xff;
+  if (a<0x100) TRUE(1, "if(a<0x100) ...");
+  else         TRUE(0, "if(a<0x100) ...");
+  a= 0x100;
+  if (a<0x100) FALSE(1, "if(a<0x100) ...");
+  else         FALSE(0, "if(a<0x100) ...");
+  a= 0x101;
+  if (a<0x100) FALSE(1, "if(a<0x100) ...");
+  else         FALSE(0, "if(a<0x100) ...");
+  putchar('\n');
+
+  // WHILE
+  a= 0; while(a<10) {
+    putu(a);
+    TRUE(1, "while(a<10)...");
+    ++a;
+  }
+  //TRUE(a==10, "AFTER while(a<10)...");
+  // TODO: assert hang?
+  // assert(a==10);
+  putchar('\n');
+
+  a= 0x00FE; while(a<0x0100) {
+    putu(a);
+    TRUE(1, "while(a<0x100)...");
+    ++a;
+  }
+  putchar('\n');
+
+  a= 0x00FE; while(a<0x0101) {
+    putu(a);
+    TRUE(1, "while(a<0x101)...");
+    ++a;
+  }
+  putchar('\n');
+
+  a= 0x00FE; while(a<0x0102) {
+    putu(a);
+    TRUE(1, "while(a<0x101)...");
+    ++a;
+  }
+  putchar('\n');
+
+  a= 0x1234; while(a<0x1239) {
+    putu(a);
+    TRUE(1, "while(a<0x1239)...");
+    ++a;
+  }
+  putchar('\n');
+
+  // FOR
+  // - no need as there is nothing specific for < ???
+
   // return number of failures
-  return 31-pass;
+  return 61-pass;
 }

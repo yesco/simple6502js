@@ -8,12 +8,12 @@
 
 
 LINES
-	1a b 23pass report v s 456789101112TRUE v s 13141516171819FALSE v s 2021222324252627282930/31/32/33343536/37/38/394041/42/43/444546/47/48/495051/52/53/54555657/58/59/606162/63/64/656667/68/69/707172//73/7475//76//77787980
+	1a b 23pass report v s 456789101112TRUE v s 13141516171819FALSE v s 2021222324252627282930/31/32/33343536/37/38/394041/42/43/444546/47/48/495051/52/53/54555657/58/59/606162/63/64/656667/68/69/707172//73/7475//76//7778798081828384858687888990919293949596979899100101102103104105106107108109110111112113114115116117118119120121122123124125126127128129130131132133134135136137138139140141142
 
 
-1898 bytes source
+3183 bytes source
 
-OK 2128 Bytes (libs +1096 bios +98)
+OK 3167 Bytes (libs +1096 bios +98)
 
 
 
@@ -63,12 +63,49 @@ pass: TRUE	0<-1u	=> 1	a=$0100 b=$0101
 pass: TRUE	-2u<-1u	=> 1	a=$0100 b=$0101
 pass: FALSE	-2u<2	=> 0	a=$0100 b=$0101
 
+pass: TRUE	if(a<4) ...	=> 1	a=$0003 b=$0101
+pass: FALSE	if(a<4) ...	=> 0	a=$0004 b=$0101
+pass: FALSE	if(a<4) ...	=> 0	a=$0005 b=$0101
+
+pass: TRUE	if(a<0x100) ...	=> 1	a=$00FF b=$0101
+pass: FALSE	if(a<0x100) ...	=> 0	a=$0100 b=$0101
+pass: FALSE	if(a<0x100) ...	=> 0	a=$0101 b=$0101
+
+0pass: TRUE	while(a<10)...	=> 1	a=$0000 b=$0101
+1pass: TRUE	while(a<10)...	=> 1	a=$0001 b=$0101
+2pass: TRUE	while(a<10)...	=> 1	a=$0002 b=$0101
+3pass: TRUE	while(a<10)...	=> 1	a=$0003 b=$0101
+4pass: TRUE	while(a<10)...	=> 1	a=$0004 b=$0101
+5pass: TRUE	while(a<10)...	=> 1	a=$0005 b=$0101
+6pass: TRUE	while(a<10)...	=> 1	a=$0006 b=$0101
+7pass: TRUE	while(a<10)...	=> 1	a=$0007 b=$0101
+8pass: TRUE	while(a<10)...	=> 1	a=$0008 b=$0101
+9pass: TRUE	while(a<10)...	=> 1	a=$0009 b=$0101
+
+254pass: TRUE	while(a<0x100)...	=> 1	a=$00FE b=$0101
+255pass: TRUE	while(a<0x100)...	=> 1	a=$00FF b=$0101
+
+254pass: TRUE	while(a<0x101)...	=> 1	a=$00FE b=$0101
+255pass: TRUE	while(a<0x101)...	=> 1	a=$00FF b=$0101
+256pass: TRUE	while(a<0x101)...	=> 1	a=$0100 b=$0101
+
+254pass: TRUE	while(a<0x101)...	=> 1	a=$00FE b=$0101
+255pass: TRUE	while(a<0x101)...	=> 1	a=$00FF b=$0101
+256pass: TRUE	while(a<0x101)...	=> 1	a=$0100 b=$0101
+257pass: TRUE	while(a<0x101)...	=> 1	a=$0101 b=$0101
+
+4660pass: TRUE	while(a<0x1239)...	=> 1	a=$1234 b=$0101
+4661pass: TRUE	while(a<0x1239)...	=> 1	a=$1235 b=$0101
+4662pass: TRUE	while(a<0x1239)...	=> 1	a=$1236 b=$0101
+4663pass: TRUE	while(a<0x1239)...	=> 1	a=$1237 b=$0101
+4664pass: TRUE	while(a<0x1239)...	=> 1	a=$1238 b=$0101
+
 
 
 
 => 0
 
-27288024 cycles
+41946995 cycles
 
 
 
@@ -101,7 +138,7 @@ OK 10 Bytes (libs +1096 bios +98)
 
 => 0
 
-131044 cycles
+130865 cycles
 
 
 
@@ -134,7 +171,7 @@ OK 15 Bytes (libs +1096 bios +98)
 
 => 17
 
-199109 cycles
+199654 cycles
 
 
 
@@ -167,7 +204,7 @@ OK 15 Bytes (libs +1096 bios +98)
 
 => 4711
 
-202785 cycles
+203307 cycles
 
 
 
@@ -198,9 +235,9 @@ OK 11 Bytes (libs +1096 bios +98)
 
 
 
-=> 378
+=> 361
 
-146175 cycles
+146052 cycles
 
 
 
@@ -234,7 +271,7 @@ OK 79 Bytes (libs +1096 bios +98)
 
 => 17
 
-867107 cycles
+866738 cycles
 
 
 
@@ -267,7 +304,7 @@ OK 10 Bytes (libs +1096 bios +98)
 
 => 0
 
-240484 cycles
+240154 cycles
 
 
 
