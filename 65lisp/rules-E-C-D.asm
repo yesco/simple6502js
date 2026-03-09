@@ -15,7 +15,12 @@ ruleE:
         ;; make sure it's not '==' lol
         ;; (remember subexpr not fail!)
         .byte "|%V="
-        .byte "%!=",$80
+
+;;; TODO: HANGS!
+;        .byte "%!==",$80
+;;; OK! LOL
+        .byte "%!===",$80
+
         .byte "[#]",_E
      .byte "[;"
         sta VAR0

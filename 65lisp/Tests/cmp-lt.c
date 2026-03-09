@@ -153,6 +153,21 @@ int main() {
   }
   putchar('\n');
 
+  // DO...WHILE
+  a= 40;
+  do {
+    TRUE(1, "do...while(a<42)");
+    ++a;
+  } while (a<42);
+  putchar('\n');
+
+  a= 40; b= 42;
+  do {
+    TRUE(1, "do...while(a<b)");
+    ++a;
+  } while (a<b);
+  putchar('\n');
+
   // FOR
   // - no need as there is nothing specific for < ???
 

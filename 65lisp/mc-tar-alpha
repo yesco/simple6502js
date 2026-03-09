@@ -8,6 +8,8 @@ LISTFILES=(
 "mc"
 "mc.sim"
 "mc.tap"
+"mc-version.inc"
+"mc-version.txt"
 "oric-terminal.c"
 "mepoc.c"
 "Input/arrays.c"

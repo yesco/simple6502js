@@ -10124,6 +10124,7 @@ ruleM:
 ;;; Hackey rule we need to lookUP wards many step!
 
         ;; do it once
+        ;; (common in macro expansions - we don't have)
         .byte "0);"
         
         ;; do it forever

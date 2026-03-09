@@ -1,1 +1,1 @@
-.define VERSION "@asldt"
+.define VERSION "@aslhk"
