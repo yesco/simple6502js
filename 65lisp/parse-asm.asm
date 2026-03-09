@@ -1329,6 +1329,14 @@
 ;;;   -    - default: compiler+ide+library+help
 ;;;   DEMO - compiler+ide+full library+help+examples
 
+;;; enable "dynamic libraries" - not working yet,
+;;; just prints out "$[17]$" bytes "used" from libraries
+;;; It'll print at each use (double counting)
+
+;DYNLIBRARY=1
+
+
+
 ;PICO=1
 ;NANO=1
 ;TINY=1
@@ -3144,8 +3152,7 @@ FUNC _nextI
 FUNC _next
 
 ;;; add to --trace rule access position
-;
-TRACEMEMRULE=1
+;TRACEMEMRULE=1
 
 SIM65_TRACE=$FFCB
 
@@ -4956,6 +4963,7 @@ FUNC _generate
         dey
 
         ;; get size
+        ;; (used by DYNLIBRARY below)
         lda (tos),y
         pha
 
@@ -4978,12 +4986,16 @@ FUNC _generate
         inc nlibbytes+1
 @noinc2:
 
+.ifdef DYNLIBRARY
 ;;; for now just print "cost"
 PRINTZ "$["
 pla
 ldx #0
 jsr _printu
 PRINTZ {"]$",10}
+.else
+pla
+.endif ; DYNLIBRARY
 
         ;; TODO: verify libf pointer?
         ;; (addr-4)=='$' lol

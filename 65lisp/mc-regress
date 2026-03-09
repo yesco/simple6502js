@@ -16,7 +16,8 @@ FILES=(Tests/*.c Tests/*/*.c)
 ./mc -
 
 for file in "${FILES[@]}"; do
-    echo "===================================" | tee -a mc-regress.log
+
+    echo "=======================================================" | tee -a mc-regress.log
     echo "=== $file" | tee -a mc-regress.log
    
     # this is similar to ./mc-test, only
