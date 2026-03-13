@@ -1,21 +1,45 @@
+;;; - optimizing compile of Tests/cmp-eq.c
+;;; -f -c -r    46,704,791 (+run)
+;;; FILE.c      46,695,008
+;;; -               34,215
+;;; -f           2,090,593 (just to load file?)
+;;; -f -c       45,562,519 (+compile!) !!!!?
+;;; -dummy      45,434,109 (- dummy 128410)
+
+;;; TODO: why isn't this getting faster?
+;;;             46,698,190 (no skip enabled)
+;;; skip_not_p  46,752,205
+
+
+
+;;;   unod      46,698,190
+;;; !CTYPE      45,776,414 (/ 46698190 45776414.0) = 2.01%
+;;; skip_always 46,711,593 (/ 46698190 46711593.0) == broken?
+;;; skip %{     46,775,157 ... more expensive?
+;;; skip_not_i  46,772,781
+;;;  w tests    46,780,717 (- 46780717 46772781) = +7936 each i?
+
+
+
+;;; -f -c       47,705,897 (+ one var aa before main...)
+;;; -f -c       66,407,840 (+ total 10 vars LOL)
+
+;;; (- 47705897 45562519) = 2143378 
+;;; (+ 45562519 (* 10 2143378)) == 66996299 LOL
+;;; 
+;;; word aa,bb,cc,dd,ee,ff,gg,hh,ii,jj
+
+
+
+
+
 ruleE:
         
         .byte "(",_E,")",_D
         
-.ifnblank
-;;; TODO: remove ?
-        ;; Pascal style := works fine... LOL
-        .byte "|%V:=[#]",_E
-      .byte "[;"
-        sta VAR0
-        stx VAR1
-      .byte "]"
-.endif
-
         ;; make sure it's not '==' lol
         ;; (remember subexpr not fail!)
         .byte "|%V="
-
 ;;; TODO: HANGS!
 ;        .byte "%!==",$80
 ;;; OK! LOL
@@ -67,19 +91,33 @@ FUNC _iorulesstart
 
         ;; TODO: fix
         ;; dummy rule to make | start - LOL
-        .byte "d43fj3"
+;        .byte "d43fj3"
+;        .byte "|"
 
 .ifdef STDIO
 ;;; TODO: these don't really return anything...
 
-        ;;  potentially first so no "|"
+        ;; skip of if doesn't' start w 'p'
+
+;;; TODO: if this is enabled it get's slower???
+.ifnblank
+;;; TODO: first is skipped? (need 3!)
+        .byte "%!ppp",$80
+        .byte "%R"
+        .word skip_not_p
+        .byte "|"
+.else 
+        .byte "ssdfsf|"
+.endif
+
+;;; TODO: this really shoulnd't be here?
+;;;   if match should just continue???
 
         ;; "IO-lib" hack
-        .byte "|putu(",_E,")"
+        .byte "putu(",_E,")"
       .byte '['
         LIBCALL _printu
       .byte ']'
-
 
         ;; miniprintf!
 
@@ -155,15 +193,6 @@ FUNC _iorulesstart
       .byte ']'
         .byte "%S)"
 
-        ;; fputs("foo",stdout); == putz !
-        ;; NO newline!
-        .byte "|fputs(",34
-      .byte '['
-;;; TODO: ?
-        jsr _iprintz
-      .byte ']'
-        .byte "%S,stdout)"
-
         .byte "|puts(",34
       .byte '['
 ;;; TODO: ?
@@ -173,10 +202,6 @@ FUNC _iorulesstart
 .endif ; INLINEPUTZOPT
 .endif ; OPTRULES
 
-        .byte "|fputs(",_E,",stdout)"
-      .byte '['
-        jsr _printz
-      .byte ']'
 
 .ifdef SIGNED
         .byte "|printf(",34,"\%d",34,",",_E,")"
@@ -218,6 +243,7 @@ FUNC _iorulesstart
         inc tos+1
         bne :-
 :       
+
 .else
 
 .ifnblank
@@ -238,11 +264,39 @@ ldx tos+1
         jsr putcraw
       .byte ']'
 
+        .byte "|"
+skip_not_p:
+
+.ifdef OPTRULES
+.ifdef INLINEPUTZOPT
+        ;; fputs("foo",stdout); == putz !
+        ;; NO newline!
+        .byte "fputs(",34
+      .byte '['
+;;; TODO: ?
+        jsr _iprintz
+      .byte ']'
+        .byte "%S,stdout)"
+        
+        .byte "|"
+
+.endif ; INLINEPUTZOPT
+.endif ; OPTRULES
+
+        .byte "fputs(",_E,",stdout)"
+      .byte '['
+        jsr _printz
+      .byte ']'
+
+
+
 .else ; !STDIO
+
+
 
         ;;  potentially first so no "|"
 
-        .byte "|putz(",_E,")"
+        .byte "putz(",_E,")"
       .byte '['
         ;; 19 B inline only...
         sta pos
@@ -454,6 +508,18 @@ FUNC _iorulesend
 
 
 .ifdef CTYPE
+        ;; skip of if doesn't' start w 'i'
+
+;;; TODO: if this is enabled it get's slower???
+;;;   save 2.01%
+.ifnblank
+;        .byte "%!ii",$80
+;        .byte "%R"
+;        .word skip_not_i
+        .byte "%{"
+        jmp skip_not_i
+.endif
+
         .byte "|isxdigit(",_E,")"
       .byte '['
         jsr isxdigit
@@ -493,6 +559,12 @@ FUNC _iorulesend
       .byte '['
         jsr ispunct
       .byte ']'
+
+        .byte "%{"
+skip_not_i:     
+        IMM_RET
+
+;skip_not_i:     
 
         .byte "|toupper(",_E,")"
       .byte '['

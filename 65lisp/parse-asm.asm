@@ -1,5 +1,54 @@
 ;; This is for debugging... lol
 
+;; __MAIN_START__=0x200
+;; startup:        
+;;  jsr zerobss
+;;  jsr initlib
+;;  jsr callmain
+
+;; _exit:  
+ 
+
+;; initlib:        
+
+;; initmainargs:   
+
+
+
+;; _iasmstart:     
+
+;; _inputfile:     
+
+;; _snapshot
+
+;; _processnextarg
+
+;; _main
+;;         ...
+;;         jsr _init / _bnfinterpstart
+
+;;         jsr _clrscr
+;;         jsr _processnextarg
+
+;; _Cend
+
+;; _biosstart
+;; _asmstart
+
+
+;; putchar:        $12F6 (mine)
+
+
+
+
+
+
+;; callmain:       
+;;   pushax
+;;   pushax
+;;   jmp _main
+
+
 .ifnblank
 ;;; These gives trouble...
 ;; commit 988a90bfdbdc9750ceb748b59fba51e7429e95d2
@@ -3614,8 +3663,13 @@ jsr _printchar
 @dotest:
         ;; lookahead at character
         jsr nextInp             ; skip spaces!
+
         lda (inp),y
         sta savea
+;PUTC '>'
+;jsr putchar
+;PUTC 10
+
 @loop:
         lda (rule),y
 ;PUTC '?'
@@ -4168,6 +4222,122 @@ loadruleptr:
         sta rule
         lda _rules+1,y
         sta rule+1
+
+
+;;; TODO: I'd expectedc much more savings... :-(
+
+;;; saves only 0.5% ??? 1.4% on Input/byte-sieve.c
+;;; 0.5% slower on Inputfib-list.c lol?
+;;; 0.6% faster on Inputstrlib.c
+;RULESEEK=1
+.ifdef RULESEEK
+        ;; loop using (y=lo rule, tos+1=hi rule)
+
+        sta tos+1
+        ldx #0
+        stx tos
+
+        ;; have char
+        ;; jsr _inpspc?
+        lda (inp,x)
+        sta savea
+.ifnblank
+PUTC 10
+lda rulename
+jsr _printchar
+
+   jsr nl
+   putc '-'
+   ldy #0
+:       
+   lda (inp),y
+   jsr _printchar
+   iny
+   cpy #10
+   bne :-
+   jsr nl
+.endif
+
+        ldy rule
+
+@checkalt:
+        ;; rule[0] == char?
+        lda (tos),y
+        beq @fail
+.ifnblank
+PUTC '.'
+sty savey
+jsr _printchar
+ldy savey
+.endif
+        cmp #'%'
+        ;; TODO: @ok?
+        beq @ok
+
+        ;cmp #'[' ; we dont' care?
+        cmp savea
+        beq @ok
+
+        ;; not, seek next "|"
+@seekalt:
+        iny
+        bne :+
+        inc tos+1
+:       
+        lda (tos),y
+        beq @fail
+;;; This distribes flow?
+.ifnblank
+pha
+jsr _printchar
+pla
+.endif
+        cmp #'|'
+        bne @seekalt
+;putc 10
+        iny
+        bne :+
+        inc tos+1
+:       
+        ;; always
+        jmp @checkalt
+
+@ok:
+;PUTC '!'
+        ;; move forward
+        sty rule
+        lda tos+1
+        sta rule+1
+
+.ifnblank
+   jsr nl
+   putc '='
+lda tos
+ldx tos+1
+jsr _printh
+   lda rulename
+   jsr _printchar
+   putc '='
+;   ldy #0
+   ldx #10
+:       
+;   lda (rule),y
+   lda (tos),y
+   jsr _printchar
+   iny
+;   cpy #10
+;   bne :-
+   dex
+   bne :-
+   jsr nl
+.endif
+        
+@fail:
+        ;; ? maybe got it wrong, do it normal way
+        
+
+.endif ; RULESEEK
+
 
 
 .ifdef DEBUGRULE
