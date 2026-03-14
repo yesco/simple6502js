@@ -119,6 +119,66 @@ FUNC _iorulesstart
         LIBCALL _printu
       .byte ']'
 
+
+.ifdef OPTRULES
+.ifdef INLINEPUTZOPT
+        .byte "|putz(",34
+      .byte '['
+;;; TODO: ?
+        jsr _iprintz
+      .byte ']'
+        .byte "%S)"
+
+        .byte "|puts(",34
+      .byte '['
+;;; TODO: ?
+        jsr _iprints
+      .byte ']'
+        .byte "%S)"
+.endif ; INLINEPUTZOPT
+.endif ; OPTRULES
+
+
+        .byte "|putz(",_E,")"
+      .byte '['
+        jsr _printz
+      .byte ']'
+
+        .byte "|puts(",_E,")"
+      .byte '['
+;PRINTIT=1
+.ifdef PRINTIT
+;;; 20 B inline only...
+        sta tos
+        stx tos+1
+        ldy #0
+:       
+        lda (tos),y
+        beq :+
+        jsr putchar
+        iny
+        bne :-
+        inc tos+1
+        bne :-
+:       
+
+.else
+
+.ifnblank
+sta tos
+stx tos+1
+PUTC '/'
+jsr _printh
+lda tos
+ldx tos+1
+.endif
+
+        jsr _prints
+.endif ; PRINTIT
+      .byte ']'
+
+
+
         ;; miniprintf!
 
         .byte "|putfu(",_E,",%D,[#]%D,",34
@@ -184,24 +244,6 @@ FUNC _iorulesstart
         jsr _printz
       .byte ']'
 
-.ifdef OPTRULES
-.ifdef INLINEPUTZOPT
-        .byte "|putz(",34
-      .byte '['
-;;; TODO: ?
-        jsr _iprintz
-      .byte ']'
-        .byte "%S)"
-
-        .byte "|puts(",34
-      .byte '['
-;;; TODO: ?
-        jsr _iprints
-      .byte ']'
-        .byte "%S)"
-.endif ; INLINEPUTZOPT
-.endif ; OPTRULES
-
 
 .ifdef SIGNED
         .byte "|printf(",34,"\%d",34,",",_E,")"
@@ -219,44 +261,6 @@ FUNC _iorulesstart
         .byte "|puth(",_E,")"
       .byte '['
         jsr _printh
-      .byte ']'
-
-        .byte "|putz(",_E,")"
-      .byte '['
-        jsr _printz
-      .byte ']'
-
-        .byte "|puts(",_E,")"
-      .byte '['
-;PRINTIT=1
-.ifdef PRINTIT
-;;; 20 B inline only...
-        sta tos
-        stx tos+1
-        ldy #0
-:       
-        lda (tos),y
-        beq :+
-        jsr putchar
-        iny
-        bne :-
-        inc tos+1
-        bne :-
-:       
-
-.else
-
-.ifnblank
-sta tos
-stx tos+1
-PUTC '/'
-jsr _printh
-lda tos
-ldx tos+1
-.endif
-
-        jsr _prints
-.endif ; PRINTIT
       .byte ']'
 
         .byte "|putcraw(",_E,")"
@@ -506,6 +510,8 @@ FUNC _iorulesend
 
 
 
+
+;;; 1s compile extra time for Tests/cmp-eq.c !
 
 .ifdef CTYPE
         ;; skip of if doesn't' start w 'i'

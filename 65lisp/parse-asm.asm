@@ -4229,8 +4229,18 @@ loadruleptr:
 ;;; saves only 0.5% ??? 1.4% on Input/byte-sieve.c
 ;;; 0.5% slower on Inputfib-list.c lol?
 ;;; 0.6% faster on Inputstrlib.c
+;;; slower for more vars... :-(
 ;RULESEEK=1
+
+
+
+;;;TODO:    put in _fail too!
+
+
+
 .ifdef RULESEEK
+.export ruleseek
+ruleseek:       
         ;; loop using (y=lo rule, tos+1=hi rule)
 
         sta tos+1
@@ -4263,7 +4273,8 @@ jsr _printchar
 @checkalt:
         ;; rule[0] == char?
         lda (tos),y
-        beq @fail
+        beq ruleseekOK
+        bmi ruleseekOK
 .ifnblank
 PUTC '.'
 sty savey
@@ -4272,20 +4283,25 @@ ldy savey
 .endif
         cmp #'%'
         ;; TODO: @ok?
-        beq @ok
+        beq ruleseekOK
 
         ;cmp #'[' ; we dont' care?
         cmp savea
-        beq @ok
+        beq ruleseekOK
 
-        ;; not, seek next "|"
+        ;; FAIL not, seek next "|"
 @seekalt:
         iny
         bne :+
         inc tos+1
 :       
         lda (tos),y
-        beq @fail
+;        bne :+
+;putc '%'
+;jmp ruleseekFAIL
+;:       
+        beq ruleseekFAIL
+;        beq ruleseekOK
 ;;; This distribes flow?
 .ifnblank
 pha
@@ -4302,7 +4318,8 @@ pla
         ;; always
         jmp @checkalt
 
-@ok:
+.export ruleseekOK
+ruleseekOK:     
 ;PUTC '!'
         ;; move forward
         sty rule
@@ -4332,11 +4349,16 @@ jsr _printh
    jsr nl
 .endif
         
-@fail:
+.export ruleseekFAIL
+ruleseekFAIL:   
+
         ;; ? maybe got it wrong, do it normal way
         
 
 .endif ; RULESEEK
+
+
+
 
 
 
@@ -5411,10 +5433,6 @@ FUNC _ischar
 
 
 
-;;; TODO: this breaks BYTESIEVE.... eats one char too many sometimes?
-
-.ifblank
-
 ;;; ChatGPT: 198 B several loops one per base (incl 'x')
 ;;;          145 B one loop unified, fixed C flag bug
 ;;; JSK: written before compare ShitGPT
@@ -5572,75 +5590,6 @@ FUNC _digits
         jmp _next
 
 
-.else
-
-;FUNC _olddigits
-FUNC _digits
-;DEBC '#'
-;;; 55 B + 18 B char
-;;; (+ 19 22 23) = 64
-        ;; 19 B
-        ;; valid initial digit or fail?
-        ;; Y=0
-        lda (inp),y
-
-        ;; 'c' : is char?
-        cmp #'''
-        beq _ischar
-        ;; TODO: C=1 from cmp if digit
-        ;; 0-9 : is digit?
-        sec
-        sbc #'0'
-        cmp #10
-        bcs failjmp2
-
-        ;; start with 0
-        lda #0
-        sta tos
-        sta tos+1
-
-nextdigit:
-        ;; 22 B
-        ;; Y=0
-        lda (inp),y
-
-        ;; change '0'-> 0
-        sec
-        sbc #'0'
-        cmp #10
-        bcc digit
-        ;; Done
-        ;; > 9 : end == OK
-
-        ;; test that it's allowed range D=word d=byte
-        lda percentchar
-        cmp #'D'
-        beq @OK
-        ;; we have 'd' lets see < 256
-        lda tos+1
-        bne failjmp2
-@OK:       
-        jmp _next
-
-digit:  
-        ;; 23 B
-        sta savea
-        ldy #10
-        jsr _mulTOSyAX          ; AX = tos * 10
-        ;; add digit from A to tos
-        clc
-        adc savea
-        sta tos
-        bcc :+
-        inx
-:       
-        stx tos+1
-
-        jsr _incI
-        ldy #0
-        jmp nextdigit
-.endif ; FUNC olddigit
-
 failjmp2:        
         jmp _fail
 
@@ -5655,8 +5604,6 @@ failjmp2:
 ;;; Same goes for #define or whatever (for now)
 ;;; TODO: maybe do simple macros, at least to treat
 ;;;       like constant INT/STRINGS
-
-
 
 
 
