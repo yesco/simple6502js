@@ -1,0 +1,20 @@
+Generally, I don't lik TODO-lists, but some things needs to be addressed at some point.
+
+The code is littered with // TODO: fix this...
+
+They are more like "COULD DOs"
+
+In any case - here is a list fo things that aren't ok:
+
+Critical:
+- Input/test-ctype.c hangs during compilation!
+
+Tests:
+  - Tests/memset.c
+  - Tests/memcpy.c
+  - Tests/arith-shifts.c
+
+Compilation:
+  - no main: gives error but difficult to guess why!
+
+

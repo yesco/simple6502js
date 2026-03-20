@@ -1,118 +1,9 @@
-;; This is for debugging... lol
-
-;; __MAIN_START__=0x200
-;; startup:        
-;;  jsr zerobss
-;;  jsr initlib
-;;  jsr callmain
-
-;; _exit:  
- 
-
-;; initlib:        
-
-;; initmainargs:   
-
-
-
-;; _iasmstart:     
-
-;; _inputfile:     
-
-;; _snapshot
-
-;; _processnextarg
-
-;; _main
-;;         ...
-;;         jsr _init / _bnfinterpstart
-
-;;         jsr _clrscr
-;;         jsr _processnextarg
-
-;; _Cend
-
-;; _biosstart
-;; _asmstart
-
-
-;; putchar:        $12F6 (mine)
-
-
-
-
-
-
-;; callmain:       
-;;   pushax
-;;   pushax
-;;   jmp _main
-
-
-.ifnblank
-;;; These gives trouble...
-;; commit 988a90bfdbdc9750ceb748b59fba51e7429e95d2
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 22:30:27 2026 +0700
-
-;;     printvariables: update comment about code sizes
-
-;; commit 11e4eb7cdfdac95703d8749331fcdcd273247c57
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 21:30:26 2026 +0700
-
-;;     printvariables: delimit functions
-
-;; commit c52ae3cc5a3c40c039e2fa013d05a75a05600db4
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 21:24:39 2026 +0700
-
-;;     parse:
-;;     - printvariables() in C, make a better one, lol
-;;     - -q disasm
-;;     - -pv print vars
-;;     - -pe print env
-;;     - -pV printvariables()
-
-;; commit 7f98b785192fe21c7b09b783c5121421d540d86f
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 17:43:25 2026 +0700
-
-;;     parse:
-;;     - got rid of warnings
-;;     - command line parameters
-;;     - c compile
-;;     - f file input
-;;     - r run (1)
-;;     - r10 run 10 times
-;;     - when exiting the (byte) exitcode of the last program is returned
-
-;; commit 2e1b9e9ce9612f20f2632cfdfc45ac79824ed815
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 14:44:44 2026 +0700
-
-;;     cycles: need new cc65 and sim65
-
-;; commit d329549cfcdaf2bf33d551adc302226b5c35d6c1
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Mon Feb 2 14:39:59 2026 +0700
-
-;;     cycles,fopen: Play with io on sim65 and getting cycles
-
-;; ;;; This one ok!
-;; commit 704fae71e47a4ea6fe5bc3b52bb503ede56e3989
-;; Author: Jonas S Karlsson <jsk@yesco.org>
-;; Date:   Sun Feb 1 23:19:46 2026 +0700
-
-;;     IDE:
-;;     -
-;;     atmos-constants.asm:
-;;     - updated from cc65
-
-
-.endif
-
+;;; ---------------- MeteoriC -----------------
 ;;; (C) 2025 jsk@yesco.org (Jonas S Karlsson)
+;;; 
+;;; MeteoriC: A native on-device 6502, minimalist
+;;; C-compiler & IDE using Code Generating BNF-Rules
+;;; 
 ;;; 
 ;;; ALL RIGHTS RESERVED
 ;;; - Generated code in tap-files are free,
@@ -121,15 +12,9 @@
 ;;; 
 
 
-;;; TITLE
-;;; 
-;;; MeteoriC: A native on-device 6502, minimalist
-;;; C-compiler & IDE using Code Generating BNF-Rules
-;;; 
-;;; 
-;;; It interprets a BNF-description of a programming
-;;; language while reading and matching it with a
-;;; source text of that langauge. The BNF contains
+;;; MeteoriC interprets a BNF-description of a
+;;; programminglanguage while reading and matching it
+;;; with a source text of that langauge. The BNF contains
 ;;; generative "templated" rules of code generation,
 ;;; with minimal instrumentation generates runnable
 ;;; machine code.
@@ -1390,6 +1275,52 @@
 ;;; _charset:
 ;;; _textscreen:
 ;;; _hitext:
+
+
+
+
+;; This is for debugging... lol
+
+;; __MAIN_START__=0x200
+;; startup:        
+;;  jsr zerobss
+;;  jsr initlib
+;;  jsr callmain
+
+;; _exit:  
+ 
+
+;; initlib:
+;; initmainargs:   
+;; _iasmstart:     
+;; _inputfile:     
+;; _snapshot
+;; _processnextarg
+;; _main
+;;         ...
+;;         jsr _init / _bnfinterpstart
+
+;;         jsr _clrscr
+;;         jsr _processnextarg
+
+;; _Cend
+;; _biosstart
+;; _asmstart
+
+;; putchar:        $12F6 (mine)
+
+
+
+
+;; callmain:       
+;;   pushax
+;;   pushax
+;;   jmp _main
+
+
+
+
+
 
 
 
@@ -11373,6 +11304,7 @@ command:
 
         ;; TODO: don't depend on cc65
         .import _exit
+        CURSOR_ON
         jsr nl
         jmp _exit
 :       
