@@ -94,7 +94,7 @@ pass: TRUE	do...while(a<b)	=> 1	a=$0029 b=$002A
 
 => 0
 
-46695008 cycles
+47345486 cycles
 
 
 
@@ -211,7 +211,7 @@ pass: TRUE	do...while(a<b)	=> 1	a=$0029 b=$002A
 
 => 65532
 
-44473179 cycles
+45098563 cycles
 
 
 
@@ -244,7 +244,7 @@ OK 10 Bytes (libs +1096 bios +98)
 
 => 0
 
-130868 cycles
+130875 cycles
 
 
 
@@ -277,7 +277,7 @@ OK 15 Bytes (libs +1096 bios +98)
 
 => 17
 
-199716 cycles
+199894 cycles
 
 
 
@@ -310,7 +310,7 @@ OK 15 Bytes (libs +1096 bios +98)
 
 => 4711
 
-203369 cycles
+203546 cycles
 
 
 
@@ -343,7 +343,7 @@ OK 11 Bytes (libs +1096 bios +98)
 
 => 361
 
-146055 cycles
+146043 cycles
 
 
 
@@ -377,7 +377,7 @@ OK 79 Bytes (libs +1096 bios +98)
 
 => 17
 
-867021 cycles
+873812 cycles
 
 
 
@@ -410,7 +410,7 @@ OK 10 Bytes (libs +1096 bios +98)
 
 => 0
 
-240157 cycles
+240320 cycles
 
 
 
