@@ -1,0 +1,6 @@
+if [ $# -eq 0 ]; then
+   # set args to all files
+    set -- * 
+fi
+
+stat --printf="%.16y %5s %n\n" "$@"

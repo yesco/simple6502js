@@ -1055,6 +1055,23 @@
 ;;;      - lookaread FAIL if next ISs one of [abc]
 ;;; 
 ;;; - IMMEDIATE addr (ends with _fail or _next)
+;;;   
+;;;     IMMEDIATE checkisdelimited
+;;;     IMMEDIATE checkisarray
+;;; 
+;;;     IMMEDIATE negativeLOVAL
+;;;     IMMEDIATE disallowlocal
+;;; 
+;;;     IMMEDIATE _newvar_w
+;;;     IMMEDIATE _newarr_c
+;;;     IMMEDIATE _newarr_c_unknown
+;;; 
+;;;     IMMEDIATE _newfun
+;;;     IMMEDIATE _calcsubY
+;;;     IMMEDIATE _hideargs
+;;;     IMMEDIATE _initparam
+;;;     IMMEDIATE _newparam_w
+;;; 
 ;;; 
 ;;; 
 ;;; 
@@ -1106,6 +1123,15 @@
 ;;;              jmp _fail
 ;;; 
 ;;;   JSRIMMEDIATE addr
+;;; 
+;;;        JSRIMMEDIATE load_sizeof
+;;;        JSRIMMEDIATE getpc
+;;;        JSRIMMEDIATE addDOStoTOS
+;;;        JSRIMMEDIATE _stuffarray_c
+;;;        JSRIMMEDIATE _newarr_updatesize
+;;; 
+;;;        JSRIMMEDIATE _iasmstart
+;;;        JSRIMMEDIATE _asmprintsrc
 ;;; 
 ;;; - "% " == "%" jsr dostuff == .byte "% <>" (jsr=' ')
 ;;;        This calls immmediate code, typically
@@ -3617,15 +3643,32 @@ jsr _printchar
         ;; Identifier?
         ;; (this goes to subrule and will do it's own _incR)
 
-;;; TODO: %A - REMOVE!
-
-        cmp #'A'                ; %A used often for Assign
-        beq @vars
-
         cmp #'V'                ; %V used for the variable (value)
         bne :+
 
-@vars:
+.export percentVars
+percentVars:    
+
+.ifnblank
+.scope
+jsr nl
+lda rulename
+jsr _printchar
+jsr tab
+ldy #0
+@next:       
+lda (rule),y
+jsr _printchar
+iny
+cpy #10
+bne @next
+jsr nl
+
+ldy #0
+ldx #0
+.endscope
+.endif
+
         ;; HACK! - remove once we figure out the flow...
         ;; (maybe remove %A or it's usage of DOS? use stack)
 ;;; TODO: look at this????
@@ -3634,12 +3677,15 @@ jsr _printchar
         sta whatvarpercentchar
 
         ;; - make sure start with ident
+        ;; TODO: use isident?
         lda (inp),y
         cmp #'_'
         beq @ok
         jsr isalpha
         beq failjmp             ; 0 if !a-zA-Z
 @ok:
+.export percentVarsMatch
+percentVarsMatch:       
         ;; - use rule
         lda #VARRULENAME
         jmp enterrulebyname
@@ -5145,18 +5191,18 @@ FUNC _generate
         lda (rule),y
         sec
         sbc #3
-        sta tos
+        sta gos
         ;; - hi
         iny
         lda (rule),y
         sbc #0
-        sta tos+1
+        sta gos+1
         dey
         dey
 
         ;; get size
         ;; (used by DYNLIBRARY below)
-        lda (tos),y
+        lda (gos),y
         pha
 
         ;; TODO: mark the function to be 
@@ -5222,30 +5268,7 @@ pla
 
         jmp _generate
 
-;;; TODO: hmmm
-;;; 21...?
 
-
-;;; TODO: this code not used?
-
-
-        sta (_out),y
-        jsr _incO
-
-        ;; Y stil 0
-        ;; lo: read next
-        jsr _incR
-        lda (rule),y
-
-        ;; hi: read next (inc in genoutAX)
-        pha
-
-        jsr _incR            
-        lda (rule),y
-        tax
-
-        pla
-        jmp genoutAX
 
 ;;; TODO: bad name more like
 @skipjsr:
@@ -6424,10 +6447,20 @@ checkisarray:
         ldx tos+1
         bne :+
         ;; not array (a-z)
+failjmp3:        
         jmp _fail
 :       
+nextjmp3:        
         jmp _next
         
+
+;; used by BFILL        
+tosISBYTE:      
+        ldx tos+1
+        beq nextjmp3
+        bne failjmp3
+
+
 
 ;;; a "here" word! lol
 getpc:  
@@ -6473,7 +6506,6 @@ load_sizeof:
         sta tos+1
         rts
 
-
 ;;; will give ERROR! if tos address is local
 disallowlocal:
 .ifdef ZPVARS
@@ -6490,9 +6522,9 @@ localerror:
         lda #'L'
         jmp error
         
-        
 notstackedparameter:
 isarray:
+jmpnext:        
         jmp _next
 
 .endscope
@@ -6656,9 +6688,9 @@ ruleH: ;;printf parsing
 ;ruleX: = cc65 parameter list (jsr pushax), last in AX
 ;ruleY: = ORIC parameters init (page 2)
 ;ruleZ: = ORIC list of parameters (page 2)
-ruleLeftBracket:
+ruleLeftBracket:                ; used by VARS
 ruleBackSlash:  
-ruleRightBracket:       
+ruleRightBracket:
 ruleCeiling:    
 ruleUnderScore:
         .byte 0
@@ -8056,7 +8088,7 @@ ruleS:
 
         ;; return from void function, no checks
         .byte "|return;"
-        IMMEDIATE checkisdelimited
+        IMMEDIATE checkisdelimited ; TODO: why???
       .byte '['
         rts
       .byte ']'
@@ -9673,13 +9705,9 @@ FUNC _oricend
 
 
 .ifdef OPTRULES
-;        .byte "|bzero(%V[#],%d)"
-;        .byte "%R"
-;        .word genpagememset
 
         ;; Feature (BUG): 0=>256 bytes set!
-        .byte "|memset(%D[#],%d[#],%d);"
-genpagememset:      
+        .byte "|memset(%V[#],%d[#],%d);"
       .byte "["
         ;; 10 B !
         ldy #'<'
@@ -9692,36 +9720,101 @@ genpagememset:
         bne :-
       .byte "]"
 
-
-.ifdef CANT_UNGEN_EXPRESSION
-        ;; (once _E is parsed and code generated
-        ;;           can't backtrack!           )
-        ;; typical usage? (varying address, fixed fill & len)
- 	.byte "|memset(",_E,",%D[d],%D[#]);"
+        ;; NOTE: if array size 0, clears 256 bytes...
+        .byte "|BFILL(%V[#]"
+        JSRIMMEDIATE load_sizeof
+        IMMEDIATE tosISBYTE
       .byte "["
-        ;; 22 B
-        sta tos
-        stx tos+1
-        ;; fill value
-        .byte "D"
-        lda #'<'
-        ;; YX= count
+        ;; 10 B !
+        ldy #LOVAL
+      .byte "]"
+        .byte ",%d);"
+      .byte "["
+        lda #LOVAL
         .byte ";"
-        ldx #'>'
-        ldy #'<'
-        bne :++
+:       
+        dey
+        sta VAL0,y
+        bne :-
+      .byte "]"
+
+        ;; NOTE: if array size 0, clears 256 bytes...
+        .byte "|BZERO(%V[#]);"
+        JSRIMMEDIATE load_sizeof
+        IMMEDIATE tosISBYTE
+      .byte "["
+        ;; 10 B !
+        ldy #LOVAL
+        lda #0
+        .byte ";"
+:       
+        dey
+        sta VAL0,y
+        bne :-
+      .byte "]"
+
+
+        ;; LIMIT: can only set max 32 KB
+        .byte "|BZERO(%V);"
+        ;; 25 B (memset: 4+30, jsr: 23(+sub))
+      .byte "["
+        lda #LOVAL
+        sta tos
+        ldx #HIVAL
+        stx tos+1
+      .byte "]"
+        JSRIMMEDIATE load_sizeof
+      .byte "["
+        lda #0
+        ldx #HIVAL
+        ldy #LOVAL
+        beq :++
 :       
         dey
         sta (tos),y
         bne :-
+
         inc tos+1
-        dex
-        bpl :-
 :       
-        .byte "]"
-.endif ; CANT_UNGEN_EXPRESSION
-        
+        dex
+        bpl :--                 ; bpl limits to 32K!
+      .byte "]"
+
+
+        ;; LIMIT: can only set max 32KB
+        .byte "|BFILL(%V"
+        ;; 26 B (memset: 4+30, jsr: 23(+sub))
+      .byte "["
+        lda #LOVAL
+        sta tos
+        ldx #HIVAL
+        stx tos+1
+      .byte "]"
+        JSRIMMEDIATE load_sizeof
+      .byte "["
+        ldx #HIVAL
+        ldy #LOVAL
+      .byte "]"
+        .byte ",%d);"
+      .byte "["
+        lda #LOVAL
+        cpy #0
+        beq :++
+:       
+        dey
+        sta (tos),y
+        bne :-
+
+        inc tos+1
+:       
+        dex
+        bpl :--                 ; bpl limits to 32K!
+      .byte "]"
+
+
 .endif ; OPTRULES
+
+
 
         ;; TODO: bzero(%V,sizeof(%W));
         ;; where %W == same as last var!!!
@@ -9747,6 +9840,7 @@ genpagememset:
       .byte "]"
         .byte _E,");"
       .byte "["
+        ;; AX is count, stuff A in savey, keep X
         sta savey
         ;; get value to set
         pla
@@ -9761,14 +9855,15 @@ genpagememset:
         ;; YX is count
         ldy savey
         beq :++
-:       
+:
         dey
         sta (tos),y
         bne :-
+
         inc tos+1
+:       
         dex
         bpl :-                  ; bpl limits to 32K!
-:       
       .byte "]"
 
 
@@ -14919,10 +15014,28 @@ CANT=1
 ;;;         301    2.6484 - (.sim/10 20250120)
 ;;;         284    2.6806 - (/ 6835663562 255) do-while-opts
 ;;;         282    2.68   - (extra garbage???)
+
+
+;;; 2026-03-21: having added arra[] and fixed memset...
+;;; 
+;;; --- using ARRAY = Input/byte-sieve-arr-mc.c
+;;;                       ( MC no set: 206 B )
+;;; 1194    258    2.266  - MC do while +52 B
+;;; 1194    247    1.76   - MC memset   +41 B
+;;; 1194    234    1.758  - MC BFILL    +28 B
+;;;                       ( MC BZERO    +26 B )
+;;; 2605    253    1.684  - CC65
+;;; 1472    209    1.250  - oscar64 memset
+;;; 1443    208    1.250  - oscar64 do while... 
+
 ;
 BYTESIEVE=1
 ;
 NOPRINT=1
+
+;;; 2026-03-31 Compilation 4.9ss!!! :-(
+;;;   because of long names and repeated %V searching
+;;;         286 B  2.682s (normalized to 1x)
 
 ;;; 2026-01-31 Compilation 2.000s!
 ;;;   32 "lines", 40 ops, 15 dots, 63 commas

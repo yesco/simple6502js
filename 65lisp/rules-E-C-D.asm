@@ -914,7 +914,6 @@ FUNC _memoryrulesstart
 FUNC _memoryrulesend
 
 
-
 FUNC _funcallstart
 
 ;.include "lib-runtime-funcall.asm"

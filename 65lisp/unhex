@@ -1,0 +1,4 @@
+# replace every "hex" number with a decimal!
+# prefixes with one more space to "keep" formatting
+
+perl -pe 's/\b([0-9a-fA-F]+)\b/sprintf("%*d",length($1)+1,hex($1))/ge'

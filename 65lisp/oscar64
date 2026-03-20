@@ -6,4 +6,15 @@
 # -- best!!!
 OPT="-Oz -Os" # 1684 Bytes  12,896,201 same -Os, smaller)
 
-../../oscar64/bin/oscar64 $OPT -DNOFLOAT -DNOLONG -ep -gp $1.c ; ls -l $1.[ap]* ; wc $1.asm
+../../oscar64/bin/oscar64 $OPT -DNOFLOAT -DNOLONG -ep -gp $1.c
+echo
+echo
+wc $1.asm
+echo
+./ll $1.[ap]*
+echo
+grep ") : main" $1.map | ./unhex
+echo
+grep ") : " $1.map | ./unhex
+
+
