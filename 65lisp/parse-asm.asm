@@ -11303,6 +11303,7 @@ command:
         bne :+
 
         ;; TODO: don't depend on cc65
+Quit:
         .import _exit
         CURSOR_ON
         jsr nl
@@ -11709,12 +11710,20 @@ FUNC _eoscolors
 .ifdef __ATMOS__
         sta PAPER
         stx INK
+        ;; bottom of oric screen
         GOTOXY 2,27
 .else
         ;; LOL, ./oric-terminal changes to ANSI
         jsr putchar
         txa
         jsr putchar
+
+        ;; bottom of ansi screen
+	;; GOTOXY 2,1000
+        ldx #2
+        ldy #255
+        jsr gotoxy
+
 .endif ; __ATMOS__        
 
         jsr nl
@@ -12237,12 +12246,16 @@ FUNC _extend
         jsr _printz
       
         jsr _eosnormal
+        PRINTZ {10,"eXtended>"}
+        ;; TODO: make a special jsr waitchar?
+        CURSOR_ON
         jsr getchar
+        CURSOR_OFF
+jsr _printchar
         ;; everything becomes CTRL-A .. CTRL-Z !
         ;; (a-z, A-Z)
         and #31
 
-.ifdef __ATMOS__
         ;; === key dispatch ===
         ;; (see Play/key-dispatch.asm for alternative)
 
@@ -12266,12 +12279,22 @@ FUNC _extend
         bne :+
         jmp _writefileas
 :       
-.endif ; __ATMOS__
-
-        ;; CTRL-C : compile "input" (unmodified)
+        ;; ^X^D - directory
+        cmp #CTRL('D')
+        bne :+
+        jsr clrscr
+        PRINTZ {27,"]oric:unix:ls *.[ch]",7}
+    ;; TODO: not correctg if from inside editor!
+        jmp command
+:       
+        ;; ^X^C - exit
         cmp #CTRL('C')
         bne :+
-
+        jmp Quit
+:       
+        ;; CTRL-C : compile "input" (unmodified)
+        cmp #CTRL('I')
+        bne :+
         PRINTZ {"Compile Input",10}
         jmp _compileInput
 :       
@@ -12292,11 +12315,11 @@ FUNC _extend
 FUNC _extendinfo
 .byte 10
 .byte "b - ^Buffers: show examples",10
-.byte "f - ^Files open from tape/disk",10
+.byte "d - ^Directory files listing",10
+.byte "f - ^File open from tape/disk",10
 .byte "s - ^Save current file",10
 .byte "w - ^Write/save new file as (new name)",10
-;.byte "^Crash/exit",10
-;.byte "^Zleep",10
+.byte "c - ^Close",10
 
 .byte 0
 

@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
 
@@ -45,6 +46,42 @@ void gotorc(int r, int c) {
   printf("\x1b[%d;%dH", r+1, c+1);
 }
 
+void esc() {
+  int c= getchar();
+
+  if (c!=']') {
+    // pass-through
+    putchar('\e');
+    putchar(c);
+    return;
+  }
+
+  // handle OSC
+  char buff[80]= {0}, i= 0, *p;
+
+  while((c=getchar())!=EOF && c!='\e' && c!='\a' && i<sizeof(buff)-1)
+    buff[i++]= c;
+
+  // skip trailing \ after ESC
+  if (c=='\e') { c= getchar(); c= '\a'; } // lol
+
+  // ESC ] "oric:command;params...\a"
+  if (strncmp(buff, "oric:unix:", 10)==0) {
+    p= buff+10;
+    printf("\n\n> %s[%d]\n\n", p, c);
+    system(p);
+    return;
+  }
+  if (strncmp(buff, "oric:", 5)==0) {
+    p= buff+5;
+    printf("\nOSC.*:%s[%d]\n", buff, c);
+    return;
+  }
+
+  // pass through everything!
+  printf("\e%s%c", buff, c);
+}
+
 void fullputc(int c) {
   switch(c) {
 
@@ -52,6 +89,9 @@ void fullputc(int c) {
   case 12:
   case 12+128:
     clear(); break;
+
+  case '\e':
+    esc(); break;
 
   case ' ':
     printf(SPACE);

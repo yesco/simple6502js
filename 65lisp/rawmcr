@@ -1,5 +1,7 @@
 name=$1
 
+clang oric-terminal.c -o oric-terminal || exit
+
 # stty raw
 # stty raw onlcuc # blocks input till return
 
