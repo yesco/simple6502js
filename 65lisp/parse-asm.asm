@@ -1745,15 +1745,26 @@ compilestatus:  .res 1          ;
 
 
 ;;; TODO:
-.export _ruleVARS
+.export _ruleVARS,varcacheinp,varcachepos
 
 .zeropage
 ;;; Vector pointing to beginning of current "ENVIRONMENT"
 ;;; (address bindings encoded as matching rules)
-_ruleVARS:        .res 2
+_ruleVARS:      .res 2
+
+;;; could be in .data?
+varcacheinp:    .res 2          ; points to varaible name in inp
+varcacheskiplo: .res 1          ; lo offset after var name
+varcachepos:    .res 2          ; pointer to var data/addr
+
 .code
 
+; TODO: remove define
+;VARCACHE=1
 
+.data
+curvarinp:      .res 2
+.code
 
 
 .zeropage
@@ -2460,16 +2471,11 @@ OPTPARSEALL=1
 ;;; -2) %D also parse several times, similar patterns?
 ;;;    poke(%D,%D) poke(%D,%V) poke(%V,%D) ...
 ;;;    "tokenization" before would "solve" this...
-;;; 0) jsr _incIspc - move it to before _next
-;;;    find locations where "jsr _incIspc; ... jmp _next"!
-;;;    it's at least 12c per character used!
 ;;; 1) byte < 32 ==> skip byte (at _fail)
 ;;;    check avg,max,min size of rules
 ;;; 2) ruleS could be directly TAILREC - must save some!
 ;;; 3) byte rules?
 ;;; 4) any %D many times is costly (parse number later?)
-;;; 5) match %V many times very costly, maybe just store
-;;;    pointer and look up later when syntax fine?
 ;;; 6) group functions by first letter, and skip?
 ;;; 7) bitmap hash to check if var exists (no care?)
 
@@ -2676,7 +2682,7 @@ ERRPOS=1
 
 
 
-.export percentchar,whatvarpercentchar
+.export percentchar
 .export rule,inp,_out,erp,env,valid,rulename,pframe
 
 .zeropage
@@ -2684,9 +2690,6 @@ ERRPOS=1
 ;;; if %V or %A stores 'V' or 'A'
 ;;; 'A' for assigment
 percentchar:  .res 1
-
-;;; TODO: remove! LOL
-whatvarpercentchar:      .res 1
 
 
 ;;; not pushing all
@@ -3314,6 +3317,8 @@ pla
         ;; hibit with 'A'... - Enter new Rule
         jmp _enterrule
 @skip:        
+        ;; This isn't used at all yet?
+;;; TODO: use for skip generate?
         ;; C=0
         jsr skipperPlusC
         jmp _next
@@ -3555,13 +3560,12 @@ failjmp:
         jmp _fail
 
 
+
         ;; percent matchers
 percent:
         jsr _incR
         ldy #0
         lda (rule),y
-
-
 
         sta percentchar
 
@@ -3571,46 +3575,82 @@ lda percentchar
 jsr _printchar
 .endif ; DEBUGFUN
 
-        ;; Identifier?
+        ;; %V variable
         ;; (this goes to subrule and will do it's own _incR)
-
-        cmp #'V'                ; %V used for the variable (value)
+        cmp #'V'
         bne :+
 
 .export percentVars
 percentVars:    
 
-.ifnblank
-.scope
-jsr nl
-lda rulename
-jsr _printchar
-jsr tab
-ldy #0
-@next:       
-lda (rule),y
-jsr _printchar
-iny
-cpy #10
-bne @next
-jsr nl
+.ifdef VARCACHE
+;PRINTZ " ?"
+;jsr _printInp
 
-ldy #0
-ldx #0
-.endscope
-.endif
+        ;; - save cur var info
+        lda inp
+        sta curvarinp
+        ldx inp+1
+        stx curvarinp+1
 
-        ;; HACK! - remove once we figure out the flow...
-        ;; (maybe remove %A or it's usage of DOS? use stack)
-;;; TODO: look at this????
+        ;; ? cached (@ same inp)
+        cmp varcacheinp
+        bne @notcached
+        cpx varcacheinp+1
+        bne @notcached
 
-        ;; (needed for %S and %s too)
-        sta whatvarpercentchar
+        ;; - yes!
+
+        ;; - update inp to after var (as if had parsed)
+        ldx varcacheinp+1
+        lda varcacheinp
+        cmp varcacheskiplo
+        bcc @noinc
+        ;; - if <= then passed page boundary
+        ;; (no var > 255 char long)
+        inx
+@noinc:       
+        sta inp
+        stx inp+1
+
+        ;; yes - load saved pos
+        lda varcachepos
+        sta pos
+        ldx varcachepos+1
+        stx pos+1
+
+        ;; cached a negative?
+        ora pos+1
+;        beq failjmp
+        bne @not
+        putc '%'
+        jmp failjmp
+@not:
+
+putc '!'
+        ;; continue as if we've searched
+        ;; (tos= *pos)
+        jmp foundvar
+        
+@notcached:                
+
+        ;; - invalidate cache
+        ;; Y=0
+PUTC 'I'
+        sty varcachepos
+        sty varcachepos+1
+        lda inp
+        sta varcacheinp
+        lda inp+1
+        sta varcacheinp+1
+.endif ; VARCACHE
 
         ;; - make sure start with ident
         ;; TODO: use isident?
+        ;; Y=0
         lda (inp),y
         cmp #'_'
+        ;; _ (or) alpha
         beq @ok
         jsr isalpha
         beq failjmp             ; 0 if !a-zA-Z
@@ -3620,6 +3660,8 @@ percentVarsMatch:
         ;; - use rule
         lda #VARRULENAME
         jmp enterrulebyname
+
+
 
         ;; try next %... matces
 :       
@@ -3679,8 +3721,8 @@ percentVarsMatch:
 @eqtest:
         ;; update flags if come from bvs
         tya
-        beq failjmp
         bne nextjmp2
+        jmp _fail
 :       
         ;; %b - word boundary test
         cmp #'b'
@@ -3692,7 +3734,7 @@ percentVarsMatch:
         jsr isident
         tax
         beq nextjmp2
-        bne failjmp
+        jmp _fail
 
 :       
         ;; "%$<ruleaddr>" JMP "rule" used
@@ -3825,7 +3867,7 @@ dojmp:
         jmp (tmp1)
 :       
 ;;; 26 B
-;;; TODO: remove - UNSAFE (to 
+;;; TODO: remove - UNSAFE: only used for prototyping
         ;; %{ - immediate code! to run NOW!
         cmp #'{'
         bne noimm
@@ -3870,6 +3912,8 @@ immfail:
 ;        jsr immfail
 .endmacro
 
+
+
 ;;; still % percent handling
 noimm:
 
@@ -3878,7 +3922,7 @@ noimm:
 
         and #$7f
 
-        ;; ? Skipper: A<' '
+        ;; 1-31 = Skipper 1-31
         ;; (TODO: potentially if hibit set could allow
         ;;  ..127 bytes skipped/copied, could conflict
         ;;  with hibit-'Rules if we want to make them
@@ -3893,13 +3937,31 @@ noimm:
         ldx rule+1
         stx pos+1
 
+.ifdef VARCACHE
+PUTC 'U'
+        ;; update varcache
+        sty varcachepos
+        stx varcachepos+1
+
+        ldy curvarinp
+        sty varcacheinp
+
+        ldy curvarinp+1
+        sty varcacheinp+1
+
+        ldy inp
+        sty varcacheskiplo
+.endif ; VARCACHE
+
 ;;; TODO: why is it skipping?
 ;;;   maybe just get address?
 
         ;; -- Skip n bytes
-        ;; C= 0
+        ;; C=0
+        ;; A is untouched and <' '
         jsr skipperPlusC
 
+foundvar:
         ;; -- %* - dereference tos= *pos;
         ldy #1
         lda (pos),y
@@ -3908,22 +3970,6 @@ noimm:
         dey
         lda (pos),y
         sta tos
-
-;;; TODO: jmp _next ???
-
-;;; TODO: old percent char not here!!!! 
-        ;; -- %A tos=dos lol
-        ;; (compat with old %A)
-        lda whatvarpercentchar
-        cmp #'A'
-        bne @notA
-        
-        lda tos
-        sta dos
-        lda tos+1
-        sta dos+1
-@notA:
-
 
 .ifdef DEBUGNAME
     php
@@ -3934,10 +3980,8 @@ noimm:
     plp
 .endif ; DEBUGNAME
 
-        ;; -- Skip n bytes
-        ;; C= 0
-;        jsr skipperPlusC
         jmp _next
+
 
 :       
         ;; Digits? (constants really)
@@ -4060,6 +4104,7 @@ str:
 
 ;;; skipper: skip N=(A & 127) bytes of rule
 skipperPlusC:
+;;; 11 B
         and #127
         adc rule
         sta rule
@@ -12641,10 +12686,30 @@ FUNC printaddress
 .endif
 
 
-FUNC _printinp
-        lda inp 
-        ldx inp+1
-        jmp _printz
+;;; print 10 chars of input
+FUNC _printInp
+        pha
+        ldy #0
+:       
+        lda (inp),y
+        jsr _printchar
+        iny
+        cpy #10
+        bne :-
+
+        PRINTZ " <~> "
+        ldy #0
+:       
+        lda (rule),y
+        jsr _printchar
+        iny
+        cpy #10
+        bne :-
+
+        jsr nl
+        ldy #0
+        pla
+        rts
 
 ;;; prints readable otherwise:
 ;;; (newline is printed)
